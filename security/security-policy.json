@@ -1,0 +1,31 @@
+{
+  "policyVersion": 1,
+  "module": "M26",
+  "dependencyAudit": {
+    "blockSeverities": ["high", "critical"]
+  },
+  "secretScan": {
+    "excludedDirectories": [
+      ".git",
+      "node_modules",
+      "dist",
+      ".security-artifacts",
+      "coverage"
+    ],
+    "maxFileBytes": 1048576
+  },
+  "sast": {
+    "blockSeverities": ["high", "critical"],
+    "sourceRoots": [
+      "backend/src",
+      "backend/scripts",
+      "frontend/src",
+      "frontend/scripts",
+      "scripts"
+    ]
+  },
+  "evidence": {
+    "directory": ".security-artifacts",
+    "fileName": "m26-security-gates.json"
+  }
+}

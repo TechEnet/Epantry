@@ -1,0 +1,28 @@
+{
+  "name": "epantry",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n frontend,backend -c auto \"npm run dev --workspace=frontend\" \"npm run dev --workspace=backend\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build": "npm run build --workspace=frontend",
+    "test": "npm run test --workspace=frontend && npm run test --workspace=backend",
+    "check": "npm run test",
+    "check:db": "npm run check:db --workspace=backend",
+    "security:self-test": "node scripts/security/security-self-test.mjs",
+    "security:gate": "node scripts/security/security-gate.mjs",
+    "seed": "npm run seed --workspace=backend",
+    "start": "npm run start --workspace=backend",
+    "security:dast": "node scripts/security/staging-dast.mjs",
+    "security:deploy-guard": "node scripts/security/deployment-guard.mjs",
+    "security:restore-drill": "node scripts/security/backup-restore-drill.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

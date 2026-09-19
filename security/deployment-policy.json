@@ -1,0 +1,46 @@
+{
+  "policyVersion": "m26.2.0",
+  "production": {
+    "requireHttps": true,
+    "requireWafBlockingMode": true,
+    "requireEdgeRateLimiting": true,
+    "requireTrustedProxyConfiguration": true,
+    "requireRecentSecurityGateHours": 24,
+    "requireRecentDastHours": 24,
+    "requireVerifiedRestoreDays": 90
+  },
+  "staging": {
+    "requireHttps": true,
+    "dast": {
+      "maxRedirects": 3,
+      "requestTimeoutMs": 10000,
+      "requiredHeaders": [
+        "content-security-policy",
+        "x-content-type-options",
+        "referrer-policy"
+      ],
+      "forbiddenHeaders": [
+        "x-powered-by"
+      ],
+      "rateLimitProbe": {
+        "path": "/api/v1/health",
+        "requests": 12,
+        "maxConcurrency": 3
+      }
+    }
+  },
+  "secrets": {
+    "allowRawSecretValuesInArtifacts": false,
+    "productionAllowedSources": [
+      "orchestrator_injected",
+      "file_reference",
+      "external_secret_manager"
+    ]
+  },
+  "recovery": {
+    "restoreTargetMustBeIsolated": true,
+    "requireIntegrityCheck": true,
+    "requireApplicationSmoke": true,
+    "requireTenantIsolationCheck": true
+  }
+}

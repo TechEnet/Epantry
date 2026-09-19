@@ -1,0 +1,78 @@
+name: M26 Staging Security Validation
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  schedule:
+    - cron: '17 2 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  staging-dast:
+    name: Staging DAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run security:dast
+      - name: Upload DAST evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m26-staging-dast
+          path: .security-artifacts/m26-staging-dast.json
+          if-no-files-found: error
+
+  zap-baseline:
+    name: OWASP ZAP Baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: ZAP baseline against staging
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: ${{ secrets.STAGING_BASE_URL }}
+          fail_action: true
+          allow_issue_writing: false
+
+  restore-drill:
+    name: Isolated Backup Restore Drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      BACKUP_SOURCE_MONGODB_URI: ${{ secrets.BACKUP_SOURCE_MONGODB_URI }}
+      RESTORE_DRILL_MONGODB_URI: ${{ secrets.RESTORE_DRILL_MONGODB_URI }}
+      RECOVERY_DRILL_ENVIRONMENT: staging
+      RESTORE_SMOKE_COMMAND: npm run check:db
+      PORT: '5001'
+      FRONTEND_URL: https://staging.epantry.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install MongoDB Database Tools
+        uses: mongodb-actions/install-mongodb-database-tools@v1
+      - run: npm run security:restore-drill
+      - name: Upload recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m26-backup-restore
+          path: .security-artifacts/m26-backup-restore.json
+          if-no-files-found: error

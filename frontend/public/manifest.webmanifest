@@ -1,0 +1,30 @@
+{
+  "id": "/",
+  "name": "EPANTRY",
+  "short_name": "EPANTRY",
+  "description": "Food discovery, pantry, recipes and shopping intelligence for everyday use.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#166534",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["food", "shopping", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/epantry-pwa.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/epantry-pwa.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

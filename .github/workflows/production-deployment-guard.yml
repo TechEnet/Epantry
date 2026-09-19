@@ -1,0 +1,58 @@
+name: M26 Production Deployment Guard
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  security-events: read
+
+env:
+  CI: 'true'
+  DEPLOY_ENVIRONMENT: production
+
+jobs:
+  production-security-guard:
+    name: Production Security Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    env:
+      STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+      PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL }}
+      FRONTEND_URL: ${{ vars.PUBLIC_APP_URL }}
+      EDGE_SECURITY_PROVIDER: ${{ vars.EDGE_SECURITY_PROVIDER }}
+      EDGE_WAF_MODE: ${{ vars.EDGE_WAF_MODE }}
+      EDGE_RATE_LIMIT_ENABLED: ${{ vars.EDGE_RATE_LIMIT_ENABLED }}
+      TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS }}
+      SECRETS_SOURCE: ${{ vars.SECRETS_SOURCE }}
+      BACKUP_SOURCE_MONGODB_URI: ${{ secrets.BACKUP_SOURCE_MONGODB_URI }}
+      RESTORE_DRILL_MONGODB_URI: ${{ secrets.RESTORE_DRILL_MONGODB_URI }}
+      RECOVERY_DRILL_ENVIRONMENT: staging
+      RESTORE_SMOKE_COMMAND: npm run check:db
+      PORT: '5001'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: CI dependency, secret and SAST gate
+        run: npm run security:gate
+      - name: Staging DAST gate
+        run: npm run security:dast
+      - name: Install MongoDB Database Tools
+        uses: mongodb-actions/install-mongodb-database-tools@v1
+      - name: Isolated restore verification
+        run: npm run security:restore-drill
+      - name: Production deployment boundary gate
+        run: npm run security:deploy-guard
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m26-production-deployment-guard
+          path: .security-artifacts/
+          if-no-files-found: error

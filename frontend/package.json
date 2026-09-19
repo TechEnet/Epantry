@@ -1,0 +1,34 @@
+{
+  "name": "epantry-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "validate:structure": "node scripts/validate-structure.mjs",
+    "validate:m00": "node scripts/validate-m00.mjs",
+    "validate:m01": "node scripts/validate-m01.mjs",
+    "test": "npm run validate:structure && npm run validate:m00 && npm run validate:m01 && npm run build"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.4",
+    "axios": "^1.19.0",
+    "firebase": "^12.18.0",
+    "lucide-react": "^0.542.0",
+    "motion": "^12.23.12",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.1",
+    "zod": "^4.1.5",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.0.5",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.0"
+  }
+}

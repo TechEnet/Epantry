@@ -1,0 +1,90 @@
+name: M26 Security Gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m26-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-security-gates:
+    name: Dependency, secret, regression gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      CI: true
+      NODE_ENV: test
+      PORT: 5001
+      MONGODB_URI: mongodb://127.0.0.1:27017/epantry_ci
+      FRONTEND_URL: http://localhost:5173
+      VITE_API_URL: http://localhost:5001/api/v1
+      VITE_FIREBASE_API_KEY: ci-browser-placeholder
+      VITE_FIREBASE_AUTH_DOMAIN: epantry-ci.invalid
+      VITE_FIREBASE_PROJECT_ID: epantry-ci
+      VITE_FIREBASE_STORAGE_BUCKET: epantry-ci.invalid
+      VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+      VITE_FIREBASE_APP_ID: 1:000000000000:web:ci-placeholder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Security scanner self-test
+        run: npm run security:self-test
+
+      - name: Run deterministic security gates
+        run: npm run security:gate
+
+      - name: Run frozen application regression suite
+        run: npm test
+
+      - name: Upload M26 security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m26-security-gate-evidence-${{ github.run_id }}
+          path: .security-artifacts/m26-security-gates.json
+          if-no-files-found: error
+          retention-days: 30
+
+  codeql-sast:
+    name: CodeQL JavaScript SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Analyze JavaScript and TypeScript
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript

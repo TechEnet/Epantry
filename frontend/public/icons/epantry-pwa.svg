@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">EPANTRY</title>
+  <desc id="desc">EPANTRY pantry and leaf mark</desc>
+  <rect width="512" height="512" rx="112" fill="#166534"/>
+  <path d="M154 138c0-14.4 11.6-26 26-26h152c14.4 0 26 11.6 26 26v236c0 14.4-11.6 26-26 26H180c-14.4 0-26-11.6-26-26V138Z" fill="#ffffff"/>
+  <path d="M188 164h136v40H188v-40Zm0 72h136v40H188v-40Zm0 72h78v40h-78v-40Z" fill="#166534"/>
+  <path d="M310 316c35-47 88-44 88-44 0 0 3 53-44 88-27 20-55 19-71 16 5-18 13-40 27-60Z" fill="#86efac"/>
+  <path d="M286 374c19-34 46-59 83-77" fill="none" stroke="#166534" stroke-width="18" stroke-linecap="round"/>
+</svg>
