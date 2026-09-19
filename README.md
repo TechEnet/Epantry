@@ -1,53 +1,140 @@
 # EPANTRY
 
-MERN-based food intelligence and commerce platform.
+EPANTRY is a full-stack food intelligence and commerce platform designed to connect everyday food management with recipes, pantry intelligence, meal planning, grocery commerce, host operations, brands, and intelligent food experiences.
 
-## Current implementation status
+The platform supports three primary access areas:
 
-- M00 - project foundation: complete
-- M01 - landing page: complete
-- Grocery, Brands, Recipes and Search have dedicated real module routes ready for their implementation phases.
-- The old frontend prototype implementation has been removed from active project code.
+- Customer — pantry, recipes, meal planning, grocery discovery, shopping, orders, household features, and personal food experiences.
+- Host — commercial listings, marketplace operations, inventory, fulfillment, earnings, brand participation, and business tools.
+- Super Admin — platform governance, catalog control, host management, security, observability, and administrative operations.
 
-## Local setup
+## Core Platform Capabilities
 
-1. Copy `frontend/.env.example` to `frontend/.env`.
-2. Copy `backend/.env.example` to `backend/.env`.
-3. Put the real MongoDB Atlas URI in `backend/.env`.
-4. Run `npm install` from the repository root.
-5. Run `npm run dev` from the repository root.
+- Smart Pantry Management
+- Recipe Discovery & Recipe Intelligence
+- Meal Planning
+- Grocery & Product Discovery
+- Marketplace & Checkout
+- Orders & Fulfillment
+- Household Management
+- Food Intelligence
+- Universal Product / NPI workflows
+- Brand Authority
+- Host Operations
+- Analytics & Notifications
+- Hospitality Experiences
+- Learning & Community
+- Privacy & Security Operations
+- Administrative Governance
+
+## Technology
+
+### Frontend
+- React
+- Vite
+- React Router
+- Modern modular feature architecture
+
+### Backend
+- Node.js
+- Express
+- MongoDB / Mongoose
+- Modular domain-oriented API architecture
+
+### Integrations
+- Firebase
+- Cloudinary
+- Razorpay
+- Product data providers
+- AI integrations
+
+## Architecture
+
+EPANTRY follows a feature-oriented architecture with clear separation between Customer, Host, and Super Admin experiences.
+
+frontend/
+  src/
+    features/
+    components/
+    routes/
+    api/
+
+backend/
+  src/
+    modules/
+    integrations/
+    middlewares/
+    config/
+
+Each major domain is maintained as an independent module while sharing common authentication, authorization, security, and platform infrastructure.
+
+## Local Development
+
+1. Install dependencies from the repository root:
+
+   npm install
+
+2. Configure frontend environment variables:
+
+   frontend/.env
+
+3. Configure backend environment variables:
+
+   backend/.env
+
+4. Start frontend and backend together:
+
+   npm run dev
 
 ## Local URLs
 
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:5001`
-- Health: `http://localhost:5001/api/v1/health`
-- Ready: `http://localhost:5001/api/v1/ready`
-- Bootstrap: `http://localhost:5001/api/v1/meta/bootstrap`
-- Landing content: `http://localhost:5001/api/v1/landing/featured`
-- Development debug page: `http://localhost:5173/__debug`
+Frontend:
+http://localhost:5173
 
-The debug route is only registered by Vite in development mode.
+Backend:
+http://localhost:5001
 
-## Commands
+Health:
+http://localhost:5001/api/v1/health
 
-- `npm run dev` - run frontend and backend together.
-- `npm test` - run M00/M01 validation, frontend production build and backend API tests.
-- `npm run check:db` - verify the configured MongoDB connection.
-- `npm run seed` - load development seed data when `ALLOW_SEED=true` and the environment is not production.
+Ready:
+http://localhost:5001/api/v1/ready
 
-## Project organization
+## Common Commands
 
-- `frontend/src/features/landing` - completed M01 landing module.
-- `frontend/src/features/grocery` - Grocery module entry point.
-- `frontend/src/features/brands` - Brands module entry point.
-- `frontend/src/features/recipes` - Recipes module entry point.
-- `frontend/src/features/search` - Search module entry point.
-- `frontend/src/features/system` - application bootstrap and development diagnostics.
-- `backend/src/modules` - backend domain modules.
-- `backend/seed-data` - development-only catalog fixtures used by the seed command.
-- `docs` - project documentation. This directory is retained exactly as supplied.
+npm run dev
+Run the frontend and backend development servers.
 
-## Important
+npm run build
+Create the frontend production build.
 
-Do not commit real `.env` files, `node_modules`, or frontend build output.
+npm test
+Run project validation and automated tests.
+
+npm run check:db
+Verify the configured MongoDB connection.
+
+npm run security:self-test
+Validate the repository security scanner.
+
+npm run security:gate
+Run dependency, secret, and static security gates.
+
+## Security
+
+EPANTRY includes repository-level security validation for:
+
+- dependency vulnerabilities
+- accidental secret exposure
+- static security checks
+- deployment security requirements
+- staging security validation
+- recovery and restore verification
+
+Real credentials, private keys, .env files, node_modules, and generated build output must never be committed to the repository.
+
+## Project Status
+
+EPANTRY is under active development.
+
+The current codebase includes Customer, Host, and Super Admin experiences together with marketplace, food intelligence, planning, commerce, governance, privacy, reliability, and platform expansion modules.
