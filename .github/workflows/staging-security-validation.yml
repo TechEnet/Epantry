@@ -18,7 +18,7 @@ jobs:
     env:
       STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 20
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: ZAP baseline against staging
         uses: zaproxy/action-baseline@v0.12.0
         with:
@@ -60,7 +60,7 @@ jobs:
       PORT: '5001'
       FRONTEND_URL: https://staging.epantry.invalid
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
