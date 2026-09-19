@@ -135,9 +135,8 @@ function sharedStringsFromXml(xml) {
   for (const item of stringItems) {
     const parts = [];
     const pattern = /<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/gi;
-    let match;
 
-    while ((match = pattern.exec(item))) {
+    for (const match of item.matchAll(pattern)) {
       parts.push(decodeXml(match[1]));
     }
 
@@ -179,9 +178,7 @@ function workbookSheetPath(workbookXml, relationshipXml) {
 function inlineStringFromCell(cellXml) {
   const parts = [];
   const pattern = /<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/gi;
-  let match;
-
-  while ((match = pattern.exec(cellXml))) {
+  for (const match of cellXml.matchAll(pattern)) {
     parts.push(decodeXml(match[1]));
   }
 
@@ -191,14 +188,11 @@ function inlineStringFromCell(cellXml) {
 function rowsFromWorksheetXml(xml, sharedStrings) {
   const rows = [];
   const rowPattern = /<row\b[^>]*>([\s\S]*?)<\/row>/gi;
-  let rowMatch;
-
-  while ((rowMatch = rowPattern.exec(xml))) {
+  for (const rowMatch of xml.matchAll(rowPattern)) {
     const values = [];
     const cellPattern = /<c\b([^>]*)>([\s\S]*?)<\/c>|<c\b([^>]*)\/>/gi;
-    let cellMatch;
 
-    while ((cellMatch = cellPattern.exec(rowMatch[1]))) {
+    for (const cellMatch of rowMatch[1].matchAll(cellPattern)) {
       const attributes = cellMatch[1] || cellMatch[3] || "";
       const body = cellMatch[2] || "";
       const reference = attributes.match(/\br=["']([^"']+)["']/i)?.[1] || "";
