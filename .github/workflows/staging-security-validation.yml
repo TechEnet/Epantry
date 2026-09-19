@@ -27,7 +27,7 @@ jobs:
       - run: npm run security:dast
       - name: Upload DAST evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: m26-staging-dast
           path: .security-artifacts/m26-staging-dast.json
@@ -71,7 +71,7 @@ jobs:
       - run: npm run security:restore-drill
       - name: Upload recovery evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: m26-backup-restore
           path: .security-artifacts/m26-backup-restore.json

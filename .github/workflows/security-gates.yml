@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload M26 security evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: m26-security-gate-evidence-${{ github.run_id }}
           path: .security-artifacts/m26-security-gates.json
