@@ -2408,7 +2408,7 @@ export default function RecipeDetailPage() {
               ))}
             </div>
 
-            <details className="group border-b border-[#e8dcc8]" open>
+            <details className="group border-b border-[#e8dcc8]">
               <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
                 <span className="font-serif text-xl font-semibold text-[#163b2a]">
                   Cooking steps
