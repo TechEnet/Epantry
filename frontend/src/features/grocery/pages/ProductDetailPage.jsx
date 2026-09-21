@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowRight,
   BadgeCheck,
   ChevronDown,
   Factory,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import {
+  useEffect,
   useMemo,
   useState,
 } from 'react'
@@ -41,6 +43,11 @@ import {
 } from '../../marketplace/services/marketplace.service'
 
 import useProductDetail from '../hooks/useProductDetail'
+
+import {
+  getCatalogCategoryProducts,
+  getCatalogProducts,
+} from '../services/catalog.service'
 
 function formatQuantity(
   quantity,
@@ -1437,6 +1444,222 @@ function ProductDetailsSheet({
   )
 }
 
+
+
+const PRODUCT_RECOMMENDATION_LIMIT = 5
+
+const PRODUCT_BROWSE_CATEGORY_RULES = [
+  {
+    slug: 'vegetables',
+    pattern: /(tomato|okra|bhindi|bottle gourd|lauki|broccoli|bell pepper|capsicum|potato|onion|garlic|carrot|cabbage|cauliflower|spinach|cucumber|brinjal|eggplant|green beans|peas|vegetable)/i,
+  },
+  {
+    slug: 'fruits',
+    pattern: /(banana|mango|pomegranate|avocado|kiwi|apple|orange|grape|guava|papaya|pineapple|pear|peach|plum|berry|berries|watermelon|melon|fruit)/i,
+  },
+  {
+    slug: 'beverages',
+    pattern: /(energy drink|soft drink|beverage|juice|soda|sparkling water|tonic water)/i,
+  },
+  {
+    slug: 'rice-grains',
+    pattern: /(rice|basmati|jasmine rice|grain|quinoa|oats|wheat|cereal)/i,
+  },
+  {
+    slug: 'spices-condiments',
+    pattern: /(spice|masala|turmeric|chilli|pepper|sauce|condiment|paste)/i,
+  },
+  {
+    slug: 'tea-coffee',
+    pattern: /(tea|coffee|matcha)/i,
+  },
+  {
+    slug: 'oils-fats',
+    pattern: /(oil|ghee|butter|fat)/i,
+  },
+  {
+    slug: 'sweeteners-syrups',
+    pattern: /(honey|sugar|sweetener|syrup|jaggery)/i,
+  },
+]
+
+function getProductRecommendationKey(product) {
+  return String(
+    product?.productVersionId ||
+      product?.id ||
+      product?.slug ||
+      '',
+  ).trim()
+}
+
+function inferProductRecommendationCategory(product) {
+  const categorySlug = String(
+    product?.category?.slug ||
+      '',
+  ).trim()
+
+  const knownBrowseCategory =
+    PRODUCT_BROWSE_CATEGORY_RULES.find(
+      (rule) =>
+        rule.slug === categorySlug,
+    )
+
+  if (knownBrowseCategory) {
+    return categorySlug
+  }
+
+  const searchableText = [
+    product?.displayName,
+    product?.family?.name,
+    product?.variant?.name,
+    product?.category?.name,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const matchedRule =
+    PRODUCT_BROWSE_CATEGORY_RULES.find(
+      (rule) =>
+        rule.pattern.test(searchableText),
+    )
+
+  return matchedRule?.slug || categorySlug
+}
+
+function RecommendationProductCard({
+  product,
+}) {
+  const path =
+    `/grocery/product/${encodeURIComponent(
+      product?.slug || '',
+    )}`
+
+  const imageUrl =
+    product?.image?.url ||
+    ''
+
+  const quantity =
+    product?.netQuantity?.value !== undefined &&
+    product?.netQuantity?.value !== null
+      ? `${product.netQuantity.value} ${product.netQuantity.unit || ''}`.trim()
+      : ''
+
+  return (
+    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#dfe7dc] bg-white shadow-[0_10px_30px_rgba(23,60,45,0.06)] transition duration-300 hover:-translate-y-1.5 hover:border-[#9fbea8] hover:shadow-[0_22px_44px_rgba(23,60,45,0.14)] motion-reduce:transform-none motion-reduce:transition-none">
+      <Link
+        to={path}
+        className="focus-ring relative block aspect-[1.08/1] overflow-hidden bg-[linear-gradient(145deg,#f7f7f1,#eef4eb)]"
+        aria-label={`View ${product?.displayName || 'product'}`}
+      >
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={product?.image?.alt || product?.displayName || 'Product'}
+            className="h-full w-full object-contain p-5 transition duration-500 group-hover:scale-[1.04]"
+          />
+        ) : (
+          <div className="grid h-full place-items-center text-emerald-700/35">
+            <Package
+              size={42}
+              strokeWidth={1.4}
+              aria-hidden="true"
+            />
+          </div>
+        )}
+
+        <span className="absolute left-3 top-3 rounded-full border border-white/70 bg-white/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 shadow-sm backdrop-blur">
+          {product?.category?.name || 'EPANTRY pick'}
+        </span>
+      </Link>
+
+      <div className="flex flex-1 flex-col p-4">
+        {product?.brand?.name ? (
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-700">
+            {product.brand.name}
+          </p>
+        ) : null}
+
+        <h3 className="mt-1.5 line-clamp-2 min-h-[2.7em] text-[16px] font-black leading-[1.35] tracking-[-0.02em] text-[#173c2d]">
+          {product?.displayName || 'Grocery product'}
+        </h3>
+
+        <div className="mt-2 min-h-5 text-[11px] font-semibold text-stone-500">
+          {quantity || product?.pack?.name || 'Published product'}
+        </div>
+
+        <Link
+          to={path}
+          className="focus-ring mt-4 inline-flex items-center justify-between gap-3 rounded-xl bg-[#edf5e9] px-3.5 py-2.5 text-xs font-black text-[#1b5a3d] transition group-hover:bg-[#175339] group-hover:text-white"
+        >
+          View product
+          <ArrowRight
+            size={15}
+            aria-hidden="true"
+          />
+        </Link>
+      </div>
+    </article>
+  )
+}
+
+function ProductRecommendationShelf({
+  eyebrow,
+  title,
+  description,
+  items,
+  loading,
+  viewAllTo,
+}) {
+  if (!loading && items.length === 0) {
+    return null
+  }
+
+  return (
+    <section>
+      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+            {eyebrow}
+          </p>
+          <h2 className="mt-1.5 text-2xl font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
+            {title}
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-stone-500">
+            {description}
+          </p>
+        </div>
+
+        <Link
+          to={viewAllTo}
+          className="focus-ring inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
+        >
+          View all
+          <ArrowRight
+            size={16}
+            aria-hidden="true"
+          />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+        {loading
+          ? Array.from({ length: PRODUCT_RECOMMENDATION_LIMIT }).map((_, index) => (
+              <div
+                key={index}
+                className="aspect-[0.76/1] animate-pulse rounded-[24px] border border-stone-200 bg-white"
+              />
+            ))
+          : items.map((item) => (
+              <RecommendationProductCard
+                key={getProductRecommendationKey(item)}
+                product={item}
+              />
+            ))}
+      </div>
+    </section>
+  )
+}
+
 export default function ProductDetailPage() {
   const {
     slug,
@@ -1467,6 +1690,180 @@ export default function ProductDetailPage() {
     useState(
       false,
     )
+
+  const [
+    frequentlyBought,
+    setFrequentlyBought,
+  ] =
+    useState(
+      [],
+    )
+
+  const [
+    similarProducts,
+    setSimilarProducts,
+  ] =
+    useState(
+      [],
+    )
+
+  const [
+    recommendationsLoading,
+    setRecommendationsLoading,
+  ] =
+    useState(
+      false,
+    )
+
+  const [
+    similarCategorySlug,
+    setSimilarCategorySlug,
+  ] =
+    useState(
+      '',
+    )
+
+  useEffect(
+    () => {
+      if (!product?.slug) {
+        setFrequentlyBought([])
+        setSimilarProducts([])
+        setSimilarCategorySlug('')
+        return undefined
+      }
+
+      let active = true
+
+      async function loadProductRecommendations() {
+        setRecommendationsLoading(true)
+
+        const recommendationCategory =
+          inferProductRecommendationCategory(product)
+
+        try {
+          const [catalogSettled, categorySettled] =
+            await Promise.allSettled([
+              getCatalogProducts({
+                page: 1,
+                limit: 24,
+              }),
+              recommendationCategory
+                ? getCatalogCategoryProducts({
+                    categorySlug: recommendationCategory,
+                    page: 1,
+                    limit: 18,
+                  })
+                : Promise.resolve({
+                    products: [],
+                  }),
+            ])
+
+          if (!active) {
+            return
+          }
+
+          const catalogResult =
+            catalogSettled.status === 'fulfilled'
+              ? catalogSettled.value
+              : { products: [] }
+
+          const categoryResult =
+            categorySettled.status === 'fulfilled'
+              ? categorySettled.value
+              : { products: [] }
+
+          const currentKey =
+            getProductRecommendationKey(product)
+
+          const uniqueProducts =
+            (items) => {
+              const seen = new Set()
+
+              return (items || []).filter(
+                (item) => {
+                  const key =
+                    getProductRecommendationKey(item)
+
+                  if (
+                    !key ||
+                    key === currentKey ||
+                    seen.has(key)
+                  ) {
+                    return false
+                  }
+
+                  seen.add(key)
+                  return true
+                },
+              )
+            }
+
+          const catalogProducts =
+            uniqueProducts(
+              catalogResult?.products,
+            )
+
+          const categoryProducts =
+            uniqueProducts(
+              categoryResult?.products,
+            )
+
+          const inferredCategoryMatches =
+            recommendationCategory
+              ? catalogProducts.filter(
+                  (item) =>
+                    inferProductRecommendationCategory(item) ===
+                    recommendationCategory,
+                )
+              : []
+
+          // Similar products must stay visible even when the category endpoint
+          // has fewer than five published items. Prefer the same category, then
+          // fill the row from the live catalog without repeating the current item.
+          const nextSimilar =
+            uniqueProducts([
+              ...categoryProducts,
+              ...inferredCategoryMatches,
+              ...catalogProducts,
+            ]).slice(0, PRODUCT_RECOMMENDATION_LIMIT)
+
+          // Frequently bought is a separate discovery shelf. It may overlap with
+          // Similar products when the published catalog is small; hiding an entire
+          // section is worse than repeating a useful product.
+          const nextFrequent =
+            catalogProducts.slice(0, PRODUCT_RECOMMENDATION_LIMIT)
+
+          setFrequentlyBought(nextFrequent)
+          setSimilarProducts(nextSimilar)
+          setSimilarCategorySlug(recommendationCategory)
+        } catch {
+          if (active) {
+            setFrequentlyBought([])
+            setSimilarProducts([])
+            setSimilarCategorySlug('')
+          }
+        } finally {
+          if (active) {
+            setRecommendationsLoading(false)
+          }
+        }
+      }
+
+      loadProductRecommendations()
+
+      return () => {
+        active = false
+      }
+    },
+    [
+      product?.slug,
+      product?.displayName,
+      product?.category?.name,
+      product?.category?.slug,
+      product?.family?.name,
+      product?.variant?.name,
+    ],
+  )
 
   if (loading) {
     return (
@@ -2266,6 +2663,34 @@ export default function ProductDetailPage() {
           </section>
 
         </section>
+
+        <div className="mt-12 space-y-12 border-t border-stone-200/80 pt-10 sm:mt-14 sm:pt-12">
+          <ProductRecommendationShelf
+            eyebrow="More for your basket"
+            title="Frequently bought"
+            description="Useful picks from the live EPANTRY grocery catalog that work well alongside everyday shopping."
+            items={frequentlyBought}
+            loading={recommendationsLoading}
+            viewAllTo="/grocery"
+          />
+
+          <ProductRecommendationShelf
+            eyebrow="Same shelf"
+            title="Similar products"
+            description={
+              similarCategorySlug
+                ? `More choices from the same ${similarCategorySlug.replace(/-/g, ' ')} collection.`
+                : 'More published products from the same grocery category.'
+            }
+            items={similarProducts}
+            loading={recommendationsLoading}
+            viewAllTo={
+              similarCategorySlug
+                ? `/grocery/category/${encodeURIComponent(similarCategorySlug)}`
+                : '/grocery'
+            }
+          />
+        </div>
 
       </div>
 

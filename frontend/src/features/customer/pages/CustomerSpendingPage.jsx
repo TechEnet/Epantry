@@ -116,6 +116,29 @@ function formatOrderDate(
   )
 }
 
+function getOrderDisplayTitle(order) {
+  const primaryItemName = String(
+    order?.primaryItemName ||
+      '',
+  ).trim()
+
+  const itemCount = Math.max(
+    0,
+    Number(
+      order?.itemCount ||
+        0,
+    ) || 0,
+  )
+
+  if (primaryItemName) {
+    return itemCount > 1
+      ? `${primaryItemName} + ${itemCount - 1} more`
+      : primaryItemName
+  }
+
+  return 'EPANTRY order'
+}
+
 export default function CustomerSpendingPage() {
   const [
     orders,
@@ -325,12 +348,12 @@ export default function CustomerSpendingPage() {
     )
 
   return (
-    <main className="p-4 sm:p-6 lg:p-7">
-      <div className="mx-auto max-w-6xl">
+    <main className="min-h-full bg-[#f8f5ef]">
+      <div className="w-full px-4 pb-8 pt-3 sm:px-5 sm:pb-10 sm:pt-4 lg:px-6 lg:pt-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <Link
             to="/dashboard"
-            className="focus-ring inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-black text-stone-600 transition hover:text-emerald-800"
+            className="focus-ring inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-black text-[#5f564c] transition hover:bg-white/70 hover:text-[#17483b]"
           >
             <ArrowLeft size={17} aria-hidden="true" />
             Dashboard
@@ -345,7 +368,7 @@ export default function CustomerSpendingPage() {
               })
             }
             disabled={refreshing}
-            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-xs font-black text-stone-700 shadow-sm transition hover:border-emerald-200 disabled:opacity-60"
+            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-[#ded4c6] bg-[#fffdf9] px-3.5 py-2.5 text-xs font-black text-[#4f463d] shadow-[0_4px_12px_rgba(74,59,43,0.06)] transition hover:border-[#c9ab78] hover:text-[#17483b] disabled:opacity-60"
           >
             <RefreshCw
               size={15}
@@ -360,35 +383,35 @@ export default function CustomerSpendingPage() {
           </button>
         </div>
 
-        <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#043f33] via-[#075d49] to-[#0b765c] p-6 text-white shadow-[0_24px_70px_-42px_rgba(4,63,51,0.9)] sm:p-8">
-          <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full border border-white/10 bg-white/5" />
-          <div className="pointer-events-none absolute -bottom-28 right-40 size-60 rounded-full bg-emerald-100/10 blur-2xl" />
+        <section className="relative overflow-hidden rounded-[30px] border border-[#2e6655]/30 bg-[linear-gradient(135deg,#123e33_0%,#185344_52%,#21644f_100%)] p-6 text-white shadow-[0_24px_55px_-38px_rgba(18,62,51,0.7)] sm:p-7 lg:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full border border-[#f0d39a]/15 bg-[#f0d39a]/8" />
+          <div className="pointer-events-none absolute -bottom-24 right-[28%] size-52 rounded-full bg-[#f1d59f]/8 blur-2xl" />
 
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div>
-              <div className="flex items-center gap-2 text-emerald-100">
+              <div className="flex items-center gap-2 text-[#f1d9a7]">
                 <ReceiptIndianRupee size={20} aria-hidden="true" />
                 <p className="text-[10px] font-black uppercase tracking-[0.18em]">
-                  Customer payments
+                  Spending overview
                 </p>
               </div>
 
-              <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
+              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
                 Your monthly spending
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/75">
-                A simple view of EPANTRY orders that are currently recorded as paid for this month.
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#e6eee9]/80">
+                See what you have paid for this month and open any order for the full details.
               </p>
             </div>
 
-            <div className="rounded-[24px] border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-sm sm:min-w-56">
-              <div className="flex items-center gap-2 text-emerald-100/80">
+            <div className="rounded-[24px] border border-[#f3d9a6]/20 bg-[#fff8e9]/10 px-5 py-4 backdrop-blur-sm sm:min-w-56">
+              <div className="flex items-center gap-2 text-[#f1d9a7]">
                 <CalendarDays size={15} aria-hidden="true" />
                 <p className="text-[10px] font-black uppercase tracking-[0.14em]">
                   {summary.monthLabel}
                 </p>
               </div>
-              <p className="mt-2 text-3xl font-black tracking-tight">
+              <p className="mt-2 text-3xl font-black tracking-tight text-white">
                 {loading
                   ? '—'
                   : formatMoney(
@@ -396,31 +419,29 @@ export default function CustomerSpendingPage() {
                       summary.currency,
                     )}
               </p>
-              <p className="mt-1 text-xs font-semibold text-emerald-100/75">
+              <p className="mt-1 text-xs font-semibold text-[#e7efe9]/75">
                 {loading
                   ? 'Loading paid orders…'
-                  : `${summary.paidOrders.length} paid ${summary.paidOrders.length === 1 ? 'order' : 'orders'}`}
+                  : `${summary.paidOrders.length} paid ${summary.paidOrders.length === 1 ? 'order' : 'orders'} this month`}
               </p>
             </div>
           </div>
         </section>
 
         {error ? (
-          <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+          <div className="mt-5 rounded-2xl border border-[#efc7c0] bg-[#fff1ee] px-4 py-3 text-sm font-semibold text-[#9b3f32]">
             {error}
           </div>
         ) : null}
 
         <section className="mt-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                Payment activity
-              </p>
-              <h2 className="mt-1 text-xl font-black text-stone-950 sm:text-2xl">
-                Paid orders this month
-              </h2>
-            </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1d7157]">
+              Payment activity
+            </p>
+            <h2 className="mt-1 text-xl font-black text-[#1f2924] sm:text-2xl">
+              Paid orders this month
+            </h2>
           </div>
 
           {loading ? (
@@ -431,21 +452,21 @@ export default function CustomerSpendingPage() {
                 ) => (
                   <div
                     key={item}
-                    className="h-24 animate-pulse rounded-[24px] border border-stone-200 bg-white"
+                    className="h-24 animate-pulse rounded-[24px] border border-[#e6ddd1] bg-[#fffdf9]"
                   />
                 ),
               )}
             </div>
           ) : summary.paidOrders.length === 0 ? (
-            <div className="mt-4 rounded-[26px] border border-dashed border-stone-300 bg-white px-6 py-12 text-center">
-              <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+            <div className="mt-4 rounded-[26px] border border-dashed border-[#d9c9b3] bg-[#fffdf9] px-6 py-12 text-center">
+              <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#e7f3ed] text-[#1d7157]">
                 <ShoppingBag size={21} aria-hidden="true" />
               </div>
-              <h3 className="mt-4 text-base font-black text-stone-950">
+              <h3 className="mt-4 text-base font-black text-[#1f2924]">
                 No paid orders this month
               </h3>
-              <p className="mt-2 text-sm text-stone-500">
-                Paid EPANTRY orders will appear here automatically.
+              <p className="mt-2 text-sm text-[#756b61]">
+                Your paid EPANTRY orders will appear here automatically.
               </p>
             </div>
           ) : (
@@ -457,24 +478,24 @@ export default function CustomerSpendingPage() {
                   <Link
                     key={order.id}
                     to={`/orders/${order.id}`}
-                    className="focus-ring group grid gap-4 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                    className="focus-ring group grid gap-4 rounded-[24px] border border-[#e2d8ca] bg-[#fffdf9] p-5 shadow-[0_5px_16px_rgba(74,59,43,0.05)] transition hover:-translate-y-0.5 hover:border-[#c9ab78] hover:bg-[#fffaf1] hover:shadow-[0_10px_22px_rgba(74,59,43,0.08)] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-black text-stone-950">
-                          Order {String(order.id || '').slice(-8).toUpperCase()}
+                        <p className="truncate font-black text-[#25312b]">
+                          {getOrderDisplayTitle(order)}
                         </p>
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-800">
+                        <span className="rounded-full border border-[#b9dbc8] bg-[#e8f5ee] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#176348]">
                           Paid
                         </span>
                       </div>
-                      <p className="mt-2 text-xs font-semibold text-stone-500">
+                      <p className="mt-2 text-xs font-semibold text-[#7b7065]">
                         {formatOrderDate(order.createdAt)}
                       </p>
                     </div>
 
                     <div className="flex items-center justify-between gap-4 sm:justify-end">
-                      <p className="text-lg font-black text-stone-950">
+                      <p className="text-lg font-black text-[#17483b]">
                         {formatMoney(
                           order?.totals
                             ?.totalLandedCostMinor,
@@ -484,7 +505,7 @@ export default function CustomerSpendingPage() {
                       </p>
                       <ArrowRight
                         size={17}
-                        className="text-stone-300 transition group-hover:translate-x-1 group-hover:text-emerald-700"
+                        className="text-[#b9aa96] transition group-hover:translate-x-1 group-hover:text-[#a77834]"
                         aria-hidden="true"
                       />
                     </div>

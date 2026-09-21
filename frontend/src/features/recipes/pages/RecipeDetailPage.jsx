@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowRight,
   BellRing,
   Check,
   ChefHat,
@@ -52,6 +53,7 @@ import {
 
 import {
   getPublicRecipe,
+  listPublicRecipes,
   scalePublicRecipe,
 } from '../services/recipe.service'
 
@@ -547,6 +549,170 @@ function RecipeDetailsSheet({
   )
 }
 
+
+
+const RECIPE_RECOMMENDATION_LIMIT = 5
+
+function getRecipeRecommendationKey(item) {
+  return String(
+    item?.dish?.id ||
+      item?.recipe?.id ||
+      item?.dish?.slug ||
+      '',
+  ).trim()
+}
+
+function getRecipeRecommendationName(item) {
+  return (
+    item?.dish?.name ||
+    item?.recipe?.title ||
+    'Recipe'
+  )
+}
+
+function getRecipeRecommendationPath(item) {
+  return (
+    item?.path ||
+    `/recipes/${encodeURIComponent(
+      item?.dish?.slug || '',
+    )}`
+  )
+}
+
+function RecommendedRecipeCard({
+  item,
+}) {
+  const dish = item?.dish || {}
+  const recipe = item?.recipe || {}
+  const totalMinutes =
+    Number(recipe.preparationTimeMinutes || 0) +
+    Number(recipe.cookingTimeMinutes || 0)
+
+  return (
+    <Link
+      to={getRecipeRecommendationPath(item)}
+      className="focus-ring group flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#e2d8c8] bg-[#fffdf8] shadow-[0_10px_30px_rgba(92,70,38,0.08)] transition duration-300 hover:-translate-y-1.5 hover:border-amber-300 hover:shadow-[0_22px_46px_rgba(92,70,38,0.15)] motion-reduce:transform-none motion-reduce:transition-none"
+      aria-label={`Open ${getRecipeRecommendationName(item)}`}
+    >
+      <div className="relative aspect-[1.08/1] overflow-hidden bg-[linear-gradient(145deg,#fbf2df,#eef5eb)]">
+        {dish.heroImageUrl ? (
+          <img
+            src={dish.heroImageUrl}
+            alt={dish.name || getRecipeRecommendationName(item)}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+          />
+        ) : (
+          <div className="grid h-full place-items-center text-emerald-800/45">
+            <ChefHat
+              size={44}
+              strokeWidth={1.45}
+              aria-hidden="true"
+            />
+          </div>
+        )}
+
+        <div className="absolute inset-x-3 top-3 flex flex-wrap gap-2">
+          {dish.cuisine ? (
+            <span className="rounded-full border border-white/65 bg-white/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#24543d] shadow-sm backdrop-blur">
+              {dish.cuisine}
+            </span>
+          ) : null}
+          {dish.course ? (
+            <span className="rounded-full border border-amber-100/80 bg-[#fff7e8]/92 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-amber-800 shadow-sm backdrop-blur">
+              {dish.course}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <h3 className="line-clamp-2 min-h-[2.7em] text-[16px] font-black leading-[1.35] tracking-[-0.02em] text-[#173c2d]">
+          {getRecipeRecommendationName(item)}
+        </h3>
+
+        <div className="mt-2 flex min-h-5 items-center gap-2 text-[11px] font-semibold text-stone-500">
+          {totalMinutes > 0 ? (
+            <span>{totalMinutes} min</span>
+          ) : null}
+          {recipe.difficulty ? (
+            <>
+              {totalMinutes > 0 ? (
+                <span className="text-stone-300">|</span>
+              ) : null}
+              <span>{recipe.difficulty}</span>
+            </>
+          ) : null}
+        </div>
+
+        <span className="mt-4 inline-flex items-center justify-between gap-3 rounded-xl bg-[#edf5e9] px-3.5 py-2.5 text-xs font-black text-[#1b5a3d] transition group-hover:bg-[#175339] group-hover:text-white">
+          Open recipe
+          <ArrowRight
+            size={15}
+            aria-hidden="true"
+          />
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+function RecipeRecommendationShelf({
+  eyebrow,
+  title,
+  description,
+  items,
+  loading,
+}) {
+  if (!loading && items.length === 0) {
+    return null
+  }
+
+  return (
+    <section>
+      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
+            {eyebrow}
+          </p>
+          <h2 className="mt-1.5 font-serif text-3xl font-semibold tracking-[-0.035em] text-[#163b2a]">
+            {title}
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-stone-500">
+            {description}
+          </p>
+        </div>
+
+        <Link
+          to="/recipes"
+          className="focus-ring inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-[#dccdb5] bg-[#fffdf8] px-4 py-2.5 text-sm font-black text-[#24543d] shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
+        >
+          View all
+          <ArrowRight
+            size={16}
+            aria-hidden="true"
+          />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+        {loading
+          ? Array.from({ length: RECIPE_RECOMMENDATION_LIMIT }).map((_, index) => (
+              <div
+                key={index}
+                className="aspect-[0.76/1] animate-pulse rounded-[24px] border border-[#e3d7c2] bg-[#fffdf8]"
+              />
+            ))
+          : items.map((item) => (
+              <RecommendedRecipeCard
+                key={getRecipeRecommendationKey(item)}
+                item={item}
+              />
+            ))}
+      </div>
+    </section>
+  )
+}
+
 export default function RecipeDetailPage() {
   const {
     slug,
@@ -573,6 +739,30 @@ export default function RecipeDetailPage() {
   ] =
     useState(
       null,
+    )
+
+  const [
+    cookNextRecipes,
+    setCookNextRecipes,
+  ] =
+    useState(
+      [],
+    )
+
+  const [
+    similarRecipes,
+    setSimilarRecipes,
+  ] =
+    useState(
+      [],
+    )
+
+  const [
+    recipeRecommendationsLoading,
+    setRecipeRecommendationsLoading,
+  ] =
+    useState(
+      false,
     )
 
   const [
@@ -775,6 +965,162 @@ export default function RecipeDetailPage() {
     },
     [
       loadRecipe,
+    ],
+  )
+
+  useEffect(
+    () => {
+      const currentSlug =
+        String(
+          data?.dish?.slug ||
+          slug ||
+          '',
+        ).trim()
+
+      if (!currentSlug || !data?.dish) {
+        setCookNextRecipes([])
+        setSimilarRecipes([])
+        return undefined
+      }
+
+      let active = true
+
+      async function loadRecipeRecommendations() {
+        setRecipeRecommendationsLoading(true)
+
+        const cuisine =
+          String(
+            data?.dish?.cuisine ||
+            '',
+          ).trim()
+
+        const course =
+          String(
+            data?.dish?.course ||
+            '',
+          ).trim()
+
+        try {
+          const [generalResult, courseResult, cuisineResult] =
+            await Promise.all([
+              listPublicRecipes({
+                page: 1,
+                limit: 24,
+              }),
+              course
+                ? listPublicRecipes({
+                    page: 1,
+                    limit: 18,
+                    course,
+                  })
+                : Promise.resolve({ recipes: [] }),
+              cuisine
+                ? listPublicRecipes({
+                    page: 1,
+                    limit: 18,
+                    cuisine,
+                  })
+                : Promise.resolve({ recipes: [] }),
+            ])
+
+          if (!active) {
+            return
+          }
+
+          const withoutCurrent =
+            (items) =>
+              (items || []).filter(
+                (item) =>
+                  String(
+                    item?.dish?.slug ||
+                    '',
+                  ).trim() !== currentSlug,
+              )
+
+          const generalRecipes =
+            withoutCurrent(
+              generalResult?.recipes,
+            )
+
+          const courseRecipes =
+            withoutCurrent(
+              courseResult?.recipes,
+            )
+
+          const cuisineRecipes =
+            withoutCurrent(
+              cuisineResult?.recipes,
+            )
+
+          const makeUnique =
+            (items) => {
+              const seen = new Set()
+
+              return items.filter(
+                (item) => {
+                  const key =
+                    getRecipeRecommendationKey(item)
+
+                  if (!key || seen.has(key)) {
+                    return false
+                  }
+
+                  seen.add(key)
+                  return true
+                },
+              )
+            }
+
+          const nextCook =
+            makeUnique([
+              ...courseRecipes,
+              ...generalRecipes,
+            ]).slice(0, RECIPE_RECOMMENDATION_LIMIT)
+
+          const cookKeys =
+            new Set(
+              nextCook.map(
+                getRecipeRecommendationKey,
+              ),
+            )
+
+          const nextSimilar =
+            makeUnique([
+              ...cuisineRecipes,
+              ...courseRecipes,
+              ...generalRecipes,
+            ])
+              .filter(
+                (item) =>
+                  !cookKeys.has(
+                    getRecipeRecommendationKey(item),
+                  ),
+              )
+              .slice(0, RECIPE_RECOMMENDATION_LIMIT)
+
+          setCookNextRecipes(nextCook)
+          setSimilarRecipes(nextSimilar)
+        } catch {
+          if (active) {
+            setCookNextRecipes([])
+            setSimilarRecipes([])
+          }
+        } finally {
+          if (active) {
+            setRecipeRecommendationsLoading(false)
+          }
+        }
+      }
+
+      loadRecipeRecommendations()
+
+      return () => {
+        active = false
+      }
+    },
+    [
+      data?.dish,
+      slug,
     ],
   )
 
@@ -2041,7 +2387,28 @@ export default function RecipeDetailPage() {
 
             <div className="min-h-0 flex-1 overflow-y-auto" data-recipe-guide-scroll>
 
-            <details className="group border-b border-[#e8dcc8]">
+            <div className="grid grid-cols-2 gap-2 border-b border-[#e8dcc8] bg-[#fffaf0] p-4 sm:grid-cols-4">
+              {[
+                ['Servings', servings || recipe?.baseServings || '—'],
+                ['Prep', `${Number(recipe?.preparationTimeMinutes || 0)} min`],
+                ['Cook', `${Number(recipe?.cookingTimeMinutes || 0)} min`],
+                ['Difficulty', recipeDetailLabel(recipe?.difficulty) || '—'],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-[#eadfca] bg-white px-3 py-3 shadow-[0_5px_14px_rgba(92,70,38,0.05)]"
+                >
+                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-400">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-sm font-black capitalize text-[#163b2a]">
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <details className="group border-b border-[#e8dcc8]" open>
               <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
                 <span className="font-serif text-xl font-semibold text-[#163b2a]">
                   Cooking steps
@@ -2084,6 +2451,126 @@ export default function RecipeDetailPage() {
               </div>
             </details>
 
+            <details className="group border-b border-[#e8dcc8]">
+              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
+                <span className="font-serif text-xl font-semibold text-[#163b2a]">
+                  Ingredients
+                </span>
+                <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
+                  <ChevronDown size={16} aria-hidden="true" />
+                </span>
+              </summary>
+
+              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-5 py-3">
+                {ingredientRows.length ? (
+                  <div className="divide-y divide-[#e5d9c5]">
+                    {ingredientRows.map((ingredient, index) => (
+                      <div
+                        key={ingredient.id || ingredient.canonicalIngredientId || index}
+                        className="flex items-start justify-between gap-4 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-stone-800">
+                            {ingredient?.ingredient?.name || ingredient?.name || 'Ingredient'}
+                          </p>
+                          {ingredient.preparationState ? (
+                            <p className="mt-0.5 text-[10px] font-semibold text-stone-500">
+                              {ingredient.preparationState}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span className="shrink-0 rounded-full border border-[#e4d7c2] bg-white px-2.5 py-1 text-[10px] font-black text-[#24543d]">
+                          {formatQuantity(ingredient.displayQuantity ?? ingredient.quantity)}{' '}
+                          {ingredient.displayUnit || ingredient.unit || ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs font-semibold text-stone-500">
+                    Ingredient details are not currently published.
+                  </p>
+                )}
+              </div>
+            </details>
+
+            <details className="group border-b border-[#e8dcc8]">
+              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
+                <span className="font-serif text-xl font-semibold text-[#163b2a]">
+                  Nutrition
+                </span>
+                <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
+                  <ChevronDown size={16} aria-hidden="true" />
+                </span>
+              </summary>
+
+              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-5 py-3">
+                {Array.isArray(detailsFoodIntelligence?.nutrition) && detailsFoodIntelligence.nutrition.length ? (
+                  <div className="divide-y divide-[#e5d9c5]">
+                    {detailsFoodIntelligence.nutrition.map((item, index) => (
+                      <div
+                        key={`${item?.key || item?.name || 'nutrient'}-${index}`}
+                        className="flex items-center justify-between gap-4 py-2.5"
+                      >
+                        <span className="text-xs font-bold text-stone-600">
+                          {item?.name || recipeDetailLabel(item?.key)}
+                        </span>
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-900">
+                          {item?.amount ?? '—'} {item?.unit || ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs font-semibold text-stone-500">
+                    Approved nutrition details are not currently available.
+                  </p>
+                )}
+              </div>
+            </details>
+
+            <details className="group border-b border-[#e8dcc8]">
+              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
+                <span className="font-serif text-xl font-semibold text-[#163b2a]">
+                  Allergens & dietary
+                </span>
+                <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
+                  <ChevronDown size={16} aria-hidden="true" />
+                </span>
+              </summary>
+
+              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-5 py-4">
+                <p className="text-xs font-semibold leading-5 text-stone-700">
+                  {detailsFoodIntelligence?.allergenStatement ||
+                    (Array.isArray(detailsFoodIntelligence?.allergens) && detailsFoodIntelligence.allergens.length
+                      ? detailsFoodIntelligence.allergens
+                          .map((item) =>
+                            `${item?.name || recipeDetailLabel(item?.key)}: ${recipeDetailLabel(
+                              item?.relationship || item?.relationType || item?.outcome || item?.evidenceState,
+                            )}`,
+                          )
+                          .join(' · ')
+                      : 'No approved allergen declaration is currently available.')}
+                </p>
+
+                {Array.isArray(detailsFoodIntelligence?.dietary) && detailsFoodIntelligence.dietary.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {detailsFoodIntelligence.dietary.map((item, index) => (
+                      <span
+                        key={`${item?.ruleKey || item?.key || 'dietary'}-${index}`}
+                        className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-800"
+                      >
+                        {recipeDetailLabel(item?.label || item?.ruleKey || item?.key)}: {recipeDetailLabel(
+                          item?.status || item?.outcome,
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </details>
+
+            {/* Keep the governed Food Intelligence bridge targets intact. */}
             <div id="recipe-nutrition-intelligence-slot" />
             <div id="recipe-allergen-intelligence-slot" />
             <div id="recipe-dietary-intelligence-slot" />
@@ -2093,6 +2580,28 @@ export default function RecipeDetailPage() {
 
           </section>
 
+        </div>
+
+        <div className="mt-12 space-y-12 border-t border-[#dfd3c1] pt-10 sm:mt-14 sm:pt-12">
+          <RecipeRecommendationShelf
+            eyebrow="Cook next"
+            title="More recipes to try"
+            description="A fresh set of published EPANTRY recipes that fit naturally into your next cooking session."
+            items={cookNextRecipes}
+            loading={recipeRecommendationsLoading}
+          />
+
+          <RecipeRecommendationShelf
+            eyebrow="Same table"
+            title="Similar recipes"
+            description={
+              data?.dish?.cuisine
+                ? `More ${data.dish.cuisine} recipes with a familiar cooking direction.`
+                : 'More recipes with a similar course and cooking style.'
+            }
+            items={similarRecipes}
+            loading={recipeRecommendationsLoading}
+          />
         </div>
 
       </div>
