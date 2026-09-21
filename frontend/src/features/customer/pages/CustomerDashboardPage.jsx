@@ -2,10 +2,6 @@ import {
   ArrowRight,
   Bell,
   BookOpen,
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ListChecks,
   PackageSearch,
   ReceiptIndianRupee,
@@ -17,14 +13,9 @@ import {
 } from 'lucide-react'
 
 import {
-  motion,
-} from 'motion/react'
-
-import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 
@@ -41,10 +32,53 @@ import {
   listOrders,
 } from '../../commerce/services/commerce.service'
 
-const quickActions = [
+const customerFlowStages = [
+  {
+    step: 'Step 1',
+    title: 'Check your pantry',
+    description: 'See what is available at home, what is running low and what should be used soon before planning the next meal.',
+    to: '/pantry',
+    action: 'Open My Pantry',
+    icon: PackageSearch,
+    className: 'border-amber-200 bg-[#fff2c9]',
+    iconClassName: 'bg-amber-500 text-stone-950',
+  },
+  {
+    step: 'Step 2',
+    title: 'Plan the next meals',
+    description: 'Build a practical meal plan around your household, food preferences and the ingredients you already have.',
+    to: '/meal-plan',
+    action: 'Open Meal Planner',
+    icon: ListChecks,
+    className: 'border-sky-200 bg-[#e5f4ff]',
+    iconClassName: 'bg-sky-600 text-white',
+  },
+  {
+    step: 'Step 3',
+    title: 'Build the next basket',
+    description: 'Turn pantry and planning signals into the next useful shopping basket without losing the context of what is at home.',
+    to: '/next-basket',
+    action: 'Open Next Basket',
+    icon: ShoppingBasket,
+    className: 'border-emerald-200 bg-[#dcf7e8]',
+    iconClassName: 'bg-emerald-700 text-white',
+  },
+  {
+    step: 'Step 4',
+    title: 'Use food before it is wasted',
+    description: 'Prioritise ingredients that should be used soon and keep avoidable food waste visible in your everyday workflow.',
+    to: '/waste-reduction',
+    action: 'Reduce Waste',
+    icon: Sparkles,
+    className: 'border-violet-200 bg-[#eee8ff]',
+    iconClassName: 'bg-violet-600 text-white',
+  },
+]
+
+const quickAccessItems = [
   {
     title: 'My Pantry',
-    description: 'See what you have, what is running low, and what should be used soon.',
+    description: 'See what you have, what is running low and what should be used soon.',
     to: '/pantry',
     icon: PackageSearch,
   },
@@ -90,6 +124,12 @@ const quickActions = [
     to: '/account/learning',
     icon: BookOpen,
   },
+  {
+    title: 'Notifications',
+    description: 'Open your notification center and review anything that needs your attention.',
+    to: '/notifications',
+    icon: Bell,
+  },
 ]
 
 function isSameMonth(
@@ -127,245 +167,6 @@ function formatMoney(
   ).format(Number(amountMinor) / 100)
 }
 
-function getCircularOffset(
-  index,
-  activeIndex,
-  total,
-) {
-  let offset = index - activeIndex
-  const half = total / 2
-
-  if (offset > half) {
-    offset -= total
-  }
-
-  if (offset < -half) {
-    offset += total
-  }
-
-  return offset
-}
-
-function WorkspaceCarousel({
-  items,
-}) {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const total = items.length
-
-  const goPrevious = useCallback(() => {
-    setActiveIndex((current) => (current - 1 + total) % total)
-  }, [total])
-
-  const goNext = useCallback(() => {
-    setActiveIndex((current) => (current + 1) % total)
-  }, [total])
-
-  const wheelLockRef = useRef(false)
-  const wheelResetRef = useRef(null)
-
-  const handleWheel = useCallback((event) => {
-    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-      ? event.deltaX
-      : event.deltaY
-
-    if (Math.abs(delta) < 14) {
-      return
-    }
-
-    event.preventDefault()
-
-    if (wheelLockRef.current) {
-      return
-    }
-
-    wheelLockRef.current = true
-
-    if (delta > 0) {
-      goNext()
-    } else {
-      goPrevious()
-    }
-
-    window.clearTimeout(wheelResetRef.current)
-    wheelResetRef.current = window.setTimeout(() => {
-      wheelLockRef.current = false
-    }, 460)
-  }, [
-    goNext,
-    goPrevious,
-  ])
-
-  useEffect(() => () => {
-    window.clearTimeout(wheelResetRef.current)
-  }, [])
-
-  return (
-    <div
-      onWheel={handleWheel}
-      className="mt-5 flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[36px] border border-[#d8d2c5] bg-[linear-gradient(145deg,#f4f0e7_0%,#fbfaf6_52%,#eef3ef_100%)] px-4 pb-6 pt-5 shadow-[0_30px_80px_-58px_rgba(26,46,37,0.42)] sm:px-7"
-    >
-      <div className="flex items-center gap-2 px-1 text-[11px] font-bold text-[#6f6a5e]">
-        <span className="size-2 rounded-full bg-[#9b7a43]" />
-        Scroll or use the controls to move through your workspace
-      </div>
-
-      <div className="relative mt-3 min-h-[430px] flex-1 w-full overflow-hidden [perspective:1700px]">
-        {items.map((item, index) => {
-          const offset = getCircularOffset(index, activeIndex, total)
-          const distance = Math.abs(offset)
-          const isActive = offset === 0
-          const isVisible = distance <= 2
-          const Icon = item.icon
-
-          const x = `${offset * 66}%`
-          const scale = isActive ? 1 : distance === 1 ? 0.9 : 0.82
-          const rotateY = offset * -18
-          const opacity = isVisible ? (isActive ? 1 : distance === 1 ? 0.76 : 0.28) : 0
-          const zIndex = 30 - distance
-
-          return (
-            <motion.div
-              key={item.key || item.to}
-              initial={false}
-              animate={{
-                x,
-                scale,
-                rotateY,
-                opacity,
-              }}
-              transition={{
-                duration: 0.5,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              style={{
-                zIndex,
-                transformStyle: 'preserve-3d',
-                pointerEvents: isVisible ? 'auto' : 'none',
-                willChange: 'transform, opacity',
-              }}
-              className="absolute left-1/2 top-1/2 w-[min(82vw,520px)] -translate-x-1/2 -translate-y-1/2 transform-gpu"
-            >
-              {isActive ? (
-                <Link
-                  to={item.to}
-                  className="focus-ring group relative flex h-[330px] w-full flex-col justify-between overflow-hidden rounded-[32px] border border-[#315e50] bg-[linear-gradient(145deg,#173c33_0%,#102f28_56%,#0b211c_100%)] p-8 text-white shadow-[0_34px_70px_-38px_rgba(9,29,25,0.72)] transition-colors duration-300 hover:border-[#bca36f]"
-                >
-                  <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-bl-[120px] bg-[#d1b87e]/10" />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/18 to-transparent" />
-
-                  <div className="relative flex items-start justify-between gap-4">
-                    <div className="grid size-14 place-items-center rounded-[20px] border border-white/12 bg-white/10 text-[#ead9ad]">
-                      <Icon size={23} aria-hidden="true" />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {item.meta ? (
-                        <span className="hidden items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[9px] font-black text-[#efe3c4] sm:inline-flex">
-                          <CalendarDays size={11} aria-hidden="true" />
-                          {item.meta}
-                        </span>
-                      ) : null}
-                      <div className="grid size-10 place-items-center rounded-full border border-white/15 bg-white/10 text-white/72 transition duration-300 group-hover:translate-x-1 group-hover:border-[#d8c28f]/55 group-hover:text-[#f3e4bf]">
-                        <ArrowRight size={17} aria-hidden="true" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="relative">
-                    {item.eyebrow ? (
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#d8c28f]">
-                        {item.eyebrow}
-                      </p>
-                    ) : null}
-                    <h3 className={`${item.largeTitle ? 'text-3xl tracking-[-0.045em]' : 'text-2xl tracking-[-0.035em]'} font-black text-white`}>
-                      {item.title}
-                    </h3>
-                    <p className="mt-3 max-w-md text-[15px] leading-7 text-white/70">
-                      {item.description}
-                    </p>
-                  </div>
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setActiveIndex(index)}
-                  className="focus-ring group relative flex h-[330px] w-full flex-col justify-between overflow-hidden rounded-[32px] border border-[#d8d0be] bg-[linear-gradient(150deg,#fffdf9_0%,#f2eee5_100%)] p-8 text-left shadow-[0_24px_56px_-42px_rgba(45,40,31,0.46)] transition-colors duration-300 hover:border-[#bba06e]"
-                  aria-label={`Focus ${item.eyebrow || item.title}`}
-                >
-                  <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-bl-[120px] bg-[#ccb98c]/12" />
-                  <div className="relative grid size-14 place-items-center rounded-[20px] border border-[#cadbd3] bg-[#e7efe9] text-[#184b3d]">
-                    <Icon size={23} aria-hidden="true" />
-                  </div>
-
-                  <div className="relative">
-                    {item.eyebrow ? (
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#8b6a35]">
-                        {item.eyebrow}
-                      </p>
-                    ) : null}
-                    <h3 className="text-2xl font-black tracking-[-0.035em] text-stone-950">
-                      {item.title}
-                    </h3>
-                    <p className="mt-3 max-w-md text-[15px] leading-7 text-stone-500">
-                      {item.description}
-                    </p>
-                  </div>
-                </button>
-              )}
-            </motion.div>
-          )
-        })}
-      </div>
-
-      <div className="mt-3 flex items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={goPrevious}
-          className="focus-ring grid size-12 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-sm transition hover:-translate-x-0.5 hover:border-[#b89b69] hover:text-[#173b32]"
-          aria-label="Previous workspace card"
-        >
-          <ChevronLeft size={20} aria-hidden="true" />
-        </button>
-
-        <div className="flex items-center gap-3">
-          <span
-            aria-live="polite"
-            className="min-w-[58px] rounded-full border border-[#d8d0be] bg-white px-3 py-2 text-center text-[11px] font-black tabular-nums text-[#173b32] shadow-sm"
-          >
-            {activeIndex + 1} / {total}
-          </span>
-
-          <div className="flex flex-wrap items-center justify-center gap-2">
-          {items.map((item, index) => (
-            <button
-              key={`dot-${item.key || item.to}`}
-              type="button"
-              onClick={() => setActiveIndex(index)}
-              className={`focus-ring h-2.5 rounded-full transition-all duration-300 ${
-                index === activeIndex
-                  ? 'w-8 bg-[#173b32]'
-                  : 'w-2.5 bg-[#c9c0af] hover:bg-[#b89b69]'
-              }`}
-              aria-label={`Show ${item.eyebrow || item.title}`}
-              aria-current={index === activeIndex ? 'true' : undefined}
-            />
-          ))}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={goNext}
-          className="focus-ring grid size-12 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-sm transition hover:translate-x-0.5 hover:border-[#b89b69] hover:text-[#173b32]"
-          aria-label="Next workspace card"
-        >
-          <ChevronRight size={20} aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export default function CustomerDashboardPage() {
   const {
     currentUser,
@@ -378,23 +179,47 @@ export default function CustomerDashboardPage() {
   const name =
     currentUser?.displayName ||
     currentUser?.name ||
-    'there'
+    currentUser?.email ||
+    'Customer'
 
   const loadPaymentSummary = useCallback(async () => {
     setPaymentLoading(true)
     setPaymentError('')
 
     try {
-      const result = await listOrders({
+      const firstPage = await listOrders({
         page: 1,
-        limit: 100,
+        limit: 50,
       })
 
-      setOrders(
-        Array.isArray(result?.orders)
-          ? result.orders
-          : [],
-      )
+      let nextOrders = Array.isArray(firstPage?.orders)
+        ? [...firstPage.orders]
+        : []
+
+      const pages = Number(firstPage?.pagination?.pages || 1)
+
+      if (pages > 1) {
+        const remainingPages = await Promise.all(
+          Array.from(
+            { length: pages - 1 },
+            (_, index) =>
+              listOrders({
+                page: index + 2,
+                limit: 50,
+              }),
+          ),
+        )
+
+        nextOrders = nextOrders.concat(
+          ...remainingPages.map((page) =>
+            Array.isArray(page?.orders)
+              ? page.orders
+              : [],
+          ),
+        )
+      }
+
+      setOrders(nextOrders)
     } catch (error) {
       setPaymentError(
         getCommerceErrorMessage(
@@ -414,10 +239,12 @@ export default function CustomerDashboardPage() {
   const monthSummary = useMemo(() => {
     const now = new Date()
 
-    const paidOrders = orders.filter(
-      (order) =>
-        order?.paymentStatus === 'paid' &&
-        isSameMonth(order?.createdAt, now),
+    const monthOrders = orders.filter(
+      (order) => isSameMonth(order?.createdAt, now),
+    )
+
+    const paidOrders = monthOrders.filter(
+      (order) => order?.paymentStatus === 'paid',
     )
 
     const amountMinor = paidOrders.reduce(
@@ -434,6 +261,7 @@ export default function CustomerDashboardPage() {
       amountMinor,
       currency,
       paidOrderCount: paidOrders.length,
+      monthOrderCount: monthOrders.length,
       monthLabel: now.toLocaleDateString(
         'en-IN',
         {
@@ -444,158 +272,223 @@ export default function CustomerDashboardPage() {
     }
   }, [orders])
 
-  const workspaceItems = useMemo(() => {
-    const paymentTitle = paymentLoading
-      ? 'Loading payments…'
-      : paymentError
-        ? 'Payment summary unavailable'
-        : formatMoney(
-            monthSummary.amountMinor,
-            monthSummary.currency,
-          )
-
-    const paymentDescription = paymentLoading
-      ? 'Checking your paid orders for this month.'
-      : paymentError
-        ? 'Open payment history to try again.'
-        : `${monthSummary.paidOrderCount} paid ${monthSummary.paidOrderCount === 1 ? 'order' : 'orders'} this month`
-
-    const paymentItem = {
-      key: 'payment-summary',
-      title: paymentTitle,
-      description: paymentDescription,
-      to: '/account/spending',
-      icon: ReceiptIndianRupee,
-      eyebrow: 'Paid this month',
-      meta: monthSummary.monthLabel,
-      largeTitle: true,
-    }
-
-    return [
-      ...quickActions.slice(0, 5),
-      paymentItem,
-      ...quickActions.slice(5),
-    ]
-  }, [
-    monthSummary.amountMinor,
-    monthSummary.currency,
-    monthSummary.monthLabel,
-    monthSummary.paidOrderCount,
-    paymentError,
-    paymentLoading,
-  ])
-
   return (
-    <div className="w-full min-w-0 overflow-x-clip">
-      <header className="relative flex min-h-[100svh] w-full flex-col overflow-hidden border-y border-[#315e50]/30 bg-[#173f35] px-6 text-white shadow-[0_34px_90px_-58px_rgba(11,37,31,0.74)] sm:px-10 lg:min-h-[133.333svh] lg:px-14">
-        <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full bg-[#b89b69]/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-40 left-[12%] size-[24rem] rounded-full bg-emerald-300/8 blur-3xl" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/15 to-transparent" />
+    <main className="min-h-screen bg-[#f7f5ef] p-5 sm:p-7">
+      <section className="relative overflow-hidden rounded-[30px] border border-[#24594c] bg-[#173f35] px-6 py-8 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:px-8 sm:py-10">
+        <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-amber-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-1/4 size-64 rounded-full bg-emerald-300/10 blur-3xl" />
 
-        <div className="relative flex items-center justify-between gap-4 pt-7 sm:pt-9">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#e0cea6]">
-            Customer Dashboard
-          </p>
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#f0dfb8]">
+                Customer Dashboard
+              </span>
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+                Customer mode
+              </span>
+            </div>
 
-          <div className="rounded-full border border-[#ead9b4]/25 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#efe3c4]">
-            Customer mode
+            <p className="mt-6 text-sm font-bold text-white/55">
+              Welcome back
+            </p>
+
+            <h1 className="mt-1 text-4xl font-black tracking-[-0.045em] text-white sm:text-5xl">
+              {name}
+            </h1>
+
+            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-white/70">
+              Follow your food workflow in order, or jump straight into the Customer area you need from this dashboard.
+            </p>
           </div>
+
+          <Link
+            to="/pantry"
+            className="focus-ring inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-[#173f35] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f6f0e4]"
+          >
+            Start with My Pantry
+            <ArrowRight size={17} aria-hidden="true" />
+          </Link>
         </div>
+      </section>
 
-        <div className="relative flex flex-1 items-center py-12 sm:py-16">
-          <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] lg:gap-12">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: {},
-                visible: {
-                  transition: {
-                    staggerChildren: 0.13,
-                  },
-                },
-              }}
-              className="min-w-0"
-            >
-              {[
-                'Welcome back.',
-                'Your pantry, meal plans and orders are ready.',
-                'Everything stays organised in one place.',
-                'Pick up exactly where you left off.',
-              ].map((line, index) => (
-                <motion.p
-                  key={line}
-                  variants={{
-                    hidden: { opacity: 0, y: 24 },
-                    visible: { opacity: 1, y: 0 },
-                  }}
-                  transition={{
-                    duration: 0.62,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  className={[
-                    index === 0
-                      ? 'text-4xl font-black tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl'
-                      : 'mt-3 max-w-3xl text-lg font-semibold leading-8 text-white/72 sm:text-xl lg:text-2xl',
-                  ].join(' ')}
-                >
-                  {line}
-                </motion.p>
-              ))}
-            </motion.div>
+      <section className="mt-6">
+        <div className="relative overflow-hidden rounded-[28px] border border-[#1f594a] bg-[linear-gradient(135deg,#153f35_0%,#1e5a49_58%,#286854_100%)] p-5 text-white shadow-[0_24px_60px_-42px_rgba(21,63,53,0.85)] sm:p-6">
+          <div className="pointer-events-none absolute -right-20 -top-24 size-60 rounded-full bg-[#f0c978]/12 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-1/3 size-56 rounded-full bg-emerald-200/10 blur-3xl" />
 
-            <motion.div
-              initial={{ opacity: 0, x: 34 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.72, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className="flex min-w-0 flex-col items-start lg:items-end lg:text-right"
-            >
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/46">
-                Good to have you here
-              </p>
-              <p className="mt-3 max-w-full whitespace-nowrap font-serif text-5xl font-semibold leading-none tracking-[-0.045em] text-[#efd39a] sm:text-6xl lg:text-[clamp(3.75rem,5.2vw,6.25rem)]">
-                {name}
-              </p>
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="grid size-12 shrink-0 place-items-center rounded-2xl border border-[#f2dcad]/40 bg-[#f0d39a] text-[#173f35] shadow-[0_5px_0_#b99659]">
+                <ReceiptIndianRupee size={22} aria-hidden="true" />
+              </span>
+
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#eed9ac]">
+                  Your spending
+                </p>
+
+                <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
+                  <p className="text-3xl font-black tracking-[-0.035em] text-white sm:text-4xl">
+                    {paymentLoading
+                      ? 'Loading…'
+                      : paymentError
+                        ? '—'
+                        : formatMoney(
+                            monthSummary.amountMinor,
+                            monthSummary.currency,
+                          )}
+                  </p>
+                  <p className="pb-1 text-sm font-bold text-white/60">
+                    in {monthSummary.monthLabel}
+                  </p>
+                </div>
+
+                <p className="mt-2 text-sm font-semibold text-white/70">
+                  {paymentLoading
+                    ? 'Getting your latest order activity…'
+                    : paymentError
+                      ? 'Your spending summary could not be loaded right now.'
+                      : `${monthSummary.paidOrderCount} paid ${monthSummary.paidOrderCount === 1 ? 'order' : 'orders'} this month.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+              <div className="min-w-[130px] rounded-2xl border border-white/12 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/50">
+                  Orders this month
+                </p>
+                <p className="mt-1 text-xl font-black text-white">
+                  {paymentLoading || paymentError
+                    ? '—'
+                    : monthSummary.monthOrderCount}
+                </p>
+              </div>
+
+              <div className="min-w-[130px] rounded-2xl border border-white/12 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/50">
+                  Paid orders
+                </p>
+                <p className="mt-1 text-xl font-black text-white">
+                  {paymentLoading || paymentError
+                    ? '—'
+                    : monthSummary.paidOrderCount}
+                </p>
+              </div>
 
               <Link
-                to="/notifications"
-                className="focus-ring mt-8 inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-4 py-3 text-xs font-black text-[#173b32] shadow-sm transition duration-300 hover:-translate-y-0.5 hover:bg-[#f5efe2]"
+                to="/account/spending"
+                className="focus-ring inline-flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-[#173f35] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#fff8ec]"
               >
-                <Bell size={16} aria-hidden="true" />
-                Open notifications
+                View spending
+                <ArrowRight size={16} aria-hidden="true" />
               </Link>
-            </motion.div>
+            </div>
           </div>
         </div>
+      </section>
 
-        <motion.a
-          href="#customer-workspace"
-          animate={{ y: [0, 7, 0] }}
-          transition={{ duration: 1.45, repeat: Infinity, ease: 'easeInOut' }}
-          className="focus-ring relative mx-auto mb-5 flex w-fit flex-col items-center gap-2 rounded-full px-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.16em] text-white/70 transition hover:text-white"
-        >
-          <span>Scroll to your workspace</span>
-          <span className="grid size-9 place-items-center rounded-full border border-white/18 bg-white/10">
-            <ChevronDown size={18} aria-hidden="true" />
-          </span>
-        </motion.a>
-      </header>
-
-      <section
-        id="customer-workspace"
-        className="flex min-h-[100svh] w-full scroll-mt-0 flex-col bg-[#f7f5ef] px-4 py-8 sm:px-6 sm:py-10 lg:px-7"
-      >
-        <div className="shrink-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8b6a35]">
-            Your workspace
+      <section className="mt-6">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+            Recommended flow
           </p>
-          <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-stone-950 sm:text-4xl">
-            Pick up where you left off
+          <h2 className="mt-1 text-2xl font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
+            What to do next
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-500">
+            The same Customer tools from the sidebar are arranged here in a simple everyday food sequence.
+          </p>
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-4">
+          {customerFlowStages.map((stage) => {
+            const Icon = stage.icon
+
+            return (
+              <Link
+                key={stage.step}
+                to={stage.to}
+                className={`focus-ring group flex min-h-[255px] flex-col rounded-[26px] border p-5 transition duration-200 hover:-translate-y-1 hover:shadow-lg ${stage.className}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-600">
+                    {stage.step}
+                  </span>
+
+                  <span className={`grid size-11 place-items-center rounded-2xl ${stage.iconClassName}`}>
+                    <Icon size={19} aria-hidden="true" />
+                  </span>
+                </div>
+
+                <h3 className="mt-6 text-xl font-black tracking-[-0.025em] text-stone-950">
+                  {stage.title}
+                </h3>
+
+                <p className="mt-2 flex-1 text-sm leading-6 text-stone-600">
+                  {stage.description}
+                </p>
+
+                <span className="mt-5 inline-flex items-center gap-2 text-xs font-black text-stone-900">
+                  {stage.action}
+                  <ArrowRight
+                    size={15}
+                    aria-hidden="true"
+                    className="transition-transform duration-200 group-hover:translate-x-1"
+                  />
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="mt-7 rounded-[30px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-700">
+            Customer workspace
+          </p>
+          <h2 className="mt-1 text-2xl font-black tracking-[-0.035em] text-stone-950">
+            Quick access
           </h2>
         </div>
 
-        <WorkspaceCarousel items={workspaceItems} />
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {quickAccessItems.map((item) => {
+            const Icon = item.icon
+
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="focus-ring group flex items-start gap-4 rounded-[22px] border border-stone-200 bg-[#faf8f2] p-4 transition duration-200 hover:border-emerald-200 hover:bg-emerald-50/70"
+              >
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-emerald-800 shadow-sm">
+                  <Icon size={18} aria-hidden="true" />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-black text-stone-950">
+                      {item.title}
+                    </span>
+                    <ArrowRight
+                      size={15}
+                      aria-hidden="true"
+                      className="shrink-0 text-stone-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-emerald-700"
+                    />
+                  </span>
+
+                  <span className="mt-1.5 block text-xs leading-5 text-stone-500">
+                    {item.description}
+                  </span>
+                </span>
+              </Link>
+            )
+          })}
+        </div>
       </section>
-    </div>
+    </main>
   )
 }

@@ -1100,18 +1100,16 @@ function getAuthenticatedHomePath({
   hostEnabled,
   hostAccessStatus,
   superAdminEnabled,
+  activeMode,
 }) {
   /*
   |--------------------------------------------------------------------------
   | Authenticated landing priority
   |--------------------------------------------------------------------------
   |
-  | Super Admin is a separate governance identity and must never fall through
-  | to Customer or Host presentation routes, even if a legacy record carries
-  | customerEnabled/hostEnabled state.
-  |
-  | Host access is derived only from Host capability plus active Host status.
-  | Presentation mode is intentionally not an authorization input here.
+  | Super Admin remains a separate governance identity. Customer and Host
+  | identities land on the dashboard that matches their current presentation
+  | mode, while authorization still comes only from capability/access state.
   */
 
   if (
@@ -1125,6 +1123,20 @@ function getAuthenticatedHomePath({
     hostEnabled === true &&
     hostAccessStatus ===
       'active'
+
+  if (
+    activeMode === 'host' &&
+    hasActiveHostAccess
+  ) {
+    return '/host'
+  }
+
+  if (
+    activeMode === 'customer' &&
+    customerEnabled === true
+  ) {
+    return '/dashboard'
+  }
 
   if (
     customerEnabled ===
@@ -1143,9 +1155,6 @@ function getAuthenticatedHomePath({
 function GuestOnlyRoute({
   children,
 }) {
-  const location =
-    useLocation()
-
   const {
     isAuthenticated,
     isBootstrapping,
@@ -1153,6 +1162,7 @@ function GuestOnlyRoute({
     hostEnabled,
     hostAccessStatus,
     superAdminEnabled,
+    activeMode,
   } =
     useAuth()
 
@@ -1167,26 +1177,12 @@ function GuestOnlyRoute({
         hostEnabled,
         hostAccessStatus,
         superAdminEnabled,
+        activeMode,
       })
-
-    /*
-    | Super Admin always enters the governance console. A stale returnTo such
-    | as /dashboard must not route a privileged identity into Customer UX.
-    */
-    const safeReturnTo =
-      superAdminEnabled ===
-      true
-        ? null
-        : getSafeReturnTo(
-            location.search,
-          )
 
     return (
       <Navigate
-        to={
-          safeReturnTo ||
-          authenticatedHome
-        }
+        to={authenticatedHome}
         replace
       />
     )
@@ -1390,6 +1386,7 @@ function ApplicationAccessRoute({
             hostEnabled,
             hostAccessStatus,
             superAdminEnabled,
+            activeMode,
           })
         }
         replace

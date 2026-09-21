@@ -171,7 +171,7 @@ export default function CustomerSpendingPage() {
               page:
                 1,
               limit:
-                100,
+                50,
             })
 
           let nextOrders =
@@ -205,7 +205,7 @@ export default function CustomerSpendingPage() {
                         index +
                         2,
                       limit:
-                        100,
+                        50,
                     }),
                 ),
               )
