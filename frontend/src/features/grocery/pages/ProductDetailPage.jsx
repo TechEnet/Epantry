@@ -49,6 +49,10 @@ import {
   getCatalogProducts,
 } from '../services/catalog.service'
 
+import {
+  listPublicRecipes,
+} from '../../recipes/services/recipe.service'
+
 function formatQuantity(
   quantity,
 ) {
@@ -63,6 +67,347 @@ function formatQuantity(
   }
 
   return `${quantity.value} ${quantity.unit || ''}`.trim()
+}
+
+const CODE128_PATTERNS = [
+  '212222', '222122', '222221', '121223', '121322', '131222',
+  '122213', '122312', '132212', '221213', '221312', '231212',
+  '112232', '122132', '122231', '113222', '123122', '123221',
+  '223211', '221132', '221231', '213212', '223112', '312131',
+  '311222', '321122', '321221', '312212', '322112', '322211',
+  '212123', '212321', '232121', '111323', '131123', '131321',
+  '112313', '132113', '132311', '211313', '231113', '231311',
+  '112133', '112331', '132131', '113123', '113321', '133121',
+  '313121', '211331', '231131', '213113', '213311', '213131',
+  '311123', '311321', '331121', '312113', '312311', '332111',
+  '314111', '221411', '431111', '111224', '111422', '121124',
+  '121421', '141122', '141221', '112214', '112412', '122114',
+  '122411', '142112', '142211', '241211', '221114', '413111',
+  '241112', '134111', '111242', '121142', '121241', '114212',
+  '124112', '124211', '411212', '421112', '421211', '212141',
+  '214121', '412121', '111143', '111341', '131141', '114113',
+  '114311', '411113', '411311', '113141', '114131', '311141',
+  '411131', '211412', '211214', '211232', '2331112',
+]
+
+function normalizeBarcodeValue(value) {
+  return String(value || '')
+    .replace(/\D/g, '')
+    .trim()
+}
+
+function buildCode128Bars(value) {
+  const digits = normalizeBarcodeValue(value)
+
+  if (!digits) {
+    return null
+  }
+
+  const startCode = 104
+  const values = Array.from(digits).map(
+    (character) => character.charCodeAt(0) - 32,
+  )
+
+  const checksum =
+    (
+      startCode +
+      values.reduce(
+        (sum, code, index) =>
+          sum + code * (index + 1),
+        0,
+      )
+    ) % 103
+
+  const encodedValues = [
+    startCode,
+    ...values,
+    checksum,
+    106,
+  ]
+
+  const quietZone = 10
+  let x = quietZone
+  const bars = []
+
+  encodedValues.forEach((code) => {
+    const pattern = CODE128_PATTERNS[code]
+
+    if (!pattern) {
+      return
+    }
+
+    Array.from(pattern).forEach((moduleWidth, index) => {
+      const width = Number(moduleWidth)
+
+      if (index % 2 === 0) {
+        bars.push({
+          x,
+          width,
+        })
+      }
+
+      x += width
+    })
+  })
+
+  return {
+    digits,
+    bars,
+    width: x + quietZone,
+  }
+}
+
+function ProductBarcode({
+  value,
+  compact = false,
+}) {
+  const barcode =
+    buildCode128Bars(value)
+
+  if (!barcode) {
+    return (
+      <span className="text-xs font-bold text-stone-500">
+        Not declared
+      </span>
+    )
+  }
+
+  const barHeight =
+    compact ? 42 : 56
+
+  const textY =
+    barHeight + 15
+
+  return (
+    <div className="w-full max-w-[320px]">
+      <svg
+        viewBox={`0 0 ${barcode.width} ${barHeight + 22}`}
+        className="block h-auto w-full"
+        role="img"
+        aria-label={`Barcode ${barcode.digits}`}
+        preserveAspectRatio="xMinYMid meet"
+        shapeRendering="crispEdges"
+      >
+        <rect
+          width={barcode.width}
+          height={barHeight + 22}
+          fill="white"
+        />
+
+        {barcode.bars.map((bar, index) => (
+          <rect
+            key={`${bar.x}-${index}`}
+            x={bar.x}
+            y="2"
+            width={bar.width}
+            height={barHeight}
+            fill="#111827"
+          />
+        ))}
+
+        <text
+          x={barcode.width / 2}
+          y={textY}
+          textAnchor="middle"
+          fontSize={compact ? 8 : 10}
+          fontWeight="700"
+          letterSpacing="1.4"
+          fill="#292524"
+        >
+          {barcode.digits}
+        </text>
+      </svg>
+    </div>
+  )
+}
+
+const COUNTRY_META = {
+  india: { code: 'IN', cuisine: 'Indian' },
+  japan: { code: 'JP', cuisine: 'Japanese' },
+  china: { code: 'CN', cuisine: 'Chinese' },
+  italy: { code: 'IT', cuisine: 'Italian' },
+  mexico: { code: 'MX', cuisine: 'Mexican' },
+  thailand: { code: 'TH', cuisine: 'Thai' },
+  france: { code: 'FR', cuisine: 'French' },
+  spain: { code: 'ES', cuisine: 'Spanish' },
+  greece: { code: 'GR', cuisine: 'Greek' },
+  turkey: { code: 'TR', cuisine: 'Turkish' },
+  vietnam: { code: 'VN', cuisine: 'Vietnamese' },
+  indonesia: { code: 'ID', cuisine: 'Indonesian' },
+  malaysia: { code: 'MY', cuisine: 'Malaysian' },
+  singapore: { code: 'SG', cuisine: 'Singaporean' },
+  'south korea': { code: 'KR', cuisine: 'Korean' },
+  korea: { code: 'KR', cuisine: 'Korean' },
+  'united states': { code: 'US', cuisine: 'American' },
+  'united states of america': { code: 'US', cuisine: 'American' },
+  usa: { code: 'US', cuisine: 'American' },
+  canada: { code: 'CA', cuisine: 'Canadian' },
+  brazil: { code: 'BR', cuisine: 'Brazilian' },
+  argentina: { code: 'AR', cuisine: 'Argentinian' },
+  peru: { code: 'PE', cuisine: 'Peruvian' },
+  australia: { code: 'AU', cuisine: 'Australian' },
+  'new zealand': { code: 'NZ', cuisine: 'New Zealand' },
+  germany: { code: 'DE', cuisine: 'German' },
+  portugal: { code: 'PT', cuisine: 'Portuguese' },
+  netherlands: { code: 'NL', cuisine: 'Dutch' },
+  belgium: { code: 'BE', cuisine: 'Belgian' },
+  switzerland: { code: 'CH', cuisine: 'Swiss' },
+  austria: { code: 'AT', cuisine: 'Austrian' },
+  ireland: { code: 'IE', cuisine: 'Irish' },
+  'united kingdom': { code: 'GB', cuisine: 'British' },
+  uk: { code: 'GB', cuisine: 'British' },
+  egypt: { code: 'EG', cuisine: 'Egyptian' },
+  morocco: { code: 'MA', cuisine: 'Moroccan' },
+  lebanon: { code: 'LB', cuisine: 'Lebanese' },
+  israel: { code: 'IL', cuisine: 'Israeli' },
+  'saudi arabia': { code: 'SA', cuisine: 'Saudi Arabian' },
+  'united arab emirates': { code: 'AE', cuisine: 'Emirati' },
+  uae: { code: 'AE', cuisine: 'Emirati' },
+  pakistan: { code: 'PK', cuisine: 'Pakistani' },
+  bangladesh: { code: 'BD', cuisine: 'Bangladeshi' },
+  'sri lanka': { code: 'LK', cuisine: 'Sri Lankan' },
+  nepal: { code: 'NP', cuisine: 'Nepalese' },
+}
+
+function normalizeCountryKey(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+const ISO_ALPHA2_CODES = `AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW`.split(' ')
+
+function findCountryCodeByDisplayName(value) {
+  const key = normalizeCountryKey(value)
+
+  if (
+    !key ||
+    typeof Intl === 'undefined' ||
+    typeof Intl.DisplayNames !== 'function'
+  ) {
+    return ''
+  }
+
+  try {
+    const displayNames =
+      new Intl.DisplayNames(
+        ['en'],
+        { type: 'region' },
+      )
+
+    return (
+      ISO_ALPHA2_CODES.find(
+        (code) =>
+          normalizeCountryKey(
+            displayNames.of(code),
+          ) === key,
+      ) ||
+      ''
+    )
+  } catch {
+    return ''
+  }
+}
+
+function resolveCountryMeta(value) {
+  const raw = String(value || '').trim()
+  const key = normalizeCountryKey(raw)
+
+  if (!raw) {
+    return {
+      name: '',
+      code: '',
+      cuisine: '',
+      flag: '🌍',
+    }
+  }
+
+  const directCode =
+    /^[a-z]{2}$/i.test(raw)
+      ? raw.toUpperCase()
+      : ''
+
+  const known =
+    COUNTRY_META[key] ||
+    null
+
+  const code =
+    directCode ||
+    known?.code ||
+    findCountryCodeByDisplayName(raw) ||
+    ''
+
+  const flag =
+    code.length === 2
+      ? String.fromCodePoint(
+          ...Array.from(code).map(
+            (character) =>
+              127397 + character.charCodeAt(0),
+          ),
+        )
+      : '🌍'
+
+  return {
+    name: raw,
+    code,
+    cuisine:
+      known?.cuisine ||
+      '',
+    flag,
+  }
+}
+
+function countryDescription(countryName) {
+  const country =
+    String(countryName || '').trim()
+
+  if (!country) {
+    return []
+  }
+
+  return [
+    `${country} has its own regional food traditions, ingredients, and production practices.`,
+    `Foods grown, prepared, or packed there can vary significantly by region and producer.`,
+    `EPANTRY shows the published country-of-origin record and connects other listings from the same country when they are available.`,
+  ]
+}
+
+function recipeCountryCuisine(item) {
+  return String(
+    item?.dish?.cuisine ||
+      item?.recipe?.cuisine ||
+      '',
+  ).trim()
+}
+
+function getCountryRecipeName(item) {
+  return (
+    item?.dish?.name ||
+    item?.recipe?.title ||
+    'Recipe'
+  )
+}
+
+function getCountryRecipePath(item) {
+  return (
+    item?.path ||
+    `/recipes/${encodeURIComponent(
+      item?.dish?.slug ||
+        item?.recipe?.slug ||
+        '',
+    )}`
+  )
+}
+
+function getCountryRecipeImage(item) {
+  return (
+    item?.dish?.heroImageUrl ||
+    item?.recipe?.heroImageUrl ||
+    ''
+  )
 }
 
 
@@ -1241,9 +1586,15 @@ function ProductDetailsSheet({
         'Not declared',
     ],
     [
-      'GTIN',
-      product?.gtin ||
-        'Not declared',
+      'Barcode',
+      <ProductBarcode
+        key="product-barcode"
+        value={
+          product?.gtin ||
+          product?.barcode
+        }
+        compact
+      />,
     ],
     [
       'Country of origin',
@@ -1296,7 +1647,7 @@ function ProductDetailsSheet({
                   <dt className="text-[9px] font-black uppercase tracking-[0.1em] text-stone-400">
                     {label}
                   </dt>
-                  <dd className="mt-1 break-words text-xs font-black text-stone-900">
+                  <dd className="mt-1 min-w-0 break-words text-xs font-black text-stone-900">
                     {value}
                   </dd>
                 </div>
@@ -1602,6 +1953,87 @@ function RecommendationProductCard({
   )
 }
 
+function CountryListingCard({
+  listing,
+}) {
+  const isRecipe =
+    listing?.type === 'recipe'
+
+  const item =
+    listing?.item || {}
+
+  const path =
+    isRecipe
+      ? getCountryRecipePath(item)
+      : `/grocery/product/${encodeURIComponent(
+          item?.slug || '',
+        )}`
+
+  const title =
+    isRecipe
+      ? getCountryRecipeName(item)
+      : item?.displayName ||
+        'Grocery product'
+
+  const imageUrl =
+    isRecipe
+      ? getCountryRecipeImage(item)
+      : item?.image?.url ||
+        ''
+
+  const meta =
+    isRecipe
+      ? recipeCountryCuisine(item) ||
+        'Recipe'
+      : item?.category?.name ||
+        item?.brand?.name ||
+        'Grocery'
+
+  return (
+    <Link
+      to={path}
+      className="focus-ring group flex min-w-0 items-center gap-3 rounded-2xl border border-stone-200 bg-white p-2.5 shadow-[0_8px_24px_rgba(28,25,23,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_28px_rgba(4,120,87,0.10)] motion-reduce:transform-none"
+    >
+      <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#f3f6f1]">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <Package
+            size={24}
+            className="text-emerald-700/40"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-800">
+            {isRecipe ? 'Recipe' : 'Grocery'}
+          </span>
+          <span className="truncate text-[9px] font-bold text-stone-400">
+            {meta}
+          </span>
+        </div>
+
+        <p className="mt-1.5 line-clamp-2 text-xs font-black leading-4 text-stone-900">
+          {title}
+        </p>
+      </div>
+
+      <ArrowRight
+        size={15}
+        className="shrink-0 text-stone-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-700"
+        aria-hidden="true"
+      />
+    </Link>
+  )
+}
+
 function ProductRecommendationShelf({
   eyebrow,
   title,
@@ -1722,6 +2154,247 @@ export default function ProductDetailPage() {
     useState(
       '',
     )
+
+  const [
+    countryPanelOpen,
+    setCountryPanelOpen,
+  ] =
+    useState(
+      false,
+    )
+
+  const [
+    countryListings,
+    setCountryListings,
+  ] =
+    useState(
+      [],
+    )
+
+  const [
+    countryListingsLoading,
+    setCountryListingsLoading,
+  ] =
+    useState(
+      false,
+    )
+
+  useEffect(
+    () => {
+      setCountryPanelOpen(false)
+      setCountryListings([])
+    },
+    [product?.slug],
+  )
+
+  useEffect(
+    () => {
+      if (!countryPanelOpen) {
+        return undefined
+      }
+
+      const previousOverflow =
+        document.body.style.overflow
+
+      const handleKeyDown =
+        (event) => {
+          if (event.key === 'Escape') {
+            setCountryPanelOpen(false)
+          }
+        }
+
+      document.body.style.overflow =
+        'hidden'
+
+      window.addEventListener(
+        'keydown',
+        handleKeyDown,
+      )
+
+      return () => {
+        document.body.style.overflow =
+          previousOverflow
+
+        window.removeEventListener(
+          'keydown',
+          handleKeyDown,
+        )
+      }
+    },
+    [countryPanelOpen],
+  )
+
+  useEffect(
+    () => {
+      const origin =
+        String(
+          product?.countryOfOrigin ||
+            '',
+        ).trim()
+
+      if (
+        !countryPanelOpen ||
+        !origin
+      ) {
+        if (!origin) {
+          setCountryListings([])
+        }
+
+        return undefined
+      }
+
+      let active = true
+
+      async function loadCountryListings() {
+        setCountryListingsLoading(true)
+
+        const countryMeta =
+          resolveCountryMeta(origin)
+
+        try {
+          const [productsSettled, recipesSettled] =
+            await Promise.allSettled([
+              getCatalogProducts({
+                page: 1,
+                limit: 100,
+              }),
+              listPublicRecipes({
+                page: 1,
+                limit: countryMeta.cuisine
+                  ? 18
+                  : 50,
+                ...(countryMeta.cuisine
+                  ? {
+                      cuisine:
+                        countryMeta.cuisine,
+                    }
+                  : {}),
+              }),
+            ])
+
+          if (!active) {
+            return
+          }
+
+          const currentProductKey =
+            getProductRecommendationKey(product)
+
+          const originKey =
+            normalizeCountryKey(origin)
+
+          const productItems =
+            productsSettled.status === 'fulfilled'
+              ? productsSettled.value?.products || []
+              : []
+
+          const matchingProducts =
+            productItems
+              .filter(
+                (item) =>
+                  getProductRecommendationKey(item) !==
+                    currentProductKey &&
+                  normalizeCountryKey(
+                    item?.countryOfOrigin,
+                  ) === originKey,
+              )
+              .slice(0, 4)
+              .map((item) => ({
+                type: 'product',
+                item,
+              }))
+
+          const recipeItems =
+            recipesSettled.status === 'fulfilled'
+              ? recipesSettled.value?.recipes || []
+              : []
+
+          const cuisineKey =
+            normalizeCountryKey(
+              countryMeta.cuisine,
+            )
+
+          const matchingRecipes =
+            recipeItems
+              .filter((item) => {
+                const recipeCuisine =
+                  normalizeCountryKey(
+                    recipeCountryCuisine(item),
+                  )
+
+                if (!recipeCuisine) {
+                  return false
+                }
+
+                if (cuisineKey) {
+                  return (
+                    recipeCuisine === cuisineKey ||
+                    recipeCuisine.includes(cuisineKey) ||
+                    cuisineKey.includes(recipeCuisine)
+                  )
+                }
+
+                return (
+                  recipeCuisine === originKey ||
+                  recipeCuisine.includes(originKey) ||
+                  originKey.includes(recipeCuisine)
+                )
+              })
+              .slice(0, 4)
+              .map((item) => ({
+                type: 'recipe',
+                item,
+              }))
+
+          const combined = []
+          const maxLength = Math.max(
+            matchingProducts.length,
+            matchingRecipes.length,
+          )
+
+          for (
+            let index = 0;
+            index < maxLength;
+            index += 1
+          ) {
+            if (matchingProducts[index]) {
+              combined.push(
+                matchingProducts[index],
+              )
+            }
+
+            if (matchingRecipes[index]) {
+              combined.push(
+                matchingRecipes[index],
+              )
+            }
+          }
+
+          setCountryListings(
+            combined.slice(0, 6),
+          )
+        } catch {
+          if (active) {
+            setCountryListings([])
+          }
+        } finally {
+          if (active) {
+            setCountryListingsLoading(false)
+          }
+        }
+      }
+
+      loadCountryListings()
+
+      return () => {
+        active = false
+      }
+    },
+    [
+      countryPanelOpen,
+      product?.slug,
+      product?.countryOfOrigin,
+    ],
+  )
 
   useEffect(
     () => {
@@ -1973,6 +2646,16 @@ export default function ProductDetailPage() {
       ?.length >
       0
 
+  const countryMeta =
+    resolveCountryMeta(
+      product.countryOfOrigin,
+    )
+
+  const countryCopy =
+    countryDescription(
+      product.countryOfOrigin,
+    )
+
   return (
     <main className="min-h-screen bg-[#f5f4ef]">
 
@@ -2203,6 +2886,42 @@ export default function ProductDetailPage() {
                 </span>
               </p>
 
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">
+                  Country of origin
+                </span>
+
+                {product.countryOfOrigin ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCountryPanelOpen(true)
+                    }
+                    className="focus-ring group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-left shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50"
+                    aria-label={`Learn about ${product.countryOfOrigin}`}
+                  >
+                    <span
+                      className="text-[28px] leading-none"
+                      aria-hidden="true"
+                    >
+                      {countryMeta.flag}
+                    </span>
+                    <span className="text-xs font-black text-emerald-950">
+                      {product.countryOfOrigin}
+                    </span>
+                    <ArrowRight
+                      size={14}
+                      className="text-emerald-700 transition group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    />
+                  </button>
+                ) : (
+                  <span className="text-xs font-bold text-stone-400">
+                    Not declared
+                  </span>
+                )}
+              </div>
+
               <details className="group mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
 
                 <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 bg-stone-50/80 px-4 py-4 text-sm font-black text-stone-950 transition hover:bg-stone-100">
@@ -2262,11 +2981,12 @@ export default function ProductDetailPage() {
 
                   <div className="grid grid-cols-[118px_minmax(0,1fr)] gap-4 px-4 py-3">
                     <dt className="text-xs font-bold text-stone-500">
-                      GTIN
+                      Barcode
                     </dt>
                     <dd className="break-all text-sm font-black text-stone-950">
                       {
                         product.gtin ||
+                        product.barcode ||
                         'Not declared'
                       }
                     </dd>
@@ -2381,6 +3101,114 @@ export default function ProductDetailPage() {
             </div>
           </div>
         )}
+
+        {countryPanelOpen && product.countryOfOrigin ? (
+          <div
+            className="fixed inset-0 z-[140] bg-stone-950/10 backdrop-blur-[1px]"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setCountryPanelOpen(false)
+              }
+            }}
+          >
+            <aside
+              className="absolute right-4 top-[96px] flex max-h-[72vh] w-[min(380px,calc(100vw-32px))] flex-col overflow-hidden rounded-[28px] border border-emerald-100 bg-[#fbfcf8] shadow-[0_24px_70px_rgba(28,25,23,0.22)] sm:right-6 sm:top-[104px]"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`About ${product.countryOfOrigin}`}
+            >
+              <div className="relative shrink-0 overflow-hidden border-b border-emerald-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.20),transparent_44%),linear-gradient(145deg,#0b3d2f,#145c43)] px-5 pb-4 pt-5 text-white">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCountryPanelOpen(false)
+                  }
+                  className="focus-ring absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white hover:text-emerald-950"
+                  aria-label="Close country panel"
+                >
+                  <X
+                    size={18}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                <div className="flex items-center gap-3 pr-11">
+                  <span
+                    className="text-[42px] leading-none drop-shadow-sm"
+                    aria-hidden="true"
+                  >
+                    {countryMeta.flag}
+                  </span>
+
+                  <div className="min-w-0 pb-1">
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-200">
+                      Country of origin
+                    </p>
+                    <h2 className="mt-0.5 break-words text-2xl font-black tracking-[-0.035em]">
+                      {product.countryOfOrigin}
+                    </h2>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+                <section>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                    About the origin
+                  </p>
+
+                  <div className="mt-2.5 space-y-2 text-[13px] font-semibold leading-5 text-stone-600">
+                    {countryCopy.map((paragraph) => (
+                      <p key={paragraph}>
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="mt-5 border-t border-stone-200 pt-5">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                      More from {product.countryOfOrigin}
+                    </p>
+                    <h3 className="mt-1 text-lg font-black tracking-[-0.025em] text-stone-950">
+                      Grocery & recipes on EPANTRY
+                    </h3>
+                  </div>
+
+                  {countryListingsLoading ? (
+                    <div className="mt-3 grid gap-2.5">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="h-[74px] animate-pulse rounded-2xl border border-stone-200 bg-white"
+                        />
+                      ))}
+                    </div>
+                  ) : countryListings.length > 0 ? (
+                    <div className="mt-3 grid gap-2.5">
+                      {countryListings.map((listing, index) => (
+                        <CountryListingCard
+                          key={`${listing.type}-${
+                            listing.type === 'recipe'
+                              ? getCountryRecipePath(listing.item)
+                              : getProductRecommendationKey(listing.item)
+                          }-${index}`}
+                          listing={listing}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-2xl border border-dashed border-stone-300 bg-white px-4 py-4 text-[13px] font-semibold leading-5 text-stone-500">
+                      No other published grocery or recipe listing from this country is available yet.
+                    </div>
+                  )}
+                </section>
+              </div>
+            </aside>
+          </div>
+        ) : null}
 
         <section className="mt-6 grid gap-5 xl:grid-cols-2 xl:items-stretch">
 

@@ -507,7 +507,7 @@ export async function getLandingFeaturedContent() {
         1,
 
       limit:
-        3,
+        5,
 
       search:
         '',
@@ -572,15 +572,34 @@ export async function getLandingFeaturedContent() {
   |--------------------------------------------------------------------------
   */
 
-  const featuredRecipeItems =
+  const publicRecipes =
     Array.isArray(
       publicRecipeResult?.recipes,
     )
-      ? publicRecipeResult.recipes.slice(
-          0,
-          3,
-        )
+      ? publicRecipeResult.recipes
       : []
+
+  /*
+  |--------------------------------------------------------------------------
+  | Mobile Fourth Recipe Selection
+  |--------------------------------------------------------------------------
+  |
+  | Desktop keeps the original first three featured recipes. The recipe that
+  | was fourth in the public result does not currently have the intended
+  | image, so the mobile-only fourth card intentionally uses the fifth public
+  | recipe instead. If fewer than five published recipes exist, fall back to
+  | the fourth record rather than inventing any content.
+  |
+  */
+
+  const featuredRecipeItems = [
+    ...publicRecipes.slice(
+      0,
+      3,
+    ),
+    publicRecipes[4] ||
+      publicRecipes[3],
+  ].filter(Boolean)
 
   const featuredRecipes =
     await Promise.all(

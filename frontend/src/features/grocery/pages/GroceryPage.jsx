@@ -633,9 +633,72 @@ const PAGE_STYLES = `
   .ep-grocery-hero__content { padding-left: 22px; padding-right: 22px; padding-bottom: 112px; }
   .ep-grocery-hero h1 { max-width: 330px; font-size: clamp(50px,13vw,72px); }
   .ep-grocery-hero__copy { max-width: 320px; font-size: 13px; }
-  .ep-grocery-hero__filters { width: 100%; max-width: 430px; margin-top: 22px; }
-  .ep-grocery-hero__selects { grid-template-columns: 1fr 1fr; }
-  .ep-grocery-hero__reset { grid-column: span 2; }
+  .ep-grocery-hero__filters {
+    width: calc(100% + 20px);
+    max-width: none;
+    margin-top: 22px;
+    margin-left: -10px;
+    margin-right: -10px;
+    padding: 7px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .ep-grocery-hero__search {
+    min-width: 0;
+    min-height: 40px;
+    flex: 1 1 auto;
+    gap: 5px;
+    padding: 0 4px 0 8px;
+    border-radius: 10px;
+  }
+  .ep-grocery-hero__search > svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .ep-grocery-hero__search input {
+    min-width: 0;
+    font-size: 10px;
+  }
+  .ep-grocery-hero__search input::placeholder {
+    font-size: 10px;
+  }
+  .ep-grocery-hero__search button {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+  .ep-grocery-hero__selects {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 0;
+  }
+  .ep-grocery-hero__selects select {
+    height: 40px;
+    padding: 0 20px 0 7px;
+    border-radius: 9px;
+    background-position: calc(100% - 7px) center;
+    font-size: 9px;
+  }
+  #grocery-category { width: 72px; }
+  #grocery-brand { width: 62px; }
+  .ep-grocery-hero__reset {
+    width: 34px;
+    min-width: 34px;
+    min-height: 40px;
+    grid-column: auto;
+    padding: 0;
+    gap: 0;
+    font-size: 0;
+  }
+  .ep-grocery-hero__reset svg {
+    width: 14px;
+    height: 14px;
+  }
   .ep-grocery-scroll-cue { left: 22px; right: 22px; }
   .ep-grocery-scroll-cue p { display: none; }
   .ep-grocery-stage::after { display: none; }

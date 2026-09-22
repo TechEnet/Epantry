@@ -25,6 +25,75 @@ import {
   useLandingFeaturedQuery,
 } from '../hooks/useLandingFeaturedQuery'
 
+const mobileRailFrames = new WeakMap()
+
+function updateMobileRailFocus(rail) {
+  if (!rail?.children?.length) {
+    return
+  }
+
+  const railRect = rail.getBoundingClientRect()
+  const railCenter = railRect.left + railRect.width / 2
+  const focusDistance = Math.max(railRect.width * 0.72, 1)
+
+  Array.from(rail.children).forEach((child) => {
+    const card = child.firstElementChild
+
+    if (!card) {
+      return
+    }
+
+    const childRect = child.getBoundingClientRect()
+    const childCenter = childRect.left + childRect.width / 2
+    const distance = Math.min(
+      Math.abs(childCenter - railCenter) / focusDistance,
+      1,
+    )
+    const scale = 1.035 - distance * 0.115
+    const translateY = distance * 8
+    const opacity = 1 - distance * 0.045
+
+    card.style.transform = `translate3d(0, ${translateY.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`
+    card.style.opacity = opacity.toFixed(3)
+  })
+}
+
+function handleMobileRailScroll(event) {
+  const rail = event.currentTarget
+  const previousFrame = mobileRailFrames.get(rail)
+
+  if (previousFrame) {
+    cancelAnimationFrame(previousFrame)
+  }
+
+  const nextFrame = requestAnimationFrame(() => {
+    updateMobileRailFocus(rail)
+    mobileRailFrames.delete(rail)
+  })
+
+  mobileRailFrames.set(rail, nextFrame)
+}
+
+function initializeMobileRail(rail) {
+  if (!rail || typeof requestAnimationFrame === 'undefined') {
+    return
+  }
+
+  requestAnimationFrame(() => {
+    const startCard = rail.querySelector('[data-mobile-rail-start]')
+
+    if (startCard) {
+      const centeredScrollLeft =
+        startCard.offsetLeft -
+        (rail.clientWidth - startCard.offsetWidth) / 2
+
+      rail.scrollLeft = Math.max(centeredScrollLeft, 0)
+    }
+
+    updateMobileRailFocus(rail)
+  })
+}
+
 export default function FeaturedContentSection() {
   const shouldReduceMotion =
     useReducedMotion()
@@ -96,6 +165,26 @@ export default function FeaturedContentSection() {
   const recipes =
     data?.recipes || []
 
+  const mobileGroceryItems =
+    grocery.slice(0, 4)
+
+  const mobileGroceryCards =
+    mobileGroceryItems.map(
+      (product) => ({
+        product,
+      }),
+    )
+
+  const mobileRecipeItems =
+    recipes.slice(0, 4)
+
+  const mobileRecipeCards =
+    mobileRecipeItems.map(
+      (recipe) => ({
+        recipe,
+      }),
+    )
+
   /*
   |--------------------------------------------------------------------------
   | Temporary Featured Cart
@@ -142,10 +231,149 @@ export default function FeaturedContentSection() {
           tone="grocery"
         />
 
-        <div className="flex flex-1 items-center py-5">
+        <div className="pb-7 pt-4 sm:flex sm:flex-1 sm:items-center sm:py-5">
 
           {grocery.length > 0 ? (
-            <div className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <>
+              {/* Mobile-only focus rail inspired by the supplied reference video. */}
+              <div
+                ref={initializeMobileRail}
+                className="-mx-4 flex snap-x snap-mandatory scroll-smooth gap-3 overflow-x-auto overscroll-x-contain pl-4 pr-[12vw] pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden"
+                onScroll={handleMobileRailScroll}
+              >
+
+                {mobileGroceryCards.map(({ product }, index) => {
+                  return (
+                    <motion.article
+                      key={`mobile-grocery-${product.id || product.slug || index}`}
+                      initial={false}
+                      data-mobile-rail-start={index === 0 ? 'true' : undefined}
+                      className="w-[84vw] shrink-0 snap-center"
+                    >
+                      <Link
+                        to={
+                          product.path ||
+                          (product.slug
+                            ? `/grocery/product/${product.slug}`
+                            : '/grocery')
+                        }
+                        data-mobile-focus-card
+                        className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#E7E5E4] bg-[#F7F7F3] shadow-[0_18px_42px_rgba(17,24,39,0.12)] will-change-transform [backface-visibility:hidden]"
+                        style={{
+                          transform:
+                            index === 0
+                              ? 'translate3d(0, 0, 0) scale(1.025)'
+                              : 'translate3d(0, 8px, 0) scale(0.92)',
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-[#F7F7F3]" />
+                        <div className="absolute inset-x-0 top-0 h-[67%] bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.98),rgba(248,248,244,0.92)_54%,rgba(239,240,234,0.92)_100%)]" />
+                        <div className="absolute inset-x-6 top-12 h-[52%] rounded-[30px] border border-black/[0.05] bg-white/72 shadow-[0_18px_44px_rgba(17,24,39,0.08)] backdrop-blur-sm" />
+
+                        <div className="absolute left-5 top-5 rounded-full border border-black/[0.06] bg-white/88 px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.13em] text-[#35543E] shadow-sm backdrop-blur-md">
+                          {product.subCategory || 'Grocery'}
+                        </div>
+
+                        <div className="absolute inset-x-8 top-[15%] flex h-[43%] items-center justify-center p-2">
+                          {product.image ? (
+                            <img
+                              src={product.image}
+                              alt={product.name || 'Grocery product'}
+                              loading="lazy"
+                              className="max-h-full max-w-full object-contain drop-shadow-[0_14px_18px_rgba(17,24,39,0.12)] transition duration-500 group-active:-translate-y-0.5"
+                            />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center text-[#35543E]">
+                              <Package size={46} aria-hidden="true" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="absolute inset-x-4 bottom-4 rounded-[26px] border border-black/[0.06] bg-white/88 px-4 py-4 text-[#111827] shadow-[0_16px_34px_rgba(17,24,39,0.10)] backdrop-blur-xl">
+                          <p className="text-[8px] font-black uppercase tracking-[0.17em] text-[#55705D]">
+                            EPANTRY Grocery
+                          </p>
+                          <h3 className="mt-1.5 text-[22px] font-black leading-[1.02] tracking-[-0.035em] text-[#111827]">
+                            {product.name || 'Grocery Product'}
+                          </h3>
+                          {(product.quantity || product.unit) && (
+                            <p className="mt-2 text-[10px] font-bold text-[#737A73]">
+                              {product.quantity}{product.quantity && product.unit ? ' ' : ''}{product.unit || ''}
+                            </p>
+                          )}
+                        </div>
+
+                        <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/60 bg-white/90 text-[#166534] shadow-sm backdrop-blur">
+                          <ArrowRight size={17} aria-hidden="true" />
+                        </span>
+                      </Link>
+                    </motion.article>
+                  )
+                })}
+
+                <article className="w-[84vw] shrink-0 snap-center">
+                  <Link
+                    to="/grocery"
+                    data-mobile-focus-card
+                    className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#E7E5E4] bg-[#F7F7F3] shadow-[0_18px_42px_rgba(17,24,39,0.12)] will-change-transform [backface-visibility:hidden]"
+                    style={{
+                      transform: 'translate3d(0, 8px, 0) scale(0.92)',
+                    }}
+                    aria-label="View all groceries"
+                  >
+                    <div className="absolute inset-0 bg-[linear-gradient(155deg,#FCFCF8_0%,#F4F3EE_52%,#ECEAE3_100%)]" />
+                    <div className="absolute -right-10 top-12 h-40 w-40 rounded-full bg-white/70 blur-2xl" />
+                    <div className="absolute -left-12 top-[38%] h-36 w-36 rounded-full bg-[#D7D4CA]/35 blur-2xl" />
+
+                    <div className="absolute inset-x-5 top-7 grid h-[48%] grid-cols-2 grid-rows-2 gap-2.5">
+                      {grocery.slice(0, 3).map((item, previewIndex) => (
+                        <div
+                          key={`grocery-view-all-preview-${item.id || item.slug || previewIndex}`}
+                          className={`overflow-hidden rounded-[18px] border border-white/80 bg-white/80 p-2 shadow-sm backdrop-blur ${
+                            previewIndex === 0 ? 'row-span-2' : ''
+                          }`}
+                        >
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center text-[#166534]">
+                              <Package size={28} aria-hidden="true" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="absolute inset-x-4 bottom-4 rounded-[24px] border border-white/90 bg-white/82 px-4 py-4 text-[#111827] shadow-[0_14px_34px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#166534]/75">
+                        EPANTRY Grocery
+                      </p>
+                      <h3 className="mt-1.5 max-w-[230px] text-[25px] font-black leading-[0.98] tracking-[-0.04em]">
+                        See the full grocery shelf
+                      </h3>
+                      <p className="mt-2.5 max-w-[235px] text-[10px] font-semibold leading-4 text-[#667085]">
+                        Browse every available grocery product in one place.
+                      </p>
+                      <span className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-[#166534] px-4 text-[11px] font-black text-white shadow-sm">
+                        View all
+                        <ArrowRight size={13} aria-hidden="true" />
+                      </span>
+                    </div>
+
+                    <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/70 bg-white/90 text-[#166534] shadow-sm backdrop-blur">
+                      <ArrowRight size={17} aria-hidden="true" />
+                    </span>
+                  </Link>
+                </article>
+
+              </div>
+
+              <div className="hidden w-full sm:grid sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
 
               {grocery.map(
                 (
@@ -202,9 +430,9 @@ export default function FeaturedContentSection() {
                           The new two-phase interaction is desktop-only.
                       ============================================== */}
 
-                      <div className="flex h-full flex-col overflow-hidden rounded-[26px] border border-[#E5E7EB] bg-white p-3.5 shadow-sm transition-all duration-300 hover:border-[#16A34A]/30 hover:bg-white hover:shadow-xl hover:shadow-[#111827]/10 lg:hidden">
+                      <div className="flex h-full flex-col overflow-hidden rounded-[18px] border border-[#E5E7EB] bg-white p-2 shadow-sm transition-all duration-300 hover:border-[#16A34A]/30 hover:bg-white hover:shadow-xl hover:shadow-[#111827]/10 sm:rounded-[26px] sm:p-3.5 lg:hidden">
 
-                        <div className="relative h-[210px] shrink-0 overflow-hidden rounded-[20px] bg-white">
+                        <div className="relative h-[116px] shrink-0 overflow-hidden rounded-[14px] bg-white sm:h-[210px] sm:rounded-[20px]">
 
                           {product.image ? (
                             <img
@@ -231,29 +459,29 @@ export default function FeaturedContentSection() {
 
                         </div>
 
-                        <div className="flex flex-1 flex-col px-1 pt-4">
+                        <div className="flex flex-col px-0.5 pt-2.5 sm:flex-1 sm:pt-4 sm:px-1">
 
-                          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#166534]">
+                          <p className="text-[9px] font-bold uppercase tracking-[0.10em] text-[#166534] sm:text-[11px] sm:tracking-[0.12em]">
 
                             {product.subCategory ||
                               'Grocery'}
 
                           </p>
 
-                          <h3 className="mt-2 line-clamp-2 text-lg font-black leading-snug text-[#111827]">
+                          <h3 className="mt-1.5 text-[12px] font-black leading-[1.12] text-[#111827] break-words sm:mt-2 sm:line-clamp-2 sm:text-lg sm:leading-snug">
 
                             {product.name ||
                               'Grocery Product'}
 
                           </h3>
 
-                          <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+                          <div className="mt-1.5 flex items-end justify-between gap-2 sm:mt-auto sm:gap-3 sm:pt-4">
 
                             <div>
 
                               {(product.quantity ||
                                 product.unit) && (
-                                <p className="text-xs font-medium text-[#6B7280]/70">
+                                <p className="text-[10px] font-medium text-[#6B7280]/70 sm:text-xs">
 
                                   {
                                     product.quantity
@@ -267,7 +495,7 @@ export default function FeaturedContentSection() {
 
                               {product.price !=
                                 null && (
-                                <p className="mt-1 text-lg font-black text-[#111827]">
+                                <p className="mt-1 text-[15px] font-black text-[#111827] sm:text-lg">
 
                                   {formatPrice(
                                     product.price,
@@ -279,7 +507,7 @@ export default function FeaturedContentSection() {
 
                             </div>
 
-                            <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#F0FDF4] text-[#166534]">
+                            <div className="hidden size-10 shrink-0 place-items-center rounded-full bg-[#F0FDF4] text-[#166534] sm:grid">
 
                               <ShoppingBasket
                                 size={18}
@@ -290,16 +518,17 @@ export default function FeaturedContentSection() {
 
                           </div>
 
-                          <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:mt-3 sm:gap-2">
 
                             <Link
                               to="/grocery"
-                              className="focus-ring flex h-10 items-center justify-center gap-1.5 rounded-full bg-[#1F2937] px-3 text-xs font-bold text-white transition duration-300 hover:bg-[#111827]"
+                              className="focus-ring flex h-8 items-center justify-center gap-1 rounded-full bg-[#1F2937] px-2 text-[10px] font-bold text-white transition duration-300 hover:bg-[#111827] sm:h-10 sm:gap-1.5 sm:px-3 sm:text-xs"
                             >
 
                               <Eye
                                 size={15}
                                 aria-hidden="true"
+                                className="size-3 sm:size-[15px]"
                               />
 
                               View
@@ -313,15 +542,17 @@ export default function FeaturedContentSection() {
                                   product,
                                 )
                               }
-                              className="focus-ring flex h-10 items-center justify-center gap-1.5 rounded-full bg-[#166534] px-3 text-xs font-bold text-white transition duration-300 hover:bg-[#14532D]"
+                              className="focus-ring flex h-8 items-center justify-center gap-1 rounded-full bg-[#166534] px-2 text-[10px] font-bold text-white transition duration-300 hover:bg-[#14532D] sm:h-10 sm:gap-1.5 sm:px-3 sm:text-xs"
                             >
 
                               <ShoppingBasket
                                 size={15}
                                 aria-hidden="true"
+                                className="size-3 sm:size-[15px]"
                               />
 
-                              Add to Cart
+                              <span className="sm:hidden">Add</span>
+                              <span className="hidden sm:inline">Add to Cart</span>
 
                             </button>
 
@@ -557,7 +788,8 @@ export default function FeaturedContentSection() {
                 },
               )}
 
-            </div>
+              </div>
+            </>
           ) : (
             <EmptyState
               message="Featured grocery products will appear here once catalog data is available."
@@ -586,10 +818,166 @@ export default function FeaturedContentSection() {
           tone="recipes"
         />
 
-        <div className="flex flex-1 items-center py-5">
+        <div className="pb-7 pt-4 sm:flex sm:flex-1 sm:items-center sm:py-5">
 
           {recipes.length > 0 ? (
-            <div className="grid w-full gap-5 md:grid-cols-3">
+            <>
+              {/* Mobile-only focus rail inspired by the supplied reference video. */}
+              <div
+                ref={initializeMobileRail}
+                className="-mx-4 flex snap-x snap-mandatory scroll-smooth gap-3 overflow-x-auto overscroll-x-contain pl-4 pr-[12vw] pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden"
+                onScroll={handleMobileRailScroll}
+              >
+
+                {mobileRecipeCards.map(({ recipe }, index) => {
+                  return (
+                    <motion.article
+                      key={`mobile-recipe-${recipe.id || recipe.slug || index}`}
+                      initial={false}
+                      data-mobile-rail-start={index === 0 ? 'true' : undefined}
+                      className="w-[84vw] shrink-0 snap-center"
+                    >
+                      <Link
+                        to={
+                          recipe.path ||
+                          (recipe.slug
+                            ? `/recipes/${recipe.slug}`
+                            : '/recipes')
+                        }
+                        data-mobile-focus-card
+                        className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#FED7AA]/70 bg-[#FFF7ED] shadow-[0_18px_42px_rgba(154,52,18,0.14)] will-change-transform [backface-visibility:hidden]"
+                        style={{
+                          transform:
+                            index === 0
+                              ? 'translate3d(0, 0, 0) scale(1.025)'
+                              : 'translate3d(0, 8px, 0) scale(0.92)',
+                        }}
+                      >
+                        {recipe.image ? (
+                          <img
+                            src={recipe.image}
+                            alt={recipe.name || 'Recipe'}
+                            loading="lazy"
+                            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-active:scale-[1.02]"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 grid place-items-center bg-[#FFF7ED] text-5xl">
+                            🍽️
+                          </div>
+                        )}
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#2A1208]/95 via-[#2A1208]/18 to-transparent" />
+
+                        <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                          <div className="flex flex-wrap gap-1.5">
+                            {recipe.cuisine && (
+                              <span className="rounded-full border border-white/25 bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] backdrop-blur-sm">
+                                {recipe.cuisine}
+                              </span>
+                            )}
+                            {recipe.dietaryType && (
+                              <span className="rounded-full border border-white/25 bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] backdrop-blur-sm">
+                                {recipe.dietaryType}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="mt-3 text-[23px] font-black leading-[1.02] tracking-[-0.03em]">
+                            {recipe.name || 'Recipe'}
+                          </h3>
+                          <div className="mt-3 flex items-center gap-4 text-[11px] font-bold text-white/75">
+                            {recipe.totalTime > 0 && (
+                              <span className="flex items-center gap-1.5">
+                                <Clock3 size={13} aria-hidden="true" />
+                                {recipe.totalTime} min
+                              </span>
+                            )}
+                            {recipe.servings && (
+                              <span className="flex items-center gap-1.5">
+                                <Users size={13} aria-hidden="true" />
+                                {recipe.servings} servings
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/35 bg-white/90 text-[#C2410C] shadow-sm backdrop-blur">
+                          <ArrowRight size={17} aria-hidden="true" />
+                        </span>
+                      </Link>
+                    </motion.article>
+                  )
+                })}
+
+                <article className="w-[84vw] shrink-0 snap-center">
+                  <Link
+                    to="/recipes"
+                    data-mobile-focus-card
+                    className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#FED7AA]/80 bg-[#FFF4E8] shadow-[0_18px_42px_rgba(154,52,18,0.14)] will-change-transform [backface-visibility:hidden]"
+                    style={{
+                      transform: 'translate3d(0, 8px, 0) scale(0.92)',
+                    }}
+                    aria-label="View all recipes"
+                  >
+                    {recipes[0]?.image ? (
+                      <img
+                        src={recipes[0].image}
+                        alt=""
+                        loading="lazy"
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-[linear-gradient(155deg,#FFF7ED_0%,#FED7AA_100%)]" />
+                    )}
+
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#2A1208]/5 via-[#2A1208]/18 to-[#2A1208]/95" />
+
+                    <div className="absolute left-5 top-6 flex -space-x-3">
+                      {recipes.slice(1, 4).map((item, previewIndex) => (
+                        <div
+                          key={`recipe-view-all-preview-${item.id || item.slug || previewIndex}`}
+                          className="h-14 w-14 overflow-hidden rounded-2xl border-2 border-white bg-[#FFF7ED] shadow-md"
+                        >
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center text-lg">
+                              🍽️
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="absolute inset-x-0 bottom-0 px-5 pb-6 pt-24 text-white">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/65">
+                        EPANTRY Recipes
+                      </p>
+                      <h3 className="mt-2 max-w-[220px] text-[28px] font-black leading-[0.98] tracking-[-0.04em]">
+                        Keep exploring recipes
+                      </h3>
+                      <p className="mt-3 max-w-[225px] text-[11px] font-semibold leading-5 text-white/75">
+                        Open the full recipe collection and discover what to cook next.
+                      </p>
+                      <span className="mt-4 inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-xs font-black text-[#C2410C] shadow-sm">
+                        View all
+                        <ArrowRight size={14} aria-hidden="true" />
+                      </span>
+                    </div>
+
+                    <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/70 bg-white/90 text-[#C2410C] shadow-sm backdrop-blur">
+                      <ArrowRight size={17} aria-hidden="true" />
+                    </span>
+                  </Link>
+                </article>
+
+              </div>
+
+              <div className="hidden w-full sm:grid sm:grid-cols-1 sm:gap-5 md:grid-cols-3">
 
               {recipes.map(
                 (
@@ -625,10 +1013,14 @@ export default function FeaturedContentSection() {
                           : index *
                             0.06,
                     }}
-                    className="group relative mx-auto w-full lg:aspect-square lg:max-w-[410px] lg:rounded-[28px] lg:hover:z-20"
+                    className={`group relative mx-auto h-full w-full lg:aspect-square lg:max-w-[410px] lg:rounded-[28px] lg:hover:z-20 ${
+                      index >= 3
+                        ? 'sm:hidden'
+                        : ''
+                    }`}
                   >
 
-                    <div className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white/95 shadow-sm lg:hidden">
+                    <div className="flex h-full flex-col overflow-hidden rounded-[18px] border border-[#E5E7EB] bg-white/95 shadow-sm sm:block sm:rounded-[28px] lg:hidden">
 
                       <Link
                         to={
@@ -637,25 +1029,32 @@ export default function FeaturedContentSection() {
                             ? `/recipes/${recipe.slug}`
                             : '/recipes')
                         }
-                        className="block h-full"
+                        className="flex h-full flex-col sm:block"
                       >
 
-                        <MediaBox
-                          image={
-                            recipe.image
-                          }
-                          alt={
-                            recipe.name
-                          }
-                          type="recipe"
-                        />
+                        {recipe.image ? (
+                          <div className="h-[112px] shrink-0 overflow-hidden bg-[#F8FAF7] sm:aspect-[4/3] sm:h-auto">
 
-                        <div className="p-6">
+                            <img
+                              src={recipe.image}
+                              alt={recipe.name || ''}
+                              loading="lazy"
+                              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                            />
 
-                          <div className="flex flex-wrap gap-2">
+                          </div>
+                        ) : (
+                          <div className="grid h-[112px] shrink-0 place-items-center bg-[#F8FAF7] text-3xl sm:aspect-[4/3] sm:h-auto sm:text-4xl">
+                            🍽️
+                          </div>
+                        )}
+
+                        <div className="flex flex-1 flex-col p-3 sm:block sm:p-6">
+
+                          <div className="flex min-h-[20px] flex-wrap gap-1.5 sm:min-h-0 sm:gap-2">
 
                             {recipe.cuisine && (
-                              <span className="rounded-full bg-[#FFF7ED] px-3 py-1 text-xs font-bold text-[#EA580C]">
+                              <span className="max-w-full truncate rounded-full bg-[#FFF7ED] px-2 py-0.5 text-[9px] font-bold text-[#EA580C] sm:px-3 sm:py-1 sm:text-xs">
 
                                 {
                                   recipe.cuisine
@@ -665,7 +1064,7 @@ export default function FeaturedContentSection() {
                             )}
 
                             {recipe.dietaryType && (
-                              <span className="rounded-full bg-[#F8FAF7] px-3 py-1 text-xs font-bold text-[#6B7280]">
+                              <span className="max-w-full truncate rounded-full bg-[#F8FAF7] px-2 py-0.5 text-[9px] font-bold text-[#6B7280] sm:px-3 sm:py-1 sm:text-xs">
 
                                 {
                                   recipe.dietaryType
@@ -676,7 +1075,7 @@ export default function FeaturedContentSection() {
 
                           </div>
 
-                          <h3 className="mt-4 text-xl font-black text-[#111827]">
+                          <h3 className="mt-2 text-[13px] font-black leading-[1.18] text-[#111827] sm:mt-4 sm:text-xl sm:leading-normal">
 
                             {recipe.name ||
                               'Recipe'}
@@ -684,7 +1083,7 @@ export default function FeaturedContentSection() {
                           </h3>
 
                           {recipe.description && (
-                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#6B7280]">
+                            <p className="mt-1.5 line-clamp-2 text-[10px] leading-4 text-[#6B7280] sm:mt-2 sm:text-sm sm:leading-6">
 
                               {
                                 recipe.description
@@ -693,15 +1092,16 @@ export default function FeaturedContentSection() {
                             </p>
                           )}
 
-                          <div className="mt-5 flex flex-wrap items-center gap-5 text-xs font-bold text-[#6B7280]">
+                          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-bold text-[#6B7280] sm:mt-5 sm:gap-5 sm:text-xs">
 
                             {recipe.totalTime >
                               0 && (
-                              <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1 sm:gap-1.5">
 
                                 <Clock3
                                   size={15}
                                   aria-hidden="true"
+                                  className="h-3 w-3 sm:h-[15px] sm:w-[15px]"
                                 />
 
                                 {
@@ -713,11 +1113,12 @@ export default function FeaturedContentSection() {
                             )}
 
                             {recipe.servings && (
-                              <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1 sm:gap-1.5">
 
                                 <Users
                                   size={15}
                                   aria-hidden="true"
+                                  className="h-3 w-3 sm:h-[15px] sm:w-[15px]"
                                 />
 
                                 {
@@ -969,7 +1370,8 @@ export default function FeaturedContentSection() {
                 ),
               )}
 
-            </div>
+              </div>
+            </>
           ) : (
             <EmptyState
               message="Featured recipes will appear here once recipe data is available."
@@ -1111,17 +1513,24 @@ export default function FeaturedContentSection() {
                               y: -4,
                             }
                       }
-                      className="group relative min-h-[138px] overflow-hidden rounded-[22px] border border-[#2563EB]/12 bg-white shadow-[0_8px_28px_rgba(17,24,39,0.06)] transition duration-300 hover:border-[#2563EB]/30 hover:shadow-[0_16px_38px_rgba(37,99,235,0.12)]"
+                      className={[
+                        'group relative min-h-[118px] overflow-hidden rounded-[20px] border border-[#2563EB]/12 bg-white shadow-[0_8px_28px_rgba(17,24,39,0.06)] transition duration-300 hover:border-[#2563EB]/30 hover:shadow-[0_16px_38px_rgba(37,99,235,0.12)] sm:min-h-[138px] sm:rounded-[22px]',
+                        index >= 6
+                          ? 'hidden sm:block'
+                          : '',
+                      ].join(' ')}
                     >
 
                       <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-[#2563EB]/5 transition duration-300 group-hover:scale-125 group-hover:bg-[#2563EB]/10" />
 
                       <Link
-                        to="/brands"
-                        className="relative flex h-full min-h-[138px] flex-col justify-between p-5"
+                        to={getFeaturedBrandPath(
+                          brand,
+                        )}
+                        className="relative flex h-full min-h-[118px] flex-col justify-between p-4 sm:min-h-[138px] sm:p-5"
                       >
 
-                        <h3 className="line-clamp-2 pr-4 text-[17px] font-black leading-snug text-[#111827] transition duration-300 group-hover:text-[#2563EB]">
+                        <h3 className="line-clamp-2 pr-3 text-[15px] font-black leading-snug text-[#111827] transition duration-300 group-hover:text-[#2563EB] sm:pr-4 sm:text-[17px]">
 
                           {brand.name ||
                             'Brand'}
@@ -1130,7 +1539,7 @@ export default function FeaturedContentSection() {
 
                         <div className="mt-5">
 
-                          <span className="inline-flex rounded-full border border-[#2563EB]/10 bg-[#EFF6FF] px-3 py-1.5 text-[11px] font-black text-[#2563EB]">
+                          <span className="inline-flex rounded-full border border-[#2563EB]/10 bg-[#EFF6FF] px-2.5 py-1 text-[10px] font-black text-[#2563EB] sm:px-3 sm:py-1.5 sm:text-[11px]">
                             {formatBrandProductCount(
                               brand.productCount,
                             )}
@@ -1937,6 +2346,24 @@ function getVisibleBrands({
     0,
     FEATURED_BRAND_LIMIT,
   )
+}
+
+function getFeaturedBrandPath(
+  brand,
+) {
+  const brandKey =
+    String(
+      brand?.slug ||
+        brand?.id ||
+        brand?._id ||
+        '',
+    ).trim()
+
+  return brandKey
+    ? `/brands/${encodeURIComponent(
+        brandKey,
+      )}`
+    : '/brands'
 }
 
 function formatBrandProductCount(
