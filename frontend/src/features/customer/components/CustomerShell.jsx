@@ -6,6 +6,7 @@ import {
   Home,
   LayoutDashboard,
   ListChecks,
+  Menu,
   PackageSearch,
   ReceiptText,
   ScanLine,
@@ -16,6 +17,7 @@ import {
   ShoppingCart,
   Sparkles,
   UsersRound,
+  X,
 } from 'lucide-react'
 
 import {
@@ -27,7 +29,6 @@ import {
   useAuth,
 } from '../../auth/context/AuthContext'
 
-import MobileWorkspaceNav from '../../pwa/components/MobileWorkspaceNav'
 
 const navigationGroups = [
   {
@@ -427,6 +428,9 @@ export default function CustomerShell({
   const [sidebarHovered, setSidebarHovered] =
     useState(false)
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] =
+    useState(false)
+
   const [cartNavigation, setCartNavigation] =
     useState(readCustomerCartNavigation)
 
@@ -512,6 +516,7 @@ export default function CustomerShell({
   function collapseSidebarAfterNavigation() {
     setSidebarCollapsed(true)
     setSidebarHovered(false)
+    setMobileSidebarOpen(false)
 
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(
@@ -522,7 +527,32 @@ export default function CustomerShell({
   }
 
   return (
-    <main className="min-h-[calc(100vh-72px)] bg-[#f7f5ef] pb-20 lg:pb-0">
+    <main className="min-h-screen bg-[#f7f5ef] pb-0 lg:min-h-[calc(100vh-72px)]">
+      <div className="sticky top-0 z-[105] flex h-14 items-center border-b border-stone-200/70 bg-[#f7f5ef]/92 px-3 backdrop-blur-xl lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileSidebarOpen(true)}
+          className="focus-ring grid size-10 place-items-center rounded-[15px] border border-stone-200 bg-white/88 text-stone-800 shadow-[0_7px_20px_rgba(28,25,23,0.10)]"
+          aria-label="Open customer sidebar"
+          aria-expanded={mobileSidebarOpen}
+        >
+          <Menu size={19} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+
+        <span className="ml-3 text-[11px] font-black uppercase tracking-[0.14em] text-stone-700">
+          Customer workspace
+        </span>
+      </div>
+
+      {mobileSidebarOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-[120] bg-stone-950/30 backdrop-blur-[2px] lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+          aria-label="Close customer sidebar"
+        />
+      ) : null}
+
       <div className={`page-shell ${isDashboard ? 'py-5 sm:py-7' : isPantry || isMealPlan || isNextBasket || isWasteReduction || isCookToday || isHousehold || isAccountSettings || isPrivacy || isOrders || isOrderDetail || isScan || isPurchaseIntelligence || isLearning || isSpending ? 'pt-0 pb-5 sm:pb-7' : 'py-5 sm:py-7'}`}>
         <div className={`${isDashboard ? 'overflow-hidden' : 'overflow-visible'} rounded-[28px] border border-stone-200 bg-white shadow-sm`}>
           <div
@@ -535,7 +565,10 @@ export default function CustomerShell({
           >
             <aside
               className={[
-                'relative border-b border-stone-200 bg-[#faf8f4] lg:border-r lg:border-stone-200 lg:bg-[#faf8f4]',
+                'fixed inset-y-0 left-0 z-[130] w-[min(88vw,330px)] overflow-y-auto border-r border-stone-200 bg-[#faf8f4] shadow-[18px_0_50px_rgba(28,25,23,0.18)] transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-visible lg:border-r lg:border-stone-200 lg:bg-[#faf8f4] lg:shadow-none',
+                mobileSidebarOpen
+                  ? 'translate-x-0'
+                  : '-translate-x-full',
                 isDashboard
                   ? 'lg:border-b-0'
                   : 'lg:sticky lg:self-start lg:border-b-0 lg:top-[88px] lg:h-[calc(100svh-104px)]',
@@ -553,13 +586,40 @@ export default function CustomerShell({
                   }
                 }}
                 className={[
-                  'p-4 sm:p-5',
+                  'flex min-h-full flex-col p-4 sm:p-5',
                   'lg:absolute lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:h-full lg:flex-col lg:overflow-visible lg:transform-gpu lg:will-change-[width,padding] lg:transition-[width,padding] lg:duration-[560ms] lg:ease-[cubic-bezier(0.22,1,0.36,1)]',
                   sidebarOpen
                     ? 'lg:w-[248px] lg:bg-[#faf8f4] lg:px-4 lg:py-5 lg:shadow-none'
                     : 'lg:w-[70px] lg:rounded-r-[26px] lg:border-r lg:border-stone-200 lg:bg-[#faf8f4] lg:px-3 lg:py-4 lg:shadow-[5px_0_16px_rgba(83,58,33,0.06)]',
                 ].join(' ')}
               >
+                <div className="mb-3 flex items-center justify-between lg:hidden">
+                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">
+                    Customer navigation
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <NavLink
+                      to="/"
+                      onClick={() => setMobileSidebarOpen(false)}
+                      className="focus-ring grid size-9 place-items-center rounded-[14px] border border-stone-200 bg-white text-stone-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700"
+                      aria-label="Back to EPANTRY home"
+                      title="Back to home"
+                    >
+                      <Home size={17} aria-hidden="true" />
+                    </NavLink>
+
+                    <button
+                      type="button"
+                      onClick={() => setMobileSidebarOpen(false)}
+                      className="focus-ring grid size-9 place-items-center rounded-[14px] border border-stone-200 bg-white text-stone-700 shadow-sm"
+                      aria-label="Close customer sidebar"
+                    >
+                      <X size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+
                 <div
                   className={[
                     'shrink-0 rounded-[22px] border border-[#315f50] bg-[linear-gradient(145deg,#17483b_0%,#11382f_100%)] px-3.5 py-3.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_7px_16px_rgba(31,63,53,0.16)] transition-[opacity,transform] duration-200 ease-out lg:relative lg:z-10 lg:w-full lg:max-w-[220px] lg:self-start',
@@ -597,10 +657,10 @@ export default function CustomerShell({
 
                 <nav
                   className={[
-                    'lg:relative lg:z-10',
+                    'relative z-10 mt-4 flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overflow-x-visible pb-6 pr-1',
                     sidebarOpen
-                      ? 'mt-4 hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3.5 lg:overflow-y-auto lg:overflow-x-visible lg:pb-6 lg:pr-1'
-                      : 'mt-2 hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-1 lg:overflow-y-auto lg:pb-2 lg:pr-0',
+                      ? 'lg:mt-4 lg:gap-3.5 lg:pb-6 lg:pr-1'
+                      : 'lg:mt-2 lg:gap-1 lg:pb-2 lg:pr-0',
                   ].join(' ')}
                   aria-label="Customer workspace"
                 >
@@ -618,7 +678,7 @@ export default function CustomerShell({
                       <CustomerNavigationGroup
                         key={group.id}
                         group={group}
-                        collapsed={!sidebarOpen}
+                        collapsed={mobileSidebarOpen ? false : !sidebarOpen}
                         active={active}
                         onNavigate={collapseSidebarAfterNavigation}
                         onOpenSidebar={() => {
@@ -637,36 +697,7 @@ export default function CustomerShell({
                   })}
                 </nav>
 
-                <nav
-                  className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden"
-                  aria-label="Customer workspace"
-                >
-                  {resolvedNavigationItems.map((item) => {
-                    const Icon = item.icon
 
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        end={item.end}
-                        className={({
-                          isActive,
-                        }) => [
-                          'focus-ring inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-black transition',
-                          isActive
-                            ? 'bg-emerald-700 text-white'
-                            : 'border border-[#d7c3a5] bg-[#fff8ec] text-[#5c4936]',
-                        ].join(' ')}
-                      >
-                        <Icon
-                          size={15}
-                          aria-hidden="true"
-                        />
-                        {item.label}
-                      </NavLink>
-                    )
-                  })}
-                </nav>
               </div>
             </aside>
 
@@ -685,7 +716,6 @@ export default function CustomerShell({
         </div>
       </div>
 
-      <MobileWorkspaceNav workspace="customer" />
     </main>
   )
 }

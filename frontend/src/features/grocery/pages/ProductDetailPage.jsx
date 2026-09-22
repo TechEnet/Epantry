@@ -21,6 +21,7 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -610,7 +611,7 @@ function DetailCard({
     return (
       <details className="group border-b border-stone-200 last:border-b-0">
 
-        <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:px-6">
+        <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-6 sm:py-4">
 
           <div>
 
@@ -626,13 +627,13 @@ function DetailCard({
               {title}
             </h3>
 
-            <p className="mt-1 text-xs text-stone-500 group-open:hidden">
+            <p className="mt-0.5 text-[10px] text-stone-500 group-open:hidden sm:mt-1 sm:text-xs">
               Click to view details
             </p>
 
           </div>
 
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white sm:h-9 sm:w-9">
             <ChevronDown
               size={17}
               className="transition-transform duration-200 group-open:rotate-180"
@@ -642,7 +643,7 @@ function DetailCard({
 
         </summary>
 
-        <div className="border-t border-emerald-100 bg-white px-5 py-5 sm:px-6">
+        <div className="border-t border-emerald-100 bg-white px-4 py-4 sm:px-6 sm:py-5">
           {children}
         </div>
 
@@ -653,12 +654,12 @@ function DetailCard({
   return (
     <details className="group border-b border-stone-200 last:border-b-0">
 
-      <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:px-6">
+      <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-6 sm:py-4">
 
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
 
           {Icon && (
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm sm:h-10 sm:w-10">
               <Icon
                 size={17}
                 aria-hidden="true"
@@ -680,7 +681,7 @@ function DetailCard({
               {title}
             </h3>
 
-            <p className="mt-1 text-xs leading-5 text-stone-500 group-open:hidden">
+            <p className="mt-0.5 text-[10px] leading-4 text-stone-500 group-open:hidden sm:mt-1 sm:text-xs sm:leading-5">
               {description || 'Click to view details'}
             </p>
 
@@ -688,7 +689,7 @@ function DetailCard({
 
         </div>
 
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white sm:h-9 sm:w-9">
           <ChevronDown
             size={17}
             className="transition-transform duration-200 group-open:rotate-180"
@@ -698,7 +699,7 @@ function DetailCard({
 
       </summary>
 
-      <div className="border-t border-emerald-100 bg-white px-5 py-5 sm:px-6">
+      <div className="border-t border-emerald-100 bg-white px-4 py-4 sm:px-6 sm:py-5">
         {children}
       </div>
 
@@ -1328,7 +1329,7 @@ function MarketplaceOffers({
             Check price by pincode
           </h2>
           <p className="mt-0.5 text-[11px] leading-4 text-stone-500">
-            See live Host price and delivery availability.
+            See prices and delivery options available for your area.
           </p>
         </div>
 
@@ -1359,13 +1360,18 @@ function MarketplaceOffers({
 
         <button
           disabled={loading}
-          className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white shadow-[0_8px_20px_rgba(4,120,87,0.18)] transition hover:bg-emerald-800 disabled:opacity-50"
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-center text-[12px] font-black leading-4 text-white shadow-[0_8px_20px_rgba(4,120,87,0.18)] transition hover:bg-emerald-800 disabled:opacity-50 sm:h-11 sm:px-5 sm:py-0 sm:text-sm sm:leading-normal"
         >
           <Search
             size={15}
+            className="shrink-0"
             aria-hidden="true"
           />
-          {loading ? 'Checking...' : 'Check'}
+          <span className="min-w-0 text-center">
+            {loading
+              ? 'Checking pincode...'
+              : 'Check pincode to unlock Add to Cart'}
+          </span>
         </button>
 
       </form>
@@ -1384,24 +1390,6 @@ function MarketplaceOffers({
           <p className="mt-1 text-[11px] leading-4 text-stone-500">
             Availability can depend on serviceability, current price and inventory.
           </p>
-        </div>
-      )}
-
-      {offers.length === 0 && (
-        <div className="border-t border-emerald-100 px-4 py-3">
-          <button
-            type="button"
-            disabled
-            className="inline-flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-100 px-4 text-xs font-black text-stone-500"
-          >
-            <ShoppingCart
-              size={15}
-              aria-hidden="true"
-            />
-            {checked
-              ? 'Add to Cart unavailable for this pincode'
-              : 'Check pincode to unlock Add to Cart'}
-          </button>
         </div>
       )}
 
@@ -1546,7 +1534,155 @@ function productDetailLabel(value) {
 
 function ProductDetailsSheet({
   product,
+  autoScroll = false,
 }) {
+  const scrollAreaRef = useRef(null)
+
+  useEffect(() => {
+    if (
+      !autoScroll ||
+      typeof window === 'undefined'
+    ) {
+      return undefined
+    }
+
+    const scrollArea =
+      scrollAreaRef.current
+
+    if (!scrollArea) {
+      return undefined
+    }
+
+    const mobileQuery =
+      window.matchMedia(
+        '(max-width: 639px)',
+      )
+
+    const reducedMotionQuery =
+      window.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      )
+
+    if (
+      !mobileQuery.matches ||
+      reducedMotionQuery.matches
+    ) {
+      return undefined
+    }
+
+    let animationFrameId = null
+    let previousTime = null
+    let pausedUntil =
+      performance.now() + 1200
+    let endHoldUntil = 0
+
+    const pauseAutoScroll = () => {
+      pausedUntil =
+        performance.now() + 2800
+      endHoldUntil = 0
+    }
+
+    const tick = (time) => {
+      if (previousTime === null) {
+        previousTime = time
+      }
+
+      const elapsed = Math.min(
+        40,
+        time - previousTime,
+      )
+
+      previousTime = time
+
+      if (time >= pausedUntil) {
+        const maxScroll = Math.max(
+          0,
+          scrollArea.scrollHeight -
+            scrollArea.clientHeight,
+        )
+
+        if (maxScroll > 6) {
+          if (
+            scrollArea.scrollTop >=
+            maxScroll - 2
+          ) {
+            if (!endHoldUntil) {
+              endHoldUntil =
+                time + 1400
+            } else if (
+              time >= endHoldUntil
+            ) {
+              scrollArea.scrollTo({
+                top: 0,
+                behavior: 'smooth',
+              })
+
+              pausedUntil =
+                time + 1700
+              endHoldUntil = 0
+            }
+          } else {
+            scrollArea.scrollTop +=
+              elapsed * 0.04
+            endHoldUntil = 0
+          }
+        }
+      }
+
+      animationFrameId =
+        window.requestAnimationFrame(
+          tick,
+        )
+    }
+
+    scrollArea.addEventListener(
+      'touchstart',
+      pauseAutoScroll,
+      { passive: true },
+    )
+    scrollArea.addEventListener(
+      'pointerdown',
+      pauseAutoScroll,
+      { passive: true },
+    )
+    scrollArea.addEventListener(
+      'wheel',
+      pauseAutoScroll,
+      { passive: true },
+    )
+
+    animationFrameId =
+      window.requestAnimationFrame(
+        tick,
+      )
+
+    return () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(
+          animationFrameId,
+        )
+      }
+
+      scrollArea.removeEventListener(
+        'touchstart',
+        pauseAutoScroll,
+      )
+      scrollArea.removeEventListener(
+        'pointerdown',
+        pauseAutoScroll,
+      )
+      scrollArea.removeEventListener(
+        'wheel',
+        pauseAutoScroll,
+      )
+    }
+  }, [
+    autoScroll,
+    product?.id,
+    product?.slug,
+    product?.displayName,
+  ])
+
   const nutrients =
     Array.isArray(
       product?.nutrition
@@ -1620,20 +1756,23 @@ function ProductDetailsSheet({
   return (
     <div className="flex h-full w-full items-stretch justify-center bg-[#f4f7f2] p-4 sm:p-6 xl:p-8">
       <div className="flex h-full w-full max-w-[760px] flex-col overflow-hidden rounded-[24px] border border-emerald-200 bg-white shadow-[0_18px_42px_rgba(4,120,87,0.10)]">
-        <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-5 py-5 text-white sm:px-6">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200">
+        <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-4 py-3 text-white sm:px-6 sm:py-5">
+          <p className="text-[8px] font-black uppercase tracking-[0.15em] text-emerald-200 sm:text-[10px] sm:tracking-[0.18em]">
             EPANTRY · Product details sheet
           </p>
-          <h2 className="mt-2 text-2xl font-black leading-tight sm:text-3xl">
+          <h2 className="mt-1 text-[17px] font-black leading-[1.08] sm:mt-2 sm:text-3xl sm:leading-tight">
             {product?.displayName ||
               'Product'}
           </h2>
-          <p className="mt-1 text-xs font-semibold text-emerald-100/80">
+          <p className="mt-1 text-[9px] font-semibold leading-3 text-emerald-100/80 sm:text-xs sm:leading-normal">
             Published listing details · generated from governed product data
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+        <div
+          ref={scrollAreaRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 [scrollbar-width:thin]"
+        >
           <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
             {detailRows.map(
               ([
@@ -2073,19 +2212,25 @@ function ProductRecommendationShelf({
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:pb-0 md:grid-cols-3 xl:grid-cols-5">
         {loading
           ? Array.from({ length: PRODUCT_RECOMMENDATION_LIMIT }).map((_, index) => (
               <div
                 key={index}
-                className="aspect-[0.76/1] animate-pulse rounded-[24px] border border-stone-200 bg-white"
-              />
+                className="w-[64%] shrink-0 snap-start sm:w-auto sm:shrink"
+              >
+                <div className="aspect-[0.76/1] animate-pulse rounded-[24px] border border-stone-200 bg-white" />
+              </div>
             ))
           : items.map((item) => (
-              <RecommendationProductCard
+              <div
                 key={getProductRecommendationKey(item)}
-                product={item}
-              />
+                className="w-[64%] shrink-0 snap-start sm:w-auto sm:shrink"
+              >
+                <RecommendationProductCard
+                  product={item}
+                />
+              </div>
             ))}
       </div>
     </section>
@@ -2540,7 +2685,7 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f5f4ef]">
+      <main className="min-h-screen bg-[linear-gradient(180deg,#dcefe9_0%,#edf5f2_24%,#f4efe5_58%,#deedf1_100%)] sm:bg-[#f5f4ef]">
 
         <div className="page-shell py-10">
 
@@ -2673,12 +2818,45 @@ export default function ProductDetailPage() {
           Back to Grocery
         </Link>
 
-        <section className="mt-3 rounded-[24px] border border-stone-200 bg-white shadow-[0_18px_50px_rgba(28,25,23,0.08)]">
+        <section className="mt-3 rounded-[24px] border border-white/75 bg-white/[0.82] shadow-[0_18px_50px_rgba(28,25,23,0.08)] backdrop-blur-[10px] sm:border-stone-200 sm:bg-white sm:backdrop-blur-none">
 
           <div className="grid items-start xl:grid-cols-[minmax(0,1.04fr)_minmax(430px,0.96fr)]">
 
-            <div className="overflow-hidden rounded-t-[24px] border-b border-stone-200 bg-[#fafafa] xl:rounded-l-[24px] xl:rounded-tr-none xl:border-b-0 xl:border-r">
+            <div className="overflow-hidden rounded-t-[24px] border-b border-white/70 bg-white/[0.58] xl:rounded-l-[24px] xl:rounded-tr-none xl:border-b-0 xl:border-r sm:border-stone-200 sm:bg-[#fafafa]">
 
+              <div className="sm:hidden">
+                <div className="bg-transparent">
+                  <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {productGalleryItems.map((item, index) => (
+                      <div
+                        key={
+                          item.type === 'details'
+                            ? 'mobile-product-details-sheet'
+                            : `mobile-${item.image?.url}-${index}`
+                        }
+                        className="relative h-[480px] w-[88%] shrink-0 snap-start overflow-hidden rounded-[22px] border border-stone-200 bg-white shadow-[0_12px_34px_rgba(28,25,23,0.07)]"
+                      >
+                        {item.type === 'details' ? (
+                          <ProductDetailsSheet
+                            product={product}
+                            autoScroll
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center overflow-hidden bg-white">
+                            <img
+                              src={item.image.url}
+                              alt={item.image.alt || product.displayName}
+                              className="h-full w-full scale-[1.18] object-contain"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden sm:block">
               {imageCount >
               0 ? (
                 <div className="bg-white">
@@ -2836,6 +3014,7 @@ export default function ProductDetailPage() {
 
                 </div>
               )}
+              </div>
 
             </div>
 
@@ -2875,7 +3054,56 @@ export default function ProductDetailPage() {
                 }
               </h1>
 
-              <p className="mt-4 text-sm font-bold text-stone-600">
+              <div className="mt-4 grid grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-2 sm:hidden">
+                <div className="min-w-0 rounded-2xl border border-white/80 bg-white/72 px-3 py-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] backdrop-blur-md">
+                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-stone-500">
+                    Net quantity
+                  </p>
+                  <p className="mt-1 text-sm font-black text-stone-950">
+                    {formatQuantity(
+                      product.netQuantity,
+                    )}
+                  </p>
+                </div>
+
+                <div className="min-w-0 rounded-2xl border border-white/80 bg-white/72 px-3 py-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] backdrop-blur-md">
+                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-stone-500">
+                    Country of origin
+                  </p>
+
+                  {product.countryOfOrigin ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCountryPanelOpen(true)
+                      }
+                      className="focus-ring group mt-1 inline-flex max-w-full items-center gap-1.5 text-left"
+                      aria-label={`Learn about ${product.countryOfOrigin}`}
+                    >
+                      <span
+                        className="text-[20px] leading-none"
+                        aria-hidden="true"
+                      >
+                        {countryMeta.flag}
+                      </span>
+                      <span className="min-w-0 truncate text-xs font-black text-stone-950">
+                        {product.countryOfOrigin}
+                      </span>
+                      <ArrowRight
+                        size={13}
+                        className="shrink-0 text-emerald-700 transition group-hover:translate-x-0.5"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  ) : (
+                    <p className="mt-1 text-xs font-bold text-stone-400">
+                      Not declared
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <p className="mt-4 hidden text-sm font-bold text-stone-600 sm:block">
                 Net quantity{' '}
                 <span className="font-black text-stone-950">
                   {
@@ -2886,7 +3114,7 @@ export default function ProductDetailPage() {
                 </span>
               </p>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="mt-4 hidden flex-wrap items-center gap-3 sm:flex">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">
                   Country of origin
                 </span>
@@ -3210,15 +3438,15 @@ export default function ProductDetailPage() {
           </div>
         ) : null}
 
-        <section className="mt-6 grid gap-5 xl:grid-cols-2 xl:items-stretch">
+        <section className="mt-4 grid gap-3 sm:mt-6 sm:gap-5 xl:grid-cols-2 xl:items-stretch">
 
-          <section className="h-full overflow-hidden rounded-[24px] border border-stone-200 bg-white shadow-[0_12px_34px_rgba(28,25,23,0.06)]">
+          <section className="h-full overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_8px_24px_rgba(28,25,23,0.05)] sm:rounded-[24px] sm:shadow-[0_12px_34px_rgba(28,25,23,0.06)]">
 
-            <div className="border-b border-stone-200 bg-stone-50/70 px-5 py-5 sm:px-6">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+            <div className="border-b border-stone-200 bg-stone-50/70 px-4 py-3 sm:px-6 sm:py-5">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:tracking-[0.16em]">
                 Product information
               </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-stone-950">
+              <h2 className="mt-0.5 text-lg font-black tracking-tight text-stone-950 sm:mt-1 sm:text-2xl">
                 About this product
               </h2>
             </div>
@@ -3448,32 +3676,32 @@ export default function ProductDetailPage() {
 
           </section>
 
-          <section className="h-full overflow-hidden rounded-[24px] border border-emerald-200 bg-white shadow-[0_14px_38px_rgba(4,120,87,0.09)] ring-1 ring-emerald-100">
+          <section className="h-full overflow-hidden rounded-[18px] border border-emerald-200 bg-white shadow-[0_9px_26px_rgba(4,120,87,0.07)] ring-1 ring-emerald-100 sm:rounded-[24px] sm:shadow-[0_14px_38px_rgba(4,120,87,0.09)]">
 
-            <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-5 py-5 text-white sm:px-6">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
+            <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-4 py-3 text-white sm:px-6 sm:py-5">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-200 sm:text-[10px] sm:tracking-[0.16em]">
                 Governed nutrition
               </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
+              <h2 className="mt-0.5 text-lg font-black tracking-tight sm:mt-1 sm:text-2xl">
                 Nutrition
               </h2>
-              <p className="mt-1 text-xs leading-5 text-emerald-50/80">
+              <p className="mt-0.5 text-[10px] leading-4 text-emerald-50/80 sm:mt-1 sm:text-xs sm:leading-5">
                 Published values from the current approved product record.
               </p>
             </div>
 
-            <div className="p-5 sm:p-6">
+            <div className="p-4 sm:p-6">
               {product.nutrition?.nutrients?.length > 0 ? (
                 <div className="divide-y divide-stone-200">
                   {product.nutrition.nutrients.map((nutrient, index) => (
                     <div
                       key={`${nutrient.nutrientKey}-${index}`}
-                      className="flex items-center justify-between gap-4 py-3.5 text-sm"
+                      className="flex items-center justify-between gap-3 py-2.5 text-[12px] sm:gap-4 sm:py-3.5 sm:text-sm"
                     >
                       <span className="font-bold capitalize text-stone-600">
                         {nutrient.nutrientKey}
                       </span>
-                      <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-black text-emerald-950">
+                      <span className="rounded-lg bg-emerald-50 px-2 py-0.5 font-black text-emerald-950 sm:px-2.5 sm:py-1">
                         {nutrient.amount} {nutrient.unit}
                       </span>
                     </div>

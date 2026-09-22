@@ -11,9 +11,11 @@ import {
     Flag,
     FlaskConical,
     History,
+    Home,
     LayoutDashboard,
     List,
     LockKeyhole,
+    Menu,
     Megaphone,
     Package,
     ScanLine,
@@ -25,6 +27,7 @@ import {
     Users,
     WalletCards,
     Webhook,
+    X,
   } from 'lucide-react';
   
   import {
@@ -123,12 +126,16 @@ import {
     const [sidebarHovered, setSidebarHovered] =
         useState(false);
 
+    const [mobileSidebarOpen, setMobileSidebarOpen] =
+        useState(false);
+
     const sidebarOpen =
         !sidebarCollapsed || sidebarHovered;
 
     function collapseSidebarAfterNavigation() {
         setSidebarCollapsed(true);
         setSidebarHovered(false);
+        setMobileSidebarOpen(false);
 
         if (typeof window !== 'undefined') {
             window.sessionStorage.setItem(
@@ -580,7 +587,32 @@ import {
             'Internal Admin';
   
     return (
-        <main className="min-h-[calc(100vh-72px)] bg-[#f7f5ef]">
+        <main className="min-h-screen bg-[#f7f5ef] lg:min-h-[calc(100vh-72px)]">
+            <div className="sticky top-0 z-[105] flex h-14 items-center border-b border-stone-200/70 bg-[#f7f5ef]/92 px-3 backdrop-blur-xl lg:hidden">
+                <button
+                    type="button"
+                    onClick={() => setMobileSidebarOpen(true)}
+                    className="focus-ring grid size-10 place-items-center rounded-[15px] border border-stone-200 bg-white/88 text-stone-800 shadow-[0_7px_20px_rgba(28,25,23,0.10)]"
+                    aria-label="Open admin sidebar"
+                    aria-expanded={mobileSidebarOpen}
+                >
+                    <Menu size={19} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+
+                <span className="ml-3 text-[11px] font-black uppercase tracking-[0.14em] text-stone-700">
+                    Super Admin workspace
+                </span>
+            </div>
+
+            {mobileSidebarOpen ? (
+                <button
+                    type="button"
+                    className="fixed inset-0 z-[120] bg-stone-950/30 backdrop-blur-[2px] lg:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                    aria-label="Close admin sidebar"
+                />
+            ) : null}
+
             <div className="page-shell py-5 sm:py-7">
                 <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
                     <div
@@ -591,7 +623,14 @@ import {
                                 : 'lg:grid-cols-[70px_minmax(0,1fr)]',
                         ].join(' ')}
                     >
-                        <aside className="relative border-b border-stone-200 bg-stone-50/80 lg:border-b-0 lg:bg-transparent">
+                        <aside
+                            className={[
+                                'fixed inset-y-0 left-0 z-[130] w-[min(88vw,350px)] overflow-y-auto border-r border-stone-200 bg-stone-50/95 shadow-[18px_0_50px_rgba(28,25,23,0.18)] transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-visible lg:border-b-0 lg:border-r-0 lg:bg-transparent lg:shadow-none',
+                                mobileSidebarOpen
+                                    ? 'translate-x-0'
+                                    : '-translate-x-full',
+                            ].join(' ')}
+                        >
                             <div
                                 onMouseEnter={() => {
                                     if (sidebarCollapsed) {
@@ -604,13 +643,39 @@ import {
                                     }
                                 }}
                                 className={[
-                                    'p-4 sm:p-5',
+                                    'flex min-h-full flex-col p-4 sm:p-5',
                                     'lg:absolute lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:h-full lg:flex-col lg:overflow-visible lg:transform-gpu lg:will-change-[width,padding] lg:transition-[width,padding] lg:duration-[560ms] lg:ease-[cubic-bezier(0.22,1,0.36,1)]',
                                     sidebarOpen
                                         ? 'lg:w-[390px] lg:bg-transparent lg:border-r-0 lg:shadow-none lg:px-5 lg:py-5 lg:pr-[130px]'
                                         : 'lg:w-[70px] lg:rounded-r-[32px] lg:border-r lg:border-stone-200 lg:bg-stone-50/95 lg:px-3 lg:py-4 lg:shadow-[8px_0_22px_rgba(15,23,42,0.07)]',
                                 ].join(' ')}
                             >
+                                <div className="mb-3 flex items-center justify-between lg:hidden">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">
+                                        Administration
+                                    </span>
+
+                                    <div className="flex items-center gap-2">
+                                        <NavLink
+                                            to="/"
+                                            onClick={() => setMobileSidebarOpen(false)}
+                                            className="focus-ring grid size-9 place-items-center rounded-[14px] border border-stone-200 bg-white text-stone-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700"
+                                            aria-label="Back to EPANTRY home"
+                                            title="Back to home"
+                                        >
+                                            <Home size={17} aria-hidden="true" />
+                                        </NavLink>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setMobileSidebarOpen(false)}
+                                            className="focus-ring grid size-9 place-items-center rounded-[14px] border border-stone-200 bg-white text-stone-700 shadow-sm"
+                                            aria-label="Close admin sidebar"
+                                        >
+                                            <X size={17} aria-hidden="true" />
+                                        </button>
+                                    </div>
+                                </div>
 
                                 {sidebarOpen ? (
                                     <>
@@ -673,13 +738,10 @@ import {
   
                                 <nav
                                     className={[
-                                        'lg:relative lg:z-10',
+                                        'relative z-10 mt-5 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1',
                                         sidebarOpen
-                                            ? 'mt-5 hidden space-y-1.5 lg:block'
-                                            : 'mt-2 hidden space-y-1.5 lg:block',
-                                        sidebarOpen
-                                            ? 'lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1'
-                                            : 'lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-0',
+                                            ? 'lg:mt-5 lg:pr-1'
+                                            : 'lg:mt-2 lg:pr-0',
                                     ].join(' ')}
                                     aria-label="Administration"
                                 >
@@ -688,49 +750,14 @@ import {
                                             <AdminNavigationItem
                                                 key={`${item.to}:${item.screenLabel || item.label}`}
                                                 item={item}
-                                                collapsed={!sidebarOpen}
+                                                collapsed={mobileSidebarOpen ? false : !sidebarOpen}
                                                 onNavigate={collapseSidebarAfterNavigation}
                                             />
                                         ),
                                     )}
                                 </nav>
   
-                                <nav
-                                    className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden"
-                                    aria-label="Administration"
-                                >
-                                    {navigationItems.map(
-                                        (item) => {
-                                            const Icon =
-                                                item.icon;
-  
-                                            return (
-                                                <NavLink
-                                                    key={`${item.to}:${item.screenLabel || item.label}`}
-                                                    to={item.to}
-                                                    end={item.end}
-                                                    className={({
-                                                        isActive,
-                                                    }) => [
-                                                        'focus-ring inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-black transition',
-                                                        isActive
-                                                            ? 'bg-emerald-700 text-white'
-                                                            : 'border border-stone-200 bg-white text-stone-600',
-                                                    ].join(' ')}
-                                                >
-                                                    <Icon
-                                                        size={15}
-                                                        aria-hidden="true"
-                                                    />
-  
-                                                    {visibleLabel(
-                                                        item,
-                                                    )}
-                                                </NavLink>
-                                            );
-                                        },
-                                    )}
-                                </nav>
+
   
                                 <div
                                     className={[

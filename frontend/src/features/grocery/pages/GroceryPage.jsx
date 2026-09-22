@@ -30,6 +30,7 @@ const CARD_GAP = 0.92
 const FIRST_CARD_OFFSET = -0.24
 const ENDING_REVEAL_DISTANCE = 0.58
 const ENDING_HOLD_DISTANCE = 0.32
+const MOBILE_ENDING_HOLD_EXTRA = 0.92
 
 const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value))
 
@@ -126,10 +127,12 @@ function useGroceryScrollScene({
     const hint = stage.querySelector('[data-grocery-hint]')
     const progressBar = stage.querySelector('[data-grocery-progress]')
     const counter = stage.querySelector('[data-grocery-counter]')
+    const namePanel = stage.querySelector('.ep-grocery-stage__left')
+    const bottomPanel = stage.querySelector('.ep-grocery-stage__bottom')
 
     const lastStart = FIRST_CARD_OFFSET + (count - 1) * CARD_GAP
     const lastExit = lastStart + CARD_TRAVEL
-    const travelLength = getSceneLength(count)
+    let travelLength = getSceneLength(count)
     let frame = null
     let currentDistance = null
     let targetDistance = 0
@@ -140,6 +143,9 @@ function useGroceryScrollScene({
     let cardHeight = 1
     let smallScreen = false
     let cardX = 0
+    let mobileNameTop = 0
+    let mobileNameBottom = 0
+    let mobileBottomTop = 0
 
     const smoothstep = (value) => {
       const t = clamp(value)
@@ -152,12 +158,29 @@ function useGroceryScrollScene({
       cardWidth = cards[0]?.offsetWidth || 1
       cardHeight = cards[0]?.offsetHeight || 1
       smallScreen = stageWidth < 700
+      travelLength = getSceneLength(count) + (smallScreen ? MOBILE_ENDING_HOLD_EXTRA : 0)
 
       const cardCenterX = smallScreen
         ? stageWidth * 0.5
         : stageWidth * 0.675
 
       cardX = cardCenterX - cardWidth / 2
+
+      if (smallScreen) {
+        const stageRect = stage.getBoundingClientRect()
+        const nameRect = namePanel?.getBoundingClientRect()
+        const bottomRect = bottomPanel?.getBoundingClientRect()
+
+        mobileNameTop = nameRect
+          ? nameRect.top - stageRect.top - 4
+          : stageHeight * 0.15
+        mobileNameBottom = nameRect
+          ? nameRect.bottom - stageRect.top + 8
+          : stageHeight * 0.36
+        mobileBottomTop = bottomRect
+          ? bottomRect.top - stageRect.top - 12
+          : stageHeight - 88
+      }
     }
 
     const readTargetDistance = () => {
@@ -184,7 +207,34 @@ function useGroceryScrollScene({
         let y
         let scale
 
-        if (t < entranceEnd) {
+        if (smallScreen) {
+          const safeTop = Math.max(mobileNameBottom + 18, stageHeight * 0.34)
+          const safeBottom = Math.max(safeTop + cardHeight, mobileBottomTop)
+          const restingY = Math.min(
+            Math.max(safeTop, stageHeight * 0.51 - cardHeight / 2),
+            safeBottom - cardHeight,
+          )
+          const entranceY = stageHeight + 18
+
+          if (t < entranceEnd) {
+            const p = smoothstep(t / entranceEnd)
+            y = entranceY + (restingY - entranceY) * p
+            scale = 0.82 + 0.18 * p
+          } else if (t < holdEnd) {
+            const p = smoothstep((t - entranceEnd) / (holdEnd - entranceEnd))
+            y = restingY - p * 5
+            scale = 1
+          } else {
+            const p = smoothstep((t - holdEnd) / (1 - holdEnd))
+            const namePanelCentre = mobileNameTop + (mobileNameBottom - mobileNameTop) * 0.56
+            const exitY = Math.max(
+              mobileNameTop - cardHeight * 0.18,
+              namePanelCentre - cardHeight * 0.5,
+            )
+            y = (restingY - 5) + (exitY - (restingY - 5)) * p
+            scale = 1 - 0.10 * p
+          }
+        } else if (t < entranceEnd) {
           const p = smoothstep(t / entranceEnd)
           y = stageHeight * 1.08 + (stageHeight * 0.50 - cardHeight / 2 - stageHeight * 1.08) * p
           scale = 0.80 + 0.20 * p
@@ -200,8 +250,10 @@ function useGroceryScrollScene({
           scale = 1 - 0.07 * p
         }
 
-        const fadeIn = smoothstep(t / 0.12)
-        const fadeOut = 1 - smoothstep((t - 0.68) / 0.25)
+        const fadeIn = smoothstep(t / (smallScreen ? 0.16 : 0.12))
+        const fadeOut = smallScreen
+          ? 1 - smoothstep((t - 0.64) / 0.31)
+          : 1 - smoothstep((t - 0.68) / 0.25)
         const opacity = visible ? Math.min(fadeIn, fadeOut) : 0
         const centreStrength = visible ? 1 - Math.min(1, Math.abs(t - 0.47) / 0.47) : 0
 
@@ -222,7 +274,7 @@ function useGroceryScrollScene({
         if (link) link.tabIndex = opacity > 0.38 && centreStrength > 0.38 ? 0 : -1
 
         const name = names[index]
-        if (name) {
+        if (name && !smallScreen) {
           const nameOpacity = smoothstep((centreStrength - 0.18) / 0.60)
           const offset = 30 * (1 - nameOpacity)
           name.style.opacity = nameOpacity.toFixed(3)
@@ -231,11 +283,36 @@ function useGroceryScrollScene({
         }
       })
 
+      if (smallScreen) {
+        names.forEach((name, index) => {
+          const active = index === activeIndex
+          name.style.opacity = active ? '1' : '0'
+          name.style.transform = active ? 'translate3d(0, 0, 0)' : 'translate3d(0, 12px, 0)'
+          name.style.visibility = active ? 'visible' : 'hidden'
+        })
+      }
+
       const endProgress = smoothstep((distance - lastExit + 0.06) / ENDING_REVEAL_DISTANCE)
+
+      // MOBILE ENDING HANDOFF:
+      // As the final directory scene arrives, retire the Published products/name
+      // panel so the ending CTA can reclaim that vertical space cleanly.
+      if (smallScreen && namePanel) {
+        const panelExit = smoothstep((endProgress - 0.04) / 0.46)
+        const panelOpacity = 1 - panelExit
+        namePanel.style.opacity = panelOpacity.toFixed(3)
+        namePanel.style.transform = `translate3d(0, ${(-14 * panelExit).toFixed(2)}px, 0) scale(${(1 - 0.015 * panelExit).toFixed(4)})`
+        namePanel.style.visibility = panelOpacity > 0.015 ? 'visible' : 'hidden'
+      } else if (namePanel) {
+        namePanel.style.opacity = '1'
+        namePanel.style.transform = ''
+        namePanel.style.visibility = 'visible'
+      }
 
       if (ending) {
         ending.style.opacity = endProgress.toFixed(3)
-        ending.style.transform = `translate3d(0, ${(26 * (1 - endProgress)).toFixed(2)}px, 0) scale(${(0.985 + endProgress * 0.015).toFixed(4)})`
+        const endingOffsetY = smallScreen ? 0 : 26 * (1 - endProgress)
+        ending.style.transform = `translate3d(0, ${endingOffsetY.toFixed(2)}px, 0) scale(${(0.985 + endProgress * 0.015).toFixed(4)})`
         ending.style.visibility = endProgress > 0.01 ? 'visible' : 'hidden'
         ending.style.pointerEvents = endProgress > 0.06 ? 'auto' : 'none'
         ending.inert = endProgress <= 0.06
@@ -542,7 +619,7 @@ const PAGE_STYLES = `
 .ep-grocery-scroll-cue p { margin: 0; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #dae7de; }
 @keyframes ep-grocery-cue { 0%,100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
 
-.ep-grocery-track { position: relative; background: #081f19; }
+.ep-grocery-track { position: relative; height: var(--grocery-track-height); background: #081f19; }
 .ep-grocery-stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; isolation: isolate; background: linear-gradient(118deg,#061b16 0%,#0c3327 42%,#335847 66%,#d7e3d9 100%); }
 .ep-grocery-stage::before { content: ''; position: absolute; inset: 0; z-index: -2; background: radial-gradient(circle at 67% 48%,#ffffff2c 0%,#ffffff10 26%,transparent 47%),linear-gradient(90deg,rgba(3,19,15,.36),transparent 58%); }
 .ep-grocery-stage::after { content: ''; position: absolute; top: 0; bottom: 0; left: 31%; width: 1px; background: linear-gradient(180deg,transparent,#d5e6da55 15%,#d5e6da72 50%,#d5e6da55 85%,transparent); }
@@ -640,17 +717,15 @@ const PAGE_STYLES = `
     margin-left: -10px;
     margin-right: -10px;
     padding: 7px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    display: block;
     overflow: hidden;
   }
   .ep-grocery-hero__search {
+    width: 100%;
     min-width: 0;
     min-height: 40px;
-    flex: 1 1 auto;
-    gap: 5px;
-    padding: 0 4px 0 8px;
+    gap: 7px;
+    padding: 0 5px 0 10px;
     border-radius: 10px;
   }
   .ep-grocery-hero__search > svg {
@@ -671,53 +746,62 @@ const PAGE_STYLES = `
     border-radius: 8px;
   }
   .ep-grocery-hero__selects {
-    flex: 0 0 auto;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
     align-items: center;
-    gap: 5px;
-    margin-top: 0;
+    gap: 6px;
+    margin-top: 7px;
   }
   .ep-grocery-hero__selects select {
-    height: 40px;
-    padding: 0 20px 0 7px;
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 0 25px 0 9px;
     border-radius: 9px;
-    background-position: calc(100% - 7px) center;
-    font-size: 9px;
+    background-position: calc(100% - 8px) center;
+    font-size: 10px;
   }
-  #grocery-category { width: 72px; }
-  #grocery-brand { width: 62px; }
+  #grocery-category,
+  #grocery-brand { width: 100%; }
   .ep-grocery-hero__reset {
-    width: 34px;
-    min-width: 34px;
-    min-height: 40px;
-    grid-column: auto;
-    padding: 0;
-    gap: 0;
-    font-size: 0;
+    width: auto;
+    min-width: 66px;
+    min-height: 38px;
+    padding: 0 9px;
+    gap: 5px;
+    font-size: 10px;
   }
   .ep-grocery-hero__reset svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
   }
   .ep-grocery-scroll-cue { left: 22px; right: 22px; }
   .ep-grocery-scroll-cue p { display: none; }
+  .ep-grocery-track { height: var(--grocery-track-height-mobile); }
   .ep-grocery-stage::after { display: none; }
-  .ep-grocery-stage__meta { top: calc(var(--grocery-nav-height) + 18px); left: 18px; right: 18px; }
-  .ep-grocery-stage__left { z-index: 40; top: calc(var(--grocery-nav-height) + 72px); left: 18px; width: calc(100% - 36px); transform: none; padding: 0; pointer-events: none; }
+  .ep-grocery-stage__meta { z-index: 70; top: calc(var(--grocery-nav-height) + 18px); left: 18px; right: 18px; }
+  .ep-grocery-stage__left { z-index: 70; top: calc(var(--grocery-nav-height) + 72px); left: 18px; width: calc(100% - 36px); transform: none; padding: 0; pointer-events: none; will-change: opacity, transform; transform-origin: top center; }
   .ep-grocery-stage__left::before { inset: -12px -18px; }
   .ep-grocery-stage__label { min-height: 34px; font-size: 8px; }
-  .ep-grocery-stage__names { min-height: 90px; margin-top: 10px; }
-  .ep-grocery-stage__name h2 { max-width: 330px; font-size: clamp(34px,9vw,48px); }
+  .ep-grocery-stage__names { min-height: 122px; margin-top: 10px; overflow: hidden; }
+  .ep-grocery-stage__name span { margin-bottom: 8px; font-size: 10px; }
+  .ep-grocery-stage__name h2 { max-width: 100%; font-size: clamp(30px,8.2vw,42px); line-height: .92; text-wrap: pretty; }
   .ep-grocery-stage__name p { display: none; }
   .ep-grocery-flight { width: min(76vw,430px); }
   .ep-grocery-image-card { border-radius: 22px; }
-  .ep-grocery-stage__hint { left: 18px; bottom: 70px; }
-  .ep-grocery-stage__bottom { left: 18px; right: 18px; bottom: 20px; }
-  .ep-grocery-ending__view { left: 50%; top: 27%; width: min(72vw,360px); height: min(66vw,320px); transform: translateX(-50%); }
-  .ep-grocery-ending__categories { left: 18px; right: 18px; bottom: 60px; padding: 14px; }
-  .ep-grocery-ending__category-row { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .ep-grocery-stage__hint { z-index: 60; left: 18px; bottom: 70px; pointer-events: none; }
+  .ep-grocery-stage__bottom { z-index: 60; left: 18px; right: 18px; bottom: 20px; pointer-events: none; }
+  .ep-grocery-ending__view { left: 50%; top: calc(var(--grocery-nav-height) + 92px); width: min(72vw,360px); height: min(66vw,320px); transform: translateX(-50%); }
+  .ep-grocery-ending__categories { left: 18px; right: 18px; bottom: 60px; padding: 13px; border-color: rgba(255,255,255,.34); border-radius: 24px; background: linear-gradient(150deg,rgba(7,43,32,.80),rgba(52,92,73,.52)); box-shadow: 0 20px 50px rgba(0,18,12,.24),inset 0 1px 0 rgba(255,255,255,.08); }
+  .ep-grocery-ending__categories-head { margin-bottom: 11px; gap: 8px; }
+  .ep-grocery-ending__categories-head p { font-size: 10px; letter-spacing: .14em; }
+  .ep-grocery-ending__categories-head button { min-height: 31px; padding: 0 10px; font-size: 9px; }
+  .ep-grocery-ending__category-row { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
   .ep-grocery-ending__category-row button:nth-child(n+4) { display: none; }
-  .ep-grocery-ending__category-row button { min-height: 82px; }
+  .ep-grocery-ending__category-row button { position: relative; min-height: 96px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; overflow: hidden; border-color: rgba(255,255,255,.50); border-radius: 17px; background: linear-gradient(145deg,rgba(255,255,255,.24),rgba(255,255,255,.10)); padding: 11px 10px 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,.14),0 8px 18px rgba(0,18,12,.10); }
+  .ep-grocery-ending__category-row button::before { content: ''; position: absolute; left: 10px; right: 10px; top: 0; height: 2px; border-radius: 999px; background: linear-gradient(90deg,#f1ddb0,rgba(241,221,176,0)); opacity: .9; }
+  .ep-grocery-ending__category-row button span { margin-bottom: 0; align-self: flex-start; border: 1px solid rgba(255,255,255,.20); border-radius: 999px; background: rgba(255,255,255,.10); padding: 4px 6px; color: #e6f1ea; font-size: 8px; line-height: 1; }
+  .ep-grocery-ending__category-row button strong { display: block; overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; word-break: normal; color: #fffdf7; font-size: 11px; line-height: 1.18; font-weight: 850; }
   .ep-grocery-modal { width: calc(100vw - 22px); height: calc(100svh - 28px); border-radius: 20px; }
   .ep-grocery-modal__header { padding: 18px 16px 13px; }
   .ep-grocery-modal__header h2 { font-size: 29px; }
@@ -970,7 +1054,10 @@ export default function GroceryPage() {
           ref={trackRef}
           className="ep-grocery-track"
           aria-labelledby="published-products-title"
-          style={{ height: `${getSceneLength(featuredProducts.length) * 100}svh` }}
+          style={{
+            '--grocery-track-height': `${getSceneLength(featuredProducts.length) * 100}svh`,
+            '--grocery-track-height-mobile': `${(getSceneLength(featuredProducts.length) + MOBILE_ENDING_HOLD_EXTRA) * 100}svh`,
+          }}
         >
           <div ref={stageRef} className="ep-grocery-stage">
             <div className="ep-grocery-stage__meta">

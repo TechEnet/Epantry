@@ -7,6 +7,7 @@ import {
   
   import {
     ArrowLeft,
+    Bell,
     BookOpen,
     ChevronDown,
     CircleAlert,
@@ -14,10 +15,13 @@ import {
     LayoutDashboard,
     LoaderCircle,
     LogOut,
+    MapPin,
     Menu,
+    Search,
     ScanLine,
     Settings,
     ShoppingCart,
+    Truck,
     UserRound,
     UsersRound,
     X,
@@ -47,6 +51,14 @@ import {
   import NavbarLocationStatus from '../../features/location/components/NavbarLocationStatus';
   import ModeSwitcher from '../../features/auth/components/ModeSwitcher';
   import NotificationBell from '../../features/notifications/components/NotificationBell';
+
+  import {
+    listOrders,
+  } from '../../features/commerce/services/commerce.service';
+
+  import {
+    listNotifications,
+  } from '../../features/analytics/services/analytics.service';
   
   const RECIPE_CART_PENDING_KEY =
     'epantry-pending-recipe-cart';
@@ -56,6 +68,23 @@ import {
 
   const FLOATING_CART_UPDATE_EVENT =
     'epantry-cart-updated';
+
+  const UNREAD_NOTIFICATION_STATUSES =
+    new Set([
+      'pending',
+      'delivered',
+      'action_required_domain',
+    ]);
+
+  const NON_TRACKABLE_ORDER_STATUSES =
+    new Set([
+      'draft',
+      'delivered',
+      'customer_cancelled',
+      'seller_cancelled',
+      'returned',
+      'refunded',
+    ]);
 
   function readSessionJson(
     key,
@@ -243,6 +272,21 @@ import {
         setMenuOpen,
     ] =
         useState(false);
+
+    const [
+        mobileLocationOpen,
+        setMobileLocationOpen,
+    ] =
+        useState(false);
+
+    const [
+        mobileSearchOpen,
+        setMobileSearchOpen,
+    ] =
+        useState(false);
+
+    const mobileUtilityRef =
+        useRef(null);
   
     const [
         mobileCompact,
@@ -272,6 +316,18 @@ import {
         useState(
             readNavbarCartNavigation,
         );
+
+    const [
+        activeTrackingOrder,
+        setActiveTrackingOrder,
+    ] =
+        useState(null);
+
+    const [
+        unreadNotificationCount,
+        setUnreadNotificationCount,
+    ] =
+        useState(0);
   
     const location =
         useLocation();
@@ -320,6 +376,64 @@ import {
     const isHomePage =
         location.pathname ===
         '/';
+
+    const isGroceryPage =
+        location.pathname ===
+        '/grocery';
+
+    const isGroceryCategoryPage =
+        location.pathname.startsWith(
+            '/grocery/category/',
+        );
+
+    const isMobileCompactPage =
+        isHomePage ||
+        isGroceryPage ||
+        isGroceryCategoryPage;
+
+    const workspacePath =
+        location.pathname;
+
+    const isCustomerWorkspaceRoute =
+        workspacePath === '/dashboard' ||
+        workspacePath === '/scan' ||
+        workspacePath === '/cook-today' ||
+        workspacePath === '/meal-plan' ||
+        workspacePath === '/next-basket' ||
+        workspacePath === '/waste-reduction' ||
+        workspacePath === '/account/spending' ||
+        workspacePath === '/account/profile' ||
+        workspacePath === '/account/household' ||
+        workspacePath === '/account/purchase-intelligence' ||
+        workspacePath === '/account/learning' ||
+        workspacePath === '/pantry' ||
+        workspacePath.startsWith('/pantry/') ||
+        workspacePath === '/orders' ||
+        workspacePath.startsWith('/orders/') ||
+        workspacePath.startsWith('/household-invitations/') ||
+        (
+            workspacePath === '/account/settings' &&
+            customerEnabled === true &&
+            superAdminEnabled !== true &&
+            activeMode !== 'host'
+        );
+
+    const isHostWorkspaceRoute =
+        workspacePath.startsWith('/host/') &&
+        !workspacePath.startsWith('/host/hospitality');
+
+    const isAdminWorkspaceRoute =
+        (
+            workspacePath === '/admin' ||
+            workspacePath.startsWith('/admin/')
+        ) &&
+        workspacePath !== '/admin/privacy' &&
+        workspacePath !== '/admin/observability';
+
+    const isWorkspaceShellRoute =
+        isCustomerWorkspaceRoute ||
+        isHostWorkspaceRoute ||
+        isAdminWorkspaceRoute;
 
     const isHeroGlassPage =
         [
@@ -429,6 +543,29 @@ import {
         !hasAdminAccess &&
         !superAdminEnabled;
 
+    const activeTrackingOrderId =
+        activeTrackingOrder?.id ||
+        activeTrackingOrder?._id ||
+        null;
+
+    const showMobileCartIcon =
+        showCustomerCart &&
+        cartNavigation.count > 0;
+
+    const hasTrackableOrder =
+        showCustomerCart &&
+        Boolean(
+            activeTrackingOrderId,
+        );
+
+    const showMobileTrackIcon =
+        hasTrackableOrder &&
+        !showMobileCartIcon;
+
+    const showMobileNotificationIcon =
+        isAuthenticated &&
+        unreadNotificationCount > 0;
+
     useEffect(
         () => {
             function refreshCartNavigation() {
@@ -472,6 +609,182 @@ import {
         },
         [],
     );
+
+    useEffect(
+        () => {
+            let cancelled =
+                false;
+
+            if (
+                !isAuthenticated ||
+                isBootstrapping
+            ) {
+                setActiveTrackingOrder(
+                    null,
+                );
+                setUnreadNotificationCount(
+                    0,
+                );
+
+                return undefined;
+            }
+
+            const refreshContextualActions =
+                async () => {
+                    const requests =
+                        await Promise.allSettled([
+                            showCustomerCart
+                                ? listOrders({
+                                      page: 1,
+                                      limit: 10,
+                                  })
+                                : Promise.resolve({
+                                      orders: [],
+                                  }),
+                            listNotifications({
+                                limit: 100,
+                            }),
+                        ]);
+
+                    if (cancelled) {
+                        return;
+                    }
+
+                    const [
+                        ordersResult,
+                        notificationsResult,
+                    ] =
+                        requests;
+
+                    if (
+                        ordersResult.status ===
+                        'fulfilled'
+                    ) {
+                        const orders =
+                            Array.isArray(
+                                ordersResult.value?.orders,
+                            )
+                                ? ordersResult.value.orders
+                                : [];
+
+                        const activeOrder =
+                            orders.find(
+                                (order) => {
+                                    const status =
+                                        String(
+                                            order?.status ||
+                                                '',
+                                        )
+                                            .trim()
+                                            .toLowerCase();
+
+                                    return (
+                                        status &&
+                                        !NON_TRACKABLE_ORDER_STATUSES.has(
+                                            status,
+                                        )
+                                    );
+                                },
+                            ) || null;
+
+                        setActiveTrackingOrder(
+                            activeOrder,
+                        );
+                    } else if (
+                        !showCustomerCart
+                    ) {
+                        setActiveTrackingOrder(
+                            null,
+                        );
+                    }
+
+                    if (
+                        notificationsResult.status ===
+                        'fulfilled'
+                    ) {
+                        const notifications =
+                            Array.isArray(
+                                notificationsResult.value
+                                    ?.notifications,
+                            )
+                                ? notificationsResult.value
+                                      .notifications
+                                : [];
+
+                        setUnreadNotificationCount(
+                            notifications.filter(
+                                (item) =>
+                                    !item?.readAt &&
+                                    UNREAD_NOTIFICATION_STATUSES.has(
+                                        String(
+                                            item?.status ||
+                                                '',
+                                        ).toLowerCase(),
+                                    ),
+                            ).length,
+                        );
+                    }
+                };
+
+            const handleVisibility =
+                () => {
+                    if (
+                        document.visibilityState ===
+                        'visible'
+                    ) {
+                        refreshContextualActions();
+                    }
+                };
+
+            refreshContextualActions();
+
+            const intervalId =
+                window.setInterval(
+                    refreshContextualActions,
+                    45000,
+                );
+
+            window.addEventListener(
+                'epantry:notifications-changed',
+                refreshContextualActions,
+            );
+            window.addEventListener(
+                FLOATING_CART_UPDATE_EVENT,
+                refreshContextualActions,
+            );
+            document.addEventListener(
+                'visibilitychange',
+                handleVisibility,
+            );
+
+            return () => {
+                cancelled =
+                    true;
+
+                window.clearInterval(
+                    intervalId,
+                );
+                window.removeEventListener(
+                    'epantry:notifications-changed',
+                    refreshContextualActions,
+                );
+                window.removeEventListener(
+                    FLOATING_CART_UPDATE_EVENT,
+                    refreshContextualActions,
+                );
+                document.removeEventListener(
+                    'visibilitychange',
+                    handleVisibility,
+                );
+            };
+        },
+        [
+            isAuthenticated,
+            isBootstrapping,
+            showCustomerCart,
+            location.pathname,
+        ],
+    );
   
     useEffect(
         () => {
@@ -480,6 +793,14 @@ import {
             );
 
             setAccountMenuOpen(
+                false,
+            );
+
+            setMobileLocationOpen(
+                false,
+            );
+
+            setMobileSearchOpen(
                 false,
             );
         },
@@ -550,6 +871,77 @@ import {
   
     useEffect(
         () => {
+            if (
+                !mobileLocationOpen &&
+                !mobileSearchOpen
+            ) {
+                return undefined;
+            }
+
+            const handlePointerDown =
+                (event) => {
+                    if (
+                        mobileUtilityRef.current &&
+                        !mobileUtilityRef.current.contains(
+                            event.target,
+                        )
+                    ) {
+                        setMobileLocationOpen(
+                            false,
+                        );
+
+                        setMobileSearchOpen(
+                            false,
+                        );
+                    }
+                };
+
+            const handleKeyDown =
+                (event) => {
+                    if (
+                        event.key ===
+                        'Escape'
+                    ) {
+                        setMobileLocationOpen(
+                            false,
+                        );
+
+                        setMobileSearchOpen(
+                            false,
+                        );
+                    }
+                };
+
+            document.addEventListener(
+                'pointerdown',
+                handlePointerDown,
+            );
+
+            document.addEventListener(
+                'keydown',
+                handleKeyDown,
+            );
+
+            return () => {
+                document.removeEventListener(
+                    'pointerdown',
+                    handlePointerDown,
+                );
+
+                document.removeEventListener(
+                    'keydown',
+                    handleKeyDown,
+                );
+            };
+        },
+        [
+            mobileLocationOpen,
+            mobileSearchOpen,
+        ],
+    );
+  
+    useEffect(
+        () => {
             if (isAuthenticated) {
                 setLogoutError(
                     '',
@@ -563,7 +955,7 @@ import {
   
     useEffect(
         () => {
-            if (!isHomePage) {
+            if (!isMobileCompactPage) {
                 setMobileCompact(
                     false,
                 );
@@ -571,15 +963,53 @@ import {
                 return undefined;
             }
   
-            const handleScroll =
+            let frameId =
+                null;
+
+            const updateCompactState =
                 () => {
+                    frameId =
+                        null;
+
+                    if (isGroceryCategoryPage) {
+                        const scrollY =
+                            window.scrollY;
+
+                        setMobileCompact(
+                            (current) => {
+                                const next =
+                                    current
+                                        ? scrollY > 28
+                                        : scrollY > 72;
+
+                                return next === current
+                                    ? current
+                                    : next;
+                            },
+                        );
+
+                        return;
+                    }
+
                     setMobileCompact(
                         window.scrollY >
                             MOBILE_COMPACT_SCROLL_Y,
                     );
                 };
+
+            const handleScroll =
+                () => {
+                    if (frameId !== null) {
+                        return;
+                    }
+
+                    frameId =
+                        window.requestAnimationFrame(
+                            updateCompactState,
+                        );
+                };
   
-            handleScroll();
+            updateCompactState();
   
             window.addEventListener(
                 'scroll',
@@ -595,10 +1025,17 @@ import {
                     'scroll',
                     handleScroll,
                 );
+
+                if (frameId !== null) {
+                    window.cancelAnimationFrame(
+                        frameId,
+                    );
+                }
             };
         },
         [
-            isHomePage,
+            isMobileCompactPage,
+            isGroceryCategoryPage,
         ],
     );
   
@@ -1237,68 +1674,177 @@ import {
                 to={
                     dashboardDestination
                 }
-                className="focus-ring col-span-2 flex min-h-10 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-900 transition hover:bg-emerald-100 sm:col-span-1"
+                className="focus-ring flex min-h-9 w-full items-center gap-2 border-b border-stone-300/35 px-1 text-[10px] font-black text-stone-800 transition hover:text-emerald-800 md:min-h-11 md:justify-center md:rounded-2xl md:border md:border-white/85 md:bg-white/58 md:px-3 md:text-xs md:text-emerald-950 md:shadow-sm md:backdrop-blur-xl md:hover:bg-white/78"
                 title={
                     user?.email ||
                     dashboardTitle
                 }
             >
                 <UserRound
-                    size={15}
-                    className="shrink-0"
-                    aria-hidden="true"
-                />
-  
-                <span className="truncate">
-                    Hi, {firstName}
-                </span>
-  
-                <span
-                    className="h-4 w-px bg-emerald-300"
-                    aria-hidden="true"
-                />
-  
-                <LayoutDashboard
                     size={14}
                     className="shrink-0"
                     aria-hidden="true"
                 />
   
-                <span className="shrink-0">
+                <span className="min-w-0 flex-1 truncate md:flex-none">
                     Dashboard
                 </span>
+  
+                <LayoutDashboard
+                    size={13}
+                    className="shrink-0"
+                    aria-hidden="true"
+                />
             </Link>
         ) : (
             <div
-                className="col-span-2 flex min-h-10 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-900 sm:col-span-1"
+                className="flex min-h-9 w-full items-center gap-2 border-b border-stone-300/35 px-1 text-[10px] font-black text-stone-800 md:min-h-11 md:justify-center md:rounded-2xl md:border md:border-white/85 md:bg-white/58 md:px-3 md:text-xs md:text-emerald-950 md:shadow-sm md:backdrop-blur-xl"
                 title={
                     user?.email ||
                     'Signed in'
                 }
             >
                 <UserRound
-                    size={15}
+                    size={14}
                     aria-hidden="true"
                 />
   
-                <span className="truncate">
+                <span className="min-w-0 flex-1 truncate md:flex-none">
                     Hi, {firstName}
                 </span>
             </div>
         );
+
+    const mobileUtilityIconClass =
+        'focus-ring relative grid size-8 shrink-0 place-items-center rounded-[11px] border border-white/95 bg-white/72 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.12)] backdrop-blur-2xl transition hover:-translate-y-0.5 hover:bg-white/95 hover:text-stone-950';
+
+    const mobileMenuUtilities =
+        isAuthenticated ? (
+            <div className="flex min-h-10 w-full items-center justify-between gap-1.5 border-b border-stone-300/35 px-0.5 py-1.5">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setMenuOpen(false);
+                        setMobileSearchOpen(false);
+                        setMobileLocationOpen(true);
+                    }}
+                    className={mobileUtilityIconClass}
+                    aria-label="Choose location"
+                    title="Location"
+                >
+                    <MapPin
+                        size={15}
+                        strokeWidth={2.1}
+                        aria-hidden="true"
+                    />
+                </button>
+
+                <Link
+                    to={cartNavigation.href}
+                    onClick={() => {
+                        setMenuOpen(false);
+                        setMobileLocationOpen(false);
+                        setMobileSearchOpen(false);
+                    }}
+                    className={mobileUtilityIconClass}
+                    aria-label={
+                        cartNavigation.count > 0
+                            ? `Open cart with ${cartNavigation.count} item${cartNavigation.count === 1 ? '' : 's'}`
+                            : 'Open cart'
+                    }
+                    title="Cart"
+                >
+                    <ShoppingCart
+                        size={15}
+                        strokeWidth={2.1}
+                        aria-hidden="true"
+                    />
+
+                    {cartNavigation.count > 0 ? (
+                        <span className="absolute -right-1 -top-1 grid min-h-3.5 min-w-3.5 place-items-center rounded-full bg-emerald-700 px-0.5 text-[7px] font-black leading-none text-white shadow-sm">
+                            {cartNavigation.count > 99
+                                ? '99+'
+                                : cartNavigation.count}
+                        </span>
+                    ) : null}
+                </Link>
+
+                <Link
+                    to="/notifications"
+                    onClick={() => {
+                        setMenuOpen(false);
+                        setMobileLocationOpen(false);
+                        setMobileSearchOpen(false);
+                    }}
+                    className={mobileUtilityIconClass}
+                    aria-label={
+                        unreadNotificationCount > 0
+                            ? `Notifications, ${unreadNotificationCount} unread`
+                            : 'Notifications'
+                    }
+                    title="Notifications"
+                >
+                    <Bell
+                        size={15}
+                        strokeWidth={2.1}
+                        aria-hidden="true"
+                    />
+
+                    {unreadNotificationCount > 0 ? (
+                        <span className="absolute -right-1 -top-1 grid min-h-3.5 min-w-3.5 place-items-center rounded-full bg-red-600 px-0.5 text-[7px] font-black leading-none text-white shadow-sm">
+                            {unreadNotificationCount > 99
+                                ? '99+'
+                                : unreadNotificationCount}
+                        </span>
+                    ) : null}
+                </Link>
+
+                <Link
+                    to={
+                        hasTrackableOrder
+                            ? `/orders/${encodeURIComponent(
+                                String(activeTrackingOrderId),
+                            )}`
+                            : '/orders'
+                    }
+                    onClick={() => {
+                        setMenuOpen(false);
+                        setMobileLocationOpen(false);
+                        setMobileSearchOpen(false);
+                    }}
+                    className={mobileUtilityIconClass}
+                    aria-label={
+                        hasTrackableOrder
+                            ? 'Track current order'
+                            : 'Open orders and delivery'
+                    }
+                    title={
+                        hasTrackableOrder
+                            ? 'Track order'
+                            : 'Orders & delivery'
+                    }
+                >
+                    <Truck
+                        size={15}
+                        strokeWidth={2.1}
+                        aria-hidden="true"
+                    />
+                </Link>
+            </div>
+        ) : null;
   
     const mobileAuth =
         isBootstrapping ? (
-            <div className="col-span-2 h-10 animate-pulse rounded-full bg-stone-200" />
+            <div className="h-10 w-full animate-pulse rounded-xl bg-white/50 backdrop-blur-xl" />
         ) : isAuthenticated ? (
             <>
                 {mobileAccount}
-  
-                <div className="col-span-2 flex items-center justify-center gap-2 sm:col-span-1">
+
+                <div className="flex min-h-10 w-full items-center justify-center border-b border-stone-300/35 py-1 md:rounded-xl md:border md:border-white/85 md:bg-white/52 md:px-1.5 md:shadow-sm md:backdrop-blur-2xl">
                     <ModeSwitcher compact />
-                    {customerCartButton}
-                    <NotificationBell compact />
                 </div>
+
+                {mobileMenuUtilities}
   
                 <button
                     type="button"
@@ -1308,17 +1854,17 @@ import {
                     disabled={
                         isLoggingOut
                     }
-                    className="focus-ring flex min-h-10 items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 text-xs font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="focus-ring flex min-h-9 w-full items-center justify-start gap-2 px-1 text-[10px] font-black text-red-700 transition hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-11 md:justify-center md:rounded-2xl md:border md:border-red-200/70 md:bg-red-50/72 md:px-3 md:text-xs md:shadow-sm md:backdrop-blur-xl md:hover:bg-red-50/90"
                 >
                     {isLoggingOut ? (
                         <LoaderCircle
-                            size={15}
+                            size={14}
                             className="animate-spin"
                             aria-hidden="true"
                         />
                     ) : (
                         <LogOut
-                            size={15}
+                            size={14}
                             aria-hidden="true"
                         />
                     )}
@@ -1364,6 +1910,10 @@ import {
                 'backdrop-blur-xl',
                 'transition-all',
                 'duration-200',
+
+                isWorkspaceShellRoute
+                    ? 'hidden lg:block'
+                    : '',
   
                 isHeroGlassPage
                     ? 'fixed left-0 right-0 w-full border-white/35 bg-white/30 shadow-[0_8px_30px_rgba(17,24,39,0.06)] backdrop-blur-2xl'
@@ -1540,55 +2090,178 @@ import {
                     </div>
                 </div>
   
-                <div className="md:hidden">
-                    {mobileCompact &&
-                    isHomePage ? (
-                        <div className="flex h-[60px] w-full items-center gap-1.5">
-                            <Link
-                                to="/"
-                                onClick={() =>
-                                    setMenuOpen(
-                                        false,
-                                    )
-                                }
-                                className="focus-ring grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-700 text-xs font-black text-white shadow-sm"
-                                aria-label="EPANTRY home"
-                            >
+                <div
+                    ref={mobileUtilityRef}
+                    className="relative md:hidden"
+                >
+                    <motion.div
+                        initial={false}
+                        animate={{
+                            height:
+                                mobileCompact && isMobileCompactPage
+                                    ? 56
+                                    : 64,
+                        }}
+                        transition={{
+                            duration: 0.28,
+                            ease: [0.22, 1, 0.36, 1],
+                        }}
+                        className="flex w-full items-center"
+                    >
+                        <Link
+                            to="/"
+                            onClick={() => {
+                                setMenuOpen(false);
+                                setMobileLocationOpen(false);
+                                setMobileSearchOpen(false);
+                            }}
+                            className="focus-ring flex shrink-0 items-center gap-1.5 rounded-[15px]"
+                            aria-label="EPANTRY home"
+                        >
+                            <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-emerald-700 text-[13px] font-black text-white shadow-[0_8px_20px_rgba(4,120,87,0.24)] ring-1 ring-white/35">
                                 E
-                            </Link>
-  
-                            <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,3fr)] gap-1.5">
-                                <div className="min-w-0">
-                                    <NavbarLocationStatus />
-                                </div>
-  
-                                <div className="min-w-0">
-                                    <SearchBar
-                                        value={
-                                            currentQuery
-                                        }
-                                        onSubmit={
-                                            handleSearch
-                                        }
-                                        compact
-                                    />
-                                </div>
-                            </div>
-  
+                            </span>
+
+                            <span className="text-[10px] font-black tracking-[0.04em] text-stone-900">
+                                EPANTRY
+                            </span>
+                        </Link>
+
+                        <div className="ml-auto flex items-center gap-1.5">
                             <button
                                 type="button"
-                                onClick={() =>
-                                    setMenuOpen(
-                                        (
-                                            value,
-                                        ) =>
-                                            !value,
-                                    )
-                                }
-                                className="focus-ring grid size-9 shrink-0 place-items-center rounded-xl border border-white/40 bg-white/55 text-stone-700 shadow-sm backdrop-blur-md"
-                                aria-expanded={
+                                onClick={() => {
+                                    setMobileLocationOpen((value) => !value);
+                                    setMobileSearchOpen(false);
+                                    setMenuOpen(false);
+                                }}
+                                className={[
+                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
+                                    mobileLocationOpen
+                                        ? 'border-emerald-200/80 bg-emerald-50/90 text-emerald-800'
+                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
+                                ].join(' ')}
+                                aria-label="Choose location"
+                                aria-expanded={mobileLocationOpen}
+                            >
+                                <MapPin
+                                    size={17}
+                                    strokeWidth={2.15}
+                                    aria-hidden="true"
+                                />
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMobileSearchOpen((value) => !value);
+                                    setMobileLocationOpen(false);
+                                    setMenuOpen(false);
+                                }}
+                                className={[
+                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
+                                    mobileSearchOpen
+                                        ? 'border-emerald-200/80 bg-emerald-50/90 text-emerald-800'
+                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
+                                ].join(' ')}
+                                aria-label="Search EPANTRY"
+                                aria-expanded={mobileSearchOpen}
+                            >
+                                <Search
+                                    size={17}
+                                    strokeWidth={2.15}
+                                    aria-hidden="true"
+                                />
+                            </button>
+
+                            {showMobileCartIcon ? (
+                                <Link
+                                    to={cartNavigation.href}
+                                    onClick={() => {
+                                        setMobileLocationOpen(false);
+                                        setMobileSearchOpen(false);
+                                        setMenuOpen(false);
+                                    }}
+                                    className="focus-ring relative grid size-9 shrink-0 place-items-center rounded-[14px] border border-white/75 bg-white/58 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition hover:bg-white/80 hover:text-stone-950"
+                                    aria-label={`Open cart with ${cartNavigation.count} item${cartNavigation.count === 1 ? '' : 's'}`}
+                                    title="Cart"
+                                >
+                                    <ShoppingCart
+                                        size={17}
+                                        strokeWidth={2.1}
+                                        aria-hidden="true"
+                                    />
+
+                                    <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-emerald-700 px-1 text-[8px] font-black leading-none text-white shadow-sm">
+                                        {cartNavigation.count > 99
+                                            ? '99+'
+                                            : cartNavigation.count}
+                                    </span>
+                                </Link>
+                            ) : showMobileTrackIcon ? (
+                                <Link
+                                    to={`/orders/${encodeURIComponent(
+                                        String(
+                                            activeTrackingOrderId,
+                                        ),
+                                    )}`}
+                                    onClick={() => {
+                                        setMobileLocationOpen(false);
+                                        setMobileSearchOpen(false);
+                                        setMenuOpen(false);
+                                    }}
+                                    className="focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border border-white/75 bg-white/58 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition hover:bg-white/80 hover:text-stone-950"
+                                    aria-label="Track current order"
+                                    title="Track order"
+                                >
+                                    <Truck
+                                        size={17}
+                                        strokeWidth={2.1}
+                                        aria-hidden="true"
+                                    />
+                                </Link>
+                            ) : null}
+
+                            {showMobileNotificationIcon ? (
+                                <Link
+                                    to="/notifications"
+                                    onClick={() => {
+                                        setMobileLocationOpen(false);
+                                        setMobileSearchOpen(false);
+                                        setMenuOpen(false);
+                                    }}
+                                    className="focus-ring relative grid size-9 shrink-0 place-items-center rounded-[14px] border border-white/75 bg-white/58 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition hover:bg-white/80 hover:text-stone-950"
+                                    aria-label={`Notifications, ${unreadNotificationCount} unread`}
+                                    title="Notifications"
+                                >
+                                    <Bell
+                                        size={17}
+                                        strokeWidth={2.1}
+                                        aria-hidden="true"
+                                    />
+
+                                    <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[8px] font-black leading-none text-white shadow-sm">
+                                        {unreadNotificationCount > 99
+                                            ? '99+'
+                                            : unreadNotificationCount}
+                                    </span>
+                                </Link>
+                            ) : null}
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMenuOpen((value) => !value);
+                                    setMobileLocationOpen(false);
+                                    setMobileSearchOpen(false);
+                                }}
+                                className={[
+                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
                                     menuOpen
-                                }
+                                        ? 'border-stone-300/80 bg-stone-950 text-white'
+                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
+                                ].join(' ')}
+                                aria-expanded={menuOpen}
                                 aria-label={
                                     menuOpen
                                         ? 'Close menu'
@@ -1597,75 +2270,58 @@ import {
                             >
                                 {menuOpen ? (
                                     <X
-                                        size={18}
+                                        size={17}
+                                        strokeWidth={2.1}
                                         aria-hidden="true"
                                     />
                                 ) : (
                                     <Menu
                                         size={18}
+                                        strokeWidth={2.1}
                                         aria-hidden="true"
                                     />
                                 )}
                             </button>
                         </div>
-                    ) : (
-                        <div className="py-3">
-                            <div className="flex min-h-[48px] items-center justify-between gap-3">
-                                {brandCluster}
-  
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setMenuOpen(
-                                            (
-                                                value,
-                                            ) =>
-                                                !value,
-                                        )
-                                    }
-                                    className="focus-ring grid size-11 shrink-0 place-items-center rounded-xl border border-white/40 bg-white/55 text-stone-700 shadow-sm backdrop-blur-md"
-                                    aria-expanded={
-                                        menuOpen
-                                    }
-                                    aria-label={
-                                        menuOpen
-                                            ? 'Close menu'
-                                            : 'Open menu'
-                                    }
-                                >
-                                    {menuOpen ? (
-                                        <X
-                                            size={20}
-                                            aria-hidden="true"
-                                        />
-                                    ) : (
-                                        <Menu
-                                            size={20}
-                                            aria-hidden="true"
-                                        />
-                                    )}
-                                </button>
-                            </div>
-  
-                            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,3fr)] items-stretch gap-2">
-                                <div className="min-w-0">
-                                    <NavbarLocationStatus />
-                                </div>
-  
-                                <div className="min-w-0">
-                                    <SearchBar
-                                        value={
-                                            currentQuery
-                                        }
-                                        onSubmit={
-                                            handleSearch
-                                        }
-                                        compact
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    </motion.div>
+
+                    <AnimatePresence>
+                        {mobileLocationOpen ? (
+                            <motion.div
+                                initial={{ opacity: 0, y: -6, scale: 0.985 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -5, scale: 0.99 }}
+                                transition={{
+                                    duration: 0.18,
+                                    ease: [0.22, 1, 0.36, 1],
+                                }}
+                                className="absolute left-0 right-0 top-[calc(100%+7px)] z-[78] rounded-[22px] border border-white/75 bg-white/62 p-2 shadow-[0_18px_45px_rgba(28,25,23,0.15)] backdrop-blur-2xl"
+                            >
+                                <NavbarLocationStatus />
+                            </motion.div>
+                        ) : null}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {mobileSearchOpen ? (
+                            <motion.div
+                                initial={{ opacity: 0, y: -6, scale: 0.985 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -5, scale: 0.99 }}
+                                transition={{
+                                    duration: 0.18,
+                                    ease: [0.22, 1, 0.36, 1],
+                                }}
+                                className="absolute left-0 right-0 top-[calc(100%+7px)] z-[78] rounded-[22px] border border-white/75 bg-white/62 p-2 shadow-[0_18px_45px_rgba(28,25,23,0.15)] backdrop-blur-2xl"
+                            >
+                                <SearchBar
+                                    value={currentQuery}
+                                    onSubmit={handleSearch}
+                                    compact
+                                />
+                            </motion.div>
+                        ) : null}
+                    </AnimatePresence>
                 </div>
   
                 <AnimatePresence>
@@ -1674,37 +2330,54 @@ import {
                             initial={{
                                 opacity:
                                     0,
-  
-                                height:
-                                    0,
+
+                                y:
+                                    -10,
+
+                                scale:
+                                    0.985,
                             }}
                             animate={{
                                 opacity:
                                     1,
-  
-                                height:
-                                    'auto',
+
+                                y:
+                                    0,
+
+                                scale:
+                                    1,
                             }}
                             exit={{
                                 opacity:
                                     0,
-  
-                                height:
-                                    0,
+
+                                y:
+                                    -8,
+
+                                scale:
+                                    0.99,
                             }}
                             transition={{
                                 duration:
-                                    0.2,
+                                    0.22,
+
+                                ease: [
+                                    0.22,
+                                    1,
+                                    0.36,
+                                    1,
+                                ],
                             }}
-                            className="overflow-hidden border-t border-stone-200/60 bg-white/75 backdrop-blur-xl lg:hidden md:bg-transparent md:backdrop-blur-none"
+                            className="absolute right-2 top-[calc(100%+8px)] z-[80] w-[48vw] min-w-[168px] max-w-[220px] overflow-hidden rounded-[24px] border border-white/90 bg-white/88 shadow-[0_26px_72px_rgba(28,25,23,0.24)] backdrop-blur-[42px] saturate-150 lg:hidden md:static md:mx-0 md:mt-0 md:w-auto md:min-w-0 md:max-w-none md:rounded-none md:border-t md:border-stone-200/60 md:bg-transparent md:shadow-none md:backdrop-blur-none md:saturate-100"
                         >
                             <nav
-                                className="grid grid-cols-2 gap-2 py-3 sm:grid-cols-3"
+                                className="flex max-h-[calc(100svh-110px)] flex-col gap-1.5 overflow-y-auto p-2.5 md:grid md:max-h-none md:grid-cols-3 md:gap-2 md:overflow-visible md:p-3 md:py-3"
                                 aria-label="Mobile navigation"
                             >
                                 {navItems.map(
                                     (
                                         item,
+                                        index,
                                     ) => (
                                         <Link
                                             key={
@@ -1713,11 +2386,41 @@ import {
                                             to={
                                                 item.to
                                             }
-                                            className={
-                                                getNavClasses(
+                                            className={[
+                                                'focus-ring',
+                                                'relative',
+                                                'flex',
+                                                'min-h-8',
+                                                'items-center',
+                                                'justify-start',
+                                                'border-b',
+                                                'border-stone-300/35',
+                                                'px-1',
+                                                'text-[10px]',
+                                                'font-black',
+                                                'tracking-[0.01em]',
+                                                'md:min-h-11',
+                                                'md:justify-center',
+                                                'md:rounded-2xl',
+                                                'md:border',
+                                                'md:px-3',
+                                                'md:text-xs',
+                                                'md:shadow-sm',
+                                                'md:backdrop-blur-md',
+                                                'transition',
+                                                index ===
+                                                navItems.length - 1 &&
+                                                navItems.length % 2 === 1
+                                                    ? 'md:col-span-1'
+                                                    : '',
+                                                isActive(
                                                     item.to,
                                                 )
-                                            }
+                                                    ? 'border-emerald-700/35 text-emerald-800 md:border-emerald-700/15 md:bg-emerald-700 md:text-white'
+                                                    : 'text-stone-700 hover:text-stone-950 md:border-white/70 md:bg-white/35 md:hover:bg-white/60',
+                                            ].join(
+                                                ' ',
+                                            )}
                                         >
                                             {
                                                 item.label
@@ -1725,7 +2428,9 @@ import {
                                         </Link>
                                     ),
                                 )}
-  
+
+                                <div className="my-1 h-px w-full bg-gradient-to-r from-transparent via-stone-400/55 to-transparent md:col-span-3" />
+
                                 {mobileAuth}
                             </nav>
                         </motion.div>
