@@ -1115,7 +1115,7 @@ export default function ScanAnythingPage({
   }
 
   return (
-    <div className="px-5 pb-5 pt-0 sm:px-7 sm:pb-7 sm:pt-0 lg:px-8 lg:pb-8 lg:pt-0">
+    <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-x-hidden bg-[#F7FBFF] px-5 pb-0 pt-0 sm:left-auto sm:w-auto sm:translate-x-0 sm:overflow-visible sm:bg-transparent sm:px-7 sm:pb-7 sm:pt-0 lg:px-8 lg:pb-8 lg:pt-0">
       {hostMode ? (
         <section className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
           <div className="grid gap-0 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
@@ -1389,48 +1389,54 @@ export default function ScanAnythingPage({
           </div>
         </section>
       ) : (
-        <section className="overflow-hidden rounded-[32px] border border-sky-200 bg-[#F7FBFF] shadow-[0_24px_70px_-42px_rgba(15,23,42,0.28)]">
-          <div className="grid min-h-[410px] gap-0 xl:grid-cols-[minmax(0,1.35fr)_minmax(330px,0.65fr)]">
-            <div className="relative overflow-hidden bg-[radial-gradient(circle_at_12%_8%,rgba(45,180,169,0.16),transparent_28%),linear-gradient(135deg,#DFF8F1_0%,#DDF3FF_52%,#E9E7FF_100%)] p-5 sm:p-7 lg:p-9">
-              <div className="pointer-events-none absolute -left-24 -top-28 h-72 w-72 rounded-full bg-teal-200/35 blur-3xl" />
-              <div className="pointer-events-none absolute bottom-0 right-0 h-40 w-40 rounded-tl-[90px] border-l border-t border-sky-200/80 bg-sky-200/30" />
+        <section className="-ml-1 -mr-7 h-[100svh] w-[calc(100%+2rem)] overflow-hidden rounded-none border border-sky-200 bg-[#F7FBFF] shadow-[0_24px_60px_-30px_rgba(15,23,42,0.18)] sm:mx-0 sm:h-auto sm:w-auto sm:rounded-[32px] sm:border-sky-200 sm:bg-[#F7FBFF] sm:shadow-[0_24px_70px_-42px_rgba(15,23,42,0.28)]">
+          <div className="grid h-full min-h-0 grid-rows-2 gap-0 sm:h-auto sm:min-h-[410px] sm:grid-rows-none xl:grid-cols-[minmax(0,1.35fr)_minmax(330px,0.65fr)]">
+            <div className="order-2 relative flex min-h-0 flex-col overflow-hidden border-t border-sky-200 bg-[radial-gradient(circle_at_12%_8%,rgba(45,180,169,0.16),transparent_28%),linear-gradient(135deg,#DFF8F1_0%,#DDF3FF_52%,#E9E7FF_100%)] p-3 sm:order-1 sm:block sm:min-h-0 sm:border-t-0 sm:bg-[radial-gradient(circle_at_12%_8%,rgba(45,180,169,0.16),transparent_28%),linear-gradient(135deg,#DFF8F1_0%,#DDF3FF_52%,#E9E7FF_100%)] sm:p-7 lg:p-9">
+              <div className="pointer-events-none absolute -left-24 -top-28 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl sm:bg-teal-200/35" />
+              <div className="pointer-events-none absolute bottom-0 right-0 h-40 w-40 rounded-tl-[90px] border-l border-t border-white/10 bg-white/[0.03] sm:border-sky-200/80 sm:bg-sky-200/30" />
 
-              <div className="relative max-w-3xl">
-                <div className="flex items-start gap-4">
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-[#007E68] text-white shadow-[0_14px_30px_-18px_rgba(0,126,104,0.65)]">
+              <div className="relative flex h-full w-full max-w-3xl flex-col justify-start sm:block sm:h-auto">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#007E68] text-white shadow-[0_14px_30px_-18px_rgba(0,126,104,0.65)] sm:h-14 sm:w-14 sm:rounded-[20px]">
                     <ScanLine
-                      size={27}
+                      size={22}
                       aria-hidden="true"
                     />
                   </div>
 
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#006B5A]">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#006B5A] sm:text-[11px] sm:tracking-[0.2em] sm:text-[#006B5A]">
                       Quick product finder
                     </p>
 
-                    <h1 className="mt-1 text-3xl font-black tracking-[-0.035em] text-stone-950 sm:text-4xl">
+                    <h1 className="mt-0.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:mt-1 sm:text-4xl sm:text-stone-950">
                       Scan a product
                     </h1>
 
-                    <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-stone-600 sm:text-[15px]">
+                    <p className="mt-1 whitespace-nowrap text-[10px] font-semibold leading-4 text-stone-500 sm:hidden">
+                      Scan a barcode to find matching EPANTRY products.
+                    </p>
+                    <p className="mt-3 hidden max-w-2xl text-[15px] font-medium leading-6 text-stone-600 sm:block">
                       Scan the barcode to identify a product and find matching items available on EPANTRY.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-7 rounded-[28px] border border-sky-200 bg-[#EAF6FF] p-4 shadow-[0_22px_50px_-34px_rgba(37,99,235,0.20)] sm:p-5">
+                <div className="mt-3 flex flex-col gap-2 rounded-none border-0 bg-transparent p-0 shadow-none sm:mt-7 sm:block sm:rounded-[28px] sm:border sm:border-sky-200 sm:bg-[#EAF6FF] sm:p-5 sm:shadow-[0_22px_50px_-34px_rgba(37,99,235,0.20)]">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-500">
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-stone-500 sm:text-[11px] sm:tracking-[0.16em] sm:text-stone-500">
                         Enter or scan barcode
                       </p>
-                      <p className="mt-1 text-xs font-semibold leading-5 text-stone-400">
+                      <p className="mt-0.5 whitespace-nowrap text-[10px] font-semibold leading-4 text-stone-500 sm:hidden">
+                        Enter barcode digits or use the camera.
+                      </p>
+                      <p className="mt-1 hidden text-xs font-semibold leading-5 text-stone-400 sm:block">
                         Type the numbers printed below the barcode, or use your camera.
                       </p>
                     </div>
 
-                    <label className="flex items-center gap-2 rounded-2xl border border-violet-200 bg-[#EEEAFE] px-3 py-2">
+                    <label className="hidden items-center gap-2 rounded-2xl border border-violet-200 bg-[#EEEAFE] px-3 py-2 sm:flex">
                       <span className="text-[9px] font-black uppercase tracking-[0.14em] text-stone-400">
                         Market
                       </span>
@@ -1449,30 +1455,49 @@ export default function ScanAnythingPage({
                     </label>
                   </div>
 
-                  <label className="mt-4 block">
-                    <div className="flex min-h-[62px] items-center rounded-[20px] border border-sky-200 bg-[#F9FCFF] px-3 shadow-inner shadow-sky-100/80 transition focus-within:border-cyan-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-100">
-                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#E5F4FF] text-[#1769E0] shadow-sm ring-1 ring-sky-200">
-                        <Barcode
-                          size={21}
-                          aria-hidden="true"
-                        />
-                      </div>
-
+                  <div className="mt-2 grid grid-cols-[82px_minmax(0,1fr)] gap-2 sm:mt-4 sm:block">
+                    <label className="flex min-h-11 items-center justify-center gap-1 rounded-xl border border-violet-200 bg-[#EEEAFE] px-2 sm:hidden">
+                      <span className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-400">
+                        Market
+                      </span>
                       <input
-                        value={barcodeInput}
+                        value={market}
                         onChange={(event) =>
-                          setBarcodeInput(
-                            event.target.value,
+                          setMarket(
+                            event.target.value
+                              .toUpperCase()
+                              .slice(0, 10),
                           )
                         }
-                        inputMode="numeric"
-                        placeholder="8901234567890"
-                        className="min-w-0 flex-1 bg-transparent px-4 py-3 text-base font-bold tracking-[0.04em] text-stone-900 outline-none placeholder:font-medium placeholder:tracking-normal placeholder:text-stone-400"
+                        className="w-7 bg-transparent text-center text-[11px] font-black text-stone-800 outline-none"
                       />
-                    </div>
-                  </label>
+                    </label>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+                    <label className="block">
+                      <div className="flex min-h-11 items-center rounded-xl border border-sky-200 bg-[#F9FCFF] px-2 shadow-inner shadow-sky-100/80 transition focus-within:border-cyan-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-cyan-100 sm:min-h-[62px] sm:rounded-[20px] sm:px-3 sm:focus-within:ring-4">
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#E5F4FF] text-[#1769E0] shadow-sm ring-1 ring-sky-200 sm:h-11 sm:w-11 sm:rounded-2xl">
+                          <Barcode
+                            size={18}
+                            aria-hidden="true"
+                          />
+                        </div>
+
+                        <input
+                          value={barcodeInput}
+                          onChange={(event) =>
+                            setBarcodeInput(
+                              event.target.value,
+                            )
+                          }
+                          inputMode="numeric"
+                          placeholder="8901234567890"
+                          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[12px] font-bold tracking-[0.03em] text-stone-900 outline-none placeholder:font-medium placeholder:tracking-normal placeholder:text-stone-400 sm:px-4 sm:py-3 sm:text-base sm:tracking-[0.04em]"
+                        />
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
                     <button
                       type="button"
                       disabled={isResolvingBarcode}
@@ -1482,17 +1507,17 @@ export default function ScanAnythingPage({
                           'manual',
                         )
                       }
-                      className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#007E68] px-5 py-3 text-sm font-black text-white shadow-[0_12px_25px_-16px_rgba(0,126,104,0.8)] transition hover:-translate-y-0.5 hover:bg-[#006A59] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="focus-ring order-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#007E68] px-3 py-2 text-[11px] font-black text-white shadow-[0_12px_25px_-16px_rgba(0,126,104,0.8)] transition hover:-translate-y-0.5 hover:bg-[#006A59] disabled:cursor-not-allowed disabled:opacity-60 sm:order-1 sm:min-h-12 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
                     >
                       {isResolvingBarcode ? (
                         <LoaderCircle
-                          size={18}
+                          size={16}
                           className="animate-spin"
                           aria-hidden="true"
                         />
                       ) : (
                         <FileSearch
-                          size={18}
+                          size={16}
                           aria-hidden="true"
                         />
                       )}
@@ -1507,10 +1532,10 @@ export default function ScanAnythingPage({
                           ? stopCamera
                           : startCamera
                       }
-                      className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-teal-200 bg-[#E4F7F2] px-5 py-3 text-sm font-black text-[#1D4F91] shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:bg-[#D7F2EC] hover:text-[#143B73]"
+                      className="focus-ring order-1 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-[#E4F7F2] px-3 py-2 text-[11px] font-black text-[#1D4F91] shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:bg-[#D7F2EC] hover:text-[#143B73] sm:order-2 sm:min-h-12 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
                     >
                       <Camera
-                        size={18}
+                        size={16}
                         aria-hidden="true"
                       />
 
@@ -1578,12 +1603,12 @@ export default function ScanAnythingPage({
               </div>
             </div>
 
-            <aside className="relative overflow-hidden border-t border-violet-200 bg-[linear-gradient(160deg,#ECE9FF_0%,#E2F2FF_55%,#E4F7F1_100%)] p-5 sm:p-7 lg:p-8 xl:border-l xl:border-t-0">
-              <div className="pointer-events-none absolute -right-14 -top-16 h-48 w-48 rounded-full border border-violet-300/60 bg-[#DFF0FF]/70" />
+            <aside className="order-1 relative flex min-h-0 flex-col overflow-hidden bg-[linear-gradient(160deg,#ECE9FF_0%,#E2F2FF_55%,#E4F7F1_100%)] p-3 sm:order-2 sm:block sm:min-h-0 sm:border-t sm:border-violet-200 sm:bg-[linear-gradient(160deg,#ECE9FF_0%,#E2F2FF_55%,#E4F7F1_100%)] sm:p-7 lg:p-8 xl:border-l xl:border-t-0">
+              <div className="pointer-events-none absolute -right-14 -top-16 h-48 w-48 rounded-full border border-white/10 bg-white/[0.03] sm:border-violet-300/60 sm:bg-[#DFF0FF]/70" />
 
-              <div className="relative">
-                <div className="flex items-center gap-3">
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#6D4AFF] text-white shadow-sm">
+              <div className="relative flex h-full flex-col sm:block sm:h-auto">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#6D4AFF] text-white shadow-sm sm:h-11 sm:w-11 sm:rounded-2xl">
                     <ShieldCheck
                       size={21}
                       aria-hidden="true"
@@ -1591,48 +1616,62 @@ export default function ScanAnythingPage({
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6246C7]">
+                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#6246C7] sm:text-[10px] sm:tracking-[0.18em] sm:text-[#6246C7]">
                       Scan guide
                     </p>
-                    <h2 className="mt-0.5 text-xl font-black tracking-tight text-stone-950">
+                    <h2 className="text-[16px] font-black tracking-tight text-stone-950 sm:mt-0.5 sm:text-xl sm:text-stone-950">
                       What you&apos;ll see
                     </h2>
                   </div>
                 </div>
 
-                <div className="mt-6 space-y-3">
+                <div className="mt-2 grid flex-1 auto-rows-fr grid-cols-2 gap-2 sm:mt-6 sm:block sm:space-y-3">
                   {[
                     {
                       title: 'Verified on EPANTRY',
+                      mobileTitle: 'Verified match',
                       text: 'If the barcode matches our catalog, we show the verified product details.',
+                      mobileText: 'See verified EPANTRY product details.',
                     },
                     {
                       title: 'Other product matches',
+                      mobileTitle: 'Reference match',
                       text: 'If the product is not verified yet, any external match is shown only as reference information.',
+                      mobileText: 'Unverified matches stay reference-only.',
                     },
                     {
                       title: 'Find what is available',
+                      mobileTitle: 'Find available',
                       text: 'Use EPANTRY search to find matching products you can browse or buy.',
+                      mobileText: 'Search matching products to browse or buy.',
                     },
                     {
                       title: 'Simple product lookup',
+                      mobileTitle: 'Quick lookup',
                       text: 'Scanning helps you identify a product quickly and continue to the right product page.',
+                      mobileText: 'Identify the product and open its page.',
                     },
                   ].map((item, index) => (
                     <div
                       key={item.title}
-                      className="group rounded-[20px] border border-violet-200 bg-[#EAF3FF] p-4 shadow-[0_10px_24px_-22px_rgba(98,70,199,0.38)] transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-[#E2EDFF]"
+                      className="group rounded-xl border border-violet-200 bg-[#EAF3FF] p-2 shadow-[0_10px_24px_-22px_rgba(37,99,235,0.20)] transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-[#E2EDFF] sm:rounded-[20px] sm:border-violet-200 sm:bg-[#EAF3FF] sm:p-4 sm:hover:border-violet-300 sm:hover:bg-[#E2EDFF]"
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#6D4AFF] text-[11px] font-black text-white">
+                      <div className="flex items-start gap-2 sm:gap-3">
+                        <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-violet-500 text-[10px] font-black text-white shadow-sm sm:h-7 sm:w-7 sm:bg-[#6D4AFF] sm:text-[11px]">
                           {index + 1}
                         </div>
 
                         <div className="min-w-0">
-                          <p className="text-sm font-black text-stone-900">
+                          <p className="text-[12px] font-black leading-4 text-stone-900 sm:hidden">
+                            {item.mobileTitle}
+                          </p>
+                          <p className="hidden text-sm font-black text-stone-900 sm:block">
                             {item.title}
                           </p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-stone-500">
+                          <p className="mt-1 text-[10.5px] font-semibold leading-[15px] text-stone-500 sm:hidden">
+                            {item.mobileText}
+                          </p>
+                          <p className="mt-1 hidden text-xs font-semibold leading-5 text-stone-500 sm:block">
                             {item.text}
                           </p>
                         </div>
@@ -1641,11 +1680,11 @@ export default function ScanAnythingPage({
                   ))}
                 </div>
 
-                <div className="mt-5 rounded-[20px] border border-[#5267C9] bg-[#5D70D6] px-4 py-4 text-white shadow-[0_14px_28px_-22px_rgba(90,57,199,0.75)]">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-violet-100">
+                <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#5267C9] bg-[#5D70D6] px-3 py-2 text-white shadow-[0_14px_28px_-22px_rgba(37,99,235,0.35)] sm:mt-5 sm:block sm:rounded-[20px] sm:border-[#5267C9] sm:bg-[#5D70D6] sm:px-4 sm:py-4">
+                  <p className="shrink-0 text-[8px] font-black uppercase tracking-[0.12em] text-violet-100 sm:text-xs sm:tracking-[0.14em]">
                     Quick tip
                   </p>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-white/90">
+                  <p className="text-[9px] font-semibold leading-3 text-white/90 sm:mt-1 sm:text-sm sm:leading-6">
                     Keep the barcode clear and centered for the fastest match.
                   </p>
                 </div>

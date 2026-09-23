@@ -482,7 +482,7 @@ export default function AiCookTodayPage() {
   }
 
   return (
-    <div className="px-4 pb-8 pt-0 sm:px-6 lg:px-8">
+    <div className="px-4 pb-0 pt-0 sm:px-6 sm:pb-8 lg:px-8">
       <div className="w-full max-w-none">
         <Link
           to="/dashboard"
@@ -495,35 +495,39 @@ export default function AiCookTodayPage() {
           Dashboard
         </Link>
 
-        <section className="mt-3 min-h-[520px] overflow-hidden rounded-[30px] border border-sky-200 bg-[#F3FAFF] shadow-[0_24px_70px_rgba(28,25,23,0.08)]">
-          <div className="grid h-full min-h-[520px] lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
-            <div className="relative overflow-hidden bg-[linear-gradient(145deg,#D8F2FF_0%,#D5F4F0_55%,#E7F2FF_100%)] p-9 text-[#2F1F18] sm:p-11 xl:p-12">
+        <section className="mt-2 min-h-0 overflow-hidden rounded-[30px] border border-sky-200 bg-[#F3FAFF] shadow-[0_24px_70px_rgba(28,25,23,0.08)] sm:mt-3 sm:min-h-[520px]">
+          <div className="grid h-full min-h-0 sm:min-h-[520px] lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+            <div className="relative overflow-hidden bg-[linear-gradient(145deg,#D8F2FF_0%,#D5F4F0_55%,#E7F2FF_100%)] p-5 text-[#2F1F18] sm:p-11 xl:p-12">
               <div
                 aria-hidden="true"
                 className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/35 blur-3xl"
               />
 
               <div className="relative">
-                <div className="grid h-16 w-16 place-items-center rounded-[22px] border border-sky-300/60 bg-white/45 text-[#6B2A1A] backdrop-blur">
-                  <ChefHat
-                    size={30}
-                    aria-hidden="true"
-                  />
+                <div className="flex items-center gap-3 sm:block">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-sky-300/60 bg-white/45 text-[#6B2A1A] backdrop-blur sm:h-16 sm:w-16 sm:rounded-[22px]">
+                    <ChefHat
+                      size={30}
+                      className="h-5 w-5 sm:h-[30px] sm:w-[30px]"
+                      aria-hidden="true"
+                    />
+                  </div>
+
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7A321D] sm:mt-8 sm:text-sm sm:tracking-[0.18em]">
+                    EPANTRY AI · Cook Today
+                  </p>
                 </div>
 
-                <p className="mt-8 text-sm font-black uppercase tracking-[0.18em] text-[#7A321D]">
-                  EPANTRY AI · Cook Today
-                </p>
-
-                <h1 className="mt-3 text-5xl font-black tracking-tight sm:text-6xl">
+                <h1 className="mt-4 whitespace-nowrap text-[24px] font-black leading-[1.05] tracking-[-0.03em] sm:mt-3 sm:text-6xl sm:tracking-tight">
                   What do you have today?
                 </h1>
 
-                <p className="mt-5 max-w-2xl text-base font-semibold leading-8 text-[#56332A]/85">
-                  Tell EPANTRY what is in your kitchen. AI will suggest a few dishes you can make, then build the complete recipe when you choose one.
+                <p className="mt-3 max-w-none text-[12px] font-semibold leading-5 text-[#56332A]/85 sm:mt-5 sm:max-w-2xl sm:text-base sm:leading-8">
+                  <span className="block">Tell EPANTRY what ingredients you have.</span>
+                  <span className="block">Pick a dish idea and get the full recipe.</span>
                 </p>
 
-                <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                <div className="mt-4 grid gap-2 sm:mt-8 sm:gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                   {[
                     'Tell us what you have',
                     'Choose a dish idea',
@@ -531,12 +535,12 @@ export default function AiCookTodayPage() {
                   ].map((label, index) => (
                     <div
                       key={label}
-                      className="rounded-2xl border border-cyan-200/80 bg-[#E7F7F6]/85 p-4 backdrop-blur"
+                      className="rounded-xl border border-cyan-200/80 bg-[#E7F7F6]/85 px-3 py-2.5 backdrop-blur sm:rounded-2xl sm:p-4"
                     >
-                      <p className="text-[11px] font-black uppercase tracking-[0.13em] text-[#A53D21]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#A53D21] sm:text-[11px] sm:tracking-[0.13em]">
                         Step {index + 1}
                       </p>
-                      <p className="mt-1.5 text-sm font-bold text-[#2F1F18]">
+                      <p className="mt-0.5 text-[12px] font-bold leading-4 text-[#2F1F18] sm:mt-1.5 sm:text-sm sm:leading-normal">
                         {label}
                       </p>
                     </div>
@@ -547,7 +551,7 @@ export default function AiCookTodayPage() {
 
             <form
               onSubmit={handleFindIdeas}
-              className="bg-[#E7F4FF] p-9 sm:p-11 xl:p-12"
+              className="bg-[#E7F4FF] px-5 pb-0 pt-5 sm:p-11 xl:p-12"
             >
               <label
                 htmlFor="cook-today-ingredients"
@@ -556,8 +560,9 @@ export default function AiCookTodayPage() {
                 Ingredients you have
               </label>
 
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#54738E]">
-                Write naturally or separate items with commas. Example: chicken, tomato, onion, rice, yogurt.
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[#54738E] sm:text-sm sm:leading-6">
+                <span className="block">Add ingredients naturally or separate them with commas.</span>
+                <span className="block">Example: chicken, tomato, onion, rice, yogurt.</span>
               </p>
 
               <textarea
@@ -570,7 +575,7 @@ export default function AiCookTodayPage() {
                 }
                 rows={8}
                 placeholder="I have chicken breast, onions, tomatoes, rice, yogurt and a few basic spices..."
-                className="focus-ring mt-4 w-full resize-y rounded-[22px] border border-sky-200 bg-[#F8FCFF] p-5 text-base font-semibold leading-7 text-[#17324D] outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                className="focus-ring mt-3 h-[132px] w-full resize-y rounded-[22px] border border-sky-200 bg-[#F8FCFF] p-4 text-[14px] font-semibold leading-6 text-[#17324D] outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:mt-4 sm:h-auto sm:p-5 sm:text-base sm:leading-7"
               />
 
               {error ? (
@@ -606,7 +611,7 @@ export default function AiCookTodayPage() {
               </button>
 
               <p className="mt-4 text-xs font-medium leading-5 text-[#6B8296]">
-                AI-generated cooking guidance can vary. Check allergies and use normal food-safety practices while cooking.
+                AI suggestions can vary. Check allergens and follow safe cooking practices.
               </p>
             </form>
           </div>

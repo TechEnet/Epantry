@@ -280,12 +280,101 @@ function recipeDetailLabel(
     )
 }
 
+function resolveRecipeDietaryBadge(foodIntelligence) {
+  const dietaryRows = Array.isArray(foodIntelligence?.dietary)
+    ? foodIntelligence.dietary
+    : []
+
+  const eligible = dietaryRows.find((item) =>
+    String(item?.outcome || item?.status || '')
+      .trim()
+      .toLowerCase() === 'eligible',
+  )
+
+  const key = String(
+    eligible?.ruleKey ||
+      eligible?.key ||
+      eligible?.label ||
+      '',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/-/g, '_')
+
+  if (key === 'vegetarian' || key === 'vegan') {
+    return { label: 'Veg', kind: 'veg' }
+  }
+
+  if (key === 'eggitarian' || key === 'non_vegetarian') {
+    return { label: 'Non-veg', kind: 'nonveg' }
+  }
+
+  return null
+}
+
 function RecipeDetailsSheet({
   dish,
   recipe,
   ingredients,
   foodIntelligence,
 }) {
+  const scrollRef = useRef(null)
+  const resumeTimerRef = useRef(null)
+  const animationFrameRef = useRef(null)
+  const pausedUntilRef = useRef(0)
+  const directionRef = useRef(1)
+
+  const pauseAutoScroll = useCallback(() => {
+    pausedUntilRef.current = Date.now() + 3200
+    if (resumeTimerRef.current) {
+      window.clearTimeout(resumeTimerRef.current)
+    }
+    resumeTimerRef.current = window.setTimeout(() => {
+      pausedUntilRef.current = 0
+    }, 3200)
+  }, [])
+
+  useEffect(() => {
+    const element = scrollRef.current
+    if (!element || typeof window === 'undefined') return undefined
+
+    const mobileQuery = window.matchMedia('(max-width: 639px)')
+    if (!mobileQuery.matches) return undefined
+
+    let previousTime = performance.now()
+
+    const tick = (time) => {
+      const target = scrollRef.current
+      if (!target) return
+
+      const delta = Math.min(time - previousTime, 48)
+      previousTime = time
+
+      if (Date.now() >= pausedUntilRef.current) {
+        const maxScroll = Math.max(0, target.scrollHeight - target.clientHeight)
+        if (maxScroll > 2) {
+          if (target.scrollTop >= maxScroll - 1) directionRef.current = -1
+          if (target.scrollTop <= 1) directionRef.current = 1
+          target.scrollTop += directionRef.current * delta * 0.018
+        }
+      }
+
+      animationFrameRef.current = window.requestAnimationFrame(tick)
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(tick)
+
+    return () => {
+      if (animationFrameRef.current) {
+        window.cancelAnimationFrame(animationFrameRef.current)
+      }
+      if (resumeTimerRef.current) {
+        window.clearTimeout(resumeTimerRef.current)
+      }
+    }
+  }, [])
+
   const ingredientRows =
     Array.isArray(
       ingredients,
@@ -317,23 +406,46 @@ function RecipeDetailsSheet({
       ? foodIntelligence.dietary
       : []
 
+  const dietaryBadge = resolveRecipeDietaryBadge(foodIntelligence)
+
   return (
-    <div className="flex h-full min-h-[360px] max-h-[560px] w-full flex-col overflow-hidden bg-[#f4f7f2]">
-      <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-5 py-5 text-white">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200">
+    <div className="flex h-full min-h-[205px] max-h-[240px] w-full flex-col overflow-hidden bg-[#f4f7f2] sm:min-h-[360px] sm:max-h-[560px]">
+      <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-3 py-2 text-white sm:px-5 sm:py-5">
+        <p className="text-[7px] font-black uppercase tracking-[0.13em] text-emerald-200 sm:text-[10px] sm:tracking-[0.18em]">
           EPANTRY · Recipe details sheet
         </p>
-        <h2 className="mt-2 font-serif text-3xl font-semibold leading-tight">
-          {dish?.name ||
-            recipe?.title ||
-            'Recipe'}
-        </h2>
-        <p className="mt-1 text-xs font-semibold text-emerald-100/80">
+        <div className="mt-1 flex items-start justify-between gap-2 sm:block">
+          <h2 className="min-w-0 font-sans text-[15px] font-black leading-[1.08] sm:mt-2 sm:font-serif sm:text-3xl sm:font-semibold sm:leading-tight">
+            {dish?.name ||
+              recipe?.title ||
+              'Recipe'}
+          </h2>
+          {dietaryBadge ? (
+            <span
+              className={[
+                'shrink-0 rounded-full border px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] sm:hidden',
+                dietaryBadge.kind === 'veg'
+                  ? 'border-lime-200 bg-lime-100/95 text-lime-900'
+                  : 'border-rose-200 bg-rose-100/95 text-rose-900',
+              ].join(' ')}
+            >
+              {dietaryBadge.label}
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-1 hidden text-xs font-semibold leading-4 text-emerald-100/80 sm:block">
           Published recipe details · generated from governed listing data
         </p>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+      <div
+        ref={scrollRef}
+        onTouchStart={pauseAutoScroll}
+        onTouchMove={pauseAutoScroll}
+        onWheel={pauseAutoScroll}
+        onPointerDown={pauseAutoScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5"
+      >
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
           {[
             [
@@ -591,7 +703,7 @@ function RecommendedRecipeCard({
   return (
     <Link
       to={getRecipeRecommendationPath(item)}
-      className="focus-ring group flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#e2d8c8] bg-[#fffdf8] shadow-[0_10px_30px_rgba(92,70,38,0.08)] transition duration-300 hover:-translate-y-1.5 hover:border-amber-300 hover:shadow-[0_22px_46px_rgba(92,70,38,0.15)] motion-reduce:transform-none motion-reduce:transition-none"
+      className="focus-ring group flex h-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-[#e2d8c8] bg-[#fffdf8] shadow-[0_6px_18px_rgba(92,70,38,0.07)] transition duration-300 hover:-translate-y-1.5 hover:border-amber-300 hover:shadow-[0_22px_46px_rgba(92,70,38,0.15)] motion-reduce:transform-none motion-reduce:transition-none sm:rounded-[24px] sm:shadow-[0_10px_30px_rgba(92,70,38,0.08)]"
       aria-label={`Open ${getRecipeRecommendationName(item)}`}
     >
       <div className="relative aspect-[1.08/1] overflow-hidden bg-[linear-gradient(145deg,#fbf2df,#eef5eb)]">
@@ -611,26 +723,26 @@ function RecommendedRecipeCard({
           </div>
         )}
 
-        <div className="absolute inset-x-3 top-3 flex flex-wrap gap-2">
+        <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1.5 sm:inset-x-3 sm:top-3 sm:gap-2">
           {dish.cuisine ? (
-            <span className="rounded-full border border-white/65 bg-white/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#24543d] shadow-sm backdrop-blur">
+            <span className="rounded-full border border-white/65 bg-white/90 px-2 py-0.5 text-[7px] font-semibold uppercase tracking-[0.1em] text-[#24543d] shadow-sm backdrop-blur sm:px-2.5 sm:py-1 sm:text-[9px] sm:font-black sm:tracking-[0.12em]">
               {dish.cuisine}
             </span>
           ) : null}
           {dish.course ? (
-            <span className="rounded-full border border-amber-100/80 bg-[#fff7e8]/92 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-amber-800 shadow-sm backdrop-blur">
+            <span className="rounded-full border border-amber-100/80 bg-[#fff7e8]/92 px-2 py-0.5 text-[7px] font-semibold uppercase tracking-[0.1em] text-amber-800 shadow-sm backdrop-blur sm:px-2.5 sm:py-1 sm:text-[9px] sm:font-black sm:tracking-[0.12em]">
               {dish.course}
             </span>
           ) : null}
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="line-clamp-2 min-h-[2.7em] text-[16px] font-black leading-[1.35] tracking-[-0.02em] text-[#173c2d]">
+      <div className="flex flex-1 flex-col p-2.5 sm:p-4">
+        <h3 className="line-clamp-2 min-h-[2.7em] text-[12px] font-semibold leading-[1.35] tracking-normal text-[#173c2d] sm:text-[16px] sm:font-black sm:tracking-[-0.02em]">
           {getRecipeRecommendationName(item)}
         </h3>
 
-        <div className="mt-2 flex min-h-5 items-center gap-2 text-[11px] font-semibold text-stone-500">
+        <div className="mt-1.5 flex min-h-4 items-center gap-1.5 text-[9px] font-medium text-stone-500 sm:mt-2 sm:min-h-5 sm:gap-2 sm:text-[11px] sm:font-semibold">
           {totalMinutes > 0 ? (
             <span>{totalMinutes} min</span>
           ) : null}
@@ -644,7 +756,7 @@ function RecommendedRecipeCard({
           ) : null}
         </div>
 
-        <span className="mt-4 inline-flex items-center justify-between gap-3 rounded-xl bg-[#edf5e9] px-3.5 py-2.5 text-xs font-black text-[#1b5a3d] transition group-hover:bg-[#175339] group-hover:text-white">
+        <span className="mt-2.5 inline-flex items-center justify-between gap-2 rounded-lg bg-[#edf5e9] px-2.5 py-1.5 text-[10px] font-semibold text-[#1b5a3d] transition group-hover:bg-[#175339] group-hover:text-white sm:mt-4 sm:gap-3 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs sm:font-black">
           Open recipe
           <ArrowRight
             size={15}
@@ -669,22 +781,22 @@ function RecipeRecommendationShelf({
 
   return (
     <section>
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-3 flex flex-col gap-2 sm:mb-5 sm:gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
+          <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-amber-700 sm:text-[10px] sm:font-black sm:tracking-[0.18em]">
             {eyebrow}
           </p>
-          <h2 className="mt-1.5 font-serif text-3xl font-semibold tracking-[-0.035em] text-[#163b2a]">
+          <h2 className="mt-1 font-sans text-[15px] font-semibold tracking-normal text-[#163b2a] sm:mt-1.5 sm:font-serif sm:text-3xl sm:font-semibold sm:tracking-[-0.035em]">
             {title}
           </h2>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-stone-500">
+          <p className="mt-1 max-w-2xl text-[10px] font-medium leading-4 text-stone-500 sm:mt-1.5 sm:text-sm sm:leading-6">
             {description}
           </p>
         </div>
 
         <Link
           to="/recipes"
-          className="focus-ring inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-[#dccdb5] bg-[#fffdf8] px-4 py-2.5 text-sm font-black text-[#24543d] shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
+          className="focus-ring inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-[#dccdb5] bg-[#fffdf8] px-3 py-1.5 text-[10px] font-semibold text-[#24543d] shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 hover:text-white sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm sm:font-black"
         >
           View all
           <ArrowRight
@@ -694,19 +806,26 @@ function RecipeRecommendationShelf({
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
         {loading
           ? Array.from({ length: RECIPE_RECOMMENDATION_LIMIT }).map((_, index) => (
               <div
                 key={index}
-                className="aspect-[0.76/1] animate-pulse rounded-[24px] border border-[#e3d7c2] bg-[#fffdf8]"
+                className={[
+                  'aspect-[0.76/1] animate-pulse rounded-[18px] border border-[#e3d7c2] bg-[#fffdf8] sm:rounded-[24px]',
+                  index >= 4 ? 'hidden sm:block' : '',
+                ].join(' ')}
               />
             ))
-          : items.map((item) => (
-              <RecommendedRecipeCard
+          : items.map((item, index) => (
+              <div
                 key={getRecipeRecommendationKey(item)}
-                item={item}
-              />
+                className={index >= 4 ? 'hidden h-full sm:block' : 'h-full'}
+              >
+                <RecommendedRecipeCard
+                  item={item}
+                />
+              </div>
             ))}
       </div>
     </section>
@@ -1478,6 +1597,8 @@ export default function RecipeDetailPage() {
     data?.recipe ||
     {}
 
+  const recipeDietaryBadge = resolveRecipeDietaryBadge(detailsFoodIntelligence)
+
 
   useEffect(() => {
     ingredientDecisionLockRef.current.clear()
@@ -1820,7 +1941,7 @@ export default function RecipeDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4efe6]">
+    <main className="min-h-screen bg-[#eef3ef] sm:bg-[#f4efe6]">
 
       <div className="page-shell pt-2 pb-6 sm:pt-2 sm:pb-10">
 
@@ -1836,13 +1957,13 @@ export default function RecipeDetailPage() {
           Recipes
         </Link>
 
-        <div className="mt-1 overflow-hidden rounded-[30px] border border-[#e3d7c2] bg-[#fffdf8] shadow-[0_18px_50px_rgba(92,70,38,0.10)]">
+        <div className="mt-1 overflow-hidden bg-[#fffdf8] sm:rounded-[30px] sm:border sm:border-[#e3d7c2] sm:shadow-[0_18px_50px_rgba(92,70,38,0.10)]">
 
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
 
-            <div className="relative m-4 min-h-[320px] overflow-hidden rounded-[24px] bg-gradient-to-br from-amber-50 via-stone-50 to-emerald-50 sm:m-5 lg:mr-0">
+            <div className="relative mx-0 mt-2 h-[29svh] min-h-[205px] max-h-[240px] overflow-hidden rounded-none bg-gradient-to-br from-amber-50 via-stone-50 to-emerald-50 sm:m-5 sm:h-auto sm:min-h-[320px] sm:max-h-none sm:rounded-[24px] lg:mr-0">
 
-              <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full border border-white/60 bg-white/90 p-1 shadow-sm backdrop-blur-md">
+              <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full border border-white/60 bg-white/90 p-1 shadow-sm backdrop-blur-md sm:right-3 sm:top-3">
                 <button
                   type="button"
                   onClick={() =>
@@ -1904,7 +2025,7 @@ export default function RecipeDetailPage() {
                   alt={
                     dish.name
                   }
-                  className="h-full min-h-[360px] max-h-[560px] w-full object-cover transition duration-500 hover:scale-[1.015]"
+                  className="h-full w-full object-cover transition duration-500 hover:scale-[1.015] sm:min-h-[360px] sm:max-h-[560px]"
                 />
               ) : (
                 <div className="grid h-full min-h-[320px] place-items-center">
@@ -1921,13 +2042,79 @@ export default function RecipeDetailPage() {
 
             </div>
 
-            <div className="flex flex-col justify-start p-6 pt-5 sm:p-8 sm:pt-6 lg:p-9 lg:pt-7 xl:p-10 xl:pt-8">
+            <div className="px-4 pb-5 pt-3 sm:hidden">
 
-              <h1 className="font-serif text-4xl font-semibold tracking-[-0.035em] text-[#163b2a] sm:text-5xl xl:text-6xl">
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="min-w-0 font-sans text-[23px] font-black leading-[1.05] tracking-[-0.035em] text-[#163b2a]">
+                  {dish.name || recipe.title}
+                </h1>
+
+                {recipeDietaryBadge ? (
+                  <span
+                    className={[
+                      'mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em]',
+                      recipeDietaryBadge.kind === 'veg'
+                        ? 'border-lime-200 bg-lime-100 text-lime-900'
+                        : 'border-rose-200 bg-rose-100 text-rose-900',
+                    ].join(' ')}
+                  >
+                    {recipeDietaryBadge.label}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {[
+                  ['Base servings', recipe.baseServings || '—'],
+                  ['Prep time', `${Number(recipe.preparationTimeMinutes || 0)} min`],
+                  ['Cook time', `${Number(recipe.cookingTimeMinutes || 0)} min`],
+                  ['Difficulty', recipe.difficulty || '—'],
+                  ['Cuisine', dish.cuisine || '—'],
+                  ['Course', dish.course || '—'],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="min-w-0 rounded-xl border border-[#e7ddcb] bg-[#fbf6eb] px-2.5 py-2.5 shadow-[0_3px_10px_rgba(92,70,38,0.04)]"
+                  >
+                    <p className="text-[7px] font-black uppercase leading-3 tracking-[0.08em] text-stone-400">
+                      {label}
+                    </p>
+                    <p className="mt-1 break-words text-[11px] font-black leading-[1.15] capitalize text-stone-950">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-[#e7ddcb] bg-white/90 px-3 py-3 shadow-[0_4px_14px_rgba(92,70,38,0.05)]">
+                <p className="text-[11px] font-black text-[#163b2a]">
+                  About this recipe
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium leading-[1.55] text-stone-600">
+                  {recipe.description || dish.description}
+                </p>
+              </div>
+
+              <Link
+                to={`/recipes/${dish.slug}/history`}
+                className="focus-ring mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[9px] font-black text-stone-600 transition hover:bg-stone-50 hover:text-stone-950"
+              >
+                <History
+                  size={13}
+                  aria-hidden="true"
+                />
+                Version history
+              </Link>
+
+            </div>
+
+            <div className="hidden flex-col justify-start px-5 pb-6 pt-4 sm:flex sm:p-8 sm:pt-6 lg:p-9 lg:pt-7 xl:p-10 xl:pt-8">
+
+              <h1 className="font-serif text-3xl font-semibold tracking-[-0.035em] text-[#163b2a] sm:text-5xl xl:text-6xl">
                 {dish.name || recipe.title}
               </h1>
 
-              <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600 sm:mt-3 sm:text-base sm:leading-7">
                 {recipe.description || dish.description}
               </p>
 
@@ -1987,29 +2174,31 @@ export default function RecipeDetailPage() {
           <section
             onMouseEnter={() => setIngredientAutoScrollPaused(true)}
             onMouseLeave={() => setIngredientAutoScrollPaused(false)}
-            className="relative order-1 rounded-[28px] border border-[#e3d7c2] bg-[#fffdf8] p-5 shadow-[0_16px_42px_rgba(92,70,38,0.08)] sm:p-6 lg:order-1 lg:flex lg:h-[560px] lg:flex-col lg:overflow-hidden"
+            className="relative order-1 rounded-[28px] border border-[#e3d7c2] bg-[#fffdf8] p-3 shadow-[0_16px_42px_rgba(92,70,38,0.08)] sm:p-6 lg:order-1 lg:flex lg:h-[560px] lg:flex-col lg:overflow-hidden"
           >
 
-            <div className="flex shrink-0 flex-col gap-3 border-b border-[#eee4d2] pb-3 xl:flex-row xl:items-start xl:justify-between">
+            <div className="flex shrink-0 flex-col gap-2 border-b border-[#eee4d2] pb-2 sm:gap-3 sm:pb-3 xl:flex-row xl:items-start xl:justify-between">
 
               <div className="max-w-xl">
 
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-emerald-800 sm:gap-2 sm:px-3 sm:py-1 sm:text-[10px] sm:font-black sm:tracking-[0.16em]">
                   <ShieldCheck
                     size={13}
                     aria-hidden="true"
                   />
-                  Ingredients + your Living Pantry
+                  <span className="sm:hidden">Ingredients · Living Pantry</span>
+                  <span className="hidden sm:inline">Ingredients + your Living Pantry</span>
                 </div>
 
-                <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#163b2a] sm:text-[28px]">
-                  Ingredients & Can I cook this from home?
+                <h2 className="mt-1 font-sans text-[15px] font-semibold tracking-normal text-[#163b2a] sm:mt-2 sm:font-serif sm:text-[28px] sm:font-semibold sm:tracking-tight">
+                  <span className="sm:hidden">Can I cook this at home?</span>
+                  <span className="hidden sm:inline">Ingredients & Can I cook this from home?</span>
                 </h2>
 
 
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">
 
                 {showCustomerActionControls && (
                   <>
@@ -2023,7 +2212,7 @@ export default function RecipeDetailPage() {
                           pantryActionKey,
                         )
                       }
-                      className="focus-ring inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800 disabled:opacity-50"
+                      className="focus-ring inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-1.5 py-1 text-[9px] font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs sm:font-black"
                     >
                       {pantryActionKey ===
                       'cooked' ? (
@@ -2043,14 +2232,14 @@ export default function RecipeDetailPage() {
 
                     <Link
                       to="/pantry"
-                      className="focus-ring rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+                      className="focus-ring whitespace-nowrap sm:whitespace-normal rounded-lg border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-[9px] font-semibold text-emerald-800 transition hover:bg-emerald-100 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs sm:font-black"
                     >
                       Open Living Pantry →
                     </Link>
                   </>
                 )}
 
-                <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-bold text-stone-600">
+                <span className="whitespace-nowrap sm:whitespace-normal rounded-full bg-stone-100 px-1.5 py-1 text-[9px] font-semibold text-stone-600 sm:px-3 sm:py-1.5 sm:text-xs sm:font-bold">
                   {ingredientRows.length} items
                 </span>
 
@@ -2059,17 +2248,18 @@ export default function RecipeDetailPage() {
             </div>
 
 
-            <div className="mt-3 flex shrink-0 items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/65 px-3 py-2">
+            <div className="mt-2 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/65 px-2.5 py-1.5 sm:mt-3 sm:gap-4 sm:px-3 sm:py-2">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-emerald-800 sm:text-[9px] sm:font-black sm:tracking-[0.14em]">
                   Servings
                 </p>
-                <p className="mt-0.5 text-[10px] font-semibold text-stone-500">
-                  Ingredient quantities update automatically.
+                <p className="text-[9px] font-medium leading-tight text-stone-500 sm:mt-0.5 sm:text-[10px] sm:font-semibold sm:leading-normal">
+                  <span className="sm:hidden">Quantities adjust with servings.</span>
+                  <span className="hidden sm:inline">Ingredient quantities update automatically.</span>
                 </p>
               </div>
 
-              <div className="flex items-center gap-1 rounded-xl border border-emerald-200 bg-white p-1">
+              <div className="flex items-center gap-0.5 rounded-lg border border-emerald-200 bg-white p-0.5 sm:gap-1 sm:rounded-xl sm:p-1">
                 <button
                   type="button"
                   onClick={() =>
@@ -2078,14 +2268,14 @@ export default function RecipeDetailPage() {
                     )
                   }
                   disabled={servings <= 1}
-                  className="focus-ring grid h-8 w-8 place-items-center rounded-lg text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="focus-ring grid h-7 w-7 place-items-center rounded-md text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8 sm:rounded-lg"
                   aria-label="Decrease servings"
                 >
                   <Minus size={15} aria-hidden="true" />
                 </button>
 
-                <div className="min-w-11 text-center">
-                  <p className="text-sm font-black text-stone-950">
+                <div className="min-w-8 text-center sm:min-w-11">
+                  <p className="text-xs font-black text-stone-950 sm:text-sm">
                     {servings}
                   </p>
                 </div>
@@ -2097,7 +2287,7 @@ export default function RecipeDetailPage() {
                       Math.min(1000, current + 1),
                     )
                   }
-                  className="focus-ring grid h-8 w-8 place-items-center rounded-lg text-emerald-800 transition hover:bg-emerald-50"
+                  className="focus-ring grid h-7 w-7 place-items-center rounded-md text-emerald-800 transition hover:bg-emerald-50 sm:h-8 sm:w-8 sm:rounded-lg"
                   aria-label="Increase servings"
                 >
                   <Plus size={15} aria-hidden="true" />
@@ -2150,7 +2340,7 @@ export default function RecipeDetailPage() {
 
             <div
               ref={ingredientScrollRef}
-              className="mt-3 min-h-0 flex-1 divide-y divide-[#eee4d2] overflow-hidden rounded-2xl border border-[#e8dcc8] bg-white lg:overflow-y-auto lg:overscroll-contain"
+              className="mt-2 min-h-0 flex-1 divide-y divide-[#eee4d2] overflow-hidden rounded-2xl border border-[#e8dcc8] bg-white sm:mt-3 lg:overflow-y-auto lg:overscroll-contain"
               aria-label="Recipe ingredients"
             >
 
@@ -2215,23 +2405,23 @@ export default function RecipeDetailPage() {
                         ingredient.id ||
                         `${ingredient.lineNumber}-${ingredient.canonicalIngredientId}`
                       }
-                      className="flex flex-col gap-2 bg-white px-3 py-2.5 transition hover:bg-[#fffaf1] sm:flex-row sm:items-center"
+                      className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 bg-white px-2.5 py-1.5 transition hover:bg-[#fffaf1] sm:flex sm:flex-row sm:items-center sm:gap-2 sm:px-3 sm:py-2.5"
                     >
 
-                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-[11px] font-black text-emerald-800">
+                      <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-[9px] font-black text-emerald-800 sm:h-8 sm:w-8 sm:text-[11px]">
                         {ingredient.lineNumber}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-black text-stone-950">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <h3 className="text-[13px] font-black leading-tight text-stone-950 sm:text-base sm:leading-normal">
                             {identity.name ||
                               'Canonical ingredient'}
                           </h3>
 
                           {canUseCustomerFeatures && (
                             <span
-                              className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] ${pantryStatusClassName}`}
+                              className={`rounded-full border px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.06em] sm:px-2.5 sm:py-1 sm:text-[9px] sm:tracking-[0.08em] ${pantryStatusClassName}`}
                             >
                               {pantryStatus ===
                               'checking'
@@ -2245,20 +2435,20 @@ export default function RecipeDetailPage() {
                         </div>
 
                         {ingredient.preparationState && (
-                          <p className="mt-1 text-xs text-stone-500">
+                          <p className="mt-0.5 text-[10px] leading-tight text-stone-500 sm:mt-1 sm:text-xs sm:leading-normal">
                             {ingredient.preparationState}
                           </p>
                         )}
 
                         {ingredient.optional && (
-                          <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-amber-700">
+                          <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.1em] text-amber-700 sm:mt-1 sm:text-[9px] sm:tracking-[0.12em]">
                             Optional
                           </p>
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                        <span className="rounded-full bg-stone-100 px-3 py-2 text-sm font-black text-stone-800">
+                      <div className="col-start-2 flex flex-nowrap items-center justify-end justify-self-end gap-1.5 sm:col-start-auto sm:flex-wrap sm:gap-2 sm:justify-self-auto sm:justify-end">
+                        <span className="whitespace-nowrap sm:whitespace-normal rounded-full bg-stone-100 px-2 py-1.5 text-xs font-black text-stone-800 sm:px-3 sm:py-2 sm:text-sm">
                           {formatQuantity(
                             ingredient.displayQuantity,
                           )}{' '}
@@ -2282,7 +2472,7 @@ export default function RecipeDetailPage() {
                             )
                           }
                           className={[
-                            'focus-ring inline-flex min-w-24 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed',
+                            'focus-ring inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-[10px] font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed sm:min-w-24 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs sm:font-black',
                             decisionLocked
                               ? 'pointer-events-none opacity-35 grayscale'
                               : 'disabled:opacity-45',
@@ -2313,7 +2503,7 @@ export default function RecipeDetailPage() {
                               !customerContextBlocked
                             )
                           }
-                          className={`focus-ring inline-flex min-w-24 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed ${
+                          className={`focus-ring inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition disabled:cursor-not-allowed sm:min-w-24 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs sm:font-black ${
                             decisionLocked
                               ? 'pointer-events-none border-stone-200 bg-stone-100 text-stone-500 opacity-35 grayscale'
                               : pantryStatus ===
@@ -2378,16 +2568,16 @@ export default function RecipeDetailPage() {
 
           </section>
 
-          <section className="order-2 overflow-hidden rounded-[28px] border border-[#e3d7c2] bg-[#fffdf8] shadow-[0_16px_42px_rgba(92,70,38,0.08)] lg:order-2 lg:flex lg:h-[560px] lg:flex-col">
+          <section className="order-2 overflow-hidden rounded-[20px] border border-[#e3d7c2] bg-[#fffdf8] shadow-[0_16px_42px_rgba(92,70,38,0.08)] sm:rounded-[28px] lg:order-2 lg:flex lg:h-[560px] lg:flex-col">
 
-            <div className="border-b border-[#e8dcc8] bg-gradient-to-r from-[#fff8e9] via-[#fffdf8] to-emerald-50/60 px-5 py-4">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-amber-700">Recipe guide</p>
-              <h2 className="mt-1 font-serif text-2xl font-semibold tracking-tight text-[#163b2a]">Cooking & nutrition details</h2>
+            <div className="border-b border-[#e8dcc8] bg-gradient-to-r from-[#fff8e9] via-[#fffdf8] to-emerald-50/60 px-3 py-2 sm:px-5 sm:py-4">
+              <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-amber-700 sm:text-[9px] sm:font-black sm:tracking-[0.16em]">Recipe guide</p>
+              <h2 className="mt-1 font-sans text-[15px] font-semibold tracking-normal text-[#163b2a] sm:font-serif sm:text-2xl sm:font-semibold sm:tracking-tight">Cooking & nutrition details</h2>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto" data-recipe-guide-scroll>
 
-            <div className="grid grid-cols-2 gap-2 border-b border-[#e8dcc8] bg-[#fffaf0] p-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-1.5 border-b border-[#e8dcc8] bg-[#fffaf0] p-2 sm:grid-cols-4 sm:gap-2 sm:p-4">
               {[
                 ['Servings', servings || recipe?.baseServings || '—'],
                 ['Prep', `${Number(recipe?.preparationTimeMinutes || 0)} min`],
@@ -2396,12 +2586,12 @@ export default function RecipeDetailPage() {
               ].map(([label, value]) => (
                 <div
                   key={label}
-                  className="rounded-2xl border border-[#eadfca] bg-white px-3 py-3 shadow-[0_5px_14px_rgba(92,70,38,0.05)]"
+                  className="rounded-xl border border-[#eadfca] bg-white px-2 py-1.5 shadow-[0_5px_14px_rgba(92,70,38,0.05)] sm:rounded-2xl sm:px-3 sm:py-3"
                 >
-                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-400">
+                  <p className="text-[7px] font-semibold uppercase tracking-[0.1em] text-stone-400 sm:text-[8px] sm:font-black sm:tracking-[0.12em]">
                     {label}
                   </p>
-                  <p className="mt-1 text-sm font-black capitalize text-[#163b2a]">
+                  <p className="mt-0.5 text-[11px] font-semibold capitalize text-[#163b2a] sm:mt-1 sm:text-sm sm:font-black">
                     {value}
                   </p>
                 </div>
@@ -2409,37 +2599,37 @@ export default function RecipeDetailPage() {
             </div>
 
             <details className="group border-b border-[#e8dcc8]">
-              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
-                <span className="font-serif text-xl font-semibold text-[#163b2a]">
+              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-5 sm:py-4">
+                <span className="font-sans text-[13px] font-semibold text-[#163b2a] sm:font-serif sm:text-xl sm:font-semibold">
                   Cooking steps
                 </span>
-                <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
+                <span className="grid h-7 w-7 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800 sm:h-8 sm:w-8">
                   <ChevronDown size={16} aria-hidden="true" />
                 </span>
               </summary>
 
-              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-5 py-2">
+              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-3 py-1.5 sm:px-5 sm:py-2">
                 <ol className="divide-y divide-[#e3d7c2]">
                   {(data?.steps || []).map((step) => (
                     <li
                       key={step.id || step.stepNumber}
-                      className="group/step flex gap-3 px-1 py-3 transition hover:bg-[#f7ead4]/65"
+                      className="group/step flex gap-2 px-0.5 py-2 transition hover:bg-[#f7ead4]/65 sm:gap-3 sm:px-1 sm:py-3"
                     >
-                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-black text-emerald-800 ring-2 ring-emerald-50">
+                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800 ring-2 ring-emerald-50 sm:h-8 sm:w-8 sm:text-xs sm:font-black">
                         {step.stepNumber}
                       </div>
                       <div className="min-w-0 pt-0.5">
-                        <p className="text-xs font-semibold leading-5 text-stone-700">
+                        <p className="text-[11px] font-medium leading-4 text-stone-700 sm:text-xs sm:font-semibold sm:leading-5">
                           {step.instruction}
                         </p>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <div className="mt-1 flex flex-wrap gap-1 sm:mt-1.5 sm:gap-1.5">
                           {step.timerSeconds !== null && step.timerSeconds !== undefined && (
-                            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-amber-800">
+                            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.06em] text-amber-800 sm:px-2.5 sm:py-1 sm:text-[9px] sm:font-black sm:tracking-[0.08em]">
                               {Math.round(step.timerSeconds / 60)} min timer
                             </span>
                           )}
                           {step.temperature && (
-                            <span className="rounded-full bg-red-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-red-700">
+                            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.06em] text-red-700 sm:px-2.5 sm:py-1 sm:text-[9px] sm:font-black sm:tracking-[0.08em]">
                               {step.temperature.value}°{String(step.temperature.unit).toUpperCase()}
                             </span>
                           )}
@@ -2452,34 +2642,34 @@ export default function RecipeDetailPage() {
             </details>
 
             <details className="group border-b border-[#e8dcc8]">
-              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
-                <span className="font-serif text-xl font-semibold text-[#163b2a]">
+              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-5 sm:py-4">
+                <span className="font-sans text-[13px] font-semibold text-[#163b2a] sm:font-serif sm:text-xl sm:font-semibold">
                   Ingredients
                 </span>
-                <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
+                <span className="grid h-7 w-7 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800 sm:h-8 sm:w-8">
                   <ChevronDown size={16} aria-hidden="true" />
                 </span>
               </summary>
 
-              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-5 py-3">
+              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-3 py-2 sm:px-5 sm:py-3">
                 {ingredientRows.length ? (
                   <div className="divide-y divide-[#e5d9c5]">
                     {ingredientRows.map((ingredient, index) => (
                       <div
                         key={ingredient.id || ingredient.canonicalIngredientId || index}
-                        className="flex items-start justify-between gap-4 py-2.5"
+                        className="flex items-start justify-between gap-2 py-1.5 sm:gap-4 sm:py-2.5"
                       >
                         <div className="min-w-0">
-                          <p className="text-xs font-black text-stone-800">
+                          <p className="text-[11px] font-semibold text-stone-800 sm:text-xs sm:font-black">
                             {ingredient?.ingredient?.name || ingredient?.name || 'Ingredient'}
                           </p>
                           {ingredient.preparationState ? (
-                            <p className="mt-0.5 text-[10px] font-semibold text-stone-500">
+                            <p className="mt-0.5 text-[9px] font-medium text-stone-500 sm:text-[10px] sm:font-semibold">
                               {ingredient.preparationState}
                             </p>
                           ) : null}
                         </div>
-                        <span className="shrink-0 rounded-full border border-[#e4d7c2] bg-white px-2.5 py-1 text-[10px] font-black text-[#24543d]">
+                        <span className="shrink-0 rounded-full border border-[#e4d7c2] bg-white px-2 py-0.5 text-[9px] font-semibold text-[#24543d] sm:px-2.5 sm:py-1 sm:text-[10px] sm:font-black">
                           {formatQuantity(ingredient.displayQuantity ?? ingredient.quantity)}{' '}
                           {ingredient.displayUnit || ingredient.unit || ''}
                         </span>
@@ -2487,86 +2677,10 @@ export default function RecipeDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs font-semibold text-stone-500">
+                  <p className="text-[11px] font-medium text-stone-500 sm:text-xs sm:font-semibold">
                     Ingredient details are not currently published.
                   </p>
                 )}
-              </div>
-            </details>
-
-            <details className="group border-b border-[#e8dcc8]">
-              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
-                <span className="font-serif text-xl font-semibold text-[#163b2a]">
-                  Nutrition
-                </span>
-                <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
-                  <ChevronDown size={16} aria-hidden="true" />
-                </span>
-              </summary>
-
-              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-5 py-3">
-                {Array.isArray(detailsFoodIntelligence?.nutrition) && detailsFoodIntelligence.nutrition.length ? (
-                  <div className="divide-y divide-[#e5d9c5]">
-                    {detailsFoodIntelligence.nutrition.map((item, index) => (
-                      <div
-                        key={`${item?.key || item?.name || 'nutrient'}-${index}`}
-                        className="flex items-center justify-between gap-4 py-2.5"
-                      >
-                        <span className="text-xs font-bold text-stone-600">
-                          {item?.name || recipeDetailLabel(item?.key)}
-                        </span>
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-900">
-                          {item?.amount ?? '—'} {item?.unit || ''}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs font-semibold text-stone-500">
-                    Approved nutrition details are not currently available.
-                  </p>
-                )}
-              </div>
-            </details>
-
-            <details className="group border-b border-[#e8dcc8]">
-              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-emerald-50/70 group-open:bg-emerald-50">
-                <span className="font-serif text-xl font-semibold text-[#163b2a]">
-                  Allergens & dietary
-                </span>
-                <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
-                  <ChevronDown size={16} aria-hidden="true" />
-                </span>
-              </summary>
-
-              <div className="border-t border-[#eadfca] bg-[#fbf6eb] px-5 py-4">
-                <p className="text-xs font-semibold leading-5 text-stone-700">
-                  {detailsFoodIntelligence?.allergenStatement ||
-                    (Array.isArray(detailsFoodIntelligence?.allergens) && detailsFoodIntelligence.allergens.length
-                      ? detailsFoodIntelligence.allergens
-                          .map((item) =>
-                            `${item?.name || recipeDetailLabel(item?.key)}: ${recipeDetailLabel(
-                              item?.relationship || item?.relationType || item?.outcome || item?.evidenceState,
-                            )}`,
-                          )
-                          .join(' · ')
-                      : 'No approved allergen declaration is currently available.')}
-                </p>
-
-                {Array.isArray(detailsFoodIntelligence?.dietary) && detailsFoodIntelligence.dietary.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {detailsFoodIntelligence.dietary.map((item, index) => (
-                      <span
-                        key={`${item?.ruleKey || item?.key || 'dietary'}-${index}`}
-                        className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-800"
-                      >
-                        {recipeDetailLabel(item?.label || item?.ruleKey || item?.key)}: {recipeDetailLabel(
-                          item?.status || item?.outcome,
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             </details>
 
@@ -2582,7 +2696,7 @@ export default function RecipeDetailPage() {
 
         </div>
 
-        <div className="mt-12 space-y-12 border-t border-[#dfd3c1] pt-10 sm:mt-14 sm:pt-12">
+        <div className="mt-5 space-y-6 border-t border-[#dfd3c1] pt-5 sm:mt-14 sm:space-y-12 sm:pt-12">
           <RecipeRecommendationShelf
             eyebrow="Cook next"
             title="More recipes to try"

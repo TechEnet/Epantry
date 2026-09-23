@@ -1284,10 +1284,10 @@ export default function FoodIntelligencePanel({
       'group border-b border-[#e8dcc8] last:border-b-0'
 
     const summaryClassName =
-      'focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#fff5e2] group-open:bg-[#f7ead4]'
+      'focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-[#fff5e2] group-open:bg-[#f7ead4] sm:gap-4 sm:px-5 sm:py-4'
 
     const chevron = (
-      <span className="grid h-8 w-8 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800">
+      <span className="grid h-7 w-7 place-items-center rounded-full border border-[#e8dcc8] bg-white text-stone-600 transition group-open:rotate-180 group-open:border-emerald-300 group-open:text-emerald-800 sm:h-8 sm:w-8">
         <ChevronDown
           size={16}
           aria-hidden="true"
@@ -1299,11 +1299,11 @@ export default function FoodIntelligencePanel({
       recipeTargets.nutrition
         ? createPortal(
             <details className={`${accordionClassName} overflow-hidden`}>
-              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-orange-50 group-open:bg-gradient-to-r group-open:from-orange-100 group-open:via-amber-50 group-open:to-[#fff8ed]">
-                <span className="font-serif text-xl font-semibold text-[#163b2a] transition-colors duration-200 group-open:text-[#a94b12]">Nutrition</span>
+              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition-colors duration-200 hover:bg-orange-50 group-open:bg-gradient-to-r group-open:from-orange-100 group-open:via-amber-50 group-open:to-[#fff8ed] sm:gap-4 sm:px-5 sm:py-4">
+                <span className="font-sans text-[13px] font-semibold text-[#163b2a] transition-colors duration-200 group-open:text-[#a94b12] sm:font-serif sm:text-xl sm:font-semibold">Nutrition</span>
                 {chevron}
               </summary>
-              <div className="border-t border-orange-200 bg-gradient-to-br from-orange-50 via-amber-50 to-[#fffaf1] px-5 py-4 shadow-[inset_4px_0_0_#f59e0b]">
+              <div className="border-t border-orange-200 bg-gradient-to-br from-orange-50 via-amber-50 to-[#fffaf1] px-3 py-2.5 shadow-[inset_3px_0_0_#f59e0b] sm:px-5 sm:py-4 sm:shadow-[inset_4px_0_0_#f59e0b]">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[10px] leading-4 text-stone-500">
                     Governed nutrient values from the current approved calculation.
@@ -1351,12 +1351,12 @@ export default function FoodIntelligencePanel({
         ? createPortal(
             <details className={accordionClassName}>
               <summary className={summaryClassName}>
-                <span className="font-serif text-xl font-semibold text-[#163b2a]">Allergens</span>
+                <span className="font-sans text-[13px] font-semibold text-[#163b2a] sm:font-serif sm:text-xl sm:font-semibold">Allergens</span>
                 {chevron}
               </summary>
-              <div className="border-t border-[#eadfca] bg-[#fbf1df] px-5 py-4">
+              <div className="border-t border-[#eadfca] bg-[#fbf1df] px-3 py-2.5 sm:px-5 sm:py-4">
                 {allergenStatement && (
-                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 sm:mb-3 sm:rounded-xl sm:p-3">
                     <p className="text-[9px] font-black uppercase tracking-wide text-amber-800">
                       Reviewed package declaration
                     </p>
@@ -1378,7 +1378,7 @@ export default function FoodIntelligencePanel({
                     {allergens.map((item, index) => (
                       <div
                         key={item.allergenId || item.key || index}
-                        className="bg-transparent p-3"
+                        className="bg-transparent p-2 sm:p-3"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-xs font-black text-stone-900">
@@ -1408,18 +1408,18 @@ export default function FoodIntelligencePanel({
         ? createPortal(
             <details className={accordionClassName}>
               <summary className={summaryClassName}>
-                <span className="font-serif text-xl font-semibold text-[#163b2a]">Dietary</span>
+                <span className="font-sans text-[13px] font-semibold text-[#163b2a] sm:font-serif sm:text-xl sm:font-semibold">Dietary</span>
                 {chevron}
               </summary>
-              <div className="border-t border-[#eadfca] bg-[#fbf1df] px-5 py-4">
-                <label className="mb-3 block">
+              <div className="border-t border-[#eadfca] bg-[#fbf1df] px-3 py-2.5 sm:px-5 sm:py-4">
+                <label className="mb-2 block sm:mb-3">
                   <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">
                     Filter dietary results
                   </span>
                   <select
                     value={dietaryFilter}
                     onChange={(event) => setDietaryFilter(event.target.value)}
-                    className="h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs font-bold text-stone-700 outline-none focus:border-emerald-500"
+                    className="h-8 w-full rounded-lg border border-stone-200 bg-white px-2.5 text-[11px] font-semibold text-stone-700 outline-none focus:border-emerald-500 sm:h-9 sm:px-3 sm:text-xs sm:font-bold"
                   >
                     <option value="all">All results</option>
                     <option value="eligible">Eligible</option>
@@ -1440,7 +1440,7 @@ export default function FoodIntelligencePanel({
                     {filteredDietary.map((item, index) => (
                       <div
                         key={item.key || index}
-                        className="flex items-start justify-between gap-3 bg-transparent p-3"
+                        className="flex items-start justify-between gap-2 bg-transparent p-2 sm:gap-3 sm:p-3"
                       >
                         <div>
                           <p className="text-xs font-black text-stone-900">
@@ -1470,13 +1470,13 @@ export default function FoodIntelligencePanel({
         ? createPortal(
             <details className={accordionClassName}>
               <summary className={summaryClassName}>
-                <span className="font-serif text-xl font-semibold text-[#163b2a]">
+                <span className="font-sans text-[13px] font-semibold leading-5 text-[#163b2a] sm:font-serif sm:text-xl sm:font-semibold">
                   Calculation source & rule lineage
                 </span>
                 {chevron}
               </summary>
-              <div className="border-t border-[#eadfca] bg-[#fbf1df] px-5 py-4">
-                <div className="grid gap-5">
+              <div className="border-t border-[#eadfca] bg-[#fbf1df] px-3 py-2.5 sm:px-5 sm:py-4">
+                <div className="grid gap-3 sm:gap-5">
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">Calculation</p>
                     <dl className="mt-2 space-y-1 text-[10px] text-stone-600">

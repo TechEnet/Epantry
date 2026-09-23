@@ -553,7 +553,7 @@ export default function CustomerShell({
         />
       ) : null}
 
-      <div className={`page-shell ${isDashboard ? 'py-5 sm:py-7' : isPantry || isMealPlan || isNextBasket || isWasteReduction || isCookToday || isHousehold || isAccountSettings || isPrivacy || isOrders || isOrderDetail || isScan || isPurchaseIntelligence || isLearning || isSpending ? 'pt-0 pb-5 sm:pb-7' : 'py-5 sm:py-7'}`}>
+      <div className={`page-shell ${isDashboard ? 'py-5 sm:py-7' : isScan ? 'pt-0 pb-0 sm:pb-7' : isPantry || isMealPlan || isNextBasket || isWasteReduction || isCookToday || isHousehold || isAccountSettings || isPrivacy || isOrders || isOrderDetail || isPurchaseIntelligence || isLearning || isSpending ? 'pt-0 pb-5 sm:pb-7' : 'py-5 sm:py-7'}`}>
         <div className={`${isDashboard ? 'overflow-hidden' : 'overflow-visible'} rounded-[28px] border border-stone-200 bg-white shadow-sm`}>
           <div
             className={[

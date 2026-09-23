@@ -793,6 +793,9 @@ export default function AdminRecipesPage() {
       course:
         '',
 
+      dietaryType:
+        '',
+
       description:
         '',
 
@@ -1104,13 +1107,14 @@ export default function AdminRecipesPage() {
 
     if (
       !form.name.trim() ||
+      !form.dietaryType ||
       validIngredients.length ===
         0 ||
       validSteps.length ===
         0
     ) {
       setError(
-        'Recipe name, at least one canonical ingredient and one method step are required.',
+        'Recipe name, food type, at least one canonical ingredient and one method step are required.',
       )
 
       return
@@ -1142,6 +1146,11 @@ export default function AdminRecipesPage() {
           [
             form.cuisine,
             form.course,
+            form.dietaryType === 'veg'
+              ? 'vegetarian'
+              : form.dietaryType === 'nonveg'
+                ? 'non-vegetarian'
+                : '',
           ]
             .map(
               (
@@ -1753,6 +1762,44 @@ export default function AdminRecipesPage() {
                   className="focus-ring mt-2 h-11 w-full rounded-xl border border-stone-200 px-3 text-sm outline-none"
                 />
 
+              </label>
+
+              <label className="text-xs font-black text-stone-700 md:col-span-2">
+                Food type
+
+                <select
+                  value={
+                    form.dietaryType
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setForm({
+                      ...form,
+
+                      dietaryType:
+                        event.target.value,
+                    })
+                  }
+                  className="focus-ring mt-2 h-11 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm font-bold outline-none"
+                  required
+                >
+                  <option value="">
+                    Select Veg or Non-veg
+                  </option>
+
+                  <option value="veg">
+                    Veg
+                  </option>
+
+                  <option value="nonveg">
+                    Non-veg
+                  </option>
+                </select>
+
+                <span className="mt-1.5 block text-[10px] font-semibold leading-4 text-stone-500">
+                  Required for customer Veg / Non-veg recipe filtering.
+                </span>
               </label>
 
               <label className="text-xs font-black text-stone-700 md:col-span-2">

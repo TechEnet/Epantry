@@ -563,20 +563,20 @@ export default function PantryPage() {
   return (
     <main className="page-shell !p-0">
       <div className="w-full max-w-none">
-        <section className="sticky top-0 z-0 flex h-[100svh] min-h-[100svh] flex-col overflow-hidden bg-[radial-gradient(circle_at_14%_16%,rgba(209,250,229,0.88),transparent_34%),radial-gradient(circle_at_86%_12%,rgba(254,243,199,0.76),transparent_30%),linear-gradient(135deg,#fbfaf6_0%,#f3f8f2_48%,#edf7f3_100%)] shadow-[0_18px_50px_rgba(28,25,23,0.06)] relative lg:h-[133.333svh] lg:min-h-[133.333svh]">
-          <div className="flex h-full flex-col px-6 py-5 sm:px-8 sm:py-6 lg:px-10 lg:py-7">
-            <div className="grid min-h-0 flex-1 gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-12">
-              <div className="flex min-h-0 flex-col justify-start pt-2 lg:pt-1">
+        <section className="sticky top-0 z-0 flex h-[calc(100svh-48px)] min-h-[calc(100svh-48px)] flex-col overflow-hidden bg-[radial-gradient(circle_at_14%_16%,rgba(209,250,229,0.88),transparent_34%),radial-gradient(circle_at_86%_12%,rgba(254,243,199,0.76),transparent_30%),linear-gradient(135deg,#fbfaf6_0%,#f3f8f2_48%,#edf7f3_100%)] shadow-[0_18px_50px_rgba(28,25,23,0.06)] relative sm:h-[100svh] sm:min-h-[100svh] lg:h-[133.333svh] lg:min-h-[133.333svh]">
+          <div className="flex h-full flex-col px-4 py-3 sm:px-8 sm:py-6 lg:px-10 lg:py-7">
+            <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] content-stretch gap-2 sm:grid-rows-none sm:content-normal sm:gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-12">
+              <div className="flex min-h-0 flex-col justify-start pt-0 sm:pt-2 lg:pt-1">
                 <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200/90 bg-white/80 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-800 shadow-sm backdrop-blur-sm">
                   <span className="h-2 w-2 rounded-full bg-emerald-600" />
                   Living Pantry
                 </div>
 
-                <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
+                <h1 className="mt-1.5 max-w-3xl text-[30px] font-black leading-none tracking-[-0.035em] text-stone-950 sm:mt-4 sm:text-5xl sm:leading-normal sm:tracking-tight lg:text-6xl">
                   {PANTRY_MEMORY_HEADING}
                 </h1>
 
-                <div className="mt-8 max-w-xl rounded-[30px] border border-white/90 bg-white/[0.72] p-6 shadow-[0_16px_36px_rgba(28,25,23,0.05)] backdrop-blur-sm sm:p-7 lg:mt-10">
+                <div className="mt-8 hidden max-w-xl rounded-[30px] border border-white/90 bg-white/[0.72] p-6 shadow-[0_16px_36px_rgba(28,25,23,0.05)] backdrop-blur-sm sm:block sm:p-7 lg:mt-10">
                   <div className="space-y-3 text-base font-semibold leading-7 text-stone-600 sm:text-lg sm:leading-8">
                     <p>Living Pantry keeps a simple memory of the food you have at home.</p>
                     <p>It separates what you confirmed from what EPANTRY only expects, so you always know what needs checking.</p>
@@ -585,8 +585,8 @@ export default function PantryPage() {
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-col justify-center gap-5 lg:py-7">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-x-8 lg:gap-y-8">
+              <div className="flex min-h-0 flex-col justify-between gap-2 pb-1 sm:justify-center sm:gap-5 sm:pb-0 lg:py-7">
+                <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-2 sm:flex-none sm:grid-rows-none sm:gap-5 lg:gap-x-8 lg:gap-y-8">
                   {[
                     ['1', 'Tell us what is at home', 'Add or confirm the food that is actually in your kitchen.'],
                     ['2', 'Check anything uncertain', 'If EPANTRY is unsure, it asks you to check instead of guessing.'],
@@ -595,43 +595,67 @@ export default function PantryPage() {
                   ].map(([step, title, description]) => (
                     <article
                       key={step}
-                      className="relative min-h-[180px] overflow-hidden rounded-[28px] border border-white/90 bg-white/80 p-5 shadow-[0_18px_42px_rgba(20,83,45,0.08)] ring-1 ring-inset ring-emerald-950/5 backdrop-blur-md sm:min-h-[190px]"
+                      className="relative h-[80%] min-h-0 self-center overflow-hidden rounded-[16px] border border-white/90 bg-white/80 p-3 shadow-[0_8px_18px_rgba(20,83,45,0.06)] ring-1 ring-inset ring-emerald-950/5 backdrop-blur-md sm:h-auto sm:min-h-[190px] sm:self-auto sm:rounded-[28px] sm:p-5 sm:shadow-[0_18px_42px_rgba(20,83,45,0.08)]"
                     >
                       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300" />
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-800 text-sm font-black text-white shadow-[0_8px_18px_rgba(6,78,59,0.18)]">
+                      <div className="flex items-center justify-between gap-2 sm:gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-800 text-[10px] font-bold text-white shadow-[0_5px_12px_rgba(6,78,59,0.14)] sm:h-10 sm:w-10 sm:rounded-2xl sm:text-sm sm:font-black sm:shadow-[0_8px_18px_rgba(6,78,59,0.18)]">
                           {step}
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700/70">
+                        <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-emerald-700/70 sm:text-[10px] sm:font-black sm:tracking-[0.18em]">
                           Step 0{step}
                         </span>
                       </div>
-                      <h2 className="mt-5 text-base font-black leading-tight text-stone-950 sm:text-lg">
+                      <h2 className="mt-2 text-[12px] font-bold leading-[1.15] tracking-[-0.015em] text-stone-950 sm:mt-5 sm:text-lg sm:font-black sm:leading-tight sm:tracking-normal">
                         {title}
                       </h2>
-                      <p className="mt-2 text-sm leading-6 text-stone-600">
+                      <p className="mt-1 text-[9.5px] font-medium leading-[1.3] text-stone-600 sm:mt-2 sm:text-sm sm:font-normal sm:leading-6">
                         {description}
                       </p>
                     </article>
                   ))}
                 </div>
 
-                <div className="flex flex-wrap justify-end gap-2.5 pr-1">
+                <div className="flex flex-nowrap justify-end gap-2 sm:flex-wrap sm:gap-2.5 sm:pr-1">
                   <Link
                     to="/waste-reduction"
-                    className="focus-ring inline-flex min-h-14 min-w-[150px] items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-950 shadow-sm transition hover:border-amber-300 hover:bg-amber-100"
+                    className="focus-ring inline-flex min-h-10 flex-1 items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] font-black text-amber-950 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 sm:min-h-14 sm:min-w-[150px] sm:flex-none sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   >
                     Use food soon
                     <ArrowRight size={16} aria-hidden="true" />
                   </Link>
                   <Link
                     to="/next-basket"
-                    className="focus-ring inline-flex min-h-14 min-w-[150px] items-center justify-between gap-3 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-[0_10px_24px_rgba(4,120,87,0.18)] transition hover:bg-emerald-800"
+                    className="focus-ring inline-flex min-h-10 flex-1 items-center justify-between gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(4,120,87,0.16)] transition hover:bg-emerald-800 sm:min-h-14 sm:min-w-[150px] sm:flex-none sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm sm:shadow-[0_10px_24px_rgba(4,120,87,0.18)]"
                   >
                     Plan next basket
                     <ArrowRight size={16} aria-hidden="true" />
                   </Link>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    document
+                      .getElementById('pantry-food-home')
+                      ?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      })
+                  }}
+                  className="focus-ring mx-auto inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-emerald-900/10 bg-white/90 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-950 shadow-[0_8px_20px_rgba(6,78,59,0.10)] backdrop-blur-sm transition hover:bg-white sm:hidden"
+                  aria-label="Go to your food at home"
+                >
+                  <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white shadow-sm">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/25" aria-hidden="true" />
+                    <ChevronDown
+                      size={16}
+                      className="relative animate-bounce"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span>Swipe to your food</span>
+                </button>
               </div>
             </div>
           </div>
@@ -646,8 +670,8 @@ export default function PantryPage() {
                   block: 'start',
                 })
             }}
-            className="focus-ring absolute bottom-14 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-900/10 bg-white/85 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-950 shadow-[0_10px_28px_rgba(6,78,59,0.12)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white sm:bottom-16 lg:bottom-24"
-            aria-label="Scroll to your food at home"
+            className="focus-ring absolute bottom-16 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-emerald-900/10 bg-white/90 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-950 shadow-[0_8px_20px_rgba(6,78,59,0.10)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white sm:inline-flex lg:bottom-24"
+            aria-label="Go to your food at home"
           >
             <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white shadow-sm">
               <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/25" aria-hidden="true" />
@@ -665,18 +689,34 @@ export default function PantryPage() {
           id="pantry-food-home"
           className="relative z-20 -mt-6 flex h-[calc(100svh-72px)] min-h-[calc(100svh-72px)] flex-col overflow-hidden rounded-t-[36px] border-t border-emerald-100 bg-[radial-gradient(circle_at_88%_10%,rgba(186,230,253,0.30),transparent_28%),radial-gradient(circle_at_12%_92%,rgba(209,250,229,0.42),transparent_30%),linear-gradient(180deg,#fbfcfa_0%,#f5f8f3_100%)] shadow-[0_-24px_60px_rgba(28,25,23,0.10)]"
         >
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-6 border-b border-emerald-100/80 px-5 py-4 sm:px-7">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Your food at home</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-stone-950">What is in your Pantry?</h2>
-              <p className="mt-1 text-sm text-stone-500">Choose a filter, then open an item to check or update it.</p>
+          <div className="border-b border-emerald-100/80 px-4 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6 sm:px-7 sm:py-4">
+            <div className="min-w-0">
+              <div className="flex items-center justify-between gap-2 sm:block">
+                <p className="whitespace-nowrap text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 sm:text-[11px] sm:tracking-[0.16em]">Your food at home</p>
+
+                <button
+                  type="button"
+                  onClick={() => loadPantry({ refresh: true })}
+                  disabled={refreshing || loading}
+                  className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-white/90 px-2.5 py-1.5 text-[10px] font-bold text-stone-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-800 disabled:opacity-50 sm:hidden"
+                >
+                  <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
+                  Refresh list
+                </button>
+              </div>
+
+              <h2 className="mt-1 text-[19px] font-black leading-tight tracking-[-0.03em] text-stone-950 sm:text-2xl sm:tracking-tight">What is in your Pantry?</h2>
+              <p className="mt-0.5 whitespace-nowrap text-[9px] font-medium text-stone-500 sm:mt-1 sm:text-sm sm:font-normal">
+                <span className="sm:hidden">Filter, then open an item to check or update.</span>
+                <span className="hidden sm:inline">Choose a filter, then open an item to check or update it.</span>
+              </p>
             </div>
 
             <button
               type="button"
               onClick={() => loadPantry({ refresh: true })}
               disabled={refreshing || loading}
-              className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white/90 px-4 py-2.5 text-sm font-black text-stone-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-800 disabled:opacity-50"
+              className="focus-ring hidden items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white/90 px-4 py-2.5 text-sm font-black text-stone-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-800 disabled:opacity-50 sm:inline-flex"
             >
               <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
               Refresh list
@@ -684,10 +724,31 @@ export default function PantryPage() {
           </div>
 
 
-          <div className="flex min-h-0 flex-1 flex-col px-4 pb-3 pt-2.5 sm:px-5 sm:pb-4">
-            <div className="flex flex-col gap-2.5 rounded-2xl border border-stone-200/80 bg-white/65 px-3 py-2.5 sm:flex-row sm:items-center">
-              <span className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">Show</span>
-              <div className="flex flex-1 gap-2 overflow-x-auto pb-1 sm:justify-between sm:pb-0">
+          <div className="flex min-h-0 flex-1 flex-col px-3 pb-2.5 pt-2 sm:px-5 sm:pb-4 sm:pt-2.5">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200/80 bg-white/65 px-2.5 py-2 sm:flex-row sm:items-center sm:rounded-2xl sm:px-3 sm:py-2.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.13em] text-stone-500 sm:text-xs sm:tracking-[0.14em]">Show</span>
+
+              <div className="relative ml-auto sm:hidden">
+                <select
+                  value={selectedFilter}
+                  onChange={(event) => setSelectedFilter(event.target.value)}
+                  aria-label="Filter Pantry items"
+                  className="focus-ring min-w-[132px] appearance-none rounded-lg border border-stone-200 bg-white/95 py-1.5 pl-3 pr-8 text-[10px] font-bold text-stone-700 shadow-sm outline-none"
+                >
+                  {FILTERS.map((filter) => (
+                    <option key={filter.key} value={filter.key}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={13}
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500"
+                  aria-hidden="true"
+                />
+              </div>
+
+              <div className="hidden flex-1 gap-2 overflow-x-auto pb-1 sm:flex sm:justify-between sm:pb-0">
                 {FILTERS.map((filter) => {
                   const active = filter.key === selectedFilter
                   return (
@@ -713,11 +774,17 @@ export default function PantryPage() {
               <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</div>
             )}
 
-            <div className="mt-3 min-h-0 flex-1 overflow-hidden">
+            <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-0.5 sm:mt-3 sm:overflow-hidden sm:pr-0">
               {loading ? (
-                <div className="grid h-full grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2">
-                  {[1, 2, 3, 4, 5, 6].map((key) => (
-                    <div key={key} className="min-h-0 animate-pulse rounded-[20px] border border-stone-200 bg-stone-100" />
+                <div className="grid h-full grid-cols-1 content-start gap-2.5 sm:grid-cols-1 sm:gap-3 md:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2">
+                  {[1, 2, 3, 4, 5, 6].map((key, index) => (
+                    <div
+                      key={key}
+                      className={[
+                        'h-[176px] animate-pulse rounded-[18px] border border-stone-200 bg-stone-100 sm:min-h-0 sm:h-auto sm:rounded-[20px]',
+                        index >= 4 ? 'hidden sm:block' : '',
+                      ].join(' ')}
+                    />
                   ))}
                 </div>
               ) : filteredItems.length === 0 ? (
@@ -729,34 +796,38 @@ export default function PantryPage() {
                   <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-stone-500">Try another filter, or add food to your Pantry as you cook, shop and confirm what is at home.</p>
                 </div>
               ) : (
-                <div className="grid h-full content-start gap-y-6 sm:grid-cols-2 lg:grid-cols-[repeat(3,320px)] lg:justify-between">
-                  {visibleItems.map((item) => {
+                <>
+                  <div className="grid grid-cols-1 content-start gap-2.5 sm:h-full sm:grid-cols-2 sm:gap-x-0 sm:gap-y-6 lg:grid-cols-[repeat(3,320px)] lg:justify-between">
+                  {visibleItems.map((item, index) => {
                     const itemId = getItemId(item)
                     const state = getItemState(item)
                     return (
                       <article
                         key={itemId || getItemTitle(item)}
-                        className="group relative flex h-[220px] w-full max-w-[320px] flex-col overflow-hidden rounded-[30px] bg-[#edf5ef] p-5 shadow-[15px_15px_30px_#cbd8cf,-15px_-15px_30px_#ffffff] transition duration-200 hover:-translate-y-0.5 sm:justify-self-center lg:justify-self-auto"
+                        className={[
+                          'group relative flex h-[176px] w-full min-w-0 flex-col overflow-hidden rounded-[18px] bg-[#edf5ef] p-3 shadow-[8px_8px_18px_#cbd8cf,-8px_-8px_18px_#ffffff] transition duration-200 hover:-translate-y-0.5 sm:h-[220px] sm:max-w-[320px] sm:min-w-[auto] sm:justify-self-center sm:rounded-[30px] sm:p-5 sm:shadow-[15px_15px_30px_#cbd8cf,-15px_-15px_30px_#ffffff] lg:justify-self-auto',
+                          index >= 4 ? 'hidden sm:flex' : '',
+                        ].join(' ')}
                       >
-                        <div className="flex justify-center pt-1">
+                        <div className="flex justify-center sm:pt-1">
                           <PantryStateBadge state={state} />
                         </div>
 
-                        <div className="flex flex-1 items-center justify-center px-2 text-center">
-                          <h2 className="line-clamp-2 text-[18px] font-black leading-tight tracking-[-0.02em] text-stone-950">
+                        <div className="flex flex-1 items-center justify-center px-2 text-center sm:px-2">
+                          <h2 className="line-clamp-2 text-[15px] font-black leading-tight tracking-[-0.02em] text-stone-950 sm:text-[18px]">
                             {getItemTitle(item)}
                           </h2>
                         </div>
 
                         <div className="mt-auto">
                           {itemId ? (
-                            <div className="grid gap-2">
+                            <div className="grid gap-2 sm:gap-2">
                               <Link
                                 to={`/pantry/items/${encodeURIComponent(itemId)}`}
-                                className="focus-ring inline-flex min-h-9 items-center justify-between rounded-[14px] bg-emerald-800 px-3 py-2 text-[11px] font-black text-white shadow-sm transition hover:bg-emerald-900"
+                                className="focus-ring mx-auto inline-flex min-h-10 w-[88%] items-center justify-between rounded-[11px] bg-emerald-800 px-4 py-2.5 text-[11px] font-black text-white shadow-sm transition hover:bg-emerald-900 sm:min-h-9 sm:w-auto sm:rounded-[14px] sm:px-3 sm:py-2 sm:text-[11px]"
                               >
                                 Check & update
-                                <ArrowRight size={14} aria-hidden="true" />
+                                <ArrowRight className="h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]" aria-hidden="true" />
                               </Link>
 
                               {state !== 'do_not_track' ? (
@@ -764,27 +835,42 @@ export default function PantryPage() {
                                   type="button"
                                   onClick={() => setItemPendingRemoval(item)}
                                   disabled={removingItemId === itemId}
-                                  className="focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[14px] border border-rose-200/90 bg-white/80 px-3 py-2 text-[10px] font-black text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="focus-ring mx-auto inline-flex min-h-10 w-[88%] items-center justify-center gap-1.5 rounded-[11px] border border-rose-200/90 bg-white/80 px-4 py-2.5 text-[11px] font-black text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 sm:w-auto sm:rounded-[14px] sm:px-3 sm:py-2 sm:text-[10px]"
                                 >
-                                  <Trash2 size={12} aria-hidden="true" />
+                                  <Trash2 className="h-[12px] w-[12px] shrink-0" aria-hidden="true" />
                                   Remove from Pantry
                                 </button>
                               ) : (
-                                <span className="rounded-[14px] border border-stone-300 bg-white/70 px-3 py-2 text-center text-[10px] font-bold text-stone-600">Not being tracked</span>
+                                <span className="rounded-[11px] border border-stone-300 bg-white/70 px-3 py-1.5 text-center text-[10px] font-bold text-stone-600 sm:rounded-[14px] sm:px-3 sm:py-2 sm:text-[10px]">Not being tracked</span>
                               )}
                             </div>
                           ) : (
-                            <p className="text-center text-xs font-semibold text-stone-500">History unavailable for this item.</p>
+                            <p className="text-center text-[10px] font-semibold text-stone-500 sm:text-xs">History unavailable for this item.</p>
                           )}
                         </div>
                       </article>
                     )
                   })}
-                </div>
+                  </div>
+
+                  {filteredItems.length > 4 ? (
+                    <div className="flex justify-center pb-1 pt-3 sm:hidden">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAllItems(true)
+                        }}
+                        className="focus-ring inline-flex items-center justify-center rounded-lg border border-stone-200 bg-white/90 px-4 py-1.5 text-[11px] font-bold text-stone-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                      >
+                        View all
+                      </button>
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
 
-            <div className="flex shrink-0 justify-center pt-2">
+            <div className="hidden shrink-0 justify-center pt-2 sm:flex">
               <button
                 type="button"
                 onClick={() => {

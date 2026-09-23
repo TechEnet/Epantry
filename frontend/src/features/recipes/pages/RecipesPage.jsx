@@ -22,6 +22,10 @@ import {
   listPublicRecipes,
 } from '../services/recipe.service'
 
+import {
+  getRecipeFoodIntelligence,
+} from '../../foodIntelligence/services/foodIntelligence.service'
+
 const FEATURED_RECIPE_COUNT = 8
 const VISIBLE_CATEGORY_COUNT = 6
 const SCROLL_STEP_VH = 58
@@ -77,6 +81,86 @@ function recipeCourse(item) {
     item?.recipe?.mealType ||
     'Recipe'
   )
+}
+
+
+function recipeDietaryKindFromIntelligence(foodIntelligence) {
+  const dietary = Array.isArray(foodIntelligence?.dietary)
+    ? foodIntelligence.dietary
+    : []
+
+  const eligibleKeys = dietary
+    .filter((item) => {
+      const status = String(item?.status || '').trim().toLowerCase()
+
+      return item?.eligible === true || status === 'eligible'
+    })
+    .map((item) =>
+      String(item?.key || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[-\s]+/g, '_'),
+    )
+    .filter(Boolean)
+
+  if (
+    eligibleKeys.includes('non_vegetarian') ||
+    eligibleKeys.includes('eggitarian')
+  ) {
+    return 'nonveg'
+  }
+
+  if (
+    eligibleKeys.includes('vegetarian') ||
+    eligibleKeys.includes('vegan')
+  ) {
+    return 'veg'
+  }
+
+  return 'unknown'
+}
+
+function recipeDietaryKind(item, foodIntelligence = null) {
+  const values = [
+    item?.dish?.dietaryType,
+    item?.recipe?.dietaryType,
+    item?.dish?.dietaryClassification,
+    item?.recipe?.dietaryClassification,
+    ...(Array.isArray(item?.dish?.tags) ? item.dish.tags : []),
+    ...(Array.isArray(item?.recipe?.tags) ? item.recipe.tags : []),
+  ]
+    .filter(Boolean)
+    .map((value) =>
+      String(value)
+        .trim()
+        .toLowerCase()
+        .replace(/[_-]+/g, ' '),
+    )
+
+  if (
+    values.some((value) =>
+      value === 'non veg' ||
+      value === 'non vegetarian' ||
+      value === 'eggitarian' ||
+      value.includes('non vegetarian') ||
+      value.includes('non veg'),
+    )
+  ) {
+    return 'nonveg'
+  }
+
+  if (
+    values.some((value) =>
+      value === 'veg' ||
+      value === 'vegetarian' ||
+      value === 'vegan' ||
+      value.includes('vegetarian'),
+    )
+  ) {
+    return 'veg'
+  }
+
+  return recipeDietaryKindFromIntelligence(foodIntelligence)
 }
 
 function ModalShell({
@@ -212,11 +296,17 @@ export default function RecipesPage() {
   const [carouselPosition, setCarouselPosition] = useState(0)
   const [recipeModalOpen, setRecipeModalOpen] = useState(false)
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const [modalRecipeSearch, setModalRecipeSearch] = useState('')
+  const [modalRecipeDiet, setModalRecipeDiet] = useState('all')
+  const [modalDietaryByRecipeId, setModalDietaryByRecipeId] = useState({})
+  const [modalDietaryLoading, setModalDietaryLoading] = useState(false)
 
   const showcaseRef = useRef(null)
   const animationFrameRef = useRef(null)
   const positionRef = useRef(0)
   const targetPositionRef = useRef(0)
+  const swipeStartRef = useRef(null)
+  const swipeHandledRef = useRef(false)
 
   const loadRecipes = useCallback(
     async () => {
@@ -305,6 +395,112 @@ export default function RecipesPage() {
     VISIBLE_CATEGORY_COUNT,
   )
 
+  useEffect(() => {
+    if (!recipeModalOpen || recipes.length === 0) {
+      return undefined
+    }
+
+    const unresolved = recipes
+      .map((item) => ({
+        item,
+        recipeVersionId: String(item?.recipe?.id || '').trim(),
+      }))
+      .filter(({ item, recipeVersionId }) =>
+        recipeVersionId &&
+        recipeDietaryKind(item) === 'unknown' &&
+        !Object.hasOwn(modalDietaryByRecipeId, recipeVersionId),
+      )
+
+    if (unresolved.length === 0) {
+      return undefined
+    }
+
+    let cancelled = false
+
+    setModalDietaryLoading(true)
+
+    Promise.allSettled(
+      unresolved.map(async ({ recipeVersionId }) => [
+        recipeVersionId,
+        await getRecipeFoodIntelligence(recipeVersionId),
+      ]),
+    )
+      .then((results) => {
+        if (cancelled) {
+          return
+        }
+
+        setModalDietaryByRecipeId((current) => {
+          const next = { ...current }
+
+          results.forEach((result, index) => {
+            const recipeVersionId = unresolved[index]?.recipeVersionId
+
+            if (!recipeVersionId) {
+              return
+            }
+
+            next[recipeVersionId] =
+              result.status === 'fulfilled'
+                ? result.value?.[1] || null
+                : null
+          })
+
+          return next
+        })
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setModalDietaryLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    recipeModalOpen,
+    recipes,
+    modalDietaryByRecipeId,
+  ])
+
+  const filteredModalRecipes = useMemo(() => {
+    const query = modalRecipeSearch.trim().toLowerCase()
+
+    return recipes.filter((item) => {
+      const name = recipeName(item)
+      const searchable = [
+        name,
+        recipeCuisine(item),
+        recipeCourse(item),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      if (query && !searchable.includes(query)) {
+        return false
+      }
+
+      if (
+        modalRecipeDiet !== 'all' &&
+        recipeDietaryKind(
+          item,
+          modalDietaryByRecipeId[String(item?.recipe?.id || '')] || null,
+        ) !== modalRecipeDiet
+      ) {
+        return false
+      }
+
+      return true
+    })
+  }, [
+    recipes,
+    modalRecipeSearch,
+    modalRecipeDiet,
+    modalDietaryByRecipeId,
+  ])
+
   const slideCount = Math.max(1, slides.length)
   const scrollSteps = Math.max(1, slideCount - 1)
   const showcaseEndHoldVh =
@@ -324,7 +520,15 @@ export default function RecipesPage() {
       : null
 
   useEffect(() => {
+    function isMobileShowcase() {
+      return window.matchMedia('(max-width: 1023px)').matches
+    }
+
     function updateTargetFromScroll() {
+      if (isMobileShowcase()) {
+        return
+      }
+
       const section = showcaseRef.current
 
       if (!section || slideCount <= 1) {
@@ -356,6 +560,21 @@ export default function RecipesPage() {
         progress * (slideCount - 1)
     }
 
+    function handleResize() {
+      if (isMobileShowcase()) {
+        const nearestIndex = clamp(
+          Math.round(positionRef.current),
+          0,
+          slideCount - 1,
+        )
+
+        targetPositionRef.current = nearestIndex
+        return
+      }
+
+      updateTargetFromScroll()
+    }
+
     function animate() {
       const current = positionRef.current
       const target = targetPositionRef.current
@@ -374,12 +593,12 @@ export default function RecipesPage() {
     window.addEventListener('scroll', updateTargetFromScroll, {
       passive: true,
     })
-    window.addEventListener('resize', updateTargetFromScroll)
+    window.addEventListener('resize', handleResize)
     animationFrameRef.current = requestAnimationFrame(animate)
 
     return () => {
       window.removeEventListener('scroll', updateTargetFromScroll)
-      window.removeEventListener('resize', updateTargetFromScroll)
+      window.removeEventListener('resize', handleResize)
 
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
@@ -416,17 +635,23 @@ export default function RecipesPage() {
   }
 
   function scrollToSlide(nextIndex) {
+    const index = clamp(
+      nextIndex,
+      0,
+      slideCount - 1,
+    )
+
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      targetPositionRef.current = index
+      return
+    }
+
     const section = showcaseRef.current
 
     if (!section) {
       return
     }
 
-    const index = clamp(
-      nextIndex,
-      0,
-      slideCount - 1,
-    )
     const sectionScrollDistance = Math.max(
       1,
       section.offsetHeight - window.innerHeight,
@@ -451,6 +676,59 @@ export default function RecipesPage() {
       top: sectionTop + carouselScrollDistance * ratio,
       behavior: 'smooth',
     })
+  }
+
+  function handleShowcasePointerDown(event) {
+    if (!window.matchMedia('(max-width: 1023px)').matches) {
+      return
+    }
+
+    swipeStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+    }
+    swipeHandledRef.current = false
+  }
+
+  function handleShowcasePointerUp(event) {
+    if (!window.matchMedia('(max-width: 1023px)').matches) {
+      return
+    }
+
+    const start = swipeStartRef.current
+    swipeStartRef.current = null
+
+    if (!start) {
+      return
+    }
+
+    const deltaX = event.clientX - start.x
+    const deltaY = event.clientY - start.y
+
+    if (
+      Math.abs(deltaX) < 38 ||
+      Math.abs(deltaX) <= Math.abs(deltaY)
+    ) {
+      return
+    }
+
+    swipeHandledRef.current = true
+
+    if (deltaX < 0) {
+      scrollToSlide(activeIndex + 1)
+    } else {
+      scrollToSlide(activeIndex - 1)
+    }
+  }
+
+  function handleShowcaseClickCapture(event) {
+    if (!swipeHandledRef.current) {
+      return
+    }
+
+    swipeHandledRef.current = false
+    event.preventDefault()
+    event.stopPropagation()
   }
 
   return (
@@ -546,26 +824,31 @@ export default function RecipesPage() {
 
       <section
         ref={showcaseRef}
-        className="relative bg-[#1b100c]"
+        className="recipe-showcase-section relative isolate z-0 bg-[#1b100c]"
         style={{
-          minHeight: showcaseHeight,
+          '--recipe-showcase-height': showcaseHeight,
         }}
       >
-        <div className="sticky top-0 min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_35%,rgba(146,64,14,0.24),transparent_34%),radial-gradient(circle_at_100%_0%,rgba(245,158,11,0.11),transparent_31%),linear-gradient(135deg,#120a07_0%,#23120c_46%,#3a1d0f_100%)] text-white">
+        <div className="min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_35%,rgba(146,64,14,0.24),transparent_34%),radial-gradient(circle_at_100%_0%,rgba(245,158,11,0.11),transparent_31%),linear-gradient(135deg,#120a07_0%,#23120c_46%,#3a1d0f_100%)] text-white lg:sticky lg:top-0">
           <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:72px_72px]" />
 
-          <div className="relative mx-auto flex min-h-[100svh] max-w-[1500px] flex-col px-5 pb-6 pt-[118px] sm:px-8 lg:px-12">
+          <div className="relative mx-auto flex min-h-[100svh] max-w-[1500px] flex-col px-5 pb-6 pt-[102px] sm:px-8 sm:pt-[118px] lg:px-12">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-200/70">
                   EPANTRY / Recipe collection
                 </p>
                 <p className="mt-1 text-xs font-semibold text-white/45">
-                  Scroll or use the arrows to browse.
+                  <span className="lg:hidden">
+                    Swipe left or use the arrows to browse.
+                  </span>
+                  <span className="hidden lg:inline">
+                    Scroll or use the arrows to browse.
+                  </span>
                 </p>
               </div>
 
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+              <p className="hidden text-[10px] font-black uppercase tracking-[0.2em] text-white/45 lg:block">
                 Scroll-controlled
               </p>
             </div>
@@ -601,7 +884,16 @@ export default function RecipesPage() {
               </div>
             ) : (
               <>
-                <div className="relative mt-2 flex min-h-0 flex-1 items-center justify-center">
+                <div
+                  className="relative mt-7 flex min-h-0 flex-1 touch-pan-y items-center justify-center overflow-hidden sm:mt-6 lg:mt-2"
+                  onPointerDown={handleShowcasePointerDown}
+                  onPointerUp={handleShowcasePointerUp}
+                  onPointerCancel={() => {
+                    swipeStartRef.current = null
+                    swipeHandledRef.current = false
+                  }}
+                  onClickCapture={handleShowcaseClickCapture}
+                >
                   <div className="relative h-[360px] w-full sm:h-[430px] lg:h-[470px]">
                     {slides.map((slide, index) => {
                       const offset = index - carouselPosition
@@ -695,7 +987,7 @@ export default function RecipesPage() {
                             '--recipe-desktop-blur': `${desktopBlur}px`,
                             transformOrigin: 'center center',
                             opacity,
-                            zIndex: Math.round(100 - distance * 20),
+                            zIndex: Math.round(20 - distance * 4),
                             willChange: 'transform, opacity, filter',
                           }}
                         >
@@ -820,8 +1112,10 @@ export default function RecipesPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
-                  <span>Scroll down to explore. Scroll up to revisit.</span>
+                <div className="mt-3 flex items-center justify-end border-t border-white/10 pt-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/35 lg:justify-between">
+                  <span className="hidden lg:inline">
+                    Scroll down to explore. Scroll up to revisit.
+                  </span>
                   <span>
                     {String(activeIndex + 1).padStart(2, '0')} /{' '}
                     {String(slideCount).padStart(2, '0')}
@@ -839,65 +1133,149 @@ export default function RecipesPage() {
           ariaLabel="All recipes"
           wide
         >
-          <header className="border-b border-stone-900/10 px-6 pb-5 pt-7 sm:px-8">
+          <header className="border-b border-stone-900/10 px-5 pb-4 pt-6 sm:px-8 sm:pb-5 sm:pt-7">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-700">
               Recipe collection
             </p>
-            <h2 className="mt-2 pr-14 font-serif text-3xl font-semibold tracking-[-0.03em] text-[#35180d] sm:text-4xl">
+            <h2 className="mt-1.5 pr-14 font-serif text-[28px] font-semibold tracking-[-0.03em] text-[#35180d] sm:mt-2 sm:text-4xl">
               All recipes
             </h2>
-            <p className="mt-2 text-sm font-semibold text-stone-500">
-              {recipes.length}{' '}
-              {recipes.length === 1
+            <p className="mt-1 text-xs font-semibold text-stone-500 sm:mt-2 sm:text-sm">
+              {filteredModalRecipes.length}{' '}
+              {filteredModalRecipes.length === 1
                 ? 'recipe'
                 : 'recipes'}{' '}
-              available
+              shown
             </p>
+
+            <div className="mt-4 space-y-3 lg:hidden">
+              <label className="relative block">
+                <Search
+                  size={16}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500"
+                />
+                <input
+                  type="search"
+                  value={modalRecipeSearch}
+                  onChange={(event) => setModalRecipeSearch(event.target.value)}
+                  placeholder="Search recipes"
+                  className="focus-ring h-11 w-full rounded-2xl border border-stone-900/10 bg-white/80 pl-10 pr-4 text-sm font-semibold text-stone-900 outline-none placeholder:text-stone-400"
+                />
+              </label>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ['all', 'All'],
+                  ['veg', 'Veg'],
+                  ['nonveg', 'Non-veg'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setModalRecipeDiet(value)}
+                    className={`rounded-xl px-3 py-2 text-[11px] font-black transition ${
+                      modalRecipeDiet === value
+                        ? 'bg-[#35180d] text-white'
+                        : 'border border-stone-900/10 bg-white/70 text-stone-600'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {modalDietaryLoading ? (
+                <p className="text-[10px] font-bold text-stone-500">
+                  Checking approved Veg / Non-veg classifications…
+                </p>
+              ) : null}
+            </div>
           </header>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 sm:grid-cols-2 sm:p-6 lg:auto-rows-max lg:content-start lg:items-start lg:grid-cols-3">
-            {recipes.map((item, index) => (
-              <Link
-                key={recipeKey(item, index)}
-                to={recipePath(item)}
-                onClick={() => setRecipeModalOpen(false)}
-                className="focus-ring group overflow-hidden rounded-[22px] border border-stone-900/10 bg-white/78 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg lg:h-fit lg:self-start"
-              >
-                <div className="relative aspect-[4/3] overflow-hidden bg-[#f1e7db] lg:aspect-[16/10]">
-                  {item?.dish?.heroImageUrl ? (
-                    <img
-                      src={item.dish.heroImageUrl}
-                      alt={recipeName(item)}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
-                    />
-                  ) : (
-                    <div className="grid h-full place-items-center text-orange-700">
-                      <ChefHat
-                        size={34}
-                        aria-hidden="true"
-                      />
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            {modalDietaryLoading && modalRecipeDiet !== 'all' ? (
+              <div className="grid min-h-[220px] place-items-center rounded-[24px] border border-stone-900/10 bg-white/45 px-6 text-center">
+                <div>
+                  <ChefHat
+                    size={34}
+                    aria-hidden="true"
+                    className="mx-auto animate-pulse text-orange-700"
+                  />
+                  <p className="mt-3 text-sm font-black text-stone-800">
+                    Checking approved dietary classifications…
+                  </p>
+                </div>
+              </div>
+            ) : filteredModalRecipes.length ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+                {filteredModalRecipes.map((item, index) => (
+                  <Link
+                    key={recipeKey(item, index)}
+                    to={recipePath(item)}
+                    onClick={() => setRecipeModalOpen(false)}
+                    className="focus-ring group min-w-0 overflow-hidden rounded-[20px] border border-stone-900/10 bg-white/80 shadow-[0_10px_28px_rgba(54,28,17,0.08)] transition hover:-translate-y-0.5 hover:shadow-lg sm:rounded-[22px]"
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden bg-[#f1e7db] lg:aspect-[16/10]">
+                      {item?.dish?.heroImageUrl ? (
+                        <img
+                          src={item.dish.heroImageUrl}
+                          alt={recipeName(item)}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
+                        />
+                      ) : (
+                        <div className="grid h-full place-items-center text-orange-700">
+                          <ChefHat
+                            size={30}
+                            aria-hidden="true"
+                          />
+                        </div>
+                      )}
+
+                      <div className="absolute inset-x-2 bottom-2 flex flex-wrap gap-1 sm:inset-x-3 sm:bottom-3 sm:gap-2">
+                        {recipeCuisine(item) && (
+                          <span className="max-w-full truncate rounded-full bg-black/55 px-2 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-white backdrop-blur sm:px-2.5 sm:text-[9px]">
+                            {recipeCuisine(item)}
+                          </span>
+                        )}
+                        <span className="max-w-full truncate rounded-full bg-[#c65d16]/85 px-2 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-white backdrop-blur sm:px-2.5 sm:text-[9px]">
+                          {recipeCourse(item)}
+                        </span>
+                      </div>
                     </div>
-                  )}
 
-                  <div className="absolute inset-x-3 bottom-3 flex flex-wrap gap-2">
-                    {recipeCuisine(item) && (
-                      <span className="rounded-full bg-black/55 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white backdrop-blur">
-                        {recipeCuisine(item)}
-                      </span>
-                    )}
-                    <span className="rounded-full bg-[#c65d16]/85 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white backdrop-blur">
-                      {recipeCourse(item)}
-                    </span>
-                  </div>
+                    <div className="px-3 py-3 sm:px-4 sm:py-4 lg:min-h-[74px]">
+                      <h3 className="line-clamp-3 text-[13px] font-black leading-[1.18] text-stone-950 sm:line-clamp-2 sm:text-base lg:font-serif lg:text-lg lg:font-semibold lg:tracking-[-0.015em] lg:text-[#35180d]">
+                        {recipeName(item)}
+                      </h3>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="grid min-h-[220px] place-items-center rounded-[24px] border border-dashed border-stone-900/15 bg-white/45 px-6 text-center">
+                <div>
+                  <ChefHat
+                    size={34}
+                    aria-hidden="true"
+                    className="mx-auto text-orange-700"
+                  />
+                  <p className="mt-3 text-sm font-black text-stone-800">
+                    No recipes match these filters.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalRecipeSearch('')
+                      setModalRecipeDiet('all')
+                    }}
+                    className="mt-3 text-xs font-black text-orange-700 underline underline-offset-4"
+                  >
+                    Clear filters
+                  </button>
                 </div>
-
-                <div className="px-4 py-4 lg:min-h-[74px]">
-                  <h3 className="line-clamp-2 text-base font-black leading-tight text-stone-950 lg:font-serif lg:text-lg lg:font-semibold lg:tracking-[-0.015em] lg:text-[#35180d]">
-                    {recipeName(item)}
-                  </h3>
-                </div>
-              </Link>
-            ))}
+              </div>
+            )}
           </div>
         </ModalShell>
       )}
@@ -941,6 +1319,16 @@ export default function RecipesPage() {
       )}
 
       <style>{`
+        .recipe-showcase-section {
+          min-height: 100svh;
+        }
+
+        @media (min-width: 1024px) {
+          .recipe-showcase-section {
+            min-height: var(--recipe-showcase-height);
+          }
+        }
+
         .recipe-showcase-slide {
           transform: translate3d(
               calc(-50% + var(--recipe-mobile-x)),

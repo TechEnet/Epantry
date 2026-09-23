@@ -715,49 +715,49 @@ export default function MealPlanPage() {
 
   return (
     <main className="min-h-screen bg-[#f1f6f7]">
-      <div className="page-shell py-6">
-        <section className="overflow-hidden rounded-[30px] border border-[#86d8b1] bg-[#c9f3df] shadow-[0_18px_55px_rgba(31,95,68,0.12)]">
-          <div className="flex flex-col gap-6 p-7 sm:p-9 lg:flex-row lg:items-end lg:justify-between">
+      <div className="page-shell py-4 sm:py-6">
+        <section className="overflow-hidden rounded-[24px] border border-[#86d8b1] bg-[#c9f3df] shadow-[0_10px_34px_rgba(31,95,68,0.09)] sm:rounded-[30px] sm:shadow-[0_18px_55px_rgba(31,95,68,0.12)]">
+          <div className="flex flex-col gap-3 p-4 sm:gap-6 sm:p-9 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#0f6b4f] bg-[#0f6b4f] px-3 py-1.5 text-white shadow-sm">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-[#0f6b4f] bg-[#0f6b4f] px-2.5 py-1 text-white shadow-sm sm:gap-2 sm:px-3 sm:py-1.5">
                 <CalendarDays
-                  size={16}
+                  className="h-[13px] w-[13px] sm:h-4 sm:w-4"
                   aria-hidden="true"
                 />
 
-                <span className="text-[11px] font-black uppercase tracking-[0.14em]">
+                <span className="text-[8.5px] font-extrabold uppercase tracking-[0.12em] sm:text-[11px] sm:font-black sm:tracking-[0.14em]">
                   Meal planning
                 </span>
               </div>
 
-              <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-[#103f32] sm:text-4xl">
+              <h1 className="mt-2 max-w-4xl whitespace-nowrap text-[14px] font-extrabold tracking-[-0.03em] text-[#103f32] sm:mt-4 sm:whitespace-normal sm:text-4xl sm:font-black sm:tracking-tight">
                 Plan meals without double-counting Pantry.
               </h1>
 
-              <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-[#356252]">
+              <p className="mt-1.5 max-w-3xl text-[10px] font-medium leading-4 text-[#356252] sm:mt-3 sm:text-sm sm:font-semibold sm:leading-7">
                 Plan upcoming meals without changing what&apos;s currently in your Pantry.
               </p>
             </div>
 
-            <div className="flex w-full shrink-0 items-center justify-between gap-4 rounded-2xl border border-[#a9b7ef] bg-[#e5e9ff] p-4 shadow-[0_10px_24px_rgba(74,88,164,0.12)] lg:w-auto lg:min-w-[320px]">
+            <div className="flex w-full shrink-0 items-center justify-between gap-2.5 rounded-xl border border-[#a9b7ef] bg-[#e5e9ff] p-3 shadow-[0_6px_16px_rgba(74,88,164,0.10)] sm:gap-4 sm:rounded-2xl sm:p-4 sm:shadow-[0_10px_24px_rgba(74,88,164,0.12)] lg:w-auto lg:min-w-[320px]">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#46517b]">
+                <p className="text-[8.5px] font-extrabold uppercase tracking-[0.12em] text-[#46517b] sm:text-[10px] sm:font-black sm:tracking-[0.14em]">
                   Next basket
                 </p>
 
-                <p className="mt-1 max-w-[180px] text-xs font-semibold leading-5 text-[#5d668a]">
+                <p className="mt-0.5 max-w-[180px] text-[9px] font-medium leading-3.5 text-[#5d668a] sm:mt-1 sm:text-xs sm:font-semibold sm:leading-5">
                   Review what your planned meals may need next.
                 </p>
               </div>
 
               <Link
                 to="/next-basket"
-                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#5061bd] px-4 py-3 text-sm font-black text-white shadow-[0_8px_20px_rgba(80,97,189,0.22)] transition hover:bg-[#4352a4]"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#5061bd] px-3 py-2 text-[10px] font-extrabold text-white shadow-[0_6px_14px_rgba(80,97,189,0.18)] transition hover:bg-[#4352a4] sm:gap-2 sm:rounded-xl sm:px-4 sm:py-3 sm:text-sm sm:font-black sm:shadow-[0_8px_20px_rgba(80,97,189,0.22)]"
               >
                 Open
 
                 <ArrowRight
-                  size={16}
+                  className="h-[12px] w-[12px] sm:h-4 sm:w-4"
                   aria-hidden="true"
                 />
               </Link>
@@ -765,9 +765,9 @@ export default function MealPlanPage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-[24px] border border-[#bea9ee] bg-[#e9e0ff] p-4 shadow-[0_12px_30px_rgba(87,65,150,0.10)] sm:p-5">
-          <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#6048a9]">
+        <section className="mt-3 rounded-[20px] border border-[#bea9ee] bg-[#e9e0ff] p-3 shadow-[0_8px_22px_rgba(87,65,150,0.08)] sm:mt-5 sm:rounded-[24px] sm:p-5 sm:shadow-[0_12px_30px_rgba(87,65,150,0.10)]">
+          <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:mb-3">
+            <p className="text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#6048a9] sm:text-[10px] sm:font-black sm:tracking-[0.15em]">
               How this page works
             </p>
 
@@ -776,67 +776,67 @@ export default function MealPlanPage() {
             </h2> */}
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-4 lg:items-stretch">
-            <div className="min-w-0 rounded-[18px] border border-[#8eb8f5] bg-[#cfe3ff] px-4 py-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3 lg:grid-cols-4 lg:items-stretch">
+            <div className="min-w-0 rounded-xl border border-[#8eb8f5] bg-[#cfe3ff] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-black text-white">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
                   1
                 </span>
 
-                <p className="text-sm font-black text-[#173f77]">
+                <p className="text-[10px] font-extrabold text-[#173f77] sm:text-sm sm:font-black">
                   Create a plan
                 </p>
               </div>
 
-              <p className="mt-2 text-xs font-semibold leading-5 text-[#365b89]">
+              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#365b89] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
                 Give it a name and choose the start and end dates.
               </p>
             </div>
 
-            <div className="min-w-0 rounded-[18px] border border-[#78c6df] bg-[#ccefff] px-4 py-3">
+            <div className="min-w-0 rounded-xl border border-[#78c6df] bg-[#ccefff] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#007a9e] text-xs font-black text-white">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#007a9e] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
                   2
                 </span>
 
-                <p className="text-sm font-black text-[#10556b]">
+                <p className="text-[10px] font-extrabold text-[#10556b] sm:text-sm sm:font-black">
                   Add a recipe
                 </p>
               </div>
 
-              <p className="mt-2 text-xs font-semibold leading-5 text-[#356b7b]">
+              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#356b7b] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
                 Pick the recipe, meal time and servings you are planning.
               </p>
             </div>
 
-            <div className="min-w-0 rounded-[18px] border border-[#efc759] bg-[#ffe6a3] px-4 py-3">
+            <div className="min-w-0 rounded-xl border border-[#efc759] bg-[#ffe6a3] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#d38b00] text-xs font-black text-white">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#d38b00] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
                   3
                 </span>
 
-                <p className="text-sm font-black text-[#6c4a05]">
+                <p className="text-[10px] font-extrabold text-[#6c4a05] sm:text-sm sm:font-black">
                   Check Pantry
                 </p>
               </div>
 
-              <p className="mt-2 text-xs font-semibold leading-5 text-[#775d20]">
+              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#775d20] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
                 See what is enough, running low or missing for that meal.
               </p>
             </div>
 
-            <div className="min-w-0 rounded-[18px] border border-[#8fd1a6] bg-[#d2f2dc] px-4 py-3">
+            <div className="min-w-0 rounded-xl border border-[#8fd1a6] bg-[#d2f2dc] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#16794a] text-xs font-black text-white">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#16794a] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
                   4
                 </span>
 
-                <p className="text-sm font-black text-[#195b3b]">
+                <p className="text-[10px] font-extrabold text-[#195b3b] sm:text-sm sm:font-black">
                   Adjust &amp; review
                 </p>
               </div>
 
-              <p className="mt-2 text-xs font-semibold leading-5 text-[#396c52]">
+              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#396c52] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
                 Adjust servings or meals, then review what you may need next.
               </p>
             </div>
@@ -862,10 +862,10 @@ export default function MealPlanPage() {
             onSubmit={
               handleCreatePlan
             }
-            className="min-w-0 rounded-[24px] border border-[#8cbcff] bg-[#d9eaff] p-5 shadow-[0_12px_30px_rgba(50,96,170,0.10)] lg:h-full"
+            className="min-w-0 rounded-[24px] border border-[#8cbcff] bg-[#d9eaff] p-3 shadow-[0_12px_30px_rgba(50,96,170,0.10)] sm:p-5 lg:h-full"
           >
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2563eb] text-white shadow-sm">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#2563eb] text-white shadow-sm sm:h-10 sm:w-10 sm:rounded-xl">
                 <Plus
                   size={19}
                   aria-hidden="true"
@@ -883,7 +883,7 @@ export default function MealPlanPage() {
               </div>
             </div>
 
-            <div className="mt-5 space-y-4">
+            <div className="mt-3 space-y-2.5 sm:mt-5 sm:space-y-4">
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
                   Plan name
@@ -907,12 +907,12 @@ export default function MealPlanPage() {
                       }),
                     )
                   }
-                  className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-4 py-3 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3"
                   placeholder="Plan title"
                 />
               </label>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
                     Starts
@@ -937,7 +937,7 @@ export default function MealPlanPage() {
                         }),
                       )
                     }
-                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-4 py-3 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3"
                   />
                 </label>
 
@@ -965,7 +965,7 @@ export default function MealPlanPage() {
                         }),
                       )
                     }
-                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-4 py-3 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3"
                   />
                 </label>
               </div>
@@ -976,7 +976,7 @@ export default function MealPlanPage() {
               disabled={
                 saving
               }
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-3 text-sm font-black text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-black text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:py-3"
             >
               <Plus
                 size={16}
@@ -1134,7 +1134,7 @@ export default function MealPlanPage() {
           </section>
 
           <section className="min-w-0 overflow-hidden rounded-[24px] border border-[#8bd7c2] bg-[#d9f5ec] shadow-[0_12px_30px_rgba(45,118,96,0.10)] lg:flex lg:h-full lg:flex-col">
-            <div className="flex flex-col gap-4 border-b border-[#75cdb3] bg-[#bcebdc] p-5 lg:relative lg:block">
+            <div className="flex flex-col gap-2 border-b border-[#75cdb3] bg-[#bcebdc] p-3 sm:gap-4 sm:p-5 lg:relative lg:block">
               <div className="min-w-0 lg:pr-12">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-[#0f766e] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">
@@ -1147,7 +1147,7 @@ export default function MealPlanPage() {
                 </div>
 
                 <div className="lg:mt-2 lg:flex lg:min-w-0 lg:items-center lg:gap-3">
-                  <h2 className="mt-2 truncate text-2xl font-black tracking-tight text-stone-950 lg:mt-0">
+                  <h2 className="mt-1 truncate text-xl font-black tracking-tight text-stone-950 sm:mt-2 sm:text-2xl lg:mt-0">
                     {selectedPlan.title}
                   </h2>
 
@@ -1177,7 +1177,7 @@ export default function MealPlanPage() {
                     selectedPlan,
                   )
                 }
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[#d65252] bg-[#fff2f2] px-3.5 py-2.5 text-xs font-black text-[#a92525] transition hover:bg-white lg:absolute lg:bottom-5 lg:right-5 lg:h-9 lg:w-9 lg:p-0"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[#d65252] bg-[#fff2f2] px-3 py-2 text-xs font-black text-[#a92525] transition hover:bg-white sm:px-3.5 sm:py-2.5 lg:absolute lg:bottom-5 lg:right-5 lg:h-9 lg:w-9 lg:p-0"
                 aria-label="Delete plan"
                 title="Delete plan"
               >
@@ -1196,10 +1196,10 @@ export default function MealPlanPage() {
               onSubmit={
                 handleAddMeal
               }
-              className="bg-[#d7f4ff] p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+              className="bg-[#d7f4ff] p-3 sm:p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#007a9e] text-white shadow-sm">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#007a9e] text-white shadow-sm sm:h-10 sm:w-10 sm:rounded-xl">
                   <ChefHat
                     size={20}
                     aria-hidden="true"
@@ -1217,7 +1217,7 @@ export default function MealPlanPage() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3">
+              <div className="mt-3 grid gap-2 sm:mt-5 sm:gap-3">
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.11em] text-[#315f70]">
                     Recipe
@@ -1247,7 +1247,7 @@ export default function MealPlanPage() {
                       recipeOptions.length ===
                         0
                     }
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-4 py-3 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:py-3"
                   >
                     <option value="">
                       {recipeOptionsLoading
@@ -1329,7 +1329,7 @@ export default function MealPlanPage() {
                       )
                     }
                     required
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-4 py-3 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 sm:px-4 sm:py-3"
                   />
                 </label>
 
@@ -1356,7 +1356,7 @@ export default function MealPlanPage() {
                         }),
                       )
                     }
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-4 py-3 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 sm:px-4 sm:py-3"
                   >
                     <option value="breakfast">
                       Breakfast
@@ -1410,7 +1410,7 @@ export default function MealPlanPage() {
                         }),
                       )
                     }
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-4 py-3 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 sm:px-4 sm:py-3"
                   />
                 </label>
               </div>
@@ -1422,7 +1422,7 @@ export default function MealPlanPage() {
                   !mealForm.recipeSlug ||
                   !mealForm.plannedAt
                 }
-                className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#007a9e] px-5 py-3 text-sm font-black text-white shadow-[0_8px_20px_rgba(0,122,158,0.20)] transition hover:bg-[#005e7a] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-[#007a9e] px-4 py-2 text-sm font-black text-white shadow-[0_8px_20px_rgba(0,122,158,0.20)] transition hover:bg-[#005e7a] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:px-5 sm:py-3"
               >
                 <Plus
                   size={16}
@@ -1461,7 +1461,7 @@ export default function MealPlanPage() {
                   key={
                     meal.id
                   }
-                  className="overflow-hidden rounded-[20px] border border-[#ddccb2] bg-[#fffaf2] shadow-[0_8px_18px_rgba(84,67,45,0.08)] transition hover:-translate-y-0.5 hover:border-[#c8ad82] hover:shadow-[0_12px_24px_rgba(84,67,45,0.12)]"
+                  className="ml-0 mr-[-2.5rem] w-[calc(100%+2.5rem)] overflow-hidden rounded-[20px] border border-[#ddccb2] bg-[#fffaf2] shadow-[0_8px_18px_rgba(84,67,45,0.08)] transition hover:-translate-y-0.5 hover:border-[#c8ad82] hover:shadow-[0_12px_24px_rgba(84,67,45,0.12)] sm:mx-0 sm:w-auto"
                 >
                   <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
@@ -1565,7 +1565,7 @@ export default function MealPlanPage() {
 
                   {meal.status ===
                     'planned' && (
-                    <div className="flex flex-wrap gap-2 border-t border-[#b8c8e8] bg-[#e9f1ff] px-4 py-3">
+                    <div className="grid grid-cols-4 gap-1.5 border-t border-[#b8c8e8] bg-[#e9f1ff] px-2 py-2 sm:flex sm:flex-wrap sm:gap-2 sm:px-4 sm:py-3">
                       <button
                         type="button"
                         disabled={
@@ -1588,7 +1588,7 @@ export default function MealPlanPage() {
                             },
                           })
                         }
-                        className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+                        className="w-full whitespace-nowrap rounded-lg border border-stone-200 bg-white px-1 py-2 text-[9px] font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         − Serving
                       </button>
@@ -1612,7 +1612,7 @@ export default function MealPlanPage() {
                             },
                           })
                         }
-                        className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+                        className="w-full whitespace-nowrap rounded-lg border border-stone-200 bg-white px-1 py-2 text-[9px] font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         + Serving
                       </button>
@@ -1633,7 +1633,7 @@ export default function MealPlanPage() {
                             },
                           })
                         }
-                        className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-800 transition hover:bg-violet-100 disabled:opacity-50"
+                        className="w-full whitespace-nowrap rounded-lg border border-violet-200 bg-violet-50 px-1 py-2 text-[9px] font-black text-violet-800 transition hover:bg-violet-100 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         Skip meal
                       </button>
@@ -1654,7 +1654,7 @@ export default function MealPlanPage() {
                             },
                           })
                         }
-                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 transition hover:bg-rose-100 disabled:opacity-50"
+                        className="w-full whitespace-nowrap rounded-lg border border-rose-200 bg-rose-50 px-1 py-2 text-[9px] font-black text-rose-800 transition hover:bg-rose-100 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         Cancel
                       </button>
@@ -1690,10 +1690,10 @@ export default function MealPlanPage() {
               onSubmit={
                 handleCreatePlan
               }
-              className="min-w-0 rounded-[24px] border border-[#8cbcff] bg-[#d9eaff] p-5 shadow-[0_12px_30px_rgba(50,96,170,0.10)] lg:p-4"
+              className="min-w-0 rounded-[24px] border border-[#8cbcff] bg-[#d9eaff] p-3 shadow-[0_12px_30px_rgba(50,96,170,0.10)] sm:p-5 lg:p-4"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2563eb] text-white shadow-sm lg:h-9 lg:w-9">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#2563eb] text-white shadow-sm sm:h-10 sm:w-10 sm:rounded-xl lg:h-9 lg:w-9">
                   <Plus
                     size={19}
                     aria-hidden="true"
@@ -1711,7 +1711,7 @@ export default function MealPlanPage() {
                 </div>
               </div>
 
-              <div className="mt-5 space-y-4 lg:mt-4 lg:space-y-3">
+              <div className="mt-3 space-y-2.5 sm:mt-5 sm:space-y-4 lg:mt-4 lg:space-y-3">
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
                     Plan name
@@ -1735,12 +1735,12 @@ export default function MealPlanPage() {
                         }),
                       )
                     }
-                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-4 py-3 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 lg:py-2.5"
+                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3 lg:py-2.5"
                     placeholder="Plan title"
                   />
                 </label>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                   <label className="block">
                     <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
                       Starts
@@ -1765,7 +1765,7 @@ export default function MealPlanPage() {
                           }),
                         )
                       }
-                      className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-4 py-3 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 lg:py-2.5"
+                      className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3 lg:py-2.5"
                     />
                   </label>
 
@@ -1793,7 +1793,7 @@ export default function MealPlanPage() {
                           }),
                         )
                       }
-                      className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-4 py-3 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 lg:py-2.5"
+                      className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3 lg:py-2.5"
                     />
                   </label>
                 </div>
@@ -1804,7 +1804,7 @@ export default function MealPlanPage() {
                 disabled={
                   saving
                 }
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-3 text-sm font-black text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 lg:mt-4 lg:py-2.5"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-black text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:py-3 lg:mt-4 lg:py-2.5"
               >
                 <Plus
                   size={16}
