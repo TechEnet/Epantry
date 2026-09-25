@@ -321,20 +321,12 @@ export default function OrdersPage() {
 
   return (
     <main className="min-h-screen bg-[#f4f7fb]">
-      <div className="page-shell pb-7 pt-4 sm:pb-10 sm:pt-5">
-        <section className="rounded-[30px] border border-emerald-200 bg-gradient-to-br from-[#dff8ee] via-[#e5f7f2] to-[#e9f3ff] p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-black tracking-tight text-stone-950 sm:text-4xl">
-                Your EPANTRY Orders
-              </h1>
-
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600 sm:text-base">
-                Parent Orders group EPANTRY Host fulfilment splits under one
-                Customer transaction. External retailer handoffs remain
-                separate.
-              </p>
-            </div>
+      <div className="page-shell pb-5 pt-3 sm:pb-10 sm:pt-5">
+        <section className="rounded-[22px] border border-emerald-200 bg-gradient-to-br from-[#dff8ee] via-[#e5f7f2] to-[#e9f3ff] p-3 shadow-sm sm:rounded-[30px] sm:p-8">
+          <div className="flex items-center justify-between gap-2 sm:items-start sm:gap-4">
+            <h1 className="min-w-0 whitespace-nowrap text-[19px] font-black leading-none tracking-[-0.03em] text-stone-950 sm:text-4xl sm:leading-none">
+              Your EPANTRY Orders
+            </h1>
 
             <button
               type="button"
@@ -347,21 +339,25 @@ export default function OrdersPage() {
               disabled={
                 refreshing
               }
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white/85 px-4 py-2.5 text-sm font-black text-emerald-900 shadow-sm disabled:opacity-60"
+              className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-white/85 px-2.5 py-1.5 text-[10px] font-black text-emerald-900 shadow-sm disabled:opacity-60 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
             >
               <RefreshCw
-                size={16}
-                className={
+                size={14}
+                className={`sm:h-4 sm:w-4 ${
                   refreshing
                     ? 'animate-spin'
                     : ''
-                }
+                }`}
                 aria-hidden="true"
               />
 
               Refresh
             </button>
           </div>
+
+          <p className="mt-1.5 whitespace-nowrap text-[9px] font-semibold leading-4 text-stone-600 sm:mt-3 sm:max-w-3xl sm:whitespace-normal sm:text-base sm:font-normal sm:leading-6">
+            EPANTRY Host splits stay grouped; retailer handoffs stay separate.
+          </p>
         </section>
 
         {error && (
@@ -371,27 +367,27 @@ export default function OrdersPage() {
         )}
 
         {loading ? (
-          <div className="mt-5 h-[380px] animate-pulse rounded-[28px] border border-indigo-100 bg-[#ecefff]" />
+          <div className="mt-4 h-[300px] animate-pulse rounded-[24px] border border-indigo-100 bg-[#ecefff] sm:mt-5 sm:h-[380px] sm:rounded-[28px]" />
         ) : (data?.orders || [])
             .length ===
           0 ? (
-          <section className="mt-5 rounded-[28px] border border-dashed border-violet-200 bg-[#f1edff] px-6 py-14 text-center">
+          <section className="mt-4 rounded-[24px] border border-dashed border-violet-200 bg-[#f1edff] px-5 py-10 text-center sm:mt-5 sm:rounded-[28px] sm:px-6 sm:py-14">
             <PackageCheck
               size={30}
               className="mx-auto text-violet-500"
               aria-hidden="true"
             />
 
-            <h2 className="mt-4 text-lg font-black text-stone-950">
+            <h2 className="mt-3 text-base font-black text-stone-950 sm:mt-4 sm:text-lg">
               No Orders yet
             </h2>
 
-            <p className="mt-2 text-sm text-stone-500">
+            <p className="mt-1.5 text-[12px] leading-5 text-stone-500 sm:mt-2 sm:text-sm">
               Orders will appear here after checkout creates a Parent Order.
             </p>
           </section>
         ) : (
-          <section className="mt-5 space-y-3 rounded-[30px] border border-indigo-100 bg-[#e9edff] p-3 sm:p-4">
+          <section className="mt-4 space-y-2.5 rounded-[26px] border border-indigo-100 bg-[#e9edff] p-2.5 sm:mt-5 sm:space-y-3 sm:rounded-[30px] sm:p-4">
             {(data.orders || []).map(
               (
                 order,
@@ -401,7 +397,7 @@ export default function OrdersPage() {
                     order.id
                   }
                   to={`/orders/${order.id}`}
-                  className={`focus-ring group grid gap-4 rounded-[26px] border p-5 shadow-sm transition hover:shadow-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6 ${
+                  className={`focus-ring group grid overflow-hidden gap-1.5 rounded-[18px] border p-2.5 shadow-sm transition hover:shadow-md sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4 sm:rounded-[26px] sm:p-6 ${
                     String(
                       order.status ||
                         '',
@@ -417,14 +413,24 @@ export default function OrdersPage() {
                         : 'border-violet-200 bg-[#f2edff] hover:border-violet-300'
                   }`}
                 >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-black text-stone-950">
-                        {getOrderDisplayTitle(order)}
-                      </h2>
+                  <div className="min-w-0">
+                    <h2 className="block truncate whitespace-nowrap text-[11px] font-black leading-none text-stone-950 sm:text-base sm:leading-[1.3]">
+                      {getOrderDisplayTitle(order)}
+                    </h2>
+
+                    <div className="mt-1 flex min-w-0 items-center gap-1 whitespace-nowrap sm:mt-2 sm:flex-wrap sm:gap-2">
+                      <p className="min-w-0 shrink text-[8px] font-semibold text-stone-500 sm:text-xs">
+                        {
+                          order.createdAt
+                            ? new Date(
+                                order.createdAt,
+                              ).toLocaleString()
+                            : 'Created time unavailable'
+                        }
+                      </p>
 
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[7.5px] font-black uppercase tracking-[0.05em] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em] ${
                           String(
                             order.status ||
                               '',
@@ -448,7 +454,7 @@ export default function OrdersPage() {
                       </span>
 
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[7.5px] font-black uppercase tracking-[0.05em] sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em] ${
                           String(
                             order.paymentStatus ||
                               '',
@@ -473,23 +479,13 @@ export default function OrdersPage() {
                       </span>
                     </div>
 
-                    <p className="mt-2 text-xs font-semibold text-stone-500">
-                      {
-                        order.createdAt
-                          ? new Date(
-                              order.createdAt,
-                            ).toLocaleString()
-                          : 'Created time unavailable'
-                      }
-                    </p>
-
                     {Number(
                       order.sellerCount ||
                         0,
                     ) >
                       0 && (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-500">
+                      <div className="mt-1 flex min-w-0 items-center justify-between gap-1 overflow-hidden whitespace-nowrap sm:mt-3 sm:flex-wrap sm:justify-start sm:gap-2 sm:overflow-visible">
+                        <span className="shrink-0 text-[7.5px] font-black uppercase tracking-[0.06em] text-stone-500 sm:text-[10px] sm:tracking-[0.12em]">
                           {order.sellerCount}{' '}
                           {Number(
                             order.sellerCount,
@@ -504,7 +500,7 @@ export default function OrdersPage() {
                           (group) => (
                             <span
                               key={group.status}
-                              className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${sellerProgressClass(
+                              className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[7.5px] font-black sm:px-2.5 sm:py-1 sm:text-[10px] ${sellerProgressClass(
                                 group.status,
                               )}`}
                             >
@@ -519,13 +515,13 @@ export default function OrdersPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 sm:justify-end">
-                    <div className="text-right">
-                      <p className="text-[10px] font-black uppercase tracking-[0.1em] text-stone-500">
+                  <div className="mt-0.5 flex items-end justify-between gap-3 border-t border-black/5 pt-1.5 sm:mt-0 sm:justify-end sm:gap-4 sm:border-t-0 sm:pt-0">
+                    <div className="text-left sm:text-right">
+                      <p className="text-[7.5px] font-black uppercase tracking-[0.08em] text-stone-500 sm:text-[10px]">
                         Total
                       </p>
 
-                      <p className="mt-1 text-lg font-black text-stone-950">
+                      <p className="mt-0.5 text-[14px] font-black leading-none text-stone-950 sm:mt-1 sm:text-lg">
                         {formatMoney(
                           order.totals
                             ?.totalLandedCostMinor,
@@ -537,8 +533,8 @@ export default function OrdersPage() {
                     </div>
 
                     <ArrowRight
-                      size={18}
-                      className="text-stone-400"
+                      size={16}
+                      className="shrink-0 text-stone-400 sm:h-[18px] sm:w-[18px]"
                       aria-hidden="true"
                     />
                   </div>

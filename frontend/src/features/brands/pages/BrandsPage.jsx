@@ -430,6 +430,7 @@ const PAGE_STYLES = `
 .ep-brands-stage__meter { height: 1px; margin-bottom: 14px; overflow: hidden; background: #ffffff24; }
 .ep-brands-stage__meter > span { display: block; width: 100%; height: 100%; background: #c5d7e5; transform: scaleX(0); transform-origin: left center; }
 .ep-brands-stage__bottom > div:last-child { display: flex; align-items: center; justify-content: space-between; font-size: 10px; letter-spacing: .08em; }
+.ep-brands-stage__help--mobile { display: none; }
 .ep-brand-flight { position: absolute; top: 0; left: 0; z-index: 4; width: clamp(168px,21.5vw,310px); height: clamp(238px,22vw,315px); transform-origin: center center; will-change: transform,opacity; visibility: hidden; }
 .ep-brand-flight:hover, .ep-brand-flight:focus-within { z-index: 8; }
 .ep-brand-pass { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; overflow: hidden; border: 1px solid #cbd6df; border-radius: 14px; padding: clamp(18px,1.8vw,26px); background: rgba(241,240,233,.91); color: #172e43; text-decoration: none; box-shadow: 0 22px 55px -22px #020c1dd9,inset 0 1px #ffffffc9; backdrop-filter: blur(8px) saturate(118%); -webkit-backdrop-filter: blur(8px) saturate(118%); transition: border-color .2s,box-shadow .2s,background .25s; }
@@ -525,7 +526,7 @@ const PAGE_STYLES = `
   .ep-brands-stage__title p { font-size: 8px; margin-top: 18px; letter-spacing: .18em; }
   .ep-brand-flight { width: 42vw; height: 214px; }
   .ep-brand-flight .ep-brand-pass { border-radius: 12px; padding: 16px 13px; }
-  .ep-brand-flight .ep-brand-pass__identity h3, .ep-brand-flight .ep-brand-pass__identity h3.ep-brand-pass__long-name { font-size: clamp(22px,6vw,29px); }
+  .ep-brand-flight .ep-brand-pass__identity h3, .ep-brand-flight .ep-brand-pass__identity h3.ep-brand-pass__long-name { max-width: 100%; font-size: clamp(18px,5.2vw,24px) !important; line-height: .98; white-space: normal !important; overflow-wrap: anywhere; }
   .ep-brand-flight .ep-brand-pass__top { font-size: 7px; letter-spacing: .12em; }
   .ep-brand-flight .ep-brand-pass__number { font-size: 10px; }
   .ep-brand-flight .ep-brand-pass__bottom p { font-size: 9px; }
@@ -533,6 +534,9 @@ const PAGE_STYLES = `
   .ep-brand-flight .ep-brand-pass__arrow { width: 26px; height: 26px; }
   .ep-brand-flight .ep-brand-pass__arrow svg { width: 16px; }
   .ep-brands-stage__hint { top: 86%; min-height: 34px; font-size: 10px; }
+  .ep-brands-stage__bottom > div:last-child { font-size: 8.5px; letter-spacing: .03em; }
+  .ep-brands-stage__help--desktop { display: none; }
+  .ep-brands-stage__help--mobile { display: inline; }
   .ep-brands-ending { top: 66%; }
   .ep-brands-ending > p { font-size: 11px; }
   .ep-brands-directory { --directory-width: calc(100vw - 24px); --directory-height: min(720px,calc(100svh - 32px)); border-radius: 20px; }
@@ -717,7 +721,7 @@ export default function BrandsPage() {
               <p>There's more to explore.</p>
               <button type="button" className="ep-brands-view-all" onClick={() => openDirectory()} aria-haspopup="dialog">View all brands <span>{brands.length}</span><ArrowUpRight size={17} aria-hidden="true" /></button>
             </div>
-            <div className="ep-brands-stage__bottom" aria-hidden="true"><div className="ep-brands-stage__meter"><span data-brand-progress /></div><div><span>Scroll down to explore. Scroll up to revisit.</span><span data-brand-counter>00 / {String(count).padStart(2, '0')}</span></div></div>
+            <div className="ep-brands-stage__bottom" aria-hidden="true"><div className="ep-brands-stage__meter"><span data-brand-progress /></div><div><span className="ep-brands-stage__help--desktop">Scroll down to explore. Scroll up to revisit.</span><span className="ep-brands-stage__help--mobile">Scroll to explore · back to revisit.</span><span data-brand-counter>00 / {String(count).padStart(2, '0')}</span></div></div>
           </div>
         </section>
       )}

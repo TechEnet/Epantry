@@ -206,19 +206,17 @@ export default function CustomerPrivacyPage() {
   }
 
   return (
-    <main className="w-full px-4 pb-8 pt-4 sm:px-6 sm:pt-5 lg:px-8">
+    <main className="w-full px-4 pb-6 pt-3 sm:px-6 sm:pb-7 sm:pt-4 lg:px-8">
       <div className="w-full max-w-none">
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-stone-950">
+            <h1 className="text-2xl font-black tracking-tight text-stone-950 sm:text-[26px]">
               Privacy Rights Center
             </h1>
 
-            <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-stone-600">
-              Request a governed data export or account deletion review.
-              Requests are evaluated against current consent and effective
-              retention policies before any action is completed.
+            <p className="mt-2 max-w-3xl text-xs font-medium leading-5 text-stone-600 sm:text-[13px]">
+              Request an export or deletion review. EPANTRY checks consent and retention rules first.
             </p>
           </div>
 
@@ -227,7 +225,7 @@ export default function CustomerPrivacyPage() {
             onClick={
               load
             }
-            className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-bold text-stone-700"
+            className="focus-ring inline-flex items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700 sm:text-[13px]"
           >
             <RefreshCw
               size={16}
@@ -239,7 +237,7 @@ export default function CustomerPrivacyPage() {
         </div>
 
         <div
-          className="mt-5 min-h-6 text-sm font-semibold"
+          className="mt-3 min-h-5 text-xs font-semibold sm:text-[13px]"
           aria-live="polite"
         >
           {error ? (
@@ -253,22 +251,20 @@ export default function CustomerPrivacyPage() {
           ) : null}
         </div>
 
-        <section className="mt-4 grid gap-4 md:grid-cols-2">
-          <article className="rounded-[24px] border border-stone-200 bg-white p-6 shadow-sm">
+        <section className="mt-3 grid gap-3 md:grid-cols-2">
+          <article className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
             <Download
               className="text-emerald-700"
-              size={24}
+              size={20}
               aria-hidden="true"
             />
 
-            <h2 className="mt-4 text-lg font-black text-stone-950">
+            <h2 className="mt-3 text-base font-black text-stone-950 sm:text-[17px]">
               Data export
             </h2>
 
-            <p className="mt-2 text-sm font-medium leading-6 text-stone-600">
-              Ask for an access/export package of eligible account information.
-              Export generation is a controlled workflow and may require
-              additional processing before an artifact becomes available.
+            <p className="mt-1.5 text-xs font-medium leading-5 text-stone-600 sm:text-[13px]">
+              Get a copy of eligible account data. We’ll prepare it securely and notify you when it’s ready.
             </p>
 
             <button
@@ -283,7 +279,7 @@ export default function CustomerPrivacyPage() {
                   'access_export',
                 )
               }
-              className="focus-ring mt-5 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-50"
+              className="focus-ring mt-3 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50 sm:text-[13px]"
             >
               {submitting ===
               'access_export'
@@ -292,22 +288,19 @@ export default function CustomerPrivacyPage() {
             </button>
           </article>
 
-          <article className="rounded-[24px] border border-stone-200 bg-white p-6 shadow-sm">
+          <article className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
             <Trash2
               className="text-amber-700"
-              size={24}
+              size={20}
               aria-hidden="true"
             />
 
-            <h2 className="mt-4 text-lg font-black text-stone-950">
+            <h2 className="mt-3 text-base font-black text-stone-950 sm:text-[17px]">
               Account deletion
             </h2>
 
-            <p className="mt-2 text-sm font-medium leading-6 text-stone-600">
-              Ask EPANTRY to review eligible account data for deletion,
-              anonymization or restriction. Legal, security, financial,
-              audit or other immutable records may remain under applicable
-              retention rules.
+            <p className="mt-1.5 text-xs font-medium leading-5 text-stone-600 sm:text-[13px]">
+              Request deletion or restriction of eligible data. Required legal or financial records may remain.
             </p>
 
             <button
@@ -322,7 +315,7 @@ export default function CustomerPrivacyPage() {
                   'deletion',
                 )
               }
-              className="focus-ring mt-5 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-black text-white disabled:opacity-50"
+              className="focus-ring mt-3 rounded-xl bg-stone-900 px-3 py-2 text-xs font-black text-white disabled:opacity-50 sm:text-[13px]"
             >
               {submitting ===
               'deletion'
@@ -332,7 +325,7 @@ export default function CustomerPrivacyPage() {
           </article>
         </section>
 
-        <section className="mt-6 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5">
+        <section className="mt-4 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4">
           <div className="flex gap-3">
             <ShieldCheck
               className="mt-0.5 shrink-0 text-emerald-700"
@@ -340,43 +333,41 @@ export default function CustomerPrivacyPage() {
               aria-hidden="true"
             />
 
-            <div>
-              <h2 className="text-sm font-black text-emerald-950">
+            <div className="min-w-0">
+              <h2 className="text-[13px] font-black text-emerald-950 sm:text-sm">
                 Retention is policy-controlled
               </h2>
 
-              <p className="mt-1 text-sm font-medium leading-6 text-emerald-900/80">
-                A deletion request is not a blind database cascade.
-                The request stores the effective retention decisions used
-                for review, while M02 remains the consent source of truth.
+              <p className="mt-1 text-xs font-medium leading-5 text-emerald-900/80 sm:text-[13px]">
+                Deletion follows retention rules, not a full database wipe. Your consent settings stay authoritative.
               </p>
             </div>
           </div>
         </section>
 
-        <section className="mt-8 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="mt-5 rounded-[20px] border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black text-stone-950">
+              <h2 className="text-base font-black text-stone-950 sm:text-[17px]">
                 Your requests
               </h2>
 
-              <p className="mt-1 text-xs font-semibold text-stone-500">
+              <p className="mt-1 text-[11px] font-semibold text-stone-500 sm:text-xs">
                 Current workflow status and retention decision snapshots.
               </p>
             </div>
 
-            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-black text-stone-600">
+            <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-black text-stone-600 sm:text-xs">
               {requests.length}
             </span>
           </div>
 
           {loading ? (
-            <p className="mt-5 text-sm font-semibold text-stone-500">
+            <p className="mt-4 text-xs font-semibold text-stone-500 sm:text-[13px]">
               Loading privacy requests…
             </p>
           ) : requests.length ? (
-            <div className="mt-5 space-y-3">
+            <div className="mt-4 space-y-2.5">
               {requests.map(
                 (
                   request,
@@ -385,17 +376,17 @@ export default function CustomerPrivacyPage() {
                     key={
                       request.id
                     }
-                    className="rounded-2xl border border-stone-200 p-4"
+                    className="rounded-2xl border border-stone-200 p-3.5"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-black text-stone-950">
+                        <p className="text-[13px] font-black text-stone-950 sm:text-sm">
                           {titleize(
                             request.requestType,
                           )}
                         </p>
 
-                        <p className="mt-1 text-xs font-semibold text-stone-500">
+                        <p className="mt-1 text-[11px] font-semibold text-stone-500 sm:text-xs">
                           {request.requestId}
                           {' · '}
                           {formatDate(
@@ -404,14 +395,14 @@ export default function CustomerPrivacyPage() {
                         </p>
                       </div>
 
-                      <span className="rounded-full bg-stone-100 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-stone-600">
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-stone-600 sm:text-[10px]">
                         {titleize(
                           request.status,
                         )}
                       </span>
                     </div>
 
-                    <p className="mt-3 text-xs font-semibold text-stone-500">
+                    <p className="mt-2.5 text-[11px] font-semibold text-stone-500 sm:text-xs">
                       Retention decisions:{' '}
                       {request
                         .retentionEvaluation
@@ -429,7 +420,7 @@ export default function CustomerPrivacyPage() {
               )}
             </div>
           ) : (
-            <p className="mt-5 rounded-2xl bg-stone-50 p-4 text-sm font-semibold text-stone-500">
+            <p className="mt-4 rounded-2xl bg-stone-50 p-3.5 text-xs font-semibold text-stone-500 sm:text-[13px]">
               No privacy requests have been submitted yet.
             </p>
           )}
@@ -437,7 +428,7 @@ export default function CustomerPrivacyPage() {
 
         {context
           ?.consentSnapshot ? (
-          <p className="mt-4 text-xs font-medium text-stone-400">
+          <p className="mt-3 text-[11px] font-medium text-stone-400 sm:text-xs">
             Consent context loaded from the existing M02 consent authority.
           </p>
         ) : null}

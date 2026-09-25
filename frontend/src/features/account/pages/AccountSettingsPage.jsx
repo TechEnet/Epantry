@@ -1133,7 +1133,7 @@ export default function AccountSettingsPage() {
   }
 
   return (
-    <main className="w-full px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-5 lg:px-8 lg:pb-12">
+    <main className="w-full px-3 pb-5 pt-3 sm:px-6 sm:pb-10 sm:pt-5 lg:px-8 lg:pb-12">
 
       <div className="w-full max-w-none">
 
@@ -1144,15 +1144,15 @@ export default function AccountSettingsPage() {
 
         <div>
 
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:text-xs sm:tracking-[0.18em]">
             Account
           </p>
 
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-stone-950 sm:text-4xl">
+          <h1 className="mt-1.5 text-[24px] font-black tracking-tight text-stone-950 sm:mt-3 sm:text-4xl">
             Profile & preferences
           </h1>
 
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-stone-600">
+          <p className="hidden mt-3 max-w-3xl text-sm leading-7 text-stone-600 sm:block">
             Manage your EPANTRY identity, food preferences and consent settings.
           </p>
 
@@ -1187,11 +1187,11 @@ export default function AccountSettingsPage() {
             PROFILE
         ========================================================= */}
 
-        <section className="mt-8 rounded-[2rem] border border-stone-200 bg-white p-5 shadow-xl shadow-stone-900/5 sm:p-8">
+        <section className="mt-4 rounded-[1.5rem] border border-sky-100 bg-gradient-to-br from-sky-50/70 via-white to-emerald-50/40 p-3.5 shadow-lg shadow-stone-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl">
 
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-3 sm:items-start sm:gap-4">
 
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 sm:size-11 sm:rounded-2xl">
 
               <UserRound
                 size={21}
@@ -1202,11 +1202,11 @@ export default function AccountSettingsPage() {
 
             <div>
 
-              <h2 className="text-2xl font-black text-stone-950">
+              <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
                 Profile
               </h2>
 
-              <p className="mt-1 text-sm leading-6 text-stone-500">
+              <p className="hidden mt-1 text-sm leading-6 text-stone-500 sm:block">
                 Your basic EPANTRY account identity.
               </p>
 
@@ -1215,17 +1215,17 @@ export default function AccountSettingsPage() {
           </div>
 
 
-          <div className="mt-7 flex flex-col gap-4 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-center">
+          <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-emerald-100 bg-white/80 p-3 sm:mt-7 sm:flex sm:flex-row sm:gap-4 sm:border-stone-200 sm:bg-stone-50 sm:p-4">
 
             <div className="relative w-fit shrink-0">
               {profile?.profilePhotoUrl ? (
                 <img
                   src={profile.profilePhotoUrl}
                   alt="Profile"
-                  className="h-20 w-20 rounded-full border-4 border-white object-cover shadow-sm"
+                  className="h-14 w-14 rounded-full border-3 border-white object-cover shadow-sm sm:h-20 sm:w-20 sm:border-4"
                 />
               ) : (
-                <div className="grid h-20 w-20 place-items-center rounded-full border-4 border-white bg-emerald-700 text-2xl font-black text-white shadow-sm">
+                <div className="grid h-14 w-14 place-items-center rounded-full border-3 border-white bg-emerald-700 text-lg font-black text-white shadow-sm sm:h-20 sm:w-20 sm:border-4 sm:text-2xl">
                   {String(
                     profile?.name || 'E',
                   )
@@ -1235,7 +1235,7 @@ export default function AccountSettingsPage() {
                 </div>
               )}
 
-              <label className="focus-ring absolute -bottom-1 -right-1 grid h-9 w-9 cursor-pointer place-items-center rounded-full border-4 border-stone-50 bg-stone-950 text-white transition hover:bg-emerald-700">
+              <label className="focus-ring absolute -bottom-1 -right-1 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-stone-50 bg-stone-950 text-white transition hover:bg-emerald-700 sm:h-9 sm:w-9 sm:border-4">
                 <Camera
                   size={15}
                   aria-hidden="true"
@@ -1253,15 +1253,41 @@ export default function AccountSettingsPage() {
               </label>
             </div>
 
-            <div>
-              <p className="font-black text-stone-950">
-                Profile photo
-              </p>
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                {isUploadingPhoto
-                  ? 'Uploading photo...'
-                  : 'JPEG, PNG or WebP.'}
-              </p>
+            <div className="min-w-0">
+              <div className="sm:hidden">
+                <label
+                  htmlFor="account-name-mobile"
+                  className="mb-1 block text-[10px] font-black uppercase tracking-[0.08em] text-stone-600"
+                >
+                  Name
+                </label>
+                <input
+                  id="account-name-mobile"
+                  type="text"
+                  value={profileForm.name}
+                  onChange={(event) =>
+                    setProfileForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  className="focus-ring min-h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-[12px] font-bold"
+                />
+                <p className="mt-1 text-[9px] font-semibold text-stone-400">
+                  {isUploadingPhoto ? 'Uploading photo...' : 'Tap photo to change'}
+                </p>
+              </div>
+
+              <div className="hidden sm:block">
+                <p className="font-black text-stone-950">
+                  Profile photo
+                </p>
+                <p className="mt-1 text-xs leading-5 text-stone-500">
+                  {isUploadingPhoto
+                    ? 'Uploading photo...'
+                    : 'JPEG, PNG or WebP.'}
+                </p>
+              </div>
             </div>
 
           </div>
@@ -1270,10 +1296,10 @@ export default function AccountSettingsPage() {
             onSubmit={
               handleProfileSave
             }
-            className="mt-7 grid gap-5 sm:grid-cols-2"
+            className="mt-3 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-5"
           >
 
-            <div>
+            <div className="hidden sm:block">
 
               <label
                 htmlFor="account-name"
@@ -1314,7 +1340,7 @@ export default function AccountSettingsPage() {
 
               <label
                 htmlFor="account-phone"
-                className="mb-2 block text-sm font-bold text-stone-800"
+                className="mb-1 block text-[10px] font-black uppercase tracking-[0.08em] text-stone-600 sm:mb-2 sm:text-sm sm:font-bold sm:normal-case sm:tracking-normal sm:text-stone-800"
               >
                 Phone
               </label>
@@ -1341,7 +1367,7 @@ export default function AccountSettingsPage() {
                     }),
                   )
                 }
-                className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 px-4 text-sm font-semibold"
+                className="focus-ring min-h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-[11px] font-semibold sm:min-h-12 sm:rounded-2xl sm:px-4 sm:text-sm"
                 placeholder="+91 98765 43210"
               />
 
@@ -1355,19 +1381,19 @@ export default function AccountSettingsPage() {
             </div>
 
 
-            <div className="sm:col-span-2">
+            <div className="min-w-0 sm:col-span-2">
 
-              <p className="mb-2 text-sm font-bold text-stone-800">
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.08em] text-stone-600 sm:mb-2 sm:text-sm sm:font-bold sm:normal-case sm:tracking-normal sm:text-stone-800">
                 Email
               </p>
 
-              <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+              <div className="min-h-10 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3">
 
-                <p className="text-sm font-black text-stone-900">
+                <p className="truncate text-[11px] font-black text-stone-900 sm:text-sm">
                   {profile?.email}
                 </p>
 
-                <p className="mt-1 text-xs leading-5 text-stone-500">
+                <p className="hidden mt-1 text-xs leading-5 text-stone-500 sm:block">
                   Firebase identity email cannot be changed from this basic profile form.
                 </p>
 
@@ -1376,14 +1402,14 @@ export default function AccountSettingsPage() {
             </div>
 
 
-            <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+            <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:gap-3">
 
               <button
                 type="submit"
                 disabled={
                   isSavingProfile
                 }
-                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 text-sm font-black text-white disabled:opacity-50"
+                className="focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-4 text-[11px] font-black text-white disabled:opacity-50 sm:min-h-11 sm:gap-2 sm:bg-stone-950 sm:px-5 sm:text-sm"
               >
 
                 {isSavingProfile ? (
@@ -1420,13 +1446,13 @@ export default function AccountSettingsPage() {
             SAVED ADDRESSES
         ========================================================= */}
 
-        <section className="mt-8 rounded-[2rem] border border-stone-200 bg-white p-5 shadow-xl shadow-stone-900/5 sm:p-8">
+        <section className="mt-4 rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/30 to-sky-50/40 p-3.5 shadow-lg shadow-stone-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl">
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center justify-between gap-3 sm:items-start">
 
-            <div className="flex items-start gap-4">
+            <div className="flex items-center gap-3 sm:items-start sm:gap-4">
 
-              <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+              <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-sky-100 text-sky-700 sm:size-11 sm:rounded-2xl sm:bg-emerald-100 sm:text-emerald-700">
                 <MapPin
                   size={21}
                   aria-hidden="true"
@@ -1434,10 +1460,10 @@ export default function AccountSettingsPage() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-black text-stone-950">
+                <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
                   Saved addresses
                 </h2>
-                <p className="mt-1 text-sm leading-6 text-stone-500">
+                <p className="hidden mt-1 text-sm leading-6 text-stone-500 sm:block">
                   Add a delivery address or edit an existing one.
                 </p>
               </div>
@@ -1447,7 +1473,7 @@ export default function AccountSettingsPage() {
             <button
               type="button"
               onClick={beginAddAddress}
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 text-sm font-black text-white transition hover:bg-emerald-700"
+              className="focus-ring hidden min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 text-sm font-black text-white transition hover:bg-emerald-700 sm:inline-flex"
             >
               <Plus
                 size={16}
@@ -1464,7 +1490,7 @@ export default function AccountSettingsPage() {
             </p>
           )}
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2.5 sm:mt-6 sm:gap-3 sm:grid-cols-2">
             {addresses.length > 0 ? (
               addresses.map(
                 (
@@ -1472,7 +1498,7 @@ export default function AccountSettingsPage() {
                 ) => (
                   <article
                     key={address.id}
-                    className="rounded-2xl border border-stone-200 bg-stone-50 p-4"
+                    className="rounded-2xl border border-sky-100 bg-white/80 p-3 sm:border-stone-200 sm:bg-stone-50 sm:p-4"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
@@ -1525,6 +1551,15 @@ export default function AccountSettingsPage() {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={beginAddAddress}
+            className="focus-ring mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-100/80 px-3 text-[11px] font-black text-sky-900 sm:hidden"
+          >
+            <Plus size={14} aria-hidden="true" />
+            Add address
+          </button>
 
           {addressForm ? (
             <form
@@ -1827,11 +1862,11 @@ export default function AccountSettingsPage() {
             FOOD PREFERENCES
         ========================================================= */}
 
-        <section className="mt-8 rounded-[2rem] border border-stone-200 bg-white p-5 shadow-xl shadow-stone-900/5 sm:p-8">
+        <section className="mt-4 rounded-[1.5rem] border border-amber-100 bg-gradient-to-br from-amber-50/70 via-white to-emerald-50/50 p-3.5 shadow-lg shadow-amber-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl sm:shadow-stone-900/5">
 
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-3 sm:items-start sm:gap-4">
 
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 sm:size-11 sm:rounded-2xl sm:bg-emerald-100 sm:text-emerald-700">
 
               <SlidersHorizontal
                 size={21}
@@ -1842,7 +1877,7 @@ export default function AccountSettingsPage() {
 
             <div>
 
-              <h2 className="text-2xl font-black text-stone-950">
+              <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
                 Food preferences
               </h2>
 
@@ -1859,7 +1894,7 @@ export default function AccountSettingsPage() {
             onSubmit={
               handlePreferencesSave
             }
-            className="mt-8 space-y-8"
+            className="mt-4 space-y-5 sm:mt-8 sm:space-y-8"
           >
 
 
@@ -1893,9 +1928,12 @@ export default function AccountSettingsPage() {
                           'cursor-pointer',
                           'rounded-full',
                           'border',
-                          'px-3',
-                          'py-2',
-                          'text-sm',
+                          'px-2.5',
+                          'py-1.5',
+                          'text-[11px]',
+                          'sm:px-3',
+                          'sm:py-2',
+                          'sm:text-sm',
                           'font-bold',
                           'transition',
 
@@ -1967,9 +2005,12 @@ export default function AccountSettingsPage() {
                           'cursor-pointer',
                           'rounded-full',
                           'border',
-                          'px-3',
-                          'py-2',
-                          'text-sm',
+                          'px-2.5',
+                          'py-1.5',
+                          'text-[11px]',
+                          'sm:px-3',
+                          'sm:py-2',
+                          'sm:text-sm',
                           'font-bold',
 
                           selected
@@ -2251,7 +2292,7 @@ export default function AccountSettingsPage() {
             HOUSEHOLD PERSONALIZATION CONTEXT
         ========================================================= */}
 
-        <section className="mt-8 rounded-[2rem] border border-stone-200 bg-stone-50 p-5 sm:p-8">
+        <section className="mt-4 rounded-[1.5rem] border border-violet-100 bg-violet-50/50 p-3.5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-stone-50 sm:p-8">
 
           <div className="flex items-start gap-4">
 
@@ -2303,11 +2344,11 @@ export default function AccountSettingsPage() {
             CONSENT
         ========================================================= */}
 
-        <section className="mt-8 rounded-[2rem] border border-stone-200 bg-white p-5 shadow-xl shadow-stone-900/5 sm:p-8">
+        <section className="mt-4 rounded-[1.5rem] border border-violet-100 bg-gradient-to-br from-violet-50/70 via-white to-sky-50/60 p-3.5 shadow-lg shadow-violet-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl sm:shadow-stone-900/5">
 
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-3 sm:items-start sm:gap-4">
 
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700 sm:size-11 sm:rounded-2xl sm:bg-emerald-100 sm:text-emerald-700">
 
               <ShieldCheck
                 size={21}
@@ -2318,7 +2359,7 @@ export default function AccountSettingsPage() {
 
             <div>
 
-              <h2 className="text-2xl font-black text-stone-950">
+              <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
                 Consent & privacy
               </h2>
 
@@ -2331,7 +2372,7 @@ export default function AccountSettingsPage() {
           </div>
 
 
-          <div className="mt-7 grid gap-4">
+          <div className="mt-4 grid gap-2.5 sm:mt-7 sm:gap-4">
 
 
             {/* TERMS + PRIVACY */}
@@ -2353,7 +2394,7 @@ export default function AccountSettingsPage() {
                     key={
                       consentType
                     }
-                    className="rounded-2xl border border-stone-200 bg-stone-50 p-5"
+                    className="rounded-2xl border border-violet-100 bg-white/80 p-3.5 sm:border-stone-200 sm:bg-stone-50 sm:p-5"
                   >
 
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2457,7 +2498,7 @@ export default function AccountSettingsPage() {
                     key={
                       consentType
                     }
-                    className="rounded-2xl border border-stone-200 bg-stone-50 p-5"
+                    className="rounded-2xl border border-violet-100 bg-white/80 p-3.5 sm:border-stone-200 sm:bg-stone-50 sm:p-5"
                   >
 
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

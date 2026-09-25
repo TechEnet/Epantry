@@ -174,6 +174,17 @@ function getPantryLineIngredientId(
   ).trim()
 }
 
+function getRecipeIngredientCanonicalId(
+  ingredient,
+) {
+  return String(
+    ingredient?.canonicalIngredientId ||
+      ingredient?.ingredient?.id ||
+      ingredient?.ingredientId ||
+      '',
+  ).trim()
+}
+
 function getPantryLineStatus(
   line,
 ) {
@@ -1673,11 +1684,10 @@ export default function RecipeDetailPage() {
 
     if (pantryActionKey || !canUseCustomerFeatures) return
 
-    const canonicalIngredientId = String(ingredient?.canonicalIngredientId || '').trim()
+    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
 
     if (
       !canonicalIngredientId ||
-      resolvedIngredientIds.has(canonicalIngredientId) ||
       ingredientDecisionLockRef.current.has(canonicalIngredientId)
     ) {
       if (!canonicalIngredientId) {
@@ -1727,6 +1737,7 @@ export default function RecipeDetailPage() {
         ),
       )
     } finally {
+      ingredientDecisionLockRef.current.delete(canonicalIngredientId)
       setPantryActionKey('')
     }
   }
@@ -1846,7 +1857,7 @@ export default function RecipeDetailPage() {
 
     const identity = ingredient?.ingredient || {}
     const name = identity.name || 'Ingredient'
-    const canonicalIngredientId = String(ingredient?.canonicalIngredientId || '').trim()
+    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
 
     if (!canonicalIngredientId) {
       setCartError(
@@ -1880,10 +1891,9 @@ export default function RecipeDetailPage() {
   }
 
   function handleMissingIngredient(ingredient, sourceElement) {
-    const canonicalIngredientId = String(ingredient?.canonicalIngredientId || '').trim()
+    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
     if (
       !canonicalIngredientId ||
-      resolvedIngredientIds.has(canonicalIngredientId) ||
       ingredientDecisionLockRef.current.has(canonicalIngredientId)
     ) return
 
@@ -1892,9 +1902,9 @@ export default function RecipeDetailPage() {
 
     if (added) {
       setIngredientResolved(canonicalIngredientId, true)
-    } else {
-      ingredientDecisionLockRef.current.delete(canonicalIngredientId)
     }
+
+    ingredientDecisionLockRef.current.delete(canonicalIngredientId)
   }
 
 
@@ -2353,10 +2363,9 @@ export default function RecipeDetailPage() {
                     {}
 
                   const canonicalIngredientId =
-                    String(
-                      ingredient.canonicalIngredientId ||
-                        '',
-                    ).trim()
+                    getRecipeIngredientCanonicalId(
+                      ingredient,
+                    )
 
                   const pantryLine =
                     pantryByIngredientId.get(
@@ -2390,13 +2399,8 @@ export default function RecipeDetailPage() {
                   const decisionLocked =
                     Boolean(
                       canonicalIngredientId &&
-                      (
-                        resolvedIngredientIds.has(canonicalIngredientId) ||
-                        shoppingTray.some(
-                          (item) => item.canonicalIngredientId === canonicalIngredientId,
-                        ) ||
-                        pantryStatus === 'available'
-                      )
+                      resolvedIngredientIds.has(canonicalIngredientId) &&
+                      ingredientDecisionLockRef.current.has(canonicalIngredientId)
                     )
 
                   return (
