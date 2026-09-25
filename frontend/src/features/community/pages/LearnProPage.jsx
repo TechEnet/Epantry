@@ -81,7 +81,7 @@ export default function LearnProPage() {
           setError(
             getCommunityErrorMessage(
               requestError,
-              'Unable to load Learn / EPANTRY Pro.',
+              'Unable to load EPANTRY Learn & Pro.',
             ),
           )
         }
@@ -142,69 +142,66 @@ export default function LearnProPage() {
   }
 
   return (
-    <main className="page-shell py-8 sm:py-10">
-      <section className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-sm">
+    <main className="page-shell py-5 sm:py-7">
+      <section className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-sm">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="p-6 sm:p-8 lg:p-10">
+          <div className="p-4 sm:p-6 lg:p-7">
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-700 text-white">
-                <BookOpen size={22} aria-hidden="true" />
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white sm:h-11 sm:w-11">
+                <BookOpen size={20} aria-hidden="true" />
               </div>
 
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                  P31
-                </p>
-                <h1 className="text-3xl font-black tracking-tight text-stone-950 sm:text-4xl">
-                  Learn / EPANTRY Pro
+                <h1 className="whitespace-nowrap text-[24px] font-black tracking-tight text-stone-950 sm:text-3xl">
+                  EPANTRY Learn & Pro
                 </h1>
               </div>
             </div>
 
-            <p className="mt-5 max-w-3xl text-sm leading-7 text-stone-600">
-              Structured Creator courses now include real modules, lessons, learner progress, captions/transcript assets, bookmarks and notes. Prepare-for-Class still reuses the governed Recipe, Pantry and M10 Outcome Plan engines instead of inventing separate food truth.
+            <p className="mt-3 max-w-3xl text-xs font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
+              Follow structured EPANTRY courses, track progress, and return to lessons with captions, notes and bookmarks. Class prep continues to use your existing Recipe and Pantry data.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-2 text-xs font-black">
-              <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-800">
-                Course progress
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-1.5 text-[9px] font-black sm:gap-2 sm:text-xs">
+              <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 sm:px-3 sm:py-1.5">
+                Track progress
               </span>
-              <span className="rounded-full bg-blue-100 px-3 py-1.5 text-blue-800">
-                Captions + transcripts
+              <span className="whitespace-nowrap rounded-full bg-blue-100 px-2.5 py-1 text-blue-800 sm:px-3 sm:py-1.5">
+                Captions & transcripts
               </span>
-              <span className="rounded-full bg-stone-100 px-3 py-1.5 text-stone-700">
-                M22 governed live sessions remain separate
+              <span className="whitespace-nowrap rounded-full bg-stone-100 px-2.5 py-1 text-stone-700 sm:px-3 sm:py-1.5">
+                Live classes stay separate
               </span>
             </div>
           </div>
 
-          <aside className="border-t border-stone-200 bg-[#f7f5ef] p-6 lg:border-l lg:border-t-0">
-            <div className="flex items-start gap-3">
+          <aside className="border-t border-stone-200 bg-[#f7f5ef] p-4 sm:p-5 lg:border-l lg:border-t-0 lg:p-6">
+            <div className="flex items-start gap-2.5">
               <ShieldCheck size={20} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
               <div>
-                <h2 className="text-sm font-black text-stone-900">
-                  Pro is entitlement, not role
+                <h2 className="whitespace-nowrap text-sm font-black text-stone-900">
+                  Pro learning access
                 </h2>
-                <p className="mt-2 text-xs leading-5 text-stone-600">
-                  CourseEntitlement controls protected Pro lessons. Customer / Host / Super Admin remain the only top-level access model.
+                <p className="mt-1.5 text-xs leading-5 text-stone-600">
+                  Pro unlocks protected lessons; your Customer, Host or Super Admin role does not change.
                 </p>
               </div>
             </div>
 
             {isAuthenticated && customerEnabled ? (
               <>
-                <div className="mt-5 rounded-2xl bg-white p-4">
+                <div className="mt-4 rounded-2xl bg-white p-3.5">
                   <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-400">
                     Active course entitlements
                   </p>
-                  <p className="mt-2 text-2xl font-black text-stone-950">
+                  <p className="mt-1 text-xl font-black text-stone-950 sm:text-2xl">
                     {learning?.entitlements?.length || 0}
                   </p>
                 </div>
 
                 <Link
                   to="/account/learning"
-                  className="focus-ring mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-stone-950 px-4 py-3 text-xs font-black text-white"
+                  className="focus-ring mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-2.5 text-xs font-black text-white"
                 >
                   <GraduationCap size={15} aria-hidden="true" />
                   My Learning
@@ -213,7 +210,7 @@ export default function LearnProPage() {
             ) : (
               <Link
                 to="/login?returnTo=%2Flearn"
-                className="focus-ring mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-stone-950 px-4 py-3 text-sm font-black text-white"
+                className="focus-ring mt-4 inline-flex w-full items-center justify-center rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-black text-white"
               >
                 Sign in to start learning
               </Link>
@@ -234,7 +231,7 @@ export default function LearnProPage() {
           <LoaderCircle className="animate-spin text-emerald-700" aria-label="Loading courses" />
         </div>
       ) : courses.length ? (
-        <div className="mt-6 grid gap-5 lg:grid-cols-2">
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {courses.map((item) => {
             const course = item.course
             const isFree = course.accessType === 'free'
@@ -268,7 +265,7 @@ export default function LearnProPage() {
                   )}
                 </div>
 
-                <div className="p-5 sm:p-6">
+                <div className="p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
@@ -289,7 +286,7 @@ export default function LearnProPage() {
                     </span>
                   </div>
 
-                  <p className="mt-3 text-sm leading-6 text-stone-600">
+                  <p className="mt-2 text-sm leading-5 text-stone-600 sm:leading-6">
                     {course.summary || 'Structured learning from a verified EPANTRY Creator.'}
                   </p>
 
@@ -306,7 +303,7 @@ export default function LearnProPage() {
 
                   <Link
                     to={detailTarget}
-                    className="focus-ring mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-stone-950 px-4 py-3 text-sm font-black text-white"
+                    className="focus-ring mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-black text-white"
                   >
                     Open course curriculum
                     <ArrowRight size={16} aria-hidden="true" />

@@ -1389,9 +1389,25 @@ export default function ScanAnythingPage({
           </div>
         </section>
       ) : (
-        <section className="-ml-1 -mr-7 h-[100svh] w-[calc(100%+2rem)] overflow-hidden rounded-none border border-sky-200 bg-[#F7FBFF] shadow-[0_24px_60px_-30px_rgba(15,23,42,0.18)] sm:mx-0 sm:h-auto sm:w-auto sm:rounded-[32px] sm:border-sky-200 sm:bg-[#F7FBFF] sm:shadow-[0_24px_70px_-42px_rgba(15,23,42,0.28)]">
-          <div className="grid h-full min-h-0 grid-rows-2 gap-0 sm:h-auto sm:min-h-[410px] sm:grid-rows-none xl:grid-cols-[minmax(0,1.35fr)_minmax(330px,0.65fr)]">
-            <div className="order-2 relative flex min-h-0 flex-col overflow-hidden border-t border-sky-200 bg-[radial-gradient(circle_at_12%_8%,rgba(45,180,169,0.16),transparent_28%),linear-gradient(135deg,#DFF8F1_0%,#DDF3FF_52%,#E9E7FF_100%)] p-3 sm:order-1 sm:block sm:min-h-0 sm:border-t-0 sm:bg-[radial-gradient(circle_at_12%_8%,rgba(45,180,169,0.16),transparent_28%),linear-gradient(135deg,#DFF8F1_0%,#DDF3FF_52%,#E9E7FF_100%)] sm:p-7 lg:p-9">
+        <section
+          className={`-ml-1 -mr-7 w-[calc(100%+2rem)] rounded-none border border-sky-200 bg-[#F7FBFF] shadow-[0_24px_60px_-30px_rgba(15,23,42,0.18)] ${
+            isCameraRunning
+              ? 'h-auto min-h-[100svh] overflow-visible'
+              : 'h-[100svh] overflow-hidden'
+          } sm:mx-0 sm:h-auto sm:w-auto sm:overflow-hidden sm:rounded-[32px] sm:border-sky-200 sm:bg-[#F7FBFF] sm:shadow-[0_24px_70px_-42px_rgba(15,23,42,0.28)]`}
+        >
+          <div
+            className={`grid min-h-0 gap-0 ${
+              isCameraRunning
+                ? 'h-auto grid-rows-[50svh_auto]'
+                : 'h-full grid-rows-2'
+            } sm:h-auto sm:min-h-[410px] sm:grid-rows-none xl:grid-cols-[minmax(0,1.35fr)_minmax(330px,0.65fr)]`}
+          >
+            <div
+              className={`order-2 relative flex min-h-0 flex-col border-t border-sky-200 bg-[radial-gradient(circle_at_12%_8%,rgba(45,180,169,0.16),transparent_28%),linear-gradient(135deg,#DFF8F1_0%,#DDF3FF_52%,#E9E7FF_100%)] p-3 ${
+                isCameraRunning ? 'overflow-visible' : 'overflow-hidden'
+              } sm:order-1 sm:block sm:min-h-0 sm:overflow-hidden sm:border-t-0 sm:bg-[radial-gradient(circle_at_12%_8%,rgba(45,180,169,0.16),transparent_28%),linear-gradient(135deg,#DFF8F1_0%,#DDF3FF_52%,#E9E7FF_100%)] sm:p-7 lg:p-9`}
+            >
               <div className="pointer-events-none absolute -left-24 -top-28 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl sm:bg-teal-200/35" />
               <div className="pointer-events-none absolute bottom-0 right-0 h-40 w-40 rounded-tl-[90px] border-l border-t border-white/10 bg-white/[0.03] sm:border-sky-200/80 sm:bg-sky-200/30" />
 
@@ -1558,7 +1574,7 @@ export default function ScanAnythingPage({
                     ref={videoRef}
                     muted
                     playsInline
-                    className="aspect-video w-full object-cover"
+                    className="h-[180px] w-full object-cover sm:h-auto sm:aspect-video"
                   />
                 </div>
 

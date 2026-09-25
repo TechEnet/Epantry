@@ -351,7 +351,14 @@ import {
     const navItems =
         useMemo(
             () => [
-                ...BASE_NAV_ITEMS,
+                ...BASE_NAV_ITEMS.filter(
+                    (item) =>
+                        item.to !== '/community' ||
+                        (
+                            activeMode === 'host' &&
+                            hostEnabled === true
+                        ),
+                ),
                 {
                     label:
                         'Scan',
@@ -1534,23 +1541,25 @@ import {
                                         </Link>
                                     ) : null}
 
-                                    <Link
-                                        to="/community"
-                                        onClick={() =>
-                                            setAccountMenuOpen(
-                                                false,
-                                            )
-                                        }
-                                        className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                        role="menuitem"
-                                    >
-                                        <UsersRound
-                                            size={17}
-                                            className="text-stone-500"
-                                            aria-hidden="true"
-                                        />
-                                        Community
-                                    </Link>
+                                    {activeMode === 'host' && hostEnabled ? (
+                                        <Link
+                                            to="/community"
+                                            onClick={() =>
+                                                setAccountMenuOpen(
+                                                    false,
+                                                )
+                                            }
+                                            className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                                            role="menuitem"
+                                        >
+                                            <UsersRound
+                                                size={17}
+                                                className="text-stone-500"
+                                                aria-hidden="true"
+                                            />
+                                            Community
+                                        </Link>
+                                    ) : null}
 
                                     <Link
                                         to="/learn"

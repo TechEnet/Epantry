@@ -34,6 +34,16 @@ const inputClass =
 const primaryButton =
   'focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40'
 
+function friendlyExpansionExecutionError(error, fallback = 'Unable to load live classes right now.') {
+  const message = getExpansionExecutionErrorMessage(error, fallback)
+
+  if (message === 'M22 safe expansion execution is not enabled for this environment.') {
+    return 'Live class booking is not available in this environment.'
+  }
+
+  return message
+}
+
 function money(
   amountMinor,
   currency = 'INR',
@@ -368,10 +378,9 @@ export default function CreatorProTransactionsPanel() {
           requestError
         ) {
           setError(
-            getExpansionExecutionErrorMessage(
+            friendlyExpansionExecutionError(
               requestError,
-
-              'Unable to load M22 Creator session execution.',
+              'Unable to load live classes right now.',
             ),
           )
         } finally {
@@ -441,8 +450,9 @@ export default function CreatorProTransactionsPanel() {
       requestError
     ) {
       setError(
-        getExpansionExecutionErrorMessage(
+        friendlyExpansionExecutionError(
           requestError,
+          'Unable to complete this class action right now.',
         ),
       )
 
@@ -627,7 +637,7 @@ export default function CreatorProTransactionsPanel() {
 
   if (loading) {
     return (
-      <section className="mt-8 grid min-h-48 place-items-center rounded-[28px] border border-stone-200 bg-white shadow-sm">
+      <section className="mt-6 grid min-h-36 place-items-center rounded-[24px] border border-stone-200 bg-white shadow-sm">
         <LoaderCircle
           className="animate-spin text-emerald-700"
           aria-label="Loading Creator sessions"
@@ -637,20 +647,20 @@ export default function CreatorProTransactionsPanel() {
   }
 
   return (
-    <section className="mt-8 space-y-6">
-      <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <section className="mt-6 space-y-4">
+      <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-              M22 · Creator / Pro Transactions
+            <p className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs">
+              Creator sessions & bookings
             </p>
 
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-stone-950">
-              Governed classes, seats & hosted checkout
+            <h2 className="mt-1 whitespace-nowrap text-[17px] font-black tracking-tight text-stone-950 sm:text-xl">
+              Classes, seats & secure checkout
             </h2>
 
-            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-stone-600">
-              Creator remains a Customer-side profile. Sessions reuse M15 Course truth and M21 rights/governance. Paid booking uses server-owned economics and hosted Razorpay Checkout; EPANTRY never collects raw card fields here.
+            <p className="mt-1.5 max-w-4xl text-xs font-semibold leading-5 text-stone-600 sm:text-sm sm:leading-6">
+              Creators stay within Customer profiles. Class bookings use secure EPANTRY checkout, while payment details are handled by Razorpay.
             </p>
           </div>
 
@@ -662,7 +672,7 @@ export default function CreatorProTransactionsPanel() {
             disabled={
               busy
             }
-            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-40"
+            className="focus-ring inline-flex items-center gap-1.5 self-start rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 disabled:opacity-40"
           >
             <RefreshCw
               size={16}
@@ -674,7 +684,7 @@ export default function CreatorProTransactionsPanel() {
         </div>
 
         <div
-          className="mt-4 min-h-6 text-sm font-bold"
+          className="mt-2 min-h-0 text-xs font-bold sm:text-sm"
           aria-live="polite"
         >
           {error ? (
@@ -689,8 +699,8 @@ export default function CreatorProTransactionsPanel() {
         </div>
       </div>
 
-      <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex items-start gap-3">
+      <section className="rounded-[24px] border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex items-start gap-2.5">
           <CalendarDays
             size={22}
             className="mt-0.5 text-emerald-700"
@@ -698,17 +708,17 @@ export default function CreatorProTransactionsPanel() {
           />
 
           <div>
-            <h3 className="text-lg font-black text-stone-950">
-              Upcoming sessions
+            <h3 className="whitespace-nowrap text-base font-black text-stone-950 sm:text-lg">
+              Upcoming classes
             </h3>
 
-            <p className="mt-1 text-sm font-semibold leading-6 text-stone-500">
-              Capacity is reserved atomically. Free and entitlement sessions never create a payment order; paid sessions use backend-created provider economics only.
+            <p className="mt-1 text-xs font-semibold leading-5 text-stone-500 sm:text-sm sm:leading-6">
+              Seats are reserved safely. Free or included classes skip payment; paid classes use secure server-created checkout.
             </p>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {sessions.length ? (
             sessions.map(
               (
@@ -724,7 +734,7 @@ export default function CreatorProTransactionsPanel() {
                     key={
                       session.id
                     }
-                    className="rounded-2xl border border-stone-200 p-4"
+                    className="rounded-2xl border border-stone-200 p-3.5"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -1180,7 +1190,7 @@ export default function CreatorProTransactionsPanel() {
                   key={
                     session.id
                   }
-                  className="rounded-2xl border border-stone-200 p-4"
+                  className="rounded-2xl border border-stone-200 p-3.5"
                 >
                   <p className="text-sm font-black text-stone-950">
                     {session.title}
@@ -1223,7 +1233,7 @@ export default function CreatorProTransactionsPanel() {
         </section>
       ) : null}
 
-      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+      <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
         <CircleAlert
           size={18}
           className="mt-0.5 shrink-0"
@@ -1231,7 +1241,7 @@ export default function CreatorProTransactionsPanel() {
         />
 
         <p className="text-xs font-semibold leading-5">
-          Payment verification is booking evidence, not Creator payout or M16 settlement truth. Paid cancellations create refund-review-required evidence; this UI never claims an automatic refund, creator settlement, or new application role.
+          Payment confirms the booking only. Cancellations may need refund review; payouts and settlements are handled separately.
         </p>
       </div>
     </section>
