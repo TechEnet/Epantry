@@ -1,7 +1,10 @@
 import {
   BadgeCheck,
+  CheckCircle2,
   CircleAlert,
+  CreditCard,
   Eye,
+  IndianRupee,
   Megaphone,
   Pause,
   Play,
@@ -25,16 +28,22 @@ import {
 
 import {
   createRetailMediaCampaignFromBrief,
+  createRetailMediaCampaignPaymentIntent,
+  getHostRetailMediaPricing,
   getRetailMediaErrorMessage,
   listHostRetailMediaCampaigns,
   transitionRetailMediaCampaign,
+  verifyRetailMediaCampaignPayment,
 } from '../services/retailMedia.service'
 
-const inputClass =
-  'focus-ring w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none'
+const RAZORPAY_CHECKOUT_URL =
+  'https://checkout.razorpay.com/v1/checkout.js'
 
-const buttonClass =
-  'focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40'
+const inputClass =
+  'focus-ring w-full rounded-[13px] border border-stone-200 bg-white px-3 py-2.5 text-[12px] font-semibold text-stone-900 outline-none placeholder:text-stone-400 sm:rounded-xl sm:px-3.5 sm:text-sm'
+
+const primaryButtonClass =
+  'focus-ring inline-flex items-center justify-center gap-2 rounded-[13px] bg-[#176b57] px-3.5 py-2.5 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(23,107,87,0.16)] transition hover:bg-[#125846] disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-xl sm:px-4 sm:text-sm'
 
 const PLACEMENTS = [
   'home',
@@ -46,10 +55,45 @@ const PLACEMENTS = [
   'post_purchase',
 ]
 
+const TEST_PLACEMENT_PRICING_MINOR = Object.freeze({
+  home: 250000,
+  search: 200000,
+  recipe: 120000,
+  product_detail: 150000,
+  pantry_replenishment: 100000,
+  basket_compare: 180000,
+  post_purchase: 80000,
+})
+
+const STEP_CARDS = [
+  {
+    number: '01',
+    title: 'Create campaign',
+    text: 'Add the campaign goal and promotion details.',
+    className: 'border-[#b9e9d8] bg-[#e6f8f1]',
+  },
+  {
+    number: '02',
+    title: 'Choose placements',
+    text: 'Pick where the ad appears and see the price.',
+    className: 'border-[#bddff2] bg-[#e9f5fb]',
+  },
+  {
+    number: '03',
+    title: 'Pay in test mode',
+    text: 'Complete the Razorpay test payment to EPANTRY.',
+    className: 'border-[#d8cff2] bg-[#f1edfb]',
+  },
+  {
+    number: '04',
+    title: 'Super Admin approval',
+    text: 'After approval, activate the campaign here.',
+    className: 'border-[#b9e9d8] bg-[#edf9f4]',
+  },
+]
+
 function titleize(value) {
-  return String(
-    value || '',
-  )
+  return String(value || '')
     .split('_')
     .filter(Boolean)
     .map(
@@ -59,11 +103,32 @@ function titleize(value) {
     .join(' ')
 }
 
+function formatMoneyMinor(
+  amountMinor,
+  currency = 'INR',
+) {
+  const amount =
+    Number(amountMinor || 0) /
+    100
+
+  try {
+    return new Intl.NumberFormat(
+      'en-IN',
+      {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+      },
+    ).format(amount)
+  } catch {
+    return `₹${amount.toLocaleString('en-IN')}`
+  }
+}
+
 function newBriefForm() {
   return {
     title: '',
     objective: 'awareness',
-    budgetAmountMinor: 0,
     commercialDisclosure: '',
   }
 }
@@ -71,20 +136,70 @@ function newBriefForm() {
 function newCampaignForm() {
   return {
     briefId: '',
-    placements: [
-      'home',
-    ],
-    dailyBudgetMinor: 0,
-    lifetimeBudgetMinor: 0,
-    bidMinor: 0,
-    qualityScore: 50,
+    placements: ['home'],
     contextualTags: '',
-    frequencyCapPerContext: 3,
     headline: '',
     body: '',
     landingRef: '',
     sponsorLabel: 'Sponsored',
   }
+}
+
+let razorpayScriptPromise = null
+
+function loadRazorpayCheckout() {
+  if (
+    typeof window === 'undefined'
+  ) {
+    return Promise.resolve(false)
+  }
+
+  if (window.Razorpay) {
+    return Promise.resolve(true)
+  }
+
+  if (razorpayScriptPromise) {
+    return razorpayScriptPromise
+  }
+
+  razorpayScriptPromise =
+    new Promise((resolve) => {
+      const existing =
+        document.querySelector(
+          `script[src="${RAZORPAY_CHECKOUT_URL}"]`,
+        )
+
+      if (existing) {
+        existing.addEventListener(
+          'load',
+          () => resolve(Boolean(window.Razorpay)),
+          { once: true },
+        )
+        existing.addEventListener(
+          'error',
+          () => resolve(false),
+          { once: true },
+        )
+        return
+      }
+
+      const script =
+        document.createElement('script')
+
+      script.src =
+        RAZORPAY_CHECKOUT_URL
+      script.async = true
+      script.dataset.epantryRetailMediaRazorpay =
+        'true'
+      script.onload = () =>
+        resolve(Boolean(window.Razorpay))
+      script.onerror = () =>
+        resolve(false)
+
+      document.body.appendChild(script)
+    })
+
+  return razorpayScriptPromise
 }
 
 export default function HostRetailMediaPage() {
@@ -94,21 +209,23 @@ export default function HostRetailMediaPage() {
   const [campaigns, setCampaigns] =
     useState([])
 
+  const [pricing, setPricing] =
+    useState(null)
+
   const [briefForm, setBriefForm] =
-    useState(
-      newBriefForm(),
-    )
+    useState(newBriefForm())
 
   const [campaignForm, setCampaignForm] =
-    useState(
-      newCampaignForm(),
-    )
+    useState(newCampaignForm())
 
   const [loading, setLoading] =
     useState(true)
 
   const [busy, setBusy] =
     useState(false)
+
+  const [payingCampaignId, setPayingCampaignId] =
+    useState('')
 
   const [error, setError] =
     useState('')
@@ -117,50 +234,77 @@ export default function HostRetailMediaPage() {
     useState('')
 
   const load =
-    useCallback(
-      async () => {
-        setLoading(true)
-        setError('')
+    useCallback(async () => {
+      setLoading(true)
+      setError('')
 
-        try {
-          const [
-            briefResult,
-            campaignResult,
-          ] =
-            await Promise.all([
-              listHostCampaigns(),
-              listHostRetailMediaCampaigns(),
-            ])
+      try {
+        const [
+          briefResult,
+          campaignResult,
+          pricingResult,
+        ] = await Promise.allSettled([
+          listHostCampaigns(),
+          listHostRetailMediaCampaigns(),
+          getHostRetailMediaPricing(),
+        ])
 
+        let criticalError = ''
+
+        if (
+          briefResult.status ===
+          'fulfilled'
+        ) {
           setBriefs(
-            briefResult?.campaignBriefs ||
-              [],
+            briefResult.value
+              ?.campaignBriefs || [],
           )
-
-          setCampaigns(
-            campaignResult?.campaigns ||
-              [],
-          )
-        } catch (requestError) {
-          setError(
+        } else {
+          criticalError =
             getRetailMediaErrorMessage(
-              requestError,
-              'Unable to load S10 Retail Media.',
-            ),
-          )
-        } finally {
-          setLoading(false)
+              briefResult.reason,
+              'Unable to load campaign basics right now.',
+            )
         }
-      },
-      [],
-    )
 
-  useEffect(
-    () => {
-      load()
-    },
-    [load],
-  )
+        if (
+          campaignResult.status ===
+          'fulfilled'
+        ) {
+          setCampaigns(
+            campaignResult.value
+              ?.campaigns || [],
+          )
+        } else if (!criticalError) {
+          criticalError =
+            getRetailMediaErrorMessage(
+              campaignResult.reason,
+              'Unable to load your sponsored campaigns right now.',
+            )
+        }
+
+        if (
+          pricingResult.status ===
+          'fulfilled'
+        ) {
+          setPricing(
+            pricingResult.value || null,
+          )
+        } else {
+          setPricing(null)
+        }
+
+        if (criticalError) {
+          setError(criticalError)
+        }
+      } finally {
+        setLoading(false)
+      }
+    }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const submittedBriefs =
     useMemo(
@@ -173,6 +317,72 @@ export default function HostRetailMediaPage() {
       [briefs],
     )
 
+  const selectedBrief =
+    useMemo(
+      () =>
+        submittedBriefs.find(
+          (brief) =>
+            brief.id ===
+            campaignForm.briefId,
+        ) || null,
+      [
+        campaignForm.briefId,
+        submittedBriefs,
+      ],
+    )
+
+  const pricingByPlacement =
+    useMemo(() => {
+      const map = new Map(
+        PLACEMENTS.map(
+          (placement) => [
+            placement,
+            TEST_PLACEMENT_PRICING_MINOR[
+              placement
+            ] || 0,
+          ],
+        ),
+      )
+
+      for (
+        const item of
+        pricing?.placementPricing || []
+      ) {
+        const amountMinor =
+          Number(
+            item.amountMinor || 0,
+          )
+
+        if (amountMinor > 0) {
+          map.set(
+            item.placement,
+            amountMinor,
+          )
+        }
+      }
+
+      return map
+    }, [pricing])
+
+  const selectedPlacementTotalMinor =
+    useMemo(
+      () =>
+        campaignForm.placements.reduce(
+          (total, placement) =>
+            total +
+            Number(
+              pricingByPlacement.get(
+                placement,
+              ) || 0,
+            ),
+          0,
+        ),
+      [
+        campaignForm.placements,
+        pricingByPlacement,
+      ],
+    )
+
   async function run(
     task,
     successMessage,
@@ -183,9 +393,7 @@ export default function HostRetailMediaPage() {
 
     try {
       await task()
-      setNotice(
-        successMessage,
-      )
+      setNotice(successMessage)
       await load()
     } catch (requestError) {
       setError(
@@ -204,21 +412,14 @@ export default function HostRetailMediaPage() {
         await createHostCampaign({
           brandId: null,
           authorityGrantId: null,
-          title:
-            briefForm.title,
+          title: briefForm.title,
           objective:
             briefForm.objective,
-          marketCodes: [
-            'IN',
-          ],
+          marketCodes: ['IN'],
           requestedPlacements: [],
           startsAt: null,
           endsAt: null,
-          budgetAmountMinor:
-            Number(
-              briefForm.budgetAmountMinor ||
-                0,
-            ),
+          budgetAmountMinor: 0,
           currency: 'INR',
           promotedEntityType:
             'generic',
@@ -231,7 +432,7 @@ export default function HostRetailMediaPage() {
           newBriefForm(),
         )
       },
-      'Governed Host Campaign Brief created. Submit it before creating a Retail Media campaign.',
+      'Campaign basics saved. Submit the brief, then choose placements and pricing.',
     )
   }
 
@@ -243,7 +444,7 @@ export default function HostRetailMediaPage() {
         submitHostCampaign(
           briefId,
         ),
-      'Campaign Brief submitted to M21 Retail Media policy review input.',
+      'Campaign brief is ready for placement setup.',
     )
   }
 
@@ -251,9 +452,8 @@ export default function HostRetailMediaPage() {
     const tags =
       campaignForm.contextualTags
         .split(',')
-        .map(
-          (value) =>
-            value.trim(),
+        .map((value) =>
+          value.trim(),
         )
         .filter(Boolean)
 
@@ -267,33 +467,13 @@ export default function HostRetailMediaPage() {
               campaignForm.placements,
             startsAt: null,
             endsAt: null,
-            dailyBudgetMinor:
-              Number(
-                campaignForm.dailyBudgetMinor ||
-                  0,
-              ),
+            dailyBudgetMinor: 0,
             lifetimeBudgetMinor:
-              Number(
-                campaignForm.lifetimeBudgetMinor ||
-                  0,
-              ),
-            bidMinor:
-              Number(
-                campaignForm.bidMinor ||
-                  0,
-              ),
-            qualityScore:
-              Number(
-                campaignForm.qualityScore ||
-                  50,
-              ),
-            contextualTags:
-              tags,
-            frequencyCapPerContext:
-              Number(
-                campaignForm.frequencyCapPerContext ||
-                  3,
-              ),
+              selectedPlacementTotalMinor,
+            bidMinor: 0,
+            qualityScore: 50,
+            contextualTags: tags,
+            frequencyCapPerContext: 3,
             headline:
               campaignForm.headline,
             body:
@@ -309,7 +489,7 @@ export default function HostRetailMediaPage() {
           newCampaignForm(),
         )
       },
-      'Retail Media campaign created in pending policy review state.',
+      'Campaign created. Complete the Razorpay test payment; Super Admin approval comes next.',
     )
   }
 
@@ -323,7 +503,11 @@ export default function HostRetailMediaPage() {
           campaignId,
           action,
         }),
-      `Campaign ${action} completed.`,
+      action === 'activate'
+        ? 'Campaign is now active.'
+        : action === 'pause'
+          ? 'Campaign paused.'
+          : 'Campaign resumed.',
     )
   }
 
@@ -339,56 +523,245 @@ export default function HostRetailMediaPage() {
 
         return {
           ...current,
-          placements:
-            selected
-              ? current.placements.filter(
-                  (item) =>
-                    item !==
-                    placement,
-                )
-              : [
-                  ...current.placements,
-                  placement,
-                ],
+          placements: selected
+            ? current.placements.filter(
+                (item) =>
+                  item !== placement,
+              )
+            : [
+                ...current.placements,
+                placement,
+              ],
         }
       },
     )
   }
 
+  async function payCampaign(
+    campaign,
+  ) {
+    setPayingCampaignId(
+      campaign.id,
+    )
+    setError('')
+    setNotice('')
+
+    try {
+      const payment =
+        await createRetailMediaCampaignPaymentIntent({
+          campaignId:
+            campaign.id,
+        })
+
+      if (payment?.alreadyPaid) {
+        setNotice(
+          'Campaign payment is already complete.',
+        )
+        await load()
+        return
+      }
+
+      const checkout =
+        payment?.checkout
+
+      if (
+        !checkout?.configured ||
+        !checkout?.keyId ||
+        !checkout?.providerOrderId
+      ) {
+        throw new Error(
+          'Razorpay test payment is not configured.',
+        )
+      }
+
+      if (checkout.mode !== 'test') {
+        throw new Error(
+          'Campaign payments are restricted to Razorpay test mode right now.',
+        )
+      }
+
+      const loaded =
+        await loadRazorpayCheckout()
+
+      if (
+        !loaded ||
+        !window.Razorpay
+      ) {
+        throw new Error(
+          'Unable to load Razorpay test checkout.',
+        )
+      }
+
+      const razorpay =
+        new window.Razorpay({
+          key: checkout.keyId,
+          amount:
+            checkout.amountMinor,
+          currency:
+            checkout.currency,
+          name: 'EPANTRY',
+          description:
+            `Sponsored campaign: ${campaign.title}`,
+          order_id:
+            checkout.providerOrderId,
+          handler: async (
+            response,
+          ) => {
+            try {
+              await verifyRetailMediaCampaignPayment({
+                campaignId:
+                  campaign.id,
+                razorpayPaymentId:
+                  response.razorpay_payment_id,
+                razorpayOrderId:
+                  response.razorpay_order_id,
+                razorpaySignature:
+                  response.razorpay_signature,
+              })
+
+              setNotice(
+                'Test payment received by the EPANTRY platform. The campaign is now waiting for Super Admin approval.',
+              )
+              await load()
+            } catch (verifyError) {
+              setError(
+                getRetailMediaErrorMessage(
+                  verifyError,
+                  'Payment returned but verification failed.',
+                ),
+              )
+            } finally {
+              setPayingCampaignId('')
+            }
+          },
+          modal: {
+            ondismiss: () =>
+              setPayingCampaignId(''),
+          },
+          theme: {
+            color: '#176b57',
+          },
+        })
+
+      razorpay.on(
+        'payment.failed',
+        () => {
+          setError(
+            'Test payment was not completed. The campaign has not been sent for approval.',
+          )
+          setPayingCampaignId('')
+        },
+      )
+
+      razorpay.open()
+    } catch (paymentError) {
+      setError(
+        getRetailMediaErrorMessage(
+          paymentError,
+          'Unable to start campaign test payment.',
+        ),
+      )
+      setPayingCampaignId('')
+    }
+  }
+
   return (
-    <div className="p-4 sm:p-6 lg:p-7">
-      <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-              M21 · S10 Retail Media Studio
+    <div className="p-2.5 sm:p-5 lg:p-6">
+      <section className="rounded-[22px] border border-[#b8e6d7] bg-[linear-gradient(135deg,#e8f8f2_0%,#edf7fb_100%)] p-3 shadow-[0_12px_30px_rgba(23,107,87,0.08)] sm:rounded-[28px] sm:p-6">
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#176b57] sm:text-[10px]">
+              Sponsored Campaigns
             </p>
 
-            <h1 className="mt-2 text-2xl font-black tracking-tight text-stone-950 sm:text-3xl">
-              Governed sponsored discovery
-            </h1>
+            <div className="mt-1 flex min-w-0 items-center justify-between gap-2 sm:mt-2 sm:block">
+              <h1 className="min-w-0 whitespace-nowrap text-[14px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
+                Promote your products on EPANTRY
+              </h1>
 
-            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-stone-600">
-              Campaigns originate from the frozen M16 Host Campaign Brief, require M21 policy approval, and keep paid rank separate from organic relevance and safety. Sensitive health or allergy inferences are never advertising targeting segments.
+              <button
+                type="button"
+                onClick={load}
+                disabled={
+                  loading ||
+                  busy ||
+                  Boolean(payingCampaignId)
+                }
+                className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#acdcca] bg-white/90 px-1.5 py-1.5 text-[8px] font-black text-[#176b57] shadow-sm disabled:opacity-40 sm:hidden"
+              >
+                <RefreshCw
+                  size={11}
+                  aria-hidden="true"
+                />
+                Refresh
+              </button>
+            </div>
+
+            <p className="mt-1 max-w-3xl text-[8px] font-semibold leading-[1.35] text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
+              <span className="block whitespace-nowrap text-[7px] sm:hidden">
+                Choose placement, pay, then wait for approval.
+              </span>
+              <span className="hidden sm:inline">
+                Choose where your promotion appears, see the placement price, pay in Razorpay test mode, then wait for Super Admin approval before going live.
+              </span>
             </p>
           </div>
 
           <button
             type="button"
             onClick={load}
-            disabled={loading || busy}
-            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-40"
+            disabled={
+              loading ||
+              busy ||
+              Boolean(payingCampaignId)
+            }
+            className="focus-ring hidden shrink-0 items-center gap-1.5 rounded-xl border border-[#acdcca] bg-white/90 px-4 py-2.5 text-sm font-black text-[#176b57] shadow-sm disabled:opacity-40 sm:inline-flex"
           >
             <RefreshCw
-              size={16}
+              size={14}
               aria-hidden="true"
             />
             Refresh
           </button>
         </div>
 
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 xl:grid-cols-4">
+          {STEP_CARDS.map(
+            (step) => (
+              <article
+                key={step.number}
+                className={`min-w-0 rounded-[14px] border p-2.5 sm:rounded-[18px] sm:p-4 ${step.className}`}
+              >
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-8 sm:text-[10px]">
+                    {step.number}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black leading-tight text-stone-950 sm:text-[13px]">
+                      {step.number === '03' ? (
+                        <>
+                          <span className="sm:hidden">Make payment</span>
+                          <span className="hidden sm:inline">{step.title}</span>
+                        </>
+                      ) : step.title}
+                    </p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[1.35] text-stone-600 sm:text-[10px] sm:leading-4">
+                      {step.number === '03' ? (
+                        <>
+                          <span className="sm:hidden">Pay EPANTRY securely.</span>
+                          <span className="hidden sm:inline">{step.text}</span>
+                        </>
+                      ) : step.text}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            ),
+          )}
+        </div>
+
         <div
-          className="mt-4 min-h-6 text-sm font-bold"
+          className="mt-2 min-h-4 text-[10px] font-bold sm:mt-3 sm:min-h-5 sm:text-sm"
           aria-live="polite"
         >
           {error ? (
@@ -396,36 +769,46 @@ export default function HostRetailMediaPage() {
               {error}
             </p>
           ) : notice ? (
-            <p className="text-emerald-800">
+            <p className="text-[#176b57]">
               {notice}
             </p>
           ) : loading ? (
             <p className="text-stone-500">
-              Loading Retail Media governance…
+              Loading campaign workspace…
+            </p>
+          ) : pricing?.testModeBypass ? (
+            <p className="text-[#2c789d]">
+              <span className="block whitespace-nowrap text-[7px] sm:hidden">
+                Campaign setup is ready.
+              </span>
+              <span className="hidden sm:inline">
+                Test workspace active · placement pricing and Razorpay checkout are available for testing.
+              </span>
             </p>
           ) : null}
         </div>
-      </div>
+      </section>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex items-start gap-3">
-            <Megaphone
-              size={22}
-              className="mt-0.5 text-emerald-700"
-              aria-hidden="true"
-            />
-            <div>
-              <h2 className="text-lg font-black text-stone-950">
-                1. Host Campaign Brief
+      <div className="mt-3 grid gap-3 lg:mt-4 lg:grid-cols-12 lg:items-start lg:gap-4">
+        <section className="order-2 self-start rounded-[20px] border border-[#c9e8dd] bg-[linear-gradient(145deg,#eff9f5_0%,#f8fcfa_100%)] p-3 shadow-[0_12px_28px_rgba(23,107,87,0.07)] sm:order-none sm:rounded-[26px] sm:p-5 lg:col-span-5">
+          <div className="flex items-start gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center rounded-[12px] bg-white text-[#176b57] shadow-sm sm:size-10 sm:rounded-[14px]">
+              <Megaphone
+                size={17}
+                aria-hidden="true"
+              />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-[14px] font-black text-stone-950 sm:text-lg">
+                Campaign basics
               </h2>
-              <p className="mt-1 text-sm leading-6 text-stone-500">
-                M16 remains the commercial intent intake. M21 does not bypass its organization and Brand-authority controls.
+              <p className="mt-0.5 text-[9px] font-semibold leading-[1.45] text-stone-600 sm:mt-1 sm:text-xs sm:leading-5">
+                Name the promotion, choose its goal, and tell EPANTRY what you are advertising.
               </p>
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3">
             <input
               className={inputClass}
               value={briefForm.title}
@@ -438,7 +821,7 @@ export default function HostRetailMediaPage() {
                   }),
                 )
               }
-              placeholder="Campaign title"
+              placeholder="Campaign name"
             />
 
             <select
@@ -454,36 +837,19 @@ export default function HostRetailMediaPage() {
                 )
               }
             >
-              <option value="awareness">Awareness</option>
-              <option value="consideration">Consideration</option>
-              <option value="conversion">Conversion</option>
-              <option value="sampling">Sampling</option>
-              <option value="promotion">Promotion</option>
+              <option value="awareness">Build awareness</option>
+              <option value="consideration">Get consideration</option>
+              <option value="conversion">Drive purchases</option>
+              <option value="sampling">Promote sampling</option>
+              <option value="promotion">Promote an offer</option>
             </select>
 
-            <input
-              type="number"
-              min="0"
-              className={inputClass}
-              value={briefForm.budgetAmountMinor}
-              onChange={(event) =>
-                setBriefForm(
-                  (current) => ({
-                    ...current,
-                    budgetAmountMinor:
-                      Number(
-                        event.target.value,
-                      ),
-                  }),
-                )
-              }
-              placeholder="Budget minor units"
-            />
-
             <textarea
-              rows={3}
+              rows={2}
               className={`${inputClass} sm:col-span-2`}
-              value={briefForm.commercialDisclosure}
+              value={
+                briefForm.commercialDisclosure
+              }
               onChange={(event) =>
                 setBriefForm(
                   (current) => ({
@@ -493,7 +859,7 @@ export default function HostRetailMediaPage() {
                   }),
                 )
               }
-              placeholder="Commercial disclosure"
+              placeholder="Briefly describe what is being promoted and any commercial offer customers should know about."
             />
           </div>
 
@@ -502,138 +868,225 @@ export default function HostRetailMediaPage() {
             disabled={
               busy ||
               !briefForm.title.trim() ||
-              briefForm.commercialDisclosure.trim().length < 5
+              briefForm.commercialDisclosure.trim().length <
+                5
             }
             onClick={createBrief}
-            className={`${buttonClass} mt-4`}
+            className={`${primaryButtonClass} mt-3 sm:mt-4`}
           >
             <Megaphone
-              size={16}
+              size={15}
               aria-hidden="true"
             />
-            Create brief
+            Save campaign basics
           </button>
 
-          <div className="mt-5 space-y-2">
-            {briefs.map(
-              (brief) => (
-                <div
-                  key={brief.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-black text-stone-900">
-                      {brief.title}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-stone-500">
-                      {titleize(
-                        brief.status,
-                      )} · {brief.objective}
-                    </p>
-                  </div>
+          {briefs.length ? (
+            <div className="mt-3 space-y-2 sm:mt-4">
+              {briefs.map(
+                (brief) => (
+                  <div
+                    key={brief.id}
+                    className="flex items-center justify-between gap-2 rounded-[14px] border border-[#cfe8df] bg-white/90 p-2.5 shadow-[0_5px_14px_rgba(23,107,87,0.04)] sm:rounded-2xl sm:p-3.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[10px] font-black text-stone-900 sm:text-sm">
+                        {brief.title}
+                      </p>
+                      <p className="mt-0.5 text-[8px] font-semibold text-stone-500 sm:text-[10px]">
+                        {titleize(
+                          brief.status,
+                        )}{' '}
+                        ·{' '}
+                        {titleize(
+                          brief.objective,
+                        )}
+                      </p>
+                    </div>
 
-                  {brief.status ===
-                  'draft' ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        submitBrief(
-                          brief.id,
-                        )
-                      }
-                      className="focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black"
-                    >
-                      <Send
-                        size={14}
-                        aria-hidden="true"
-                      />
-                      Submit
-                    </button>
-                  ) : null}
-                </div>
-              ),
-            )}
-          </div>
+                    {brief.status ===
+                    'draft' ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          submitBrief(
+                            brief.id,
+                          )
+                        }
+                        className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#b8dccf] bg-white px-2.5 py-1.5 text-[9px] font-black text-[#176b57] sm:px-3 sm:py-2 sm:text-xs"
+                      >
+                        <Send
+                          size={12}
+                          aria-hidden="true"
+                        />
+                        Continue
+                      </button>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-[#e2f5ed] px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-[#176b57] sm:text-[9px]">
+                        Ready
+                      </span>
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
+          ) : null}
         </section>
 
-        <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex items-start gap-3">
-            <ShieldCheck
-              size={22}
-              className="mt-0.5 text-emerald-700"
-              aria-hidden="true"
-            />
-            <div>
-              <h2 className="text-lg font-black text-stone-950">
-                2. Retail Media campaign
+        <section className="order-3 self-start rounded-[20px] border border-[#c4dfee] bg-[linear-gradient(145deg,#eef7fb_0%,#f8fbfd_100%)] p-3 shadow-[0_12px_28px_rgba(34,106,144,0.07)] sm:order-none sm:rounded-[26px] sm:p-5 lg:col-span-7 lg:row-span-2">
+          <div className="flex items-start gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center rounded-[12px] bg-white text-[#2c789d] shadow-sm sm:size-10 sm:rounded-[14px]">
+              <ShieldCheck
+                size={17}
+                aria-hidden="true"
+              />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-[14px] font-black text-stone-950 sm:text-lg">
+                Placement & sponsored content
               </h2>
-              <p className="mt-1 text-sm leading-6 text-stone-500">
-                Every served unit carries an explicit Sponsored / Ad / Paid placement label and always preserves an organic path.
+              <p className="mt-0.5 text-[9px] font-semibold leading-[1.45] text-stone-600 sm:mt-1 sm:text-xs sm:leading-5">
+                Choose where the promotion appears. Each placement has its own fixed test price.
               </p>
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
-            <select
-              className={inputClass}
-              value={campaignForm.briefId}
-              onChange={(event) =>
-                setCampaignForm(
-                  (current) => ({
-                    ...current,
-                    briefId:
-                      event.target.value,
-                  }),
-                )
-              }
-            >
-              <option value="">
-                Select submitted Campaign Brief
-              </option>
-              {submittedBriefs.map(
-                (brief) => (
-                  <option
-                    key={brief.id}
-                    value={brief.id}
-                  >
-                    {brief.title}
-                  </option>
-                ),
-              )}
-            </select>
+          <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3">
+            {submittedBriefs.length ? (
+              <div className="rounded-[15px] border border-[#cfe3ed] bg-white/80 p-2.5 sm:rounded-2xl sm:p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-stone-600 sm:text-[10px]">
+                      Campaign to promote
+                    </p>
+                    <p className="mt-0.5 text-[8px] font-semibold text-stone-500 sm:text-[10px]">
+                      Choose the campaign basics you completed on the left.
+                    </p>
+                  </div>
+                  {selectedBrief ? (
+                    <span className="shrink-0 rounded-full bg-[#e4f6ef] px-2 py-1 text-[8px] font-black uppercase text-[#176b57] sm:text-[9px]">
+                      Selected
+                    </span>
+                  ) : null}
+                </div>
 
-            <div className="rounded-2xl bg-stone-50 p-4">
-              <p className="text-xs font-black uppercase tracking-wide text-stone-500">
-                Placements
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-2 grid gap-1.5 sm:mt-3 sm:grid-cols-2 sm:gap-2">
+                  {submittedBriefs.map(
+                    (brief) => {
+                      const selected =
+                        campaignForm.briefId ===
+                        brief.id
+
+                      return (
+                        <button
+                          type="button"
+                          key={brief.id}
+                          onClick={() =>
+                            setCampaignForm(
+                              (current) => ({
+                                ...current,
+                                briefId:
+                                  brief.id,
+                              }),
+                            )
+                          }
+                          className={[
+                            'focus-ring min-w-0 rounded-[12px] border p-2.5 text-left transition sm:rounded-[14px] sm:p-3',
+                            selected
+                              ? 'border-[#65b99e] bg-[#e6f7f0] shadow-[inset_0_0_0_1px_rgba(23,107,87,0.08)]'
+                              : 'border-stone-200 bg-white hover:border-[#bcd9e5]',
+                          ].join(' ')}
+                        >
+                          <span className="block truncate text-[10px] font-black text-stone-950 sm:text-xs">
+                            {brief.title}
+                          </span>
+                          <span className="mt-0.5 block text-[8px] font-semibold text-stone-500 sm:text-[9px]">
+                            {titleize(
+                              brief.objective,
+                            )}
+                          </span>
+                        </button>
+                      )
+                    },
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-[15px] border border-[#c9e8dd] bg-[#e8f7f1] p-2.5 sm:rounded-2xl sm:p-3.5">
+                <div className="flex items-start gap-2">
+                  <CircleAlert
+                    size={15}
+                    className="mt-0.5 shrink-0 text-[#176b57]"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black text-stone-950 sm:text-xs">
+                      Complete campaign basics first
+                    </p>
+                    <p className="mt-0.5 text-[8px] font-semibold leading-[1.4] text-stone-600 sm:text-[10px]">
+                      Save the campaign on the left, then tap Continue. It will appear here for placement setup.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-[15px] border border-[#d0e6f1] bg-white/75 p-2.5 sm:rounded-2xl sm:p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-stone-600 sm:text-[10px]">
+                  Choose placements · test prices
+                </p>
+                <span className="rounded-full bg-[#e6f7f0] px-2 py-1 text-[9px] font-black text-[#176b57] sm:text-xs">
+                  {formatMoneyMinor(
+                    selectedPlacementTotalMinor,
+                    pricing?.currency ||
+                      'INR',
+                  )}
+                </span>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:mt-3 sm:grid-cols-3 sm:gap-2">
                 {PLACEMENTS.map(
                   (placement) => {
                     const selected =
                       campaignForm.placements.includes(
                         placement,
                       )
+                    const amountMinor =
+                      pricingByPlacement.get(
+                        placement,
+                      ) || 0
 
                     return (
                       <button
                         type="button"
                         key={placement}
+                        disabled={!campaignForm.briefId}
                         onClick={() =>
                           togglePlacement(
                             placement,
                           )
                         }
                         className={[
-                          'focus-ring rounded-full px-3 py-2 text-xs font-black',
+                          'focus-ring min-w-0 rounded-[12px] border px-2.5 py-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-55 sm:rounded-[14px] sm:px-3 sm:py-3',
                           selected
-                            ? 'bg-emerald-700 text-white'
-                            : 'border border-stone-200 bg-white text-stone-600',
+                            ? 'border-[#5bb89a] bg-[#e5f7f0] shadow-[inset_0_0_0_1px_rgba(23,107,87,0.08)]'
+                            : 'border-stone-200 bg-white text-stone-600',
                         ].join(' ')}
                       >
-                        {titleize(
-                          placement,
-                        )}
+                        <span className="block truncate text-[9px] font-black text-stone-900 sm:text-[11px]">
+                          {titleize(
+                            placement,
+                          )}
+                        </span>
+                        <span className="mt-0.5 block text-[8px] font-bold text-stone-500 sm:text-[9px]">
+                          {formatMoneyMinor(
+                            amountMinor,
+                            pricing?.currency ||
+                              'INR',
+                          )}
+                        </span>
                       </button>
                     )
                   },
@@ -641,9 +1094,10 @@ export default function HostRetailMediaPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
               <input
                 className={inputClass}
+                disabled={!campaignForm.briefId}
                 value={campaignForm.headline}
                 onChange={(event) =>
                   setCampaignForm(
@@ -654,11 +1108,12 @@ export default function HostRetailMediaPage() {
                     }),
                   )
                 }
-                placeholder="Sponsored creative headline"
+                placeholder="Sponsored headline"
               />
 
               <select
                 className={inputClass}
+                disabled={!campaignForm.briefId}
                 value={campaignForm.sponsorLabel}
                 onChange={(event) =>
                   setCampaignForm(
@@ -674,149 +1129,82 @@ export default function HostRetailMediaPage() {
                 <option value="Ad">Ad</option>
                 <option value="Paid placement">Paid placement</option>
               </select>
+            </div>
 
-              <textarea
-                rows={3}
-                className={`${inputClass} sm:col-span-2`}
-                value={campaignForm.body}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      body:
-                        event.target.value,
-                    }),
-                  )
-                }
-                placeholder="Creative body"
-              />
+            <textarea
+              rows={2}
+              className={inputClass}
+              disabled={!campaignForm.briefId}
+              value={campaignForm.body}
+              onChange={(event) =>
+                setCampaignForm(
+                  (current) => ({
+                    ...current,
+                    body:
+                      event.target.value,
+                  }),
+                )
+              }
+              placeholder="Short promotion message"
+            />
 
-              <input
-                className={`${inputClass} sm:col-span-2`}
-                value={campaignForm.landingRef}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      landingRef:
-                        event.target.value,
-                    }),
-                  )
-                }
-                placeholder="EPANTRY landing reference"
-              />
+            <input
+              className={inputClass}
+              disabled={!campaignForm.briefId}
+              value={campaignForm.landingRef}
+              onChange={(event) =>
+                setCampaignForm(
+                  (current) => ({
+                    ...current,
+                    landingRef:
+                      event.target.value,
+                  }),
+                )
+              }
+              placeholder="Where should customers land? Add the EPANTRY page/reference."
+            />
 
-              <input
-                className={`${inputClass} sm:col-span-2`}
-                value={campaignForm.contextualTags}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      contextualTags:
-                        event.target.value,
-                    }),
-                  )
-                }
-                placeholder="Context tags, comma separated — cuisine, occasion, ingredient family; never allergy/health targeting"
-              />
+            <input
+              className={inputClass}
+              disabled={!campaignForm.briefId}
+              value={campaignForm.contextualTags}
+              onChange={(event) =>
+                setCampaignForm(
+                  (current) => ({
+                    ...current,
+                    contextualTags:
+                      event.target.value,
+                  }),
+                )
+              }
+              placeholder="Optional context: cuisine, occasion, ingredient family"
+            />
 
-              <input
-                type="number"
-                min="0"
-                className={inputClass}
-                value={campaignForm.dailyBudgetMinor}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      dailyBudgetMinor:
-                        Number(
-                          event.target.value,
-                        ),
-                    }),
-                  )
-                }
-                placeholder="Daily budget minor"
-              />
-
-              <input
-                type="number"
-                min="0"
-                className={inputClass}
-                value={campaignForm.lifetimeBudgetMinor}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      lifetimeBudgetMinor:
-                        Number(
-                          event.target.value,
-                        ),
-                    }),
-                  )
-                }
-                placeholder="Lifetime budget minor"
-              />
-
-              <input
-                type="number"
-                min="0"
-                className={inputClass}
-                value={campaignForm.bidMinor}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      bidMinor:
-                        Number(
-                          event.target.value,
-                        ),
-                    }),
-                  )
-                }
-                placeholder="Bid minor"
-              />
-
-              <input
-                type="number"
-                min="0"
-                max="100"
-                className={inputClass}
-                value={campaignForm.qualityScore}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      qualityScore:
-                        Number(
-                          event.target.value,
-                        ),
-                    }),
-                  )
-                }
-                placeholder="Quality score"
-              />
-
-              <input
-                type="number"
-                min="1"
-                max="50"
-                className={inputClass}
-                value={campaignForm.frequencyCapPerContext}
-                onChange={(event) =>
-                  setCampaignForm(
-                    (current) => ({
-                      ...current,
-                      frequencyCapPerContext:
-                        Number(
-                          event.target.value,
-                        ),
-                    }),
-                  )
-                }
-                placeholder="Frequency cap"
-              />
+            <div className="flex items-center justify-between gap-3 rounded-[14px] border border-[#d8d0ef] bg-[#f3effb] p-2.5 sm:p-3">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black text-stone-950 sm:text-xs">
+                  <span className="sm:hidden">Amount to pay</span>
+                  <span className="hidden sm:inline">Test payment total</span>
+                </p>
+                <p className="mt-0.5 text-[8px] font-semibold text-stone-500 sm:text-[10px]">
+                  <span className="block whitespace-nowrap text-[7px] sm:hidden">
+                    Payment goes to EPANTRY before approval.
+                  </span>
+                  <span className="hidden sm:inline">
+                    {pricing?.paymentProvider?.configured &&
+                    pricing?.paymentProvider?.mode === 'test'
+                      ? 'Razorpay test checkout ready · payment goes to the EPANTRY platform before Super Admin review.'
+                      : 'This is the test amount. Configure Razorpay test keys before payment.'}
+                  </span>
+                </p>
+              </div>
+              <p className="shrink-0 text-[15px] font-black text-[#5f4a95] sm:text-xl">
+                {formatMoneyMinor(
+                  selectedPlacementTotalMinor,
+                  pricing?.currency ||
+                    'INR',
+                )}
+              </p>
             </div>
 
             <button
@@ -825,174 +1213,334 @@ export default function HostRetailMediaPage() {
                 busy ||
                 !campaignForm.briefId ||
                 !campaignForm.placements.length ||
+                selectedPlacementTotalMinor <=
+                  0 ||
                 !campaignForm.headline.trim() ||
                 !campaignForm.landingRef.trim()
               }
               onClick={createCampaign}
-              className={buttonClass}
+              className={primaryButtonClass}
             >
               <ShieldCheck
-                size={16}
+                size={15}
                 aria-hidden="true"
               />
-              Create pending-review campaign
+              Create campaign
             </button>
           </div>
         </section>
+
+        <section className="order-1 self-start rounded-[20px] border border-[#d7d0ee] bg-[linear-gradient(145deg,#f4f1fb_0%,#fbf9ff_100%)] p-3 shadow-[0_12px_28px_rgba(95,74,149,0.07)] sm:order-none sm:rounded-[26px] sm:p-5 lg:col-span-5">
+          <div className="flex items-start gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center rounded-[12px] bg-white text-[#6c52a4] shadow-sm sm:size-10 sm:rounded-[14px]">
+              <BadgeCheck
+                size={17}
+                aria-hidden="true"
+              />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-[14px] font-black text-stone-950 sm:text-lg">
+                  Your campaigns
+                </h2>
+                <span className="shrink-0 rounded-full border border-[#ddd4ef] bg-white/90 px-2 py-1 text-[8px] font-black text-[#6c52a4] sm:text-[9px]">
+                  {campaigns.length}
+                </span>
+              </div>
+              <p className="mt-0.5 text-[9px] font-semibold leading-[1.45] text-stone-600 sm:mt-1 sm:text-xs sm:leading-5">
+                Pay first, then Super Admin reviews the campaign. Approved campaigns can be activated from here.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2.5 sm:mt-4 sm:gap-3">
+            {campaigns.length ? (
+              campaigns.map(
+                (campaign) => {
+                  const payment =
+                    campaign.payment || {}
+                  const isPaid =
+                    payment.status ===
+                    'paid'
+                  const isPaying =
+                    payingCampaignId ===
+                    campaign.id
+
+                  return (
+                    <article
+                      key={campaign.id}
+                      className="overflow-hidden rounded-[16px] border border-[#ded7f0] bg-white/90 p-3 shadow-[0_7px_18px_rgba(95,74,149,0.06)] sm:rounded-[20px] sm:p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-black text-stone-950 sm:text-sm">
+                            {campaign.title}
+                          </p>
+                          <p className="mt-0.5 text-[8px] font-bold text-stone-500 sm:text-[10px]">
+                            {titleize(
+                              campaign.objective,
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="rounded-full bg-[#e6f7f0] px-2 py-1 text-[8px] font-black uppercase text-[#176b57] sm:text-[9px]">
+                            {campaign.creative?.sponsorLabel ||
+                              'Sponsored'}
+                          </span>
+                          <span className="rounded-full border border-[#ddd4ef] bg-[#f7f4fc] px-2 py-1 text-[7px] font-black uppercase tracking-[0.06em] text-[#6c52a4] sm:text-[8px]">
+                            {titleize(campaign.status)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1 sm:mt-3">
+                        {(campaign.placements || []).map(
+                          (placement) => (
+                            <span
+                              key={placement}
+                              className="rounded-full border border-[#d3e7ef] bg-[#eef7fb] px-2 py-1 text-[8px] font-black text-[#2c6d8e] sm:text-[9px]"
+                            >
+                              {titleize(
+                                placement,
+                              )}
+                            </span>
+                          ),
+                        )}
+                      </div>
+
+                      <div className="mt-2 rounded-[13px] border border-stone-100 bg-[#fafaf8] p-2.5 sm:mt-3 sm:p-3">
+                        <p className="text-[10px] font-black text-stone-900 sm:text-xs">
+                          {campaign.creative?.headline ||
+                            'Sponsored content'}
+                        </p>
+                        <p className="mt-0.5 line-clamp-2 text-[8px] font-semibold leading-[1.4] text-stone-500 sm:text-[10px] sm:leading-4">
+                          {campaign.creative?.body ||
+                            campaign.commercialDisclosure}
+                        </p>
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between gap-3 rounded-[13px] border border-[#cbe7dc] bg-[linear-gradient(135deg,#edf9f4_0%,#f5fbf8_100%)] p-2.5 sm:mt-3 sm:p-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {isPaid ? (
+                              <CheckCircle2
+                                size={13}
+                                className="text-[#176b57]"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <CreditCard
+                                size={13}
+                                className="text-[#6c52a4]"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <p className="text-[9px] font-black text-stone-950 sm:text-xs">
+                              {isPaid
+                                ? 'Payment received'
+                                : 'Payment required'}
+                            </p>
+                          </div>
+                          <p className="mt-0.5 text-[8px] font-semibold text-stone-500 sm:text-[9px]">
+                            {payment.recipient ||
+                              pricing?.recipient ||
+                              'EPANTRY platform'}
+                          </p>
+                        </div>
+
+                        <p className="shrink-0 text-[13px] font-black text-stone-950 sm:text-lg">
+                          {formatMoneyMinor(
+                            payment.requiredAmountMinor,
+                            payment.currency ||
+                              pricing?.currency ||
+                              'INR',
+                          )}
+                        </p>
+                      </div>
+
+                      {campaign.status ===
+                        'pending_review' &&
+                      !isPaid ? (
+                        <button
+                          type="button"
+                          disabled={
+                            busy ||
+                            isPaying ||
+                            pricing?.paymentProvider?.mode !==
+                              'test'
+                          }
+                          onClick={() =>
+                            payCampaign(
+                              campaign,
+                            )
+                          }
+                          className={`${primaryButtonClass} mt-2 w-full sm:mt-3`}
+                        >
+                          <IndianRupee
+                            size={14}
+                            aria-hidden="true"
+                          />
+                          {isPaying ? (
+                            <>
+                              <span className="sm:hidden">Opening payment…</span>
+                              <span className="hidden sm:inline">Opening test payment…</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="sm:hidden">
+                                Pay {formatMoneyMinor(
+                                  payment.requiredAmountMinor,
+                                  payment.currency || 'INR',
+                                )}
+                              </span>
+                              <span className="hidden sm:inline">
+                                Pay {formatMoneyMinor(
+                                  payment.requiredAmountMinor,
+                                  payment.currency || 'INR',
+                                )} · Test mode
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      ) : null}
+
+                      {campaign.status ===
+                        'pending_review' &&
+                      isPaid ? (
+                        <div className="mt-2 flex items-start gap-2 rounded-[12px] border border-[#c7dded] bg-[#edf6fb] p-2.5 text-[9px] font-semibold leading-[1.4] text-[#275f7c] sm:mt-3 sm:text-[10px]">
+                          <ShieldCheck
+                            size={14}
+                            className="mt-0.5 shrink-0"
+                            aria-hidden="true"
+                          />
+                          Payment complete. Waiting for Super Admin approval.
+                        </div>
+                      ) : null}
+
+                      {campaign.review?.reason ? (
+                        <div className="mt-2 flex items-start gap-2 rounded-[12px] border border-stone-200 bg-white p-2.5 text-[9px] font-semibold leading-[1.4] text-stone-600 sm:mt-3 sm:text-[10px]">
+                          <CircleAlert
+                            size={14}
+                            className="mt-0.5 shrink-0"
+                            aria-hidden="true"
+                          />
+                          Review note: {campaign.review.reason}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-2 flex flex-wrap gap-2 sm:mt-3">
+                        {campaign.status ===
+                          'approved' &&
+                        isPaid ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              transition(
+                                campaign.id,
+                                'activate',
+                              )
+                            }
+                            className={primaryButtonClass}
+                          >
+                            <Play
+                              size={14}
+                              aria-hidden="true"
+                            />
+                            Activate campaign
+                          </button>
+                        ) : null}
+
+                        {campaign.status ===
+                        'active' ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              transition(
+                                campaign.id,
+                                'pause',
+                              )
+                            }
+                            className="focus-ring inline-flex items-center gap-2 rounded-[12px] border border-stone-200 bg-white px-3 py-2 text-[10px] font-black text-stone-700 sm:text-xs"
+                          >
+                            <Pause
+                              size={14}
+                              aria-hidden="true"
+                            />
+                            Pause
+                          </button>
+                        ) : null}
+
+                        {campaign.status ===
+                        'paused' ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              transition(
+                                campaign.id,
+                                'resume',
+                              )
+                            }
+                            className={primaryButtonClass}
+                          >
+                            <Play
+                              size={14}
+                              aria-hidden="true"
+                            />
+                            Resume
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  )
+                },
+              )
+            ) : (
+              <p className="rounded-[15px] border border-[#e3ddf1] bg-white/80 p-3 text-[10px] font-semibold leading-[1.5] text-stone-500 sm:text-sm">
+                No sponsored campaigns yet. Create campaign basics above to get started.
+              </p>
+            )}
+          </div>
+        </section>
+
       </div>
 
-      <section className="mt-6 rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex items-start gap-3">
-          <BadgeCheck
-            size={22}
-            className="mt-0.5 text-emerald-700"
+      <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3">
+        <div className="flex items-start gap-2 rounded-[16px] border border-[#c7e4d8] bg-[#eef9f4] p-3 text-[9px] font-semibold leading-[1.5] text-stone-600 sm:text-[10px]">
+          <Eye
+            size={15}
+            className="mt-0.5 shrink-0 text-[#176b57]"
             aria-hidden="true"
           />
-          <div>
-            <h2 className="text-lg font-black text-stone-950">
-              Governed campaign lifecycle
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-stone-500">
-              Admin Trust & Safety approval is required before activation. M21 does not claim billing, settlement, ROAS or transaction attribution from an impression.
-            </p>
-          </div>
+          <p>
+            <span className="block whitespace-nowrap text-[7px] sm:hidden">
+              Promotions are labeled; normal results stay unchanged.
+            </span>
+            <span className="hidden sm:inline">
+              Every promotion is clearly labeled Sponsored / Ad / Paid placement. Paid ranking never changes organic “best match”, “best value” or safety conclusions.
+            </span>
+          </p>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          {campaigns.length ? (
-            campaigns.map(
-              (campaign) => (
-                <article
-                  key={campaign.id}
-                  className="rounded-2xl border border-stone-200 p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-black text-stone-950">
-                        {campaign.title}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-stone-500">
-                        {titleize(
-                          campaign.status,
-                        )} · {campaign.objective}
-                      </p>
-                    </div>
-
-                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase text-amber-900">
-                      {campaign.creative?.sponsorLabel ||
-                        'Sponsored'}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 rounded-xl bg-stone-50 p-3">
-                    <p className="text-sm font-black text-stone-900">
-                      {campaign.creative?.headline ||
-                        'Creative pending'}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-stone-500">
-                      {campaign.creative?.body ||
-                        campaign.commercialDisclosure}
-                    </p>
-                  </div>
-
-                  <div className="mt-3 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold leading-5 text-emerald-950">
-                    <Eye
-                      size={16}
-                      className="mt-0.5 shrink-0"
-                      aria-hidden="true"
-                    />
-                    Paid ranking never changes organic “best match”, “best value” or safety conclusions. An organic alternative path remains available.
-                  </div>
-
-                  {campaign.review?.reason ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl border border-stone-200 p-3 text-xs font-semibold text-stone-600">
-                      <CircleAlert
-                        size={16}
-                        className="mt-0.5 shrink-0"
-                        aria-hidden="true"
-                      />
-                      Policy review: {campaign.review.reason}
-                    </div>
-                  ) : null}
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {campaign.status ===
-                    'approved' ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          transition(
-                            campaign.id,
-                            'activate',
-                          )
-                        }
-                        className={buttonClass}
-                      >
-                        <Play
-                          size={15}
-                          aria-hidden="true"
-                        />
-                        Activate
-                      </button>
-                    ) : null}
-
-                    {campaign.status ===
-                    'active' ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          transition(
-                            campaign.id,
-                            'pause',
-                          )
-                        }
-                        className="focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-black"
-                      >
-                        <Pause
-                          size={15}
-                          aria-hidden="true"
-                        />
-                        Pause
-                      </button>
-                    ) : null}
-
-                    {campaign.status ===
-                    'paused' ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          transition(
-                            campaign.id,
-                            'resume',
-                          )
-                        }
-                        className={buttonClass}
-                      >
-                        <Play
-                          size={15}
-                          aria-hidden="true"
-                        />
-                        Resume
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              ),
-            )
-          ) : (
-            <p className="rounded-2xl bg-stone-50 p-5 text-sm font-semibold text-stone-500 lg:col-span-2">
-              No M21 Retail Media campaigns yet.
-            </p>
-          )}
+        <div className="flex items-start gap-2 rounded-[16px] border border-[#cbdfea] bg-[#eef7fb] p-3 text-[9px] font-semibold leading-[1.5] text-stone-600 sm:text-[10px]">
+          <ShieldCheck
+            size={15}
+            className="mt-0.5 shrink-0 text-[#2c789d]"
+            aria-hidden="true"
+          />
+          <p>
+            <span className="block whitespace-nowrap text-[7px] sm:hidden">
+              Health and allergy data is never used for ads.
+            </span>
+            <span className="hidden sm:inline">
+              Sensitive health or allergy inferences are never advertising targeting segments. Product and Recipe ads remain subject to independent safety eligibility.
+            </span>
+          </p>
         </div>
-      </section>
-
-      <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-950">
-        Product and Recipe sponsored units are fail-closed in this first serving lane until independent server-side safety eligibility exists. Declared dietary or allergy constraints may suppress an ad, but must never become targeting segments.
-      </p>
+      </div>
     </div>
   )
 }

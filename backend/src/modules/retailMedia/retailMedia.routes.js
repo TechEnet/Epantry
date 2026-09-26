@@ -40,6 +40,7 @@ import {
 import {
   requireCustomerAccess,
   requireHostAccess,
+  requireSuperAdminAccess,
 } from '../auth/authorization.middleware.js'
 
 import {
@@ -49,12 +50,15 @@ import {
 
 import {
   createRetailMediaCampaignFromBrief,
+  createRetailMediaCampaignPaymentIntent,
   decideLowRiskSponsoredPlacement,
+  getHostRetailMediaPricing,
   listAdminAdDecisionLogs,
   listAdminRetailMediaCampaigns,
   listHostRetailMediaCampaigns,
   reviewAdminRetailMediaCampaign,
   transitionHostRetailMediaCampaign,
+  verifyRetailMediaCampaignPayment,
 } from './retailMedia.service.js'
 
 const router = Router()
@@ -212,6 +216,32 @@ const createFromBriefSchema =
         }
       },
     )
+
+const paymentVerifySchema =
+  z
+    .object({
+      razorpayPaymentId:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(180),
+
+      razorpayOrderId:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(180),
+
+      razorpaySignature:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(240),
+    })
+    .strict()
 
 const transitionSchema =
   z
@@ -415,6 +445,24 @@ const adminSecurity = [
 */
 
 router.get(
+  '/host/retail-media/pricing',
+  ...hostSecurity,
+  wrap(
+    async (req, res) =>
+      send(
+        req,
+        res,
+        200,
+        await getHostRetailMediaPricing({
+          actorUser:
+            req.currentUser,
+        }),
+        'Retail Media placement pricing loaded.',
+      ),
+  ),
+)
+
+router.get(
   '/host/retail-media/campaigns',
   ...hostSecurity,
   wrap(
@@ -466,6 +514,75 @@ router.post(
             req.currentUser,
         }),
         'Retail Media campaign created from the governed Host Campaign Brief.',
+      )
+    },
+  ),
+)
+
+router.post(
+  '/host/retail-media/campaigns/:campaignId/payment-intent',
+  ...hostSecurity,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(
+    async (req, res) => {
+      const campaignId =
+        parseOrThrow(
+          objectIdSchema,
+          req.params.campaignId,
+          'M21_RETAIL_MEDIA_CAMPAIGN_ID_INVALID',
+          'Invalid Retail Media Campaign ID.',
+        )
+
+      return send(
+        req,
+        res,
+        200,
+        await createRetailMediaCampaignPaymentIntent({
+          campaignId,
+          actorUser:
+            req.currentUser,
+        }),
+        'Retail Media test payment initialized.',
+      )
+    },
+  ),
+)
+
+router.post(
+  '/host/retail-media/campaigns/:campaignId/payment-verify',
+  ...hostSecurity,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(
+    async (req, res) => {
+      const campaignId =
+        parseOrThrow(
+          objectIdSchema,
+          req.params.campaignId,
+          'M21_RETAIL_MEDIA_CAMPAIGN_ID_INVALID',
+          'Invalid Retail Media Campaign ID.',
+        )
+
+      const input =
+        parseOrThrow(
+          paymentVerifySchema,
+          req.body,
+          'M21_RETAIL_MEDIA_PAYMENT_VERIFY_INVALID',
+          'Invalid Retail Media payment verification payload.',
+        )
+
+      return send(
+        req,
+        res,
+        200,
+        await verifyRetailMediaCampaignPayment({
+          campaignId,
+          input,
+          actorUser:
+            req.currentUser,
+        }),
+        'Retail Media test payment verified.',
       )
     },
   ),
@@ -586,6 +703,7 @@ router.post(
   requireAnyAdminPermission(
     'trust_safety.mutate',
   ),
+  requireSuperAdminAccess,
   wrap(
     async (req, res) => {
       const campaignId =

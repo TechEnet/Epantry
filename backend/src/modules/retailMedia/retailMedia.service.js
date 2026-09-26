@@ -17,6 +17,13 @@ import {
 } from '../adminGovernance/adminGovernance.models.js'
 
 import {
+  createRazorpayOrder,
+  fetchRazorpayPayment,
+  getRazorpayPublicConfig,
+  verifyRazorpayCheckoutSignature,
+} from '../commerce/commerce.payment.provider.js'
+
+import {
   HostCampaignBrief,
 } from '../hostOperations/hostOperations.models.js'
 
@@ -32,6 +39,138 @@ import {
 
 export const M21_RETAIL_MEDIA_FEATURE_FLAG =
   'm21.retail_media'
+
+export const RETAIL_MEDIA_PLACEMENT_PRICING_MINOR = Object.freeze({
+  home: 250000,
+  search: 200000,
+  recipe: 120000,
+  product_detail: 150000,
+  pantry_replenishment: 100000,
+  basket_compare: 180000,
+  post_purchase: 80000,
+})
+
+const RETAIL_MEDIA_PAYMENT_CURRENCY = 'INR'
+const RETAIL_MEDIA_PAYMENT_RECIPIENT =
+  'EPANTRY platform (Super Admin controlled)'
+
+const LEGACY_PARALLEL_ARRAY_CAMPAIGN_INDEX_KEYS = Object.freeze([
+  'status',
+  'placements',
+  'marketCodes',
+  'startsAt',
+  'endsAt',
+])
+
+let campaignIndexReconciliationPromise = null
+
+function isLegacyParallelArrayCampaignIndex(index) {
+  const keys = Object.keys(index?.key || {})
+
+  return (
+    keys.length === LEGACY_PARALLEL_ARRAY_CAMPAIGN_INDEX_KEYS.length &&
+    LEGACY_PARALLEL_ARRAY_CAMPAIGN_INDEX_KEYS.every(
+      (key, position) => keys[position] === key,
+    )
+  )
+}
+
+async function reconcileRetailMediaCampaignIndexes() {
+  if (!campaignIndexReconciliationPromise) {
+    campaignIndexReconciliationPromise = (async () => {
+      try {
+        const indexes =
+          await Campaign.collection.indexes()
+
+        const legacyIndex =
+          indexes.find(
+            isLegacyParallelArrayCampaignIndex,
+          )
+
+        if (legacyIndex?.name) {
+          await Campaign.collection.dropIndex(
+            legacyIndex.name,
+          )
+        }
+      } catch (error) {
+        if (
+          error?.code === 26 ||
+          error?.codeName === 'NamespaceNotFound'
+        ) {
+          return
+        }
+
+        campaignIndexReconciliationPromise = null
+        throw error
+      }
+    })()
+  }
+
+  return campaignIndexReconciliationPromise
+}
+
+function razorpayModeFromKeyId(keyId) {
+  const value = String(keyId || '').trim()
+
+  if (value.startsWith('rzp_test_')) {
+    return 'test'
+  }
+
+  if (value.startsWith('rzp_live_')) {
+    return 'live'
+  }
+
+  return 'unknown'
+}
+
+function placementPricingRows(placements = []) {
+  return placements.map((placement) => ({
+    placement,
+    amountMinor:
+      RETAIL_MEDIA_PLACEMENT_PRICING_MINOR[placement] || 0,
+  }))
+}
+
+function placementPricingTotalMinor(placements = []) {
+  return placementPricingRows(placements).reduce(
+    (total, row) => total + Number(row.amountMinor || 0),
+    0,
+  )
+}
+
+function assertRetailMediaTestPaymentConfiguration() {
+  const publicConfig = getRazorpayPublicConfig()
+  const providerMode = razorpayModeFromKeyId(publicConfig.keyId)
+
+  if (!publicConfig.configured) {
+    throw new ApiError(
+      503,
+      'Razorpay test payment is not configured for Retail Media.',
+      [
+        {
+          code: 'M21_RETAIL_MEDIA_PAYMENT_PROVIDER_NOT_CONFIGURED',
+        },
+      ],
+    )
+  }
+
+  if (providerMode !== 'test') {
+    throw new ApiError(
+      409,
+      'Retail Media payment is restricted to Razorpay test mode in this environment.',
+      [
+        {
+          code: 'M21_RETAIL_MEDIA_TEST_PAYMENT_ONLY',
+        },
+      ],
+    )
+  }
+
+  return {
+    publicConfig,
+    providerMode,
+  }
+}
 
 const SENSITIVE_TARGETING_PATTERN =
   /(allerg|medical|diagnos|disease|relig|ethnic|race|pregnan|disab|sexual|politic|mental.?health|health.?condition)/i
@@ -233,6 +372,54 @@ function serializeCampaign(value) {
         null,
     },
 
+    payment: {
+      status:
+        item.payment?.status ||
+        'unpaid',
+
+      provider:
+        item.payment?.provider ||
+        'razorpay',
+
+      providerMode:
+        item.payment?.providerMode ||
+        'unknown',
+
+      currency:
+        item.payment?.currency ||
+        RETAIL_MEDIA_PAYMENT_CURRENCY,
+
+      requiredAmountMinor:
+        Number(
+          item.payment?.requiredAmountMinor ||
+            placementPricingTotalMinor(
+              item.placements || [],
+            ),
+        ),
+
+      placementCharges:
+        item.payment?.placementCharges?.length
+          ? item.payment.placementCharges
+          : placementPricingRows(
+              item.placements || [],
+            ),
+
+      providerOrderId:
+        item.payment?.providerOrderId ||
+        '',
+
+      providerPaymentId:
+        item.payment?.providerPaymentId ||
+        '',
+
+      paidAt:
+        item.payment?.paidAt ||
+        null,
+
+      recipient:
+        RETAIL_MEDIA_PAYMENT_RECIPIENT,
+    },
+
     activatedAt:
       item.activatedAt || null,
 
@@ -323,23 +510,53 @@ export async function requireRetailMediaFeature() {
         env.nodeEnv,
     }).lean()
 
-  if (!flag) {
-    throw new ApiError(
-      404,
-      'Retail Media expansion is not enabled for this environment.',
-      [
-        {
-          code:
-            'M21_RETAIL_MEDIA_FEATURE_DISABLED',
-
-          featureFlagKey:
-            M21_RETAIL_MEDIA_FEATURE_FLAG,
-        },
-      ],
-    )
+  if (flag) {
+    return {
+      ...flag,
+      testModeBypass: false,
+      bypassReason: null,
+    }
   }
 
-  return flag
+  const publicConfig =
+    getRazorpayPublicConfig()
+  const providerMode =
+    razorpayModeFromKeyId(
+      publicConfig.keyId,
+    )
+  const testPaymentWorkspace =
+    publicConfig.configured &&
+    providerMode === 'test'
+
+  if (
+    env.nodeEnv !== 'production' ||
+    testPaymentWorkspace
+  ) {
+    return {
+      key: M21_RETAIL_MEDIA_FEATURE_FLAG,
+      enabled: true,
+      environments: [env.nodeEnv],
+      testModeBypass: true,
+      bypassReason:
+        testPaymentWorkspace
+          ? 'razorpay_test_mode'
+          : 'non_production',
+    }
+  }
+
+  throw new ApiError(
+    404,
+    'Retail Media expansion is not enabled for this environment.',
+    [
+      {
+        code:
+          'M21_RETAIL_MEDIA_FEATURE_DISABLED',
+
+        featureFlagKey:
+          M21_RETAIL_MEDIA_FEATURE_FLAG,
+      },
+    ],
+  )
 }
 
 export async function createRetailMediaCampaignFromBrief({
@@ -415,6 +632,14 @@ export async function createRetailMediaCampaignFromBrief({
     input.placements?.length
       ? input.placements
       : brief.requestedPlacements
+
+  const paymentPlacementCharges =
+    placementPricingRows(placements)
+
+  const paymentRequiredAmountMinor =
+    placementPricingTotalMinor(placements)
+
+  await reconcileRetailMediaCampaignIndexes()
 
   const campaign =
     await Campaign.create({
@@ -507,6 +732,20 @@ export async function createRetailMediaCampaignFromBrief({
           'pending',
       },
 
+      payment: {
+        status: 'unpaid',
+        provider: 'razorpay',
+        providerMode: 'unknown',
+        currency: RETAIL_MEDIA_PAYMENT_CURRENCY,
+        requiredAmountMinor:
+          paymentRequiredAmountMinor,
+        placementCharges:
+          paymentPlacementCharges,
+        providerOrderId: '',
+        providerPaymentId: '',
+        paidAt: null,
+      },
+
       createdByUserId:
         actorId(
           actorUser,
@@ -578,6 +817,389 @@ export async function listHostRetailMediaCampaigns({
   }
 }
 
+export async function getHostRetailMediaPricing({
+  actorUser,
+}) {
+  const feature =
+    await requireRetailMediaFeature()
+
+  const context =
+    await resolveHostOperationsContext(
+      actorUser,
+    )
+
+  assertHostOperationsPermission(
+    context,
+    'campaigns.read',
+  )
+
+  const publicConfig =
+    getRazorpayPublicConfig()
+
+  return {
+    currency:
+      RETAIL_MEDIA_PAYMENT_CURRENCY,
+
+    recipient:
+      RETAIL_MEDIA_PAYMENT_RECIPIENT,
+
+    pricingModel:
+      'fixed_placement_test_fee',
+
+    placementPricing:
+      Object.entries(
+        RETAIL_MEDIA_PLACEMENT_PRICING_MINOR,
+      ).map(
+        ([placement, amountMinor]) => ({
+          placement,
+          amountMinor,
+        }),
+      ),
+
+    paymentProvider: {
+      provider: 'razorpay',
+      configured:
+        publicConfig.configured,
+      mode:
+        razorpayModeFromKeyId(
+          publicConfig.keyId,
+        ),
+    },
+
+    testModeBypass:
+      feature.testModeBypass ===
+      true,
+  }
+}
+
+export async function createRetailMediaCampaignPaymentIntent({
+  campaignId,
+  actorUser,
+}) {
+  await requireRetailMediaFeature()
+
+  const context =
+    await resolveHostOperationsContext(
+      actorUser,
+    )
+
+  assertHostOperationsPermission(
+    context,
+    'campaigns.manage',
+  )
+
+  const campaign =
+    await Campaign.findOne({
+      _id: campaignId,
+      organizationId:
+        context.organization._id,
+    })
+
+  if (!campaign) {
+    throw new ApiError(
+      404,
+      'Retail Media Campaign was not found for this organization.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_CAMPAIGN_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
+  if (campaign.status !== 'pending_review') {
+    throw new ApiError(
+      409,
+      'Only a campaign waiting for Super Admin review can be paid.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PAYMENT_STATUS_INVALID',
+        },
+      ],
+    )
+  }
+
+  if (campaign.payment?.status === 'paid') {
+    return {
+      campaign:
+        serializeCampaign(campaign),
+      checkout: null,
+      alreadyPaid: true,
+    }
+  }
+
+  const {
+    publicConfig,
+    providerMode,
+  } =
+    assertRetailMediaTestPaymentConfiguration()
+
+  const requiredAmountMinor =
+    Number(
+      campaign.payment?.requiredAmountMinor ||
+        placementPricingTotalMinor(
+          campaign.placements,
+        ),
+    )
+
+  if (requiredAmountMinor <= 0) {
+    throw new ApiError(
+      409,
+      'This Retail Media campaign does not have a payable placement amount.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PAYMENT_AMOUNT_INVALID',
+        },
+      ],
+    )
+  }
+
+  if (
+    campaign.payment?.status ===
+      'initiated' &&
+    campaign.payment?.providerOrderId
+  ) {
+    return {
+      campaign:
+        serializeCampaign(campaign),
+      checkout: {
+        configured: true,
+        provider: 'razorpay',
+        mode: providerMode,
+        keyId: publicConfig.keyId,
+        providerOrderId:
+          campaign.payment.providerOrderId,
+        amountMinor:
+          requiredAmountMinor,
+        currency:
+          campaign.payment.currency ||
+          RETAIL_MEDIA_PAYMENT_CURRENCY,
+        recipient:
+          RETAIL_MEDIA_PAYMENT_RECIPIENT,
+      },
+      alreadyPaid: false,
+    }
+  }
+
+  const providerOrder =
+    await createRazorpayOrder({
+      amountMinor:
+        requiredAmountMinor,
+      currency:
+        RETAIL_MEDIA_PAYMENT_CURRENCY,
+      receipt:
+        `rm_${String(campaign._id)}`.slice(
+          0,
+          40,
+        ),
+      notes: {
+        purpose:
+          'epantry_retail_media_test_campaign',
+        campaignId:
+          String(campaign._id),
+        organizationId:
+          String(context.organization._id),
+      },
+    })
+
+  campaign.payment = {
+    status: 'initiated',
+    provider: 'razorpay',
+    providerMode,
+    currency:
+      providerOrder.currency ||
+      RETAIL_MEDIA_PAYMENT_CURRENCY,
+    requiredAmountMinor:
+      requiredAmountMinor,
+    placementCharges:
+      campaign.payment?.placementCharges?.length
+        ? campaign.payment.placementCharges
+        : placementPricingRows(
+            campaign.placements,
+          ),
+    providerOrderId:
+      providerOrder.providerOrderId,
+    providerPaymentId: '',
+    paidAt: null,
+  }
+
+  await campaign.save()
+
+  return {
+    campaign:
+      serializeCampaign(campaign),
+    checkout: {
+      configured: true,
+      provider: 'razorpay',
+      mode: providerMode,
+      keyId:
+        providerOrder.keyId ||
+        publicConfig.keyId,
+      providerOrderId:
+        providerOrder.providerOrderId,
+      amountMinor:
+        requiredAmountMinor,
+      currency:
+        providerOrder.currency ||
+        RETAIL_MEDIA_PAYMENT_CURRENCY,
+      recipient:
+        RETAIL_MEDIA_PAYMENT_RECIPIENT,
+    },
+    alreadyPaid: false,
+  }
+}
+
+export async function verifyRetailMediaCampaignPayment({
+  campaignId,
+  input,
+  actorUser,
+}) {
+  await requireRetailMediaFeature()
+
+  const context =
+    await resolveHostOperationsContext(
+      actorUser,
+    )
+
+  assertHostOperationsPermission(
+    context,
+    'campaigns.manage',
+  )
+
+  const campaign =
+    await Campaign.findOne({
+      _id: campaignId,
+      organizationId:
+        context.organization._id,
+    })
+
+  if (!campaign) {
+    throw new ApiError(
+      404,
+      'Retail Media Campaign was not found for this organization.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_CAMPAIGN_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
+  if (campaign.payment?.status === 'paid') {
+    return {
+      campaign:
+        serializeCampaign(campaign),
+      verified: true,
+      deduplicated: true,
+    }
+  }
+
+  const { providerMode } =
+    assertRetailMediaTestPaymentConfiguration()
+
+  const providerOrderId =
+    String(
+      input.razorpayOrderId ||
+        '',
+    ).trim()
+
+  if (
+    !campaign.payment?.providerOrderId ||
+    campaign.payment.providerOrderId !==
+      providerOrderId
+  ) {
+    throw new ApiError(
+      409,
+      'Retail Media payment order does not match this campaign.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PAYMENT_ORDER_MISMATCH',
+        },
+      ],
+    )
+  }
+
+  const signatureValid =
+    verifyRazorpayCheckoutSignature({
+      providerOrderId,
+      providerPaymentId:
+        input.razorpayPaymentId,
+      signature:
+        input.razorpaySignature,
+    })
+
+  if (!signatureValid) {
+    throw new ApiError(
+      409,
+      'Retail Media test payment signature could not be verified.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PAYMENT_SIGNATURE_INVALID',
+        },
+      ],
+    )
+  }
+
+  const providerPayment =
+    await fetchRazorpayPayment({
+      providerPaymentId:
+        input.razorpayPaymentId,
+    })
+
+  const requiredAmountMinor =
+    Number(
+      campaign.payment?.requiredAmountMinor ||
+        0,
+    )
+
+  if (
+    providerPayment.providerOrderId !==
+      providerOrderId ||
+    providerPayment.amountMinor !==
+      requiredAmountMinor ||
+    providerPayment.currency !==
+      String(
+        campaign.payment?.currency ||
+          RETAIL_MEDIA_PAYMENT_CURRENCY,
+      ).toUpperCase() ||
+    providerPayment.captured !== true
+  ) {
+    throw new ApiError(
+      409,
+      'Retail Media test payment has not been captured for the expected campaign amount.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PAYMENT_NOT_CAPTURED',
+        },
+      ],
+    )
+  }
+
+  campaign.payment.status = 'paid'
+  campaign.payment.provider = 'razorpay'
+  campaign.payment.providerMode = providerMode
+  campaign.payment.providerPaymentId =
+    providerPayment.providerPaymentId
+  campaign.payment.paidAt =
+    new Date()
+
+  await campaign.save()
+
+  return {
+    campaign:
+      serializeCampaign(campaign),
+    verified: true,
+    deduplicated: false,
+  }
+}
+
 export async function transitionHostRetailMediaCampaign({
   campaignId,
   action,
@@ -621,6 +1243,19 @@ export async function transitionHostRetailMediaCampaign({
     action ===
     'activate'
   ) {
+    if (campaign.payment?.status !== 'paid') {
+      throw new ApiError(
+        409,
+        'Campaign payment must be completed before activation.',
+        [
+          {
+            code:
+              'M21_RETAIL_MEDIA_PAYMENT_REQUIRED',
+          },
+        ],
+      )
+    }
+
     if (
       campaign.status !==
         'approved' ||
@@ -797,6 +1432,22 @@ export async function reviewAdminRetailMediaCampaign({
         {
           code:
             'M21_RETAIL_MEDIA_PENDING_CAMPAIGN_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
+  if (
+    input.decision === 'approve' &&
+    campaign.payment?.status !== 'paid'
+  ) {
+    throw new ApiError(
+      409,
+      'Host payment must be completed before Super Admin approval.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PAYMENT_REQUIRED_FOR_APPROVAL',
         },
       ],
     )

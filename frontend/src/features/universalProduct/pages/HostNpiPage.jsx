@@ -91,9 +91,9 @@ const EMPTY_MANUAL_DETAILS = {
 
 
 const LISTING_TYPES = [
-  ["packaged", "Packaged Food", "Pack / label based grocery"],
-  ["vegetable", "Vegetables", "Fresh vegetable listing"],
-  ["fruit", "Fruits", "Fresh fruit listing"],
+  ["packaged", "Packaged products", "Products with a pack or label"],
+  ["vegetable", "Vegetables", "Fresh vegetable products"],
+  ["fruit", "Fruits", "Fresh fruit products"],
 ];
 
 const EMPTY_PRODUCE_DETAILS = {
@@ -316,8 +316,8 @@ function ProduceNpiForm({
 
       setPageSuccess(
         result?.resolution?.draft?.status === "ready_for_review"
-          ? `${typeLabel} draft created and sent to the governed Super Admin review queue.`
-          : `${typeLabel} evidence saved. Review the updated draft status.`
+          ? `${typeLabel} submission sent for review.`
+          : `${typeLabel} details saved. Check the updated review status.`
       );
 
       setDetails(EMPTY_PRODUCE_DETAILS);
@@ -338,7 +338,7 @@ function ProduceNpiForm({
       setPageError(
         getUniversalProductErrorMessage(
           requestError,
-          `Unable to create the ${typeLabel.toLowerCase()} NPI draft.`
+          `Unable to send the ${typeLabel.toLowerCase()} product for review.`
         )
       );
     } finally {
@@ -350,26 +350,26 @@ function ProduceNpiForm({
   return (
     <form
       onSubmit={submitProduce}
-      className="rounded-[26px] border border-stone-200 bg-white p-6 shadow-sm"
+      className="rounded-[22px] border border-[#b9dcf3] bg-[linear-gradient(145deg,#d9efff_0%,#eef8ff_100%)] p-3.5 shadow-[0_10px_24px_rgba(56,124,166,0.10)] sm:rounded-[28px] sm:p-6"
     >
       <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-100 text-emerald-800">
+        <div className="grid h-8 w-8 place-items-center rounded-xl bg-sky-200 text-sky-800 sm:h-10 sm:w-10 sm:rounded-2xl">
           <TypeIcon size={19} />
         </div>
 
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-            New {typeLabel.toLowerCase()} draft
+          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-xs">
+            ADD ONE {typeLabel.toUpperCase()}
           </p>
 
-          <h2 className="text-lg font-black text-stone-950">
-            Create fresh {typeLabel.toLowerCase()} listing
+          <h2 className="text-sm font-black text-stone-950 sm:text-lg">
+            Add a fresh {typeLabel.toLowerCase()} product
           </h2>
         </div>
       </div>
 
-      <div className="mt-5 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <label>
             <span className="text-xs font-black text-stone-500">
               {typeLabel} name *
@@ -383,7 +383,7 @@ function ProduceNpiForm({
                 }))
               }
               placeholder={isVegetable ? "Example: Tomato" : "Example: Banana"}
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
@@ -394,7 +394,7 @@ function ProduceNpiForm({
               onChange={(event) =>
                 setMarket(event.target.value.toUpperCase().slice(0, 10))
               }
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
@@ -414,7 +414,7 @@ function ProduceNpiForm({
                 }))
               }
               placeholder="Example: 1"
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
@@ -428,7 +428,7 @@ function ProduceNpiForm({
                   quantityUnit: event.target.value,
                 }))
               }
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
             >
               <option value="g">g</option>
               <option value="kg">kg</option>
@@ -450,7 +450,7 @@ function ProduceNpiForm({
                 }))
               }
               placeholder="Example: India"
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
@@ -467,7 +467,7 @@ function ProduceNpiForm({
                 }))
               }
               placeholder="Defaults to Fresh Produce"
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
 
@@ -483,20 +483,20 @@ function ProduceNpiForm({
                   manufacturerName: event.target.value,
                 }))
               }
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
             />
           </label>
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+        <div className="rounded-[18px] border border-[#b9dfd1] bg-[#dff6f1]/80 p-3 sm:rounded-2xl sm:p-4">
+          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-xs">
             Nutrition per 100 g · required
           </p>
           <p className="mt-1 text-[11px] font-semibold leading-5 text-stone-500">
-            Enter the declared nutrition values that Super Admin should verify before publication.
+            Enter the nutrition values you want shown for this product. EPANTRY will review them before the product reaches your catalog.
           </p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2.5 sm:mt-4 sm:grid-cols-2 sm:gap-3">
             {MANUAL_NUTRIENTS.map(([key, label, unit]) => (
               <label key={key}>
                 <span className="text-[10px] font-black uppercase tracking-[0.08em] text-stone-500">
@@ -528,7 +528,7 @@ function ProduceNpiForm({
             {typeLabel} photo *
           </p>
           <p className="mt-1 text-[11px] font-semibold leading-5 text-stone-500">
-            Add a clear product photo. It is retained as governed evidence and follows the same Super Admin review process.
+            Add a clear product photo so EPANTRY can review the item before it reaches your catalog.
           </p>
 
           <label className="focus-ring mt-3 inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-stone-950 px-4 py-3 text-sm font-black text-white hover:bg-stone-800">
@@ -582,7 +582,7 @@ function ProduceNpiForm({
       <button
         type="submit"
         disabled={submitting || (!evidenceFiles.length && !privacyPendingAssets.length)}
-        className="focus-ring mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="focus-ring mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-6 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
       >
         {submitting ? (
           <LoaderCircle size={18} className="animate-spin" />
@@ -593,7 +593,7 @@ function ProduceNpiForm({
           ? progress
             ? `Uploading ${progress.completed}/${progress.total}…`
             : "Submitting…"
-          : `Create ${typeLabel.toLowerCase()} NPI draft`}
+          : `Send ${typeLabel.toLowerCase()} for review`}
       </button>
     </form>
   );
@@ -923,7 +923,7 @@ function BulkNpiPanel({
     } catch (requestError) {
       setWorkbookFile(null);
       setRows([]);
-      setPageError(requestError?.message || "Unable to read the bulk NPI workbook.");
+      setPageError(requestError?.message || "Unable to read the bulk product file.");
     } finally {
       setReading(false);
     }
@@ -1013,7 +1013,7 @@ function BulkNpiPanel({
       setUploadProgress({
         completed: readyRows.length,
         total: readyRows.length,
-        label: "Creating governed bulk NPI batch…",
+        label: "Preparing products for review…",
       });
 
       const result = await createHostBulkNpiBatch({
@@ -1033,7 +1033,7 @@ function BulkNpiPanel({
 
       setBatchResult(result?.batch || null);
       setPageSuccess(
-        `${result?.batch?.submittedRowCount || payloadRows.length} ${typeLabel} rows were submitted as a governed bulk NPI batch. ${issueRows.length} workbook row(s) remain local issues and were not submitted.`
+        `${result?.batch?.submittedRowCount || payloadRows.length} ${typeLabel} rows were sent for review. ${issueRows.length} row(s) still need fixing.`
       );
 
       await onSubmitted();
@@ -1043,7 +1043,7 @@ function BulkNpiPanel({
       setPageError(
         getUniversalProductErrorMessage(
           requestError,
-          `Unable to submit the bulk ${typeLabel.toLowerCase()} NPI batch.`
+          `Unable to send the bulk ${typeLabel.toLowerCase()} products for review.`
         )
       );
     } finally {
@@ -1053,54 +1053,59 @@ function BulkNpiPanel({
   }
 
   return (
-    <section className="mt-5 overflow-hidden rounded-[26px] border border-blue-200 bg-blue-50 shadow-sm">
-      <div className="flex flex-col gap-4 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
+    <section className="mt-3 overflow-hidden rounded-[22px] border border-[#c7c2ef] bg-[#eee7ff]/75 shadow-[0_10px_24px_rgba(92,75,150,0.10)] sm:mt-5 sm:rounded-[28px]">
+      <div className="flex flex-col gap-2.5 bg-[linear-gradient(110deg,#d9efff_0%,#eee7ff_52%,#dff6f1_100%)] p-3 text-stone-950 sm:gap-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white sm:h-11 sm:w-11 sm:rounded-2xl">
             <FileSpreadsheet size={21} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-100">
-              Bulk {typeLabel} listing
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700 sm:text-[10px]">
+              BULK PRODUCT UPLOAD
             </p>
-            <h2 className="mt-1 text-lg font-black">
-              Upload many products without repeating the single-product form
+            <h2 className="mt-0.5 text-sm font-black sm:mt-1 sm:text-lg">
+              Add many products at once
             </h2>
-            <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-blue-100/85">
-              The workbook includes product facts, price, availability, inventory node and delivery area. Product images are selected separately and matched by filename.
+            <p className="mt-1 max-w-3xl font-semibold text-stone-600">
+              <span className="block whitespace-nowrap text-[9px] leading-4 sm:hidden">
+                Use the template for details, then match images by filename.
+              </span>
+              <span className="hidden text-xs leading-5 sm:block">
+                Use the Excel template for product details, price, stock and delivery setup. Add product images separately and match them by filename.
+              </span>
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
           <a
             href={BULK_TEMPLATE_PATHS[listingType]}
             download
-            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-blue-800 shadow-sm hover:bg-blue-50"
+            className="focus-ring inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-2 py-2 text-[9px] font-black text-indigo-800 shadow-sm hover:bg-indigo-50 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-xs"
           >
             <Download size={15} />
-            Download Excel Template
+            Download template
           </a>
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
-            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-xs font-black text-white hover:bg-white/20"
+            className="focus-ring inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-violet-200 bg-violet-600 px-2 py-2 text-[9px] font-black text-white hover:bg-violet-700 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-xs"
           >
             <TableProperties size={15} />
-            {open ? "Close Bulk Listing" : `Open Bulk ${typeLabel}`}
+            {open ? "Close bulk upload" : "Open bulk upload"}
           </button>
         </div>
       </div>
 
       {open ? (
-        <div className="p-5 sm:p-6">
-          <div className="grid gap-3 md:grid-cols-3">
+        <div className="p-3 sm:p-6">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
             {[
-              ["01", "Fill Excel", "Keep template headers unchanged"],
-              ["02", "Select images", "Filenames must match workbook cells"],
-              ["03", "Validate & submit", "Only ready rows enter governance"],
+              ["01", "Fill template", "Add the product and selling details."],
+              ["02", "Add images", "Match image filenames with the template."],
+              ["03", "Check & send", "Only complete rows are sent for review."],
             ].map(([step, title, helper]) => (
-              <div key={step} className="rounded-2xl bg-white p-4 shadow-sm">
+              <div key={step} className="rounded-2xl bg-white/90 p-2.5 shadow-sm sm:p-4">
                 <div className="flex items-center gap-3">
                   <span className="grid h-8 w-8 place-items-center rounded-full bg-blue-100 text-xs font-black text-blue-800">
                     {step}
@@ -1120,7 +1125,7 @@ function BulkNpiPanel({
             <label className="focus-ring flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-300 bg-white p-5 text-center hover:border-blue-500">
               <FileSpreadsheet size={24} className="text-blue-700" />
               <span className="mt-3 text-sm font-black text-blue-950">
-                {workbookFile ? workbookFile.name : "Choose completed Excel workbook"}
+                {workbookFile ? workbookFile.name : "Choose completed product file"}
               </span>
               <span className="mt-1 text-xs font-semibold text-stone-500">
                 .xlsx template or exported .csv
@@ -1140,7 +1145,7 @@ function BulkNpiPanel({
             <label className="focus-ring flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50 p-5 text-center hover:border-violet-500">
               <Images size={24} className="text-violet-700" />
               <span className="mt-3 text-sm font-black text-violet-950">
-                Select all product images
+                Add product images
               </span>
               <span className="mt-1 text-xs font-semibold text-stone-500">
                 JPG, PNG or WEBP · {imageFiles.length} selected
@@ -1216,7 +1221,7 @@ function BulkNpiPanel({
                               ? item.issues.join(" · ")
                               : item.warnings.length
                                 ? item.warnings.join(" · ")
-                                : "Ready for governed review."}
+                                : "Ready to send for review."}
                           </td>
                         </tr>
                       ))}
@@ -1228,10 +1233,10 @@ function BulkNpiPanel({
               <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-slate-950 p-4 text-white sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-black">
-                    Submit {readyRows.length} ready row(s) as one governed batch
+                    Send {readyRows.length} ready row(s) for review
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-300">
-                    {issueRows.length} issue row(s) stay out of the batch until you fix and re-upload them.
+                    {issueRows.length} row(s) need fixing before they can be sent.
                   </p>
                 </div>
                 <button
@@ -1255,7 +1260,7 @@ function BulkNpiPanel({
                     ? uploadProgress?.label || "Submitting bulk batch…"
                     : batchResult
                       ? "Batch submitted"
-                      : "Submit ready rows"}
+                      : "Send ready rows"}
                 </button>
               </div>
 
@@ -1267,7 +1272,7 @@ function BulkNpiPanel({
             </>
           ) : (
             <div className="mt-4 rounded-2xl border border-blue-200 bg-white p-4 text-xs font-semibold leading-5 text-stone-600">
-              Download the template, complete the Products sheet, then upload it here. The existing single-product form below remains unchanged and can still be used anytime.
+              Download the template, fill in the Products sheet and upload it here. You can still use the single-product form below anytime.
             </div>
           )}
         </div>
@@ -1298,6 +1303,25 @@ function statusClasses(status) {
 
     default:
       return "bg-stone-100 text-stone-600";
+  }
+}
+
+function draftStatusLabel(status) {
+  switch (status) {
+    case "provisional":
+      return "In progress";
+    case "extracting":
+      return "Checking details";
+    case "ready_for_review":
+      return "Ready for review";
+    case "needs_more_evidence":
+      return "More info needed";
+    case "approved_for_catalog":
+      return "Approved for catalog";
+    case "rejected":
+      return "Not approved";
+    default:
+      return labelize(status);
   }
 }
 
@@ -1386,10 +1410,20 @@ export default function HostNpiPage() {
 
   const [additionalProgress, setAdditionalProgress] = useState(null);
 
+  const [showAllDrafts, setShowAllDrafts] = useState(false);
+
+  const [allDrafts, setAllDrafts] = useState([]);
+
+  const [loadingAllDrafts, setLoadingAllDrafts] = useState(false);
+
+  const [popupStatus, setPopupStatus] = useState("");
+
   const selectedAuthority = useMemo(
     () => authorities.find((item) => item.id === authorityGrantId) || null,
     [authorities, authorityGrantId]
   );
+
+  const totalDraftCount = Number(pagination?.total || drafts.length);
 
   const loadData = useCallback(
     async (background = false) => {
@@ -1429,7 +1463,7 @@ export default function HostNpiPage() {
         setError(
           getUniversalProductErrorMessage(
             requestError,
-            "Unable to load Host NPI workspace."
+            "Unable to load the product setup workspace."
           )
         );
       } finally {
@@ -1444,6 +1478,55 @@ export default function HostNpiPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  async function openAllDrafts(nextStatus = status) {
+    setShowAllDrafts(true);
+    setPopupStatus(nextStatus);
+    setLoadingAllDrafts(true);
+    setAllDrafts([]);
+    setError("");
+
+    try {
+      const firstPage = await listHostNpiDrafts({
+        page: 1,
+        limit: 100,
+        status: nextStatus || undefined,
+      });
+
+      const firstDrafts = firstPage?.drafts || [];
+      const totalPages = Math.max(1, Number(firstPage?.pagination?.pages || 1));
+
+      if (totalPages === 1) {
+        setAllDrafts(firstDrafts);
+        return;
+      }
+
+      const remainingPages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          listHostNpiDrafts({
+            page: index + 2,
+            limit: 100,
+            status: nextStatus || undefined,
+          })
+        )
+      );
+
+      setAllDrafts([
+        ...firstDrafts,
+        ...remainingPages.flatMap((result) => result?.drafts || []),
+      ]);
+    } catch (requestError) {
+      setShowAllDrafts(false);
+      setError(
+        getUniversalProductErrorMessage(
+          requestError,
+          "Unable to load all product submissions."
+        )
+      );
+    } finally {
+      setLoadingAllDrafts(false);
+    }
+  }
 
   function addFiles(event) {
     setPrivacyPendingAssets([]);
@@ -1475,7 +1558,7 @@ export default function HostNpiPage() {
 
     if (!evidenceFiles.length) {
       setError(
-        "Add at least one package image before starting NPI extraction."
+        "Add at least one clear pack image before sending this product for review."
       );
 
       return;
@@ -1522,8 +1605,8 @@ export default function HostNpiPage() {
 
       setSuccess(
         result?.resolution?.draft?.status === "ready_for_review"
-          ? "NPI draft created and sent to the governed review queue."
-          : "NPI evidence saved. The draft needs more evidence or manual review."
+          ? "Product submission sent for review."
+          : "Product details were saved. Check the review status for any missing information."
       );
 
       setEvidenceFiles([]);
@@ -1555,7 +1638,7 @@ export default function HostNpiPage() {
       setError(
         getUniversalProductErrorMessage(
           requestError,
-          "Unable to create the Host NPI draft."
+          "Unable to send this product for review."
         )
       );
     } finally {
@@ -1627,11 +1710,11 @@ export default function HostNpiPage() {
       setSuccess(
         result?.resolution?.draft?.status === "ready_for_review"
           ? isProduceDraft
-            ? "Additional product photo attached and the produce draft is ready for governed review."
-            : "Additional package evidence attached and the NPI draft is ready for governed review."
+            ? "Product photo added. This product is ready for review."
+            : "Pack photo added. This product is ready for review."
           : isProduceDraft
-            ? "Additional product photo attached. Review the updated produce draft status."
-            : "Additional package evidence attached. Review the updated NPI draft status."
+            ? "Product photo added. Check the updated review status."
+            : "Pack photo added. Check the updated review status."
       );
 
       await loadData(true);
@@ -1650,7 +1733,7 @@ export default function HostNpiPage() {
       setError(
         getUniversalProductErrorMessage(
           requestError,
-          "Unable to attach additional evidence to this NPI draft."
+          "Unable to add the extra product photo."
         )
       );
     } finally {
@@ -1672,7 +1755,7 @@ export default function HostNpiPage() {
       setError(
         getUniversalProductErrorMessage(
           requestError,
-          "Unable to load the Host NPI draft."
+          "Unable to load the product submission."
         )
       );
     } finally {
@@ -1700,8 +1783,8 @@ export default function HostNpiPage() {
 
       setSuccess(
         result?.resolution?.draft?.status === "ready_for_review"
-          ? "Privacy-cleared evidence resumed successfully and the NPI draft is ready for governed review."
-          : "Privacy-cleared evidence resumed. Review the updated NPI draft status."
+          ? "The saved product photos are ready and this product can continue to review."
+          : "The saved product photos were checked again. Review the updated status."
       );
 
       await loadData(true);
@@ -1714,7 +1797,7 @@ export default function HostNpiPage() {
       setError(
         getUniversalProductErrorMessage(
           requestError,
-          "Unable to resume NPI extraction from the stored evidence."
+          "Unable to continue checking the saved product photos."
         )
       );
     } finally {
@@ -1723,46 +1806,85 @@ export default function HostNpiPage() {
   }
 
   return (
-    <div className="p-5 sm:p-7 lg:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-            S03 · AI-assisted onboarding
-          </p>
+    <div className="p-3 sm:p-6 lg:p-7">
+      <section className="rounded-[22px] border border-[#9fdcc2] bg-[linear-gradient(145deg,#c9f3df_0%,#e7f8ef_100%)] p-3 shadow-[0_10px_24px_rgba(38,116,86,0.10)] sm:rounded-[30px] sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#17483b] sm:text-xs">
+              PRODUCT SETUP
+            </p>
 
-          <h1 className="mt-1 text-3xl font-black tracking-tight text-stone-950">
-            Product NPI
-          </h1>
+            <div className="mt-0.5 flex items-center justify-between gap-2 sm:mt-1 sm:block">
+              <h1 className="whitespace-nowrap text-[19px] font-black tracking-[-0.03em] text-stone-950 sm:text-3xl">
+                Add / Edit Products
+              </h1>
 
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-            {listingType === "packaged" ? (
-              <>
-                Submit package evidence for AI-assisted extraction. The result
-                remains provisional until M03-authorized human review; this screen
-                never publishes a canonical Product Version.
-              </>
-            ) : (
-              <>
-                Submit a fresh product photo, quantity and declared nutrition. The
-                draft follows the same Super Admin verification and governed catalog
-                publication flow.
-              </>
-            )}
-          </p>
+              <button
+                type="button"
+                disabled={refreshing}
+                onClick={() => loadData(true)}
+                className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-[11px] border border-[#8fd0b6] bg-white/90 px-2 py-1.5 text-[9px] font-black text-[#17483b] shadow-sm hover:bg-white disabled:opacity-60 sm:hidden"
+              >
+                <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
+                Refresh
+              </button>
+            </div>
+
+            <p className="mt-1 max-w-3xl font-semibold text-stone-700 sm:mt-2">
+              <span className="block whitespace-nowrap text-[9px] leading-4 sm:hidden">
+                {listingType === "packaged"
+                  ? "Add one or upload many — EPANTRY checks each before catalog use."
+                  : "Add fresh produce with details and a photo for EPANTRY review."}
+              </span>
+              <span className="hidden text-sm leading-6 sm:block">
+                {listingType === "packaged"
+                  ? "Add one packaged product or upload many at once. EPANTRY checks the details before they move to your catalog."
+                  : "Add fresh produce with the key details and a clear photo. EPANTRY reviews the submission before it moves to your catalog."}
+              </span>
+            </p>
+          </div>
+
+          <button
+            type="button"
+            disabled={refreshing}
+            onClick={() => loadData(true)}
+            className="focus-ring hidden shrink-0 items-center gap-1.5 rounded-2xl border border-[#8fd0b6] bg-white/90 px-4 py-2.5 text-xs font-black text-[#17483b] shadow-sm hover:bg-white disabled:opacity-60 sm:inline-flex"
+          >
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            Refresh
+          </button>
         </div>
 
-        <button
-          type="button"
-          disabled={refreshing}
-          onClick={() => loadData(true)}
-          className="focus-ring inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-xs font-black text-stone-600 hover:border-emerald-300 hover:text-emerald-800 disabled:opacity-60"
-        >
-          <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
-          Refresh
-        </button>
-      </div>
+        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-4">
+          {[
+            ["01", "Choose type", "Pick packaged food, vegetables or fruit.", "bg-sky-100 text-sky-900"],
+            ["02", "Add details", "Enter product facts and add clear photos.", "bg-violet-100 text-violet-900"],
+            ["03", "Send for review", "EPANTRY checks the submission before catalog use.", "bg-cyan-100 text-cyan-900"],
+            ["04", "Continue to catalog", "Use approved products in your Host catalog.", "bg-emerald-50 text-emerald-900"],
+          ].map(([step, title, helper, tone]) => (
+            <div
+              key={step}
+              className={`rounded-[14px] border border-white/75 p-2 shadow-[0_5px_12px_rgba(54,69,61,0.07)] sm:rounded-[22px] sm:p-4 ${tone}`}
+            >
+              <div className="flex items-start gap-2">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/85 text-[9px] font-black sm:h-8 sm:w-8 sm:text-[10px]">
+                  {step}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black leading-[13px] sm:text-sm sm:leading-5">
+                    {title}
+                  </p>
+                  <p className="mt-0.5 text-[8px] font-semibold leading-[11px] opacity-75 sm:mt-1 sm:text-[11px] sm:leading-4">
+                    {helper}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
         {LISTING_TYPES.map(([value, label, description]) => {
           const selected = listingType === value;
           const TypeIcon =
@@ -1779,25 +1901,31 @@ export default function HostNpiPage() {
                 setPrivacyHolds([]);
               }}
               className={[
-                "focus-ring flex min-h-24 items-center gap-4 rounded-[22px] border p-4 text-left transition",
+                "focus-ring flex min-h-[68px] flex-col items-start gap-1.5 rounded-[16px] border p-2.5 text-left transition sm:min-h-24 sm:flex-row sm:items-center sm:gap-4 sm:rounded-[24px] sm:p-4",
                 selected
-                  ? "border-emerald-700 bg-emerald-700 text-white shadow-sm"
-                  : "border-stone-200 bg-white text-stone-800 hover:border-emerald-300 hover:bg-emerald-50/40",
+                  ? "border-[#17483b] bg-[linear-gradient(145deg,#17483b_0%,#0f382e_100%)] text-white shadow-[0_8px_18px_rgba(23,72,59,0.18)]"
+                  : value === "packaged"
+                    ? "border-[#b9dcf3] bg-[#d9efff] text-stone-800 shadow-[0_5px_12px_rgba(56,124,166,0.08)] hover:border-[#8bc4e8]"
+                    : value === "vegetable"
+                      ? "border-[#a9dfc5] bg-[#c9f3df] text-stone-800 shadow-[0_5px_12px_rgba(38,116,86,0.08)] hover:border-[#79c9a7]"
+                      : "border-[#f2c8b9] bg-[#ffe6d9] text-stone-800 shadow-[0_5px_12px_rgba(154,92,65,0.08)] hover:border-[#e9ae97]",
               ].join(" ")}
             >
               <span
                 className={[
-                  "grid h-12 w-12 shrink-0 place-items-center rounded-2xl",
-                  selected ? "bg-white/15 text-white" : "bg-emerald-50 text-emerald-700",
+                  "grid h-7 w-7 shrink-0 place-items-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl",
+                  selected ? "bg-white/15 text-white" : "bg-white text-emerald-700",
                 ].join(" ")}
               >
-                <TypeIcon size={22} />
+                <TypeIcon className="h-4 w-4 sm:h-[22px] sm:w-[22px]" />
               </span>
-              <span>
-                <span className="block text-sm font-black">{label}</span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-black leading-[12px] sm:text-sm sm:leading-5">
+                  {label}
+                </span>
                 <span
                   className={[
-                    "mt-1 block text-xs font-semibold",
+                    "mt-0.5 hidden text-[9px] font-semibold leading-[12px] sm:block sm:text-xs sm:leading-4",
                     selected ? "text-emerald-50" : "text-stone-500",
                   ].join(" ")}
                 >
@@ -1809,14 +1937,16 @@ export default function HostNpiPage() {
         })}
       </div>
 
-      <div className="mt-5 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-        <ShieldCheck size={20} className="mt-0.5 shrink-0" />
+      <div className="mt-3 flex items-center gap-2 rounded-[16px] border border-[#d3c8f3] bg-[#eee7ff] p-2.5 text-violet-950 shadow-[0_5px_12px_rgba(92,75,150,0.07)] sm:mt-5 sm:items-start sm:gap-3 sm:rounded-[22px] sm:p-4">
+        <ShieldCheck size={18} className="mt-0.5 shrink-0 sm:size-5" />
 
-        <p className="text-xs font-semibold leading-5">
-          Privileged Host NPI is authorized by backend Host capability + active
-          Host status + MFA. Brand-linked submissions additionally require an
-          active BrandAuthorityGrant for the Host organization and market.
-          activeMode is never authority.
+        <p className="min-w-0 font-semibold">
+          <span className="block whitespace-nowrap text-[9px] leading-4 sm:hidden">
+            Submit products for review; brand items may need approved access.
+          </span>
+          <span className="hidden text-xs leading-5 sm:block">
+            Your Host account can submit products for review. Brand-linked products may also need approved brand access before they can be published.
+          </span>
         </p>
       </div>
 
@@ -1854,41 +1984,41 @@ export default function HostNpiPage() {
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="mt-3 grid gap-3 sm:mt-6 sm:gap-6 lg:grid-cols-2">
         {listingType === "packaged" ? (
         <form
           onSubmit={submitNpi}
-          className="rounded-[26px] border border-stone-200 bg-white p-6 shadow-sm"
+          className="rounded-[22px] border border-[#b9dcf3] bg-[linear-gradient(145deg,#d9efff_0%,#eef8ff_100%)] p-3.5 shadow-[0_10px_24px_rgba(56,124,166,0.10)] sm:rounded-[28px] sm:p-6"
         >
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-100 text-emerald-800">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-sky-200 text-sky-800 sm:h-10 sm:w-10 sm:rounded-2xl">
               <Sparkles size={19} />
             </div>
 
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-                New draft
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-xs">
+                ADD ONE PRODUCT
               </p>
 
-              <h2 className="text-lg font-black text-stone-950">
-                Create from package evidence + manual details
+              <h2 className="text-sm font-black text-stone-950 sm:text-lg">
+                Add a packaged product
               </h2>
             </div>
           </div>
 
-          <div className="mt-5 space-y-4">
+          <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-4">
             <label className="block">
               <span className="text-xs font-black text-stone-500">
-                Verified Brand authority (optional)
+                Brand access (optional)
               </span>
 
               <select
                 value={authorityGrantId}
                 onChange={(event) => setAuthorityGrantId(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
               >
                 <option value="">
-                  Unlinked / community-style provisional NPI
+                  No linked brand
                 </option>
 
                 {authorities.map((authority) => (
@@ -1900,7 +2030,7 @@ export default function HostNpiPage() {
               </select>
             </label>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
               <label>
                 <span className="text-xs font-black text-stone-500">
                   Market
@@ -1911,13 +2041,13 @@ export default function HostNpiPage() {
                   onChange={(event) =>
                     setMarket(event.target.value.toUpperCase().slice(0, 10))
                   }
-                  className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                  className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
                 />
               </label>
 
               <label>
                 <span className="text-xs font-black text-stone-500">
-                  Barcode hint
+                  Barcode / GTIN
                 </span>
 
                 <input
@@ -1929,13 +2059,13 @@ export default function HostNpiPage() {
                       barcode: event.target.value,
                     }))
                   }
-                  className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                  className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
                 />
               </label>
 
               <label>
                 <span className="text-xs font-black text-stone-500">
-                  Product name hint
+                  Product name
                 </span>
 
                 <input
@@ -1947,13 +2077,13 @@ export default function HostNpiPage() {
                       title: event.target.value,
                     }))
                   }
-                  className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                  className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
                 />
               </label>
 
               <label>
                 <span className="text-xs font-black text-stone-500">
-                  Brand name hint
+                  Brand name
                 </span>
 
                 <input
@@ -1965,13 +2095,13 @@ export default function HostNpiPage() {
                       brandName: event.target.value,
                     }))
                   }
-                  className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                  className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
                 />
               </label>
 
               <label className="sm:col-span-2">
                 <span className="text-xs font-black text-stone-500">
-                  Printed pack size hint
+                  Pack size on label
                 </span>
 
                 <input
@@ -1984,32 +2114,35 @@ export default function HostNpiPage() {
                     }))
                   }
                   placeholder="Example: 1 kg"
-                  className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                  className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
                 />
               </label>
             </div>
 
-            <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/40 p-4 sm:p-5">
+            <div className="rounded-[18px] border border-[#b9dfd1] bg-[#dff6f1]/80 p-3 sm:rounded-[24px] sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-                    Manual product details · optional
+                    PRODUCT DETAILS · OPTIONAL
                   </p>
 
-                  <h3 className="mt-1 text-sm font-black text-stone-900">
-                    Enter or correct label facts before creating NPI
+                  <h3 className="mt-0.5 font-black text-stone-900 sm:mt-1">
+                    <span className="block whitespace-nowrap text-[12px] sm:hidden">Check product details</span>
+                    <span className="hidden text-sm sm:block">Check and complete the product details</span>
                   </h3>
 
-                  <p className="mt-1 max-w-2xl text-[11px] font-semibold leading-5 text-stone-500">
-                    Manual values override AI extraction for this draft, are marked
-                    as Host-declared, and still require Super Admin review before
-                    canonical publication. Dietary declarations remain claims until
-                    governed Food Intelligence evaluates them.
+                  <p className="mt-0.5 max-w-2xl font-semibold text-stone-500 sm:mt-1">
+                    <span className="block whitespace-nowrap text-[9px] leading-4 sm:hidden">
+                      Use the pack label to complete details before review.
+                    </span>
+                    <span className="hidden text-[11px] leading-5 sm:block">
+                      Use the pack label to correct or complete the product details. Your entries stay with this submission and are checked before catalog use.
+                    </span>
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 sm:gap-4">
                 <label className="sm:col-span-2">
                   <span className="text-xs font-black text-stone-500">
                     Ingredients declaration
@@ -2026,7 +2159,7 @@ export default function HostNpiPage() {
                     rows={3}
                     maxLength={10000}
                     placeholder="Example: Tomato, jalapeño pepper, onion, garlic, lime juice, coriander, salt"
-                    className="mt-2 w-full resize-y rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 w-full resize-y rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
 
@@ -2044,7 +2177,7 @@ export default function HostNpiPage() {
                       }))
                     }
                     placeholder="Example: Soy, Milk"
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
 
@@ -2062,7 +2195,7 @@ export default function HostNpiPage() {
                       }))
                     }
                     placeholder="Comma separated, if printed"
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
 
@@ -2080,7 +2213,7 @@ export default function HostNpiPage() {
                       }))
                     }
                     placeholder="Example: Contains soy."
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
 
@@ -2098,7 +2231,7 @@ export default function HostNpiPage() {
                       }))
                     }
                     placeholder="Example: Japan"
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
 
@@ -2116,17 +2249,22 @@ export default function HostNpiPage() {
                       }))
                     }
                     placeholder="Printed manufacturer or packer name"
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4">
+              <div className="mt-3 rounded-[16px] border border-stone-200 bg-white p-3 sm:mt-5 sm:rounded-2xl sm:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-xs font-black text-stone-800">Nutrition</p>
-                    <p className="mt-1 text-[10px] font-semibold text-stone-400">
-                      Leave values blank when they are not declared on the pack.
+                    <p className="mt-0.5 font-semibold text-stone-400 sm:mt-1">
+                      <span className="block whitespace-nowrap text-[9px] sm:hidden">
+                        Leave blank if it is not shown on the pack.
+                      </span>
+                      <span className="hidden text-[10px] sm:block">
+                        Leave values blank when they are not declared on the pack.
+                      </span>
                     </p>
                   </div>
 
@@ -2147,7 +2285,7 @@ export default function HostNpiPage() {
                   </select>
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-4 sm:gap-3 lg:grid-cols-4">
                   {MANUAL_NUTRIENTS.map(([key, label, unit]) => (
                     <label key={key}>
                       <span className="text-[10px] font-black uppercase tracking-[0.08em] text-stone-500">
@@ -2168,13 +2306,13 @@ export default function HostNpiPage() {
                             },
                           }))
                         }
-                        className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                        className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:px-3 sm:py-2.5 sm:text-sm"
                       />
                     </label>
                   ))}
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-4 sm:gap-3">
                   <label>
                     <span className="text-[10px] font-black uppercase tracking-[0.08em] text-stone-500">
                       Serving size value (optional)
@@ -2191,7 +2329,7 @@ export default function HostNpiPage() {
                           servingSizeValue: event.target.value,
                         }))
                       }
-                      className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                      className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:px-3 sm:py-2.5 sm:text-sm"
                     />
                   </label>
 
@@ -2208,7 +2346,7 @@ export default function HostNpiPage() {
                           servingSizeUnit: event.target.value,
                         }))
                       }
-                      className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                      className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:px-3 sm:py-2.5 sm:text-sm"
                     >
                       <option value="g">g</option>
                       <option value="kg">kg</option>
@@ -2220,12 +2358,12 @@ export default function HostNpiPage() {
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3 sm:mt-4">
                 <p className="text-xs font-black text-stone-700">
-                  Dietary declarations printed on pack
+                  Dietary information on pack
                 </p>
 
-                <div className="mt-3 flex flex-wrap gap-3">
+                <div className="mt-2 flex flex-wrap gap-2 sm:mt-3 sm:gap-3">
                   {[
                     ["vegetarian", "Vegetarian"],
                     ["vegan", "Vegan"],
@@ -2256,10 +2394,13 @@ export default function HostNpiPage() {
               </div>
             </div>
 
-            <p className="text-[11px] font-semibold leading-5 text-stone-500">
-              Add at least one pack image for visual/audit evidence. AI may extract
-              from it, but any manual details entered above take precedence in the
-              provisional draft and remain subject to Super Admin approval.
+            <p className="font-semibold text-stone-500">
+              <span className="block whitespace-nowrap text-[9px] leading-4 sm:hidden">
+                Add one clear pack image for EPANTRY review.
+              </span>
+              <span className="hidden text-[11px] leading-5 sm:block">
+                Add at least one clear pack image. EPANTRY uses the photo and the details you enter to prepare the product for review.
+              </span>
             </p>
 
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -2332,7 +2473,7 @@ export default function HostNpiPage() {
           <button
             type="submit"
             disabled={submitting || !evidenceFiles.length}
-            className="focus-ring mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="focus-ring mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-6 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
           >
             {submitting ? (
               <LoaderCircle size={18} className="animate-spin" />
@@ -2342,9 +2483,9 @@ export default function HostNpiPage() {
 
             {submitting
               ? progress
-                ? `Uploading ${progress.completed}/${progress.total} and extracting…`
-                : "Extracting…"
-              : "Create provisional NPI draft"}
+                ? `Uploading ${progress.completed}/${progress.total} and checking…`
+                : "Checking…"
+              : "Send product for review"}
           </button>
         </form>
         ) : (
@@ -2360,113 +2501,265 @@ export default function HostNpiPage() {
           />
         )}
 
-        <section className="rounded-[26px] border border-stone-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-                Organization-scoped drafts
+        <section className="rounded-[22px] border border-[#d3c8f3] bg-[linear-gradient(145deg,#eee7ff_0%,#f7f3ff_100%)] p-3.5 shadow-[0_10px_24px_rgba(92,75,150,0.10)] sm:rounded-[28px] sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-700 sm:text-xs">
+                YOUR PRODUCT SUBMISSIONS
               </p>
 
-              <h2 className="mt-1 text-lg font-black text-stone-950">
-                NPI history
+              <h2 className="mt-0.5 text-sm font-black text-stone-950 sm:mt-1 sm:text-lg">
+                Product review history
               </h2>
             </div>
 
             <select
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold outline-none"
+              onChange={(event) => {
+                setStatus(event.target.value);
+                setShowAllDrafts(false);
+                setAllDrafts([]);
+              }}
+              className="max-w-[130px] rounded-xl border border-violet-200 bg-white px-2.5 py-2 text-[10px] font-bold outline-none sm:max-w-none sm:px-3 sm:text-xs"
             >
               {STATUS_OPTIONS.map((value) => (
                 <option key={value || "all"} value={value}>
-                  {value ? labelize(value) : "All statuses"}
+                  {value ? draftStatusLabel(value) : "All statuses"}
                 </option>
               ))}
             </select>
           </div>
 
           {loading ? (
-            <div className="grid min-h-64 place-items-center">
+            <div className="grid min-h-40 place-items-center sm:min-h-64">
               <LoaderCircle
-                size={26}
-                className="animate-spin text-emerald-700"
+                size={24}
+                className="animate-spin text-violet-700"
               />
             </div>
           ) : drafts.length ? (
-            <div className="mt-5 space-y-3">
-              {drafts.map((draft) => (
-                <button
-                  key={draft.id}
-                  type="button"
-                  onClick={() => openDraft(draft.id)}
-                  className="focus-ring block w-full rounded-2xl border border-stone-200 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50/30"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-stone-900">
-                        {fieldValue(draft.candidateFields?.displayName) === "—"
-                          ? draft.barcode || "Provisional product"
-                          : fieldValue(draft.candidateFields?.displayName)}
-                      </p>
+            <>
+              <div className="mt-3 space-y-2 sm:mt-5 sm:space-y-3">
+                {drafts.slice(0, 12).map((draft, index) => (
+                  <button
+                    key={draft.id}
+                    type="button"
+                    onClick={() => openDraft(draft.id)}
+                    className={[
+                      "focus-ring w-full rounded-2xl border border-violet-100 bg-white/90 p-3 text-left shadow-sm transition hover:border-violet-300 hover:bg-white sm:p-4",
+                      index >= 5 ? "hidden lg:block" : "block",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start justify-between gap-2 sm:gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-black text-stone-900 sm:text-sm">
+                          {fieldValue(draft.candidateFields?.displayName) === "—"
+                            ? draft.barcode || "Product submission"
+                            : fieldValue(draft.candidateFields?.displayName)}
+                        </p>
 
-                      <p className="mt-1 text-xs font-semibold text-stone-500">
-                        {draft.barcode
-                          ? `GTIN ${draft.barcode}`
-                          : "No barcode extracted"}
-                      </p>
+                        <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:mt-1 sm:text-xs">
+                          {draft.barcode
+                            ? `GTIN ${draft.barcode}`
+                            : "No barcode added"}
+                        </p>
+                      </div>
+
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-black sm:px-2.5 sm:text-[10px] ${statusClasses(
+                          draft.status
+                        )}`}
+                      >
+                        {draftStatusLabel(draft.status)}
+                      </span>
                     </div>
 
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${statusClasses(
-                        draft.status
-                      )}`}
-                    >
-                      {labelize(draft.status)}
-                    </span>
-                  </div>
+                    <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[8px] font-bold text-stone-500 sm:mt-3 sm:text-[10px]">
+                      <span>
+                        {draft.brandAuthorityVerified
+                          ? "Brand access confirmed"
+                          : "No linked brand access"}
+                      </span>
 
-                  <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold text-stone-500">
-                    <span>
-                      {draft.brandAuthorityVerified
-                        ? "Brand authority verified"
-                        : "No canonical brand authority linked"}
-                    </span>
+                      <span>·</span>
 
-                    <span>·</span>
+                      <span>
+                        {draft.readyForCatalog
+                          ? "Ready for catalog"
+                          : "Waiting for catalog approval"}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
 
-                    <span>
-                      {draft.readyForCatalog
-                        ? "Ready for M04 handoff"
-                        : "Canonical publish not performed"}
-                    </span>
-                  </div>
+              {totalDraftCount > 5 ? (
+                <button
+                  type="button"
+                  onClick={() => openAllDrafts()}
+                  className="focus-ring mt-3 inline-flex w-full items-center justify-center rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-[10px] font-black text-violet-800 shadow-sm hover:bg-violet-100 lg:hidden"
+                >
+                  View all {totalDraftCount} submissions
                 </button>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5 rounded-2xl bg-stone-50 p-6 text-center">
-              <FileSearch size={28} className="mx-auto text-stone-300" />
+              ) : null}
 
-              <p className="mt-3 text-sm font-black text-stone-700">
-                No NPI drafts in this filter
+              {totalDraftCount > 12 ? (
+                <div className="mt-4 hidden justify-end lg:flex">
+                  <button
+                    type="button"
+                    onClick={() => openAllDrafts()}
+                    className="focus-ring inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-xs font-black text-violet-800 shadow-sm hover:bg-violet-100"
+                  >
+                    View all {totalDraftCount} submissions
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="mt-4 rounded-2xl bg-white/75 p-4 text-center sm:mt-5 sm:p-6">
+              <FileSearch size={24} className="mx-auto text-violet-300 sm:size-7" />
+
+              <p className="mt-2 text-[11px] font-black text-stone-700 sm:mt-3 sm:text-sm">
+                No product submissions in this filter
               </p>
             </div>
           )}
 
           {pagination ? (
-            <p className="mt-4 text-right text-[11px] font-semibold text-stone-400">
-              {pagination.total || drafts.length} total drafts
+            <p className="mt-3 text-right text-[9px] font-semibold text-stone-400 sm:mt-4 sm:text-[11px]">
+              {totalDraftCount} product submissions
             </p>
           ) : null}
         </section>
       </div>
 
+      {showAllDrafts ? (
+        <div
+          className="fixed inset-0 z-[160] flex items-center justify-center bg-stone-950/35 p-3 backdrop-blur-md sm:p-6"
+          onClick={() => setShowAllDrafts(false)}
+        >
+          <section
+            className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-[24px] border border-white/70 bg-white/85 shadow-2xl backdrop-blur-2xl sm:rounded-[30px]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-violet-100 bg-violet-50/90 px-4 py-3 sm:px-6 sm:py-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-violet-700 sm:text-xs">
+                  ALL PRODUCT SUBMISSIONS
+                </p>
+                <h2 className="mt-0.5 text-sm font-black text-stone-950 sm:text-xl">
+                  Product review history
+                </h2>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={popupStatus}
+                  onChange={(event) => openAllDrafts(event.target.value)}
+                  className="max-w-[126px] rounded-xl border border-violet-200 bg-white px-2.5 py-2 text-[9px] font-bold outline-none sm:max-w-none sm:px-3 sm:text-xs"
+                  aria-label="Filter all product submissions"
+                >
+                  {STATUS_OPTIONS.map((value) => (
+                    <option key={value || "popup-all"} value={value}>
+                      {value ? draftStatusLabel(value) : "All statuses"}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAllDrafts(false)}
+                  className="focus-ring grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-white text-stone-600 shadow-sm hover:text-stone-950"
+                  aria-label="Close all product submissions"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
+              {loadingAllDrafts ? (
+                <div className="grid min-h-56 place-items-center">
+                  <div className="text-center">
+                    <LoaderCircle size={26} className="mx-auto animate-spin text-violet-700" />
+                    <p className="mt-3 text-xs font-bold text-stone-500">
+                      Loading all product submissions…
+                    </p>
+                  </div>
+                </div>
+              ) : allDrafts.length ? (
+                <div className="grid gap-2 sm:gap-3 lg:grid-cols-2">
+                  {allDrafts.map((draft) => (
+                    <button
+                      key={draft.id}
+                      type="button"
+                      onClick={() => {
+                        setShowAllDrafts(false);
+                        openDraft(draft.id);
+                      }}
+                      className="focus-ring rounded-2xl border border-violet-100 bg-white/90 p-3 text-left shadow-sm transition hover:border-violet-300 hover:bg-white sm:p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2 sm:gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-black text-stone-900 sm:text-sm">
+                            {fieldValue(draft.candidateFields?.displayName) === "—"
+                              ? draft.barcode || "Product submission"
+                              : fieldValue(draft.candidateFields?.displayName)}
+                          </p>
+
+                          <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:mt-1 sm:text-xs">
+                            {draft.barcode
+                              ? `GTIN ${draft.barcode}`
+                              : "No barcode added"}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-black sm:px-2.5 sm:text-[10px] ${statusClasses(
+                            draft.status
+                          )}`}
+                        >
+                          {draftStatusLabel(draft.status)}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[8px] font-bold text-stone-500 sm:mt-3 sm:text-[10px]">
+                        <span>
+                          {draft.brandAuthorityVerified
+                            ? "Brand access confirmed"
+                            : "No linked brand access"}
+                        </span>
+                        <span>·</span>
+                        <span>
+                          {draft.readyForCatalog
+                            ? "Ready for catalog"
+                            : "Waiting for catalog approval"}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid min-h-48 place-items-center text-center">
+                  <div>
+                    <FileSearch size={28} className="mx-auto text-violet-300" />
+                    <p className="mt-3 text-sm font-black text-stone-700">
+                      No product submissions in this filter
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {selectedDraft ? (
         <section className="mt-6 rounded-[26px] border border-stone-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-                Draft detail
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-xs">
+                Product review details
               </p>
 
               <h2 className="mt-1 text-xl font-black text-stone-950">
@@ -2497,7 +2790,7 @@ export default function HostNpiPage() {
                         : ""
                     }
                   />
-                  Resume cleared evidence
+                  Continue review
                 </button>
               ) : null}
 
@@ -2537,7 +2830,7 @@ export default function HostNpiPage() {
                         {Number.isFinite(Number(item?.confidence))
                           ? `${Math.round(
                               Number(item.confidence) * 100
-                            )}% provisional confidence`
+                            )}% match confidence`
                           : "Confidence unknown"}
                       </p>
                     </div>
@@ -2550,22 +2843,17 @@ export default function HostNpiPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-800">
-                        Additional evidence requested
+                        More product information needed
                       </p>
 
                       <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-stone-600">
                         {selectedDraft.draft?.listingType === "packaged" ? (
                           <>
-                            Attach another package panel to this existing draft. The
-                            backend keeps the same draft identity and re-runs privacy
-                            clearance and provisional extraction; no second draft is
-                            created.
+                            Add another clear pack photo requested for this product. EPANTRY keeps it with the same submission and checks the updated details again.
                           </>
                         ) : (
                           <>
-                            Attach another clear product photo to this existing produce
-                            draft. The same draft identity is kept and it returns to the
-                            governed review queue after privacy clearance.
+                            Add another clear product photo requested for this item. EPANTRY keeps it with the same submission and sends it back for review.
                           </>
                         )}
                       </p>
@@ -2595,7 +2883,7 @@ export default function HostNpiPage() {
 
                     <label className="focus-ring inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-2.5 text-xs font-black text-white hover:bg-stone-800">
                       <Upload size={15} />
-                      Add evidence to this draft
+                      Add another product photo
                       <input
                         type="file"
                         multiple
@@ -2661,10 +2949,10 @@ export default function HostNpiPage() {
                     {addingEvidenceDraftId === selectedDraft.draft?.id
                       ? additionalProgress
                         ? `Uploading ${additionalProgress.completed}/${additionalProgress.total} and rechecking…`
-                        : "Attaching evidence…"
+                        : "Adding photo…"
                       : selectedDraft.draft?.listingType === "packaged"
-                        ? "Attach evidence and re-run extraction"
-                        : "Attach photo and return to review"}
+                        ? "Add photo and check again"
+                        : "Add photo and send again"}
                   </button>
                 </div>
               ) : null}

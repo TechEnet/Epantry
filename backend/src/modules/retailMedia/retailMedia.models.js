@@ -28,6 +28,12 @@ export const RETAIL_MEDIA_SPONSOR_LABELS = Object.freeze([
   'Paid placement',
 ])
 
+export const RETAIL_MEDIA_PAYMENT_STATUSES = Object.freeze([
+  'unpaid',
+  'initiated',
+  'paid',
+])
+
 const baseOptions = Object.freeze({
   timestamps: true,
   strict: true,
@@ -63,6 +69,96 @@ const creativeSchema = new Schema(
       enum: RETAIL_MEDIA_SPONSOR_LABELS,
       required: true,
       default: 'Sponsored',
+    },
+  },
+  {
+    _id: false,
+    strict: true,
+  },
+)
+
+const placementChargeSchema = new Schema(
+  {
+    placement: {
+      type: String,
+      enum: RETAIL_MEDIA_PLACEMENTS,
+      required: true,
+    },
+
+    amountMinor: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+  },
+  {
+    _id: false,
+    strict: true,
+  },
+)
+
+const campaignPaymentSchema = new Schema(
+  {
+    status: {
+      type: String,
+      enum: RETAIL_MEDIA_PAYMENT_STATUSES,
+      required: true,
+      default: 'unpaid',
+      index: true,
+    },
+
+    provider: {
+      type: String,
+      enum: ['razorpay'],
+      required: true,
+      default: 'razorpay',
+    },
+
+    providerMode: {
+      type: String,
+      enum: ['test', 'live', 'unknown'],
+      required: true,
+      default: 'unknown',
+    },
+
+    currency: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      maxlength: 3,
+      required: true,
+      default: 'INR',
+    },
+
+    requiredAmountMinor: {
+      type: Number,
+      min: 0,
+      required: true,
+      default: 0,
+    },
+
+    placementCharges: {
+      type: [placementChargeSchema],
+      default: [],
+    },
+
+    providerOrderId: {
+      type: String,
+      trim: true,
+      maxlength: 180,
+      default: '',
+    },
+
+    providerPaymentId: {
+      type: String,
+      trim: true,
+      maxlength: 180,
+      default: '',
+    },
+
+    paidAt: {
+      type: Date,
+      default: null,
     },
   },
   {
@@ -290,6 +386,19 @@ const campaignSchema = new Schema(
       }),
     },
 
+    payment: {
+      type: campaignPaymentSchema,
+      required: true,
+      default: () => ({
+        status: 'unpaid',
+        provider: 'razorpay',
+        providerMode: 'unknown',
+        currency: 'INR',
+        requiredAmountMinor: 0,
+        placementCharges: [],
+      }),
+    },
+
     createdByUserId: {
       type: objectId,
       ref: 'User',
@@ -321,6 +430,12 @@ campaignSchema.index({
 campaignSchema.index({
   status: 1,
   placements: 1,
+  startsAt: 1,
+  endsAt: 1,
+})
+
+campaignSchema.index({
+  status: 1,
   marketCodes: 1,
   startsAt: 1,
   endsAt: 1,

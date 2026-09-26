@@ -79,8 +79,17 @@ import {
 const inputClass =
   "focus-ring w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none";
 
+const recipeInputClass =
+  "focus-ring w-full rounded-[10px] border border-stone-200 bg-white px-3 py-2 text-[12px] font-semibold text-stone-900 outline-none sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-sm";
+
 const buttonClass =
   "focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50";
+
+const settingsInputClass =
+  "focus-ring w-full min-w-0 rounded-[10px] border border-white/90 bg-white/90 px-2.5 py-2 text-[11px] font-semibold text-stone-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] outline-none sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-sm";
+
+const settingsButtonClass =
+  "focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[10px] bg-[#176a55] px-3 py-2 text-[10px] font-black text-white shadow-[0_5px_14px_rgba(23,106,85,0.14)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-10 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm";
 
 function money(amountMinor, currency = "INR") {
   if (amountMinor === null || amountMinor === undefined) {
@@ -103,20 +112,131 @@ function titleize(value) {
     .join(" ");
 }
 
-function Section({ title, description, icon: Icon, children, actions = null }) {
+function readinessLabel(value) {
   return (
-    <section className="rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
-            <Icon size={18} />
+    {
+      profileComplete: "Business profile complete",
+      kybApproved: "KYB approved",
+      commercialSetupComplete: "Commercial setup complete",
+      documentsPresent: "Business documents added",
+      catalogValidated: "Product catalog validated",
+      activeOfferPresent: "Active customer offer available",
+      pricingConfigured: "Pricing ready",
+      inventoryObserved: "Stock availability detected",
+      serviceabilityConfigured: "Delivery coverage configured",
+    }[value] || titleize(value)
+  );
+}
+
+function qualityIssueLabel(value) {
+  return (
+    {
+      NO_CANONICAL_PRODUCT_MATCH: "Product match needed",
+      NPI_REQUIRED: "Product details need review",
+      GTIN_MISSING: "Barcode / GTIN missing",
+      INGREDIENT_EVIDENCE_MISSING: "Ingredients need checking",
+      ALLERGEN_EVIDENCE_INCOMPLETE: "Allergen details incomplete",
+      NUTRITION_INCOMPLETE: "Nutrition details incomplete",
+      PROVENANCE_REVIEW_REQUIRED: "Origin details need review",
+      NET_QUANTITY_INCOMPLETE: "Pack size incomplete",
+      PACK_IMAGE_MISSING: "Pack image missing",
+      NOT_RECIPE_ELIGIBLE: "Not ready for Recipes yet",
+      INSUFFICIENT_PRODUCT_IDENTITY: "Product identity incomplete",
+    }[value] || titleize(value)
+  );
+}
+
+function Section({
+  title,
+  description,
+  icon: Icon,
+  children,
+  actions = null,
+  tone = "plain",
+}) {
+  const toneStyles = {
+    readiness: {
+      section: "border-emerald-300 bg-emerald-100/70",
+      icon: "bg-emerald-200 text-emerald-800",
+    },
+    profile: {
+      section: "border-sky-300 bg-sky-100/70",
+      icon: "bg-sky-200 text-sky-800",
+    },
+    delivery: {
+      section: "border-cyan-300 bg-cyan-100/70",
+      icon: "bg-cyan-200 text-cyan-800",
+    },
+    kyb: {
+      section: "border-violet-300 bg-violet-100/70",
+      icon: "bg-violet-200 text-violet-800",
+    },
+    recipe: {
+      section: "border-[#d8e7e2] bg-[#f8fbfa]",
+      icon: "bg-[#dcefe7] text-[#276454]",
+    },
+    finance: {
+      section: "border-[#d8e4ec] bg-[#f4f8fb]",
+      icon: "bg-[#dcecf6] text-[#2b6078]",
+    },
+    settingsMint: {
+      section: "border-[#d4eadf] bg-[#edf7f2]",
+      icon: "bg-[#dcefe7] text-[#276454]",
+    },
+    settingsBlue: {
+      section: "border-[#d6e7f2] bg-[#eef5fa]",
+      icon: "bg-[#dcecf6] text-[#315d74]",
+    },
+    settingsLavender: {
+      section: "border-[#e4daf3] bg-[#f4f0fa]",
+      icon: "bg-[#e9e1f4] text-[#5d4a73]",
+    },
+    plain: {
+      section: "border-stone-200 bg-white",
+      icon: "bg-stone-100 text-stone-700",
+    },
+  };
+
+  const activeTone = toneStyles[tone] || toneStyles.plain;
+  const compactDashboardTone = ["readiness", "profile", "delivery", "kyb"].includes(tone);
+  const compactRecipeTone = tone === "recipe";
+  const compactFinanceTone = tone === "finance";
+  const compactSettingsTone = ["settingsMint", "settingsBlue", "settingsLavender"].includes(tone);
+  const sectionClass = compactDashboardTone
+    ? `rounded-[20px] border ${activeTone.section} p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[26px] sm:p-6`
+    : compactSettingsTone
+      ? `rounded-[20px] border ${activeTone.section} p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
+      : compactRecipeTone || compactFinanceTone
+        ? `rounded-[18px] border ${activeTone.section} p-3 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
+        : `rounded-[26px] border ${activeTone.section} p-5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:p-6`;
+
+  return (
+    <section className={sectionClass}>
+      <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3" : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"}>
+        <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex min-w-0 items-start gap-2 sm:gap-3" : "flex items-start gap-3"}>
+          <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone
+            ? `grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${activeTone.icon}`
+            : `grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${activeTone.icon}`}>
+            <Icon className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "h-4 w-4 sm:h-[18px] sm:w-[18px]" : "h-[18px] w-[18px]"} />
           </div>
 
-          <div>
-            <h2 className="text-lg font-black text-stone-950">{title}</h2>
+          <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "min-w-0 flex-1" : ""}>
+            <h2 className={compactDashboardTone
+              ? `${["Commercial profile", "Delivery Areas", "Business verification (KYB)"].includes(title) ? "text-[12px] leading-[14px]" : "text-[14px] leading-4"} whitespace-nowrap font-black text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal`
+              : compactSettingsTone
+                ? "text-[14px] font-black leading-[18px] text-stone-950 sm:text-[17px] sm:leading-5"
+                : compactRecipeTone || compactFinanceTone
+                  ? "text-[13px] font-black leading-4 text-stone-950 sm:text-[17px] sm:leading-5"
+                : "text-lg font-black text-stone-950"}>{title}</h2>
 
             {description ? (
-              <p className="mt-1 max-w-3xl text-xs leading-5 text-stone-500">
+              <p className={compactDashboardTone
+                ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5"
+                : compactSettingsTone
+                  ? "mt-1 max-w-3xl text-[10px] font-semibold leading-[15px] text-stone-600 sm:text-[11px] sm:font-medium sm:leading-4"
+                  : compactRecipeTone || compactFinanceTone
+                    ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-[11px] sm:font-medium sm:leading-4"
+                  : "mt-1 max-w-3xl text-xs leading-5 text-stone-500"}>
                 {description}
               </p>
             ) : null}
@@ -126,15 +246,21 @@ function Section({ title, description, icon: Icon, children, actions = null }) {
         {actions}
       </div>
 
-      <div className="mt-5">{children}</div>
+      <div className={compactSettingsTone ? "mt-4 sm:mt-4" : compactDashboardTone || compactRecipeTone || compactFinanceTone ? "mt-3 sm:mt-4" : "mt-5"}>{children}</div>
     </section>
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, children, compactMobile = false }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.12em] text-stone-500">
+      <span
+        className={
+          compactMobile
+            ? "mb-1 flex min-h-[22px] items-end text-[8px] font-black uppercase leading-[11px] tracking-[0.1em] text-stone-500 sm:mb-1.5 sm:min-h-0 sm:block sm:text-[10px] sm:leading-normal sm:tracking-[0.12em]"
+            : "mb-1.5 block text-[10px] font-black uppercase tracking-[0.12em] text-stone-500"
+        }
+      >
         {label}
       </span>
 
@@ -522,11 +648,11 @@ function HostRecipeIngredientRow({
   ]);
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3">
-      <div className="grid gap-2 lg:grid-cols-[minmax(0,1.5fr)_110px_110px_140px_minmax(0,1fr)_44px]">
+    <div className="rounded-[14px] border border-[#dbe7e2] bg-[#f5f8f7] p-2 sm:rounded-2xl sm:p-3">
+      <div className="grid gap-1.5 sm:gap-2 lg:grid-cols-[minmax(0,1.5fr)_110px_110px_140px_minmax(0,1fr)_44px]">
         <div className="relative">
           <input
-            className={inputClass}
+            className={recipeInputClass}
             value={ingredient.ingredientQuery}
             onFocus={() => setIngredientInputFocused(true)}
             onBlur={() => setIngredientInputFocused(false)}
@@ -537,18 +663,18 @@ function HostRecipeIngredientRow({
                 ingredientName: "",
               })
             }
-            placeholder="Search canonical ingredient"
+            placeholder="Search ingredient"
           />
 
           {ingredient.canonicalIngredientId ? (
-            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700">
-              Canonical ingredient selected
+            <p className="mt-1 text-[8px] font-black uppercase tracking-[0.08em] text-emerald-700 sm:text-[10px]">
+              Ingredient matched
             </p>
           ) : null}
 
           {searching ? (
-            <div className="absolute z-20 mt-1 w-full rounded-xl border border-stone-200 bg-white p-3 text-xs font-semibold text-stone-500 shadow-lg">
-              Searching…
+            <div className="absolute z-20 mt-1 w-full rounded-xl border border-stone-200 bg-white p-2.5 text-[10px] font-semibold text-stone-500 shadow-lg sm:p-3 sm:text-xs">
+              Searching ingredients…
             </div>
           ) : results.length ? (
             <div className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-stone-200 bg-white shadow-lg">
@@ -573,8 +699,8 @@ function HostRecipeIngredientRow({
           ) : ingredientInputFocused &&
             ingredient.ingredientQuery.trim().length >= 2 &&
             !ingredient.canonicalIngredientId ? (
-            <div className="absolute z-20 mt-1 w-full rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-800 shadow-lg">
-              This ingredient will be submitted as a Host proposal and verified by Super Admin during Editorial review.
+            <div className="absolute z-20 mt-1 w-full rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-[10px] font-semibold leading-4 text-sky-800 shadow-lg sm:p-3 sm:text-xs">
+              EPANTRY could not match this ingredient yet. It will be included with the Recipe for review.
             </div>
           ) : null}
         </div>
@@ -583,7 +709,7 @@ function HostRecipeIngredientRow({
           type="number"
           min="0.001"
           step="any"
-          className={inputClass}
+          className={recipeInputClass}
           value={ingredient.quantity}
           onChange={(event) =>
             onChange({ quantity: Number(event.target.value) })
@@ -592,7 +718,7 @@ function HostRecipeIngredientRow({
         />
 
         <select
-          className={inputClass}
+          className={recipeInputClass}
           value={ingredient.unit}
           onChange={(event) => onChange({ unit: event.target.value })}
         >
@@ -604,7 +730,7 @@ function HostRecipeIngredientRow({
         </select>
 
         <select
-          className={inputClass}
+          className={recipeInputClass}
           value={ingredient.role}
           onChange={(event) => onChange({ role: event.target.value })}
         >
@@ -616,19 +742,19 @@ function HostRecipeIngredientRow({
         </select>
 
         <input
-          className={inputClass}
+          className={recipeInputClass}
           value={ingredient.preparationState}
           onChange={(event) =>
             onChange({ preparationState: event.target.value })
           }
-          placeholder="Preparation state"
+          placeholder="Prep note"
         />
 
         <button
           type="button"
           disabled={!canRemove}
           onClick={onRemove}
-          className="focus-ring rounded-xl border border-rose-200 bg-rose-50 text-sm font-black text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+          className="focus-ring min-h-9 rounded-[10px] border border-rose-200 bg-rose-50 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-xl sm:text-sm"
           aria-label="Remove ingredient"
         >
           ×
@@ -759,6 +885,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
     returnPolicySummary: "",
   });
+
+  const [savedProfileForm, setSavedProfileForm] = useState(null);
 
   const [deliveryAreaForm, setDeliveryAreaForm] = useState({
     name: "",
@@ -972,7 +1100,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         const profile = org.operationalProfile;
 
         if (profile) {
-          setProfileForm({
+          const nextProfileForm = {
             legalEntityName: profile.legalEntityName || "",
 
             businessType: profile.businessType || "private_limited",
@@ -1001,7 +1129,12 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               profile.commercial?.cancellationPolicySummary || "",
 
             returnPolicySummary: profile.commercial?.returnPolicySummary || "",
-          });
+          };
+
+          setProfileForm(nextProfileForm);
+          setSavedProfileForm(nextProfileForm);
+        } else {
+          setSavedProfileForm(null);
         }
       }
     } catch (loadError) {
@@ -1024,6 +1157,12 @@ export default function HostOperationsPage({ section = "dashboard" }) {
     () => authorities.filter((authority) => authority.status === "active"),
     [authorities]
   );
+
+  const profileHasUnsavedChanges = useMemo(() => {
+    if (!savedProfileForm) return true;
+
+    return JSON.stringify(profileForm) !== JSON.stringify(savedProfileForm);
+  }, [profileForm, savedProfileForm]);
 
   async function run(action, successMessage = "") {
     setBusy(true);
@@ -1186,15 +1325,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
       catalog: "Product Catalog",
 
-      quality: "S04 · Data Quality",
+      quality: "Data Quality",
 
-      finance: "S08 · Finance",
+      finance: "Finance",
 
-      recipes: "S09 · Recipe Listings",
+      recipes: "Recipe Listings",
 
       campaigns: "S10 · Campaigns",
 
-      settings: "Team & Documents",
+      settings: "Business settings",
     }[section] || "Host Operations";
 
   if (loading) {
@@ -1348,35 +1487,109 @@ export default function HostOperationsPage({ section = "dashboard" }) {
     "onboarding";
 
   return (
-    <main className="min-h-screen bg-[#f7f5ef] p-5 sm:p-7">
+    <main
+      className={
+        section === "dashboard"
+          ? "min-h-screen bg-[#f7f5ef] p-3 sm:p-7"
+          : section === "catalog"
+            ? "min-h-screen bg-[#f7f5ef] p-3 sm:p-7"
+            : section === "quality"
+              ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+              : section === "recipes"
+                ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+                : section === "finance"
+                  ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+                  : section === "settings"
+                    ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+                    : "min-h-screen bg-[#f7f5ef] p-5 sm:p-7"
+      }
+    >
       <section
         className={
           section === "catalog"
-            ? "overflow-hidden rounded-[28px] border border-sky-900/10 bg-gradient-to-br from-slate-950 via-sky-950 to-cyan-900 p-6 text-white shadow-lg"
-            : "rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm"
+            ? "overflow-hidden rounded-[22px] border border-sky-900/10 bg-gradient-to-br from-slate-950 via-sky-950 to-cyan-900 p-4 text-white shadow-lg sm:rounded-[28px] sm:p-6"
+            : section === "dashboard"
+              ? "rounded-[20px] border border-emerald-300 bg-emerald-100/75 p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-6"
+              : section === "quality"
+                ? "overflow-hidden rounded-[18px] border border-emerald-100 bg-gradient-to-br from-[#e8f4ee] via-[#edf6f3] to-[#e9f1f7] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                : section === "recipes"
+                  ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                  : section === "finance"
+                    ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                    : section === "settings"
+                      ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#eef5f8] to-[#f0ebf8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                      : "rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm"
         }
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+        <div
+          className={
+            section === "dashboard"
+              ? "flex items-start justify-between gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+              : section === "catalog"
+                ? "flex items-start justify-between gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                : section === "quality"
+                  ? "flex items-start justify-between gap-2 sm:gap-4"
+                  : section === "recipes"
+                    ? "flex items-start justify-between gap-2 sm:gap-4"
+                    : section === "finance"
+                      ? "flex items-start justify-between gap-2 sm:gap-4"
+                      : section === "settings"
+                        ? "flex items-start justify-between gap-2 sm:gap-4"
+                        : "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+          }
+        >
+          <div
+            className={
+              section === "dashboard" || section === "catalog" || section === "quality" || section === "recipes" || section === "finance" || section === "settings"
+                ? "min-w-0 flex-1"
+                : ""
+            }
+          >
             <p
               className={
                 section === "catalog"
-                  ? "text-xs font-black uppercase tracking-[0.14em] text-cyan-300"
-                  : "text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
+                  ? "text-[9px] font-black uppercase tracking-[0.12em] text-cyan-300 sm:text-xs sm:tracking-[0.14em]"
+                  : section === "dashboard"
+                    ? "text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs sm:tracking-[0.14em]"
+                    : section === "quality"
+                      ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                      : section === "recipes"
+                        ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                        : section === "finance"
+                          ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                          : section === "settings"
+                            ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                            : "text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
               }
             >
               {section === "settings"
-                ? "Host workspace"
+                ? "Business setup"
                 : section === "catalog"
-                  ? "Catalog & Listings"
-                  : "M16 Host Portal"}
+                  ? "Product catalog"
+                  : section === "quality"
+                    ? "Catalog health"
+                    : section === "recipes"
+                      ? "Recipe workspace"
+                      : section === "finance"
+                        ? "Earnings & settlements"
+                        : "HOST OPERATIONS"}
             </p>
 
             <h1
               className={
                 section === "catalog"
-                  ? "mt-2 text-3xl font-black text-white"
-                  : "mt-2 text-3xl font-black text-stone-950"
+                  ? "mt-1 text-[20px] font-black leading-6 text-white sm:mt-2 sm:text-3xl sm:leading-normal"
+                  : section === "dashboard"
+                    ? "mt-1 whitespace-nowrap text-[18px] font-black leading-5 text-stone-950 sm:mt-2 sm:text-3xl sm:leading-normal"
+                    : section === "quality"
+                      ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                      : section === "recipes"
+                        ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                        : section === "finance"
+                          ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                          : section === "settings"
+                            ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                            : "mt-2 text-3xl font-black text-stone-950"
               }
             >
               {pageTitle}
@@ -1385,12 +1598,34 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             <p
               className={
                 section === "catalog"
-                  ? "mt-2 text-sm font-semibold text-sky-100/80"
-                  : "mt-2 text-sm text-stone-500"
+                  ? "mt-1 text-[10px] font-semibold leading-4 text-sky-100/80 sm:mt-2 sm:text-sm sm:leading-normal"
+                  : section === "dashboard"
+                    ? "mt-1 text-[9px] font-semibold leading-3 text-stone-500 sm:mt-2 sm:text-sm sm:font-normal sm:leading-normal"
+                    : section === "quality"
+                      ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                      : section === "recipes"
+                        ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                        : section === "finance"
+                          ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                          : section === "settings"
+                            ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                            : "mt-2 text-sm text-stone-500"
               }
             >
-              {organizationData.organization.displayName} · Operational state:{" "}
-              {titleize(organizationData.operationalProfile?.activationState)}
+              {section === "quality" ? (
+                <>See what is ready, what still needs attention, and exactly where to continue.</>
+              ) : section === "recipes" ? (
+                <>Create a complete Recipe, send it for review, then track its publishing status in Listing History.</>
+              ) : section === "finance" ? (
+                <>See delivered-order earnings, money waiting to settle, and payout history in one place.</>
+              ) : section === "settings" ? (
+                <>Manage business records, team members and connections to other tools in one place.</>
+              ) : (
+                <>
+                  {organizationData.organization.displayName} · {section === "catalog" ? "Host status" : "Operational state"}:{" "}
+                  {titleize(organizationData.operationalProfile?.activationState)}
+                </>
+              )}
             </p>
           </div>
 
@@ -1399,33 +1634,180 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             onClick={load}
             className={
               section === "catalog"
-                ? "focus-ring inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-black text-white transition hover:bg-white/20"
-                : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-black"
+                ? "focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-[10px] font-black text-white transition hover:bg-white/20 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
+                : section === "dashboard"
+                  ? "focus-ring ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-200 bg-sky-100 px-2 py-1.5 text-[10px] font-black text-sky-800 sm:ml-0 sm:gap-2 sm:rounded-xl sm:border-stone-200 sm:bg-transparent sm:px-4 sm:py-2.5 sm:text-sm sm:text-stone-950"
+                  : section === "quality"
+                    ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                    : section === "recipes"
+                      ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                      : section === "finance"
+                        ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                        : section === "settings"
+                          ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                          : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-black"
             }
           >
-            <RefreshCw size={16} />
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Refresh
           </button>
         </div>
 
-        {section === "catalog" ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        {section === "quality" ? (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
             {[
-              ["01", "Upload catalog", "Choose your CSV file"],
-              ["02", "Validate products", "Match EPANTRY catalog"],
-              ["03", "Review outcome", "Matched or NPI"],
+              ["01", "Check your catalog", "See every product EPANTRY has checked.", "bg-[#e8f1f8] border-[#d6e7f2]"],
+              ["02", "Read what needs attention", "Spot missing images, nutrition or safety details.", "bg-[#e7f3ed] border-[#d4eadf]"],
+              ["03", "Complete product details", "Open Add / Edit Products and fix the missing information.", "bg-[#f0ebf8] border-[#e4daf3]"],
+              ["04", "Refresh this page", "Come back after updates to see the latest catalog health.", "bg-[#e8f4ee] border-[#d4eadf]"],
+            ].map(([step, label, helper, tone]) => (
+              <div
+                key={step}
+                className={`min-w-0 rounded-[14px] border p-2.5 shadow-[0_5px_14px_rgba(28,25,23,0.04)] sm:rounded-[20px] sm:p-4 ${tone}`}
+              >
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:h-8 sm:w-8 sm:text-[10px]">
+                    {step}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">
+                      {label}
+                    </p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">
+                      {helper}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {section === "recipes" ? (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
+            {[
+              ["01", "Add Recipe basics", "Title, servings, timing and image.", "bg-[#e7f3ed] border-[#d4eadf]"],
+              ["02", "Build the Recipe", "Add ingredients and cooking steps.", "bg-[#e8f1f8] border-[#d6e7f2]"],
+              ["03", "Add food details", "Fill only nutrition and allergen details you can support.", "bg-[#f0ebf8] border-[#e4daf3]"],
+              ["04", "Send for review", "Submit, then track approval in Listing History.", "bg-[#e7f3ed] border-[#d4eadf]"],
+            ].map(([step, label, helper, tone]) => (
+              <div
+                key={step}
+                className={`min-w-0 rounded-[14px] border p-2.5 shadow-[0_5px_14px_rgba(28,25,23,0.04)] sm:rounded-[20px] sm:p-4 ${tone}`}
+              >
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#173f35] text-[8px] font-black text-white sm:h-8 sm:w-8 sm:text-[10px]">
+                    {step}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">{label}</p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">{helper}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {section === "finance" ? (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
+            {[
+              ["01", "Check delivered sales", "See orders that have reached customers.", "bg-[#e7f3ed] border-[#d4eadf]", ""],
+              ["02", "See money waiting", "Know what is delivered but not settled yet.", "bg-[#e8f1f8] border-[#d6e7f2]", ""],
+              ["03", "Review payouts", "Track each recorded settlement and amount.", "bg-[#f0ebf8] border-[#e4daf3]", ""],
+              ["04", "Manage active orders", "Open Orders for work still in progress.", "bg-[#e7f3ed] border-[#d4eadf]", "/host/orders"],
+            ].map(([step, label, helper, tone, to]) => {
+              const card = (
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#173f35] text-[8px] font-black text-white sm:h-8 sm:w-8 sm:text-[10px]">
+                    {step}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">{label}</p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">{helper}</p>
+                  </div>
+                </div>
+              );
+
+              return to ? (
+                <Link
+                  key={step}
+                  to={to}
+                  className={`focus-ring min-w-0 rounded-[14px] border p-2.5 shadow-[0_5px_14px_rgba(28,25,23,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(28,25,23,0.07)] sm:rounded-[20px] sm:p-4 ${tone}`}
+                >
+                  {card}
+                </Link>
+              ) : (
+                <div
+                  key={step}
+                  className={`min-w-0 rounded-[14px] border p-2.5 shadow-[0_5px_14px_rgba(28,25,23,0.04)] sm:rounded-[20px] sm:p-4 ${tone}`}
+                >
+                  {card}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {section === "settings" ? (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
+            {[
+              ["01", "Save business records", "Keep licences and other important records together.", "bg-[#e7f3ed] border-[#d4eadf]", ""],
+              ["02", "Add your team", "Choose who can work on this business.", "bg-[#e8f1f8] border-[#d6e7f2]", ""],
+              ["03", "Connect other tools", "Only if another app needs EPANTRY data or updates.", "bg-[#f0ebf8] border-[#e4daf3]", ""],
+              ["04", "Back to operations", "Return to day-to-day business management.", "bg-[#e7f3ed] border-[#d4eadf]", "/host/operations-center"],
+            ].map(([step, label, helper, tone, to]) => {
+              const card = (
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#173f35] text-[8px] font-black text-white sm:h-8 sm:w-8 sm:text-[10px]">
+                    {step}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">{label}</p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">{helper}</p>
+                  </div>
+                </div>
+              );
+
+              return to ? (
+                <Link
+                  key={step}
+                  to={to}
+                  className={`focus-ring min-w-0 rounded-[16px] border p-3 shadow-[0_5px_14px_rgba(28,25,23,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(28,25,23,0.07)] sm:rounded-[20px] sm:p-4 ${tone}`}
+                >
+                  {card}
+                </Link>
+              ) : (
+                <div
+                  key={step}
+                  className={`min-w-0 rounded-[16px] border p-3 shadow-[0_5px_14px_rgba(28,25,23,0.04)] sm:rounded-[20px] sm:p-4 ${tone}`}
+                >
+                  {card}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {section === "catalog" ? (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+            {[
+              ["01", "Choose CSV", "Select your product file"],
+              ["02", "Check products", "Match products with EPANTRY"],
+              ["03", "Review results", "See matched or flagged items"],
+              ["04", "Finish listings", "Add offer, price and stock"],
             ].map(([step, label, helper]) => (
               <div
                 key={step}
-                className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm"
+                className="rounded-xl border border-white/10 bg-white/10 px-2.5 py-2 backdrop-blur-sm sm:rounded-2xl sm:px-4 sm:py-3"
               >
-                <div className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-cyan-300 text-xs font-black text-slate-950">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cyan-300 text-[9px] font-black text-slate-950 sm:h-8 sm:w-8 sm:text-xs">
                     {step}
                   </span>
                   <div>
-                    <p className="text-sm font-black text-white">{label}</p>
-                    <p className="mt-0.5 text-[11px] font-semibold text-sky-100/70">
+                    <p className="text-[10px] font-black leading-3 text-white sm:text-sm sm:leading-normal">{label}</p>
+                    <p className="mt-0.5 text-[8px] font-semibold leading-[11px] text-sky-100/70 sm:text-[11px] sm:leading-normal">
                       {helper}
                     </p>
                   </div>
@@ -1467,34 +1849,35 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "dashboard" ? (
-        <div className="mt-5 space-y-5">
+        <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
           <Section
             title="Operational readiness"
-            description="Host capability and business go-live are separate. Every readiness check must pass before activation review."
+            description="Complete each readiness check before launch approval."
             icon={ShieldCheck}
+            tone="readiness"
           >
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
               {Object.entries(readiness?.checks || {}).map(([key, value]) => (
                 <div
                   key={key}
-                  className="flex items-center gap-2 rounded-2xl bg-stone-50 p-3"
+                  className="flex min-w-0 items-center gap-1.5 rounded-xl border border-emerald-200 bg-white/78 p-2 sm:gap-2 sm:rounded-2xl sm:p-3"
                 >
                   <CheckCircle2
-                    size={16}
-                    className={value ? "text-emerald-700" : "text-stone-300"}
+                    className={`h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${value ? "text-emerald-700" : "text-stone-300"}`}
                   />
 
-                  <span className="text-xs font-bold text-stone-700">
-                    {titleize(key)}
+                  <span className="text-[9px] font-bold leading-3 text-stone-700 sm:text-xs sm:leading-normal">
+                    {readinessLabel(key)}
                   </span>
                 </div>
               ))}
             </div>
 
             {activationState === "active" ? (
-              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">
-                <ShieldCheck size={17} />
-                Host is operationally active. No further go-live review is required.
+              <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-200/60 p-2.5 text-[10px] font-bold leading-4 text-emerald-900 sm:mt-4 sm:gap-2 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
+                <ShieldCheck className="h-4 w-4 shrink-0 sm:h-[17px] sm:w-[17px]" />
+                <span className="sm:hidden">Your Host business is live and ready. No further launch review is needed.</span>
+                <span className="hidden sm:inline">Your Host business is live and ready to operate. No further launch review is needed.</span>
               </div>
             ) : activationState === "pending_review" ? (
               <div className="mt-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
@@ -1528,11 +1911,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
           <Section
             title="Commercial profile"
-            description="Commercial setup supports activation readiness but does not replace M05 offer/pricing/serviceability truth."
+            description={<>
+              <span className="sm:hidden">Keep core business details accurate. Pricing, offers and delivery coverage are checked separately.</span>
+              <span className="hidden sm:inline">Keep the business details customers and operations rely on accurate before launch. Pricing, offers and delivery coverage are checked separately.</span>
+            </>}
             icon={Building2}
+            tone="profile"
           >
             <form
-              className="grid gap-3 sm:grid-cols-2"
+              className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
 
@@ -1579,10 +1966,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 );
               }}
             >
-              <Field label="Legal entity">
+              <Field compactMobile label="Legal entity">
                 <input
                   required
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={profileForm.legalEntityName}
                   onChange={(event) =>
                     setProfileForm((current) => ({
@@ -1594,9 +1981,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Business type">
+              <Field compactMobile label="Business type">
                 <select
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={profileForm.businessType}
                   onChange={(event) =>
                     setProfileForm((current) => ({
@@ -1620,9 +2007,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 </select>
               </Field>
 
-              <Field label="Registered address">
+              <Field compactMobile label="Registered address">
                 <input
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={profileForm.line1}
                   onChange={(event) =>
                     setProfileForm((current) => ({
@@ -1634,9 +2021,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="City">
+              <Field compactMobile label="City">
                 <input
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={profileForm.city}
                   onChange={(event) =>
                     setProfileForm((current) => ({
@@ -1648,9 +2035,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="State">
+              <Field compactMobile label="State">
                 <input
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={profileForm.state}
                   onChange={(event) =>
                     setProfileForm((current) => ({
@@ -1662,9 +2049,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Store / warehouse postal code">
+              <Field compactMobile label="Store / warehouse postal code">
                 <input
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={profileForm.postalCode}
                   onChange={(event) =>
                     setProfileForm((current) => ({
@@ -1676,55 +2063,67 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Cancellation policy">
-                <textarea
-                  required
-                  rows={3}
-                  className={inputClass}
-                  value={profileForm.cancellationPolicySummary}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({
-                      ...current,
+              <div className="col-span-2 sm:col-span-1">
+                <Field compactMobile label="Cancellation policy">
+                  <textarea
+                    required
+                    rows={3}
+                    className={`${inputClass} px-2.5 py-2 text-[11px] sm:px-3.5 sm:py-2.5 sm:text-sm`}
+                    value={profileForm.cancellationPolicySummary}
+                    onChange={(event) =>
+                      setProfileForm((current) => ({
+                        ...current,
 
-                      cancellationPolicySummary: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
+                        cancellationPolicySummary: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
 
-              <Field label="Return policy">
-                <textarea
-                  required
-                  rows={3}
-                  className={inputClass}
-                  value={profileForm.returnPolicySummary}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({
-                      ...current,
+              <div className="col-span-2 sm:col-span-1">
+                <Field compactMobile label="Return policy">
+                  <textarea
+                    required
+                    rows={3}
+                    className={`${inputClass} px-2.5 py-2 text-[11px] sm:px-3.5 sm:py-2.5 sm:text-sm`}
+                    value={profileForm.returnPolicySummary}
+                    onChange={(event) =>
+                      setProfileForm((current) => ({
+                        ...current,
 
-                      returnPolicySummary: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
+                        returnPolicySummary: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
 
               <button
-                disabled={busy}
-                className={`${buttonClass} sm:col-span-2`}
+                disabled={busy || !profileHasUnsavedChanges}
+                className={`${buttonClass} col-span-2 ${
+                  !profileHasUnsavedChanges
+                    ? "cursor-not-allowed opacity-45 shadow-none"
+                    : ""
+                }`}
               >
                 <Save size={15} />
-                Save profile
+                {profileHasUnsavedChanges ? "Save profile" : "Profile saved"}
               </button>
             </form>
           </Section>
 
           <Section
             title="Delivery Areas"
-            description="Add every pincode where this Host can deliver. These delivery pincodes are separate from the registered store or warehouse postal code above."
+            description={<>
+              <span className="sm:hidden">Choose the customer pincodes you deliver to. These stay separate from your business postcode.</span>
+              <span className="hidden sm:inline">Choose the customer pincodes your business can deliver to. These are separate from your registered business postcode.</span>
+            </>}
             icon={MapPinned}
+            tone="delivery"
           >
             <form
-              className="grid gap-3 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)_auto]"
+              className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)_auto] sm:gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
 
@@ -1777,10 +2176,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 });
               }}
             >
-              <Field label="Delivery area name">
+              <Field compactMobile label="Delivery area name">
                 <input
                   required
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={deliveryAreaForm.name}
                   onChange={(event) =>
                     setDeliveryAreaForm((current) => ({
@@ -1793,11 +2192,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Delivery postal codes">
+              <Field compactMobile label="Delivery postal codes">
                 <textarea
                   required
                   rows={2}
-                  className={inputClass}
+                  className={`${inputClass} h-9 resize-none px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={deliveryAreaForm.postalCodes}
                   onChange={(event) =>
                     setDeliveryAreaForm((current) => ({
@@ -1810,7 +2209,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <div className="flex items-end gap-2">
+              <div className="col-span-2 flex items-end gap-2 sm:col-span-1">
                 <button
                   disabled={busy}
                   className={`${buttonClass} w-full whitespace-nowrap sm:w-auto`}
@@ -1840,24 +2239,25 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </div>
             </form>
 
-            <p className="mt-2 text-xs font-semibold leading-5 text-stone-500">
-              Enter multiple 6-digit pincodes separated by commas, spaces, or new lines. These pincodes are used by marketplace serviceability when customers check delivery availability.
+            <p className="mt-1.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-2 sm:text-xs sm:leading-5">
+              <span className="sm:hidden">Add 6-digit delivery pincodes so customers can see where you deliver.</span>
+              <span className="hidden sm:inline">Add the 6-digit pincodes where you can deliver. Customers will see availability based on these service areas.</span>
             </p>
 
             {serviceAreas.length ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
                 {serviceAreas.map((area) => (
                   <div
                     key={area.id}
-                    className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
+                    className="rounded-xl border border-cyan-200 bg-white/80 p-2.5 sm:rounded-2xl sm:p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-black text-emerald-950">
+                        <p className="text-[11px] font-black text-cyan-950 sm:text-sm">
                           {area.name}
                         </p>
 
-                        <p className="mt-1 text-xs font-semibold leading-5 text-emerald-800">
+                        <p className="mt-1 text-[9px] font-semibold leading-3 text-cyan-800 sm:text-xs sm:leading-5">
                           {(area.postalCodes || []).join(", ")}
                         </p>
                       </div>
@@ -1872,12 +2272,12 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                               postalCodes: (area.postalCodes || []).join(", "),
                             });
                           }}
-                          className="focus-ring rounded-lg bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-800 shadow-sm hover:bg-emerald-100"
+                          className="focus-ring rounded-lg bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-cyan-800 shadow-sm hover:bg-cyan-100"
                         >
                           Edit
                         </button>
 
-                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700">
+                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-cyan-700">
                           {area.status || "active"}
                         </span>
                       </div>
@@ -1886,24 +2286,29 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 ))}
               </div>
             ) : (
-              <div className="mt-4 rounded-2xl bg-stone-50 p-4 text-sm font-semibold text-stone-500">
-                No delivery area added yet. Add the pincodes where customers should be able to receive orders.
+              <div className="mt-3 rounded-xl bg-white/70 p-2.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-4 sm:rounded-2xl sm:bg-stone-50 sm:p-4 sm:text-sm sm:leading-normal">
+                <span className="sm:hidden">No delivery areas yet. Add pincodes where customers can receive orders.</span>
+                <span className="hidden sm:inline">No delivery area added yet. Add the pincodes where customers should be able to receive orders.</span>
               </div>
             )}
           </Section>
 
           <Section
-            title="KYB / compliance"
-            description="Full tax registration values are fingerprinted; normal API responses expose only last4, not the raw identifier."
+            title="Business verification (KYB)"
+            description={<>
+              <span className="sm:hidden">Your tax number stays protected. After saving, EPANTRY shows only the last 4 digits.</span>
+              <span className="hidden sm:inline">Your full tax registration number stays protected. After saving, EPANTRY only shows the last 4 digits.</span>
+            </>}
             icon={FileCheck2}
+            tone="kyb"
           >
             {kybStatus ? (
-              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-3">
-                <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-violet-200 bg-white/80 px-3.5 py-3">
+                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-stone-500 sm:text-xs sm:tracking-[0.12em]">
                   Current KYB status
                 </span>
 
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-stone-800 shadow-sm">
+                <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-stone-800 shadow-sm sm:px-2.5 sm:text-xs">
                   {titleize(kybStatus)}
                 </span>
 
@@ -1953,7 +2358,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             ) : null}
 
             <form
-              className="grid gap-3 sm:grid-cols-2"
+              className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
 
@@ -1971,10 +2376,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 );
               }}
             >
-              <Field label="Legal entity">
+              <Field compactMobile label="Legal entity">
                 <input
                   required
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={kybForm.legalEntityName}
                   onChange={(event) =>
                     setKybForm((current) => ({
@@ -1986,9 +2391,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Tax registration">
+              <Field compactMobile label="Tax registration">
                 <input
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={kybForm.taxRegistrationValue}
                   onChange={(event) =>
                     setKybForm((current) => ({
@@ -2001,9 +2406,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Evidence document IDs">
+              <Field compactMobile label="Evidence document IDs">
                 <input
-                  className={inputClass}
+                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
                   value={kybForm.documentIds}
                   onChange={(event) =>
                     setKybForm((current) => ({
@@ -2016,9 +2421,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <div className="flex items-end gap-2">
-                <button disabled={busy} className={buttonClass}>
-                  <Save size={15} />
+              <div className="grid grid-cols-2 items-end gap-1.5 sm:flex sm:gap-2">
+                <button disabled={busy} className={`${buttonClass} h-9 w-full gap-1 px-1.5 py-0 text-[9px] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm`}>
+                  <Save className="h-3.5 w-3.5 sm:h-[15px] sm:w-[15px]" />
                   Save KYB
                 </button>
 
@@ -2042,7 +2447,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                       "KYB submitted for governance review."
                     )
                   }
-                  className="focus-ring rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-black"
+                  className="focus-ring h-9 w-full rounded-xl border border-stone-300 px-1.5 py-0 text-[9px] font-black sm:h-auto sm:w-auto sm:px-4 sm:py-2.5 sm:text-sm"
                 >
                   Submit
                 </button>
@@ -2053,24 +2458,25 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "catalog" ? (
-        <div className="mt-5 space-y-5">
-          <section className="overflow-hidden rounded-[30px] border border-sky-200 bg-sky-100 shadow-sm">
+        <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
+          <section className="overflow-hidden rounded-[22px] border border-sky-200 bg-sky-100 shadow-sm sm:rounded-[30px]">
             <div className="grid gap-0 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-              <div className="p-5 sm:p-7">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-700 text-white shadow-md">
+              <div className="p-3.5 sm:p-7">
+                <div className="flex items-start gap-2.5 sm:gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-700 text-white shadow-md sm:h-12 sm:w-12 sm:rounded-2xl">
                     <Upload size={20} />
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
-                      Product file
+                    <p className="text-[8px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-[10px] sm:tracking-[0.14em]">
+                      Upload products
                     </p>
-                    <h2 className="mt-1 text-xl font-black text-sky-950">
-                      Upload your catalog CSV
+                    <h2 className="mt-0.5 text-[15px] font-black leading-5 text-sky-950 sm:mt-1 sm:text-xl sm:leading-normal">
+                      Upload your product CSV
                     </h2>
-                    <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-sky-900/70">
-                      EPANTRY checks each row against the approved product catalog. Existing products can continue to listing setup; unknown products move to Product NPI for review.
+                    <p className="mt-0.5 max-w-2xl text-[9px] font-semibold leading-[13px] text-sky-900/70 sm:mt-1 sm:text-xs sm:leading-5">
+                      <span className="sm:hidden">Upload the products you sell. EPANTRY checks matches and flags anything that needs review.</span>
+                      <span className="hidden sm:inline">Add the products you sell. EPANTRY checks each row, matches known products and flags anything that needs review before listing.</span>
                     </p>
                   </div>
                 </div>
@@ -2094,21 +2500,21 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
                 <label
                   htmlFor="host-catalog-csv-input"
-                  className="focus-ring group mt-6 flex min-h-[190px] cursor-pointer flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-sky-400 bg-white/80 px-6 py-8 text-center shadow-inner transition hover:border-sky-600 hover:bg-white"
+                  className="focus-ring group mt-3 flex min-h-[118px] cursor-pointer flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-sky-400 bg-white/80 px-4 py-4 text-center shadow-inner transition hover:border-sky-600 hover:bg-white sm:mt-6 sm:min-h-[190px] sm:rounded-[26px] sm:px-6 sm:py-8"
                 >
-                  <span className="grid h-14 w-14 place-items-center rounded-2xl bg-sky-700 text-white shadow-md transition group-hover:-translate-y-0.5 group-hover:bg-sky-800">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-700 text-white shadow-md transition group-hover:-translate-y-0.5 group-hover:bg-sky-800 sm:h-14 sm:w-14 sm:rounded-2xl">
                     <Upload size={22} />
                   </span>
-                  <span className="mt-4 text-base font-black text-sky-950">
-                    {csvRows.length ? "Choose a different CSV" : "Choose CSV file"}
+                  <span className="mt-2 text-[11px] font-black text-sky-950 sm:mt-4 sm:text-base">
+                    {csvRows.length ? "Choose a different CSV" : "Choose product CSV"}
                   </span>
-                  <span className="mt-1 text-xs font-semibold text-sky-800/65">
-                    Click here to browse your computer
+                  <span className="mt-0.5 text-[9px] font-semibold text-sky-800/65 sm:mt-1 sm:text-xs">
+                    Browse your device for a .csv file
                   </span>
                 </label>
 
                 <div
-                  className={`mt-4 rounded-2xl border p-4 ${
+                  className={`mt-3 rounded-xl border p-3 sm:mt-4 sm:rounded-2xl sm:p-4 ${
                     csvRows.length
                       ? "border-emerald-200 bg-emerald-50"
                       : "border-sky-200 bg-sky-50"
@@ -2117,25 +2523,25 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p
-                        className={`text-sm font-black ${
+                        className={`text-[11px] font-black sm:text-sm ${
                           csvRows.length ? "text-emerald-950" : "text-sky-950"
                         }`}
                       >
                         {csvRows.length ? csvName : "No file selected"}
                       </p>
                       <p
-                        className={`mt-1 text-xs font-semibold ${
+                        className={`mt-0.5 text-[9px] font-semibold sm:mt-1 sm:text-xs ${
                           csvRows.length ? "text-emerald-800" : "text-sky-800/65"
                         }`}
                       >
                         {csvRows.length
-                          ? `${csvRows.length} rows are ready for validation.`
-                          : "Select a CSV to unlock the validation action."}
+                          ? `${csvRows.length} products are ready to check.`
+                          : "Choose a CSV to start checking your products."}
                       </p>
                     </div>
 
                     <span
-                      className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] ${
+                      className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.1em] ${
                         csvRows.length
                           ? "bg-emerald-700 text-white"
                           : "bg-sky-200 text-sky-800"
@@ -2157,26 +2563,26 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
                           rows: csvRows,
                         }),
-                      "Catalog import validated. Canonical facts were not mutated."
+                      "Catalog checked. Review the results below before continuing your listings."
                     )
                   }
-                  className="focus-ring mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none sm:w-auto"
+                  className="focus-ring mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2.5 text-[10px] font-black text-white shadow-md transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none sm:mt-4 sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
                 >
                   <PackageSearch size={17} />
-                  Validate catalog CSV
+                  Check products
                 </button>
               </div>
 
-              <aside className="border-t border-sky-200 bg-sky-950 p-5 text-white sm:p-7 xl:border-l xl:border-t-0">
+              <aside className="border-t border-sky-200 bg-sky-950 p-3.5 text-white sm:p-7 xl:border-l xl:border-t-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cyan-300">
-                  CSV requirements
+                  CSV format
                 </p>
-                <h3 className="mt-2 text-lg font-black">Before you upload</h3>
-                <p className="mt-2 text-xs font-semibold leading-5 text-sky-100/70">
-                  Keep these exact column names so the Host catalog parser can read every row correctly.
+                <h3 className="mt-1 text-[14px] font-black sm:mt-2 sm:text-lg">Use these column headings</h3>
+                <p className="mt-1 text-[9px] font-semibold leading-[13px] text-sky-100/70 sm:mt-2 sm:text-xs sm:leading-5">
+                  Keep these names exactly as shown so EPANTRY can read every product in your CSV.
                 </p>
 
-                <div className="mt-5 space-y-2">
+                <div className="mt-3 grid grid-cols-2 gap-1.5 sm:mt-5 sm:block sm:space-y-2">
                   {[
                     "merchantSku",
                     "gtin",
@@ -2189,72 +2595,72 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   ].map((header) => (
                     <div
                       key={header}
-                      className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-bold text-sky-50"
+                      className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-[9px] font-bold text-sky-50 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs"
                     >
                       {header}
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-amber-300/40 bg-amber-300/10 p-4">
-                  <p className="text-xs font-black text-amber-200">
-                    Validation is not a live listing.
+                <div className="mt-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 sm:mt-5 sm:rounded-2xl sm:p-4">
+                  <p className="text-[9px] font-black text-amber-200 sm:text-xs">
+                    Checking products does not publish them.
                   </p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-amber-100/75">
-                    After a product matches, you still complete the offer, price and stock steps before customers can buy it.
+                  <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-amber-100/75 sm:mt-1 sm:text-xs sm:leading-5">
+                    After a match, add the offer, price and stock before customers can buy.
                   </p>
                 </div>
               </aside>
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-[30px] border border-violet-200 bg-violet-100 shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-violet-200 bg-violet-700 p-5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <section className="overflow-hidden rounded-[22px] border border-violet-200 bg-violet-100 shadow-sm sm:rounded-[30px]">
+            <div className="flex items-start justify-between gap-2 border-b border-violet-200 bg-violet-700 p-3.5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
               <div className="flex items-start gap-3">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-white sm:h-11 sm:w-11 sm:rounded-2xl">
                   <Boxes size={19} />
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-200">
-                    Validation results
+                    Product check results
                   </p>
-                  <h2 className="mt-1 text-lg font-black">Import history</h2>
-                  <p className="mt-1 text-xs font-semibold text-violet-100/80">
-                    See which rows matched, need Product NPI, or were invalid.
+                  <h2 className="mt-0.5 text-[14px] font-black sm:mt-1 sm:text-lg">Catalog checks</h2>
+                  <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-violet-100/80 sm:mt-1 sm:text-xs sm:leading-normal">
+                    See what matched, what needs review and what needs fixing.
                   </p>
                 </div>
               </div>
 
-              <span className="w-fit rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-white">
-                {imports.length} imports
+              <span className="w-fit shrink-0 rounded-full bg-white/15 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-white sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.1em]">
+                {imports.length} checks
               </span>
             </div>
 
-            <div className="p-5 sm:p-6">
+            <div className="p-3.5 sm:p-6">
               {imports.length ? (
                 <div className="grid gap-3 lg:grid-cols-2">
                   {imports.map((job) => (
                     <div
                       key={job.id}
-                      className="rounded-2xl border border-violet-200 bg-white p-4 shadow-sm"
+                      className="rounded-xl border border-violet-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-black text-violet-950">
-                            {job.sourceType}
+                          <p className="text-[11px] font-black text-violet-950 sm:text-sm">
+                            CSV catalog check
                           </p>
-                          <p className="mt-1 text-xs font-semibold text-violet-800/65">
-                            {job.rowCount} catalog rows checked
+                          <p className="mt-0.5 text-[9px] font-semibold text-violet-800/65 sm:mt-1 sm:text-xs">
+                            {job.rowCount} products checked
                           </p>
                         </div>
 
-                        <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-800">
-                          Quality {job.averageDataQualityScore}/100
+                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-black text-emerald-800 sm:px-3 sm:py-1.5 sm:text-xs">
+                          Data quality {job.averageDataQualityScore}/100
                         </span>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-                        <div className="rounded-xl bg-emerald-50 p-3 text-center">
+                      <div className="mt-2 grid grid-cols-3 gap-1.5 sm:mt-4 sm:gap-2">
+                        <div className="rounded-xl bg-emerald-50 p-2 text-center sm:p-3">
                           <p className="text-lg font-black text-emerald-800">
                             {job.matchedCount}
                           </p>
@@ -2262,20 +2668,20 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                             Matched
                           </p>
                         </div>
-                        <div className="rounded-xl bg-amber-50 p-3 text-center">
+                        <div className="rounded-xl bg-amber-50 p-2 text-center sm:p-3">
                           <p className="text-lg font-black text-amber-800">
                             {job.npiRequiredCount}
                           </p>
                           <p className="text-[9px] font-black uppercase tracking-[0.08em] text-amber-700">
-                            Needs NPI
+                            Needs review
                           </p>
                         </div>
-                        <div className="rounded-xl bg-rose-50 p-3 text-center">
+                        <div className="rounded-xl bg-rose-50 p-2 text-center sm:p-3">
                           <p className="text-lg font-black text-rose-700">
                             {job.invalidCount}
                           </p>
                           <p className="text-[9px] font-black uppercase tracking-[0.08em] text-rose-600">
-                            Invalid
+                            Needs fixing
                           </p>
                         </div>
                       </div>
@@ -2283,16 +2689,16 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   ))}
                 </div>
               ) : (
-                <div className="grid min-h-[170px] place-items-center rounded-[24px] border-2 border-dashed border-violet-300 bg-white/70 p-6 text-center">
+                <div className="grid min-h-[110px] place-items-center rounded-[18px] border-2 border-dashed border-violet-300 bg-white/70 p-4 text-center sm:min-h-[170px] sm:rounded-[24px] sm:p-6">
                   <div>
                     <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-violet-200 text-violet-800">
                       <Boxes size={20} />
                     </div>
-                    <p className="mt-3 text-sm font-black text-violet-950">
-                      No validation history yet
+                    <p className="mt-2 text-[11px] font-black text-violet-950 sm:mt-3 sm:text-sm">
+                      No catalog checks yet
                     </p>
-                    <p className="mt-1 text-xs font-semibold text-violet-800/60">
-                      Your first validated catalog CSV will appear here with matched, NPI and invalid counts.
+                    <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-violet-800/60 sm:mt-1 sm:text-xs sm:leading-normal">
+                      Completed CSV checks will appear here with matched and review counts.
                     </p>
                   </div>
                 </div>
@@ -2303,123 +2709,169 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "quality" ? (
-        <div className="mt-5 space-y-5">
-          <Section
-            title="Catalog data quality"
-            description="Unknown allergen evidence is not treated as free-from. Recipe eligibility requires reviewed safety evidence."
-            icon={BadgeCheck}
-          >
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                ["Products observed", quality?.productsObserved || 0],
-                ["Canonical matches", quality?.canonicalMatches || 0],
-                ["Needs NPI", quality?.npiRequired || 0],
-                ["Recipe eligible", quality?.recipeEligible || 0],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl bg-stone-50 p-4">
-                  <p className="text-2xl font-black">{value}</p>
+        <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
+          <section className="rounded-[20px] border border-[#d7e7e0] bg-[#eef6f2] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.05)] sm:rounded-[28px] sm:p-5">
+            <div className="flex items-start gap-2.5 sm:gap-3">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[12px] bg-[#d9ece3] text-[#245c4d] sm:h-10 sm:w-10 sm:rounded-2xl">
+                <BadgeCheck className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+              </div>
 
-                  <p className="mt-1 text-[10px] font-black uppercase text-stone-400">
+              <div className="min-w-0">
+                <h2 className="text-[14px] font-black leading-4 text-slate-950 sm:text-lg sm:leading-normal">
+                  Your catalog health
+                </h2>
+                <p className="mt-1 max-w-3xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:text-xs sm:leading-5">
+                  Use this page to quickly see which products are ready and which product details should be completed next.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+              {[
+                ["Products checked", quality?.productsObserved || 0, "bg-[#e8f1f8] border-[#d6e7f2]", "text-[#315d74]"],
+                ["Ready matches", quality?.canonicalMatches || 0, "bg-[#e7f3ed] border-[#d4eadf]", "text-[#245c4d]"],
+                ["Need details", quality?.npiRequired || 0, "bg-[#f0ebf8] border-[#e4daf3]", "text-[#5d4a73]"],
+                ["Recipe-ready", quality?.recipeEligible || 0, "bg-[#e8f4ee] border-[#d4eadf]", "text-[#245c4d]"],
+              ].map(([label, value, tone, textTone]) => (
+                <div
+                  key={label}
+                  className={`rounded-[14px] border p-2.5 sm:rounded-[20px] sm:p-4 ${tone}`}
+                >
+                  <p className={`text-xl font-black leading-none sm:text-2xl ${textTone}`}>
+                    {value}
+                  </p>
+                  <p className={`mt-1.5 text-[8px] font-black uppercase leading-[10px] tracking-[0.06em] sm:mt-2 sm:text-[10px] sm:leading-normal ${textTone}`}>
                     {label}
                   </p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-4 rounded-2xl border border-stone-200 p-4">
-              <p className="text-xs font-black">
-                Average score: {quality?.averageDataQualityScore || 0}/100
-              </p>
+            <div className="mt-3 rounded-[16px] border border-[#d8e6ed] bg-[#edf4f8] p-3 sm:mt-4 sm:rounded-[22px] sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#35695b] sm:text-[10px]">
+                    Catalog completeness
+                  </p>
+                  <p className="mt-0.5 text-[18px] font-black leading-5 text-slate-950 sm:mt-1 sm:text-2xl sm:leading-normal">
+                    {quality?.averageDataQualityScore || 0}/100
+                  </p>
+                </div>
+                <p className="max-w-[210px] text-right text-[8px] font-semibold leading-[11px] text-slate-600 sm:max-w-sm sm:text-[11px] sm:leading-4">
+                  Higher completeness means more product information is ready for catalog and recipe use.
+                </p>
+              </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {Object.entries(quality?.issueCounts || {}).map(
-                  ([key, value]) => (
+              {Object.keys(quality?.issueCounts || {}).length ? (
+                <div className="mt-2.5 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
+                  {Object.entries(quality?.issueCounts || {}).map(([key, value]) => (
                     <span
                       key={key}
-                      className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-800"
+                      className="rounded-full border border-[#dbe7e2] bg-white/85 px-2 py-1 text-[8px] font-black leading-3 text-[#46635b] sm:px-3 sm:text-[10px]"
                     >
-                      {titleize(key)} · {value}
+                      {qualityIssueLabel(key)} · {value}
                     </span>
-                  )
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2.5 rounded-xl bg-white/70 px-3 py-2 text-[9px] font-bold text-emerald-800 sm:mt-3 sm:text-xs">
+                  No product-detail issues are showing right now.
+                </p>
+              )}
             </div>
 
-            <Link
-              to="/host/product-intelligence"
-              className={`${buttonClass} mt-4`}
-            >
-              <PackageSearch size={15} />
-              Open M14 Product NPI
-            </Link>
-          </Section>
+            <div className="mt-3 flex flex-col gap-2 rounded-[16px] border border-[#d4eadf] bg-[#e8f4ee] p-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:rounded-[22px] sm:p-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black text-[#173f35] sm:text-sm">
+                  Next step: complete the flagged product details
+                </p>
+                <p className="mt-0.5 text-[8px] font-semibold leading-[11px] text-slate-700/70 sm:mt-1 sm:text-[11px] sm:leading-4">
+                  Open Add / Edit Products, update the missing information, then return here and Refresh to check the latest result.
+                </p>
+              </div>
+
+              <Link
+                to="/host/product-intelligence"
+                className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[11px] bg-[#17624f] px-3 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#124e3f] sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
+              >
+                <PackageSearch className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Open Add / Edit Products
+              </Link>
+            </div>
+          </section>
         </div>
       ) : null}
 
       {section === "finance" ? (
-        <div className="mt-5 space-y-5">
+        <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
           <Section
-            title="Finance summary"
-            description="Settlement lines reconcile M11 paid/delivered transaction facts. Historical ledger entries are never rewritten."
+            title="Earnings overview"
+            description="A quick view of delivered orders, money still waiting to settle, and what has already been paid."
             icon={WalletCards}
+            tone="finance"
           >
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
               {[
-                ["Delivered orders", finance?.deliveredOrders || 0],
-                ["Unsettled delivered", finance?.unsettledDeliveredOrders || 0],
-                ["Pending settlements", finance?.pendingSettlements || 0],
-                ["Paid net", money(finance?.paidNetMinor || 0)],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl bg-stone-50 p-4">
-                  <p className="text-xl font-black">{value}</p>
-
-                  <p className="mt-1 text-[10px] font-black uppercase text-stone-400">
+                ["Delivered orders", finance?.deliveredOrders || 0, "bg-white/85 border-[#dce7e3]"],
+                ["Awaiting settlement", finance?.unsettledDeliveredOrders || 0, "bg-[#e7f3ed] border-[#d4eadf]"],
+                ["Payouts in progress", finance?.pendingSettlements || 0, "bg-[#f0ebf8] border-[#e4daf3]"],
+                ["Paid to you", money(finance?.paidNetMinor || 0), "bg-[#e8f1f8] border-[#d6e7f2]"],
+              ].map(([label, value, tone]) => (
+                <div
+                  key={label}
+                  className={`min-w-0 rounded-[14px] border p-2.5 shadow-[0_5px_14px_rgba(28,25,23,0.03)] sm:rounded-[20px] sm:p-4 ${tone}`}
+                >
+                  <p className="text-[18px] font-black leading-5 text-stone-950 sm:text-xl">{value}</p>
+                  <p className="mt-1 text-[8px] font-black uppercase leading-[11px] tracking-[0.06em] text-stone-500 sm:text-[10px] sm:leading-4">
                     {label}
                   </p>
                 </div>
               ))}
             </div>
 
-            <p className="mt-4 text-xs leading-5 text-stone-500">
-              M16 v1 intentionally does not invent a commission schedule. Until
-              commercial fee configuration exists, settlement lines expose zero
-              platform fee/tax withholding and reconcile merchandise payable
-              only.
-            </p>
+            <div className="mt-3 rounded-[14px] border border-[#d6e7e1] bg-[#e7f3ed] px-3 py-2.5 sm:mt-4 sm:rounded-[18px] sm:px-4 sm:py-3">
+              <p className="text-[9px] font-semibold leading-[13px] text-[#35564d] sm:text-xs sm:leading-5">
+                For now, EPANTRY shows the merchandise amount from delivered orders. Any future platform fees or tax deductions will appear here once they are configured.
+              </p>
+            </div>
           </Section>
 
-          <Section title="Settlement history" icon={WalletCards}>
-            <div className="space-y-2">
+          <Section
+            title="Payout history"
+            description="See each recorded settlement period and the amount prepared or paid for your business."
+            icon={WalletCards}
+            tone="finance"
+          >
+            <div className="space-y-2 sm:space-y-3">
               {settlements.length ? (
                 settlements.map((settlement) => (
                   <div
                     key={settlement.id}
-                    className="rounded-2xl border border-stone-200 p-4"
+                    className="rounded-[14px] border border-[#dde6e3] bg-white/90 p-3 shadow-[0_4px_12px_rgba(28,25,23,0.025)] sm:rounded-[18px] sm:p-4"
                   >
-                    <div className="flex justify-between gap-3">
-                      <p className="text-sm font-black">
-                        {new Date(settlement.periodStart).toLocaleDateString()}{" "}
-                        – {new Date(settlement.periodEnd).toLocaleDateString()}
-                      </p>
+                    <div className="flex items-start justify-between gap-2 sm:gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black leading-4 text-stone-950 sm:text-sm">
+                          {new Date(settlement.periodStart).toLocaleDateString()} – {new Date(settlement.periodEnd).toLocaleDateString()}
+                        </p>
+                        <p className="mt-1 text-[9px] font-semibold leading-[13px] text-stone-500 sm:text-xs sm:leading-5">
+                          {settlement.lineCount} entries · Amount {money(settlement.totals?.netPayableMinor, settlement.currency)}
+                        </p>
+                      </div>
 
-                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-black">
+                      <span className="shrink-0 rounded-full bg-[#e7f3ed] px-2 py-1 text-[8px] font-black text-[#276454] sm:px-2.5 sm:text-[10px]">
                         {titleize(settlement.status)}
                       </span>
                     </div>
-
-                    <p className="mt-2 text-xs text-stone-500">
-                      {settlement.lineCount} lines · Net{" "}
-                      {money(
-                        settlement.totals?.netPayableMinor,
-                        settlement.currency
-                      )}
-                    </p>
                   </div>
                 ))
               ) : (
-                <p className="text-sm font-semibold text-stone-400">
-                  No settlements yet.
-                </p>
+                <div className="rounded-[14px] border border-[#d8e4ec] bg-[#e8f1f8] px-3 py-3 sm:rounded-[18px] sm:px-4 sm:py-4">
+                  <p className="text-[10px] font-black text-[#2b6078] sm:text-sm">No payouts recorded yet</p>
+                  <p className="mt-1 text-[9px] font-semibold leading-[13px] text-slate-600 sm:text-xs sm:leading-5">
+                    After delivered orders are grouped into a settlement, the payout period and amount will appear here.
+                  </p>
+                </div>
               )}
             </div>
           </Section>
@@ -2427,37 +2879,38 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "recipes" ? (
-        <div className="mt-5 space-y-5">
+        <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
           <Section
-            title={editingHostRecipeId ? "Edit Recipe Listing" : "Create Recipe Listing"}
+            title={editingHostRecipeId ? "Edit Recipe" : "Add a Recipe"}
             description={
               editingHostRecipeId
-                ? "Update this Recipe listing. Published Recipes are never overwritten: saving a published listing creates a new draft version and sends that revision to Super Admin review."
-                : "Create the full Recipe here as a Host. Submission goes directly to Super Admin review and cannot become public until Super Admin publishes it. No Brand authority is required for a normal Host Recipe listing."
+                ? "Update the Recipe below. If it is already live, your changes are sent as a new version for review while the published version stays unchanged."
+                : "Add the Recipe details below. After submission, Super Admin reviews it before it can appear publicly. You can track the result in Listing History."
             }
             icon={BookOpen}
+            tone="recipe"
             actions={
               editingHostRecipeId ? (
                 <button
                   type="button"
                   disabled={busy}
                   onClick={cancelHostRecipeEdit}
-                  className="focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-50"
+                  className="focus-ring inline-flex items-center gap-1.5 rounded-[10px] border border-stone-200 bg-white px-2.5 py-2 text-[10px] font-black text-stone-700 disabled:opacity-50 sm:gap-2 sm:rounded-xl sm:px-3 sm:text-xs"
                 >
                   <X size={14} aria-hidden="true" />
                   Cancel edit
                 </button>
               ) : (
-                <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">
-                  Host submits · Super Admin publishes
+                <span className="rounded-full border border-[#d8d0ec] bg-[#f0ebf8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.08em] text-[#5f4b82] sm:px-3 sm:text-[10px] sm:tracking-[0.1em]">
+                  Review required before publishing
                 </span>
               )
             }
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Recipe title">
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+              <Field compactMobile label="Recipe title">
                 <input
-                  className={inputClass}
+                  className={recipeInputClass}
                   value={hostRecipeForm.title}
                   onChange={(event) =>
                     setHostRecipeForm((current) => ({
@@ -2469,12 +2922,12 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Base servings">
+              <Field compactMobile label="Base servings">
                 <input
                   type="number"
                   min="1"
                   max="1000"
-                  className={inputClass}
+                  className={recipeInputClass}
                   value={hostRecipeForm.baseServings}
                   onChange={(event) =>
                     setHostRecipeForm((current) => ({
@@ -2485,9 +2938,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Cuisine">
+              <Field compactMobile label="Cuisine">
                 <input
-                  className={inputClass}
+                  className={recipeInputClass}
                   value={hostRecipeForm.cuisine}
                   onChange={(event) =>
                     setHostRecipeForm((current) => ({
@@ -2499,9 +2952,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Course">
+              <Field compactMobile label="Course">
                 <input
-                  className={inputClass}
+                  className={recipeInputClass}
                   value={hostRecipeForm.course}
                   onChange={(event) =>
                     setHostRecipeForm((current) => ({
@@ -2513,11 +2966,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Preparation minutes">
+              <Field compactMobile label="Preparation minutes">
                 <input
                   type="number"
                   min="0"
-                  className={inputClass}
+                  className={recipeInputClass}
                   value={hostRecipeForm.preparationTimeMinutes}
                   onChange={(event) =>
                     setHostRecipeForm((current) => ({
@@ -2528,11 +2981,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Cooking minutes">
+              <Field compactMobile label="Cooking minutes">
                 <input
                   type="number"
                   min="0"
-                  className={inputClass}
+                  className={recipeInputClass}
                   value={hostRecipeForm.cookingTimeMinutes}
                   onChange={(event) =>
                     setHostRecipeForm((current) => ({
@@ -2543,9 +2996,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Difficulty">
+              <Field compactMobile label="Difficulty">
                 <select
-                  className={inputClass}
+                  className={recipeInputClass}
                   value={hostRecipeForm.difficulty}
                   onChange={(event) =>
                     setHostRecipeForm((current) => ({
@@ -2561,10 +3014,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </Field>
 
               <div className="sm:col-span-2">
-                <Field label="Description">
+                <Field compactMobile label="Description">
                   <textarea
                     rows={3}
-                    className={inputClass}
+                    className={recipeInputClass}
                     value={hostRecipeForm.description}
                     onChange={(event) =>
                       setHostRecipeForm((current) => ({
@@ -2572,34 +3025,34 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         description: event.target.value,
                       }))
                     }
-                    placeholder="Describe the Recipe and serving context."
+                    placeholder="Briefly describe the Recipe and how it is served."
                   />
                 </Field>
               </div>
 
               <div className="sm:col-span-2">
-                <Field label="Recipe image">
-                  <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-4">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <Field compactMobile label="Recipe image">
+                  <div className="rounded-[14px] border border-dashed border-[#cedfd9] bg-[#f3f8f6] p-2.5 sm:rounded-2xl sm:p-4">
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
                       {hostRecipeForm.heroImageUrl ? (
                         <img
                           src={hostRecipeForm.heroImageUrl}
                           alt="Recipe preview"
-                          className="h-28 w-full rounded-2xl object-cover sm:w-44"
+                          className="h-20 w-full rounded-[12px] object-cover sm:h-28 sm:w-44 sm:rounded-2xl"
                         />
                       ) : (
-                        <div className="grid h-28 w-full place-items-center rounded-2xl border border-stone-200 bg-white text-xs font-bold text-stone-400 sm:w-44">
+                        <div className="grid h-20 w-full place-items-center rounded-[12px] border border-stone-200 bg-white text-[10px] font-bold text-stone-400 sm:h-28 sm:w-44 sm:rounded-2xl sm:text-xs">
                           No image selected
                         </div>
                       )}
 
                       <div className="flex-1">
-                        <p className="text-xs leading-5 text-stone-500">
-                          Upload a JPEG, PNG, or WebP image. Maximum size is 8 MB. Existing listings can load the current image through Edit and replace it here.
+                        <p className="text-[9px] font-semibold leading-[13px] text-stone-500 sm:text-xs sm:font-normal sm:leading-5">
+                          Add a clear Recipe photo (JPEG, PNG or WebP, up to 8 MB). You can replace it later while editing.
                         </p>
 
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <label className="focus-ring inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+                        <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
+                          <label className="focus-ring inline-flex cursor-pointer items-center gap-1.5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[10px] font-black text-emerald-800 sm:gap-2 sm:rounded-xl sm:px-3 sm:text-xs">
                             {recipeImageUploading ? (
                               <LoaderCircle
                                 size={14}
@@ -2637,7 +3090,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                                   heroImageUrl: "",
                                 }))
                               }
-                              className="focus-ring rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-50"
+                              className="focus-ring rounded-[10px] border border-rose-200 bg-rose-50 px-2.5 py-2 text-[10px] font-black text-rose-700 disabled:opacity-50 sm:rounded-xl sm:px-3 sm:text-xs"
                             >
                               Remove image
                             </button>
@@ -2650,13 +3103,13 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-black text-stone-950">
-                  Canonical ingredients
+            <div className="mt-4 flex items-center justify-between gap-2 sm:mt-6 sm:gap-3">
+              <div className="min-w-0">
+                <h3 className="text-[12px] font-black text-stone-950 sm:text-sm">
+                  Ingredients
                 </h3>
-                <p className="mt-1 text-xs text-stone-500">
-                  Search by ingredient name. Internal ObjectIds are stored automatically.
+                <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5">
+                  Search each ingredient by name. If EPANTRY cannot find it, your entry is included for review.
                 </p>
               </div>
 
@@ -2671,13 +3124,13 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     ],
                   }))
                 }
-                className="focus-ring rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700"
+                className="focus-ring shrink-0 rounded-[10px] border border-stone-200 bg-white px-2.5 py-2 text-[10px] font-black text-stone-700 sm:rounded-xl sm:px-3 sm:text-xs"
               >
                 + Ingredient
               </button>
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div className="mt-2 space-y-1.5 sm:mt-3 sm:space-y-2">
               {hostRecipeForm.ingredients.map((ingredient, index) => (
                 <HostRecipeIngredientRow
                   key={ingredient.rowId}
@@ -2703,13 +3156,13 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               ))}
             </div>
 
-            <div className="mt-6 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-black text-stone-950">
-                  Method steps
+            <div className="mt-4 flex items-center justify-between gap-2 sm:mt-6 sm:gap-3">
+              <div className="min-w-0">
+                <h3 className="text-[12px] font-black text-stone-950 sm:text-sm">
+                  Cooking steps
                 </h3>
-                <p className="mt-1 text-xs text-stone-500">
-                  Add the complete preparation and cooking sequence.
+                <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5">
+                  Add each step in the order the customer should follow.
                 </p>
               </div>
 
@@ -2721,24 +3174,24 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     steps: [...current.steps, newRecipeStep()],
                   }))
                 }
-                className="focus-ring rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700"
+                className="focus-ring shrink-0 rounded-[10px] border border-stone-200 bg-white px-2.5 py-2 text-[10px] font-black text-stone-700 sm:rounded-xl sm:px-3 sm:text-xs"
               >
                 + Step
               </button>
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div className="mt-2 space-y-1.5 sm:mt-3 sm:space-y-2">
               {hostRecipeForm.steps.map((step, index) => (
                 <div
                   key={step.rowId}
-                  className="grid gap-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-[44px_minmax(0,1fr)_130px_44px]"
+                  className="grid gap-1.5 rounded-[14px] border border-[#dbe7e2] bg-[#f5f8f7] p-2 sm:grid-cols-[44px_minmax(0,1fr)_130px_44px] sm:gap-2 sm:rounded-2xl sm:p-3"
                 >
-                  <div className="grid h-10 place-items-center rounded-xl bg-stone-950 text-xs font-black text-white">
+                  <div className="grid h-9 place-items-center rounded-[10px] bg-[#173f35] text-[10px] font-black text-white sm:h-10 sm:rounded-xl sm:text-xs">
                     {index + 1}
                   </div>
 
                   <input
-                    className={inputClass}
+                    className={recipeInputClass}
                     value={step.instruction}
                     onChange={(event) =>
                       setHostRecipeForm((current) => ({
@@ -2750,14 +3203,14 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         ),
                       }))
                     }
-                    placeholder="Instruction"
+                    placeholder="Describe this step"
                   />
 
                   <input
                     type="number"
                     min="0"
                     step="any"
-                    className={inputClass}
+                    className={recipeInputClass}
                     value={step.timerMinutes}
                     onChange={(event) =>
                       setHostRecipeForm((current) => ({
@@ -2769,7 +3222,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         ),
                       }))
                     }
-                    placeholder="Timer min"
+                    placeholder="Minutes"
                   />
 
                   <button
@@ -2783,7 +3236,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         ),
                       }))
                     }
-                    className="focus-ring rounded-xl border border-rose-200 bg-rose-50 text-sm font-black text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="focus-ring min-h-9 rounded-[10px] border border-rose-200 bg-rose-50 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-10 sm:rounded-xl sm:text-sm"
                     aria-label="Remove step"
                   >
                     ×
@@ -2792,38 +3245,38 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               ))}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
+            <div className="mt-4 rounded-[16px] border border-[#d6e7f2] bg-[#edf4f8] p-3 sm:mt-6 sm:rounded-2xl sm:p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
-                    Recipe Food Intelligence declaration
+                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#356b7f] sm:text-[10px]">
+                    Recipe food details
                   </p>
-                  <h3 className="mt-1 text-sm font-black text-stone-950">
-                    Nutrition, allergens & dietary source facts
+                  <h3 className="mt-0.5 text-[12px] font-black text-stone-950 sm:mt-1 sm:text-sm">
+                    Nutrition, allergens & dietary information
                   </h3>
-                  <p className="mt-1 max-w-3xl text-xs leading-5 text-stone-600">
-                    Enter only values you can support from the Recipe formulation or your source records. This Host declaration is not public safety truth by itself. Super Admin must review and approve it before publication. AI does not approve nutrition, allergen or dietary claims, and calculation source / lineage are generated by EPANTRY automatically.
+                  <p className="mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-600 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5">
+                    Add only information you can support from your Recipe or source records. Leave anything you cannot confirm blank; these details are reviewed before publishing.
                   </p>
                 </div>
 
-                <span className="inline-flex shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-amber-800">
-                  Super Admin review required
+                <span className="inline-flex shrink-0 rounded-full border border-[#d8d0ec] bg-[#f0ebf8] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.08em] text-[#5f4b82] sm:px-3 sm:text-[10px]">
+                  Checked before publishing
                 </span>
               </div>
 
-              <div className="mt-5">
-                <p className="text-xs font-black text-stone-800">
+              <div className="mt-3 sm:mt-5">
+                <p className="text-[10px] font-black text-stone-800 sm:text-xs">
                   Nutrition per serving
                 </p>
-                <p className="mt-1 text-[11px] leading-5 text-stone-500">
-                  Optional at Host submission. Leave a value blank when you do not have a supportable source; do not estimate with AI.
+                <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-[11px] sm:font-normal sm:leading-5">
+                  Add only values you know. Leave unknown fields blank.
                 </p>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-3 lg:grid-cols-4">
                   {RECIPE_FOOD_NUTRIENTS.map((field) => (
                     <label
                       key={field.key}
-                      className="rounded-2xl border border-stone-200 bg-white p-3 text-xs font-black text-stone-700"
+                      className="rounded-[12px] border border-stone-200 bg-white p-2 text-[10px] font-black text-stone-700 sm:rounded-2xl sm:p-3 sm:text-xs"
                     >
                       {field.label}
 
@@ -2850,10 +3303,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                             }))
                           }
                           placeholder="Unknown"
-                          className="focus-ring h-10 min-w-0 flex-1 rounded-xl border border-stone-200 px-3 text-sm outline-none"
+                          className="focus-ring h-9 min-w-0 flex-1 rounded-[10px] border border-stone-200 px-2.5 text-[11px] outline-none sm:h-10 sm:rounded-xl sm:px-3 sm:text-sm"
                         />
 
-                        <span className="text-[11px] font-black text-stone-500">
+                        <span className="text-[9px] font-black text-stone-500 sm:text-[11px]">
                           {field.unit}
                         </span>
                       </div>
@@ -2862,19 +3315,19 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 </div>
               </div>
 
-              <div className="mt-5">
-                <p className="text-xs font-black text-stone-800">
-                  Positive allergen relationships
+              <div className="mt-3 sm:mt-5">
+                <p className="text-[10px] font-black text-stone-800 sm:text-xs">
+                  Allergen information
                 </p>
-                <p className="mt-1 text-[11px] leading-5 text-stone-500">
-                  Declare only positive relationships. Blank means “not declared”, never “allergen-free”.
+                <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-[11px] sm:font-normal sm:leading-5">
+                  Choose an option only when your Recipe or source records support it. Blank means not declared.
                 </p>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-3 lg:grid-cols-3">
                   {RECIPE_FOOD_ALLERGENS.map((field) => (
                     <label
                       key={field.key}
-                      className="rounded-2xl border border-stone-200 bg-white p-3 text-xs font-black text-stone-700"
+                      className="rounded-[12px] border border-stone-200 bg-white p-2 text-[10px] font-black text-stone-700 sm:rounded-2xl sm:p-3 sm:text-xs"
                     >
                       {field.label}
 
@@ -2896,7 +3349,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                             },
                           }))
                         }
-                        className={`${inputClass} mt-2`}
+                        className={`${recipeInputClass} mt-2`}
                       >
                         <option value="">Not declared</option>
                         <option value="contains">Contains</option>
@@ -2908,10 +3361,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="Dietary classification">
+              <div className="mt-3 grid gap-2 sm:mt-5 sm:gap-4 md:grid-cols-2">
+                <Field compactMobile label="Dietary type">
                   <select
-                    className={inputClass}
+                    className={recipeInputClass}
                     value={
                       hostRecipeForm.foodIntelligence
                         ?.dietaryClassification || "not_declared"
@@ -2934,9 +3387,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   </select>
                 </Field>
 
-                <Field label="Declaration basis">
+                <Field compactMobile label="Source / basis">
                   <input
-                    className={inputClass}
+                    className={recipeInputClass}
                     value={hostRecipeForm.foodIntelligence?.basis || ""}
                     onChange={(event) =>
                       setHostRecipeForm((current) => ({
@@ -2947,14 +3400,14 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         },
                       }))
                     }
-                    placeholder="Per serving / source basis"
+                    placeholder="Example: per serving / Recipe record"
                   />
                 </Field>
 
                 <div className="md:col-span-2">
-                  <Field label="Evidence / declaration note">
+                  <Field compactMobile label="Source note">
                     <textarea
-                      className={inputClass}
+                      className={recipeInputClass}
                       rows={3}
                       value={hostRecipeForm.foodIntelligence?.reason || ""}
                       onChange={(event) =>
@@ -2966,7 +3419,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                           },
                         }))
                       }
-                      placeholder="Explain where these values came from."
+                      placeholder="Briefly note where these values came from."
                     />
                   </Field>
                 </div>
@@ -3001,8 +3454,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                       ? updateHostRecipeListing(editingHostRecipeId, payload)
                       : createHostRecipeListing(payload),
                   editingHostRecipeId
-                    ? "Recipe updated and resubmitted to Super Admin review."
-                    : "Recipe submitted to Super Admin for review."
+                    ? "Recipe updated and sent for review."
+                    : "Recipe submitted for review."
                 );
 
                 if (result) {
@@ -3011,7 +3464,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   clearRecipeEditQuery();
                 }
               }}
-              className={`${buttonClass} mt-5`}
+              className={`${buttonClass} mt-3 w-full text-[11px] sm:mt-5 sm:w-auto sm:text-sm`}
             >
               {editingHostRecipeId ? (
                 <Save size={15} />
@@ -3020,7 +3473,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               )}
               {editingHostRecipeId
                 ? "Save Recipe Changes"
-                : "Submit Recipe for Super Admin Review"}
+                : "Submit Recipe for Review"}
             </button>
           </Section>
 
@@ -3216,26 +3669,27 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "settings" ? (
-        <div className="mt-5 space-y-5">
+        <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-2">
           <Section
-            title="Documents"
-            description="M16 stores document metadata/references only; provider secrets or private file bytes are not exposed through normal responses."
+            title="Business records"
+            description="Save licences, registration, bank proof and other records your business may need."
             icon={FileCheck2}
+            tone="settingsMint"
           >
             <form
-              className="grid gap-3 sm:grid-cols-2"
+              className="grid gap-2.5 sm:grid-cols-2 sm:gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
 
                 run(
                   () => registerHostDocument(documentForm),
-                  "Document evidence metadata registered."
+                  "Business document saved."
                 );
               }}
             >
-              <Field label="Type">
+              <Field label="Document type" compactMobile>
                 <select
-                  className={inputClass}
+                  className={settingsInputClass}
                   value={documentForm.documentType}
                   onChange={(event) =>
                     setDocumentForm((current) => ({
@@ -3262,10 +3716,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 </select>
               </Field>
 
-              <Field label="Label">
+              <Field label="Document name" compactMobile>
                 <input
                   required
-                  className={inputClass}
+                  placeholder="e.g. Delhi Food Licence"
+                  className={settingsInputClass}
                   value={documentForm.label}
                   onChange={(event) =>
                     setDocumentForm((current) => ({
@@ -3277,9 +3732,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Private provider asset ID">
+              <Field label="Where this file is saved (optional)" compactMobile>
                 <input
-                  className={inputClass}
+                  placeholder="Add the saved-file reference if you have one"
+                  className={settingsInputClass}
                   value={documentForm.providerAssetId}
                   onChange={(event) =>
                     setDocumentForm((current) => ({
@@ -3291,9 +3747,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="SHA-256 checksum">
+              <Field label="File verification code (optional)" compactMobile>
                 <input
-                  className={inputClass}
+                  placeholder="Only if your storage system provides one"
+                  className={settingsInputClass}
                   value={documentForm.checksumSha256}
                   onChange={(event) =>
                     setDocumentForm((current) => ({
@@ -3307,33 +3764,40 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
               <button
                 disabled={busy}
-                className={`${buttonClass} sm:col-span-2`}
+                className={`${settingsButtonClass} sm:col-span-2`}
               >
-                <Save size={15} />
-                Register document
+                <Save size={14} />
+                Save document
               </button>
             </form>
 
-            <div className="mt-4 space-y-2">
-              {documents.map((document) => (
-                <div
-                  key={document.id}
-                  className="rounded-xl bg-stone-50 p-3 text-xs font-semibold"
-                >
-                  {document.label} · {titleize(document.status)} · ID{" "}
-                  {document.id}
-                </div>
-              ))}
+            <div className="mt-3 space-y-2">
+              {documents.length ? (
+                documents.map((document) => (
+                  <div
+                    key={document.id}
+                    className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 text-[10px] font-semibold text-stone-700 sm:rounded-xl sm:text-xs"
+                  >
+                    <span className="font-black text-stone-950">{document.label}</span>
+                    <span className="text-stone-500"> · {titleize(document.status)}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
+                  No business documents saved yet.
+                </p>
+              )}
             </div>
           </Section>
 
           <Section
-            title="Organization team"
-            description="Staff permissions are organization-scoped. Assignment never creates Host capability; the user must already be an active Host."
+            title="Team members"
+            description="Add people who already have Host access and choose what they are allowed to work on."
             icon={Users}
+            tone="settingsBlue"
           >
             <form
-              className="grid gap-3 sm:grid-cols-3"
+              className="grid gap-2.5 sm:grid-cols-3 sm:gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
 
@@ -3349,14 +3813,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         .map((value) => value.trim())
                         .filter(Boolean),
                     }),
-                  "Organization member saved."
+                  "Team member added."
                 );
               }}
             >
-              <Field label="Active Host User ID">
+              <Field label="Host account ID" compactMobile>
                 <input
                   required
-                  className={inputClass}
+                  placeholder="Active Host user"
+                  className={settingsInputClass}
                   value={memberForm.userId}
                   onChange={(event) =>
                     setMemberForm((current) => ({
@@ -3368,9 +3833,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Role label">
+              <Field label="Role in your team" compactMobile>
                 <input
-                  className={inputClass}
+                  placeholder="e.g. Operations Staff"
+                  className={settingsInputClass}
                   value={memberForm.roleLabel}
                   onChange={(event) =>
                     setMemberForm((current) => ({
@@ -3382,49 +3848,63 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Permission keys">
-                <input
-                  className={inputClass}
-                  value={memberForm.permissionKeys}
-                  onChange={(event) =>
-                    setMemberForm((current) => ({
-                      ...current,
+              <div className="sm:col-span-1">
+                <Field label="What they can access" compactMobile>
+                  <input
+                    placeholder="Example: orders.read, catalog.read"
+                    className={settingsInputClass}
+                    value={memberForm.permissionKeys}
+                    onChange={(event) =>
+                      setMemberForm((current) => ({
+                        ...current,
 
-                      permissionKeys: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
+                        permissionKeys: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
 
               <button
                 disabled={busy}
-                className={`${buttonClass} sm:col-span-3`}
+                className={`${settingsButtonClass} sm:col-span-3`}
               >
-                <UserPlus size={15} />
+                <UserPlus size={14} />
                 Add team member
               </button>
             </form>
 
-            <div className="mt-4 space-y-2">
-              {team?.members?.map((member) => (
-                <div
-                  key={member.id}
-                  className="rounded-xl bg-stone-50 p-3 text-xs font-semibold"
-                >
-                  {member.roleLabel} · {member.status} ·{" "}
-                  {(member.permissionKeys || []).join(", ")}
-                </div>
-              ))}
+            <div className="mt-3 space-y-2">
+              {team?.members?.length ? (
+                team.members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 sm:rounded-xl"
+                  >
+                    <p className="text-[10px] font-black text-stone-950 sm:text-xs">
+                      {member.roleLabel || "Team member"}
+                    </p>
+                    <p className="mt-0.5 text-[9px] font-semibold leading-3 text-stone-500 sm:text-[11px] sm:leading-4">
+                      {titleize(member.status)} · {(member.permissionKeys || []).join(", ") || "No extra permissions"}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
+                  No team members added yet.
+                </p>
+              )}
             </div>
           </Section>
 
           <Section
-            title="Service Accounts / API credentials"
-            description="Raw API keys are shown once. Mongo stores only prefix + SHA-256 hash. Scopes are explicit and organization-bound."
+            title="Connect another app"
+            description="Use this only when your warehouse, accounting or internal app needs secure access to EPANTRY."
             icon={KeyRound}
+            tone="settingsLavender"
           >
             <form
-              className="grid gap-3 sm:grid-cols-2"
+              className="grid gap-2.5 sm:grid-cols-2 sm:gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
 
@@ -3440,14 +3920,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         .map((value) => value.trim())
                         .filter(Boolean),
                     }),
-                  "Service Account created."
+                  "App access created."
                 );
               }}
             >
-              <Field label="Name">
+              <Field label="App name" compactMobile>
                 <input
                   required
-                  className={inputClass}
+                  placeholder="e.g. Warehouse app"
+                  className={settingsInputClass}
                   value={serviceAccountForm.name}
                   onChange={(event) =>
                     setServiceAccountForm((current) => ({
@@ -3459,9 +3940,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Scopes">
+              <Field label="What this app can access" compactMobile>
                 <input
-                  className={inputClass}
+                  placeholder="catalog.read, orders.read"
+                  className={settingsInputClass}
                   value={serviceAccountForm.scopes}
                   onChange={(event) =>
                     setServiceAccountForm((current) => ({
@@ -3473,66 +3955,75 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Description">
-                <input
-                  className={inputClass}
-                  value={serviceAccountForm.description}
-                  onChange={(event) =>
-                    setServiceAccountForm((current) => ({
-                      ...current,
+              <div className="sm:col-span-2">
+                <Field label="Why are you connecting it?" compactMobile>
+                  <input
+                    placeholder="Short description"
+                    className={settingsInputClass}
+                    value={serviceAccountForm.description}
+                    onChange={(event) =>
+                      setServiceAccountForm((current) => ({
+                        ...current,
 
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
+                        description: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
 
-              <button disabled={busy} className={buttonClass}>
-                <KeyRound size={15} />
-                Create credential
+              <button disabled={busy} className={`${settingsButtonClass} sm:col-span-2`}>
+                <KeyRound size={14} />
+                Connect app
               </button>
             </form>
 
-            <div className="mt-4 space-y-2">
-              {serviceAccounts.map((account) => (
-                <div
-                  key={account.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-stone-200 p-4"
-                >
-                  <div>
-                    <p className="text-sm font-black">{account.name}</p>
-
-                    <p className="mt-1 text-xs text-stone-500">
-                      {account.status} · {(account.scopes || []).join(", ")}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      run(
-                        () => rotateHostServiceAccountCredential(account.id),
-                        "API credential rotated."
-                      )
-                    }
-                    className="focus-ring inline-flex items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black"
+            <div className="mt-3 space-y-2">
+              {serviceAccounts.length ? (
+                serviceAccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex min-w-0 flex-col items-stretch gap-2 rounded-[14px] border border-white/80 bg-white/85 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:py-2"
                   >
-                    <RotateCw size={13} />
-                    Rotate
-                  </button>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">{account.name}</p>
+                      <p className="mt-1 break-words text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-0.5 sm:truncate sm:text-[11px] sm:leading-normal">
+                        {titleize(account.status)} · {(account.scopes || []).join(", ") || "No permissions"}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          () => rotateHostServiceAccountCredential(account.id),
+                          "New app security key created."
+                        )
+                      }
+                      className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-[10px] border border-[#d9cfeb] bg-white/95 px-3 py-2 text-[10px] font-black text-[#5d4a73] sm:w-auto sm:rounded-xl sm:text-xs"
+                    >
+                      <RotateCw size={12} />
+                      Create new key
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
+                  No apps connected yet.
+                </p>
+              )}
             </div>
           </Section>
 
           <Section
-            title="Webhooks"
-            description="Signing secrets are AES-256-GCM encrypted at rest and shown once. HTTPS is required outside local development."
+            title="Send updates to another system"
+            description="Use this when another system should automatically receive order or business updates from EPANTRY."
             icon={Webhook}
+            tone="settingsBlue"
           >
             <form
-              className="grid gap-3 sm:grid-cols-2"
+              className="grid gap-2.5 sm:grid-cols-2 sm:gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
 
@@ -3548,14 +4039,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         .map((value) => value.trim())
                         .filter(Boolean),
                     }),
-                  "Webhook created."
+                  "Automatic update connection created."
                 );
               }}
             >
-              <Field label="Name">
+              <Field label="Update connection name" compactMobile>
                 <input
                   required
-                  className={inputClass}
+                  placeholder="e.g. Order updates"
+                  className={settingsInputClass}
                   value={webhookForm.name}
                   onChange={(event) =>
                     setWebhookForm((current) => ({
@@ -3567,10 +4059,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="HTTPS endpoint">
+              <Field label="Where should updates go? (URL)" compactMobile>
                 <input
                   required
-                  className={inputClass}
+                  placeholder="https://..."
+                  className={settingsInputClass}
                   value={webhookForm.endpointUrl}
                   onChange={(event) =>
                     setWebhookForm((current) => ({
@@ -3582,77 +4075,96 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 />
               </Field>
 
-              <Field label="Event types">
-                <input
-                  className={inputClass}
-                  value={webhookForm.eventTypes}
-                  onChange={(event) =>
-                    setWebhookForm((current) => ({
-                      ...current,
+              <div className="sm:col-span-2">
+                <Field label="Which updates should be sent?" compactMobile>
+                  <input
+                    placeholder="Comma-separated event names"
+                    className={settingsInputClass}
+                    value={webhookForm.eventTypes}
+                    onChange={(event) =>
+                      setWebhookForm((current) => ({
+                        ...current,
 
-                      eventTypes: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
+                        eventTypes: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
 
-              <button disabled={busy} className={buttonClass}>
-                <Webhook size={15} />
-                Register webhook
+              <button disabled={busy} className={`${settingsButtonClass} sm:col-span-2`}>
+                <Webhook size={14} />
+                Start sending updates
               </button>
             </form>
 
-            <div className="mt-4 space-y-2">
-              {webhooks.map((webhook) => (
-                <div
-                  key={webhook.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-stone-200 p-4"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-black">{webhook.name}</p>
-
-                    <p className="mt-1 truncate text-xs text-stone-500">
-                      {webhook.endpointUrl} · {webhook.maskedSigningSecret}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      run(
-                        () => rotateHostWebhookSecret(webhook.id),
-                        "Webhook secret rotated."
-                      )
-                    }
-                    className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black"
+            <div className="mt-3 space-y-2">
+              {webhooks.length ? (
+                webhooks.map((webhook) => (
+                  <div
+                    key={webhook.id}
+                    className="flex min-w-0 flex-col items-stretch gap-2 rounded-[14px] border border-white/80 bg-white/85 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:py-2"
                   >
-                    <RotateCw size={13} />
-                    Rotate
-                  </button>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">{webhook.name}</p>
+                      <p className="mt-1 break-all text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-0.5 sm:truncate sm:text-[11px] sm:leading-normal">
+                        {webhook.endpointUrl}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          () => rotateHostWebhookSecret(webhook.id),
+                          "Update connection security key reset."
+                        )
+                      }
+                      className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-[10px] border border-[#cfe1eb] bg-white/95 px-3 py-2 text-[10px] font-black text-[#315d74] sm:w-auto sm:rounded-xl sm:text-xs"
+                    >
+                      <RotateCw size={12} />
+                      Reset security key
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
+                  No update connections added yet.
+                </p>
+              )}
             </div>
           </Section>
 
-          <Section
-            title="Organization audit"
-            description="M16 integration/security changes produce append-only organization audit events; M03 separately owns critical Admin audit."
-            icon={ShieldCheck}
-          >
-            <div className="space-y-2">
-              {audit.map((event) => (
-                <div key={event.id} className="rounded-xl bg-stone-50 p-3">
-                  <p className="text-xs font-black">{event.action}</p>
+          <div className="xl:col-span-2">
+            <Section
+              title="Recent changes"
+              description="See recent changes to business records, team members and connected tools."
+              icon={ShieldCheck}
+              tone="settingsMint"
+            >
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {audit.length ? (
+                  audit.map((event) => (
+                    <div
+                      key={event.id}
+                      className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 sm:rounded-xl"
+                    >
+                      <p className="text-[10px] font-black text-stone-950 sm:text-xs">{titleize(event.action)}</p>
 
-                  <p className="mt-1 text-[11px] text-stone-500">
-                    {event.entityType} · {event.entityId} ·{" "}
-                    {new Date(event.occurredAt).toLocaleString()}
+                      <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-[11px]">
+                        {titleize(event.entityType)} · {new Date(event.occurredAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:col-span-2 sm:text-xs xl:col-span-3">
+                    No recent changes recorded yet.
                   </p>
-                </div>
-              ))}
-            </div>
-          </Section>
+                )}
+              </div>
+            </Section>
+          </div>
         </div>
       ) : null}
     </main>

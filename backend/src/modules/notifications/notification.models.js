@@ -54,6 +54,7 @@ export const NOTIFICATION_TRIGGER_TYPES = Object.freeze([
   'host_registration',
   'host_listing_created',
   'host_listing_updated',
+  'host_inventory_low',
 ])
 
 export const NOTIFICATION_ACTIONS = Object.freeze([

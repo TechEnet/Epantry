@@ -107,6 +107,115 @@ const ACCEPTED_IMAGE_TYPES =
     'image/webp',
   ])
 
+const REVIEW_NUTRIENTS = [
+  ['energy', 'Energy', 'kcal'],
+  ['protein', 'Protein', 'g'],
+  ['carbohydrate', 'Carbohydrate', 'g'],
+  ['total_fat', 'Total fat', 'g'],
+  ['saturated_fat', 'Saturated fat', 'g'],
+  ['dietary_fibre', 'Dietary fibre', 'g'],
+  ['total_sugars', 'Total sugars', 'g'],
+  ['sodium', 'Sodium', 'mg'],
+]
+
+function createReviewDetails() {
+  return {
+    ingredientDeclarationText: '',
+    containsAllergens: '',
+    mayContainAllergens: '',
+    allergenStatement: '',
+    countryOfOrigin: '',
+    manufacturerName: '',
+    nutritionBasis: 'per_100g',
+    servingSizeValue: '',
+    servingSizeUnit: 'g',
+    nutrients: Object.fromEntries(
+      REVIEW_NUTRIENTS.map(([key]) => [key, '']),
+    ),
+    dietaryType: 'not_declared',
+    glutenFree: false,
+  }
+}
+
+function splitReviewList(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function buildReviewDeclarations(details) {
+  const allergens = [
+    ...splitReviewList(details.containsAllergens).map((name) => ({
+      name,
+      relationType: 'contains',
+    })),
+    ...splitReviewList(details.mayContainAllergens).map((name) => ({
+      name,
+      relationType: 'may_contain',
+    })),
+  ]
+
+  const nutrients = REVIEW_NUTRIENTS.map(([key, label, unit]) => {
+    const raw = details.nutrients?.[key]
+
+    if (raw === '' || raw === null || raw === undefined) {
+      return null
+    }
+
+    const amount = Number(raw)
+
+    return Number.isFinite(amount) && amount >= 0
+      ? { name: label, amount, unit }
+      : null
+  }).filter(Boolean)
+
+  const servingValue = Number(details.servingSizeValue)
+  const hasServingSize =
+    details.servingSizeValue !== '' &&
+    Number.isFinite(servingValue) &&
+    servingValue >= 0
+
+  const claims = []
+
+  if (details.dietaryType === 'vegetarian') {
+    claims.push('Vegetarian')
+  } else if (details.dietaryType === 'vegan') {
+    claims.push('Vegan')
+  } else if (details.dietaryType === 'non_vegetarian') {
+    claims.push('Non Vegetarian')
+  }
+
+  if (details.glutenFree) {
+    claims.push('Gluten Free')
+  }
+
+  const hasNutrition = nutrients.length > 0 || hasServingSize
+
+  return {
+    ingredientDeclarationText: details.ingredientDeclarationText.trim(),
+    allergenStatement: details.allergenStatement.trim(),
+    allergens,
+    ...(hasNutrition
+      ? {
+          nutrition: {
+            basis: details.nutritionBasis || null,
+            servingSize: hasServingSize
+              ? {
+                  value: servingValue,
+                  unit: details.servingSizeUnit,
+                }
+              : null,
+            nutrients,
+          },
+        }
+      : {}),
+    countryOfOrigin: details.countryOfOrigin.trim(),
+    manufacturerName: details.manufacturerName.trim(),
+    claims,
+  }
+}
+
 function createLocalId() {
   if (
     typeof crypto !==
@@ -176,6 +285,7 @@ function nutritionLabel(
 function ProductFact({
   label,
   value,
+  mobileWide = false,
 }) {
   if (
     value ===
@@ -196,12 +306,19 @@ function ProductFact({
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-400">
+    <div
+      className={[
+        'rounded-[12px] border border-stone-200 bg-white/90 p-2 sm:rounded-2xl sm:p-4',
+        mobileWide
+          ? 'col-span-2 sm:col-span-1'
+          : '',
+      ].join(' ')}
+    >
+      <p className="text-[7.5px] font-black uppercase tracking-[0.09em] text-stone-400 sm:text-[10px] sm:tracking-[0.12em]">
         {label}
       </p>
 
-      <p className="mt-2 break-words text-sm font-bold leading-6 text-stone-800">
+      <p className="mt-1 break-words text-[10px] font-bold leading-[14px] text-stone-800 sm:mt-2 sm:text-sm sm:leading-6">
         {Array.isArray(
           value,
         )
@@ -233,7 +350,7 @@ function VerificationBanner({
   return (
     <div
       className={[
-        'rounded-[22px] border p-4',
+        'rounded-[16px] border p-3 sm:rounded-[22px] sm:p-4',
 
         verified
           ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
@@ -258,23 +375,29 @@ function VerificationBanner({
         )}
 
         <div>
-          <p className="text-sm font-black">
-            {verified
-              ? resolution.state ===
-                'verified_historical'
-                ? 'Verified historical pack'
-                : 'Verified EPANTRY product'
-              : resolution.state ===
-                  'provisional_external'
-                ? 'External product details found'
-                : 'Product is not yet verified in EPANTRY'}
+          <p className="text-[12px] font-black sm:text-sm">
+            {hostMode
+              ? verified
+                ? 'Product match found'
+                : 'New product needs a quick review'
+              : verified
+                ? resolution.state ===
+                  'verified_historical'
+                  ? 'Verified historical pack'
+                  : 'Verified EPANTRY product'
+                : resolution.state ===
+                    'provisional_external'
+                  ? 'External product details found'
+                  : 'Product is not yet verified in EPANTRY'}
           </p>
 
-          <p className="mt-1 text-xs leading-5 opacity-80">
-            {verified
-              ? 'This result is backed by a published EPANTRY canonical Product Version.'
-              : hostMode
-                ? 'External details are hints only. A Host must submit real package evidence before this product can enter governed catalog onboarding.'
+          <p className="mt-1 text-[10px] font-semibold leading-4 opacity-80 sm:text-xs sm:font-normal sm:leading-5">
+            {hostMode
+              ? verified
+                ? 'This barcode matches an existing EPANTRY product. Continue to pricing and stock when you are ready.'
+                : 'Add clear pack photos and complete the details below. EPANTRY checks them before this product can be listed.'
+              : verified
+                ? 'This result is backed by a published EPANTRY canonical Product Version.'
                 : 'These details can help you identify the pack, but they are not EPANTRY-verified catalog truth.'}
           </p>
         </div>
@@ -302,8 +425,8 @@ function ExternalProductDetails({
     ''
 
   return (
-    <div className="mt-5 grid gap-5 lg:grid-cols-[160px_minmax(0,1fr)]">
-      <div className="overflow-hidden rounded-[24px] border border-stone-200 bg-stone-100">
+    <div className="mt-3 grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-2.5 sm:mt-5 sm:grid-cols-[130px_minmax(0,1fr)] sm:gap-4 lg:grid-cols-[160px_minmax(0,1fr)] lg:gap-5">
+      <div className="self-start overflow-hidden rounded-[14px] border border-amber-200 bg-amber-50 sm:rounded-[24px]">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -311,104 +434,105 @@ function ExternalProductDetails({
               candidate.title ||
               'Scanned product'
             }
-            className="aspect-square h-full w-full object-cover"
+            className="aspect-[3/4] w-full object-cover sm:aspect-square"
           />
         ) : (
-          <div className="grid aspect-square place-items-center text-stone-400">
+          <div className="grid aspect-[3/4] place-items-center text-stone-400 sm:aspect-square">
             <Barcode
-              size={34}
+              size={30}
               aria-hidden="true"
             />
           </div>
         )}
       </div>
 
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-700">
+      <div className="min-w-0 self-center sm:self-start">
+        <p className="text-[8px] font-black uppercase tracking-[0.1em] text-amber-700 sm:text-xs sm:tracking-[0.12em]">
           {candidate.brandName ||
             'External product match'}
         </p>
 
-        <h2 className="mt-1 text-2xl font-black text-stone-950">
+        <h2 className="mt-0.5 text-[15px] font-black leading-[18px] text-stone-950 sm:mt-1 sm:text-2xl sm:leading-normal">
           {candidate.title ||
             candidate.genericName ||
             'Scanned product'}
         </h2>
 
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold">
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">
+        <div className="mt-1.5 flex flex-wrap gap-1 text-[8px] font-bold sm:mt-3 sm:gap-2 sm:text-[11px]">
+          <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800 sm:px-2.5">
             {confidenceLabel(
               candidate.confidence,
             )}
           </span>
 
-          <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">
+          <span className="rounded-full bg-stone-100 px-2 py-1 text-stone-600 sm:px-2.5">
             {candidate.source
               ?.sourceName ||
               'External data'}
           </span>
         </div>
+      </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <ProductFact
-            label="Barcode / GTIN"
-            value={
-              candidate.barcode
-            }
-          />
+      <div className="col-span-2 grid grid-cols-2 gap-1.5 sm:col-span-1 sm:col-start-2 sm:mt-1 sm:gap-3">
+        <ProductFact
+          label="Barcode"
+          value={
+            candidate.barcode
+          }
+        />
 
-          <ProductFact
-            label="Pack size"
-            value={
-              candidate.netQuantityText
-            }
-          />
+        <ProductFact
+          label="Pack size"
+          value={
+            candidate.netQuantityText
+          }
+        />
 
-          <ProductFact
-            label="Category"
-            value={
-              candidate.categoryText
-            }
-          />
+        <ProductFact
+          label="Category"
+          value={
+            candidate.categoryText
+          }
+        />
 
-          <ProductFact
-            label="Country / origin"
-            value={
-              candidate.originText ||
-              candidate.countryText
-            }
-          />
+        <ProductFact
+          label="Country of origin"
+          value={
+            candidate.originText ||
+            candidate.countryText
+          }
+        />
 
-          <ProductFact
-            label="Ingredients"
-            value={
-              candidate.ingredientDeclarationText
-            }
-          />
+        <ProductFact
+          label="Ingredients"
+          value={
+            candidate.ingredientDeclarationText
+          }
+          mobileWide
+        />
 
-          <ProductFact
-            label="Allergen statement"
-            value={
-              candidate.allergenText
-            }
-          />
+        <ProductFact
+          label="Allergens"
+          value={
+            candidate.allergenText
+          }
+        />
 
-          <ProductFact
-            label="Trace / may contain"
-            value={
-              candidate.traceTags
-            }
-          />
+        <ProductFact
+          label="May contain"
+          value={
+            candidate.traceTags
+          }
+        />
 
-          <ProductFact
-            label="Nutrition"
-            value={
-              nutritionLabel(
-                candidate.nutrition,
-              )
-            }
-          />
-        </div>
+        <ProductFact
+          label="Nutrition"
+          value={
+            nutritionLabel(
+              candidate.nutrition,
+            )
+          }
+        />
       </div>
     </div>
   )
@@ -564,6 +688,14 @@ export default function ScanAnythingPage({
         '',
     })
 
+  const [
+    reviewDetails,
+    setReviewDetails,
+  ] =
+    useState(
+      createReviewDetails,
+    )
+
   const canonicalProduct =
     barcodeResolution
       ?.product ||
@@ -707,6 +839,9 @@ export default function ScanAnythingPage({
     setHostNpiResult(
       null,
     )
+    setReviewDetails(
+      createReviewDetails(),
+    )
     setPrivacyHolds(
       [],
     )
@@ -767,6 +902,27 @@ export default function ScanAnythingPage({
           netQuantityText:
             candidate.netQuantityText ||
             '',
+        })
+
+        setReviewDetails({
+          ...createReviewDetails(),
+          ingredientDeclarationText:
+            candidate.ingredientDeclarationText ||
+            '',
+          allergenStatement:
+            candidate.allergenText ||
+            '',
+          mayContainAllergens:
+            Array.isArray(candidate.traceTags)
+              ? candidate.traceTags.join(', ')
+              : '',
+          countryOfOrigin:
+            candidate.originText ||
+            candidate.countryText ||
+            '',
+          nutritionBasis:
+            candidate.nutritionBasis ||
+            'per_100g',
         })
       }
     } catch (
@@ -1009,7 +1165,7 @@ export default function ScanAnythingPage({
       !evidenceFiles.length
     ) {
       setError(
-        'Add at least one clear package image before creating the Host NPI draft.',
+        'Add at least one clear pack photo before sending this product for review.',
       )
 
       return
@@ -1066,6 +1222,11 @@ export default function ScanAnythingPage({
             netQuantityText:
               hints.netQuantityText,
           },
+
+          hostDeclarations:
+            buildReviewDeclarations(
+              reviewDetails,
+            ),
         })
 
       setHostNpiResult(
@@ -1083,8 +1244,8 @@ export default function ScanAnythingPage({
       setSuccess(
         status ===
           'ready_for_review'
-          ? 'Host NPI draft created and ready for governed review.'
-          : 'Host NPI draft created. Open Product NPI to review its evidence status.',
+          ? 'Product details are ready for review.'
+          : 'Product review draft created. Open Add / Edit Products to continue.',
       )
     } catch (
       requestError
@@ -1101,7 +1262,7 @@ export default function ScanAnythingPage({
       setError(
         getUniversalProductErrorMessage(
           requestError,
-          'Unable to create the Host NPI draft.',
+          'Unable to prepare this product for review.',
         ),
       )
     } finally {
@@ -1117,87 +1278,142 @@ export default function ScanAnythingPage({
   return (
     <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-x-hidden bg-[#F7FBFF] px-5 pb-0 pt-0 sm:left-auto sm:w-auto sm:translate-x-0 sm:overflow-visible sm:bg-transparent sm:px-7 sm:pb-7 sm:pt-0 lg:px-8 lg:pb-8 lg:pt-0">
       {hostMode ? (
-        <section className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
-          <div className="grid gap-0 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-            <div className="p-5 sm:p-7 lg:p-8">
-              <div className="flex items-center gap-3">
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-700 text-white">
-                  {hostMode ? (
-                    <Store
-                      size={23}
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <ScanLine
-                      size={23}
-                      aria-hidden="true"
-                    />
-                  )}
+        <section className="overflow-hidden rounded-[22px] border border-emerald-200 bg-[#F4FBF8] shadow-[0_18px_45px_-32px_rgba(5,150,105,0.28)] sm:rounded-[28px]">
+          <div className="border-b border-emerald-200 bg-[linear-gradient(135deg,#DDF8EC_0%,#E8F5FF_52%,#F1EDFF_100%)] p-3 sm:p-6 lg:p-7">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm sm:h-12 sm:w-12 sm:rounded-2xl">
+                <Store
+                  size={23}
+                  className="h-5 w-5 sm:h-[23px] sm:w-[23px]"
+                  aria-hidden="true"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-[8px] font-black uppercase tracking-[0.15em] text-emerald-700 sm:text-[11px] sm:tracking-[0.17em]">
+                  PRODUCT SCAN
+                </p>
+
+                <h1 className="mt-0.5 text-[21px] font-black leading-6 tracking-tight text-stone-950 sm:mt-1 sm:text-3xl sm:leading-tight">
+                  Scan a product to list
+                </h1>
+
+                <p className="mt-1.5 max-w-3xl text-[10.5px] font-semibold leading-[15px] text-stone-600 sm:mt-3 sm:text-sm sm:font-medium sm:leading-6">
+                  <span className="sm:hidden">
+                    Scan the barcode to find a match. New products need pack photos before review.
+                  </span>
+                  <span className="hidden sm:inline">
+                    Scan the pack barcode. Existing EPANTRY products can move to pricing and stock; new products will ask for pack photos before review.
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+              {[
+                {
+                  number: '1',
+                  title: 'Scan barcode',
+                  text: 'Enter the code or use your camera.',
+                  tone: 'border-emerald-200 bg-emerald-50',
+                  numberTone: 'bg-emerald-600',
+                },
+                {
+                  number: '2',
+                  title: 'Check match',
+                  text: 'EPANTRY looks for an existing product.',
+                  tone: 'border-sky-200 bg-sky-50',
+                  numberTone: 'bg-sky-600',
+                },
+                {
+                  number: '3',
+                  title: 'Review if new',
+                  text: 'Add clear pack photos for a new product.',
+                  tone: 'border-violet-200 bg-violet-50',
+                  numberTone: 'bg-violet-600',
+                },
+                {
+                  number: '4',
+                  title: 'Continue listing',
+                  text: 'Move to Pricing & Stock or Add / Edit Products.',
+                  tone: 'border-cyan-200 bg-cyan-50',
+                  numberTone: 'bg-cyan-700',
+                },
+              ].map((step) => (
+                <div
+                  key={step.number}
+                  className={`rounded-xl border p-2 sm:rounded-2xl sm:p-3 ${step.tone}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[9px] font-black text-white sm:h-6 sm:w-6 sm:text-[10px] ${step.numberTone}`}>
+                      {step.number}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black leading-3 text-stone-900 sm:text-xs sm:leading-4">
+                        {step.title}
+                      </p>
+                      <p className="mt-0.5 text-[8.5px] font-semibold leading-[12px] text-stone-500 sm:mt-1 sm:text-[11px] sm:leading-4">
+                        {step.text}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-        
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-2 grid gap-2 sm:mt-0 sm:gap-0 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+            <div className="bg-[#EAF6FF] p-3 sm:p-7 lg:p-8">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                    {hostMode
-                      ? 'Host product onboarding'
-                      : 'Customer product lookup'}
+                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-sky-700 sm:text-[10px]">
+                    BARCODE CHECK
                   </p>
-        
-                  <h1 className="mt-1 text-3xl font-black tracking-tight text-stone-950">
-                    {hostMode
-                      ? 'Scan Product for Listing'
-                      : 'Scan Product'}
-                  </h1>
+                  <h2 className="mt-0.5 text-sm font-black text-stone-950 sm:text-lg">
+                    Find the product
+                  </h2>
+                </div>
+                <div className="rounded-xl border border-sky-200 bg-white/80 px-2.5 py-1.5 text-[9px] font-black text-sky-700 sm:rounded-2xl sm:px-3 sm:py-2 sm:text-[10px]">
+                  Host listing
                 </div>
               </div>
-        
-              <p className="mt-4 max-w-3xl text-sm leading-6 text-stone-600">
-                {hostMode
-                  ? 'Scan a pack first. Verified EPANTRY products can move directly into Host pricing and inventory. Unknown products require Host-owned package evidence and governed NPI review before listing.'
-                  : 'Scan a barcode to identify the product. Customer Scan is read-only: it shows available product details and lets you search EPANTRY for matching products.'}
-              </p>
-        
-              <div className="mt-6 grid gap-4 sm:grid-cols-[minmax(0,1fr)_100px]">
-                <label className="block">
-                  <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
-                    Barcode / GTIN
+
+              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_72px] gap-2 sm:mt-5 sm:grid-cols-[minmax(0,1fr)_100px] sm:gap-4">
+                <label className="block min-w-0">
+                  <span className="text-[8px] font-black uppercase tracking-[0.11em] text-stone-500 sm:text-xs sm:tracking-[0.12em]">
+                    Barcode number
                   </span>
-        
-                  <div className="mt-2 flex rounded-2xl border border-stone-200 bg-stone-50 p-1.5 focus-within:border-emerald-300 focus-within:ring-4 focus-within:ring-emerald-100">
-                    <div className="grid w-11 place-items-center text-stone-400">
+
+                  <div className="mt-1 flex min-h-10 rounded-xl border border-sky-200 bg-white/90 p-1 focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100 sm:mt-2 sm:min-h-0 sm:rounded-2xl sm:p-1.5 sm:focus-within:ring-4">
+                    <div className="grid w-8 shrink-0 place-items-center text-stone-400 sm:w-11">
                       <Barcode
-                        size={20}
+                        size={17}
                         aria-hidden="true"
                       />
                     </div>
-        
+
                     <input
-                      value={
-                        barcodeInput
-                      }
-                      onChange={(
-                        event,
-                      ) =>
+                      value={barcodeInput}
+                      onChange={(event) =>
                         setBarcodeInput(
                           event.target.value,
                         )
                       }
                       inputMode="numeric"
                       placeholder="8901234567890"
-                      className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm font-bold outline-none"
+                      className="min-w-0 flex-1 bg-transparent px-0.5 py-1.5 text-[11px] font-bold outline-none sm:px-1 sm:py-2.5 sm:text-sm"
                     />
                   </div>
                 </label>
-        
+
                 <label className="block">
-                  <span className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
+                  <span className="text-[8px] font-black uppercase tracking-[0.11em] text-stone-500 sm:text-xs sm:tracking-[0.12em]">
                     Market
                   </span>
-        
+
                   <input
                     value={market}
-                    onChange={(
-                      event,
-                    ) =>
+                    onChange={(event) =>
                       setMarket(
                         event.target.value
                           .toUpperCase()
@@ -1207,41 +1423,39 @@ export default function ScanAnythingPage({
                           ),
                       )
                     }
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-sm font-black outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1 h-10 w-full rounded-xl border border-sky-200 bg-white/90 px-2 text-center text-[11px] font-black outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3.5 sm:text-sm sm:focus:ring-4"
                   />
                 </label>
               </div>
-        
-              <div className="mt-4 flex flex-wrap gap-3">
+
+              <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-4 sm:flex sm:flex-wrap sm:gap-3">
                 <button
                   type="button"
-                  disabled={
-                    isResolvingBarcode
-                  }
+                  disabled={isResolvingBarcode}
                   onClick={() =>
                     resolveCode(
                       barcodeInput,
                       'manual',
                     )
                   }
-                  className="focus-ring inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2.5 py-2 text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
                 >
                   {isResolvingBarcode ? (
                     <LoaderCircle
-                      size={17}
+                      size={15}
                       className="animate-spin"
                       aria-hidden="true"
                     />
                   ) : (
                     <FileSearch
-                      size={17}
+                      size={15}
                       aria-hidden="true"
                     />
                   )}
-        
-                  Resolve barcode
+
+                  Check barcode
                 </button>
-        
+
                 <button
                   type="button"
                   onClick={
@@ -1249,141 +1463,142 @@ export default function ScanAnythingPage({
                       ? stopCamera
                       : startCamera
                   }
-                  className="focus-ring inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-black text-stone-700 transition hover:border-emerald-300 hover:text-emerald-800"
+                  className="focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-2.5 py-2 text-[10px] font-black text-violet-800 transition hover:border-violet-300 hover:bg-violet-100 sm:min-h-0 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
                 >
                   <Camera
-                    size={17}
+                    size={15}
                     aria-hidden="true"
                   />
-        
+
                   {isCameraRunning
                     ? 'Stop camera'
-                    : 'Scan with camera'}
+                    : 'Use camera'}
                 </button>
               </div>
-        
+
               <div
                 className={[
-                  'mt-5 overflow-hidden rounded-[24px] bg-stone-950',
-        
+                  'mt-3 overflow-hidden rounded-xl bg-stone-950 sm:mt-5 sm:rounded-[24px]',
                   isCameraRunning
                     ? 'block'
                     : 'hidden',
-                ].join(
-                  ' ',
-                )}
+                ].join(' ')}
               >
                 <video
                   ref={videoRef}
                   muted
                   playsInline
-                  className="aspect-video w-full object-cover"
+                  className="h-[180px] w-full object-cover sm:h-auto sm:aspect-video"
                 />
               </div>
-        
+
               {cameraNotice ? (
-                <p className="mt-3 text-xs font-semibold leading-5 text-stone-500">
+                <p className="mt-2 text-[9px] font-semibold leading-4 text-stone-500 sm:mt-3 sm:text-xs sm:leading-5">
                   {cameraNotice}
                 </p>
               ) : null}
-        
+
               {error ? (
-                <div className="mt-5 flex items-start gap-3 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-700">
+                <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 p-2.5 text-[10px] font-semibold leading-4 text-red-700 sm:mt-5 sm:gap-3 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
                   <CircleAlert
-                    size={19}
+                    size={16}
                     className="mt-0.5 shrink-0"
                     aria-hidden="true"
                   />
-        
-                  <span>
-                    {error}
-                  </span>
+                  <span>{error}</span>
                 </div>
               ) : null}
-        
+
               {success ? (
-                <div className="mt-5 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+                <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 p-2.5 text-[10px] font-semibold leading-4 text-emerald-800 sm:mt-5 sm:gap-3 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
                   <CheckCircle2
-                    size={19}
+                    size={16}
                     className="mt-0.5 shrink-0"
                     aria-hidden="true"
                   />
-        
-                  <span>
-                    {success}
-                  </span>
+                  <span>{success}</span>
                 </div>
               ) : null}
-        
+
               {privacyHolds.length ? (
-                <div className="mt-5">
+                <div className="mt-3 sm:mt-5">
                   <MediaPrivacyHoldPanel
-                    holds={
-                      privacyHolds
-                    }
-                    scope={
-                      hostMode
-                        ? 'host'
-                        : 'customer'
-                    }
+                    holds={privacyHolds}
+                    scope="host"
                   />
                 </div>
               ) : null}
             </div>
-        
-            <aside className="border-t border-stone-200 bg-[#f7f5ef] p-5 sm:p-7 xl:border-l xl:border-t-0">
+
+            <aside className="border-t border-violet-200 bg-[#F1EDFF] p-3 sm:p-6 xl:border-l xl:border-t-0 xl:p-7">
               <div className="flex items-center gap-2 text-stone-950">
-                <ShieldCheck
-                  size={20}
-                  className="text-emerald-700"
-                  aria-hidden="true"
-                />
-        
-                <h2 className="text-base font-black">
-                  Access rule
-                </h2>
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-600 text-white sm:h-10 sm:w-10 sm:rounded-2xl">
+                  <ShieldCheck
+                    size={17}
+                    aria-hidden="true"
+                  />
+                </div>
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-violet-700 sm:text-[10px]">
+                    AFTER THE SCAN
+                  </p>
+                  <h2 className="text-sm font-black text-stone-950 sm:text-base">
+                    What happens next
+                  </h2>
+                </div>
               </div>
-        
-              <p className="mt-3 text-sm leading-6 text-stone-600">
-                {hostMode
-                  ? 'Host Scan can start listing onboarding, but external data never becomes canonical truth without package evidence and governed review.'
-                  : 'Customer Scan never creates, edits, or lists catalog products. It is product identification and EPANTRY search only.'}
+
+              <p className="mt-2 text-[9.5px] font-semibold leading-[14px] text-stone-600 sm:mt-3 sm:text-sm sm:font-medium sm:leading-6">
+                <span className="sm:hidden">
+                  EPANTRY checks the barcode first. New products need clear pack photos before listing.
+                </span>
+                <span className="hidden sm:inline">
+                  EPANTRY checks whether the barcode already matches a product. New products need clear pack photos and review before they can be listed.
+                </span>
               </p>
-        
-              <div className="mt-6 space-y-3">
-                {(hostMode
-                  ? [
-                      'Verified canonical pack → Host pricing & inventory.',
-                      'Unknown pack → Host evidence → Product NPI.',
-                      'Provisional NPI review remains Admin-governed.',
-                      'Seller / Brand / B2B remain Host business functions.',
-                    ]
-                  : [
-                      'Verified result = published EPANTRY catalog truth.',
-                      'Unverified external result = informational only.',
-                      'Use Search EPANTRY to find available products.',
-                      'Customer Scan has no listing or NPI controls.',
-                    ]
-                ).map(
-                  (
-                    item,
-                  ) => (
-                    <div
-                      key={item}
-                      className="flex gap-3 rounded-2xl border border-stone-200 bg-white p-3.5"
-                    >
-                      <CheckCircle2
-                        size={17}
-                        className="mt-0.5 shrink-0 text-emerald-700"
-                        aria-hidden="true"
-                      />
-        
-                      <p className="text-xs font-semibold leading-5 text-stone-600">
-                        {item}
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 xl:grid-cols-1 xl:gap-3">
+                {[
+                  {
+                    title: 'Existing product',
+                    text: 'Continue to Pricing & Stock.',
+                    tone: 'border-emerald-200 bg-emerald-50',
+                  },
+                  {
+                    title: 'New product',
+                    text: 'Add clear product and pack photos.',
+                    tone: 'border-sky-200 bg-sky-50',
+                  },
+                  {
+                    title: 'Product review',
+                    text: 'EPANTRY checks new product details before listing.',
+                    tone: 'border-violet-200 bg-violet-50',
+                  },
+                  {
+                    title: 'Next workspace',
+                    text: 'Continue in Add / Edit Products when review is needed.',
+                    tone: 'border-cyan-200 bg-cyan-50',
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className={`flex gap-2 rounded-xl border p-2 sm:gap-3 sm:rounded-2xl sm:p-3 ${item.tone}`}
+                  >
+                    <CheckCircle2
+                      size={14}
+                      className="mt-0.5 shrink-0 text-emerald-700 sm:h-[17px] sm:w-[17px]"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[9.5px] font-black leading-3 text-stone-900 sm:text-xs sm:leading-4">
+                        {item.title}
+                      </p>
+                      <p className="mt-0.5 text-[8.5px] font-semibold leading-[12px] text-stone-500 sm:mt-1 sm:text-[11px] sm:leading-4">
+                        {item.text}
                       </p>
                     </div>
-                  ),
-                )}
+                  </div>
+                ))}
               </div>
             </aside>
           </div>
@@ -1711,7 +1926,7 @@ export default function ScanAnythingPage({
       )}
 
       {barcodeResolution ? (
-        <section className="mt-5 rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
+        <section className={`mt-3 rounded-[20px] border p-3 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-7 ${hostMode && !canonicalProduct ? 'border-amber-200 bg-[#FFF9EE]' : 'border-stone-200 bg-white'}`}> 
           <VerificationBanner
             resolution={
               barcodeResolution
@@ -1790,7 +2005,7 @@ export default function ScanAnythingPage({
                         size={17}
                         aria-hidden="true"
                       />
-                      List / price this pack
+                      Continue to pricing & stock
                     </Link>
                   ) : searchQuery ? (
                     <Link
@@ -1853,7 +2068,7 @@ export default function ScanAnythingPage({
 
               <p className="mt-2 text-sm leading-6 text-stone-600">
                 {hostMode
-                  ? 'Add clear package evidence below to start Host NPI onboarding.'
+                  ? 'Add clear pack photos below so EPANTRY can review this new product.'
                   : 'Try searching EPANTRY using the product or brand name printed on the pack.'}
               </p>
             </div>
@@ -1864,71 +2079,114 @@ export default function ScanAnythingPage({
       {hostMode &&
       barcodeResolution &&
       !canonicalProduct ? (
-        <section className="mt-5 rounded-[28px] border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm sm:p-7">
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white">
+        <section className="mt-3 rounded-[20px] border border-emerald-200 bg-[#EAFBF3] p-3 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-7">
+          <div className="flex items-start gap-2.5 sm:gap-3">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white sm:h-10 sm:w-10 sm:rounded-2xl">
               <ImagePlus
-                size={19}
+                size={18}
                 aria-hidden="true"
               />
             </div>
 
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-                Host listing quality
+            <div className="min-w-0">
+              <p className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs">
+                COMPLETE NEW PRODUCT
               </p>
 
-              <h2 className="mt-1 text-xl font-black text-stone-950">
-                Create governed Product NPI evidence
+              <h2 className="mt-0.5 text-[17px] font-black leading-5 text-stone-950 sm:mt-1 sm:text-xl sm:leading-normal">
+                Add the details needed for review
               </h2>
 
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">
-                Use real photos from the physical pack. This creates an organization-scoped Host NPI draft; it does not publish a catalog product automatically.
+              <p className="mt-1 max-w-3xl text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:font-normal sm:leading-6">
+                Add clear pack photos and copy the label details below. EPANTRY checks them before this product can be listed.
               </p>
             </div>
           </div>
 
-          <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div className="rounded-[24px] border border-stone-200 bg-white p-5">
-              <p className="text-sm font-black text-stone-950">
-                Package evidence
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+            {[
+              {
+                number: '1',
+                title: 'Add photos',
+                text: 'Upload clear pack and label photos.',
+                tone: 'border-sky-200 bg-sky-50',
+                numberTone: 'bg-sky-600',
+              },
+              {
+                number: '2',
+                title: 'Check details',
+                text: 'Confirm the name, pack and label facts.',
+                tone: 'border-violet-200 bg-violet-50',
+                numberTone: 'bg-violet-600',
+              },
+              {
+                number: '3',
+                title: 'Add food info',
+                text: 'Fill nutrition, allergens and Veg / Non-veg.',
+                tone: 'border-cyan-200 bg-cyan-50',
+                numberTone: 'bg-cyan-700',
+              },
+              {
+                number: '4',
+                title: 'Send for review',
+                text: 'Then continue in Add / Edit Products.',
+                tone: 'border-emerald-200 bg-emerald-50',
+                numberTone: 'bg-emerald-700',
+              },
+            ].map((step) => (
+              <div
+                key={step.number}
+                className={`rounded-xl border p-2 sm:rounded-2xl sm:p-3 ${step.tone}`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[9px] font-black text-white sm:h-6 sm:w-6 sm:text-[10px] ${step.numberTone}`}>
+                    {step.number}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black leading-[14px] text-stone-900 sm:text-xs sm:leading-4">
+                      {step.title}
+                    </p>
+                    <p className="mt-0.5 text-[8.5px] font-semibold leading-3 text-stone-500 sm:mt-1 sm:text-[11px] sm:leading-4">
+                      {step.text}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 grid gap-3 xl:mt-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] xl:gap-5">
+            <div className="rounded-[18px] border border-sky-200 bg-[#EAF5FF] p-3 sm:rounded-[24px] sm:p-5">
+              <p className="text-[12px] font-black text-stone-950 sm:text-sm">
+                Product photos
+              </p>
+              <p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-xs sm:leading-5">
+                Add the clearest pack panels so the review team can verify the label.
               </p>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:mt-4 sm:gap-3">
                 <select
-                  value={
-                    evidencePurpose
-                  }
-                  onChange={(
-                    event,
-                  ) =>
+                  value={evidencePurpose}
+                  onChange={(event) =>
                     setEvidencePurpose(
                       event.target.value,
                     )
                   }
-                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                  className="min-w-0 rounded-xl border border-sky-200 bg-white px-2.5 py-2 text-[10px] font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                 >
-                  {EVIDENCE_PURPOSES.map(
-                    (
-                      item,
-                    ) => (
-                      <option
-                        key={
-                          item.value
-                        }
-                        value={
-                          item.value
-                        }
-                      >
-                        {item.label}
-                      </option>
-                    ),
-                  )}
+                  {EVIDENCE_PURPOSES.map((item) => (
+                    <option
+                      key={item.value}
+                      value={item.value}
+                    >
+                      {item.label}
+                    </option>
+                  ))}
                 </select>
 
-                <label className="focus-ring inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-stone-950 px-4 py-3 text-sm font-black text-white hover:bg-stone-800">
+                <label className="focus-ring inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2 text-[10px] font-black text-white hover:bg-sky-800 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
                   <Upload
-                    size={17}
+                    size={15}
                     aria-hidden="true"
                   />
                   Add photo
@@ -1937,162 +2195,368 @@ export default function ScanAnythingPage({
                     accept="image/jpeg,image/png,image/webp"
                     capture="environment"
                     multiple
-                    onChange={
-                      addEvidenceFiles
-                    }
+                    onChange={addEvidenceFiles}
                     className="sr-only"
                   />
                 </label>
               </div>
 
               {evidenceFiles.length ? (
-                <div className="mt-4 space-y-2">
-                  {evidenceFiles.map(
-                    (
-                      item,
-                    ) => (
-                      <div
-                        key={
-                          item.id
+                <div className="mt-2 space-y-1.5 sm:mt-4 sm:space-y-2">
+                  {evidenceFiles.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-2 rounded-xl border border-sky-100 bg-white/90 p-2 sm:gap-3 sm:rounded-2xl sm:p-3"
+                    >
+                      <ImagePlus
+                        size={15}
+                        className="shrink-0 text-sky-700"
+                        aria-hidden="true"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[10px] font-black text-stone-800 sm:text-xs">
+                          {item.file.name}
+                        </p>
+                        <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-[11px]">
+                          {EVIDENCE_PURPOSES.find(
+                            (purpose) =>
+                              purpose.value === item.purpose,
+                          )?.label || item.purpose}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeEvidence(
+                            item.id,
+                          )
                         }
-                        className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-3"
+                        className="focus-ring grid h-7 w-7 place-items-center rounded-full text-stone-400 hover:bg-white hover:text-red-600 sm:h-8 sm:w-8"
+                        aria-label="Remove image"
                       >
-                        <ImagePlus
-                          size={17}
-                          className="shrink-0 text-emerald-700"
+                        <X
+                          size={15}
                           aria-hidden="true"
                         />
-
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-black text-stone-800">
-                            {item.file.name}
-                          </p>
-
-                          <p className="mt-0.5 text-[11px] font-semibold text-stone-500">
-                            {EVIDENCE_PURPOSES.find(
-                              (
-                                purpose,
-                              ) =>
-                                purpose.value ===
-                                item.purpose,
-                            )?.label ||
-                              item.purpose}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeEvidence(
-                              item.id,
-                            )
-                          }
-                          className="focus-ring grid h-8 w-8 place-items-center rounded-full text-stone-400 hover:bg-white hover:text-red-600"
-                          aria-label="Remove image"
-                        >
-                          <X
-                            size={16}
-                            aria-hidden="true"
-                          />
-                        </button>
-                      </div>
-                    ),
-                  )}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ) : null}
             </div>
 
-            <div className="rounded-[24px] border border-stone-200 bg-white p-5">
-              <p className="text-sm font-black text-stone-950">
-                Product hints
-              </p>
+            <div className="rounded-[18px] border border-violet-200 bg-[#F2EEFF] p-3 sm:rounded-[24px] sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-[12px] font-black text-stone-950 sm:text-sm">
+                    Product details
+                  </p>
+                  <p className="mt-0.5 max-w-2xl text-[9px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-xs sm:leading-5">
+                    Check the scan and complete the information printed on the pack before review.
+                  </p>
+                </div>
+                <span className="rounded-full border border-violet-200 bg-white/80 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-violet-700 sm:text-[9px]">
+                  Pack details
+                </span>
+              </div>
 
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                External scan data can prefill hints, but uploaded package evidence remains the review source.
-              </p>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <label>
-                  <span className="text-xs font-black text-stone-500">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-4">
+                <label className="min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
                     Product name
                   </span>
-
                   <input
-                    value={
-                      hints.title
+                    value={hints.title}
+                    onChange={(event) =>
+                      setHints((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
                     }
-                    onChange={(
-                      event,
-                    ) =>
-                      setHints(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          title:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
 
-                <label>
-                  <span className="text-xs font-black text-stone-500">
+                <label className="min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
                     Brand name
                   </span>
-
                   <input
-                    value={
-                      hints.brandName
+                    value={hints.brandName}
+                    onChange={(event) =>
+                      setHints((current) => ({
+                        ...current,
+                        brandName: event.target.value,
+                      }))
                     }
-                    onChange={(
-                      event,
-                    ) =>
-                      setHints(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          brandName:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
 
-                <label className="sm:col-span-2">
-                  <span className="text-xs font-black text-stone-500">
+                <label className="min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
                     Printed pack size
                   </span>
-
                   <input
-                    value={
-                      hints.netQuantityText
+                    value={hints.netQuantityText}
+                    onChange={(event) =>
+                      setHints((current) => ({
+                        ...current,
+                        netQuantityText: event.target.value,
+                      }))
                     }
-                    onChange={(
-                      event,
-                    ) =>
-                      setHints(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          netQuantityText:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    placeholder="Example: 250 ml"
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+                    placeholder="250 ml"
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   />
                 </label>
+
+                <label className="min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
+                    Country of origin
+                  </span>
+                  <input
+                    value={reviewDetails.countryOfOrigin}
+                    onChange={(event) =>
+                      setReviewDetails((current) => ({
+                        ...current,
+                        countryOfOrigin: event.target.value,
+                      }))
+                    }
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                  />
+                </label>
+
+                <label className="col-span-2 min-w-0 sm:col-span-1">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
+                    Manufacturer / Packer
+                  </span>
+                  <input
+                    value={reviewDetails.manufacturerName}
+                    onChange={(event) =>
+                      setReviewDetails((current) => ({
+                        ...current,
+                        manufacturerName: event.target.value,
+                      }))
+                    }
+                    placeholder="Printed manufacturer or packer"
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                  />
+                </label>
+
+                <label className="col-span-2 min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
+                    Ingredients
+                  </span>
+                  <textarea
+                    rows={2}
+                    maxLength={10000}
+                    value={reviewDetails.ingredientDeclarationText}
+                    onChange={(event) =>
+                      setReviewDetails((current) => ({
+                        ...current,
+                        ingredientDeclarationText: event.target.value,
+                      }))
+                    }
+                    placeholder="Copy the ingredients from the pack"
+                    className="mt-1.5 w-full resize-y rounded-xl border border-violet-200 bg-white px-2.5 py-2 text-[10px] font-semibold leading-4 outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm sm:leading-5"
+                  />
+                </label>
+
+                <label className="min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
+                    Contains allergens
+                  </span>
+                  <input
+                    value={reviewDetails.containsAllergens}
+                    onChange={(event) =>
+                      setReviewDetails((current) => ({
+                        ...current,
+                        containsAllergens: event.target.value,
+                      }))
+                    }
+                    placeholder="Milk, Soy"
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                  />
+                </label>
+
+                <label className="min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
+                    May contain
+                  </span>
+                  <input
+                    value={reviewDetails.mayContainAllergens}
+                    onChange={(event) =>
+                      setReviewDetails((current) => ({
+                        ...current,
+                        mayContainAllergens: event.target.value,
+                      }))
+                    }
+                    placeholder="Nuts, Gluten"
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                  />
+                </label>
+
+                <label className="col-span-2 min-w-0">
+                  <span className="text-[9px] font-black text-stone-500 sm:text-xs">
+                    Printed allergen statement
+                  </span>
+                  <input
+                    value={reviewDetails.allergenStatement}
+                    onChange={(event) =>
+                      setReviewDetails((current) => ({
+                        ...current,
+                        allergenStatement: event.target.value,
+                      }))
+                    }
+                    placeholder="Example: Contains milk and soy"
+                    className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-violet-200 bg-white px-2.5 text-[10px] font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-3 rounded-[16px] border border-cyan-200 bg-[#EAFBFD] p-2.5 sm:mt-5 sm:rounded-2xl sm:p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-black text-stone-900 sm:text-xs">
+                      Nutrition
+                    </p>
+                    <p className="mt-0.5 text-[8px] font-semibold text-stone-500 sm:text-[10px]">
+                      Enter only values printed on the pack.
+                    </p>
+                  </div>
+
+                  <select
+                    value={reviewDetails.nutritionBasis}
+                    onChange={(event) =>
+                      setReviewDetails((current) => ({
+                        ...current,
+                        nutritionBasis: event.target.value,
+                      }))
+                    }
+                    className="rounded-lg border border-cyan-200 bg-white px-2 py-1.5 text-[9px] font-black outline-none sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs"
+                  >
+                    <option value="per_100g">Per 100 g</option>
+                    <option value="per_100ml">Per 100 ml</option>
+                    <option value="per_serving">Per serving</option>
+                    <option value="per_pack">Per pack</option>
+                  </select>
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
+                  {REVIEW_NUTRIENTS.map(([key, label, unit]) => (
+                    <label key={key} className="min-w-0">
+                      <span className="block truncate text-[7.5px] font-black uppercase tracking-[0.04em] text-stone-500 sm:text-[9px]">
+                        {label} ({unit})
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={reviewDetails.nutrients[key]}
+                        onChange={(event) =>
+                          setReviewDetails((current) => ({
+                            ...current,
+                            nutrients: {
+                              ...current.nutrients,
+                              [key]: event.target.value,
+                            },
+                          }))
+                        }
+                        className="mt-1 h-8 w-full min-w-0 rounded-lg border border-cyan-200 bg-white px-2 text-[9px] font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-sm"
+                      />
+                    </label>
+                  ))}
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
+                  <label className="min-w-0">
+                    <span className="text-[8px] font-black text-stone-500 sm:text-[10px]">
+                      Serving size
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={reviewDetails.servingSizeValue}
+                      onChange={(event) =>
+                        setReviewDetails((current) => ({
+                          ...current,
+                          servingSizeValue: event.target.value,
+                        }))
+                      }
+                      className="mt-1 h-8 w-full rounded-lg border border-cyan-200 bg-white px-2 text-[9px] font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-sm"
+                    />
+                  </label>
+
+                  <label className="min-w-0">
+                    <span className="text-[8px] font-black text-stone-500 sm:text-[10px]">
+                      Serving unit
+                    </span>
+                    <select
+                      value={reviewDetails.servingSizeUnit}
+                      onChange={(event) =>
+                        setReviewDetails((current) => ({
+                          ...current,
+                          servingSizeUnit: event.target.value,
+                        }))
+                      }
+                      className="mt-1 h-8 w-full rounded-lg border border-cyan-200 bg-white px-2 text-[9px] font-bold outline-none sm:mt-2 sm:h-auto sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-sm"
+                    >
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="l">l</option>
+                      <option value="piece">piece</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-[16px] border border-emerald-200 bg-[#ECF9F2] p-2.5 sm:mt-4 sm:rounded-2xl sm:p-4">
+                <p className="text-[10px] font-black text-stone-900 sm:text-xs">
+                  Dietary details
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-3">
+                  <label className="min-w-0">
+                    <span className="text-[8px] font-black text-stone-500 sm:text-[10px]">
+                      Veg / Non-veg
+                    </span>
+                    <select
+                      value={reviewDetails.dietaryType}
+                      onChange={(event) =>
+                        setReviewDetails((current) => ({
+                          ...current,
+                          dietaryType: event.target.value,
+                        }))
+                      }
+                      className="mt-1 h-8 w-full rounded-lg border border-emerald-200 bg-white px-2 text-[9px] font-bold outline-none sm:mt-2 sm:h-auto sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-sm"
+                    >
+                      <option value="not_declared">Not declared</option>
+                      <option value="vegetarian">Vegetarian</option>
+                      <option value="vegan">Vegan</option>
+                      <option value="non_vegetarian">Non-vegetarian</option>
+                    </select>
+                  </label>
+
+                  <label className="flex min-w-0 items-end">
+                    <span className="flex h-8 w-full items-center gap-2 rounded-lg border border-emerald-200 bg-white px-2 text-[9px] font-black text-stone-600 sm:h-auto sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-xs">
+                      <input
+                        type="checkbox"
+                        checked={reviewDetails.glutenFree}
+                        onChange={(event) =>
+                          setReviewDetails((current) => ({
+                            ...current,
+                            glutenFree: event.target.checked,
+                          }))
+                        }
+                        className="h-3.5 w-3.5 accent-emerald-700 sm:h-4 sm:w-4"
+                      />
+                      Gluten free
+                    </span>
+                  </label>
+                </div>
               </div>
 
               <button
@@ -2101,37 +2565,35 @@ export default function ScanAnythingPage({
                   isCreatingNpi ||
                   !evidenceFiles.length
                 }
-                onClick={
-                  createHostDraft
-                }
-                className="focus-ring mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={createHostDraft}
+                className="focus-ring mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2.5 text-[11px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
               >
                 {isCreatingNpi ? (
                   <LoaderCircle
-                    size={18}
+                    size={17}
                     className="animate-spin"
                     aria-hidden="true"
                   />
                 ) : (
                   <PackagePlus
-                    size={18}
+                    size={17}
                     aria-hidden="true"
                   />
                 )}
 
                 {isCreatingNpi
                   ? uploadProgress
-                    ? `Uploading ${uploadProgress.completed}/${uploadProgress.total} and creating NPI…`
-                    : 'Creating Host NPI…'
-                  : 'Create Host NPI draft'}
+                    ? `Uploading ${uploadProgress.completed}/${uploadProgress.total} photos…`
+                    : 'Preparing review…'
+                  : 'Send product for review'}
               </button>
 
               {hostNpiResult ? (
                 <Link
                   to="/host/product-intelligence"
-                  className="focus-ring mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300 bg-white px-5 py-3 text-sm font-black text-emerald-800 hover:bg-emerald-50"
+                  className="focus-ring mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-[10px] font-black text-emerald-800 hover:bg-emerald-50 sm:mt-3 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
                 >
-                  Open Product NPI
+                  Continue to Add / Edit Products
                   <ArrowRight
                     size={16}
                     aria-hidden="true"

@@ -178,6 +178,18 @@ function resolveNotificationDeepLink(
 
       return '/admin/marketplace'
 
+    case 'host_inventory_low':
+      if (
+        item.relatedEntityType ===
+          'host_offer'
+      ) {
+        return entityId
+          ? `/host/marketplace?editOffer=${entityId}`
+          : '/host/marketplace'
+      }
+
+      return '/host/marketplace'
+
     default:
       return '/notifications'
   }

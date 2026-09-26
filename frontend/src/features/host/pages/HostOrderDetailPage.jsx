@@ -288,6 +288,42 @@ function statusTone(
   return 'border-violet-200 bg-violet-50 text-violet-800'
 }
 
+function mobilePolicySummary(
+  value,
+  type,
+) {
+  const text = String(
+    value ||
+      '',
+  ).trim()
+
+  if (
+    !text
+  ) {
+    return 'Not captured'
+  }
+
+  if (
+    type ===
+      'cancellation' &&
+    text ===
+      'Orders may be cancelled before packing begins. Once dispatched, cancellation is not available.'
+  ) {
+    return 'Cancel before packing. After dispatch, cancellation is no longer available.'
+  }
+
+  if (
+    type ===
+      'returns' &&
+    text ===
+      'Damaged, incorrect, or missing items may be reported within 24 hours of delivery for review and eligible resolution.'
+  ) {
+    return 'Damaged, wrong or missing items can be reported within 24 hours of delivery.'
+  }
+
+  return text
+}
+
 function formatDateTime(
   value,
 ) {
@@ -444,7 +480,7 @@ export default function HostOrderDetailPage() {
           setError(
             getCommerceErrorMessage(
               loadError,
-              'Unable to load Host Order.',
+              'Unable to load this order.',
             ),
           )
         } finally {
@@ -528,7 +564,7 @@ export default function HostOrderDetailPage() {
       setError(
         getCommerceErrorMessage(
           updateError,
-          'Unable to update Host Order status.',
+          'Unable to update this order.',
         ),
       )
     } finally {
@@ -542,7 +578,7 @@ export default function HostOrderDetailPage() {
     loading
   ) {
     return (
-      <main className="min-h-screen bg-[#f7f5ef] p-5 sm:p-7">
+      <main className="min-h-screen bg-[#f7f5ef] px-2 py-0 sm:px-4 sm:py-0">
         <div className="h-[560px] animate-pulse rounded-[30px] border border-stone-200 bg-white" />
       </main>
     )
@@ -581,50 +617,50 @@ export default function HostOrderDetailPage() {
       )
 
   return (
-    <main className="min-h-screen bg-[#f7f5ef] px-4 py-5 sm:px-6 sm:py-7">
-      <div className="mx-auto max-w-[1500px]">
+    <main className="min-h-screen bg-[#f7f5ef] px-2 py-0 sm:px-4 sm:py-0">
+      <div className="w-full">
         <Link
           to="/host/orders"
-          className="inline-flex items-center gap-2 text-sm font-black text-stone-600 transition hover:text-emerald-700"
+          className="inline-flex items-center gap-1.5 pt-2 text-[11px] font-black text-stone-600 transition hover:text-emerald-700 sm:pt-3 sm:text-sm"
         >
           <ArrowLeft
             size={17}
           />
 
-          Back to Host Orders
+          Back to Orders
         </Link>
 
-        <section className="mt-4 overflow-hidden rounded-[30px] border border-emerald-100 bg-white shadow-[0_16px_45px_rgba(28,25,23,0.06)]">
-          <div className="relative overflow-hidden border-b border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 px-5 py-6 sm:px-7">
+        <section className="mt-2 overflow-hidden rounded-[20px] border border-emerald-100 bg-white shadow-[0_12px_32px_rgba(28,25,23,0.055)] sm:mt-3 sm:rounded-[28px]">
+          <div className="relative overflow-hidden border-b border-emerald-100 bg-gradient-to-br from-[#eaf8f3] via-white to-[#edf7fd] px-3 py-3 sm:px-6 sm:py-5">
             <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-emerald-100/50 blur-3xl" />
 
-            <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+            <div className="relative flex flex-col justify-between gap-3 sm:gap-4 lg:flex-row lg:items-start">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-emerald-800 shadow-sm backdrop-blur">
                   <Store
                     size={16}
                   />
 
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em]">
-                    Host Order Detail
+                  <span className="text-[9px] font-black uppercase tracking-[0.16em] sm:text-[11px]">
+                    Order details
                   </span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4 sm:gap-3">
                   <div className="min-w-0">
-                    <h1 className="text-3xl font-black tracking-tight text-stone-950 sm:text-[34px]">
+                    <h1 className="text-[22px] font-black leading-[1.08] tracking-[-0.03em] text-stone-950 sm:text-[34px]">
                       {orderDisplayName(
                         order,
                       )}
                     </h1>
 
-                    <p className="mt-1 text-[11px] font-black uppercase tracking-[0.14em] text-stone-400">
+                    <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-stone-400 sm:text-[11px] sm:tracking-[0.14em]">
                       Order reference {shortOrderId}
                     </p>
                   </div>
 
                   <span
-                    className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-black ${statusTone(
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black sm:px-3 sm:py-1.5 sm:text-xs ${statusTone(
                       order.status,
                     )}`}
                   >
@@ -634,8 +670,13 @@ export default function HostOrderDetailPage() {
                   </span>
                 </div>
 
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-                  Review the customer promise, prepare the order, and move fulfilment through its controlled status sequence.
+                <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
+                  <span className="line-clamp-2 sm:hidden">
+                    Review the order, confirm delivery, and update its status until it reaches the customer.
+                  </span>
+                  <span className="hidden sm:inline">
+                    Check what the customer ordered, confirm delivery details, then keep the order status updated as you prepare and send it.
+                  </span>
                 </p>
               </div>
 
@@ -644,7 +685,7 @@ export default function HostOrderDetailPage() {
                 onClick={
                   load
                 }
-                className="inline-flex h-fit items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white/90 px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                className="inline-flex h-fit items-center justify-center gap-1.5 self-start rounded-xl border border-emerald-200 bg-white/90 px-3 py-2 text-[11px] font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
               >
                 <RefreshCw
                   size={16}
@@ -659,32 +700,73 @@ export default function HostOrderDetailPage() {
               </button>
             </div>
 
-            <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">
+            <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-4 lg:grid-cols-4 lg:gap-3">
+              <div className="rounded-[14px] border border-emerald-100 bg-[#eaf8f3] p-2.5 sm:rounded-[18px] sm:p-3.5">
+                <div className="flex items-center gap-2">
+                  <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-700 text-[9px] font-black text-white sm:h-7 sm:w-7 sm:text-[10px]">01</div>
+                  <ShoppingBag size={15} className="text-emerald-700" />
+                </div>
+                <p className="mt-2 text-[11px] font-black text-stone-950 sm:text-[13px]">Review the order</p>
+                <p className="mt-0.5 text-[9px] font-medium leading-4 text-stone-500 sm:text-[11px]">Check items, quantity and the customer details.</p>
+              </div>
+
+              <div className="rounded-[14px] border border-sky-100 bg-[#edf7fd] p-2.5 sm:rounded-[18px] sm:p-3.5">
+                <div className="flex items-center gap-2">
+                  <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-sky-600 text-[9px] font-black text-white sm:h-7 sm:w-7 sm:text-[10px]">02</div>
+                  <MapPin size={15} className="text-sky-700" />
+                </div>
+                <p className="mt-2 text-[11px] font-black text-stone-950 sm:text-[13px]">Confirm delivery</p>
+                <p className="mt-0.5 text-[9px] font-medium leading-4 text-stone-500 sm:text-[11px]">Review the address and customer policy notes.</p>
+              </div>
+
+              <div className="rounded-[14px] border border-violet-100 bg-[#f3efff] p-2.5 sm:rounded-[18px] sm:p-3.5">
+                <div className="flex items-center gap-2">
+                  <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-violet-600 text-[9px] font-black text-white sm:h-7 sm:w-7 sm:text-[10px]">03</div>
+                  <Save size={15} className="text-violet-700" />
+                </div>
+                <p className="mt-2 text-[11px] font-black text-stone-950 sm:text-[13px]">Update the status</p>
+                <p className="mt-0.5 text-[9px] font-medium leading-4 text-stone-500 sm:text-[11px]">Move the order to the next stage as work happens.</p>
+              </div>
+
+              <Link
+                to="/host/fulfillment"
+                className="rounded-[14px] border border-emerald-100 bg-[#eef9f5] p-2.5 transition hover:border-emerald-200 hover:bg-[#e6f6ef] sm:rounded-[18px] sm:p-3.5"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-700 text-[9px] font-black text-white sm:h-7 sm:w-7 sm:text-[10px]">04</div>
+                  <Truck size={15} className="text-emerald-700" />
+                </div>
+                <p className="mt-2 text-[11px] font-black text-stone-950 sm:text-[13px]">Continue to Fulfillment</p>
+                <p className="mt-0.5 text-[9px] font-medium leading-4 text-stone-500 sm:text-[11px]">Use Fulfillment to manage dispatch and delivery.</p>
+              </Link>
+            </div>
+
+            <div className="relative mt-3 grid grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
+              <div className="rounded-[14px] border border-white/80 bg-white/80 p-2.5 shadow-sm backdrop-blur sm:rounded-2xl sm:p-4">
+                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-500 sm:text-[10px] sm:tracking-[0.16em]">
                   Current status
                 </p>
-                <p className="mt-1 text-base font-black text-stone-950">
+                <p className="mt-1 text-[12px] font-black text-stone-950 sm:text-base">
                   {label(
                     order.status,
                   )}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">
-                  Order packs
+              <div className="rounded-[14px] border border-white/80 bg-white/80 p-2.5 shadow-sm backdrop-blur sm:rounded-2xl sm:p-4">
+                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-500 sm:text-[10px] sm:tracking-[0.16em]">
+                  Total packs
                 </p>
-                <p className="mt-1 text-base font-black text-stone-950">
+                <p className="mt-1 text-[12px] font-black text-stone-950 sm:text-base">
                   {itemCount}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">
-                  Timeline updates
+              <div className="rounded-[14px] border border-white/80 bg-white/80 p-2.5 shadow-sm backdrop-blur sm:rounded-2xl sm:p-4">
+                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-500 sm:text-[10px] sm:tracking-[0.16em]">
+                  Status updates
                 </p>
-                <p className="mt-1 text-base font-black text-stone-950">
+                <p className="mt-1 text-[12px] font-black text-stone-950 sm:text-base">
                   {(data?.timeline || []).length}
                 </p>
               </div>
@@ -693,7 +775,7 @@ export default function HostOrderDetailPage() {
 
           {allowed.length >
             0 ? (
-            <div className="grid gap-5 px-5 py-5 sm:px-7 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div className="grid gap-2.5 px-3 py-3 sm:gap-5 sm:px-6 sm:py-5 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
                 <div className="flex items-center gap-2">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
@@ -704,16 +786,16 @@ export default function HostOrderDetailPage() {
 
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">
-                      Next fulfilment action
+                      Update order status
                     </p>
                     <p className="mt-0.5 text-sm text-stone-500">
-                      Only transitions permitted by the current order state are available.
+                      Choose the next real stage for this order.
                     </p>
                   </div>
                 </div>
 
                 <label className="mt-4 block text-xs font-black uppercase tracking-[0.08em] text-stone-500">
-                  Controlled next status
+                  Next status
 
                   <select
                     value={
@@ -726,7 +808,7 @@ export default function HostOrderDetailPage() {
                         event.target.value,
                       )
                     }
-                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3.5 text-sm font-black text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[12px] font-black text-stone-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:mt-2 sm:rounded-2xl sm:px-4 sm:py-3.5 sm:text-sm"
                   >
                     {allowed.map(
                       (
@@ -759,7 +841,7 @@ export default function HostOrderDetailPage() {
                   !nextStatus ||
                   saving
                 }
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-[0_10px_25px_rgba(4,120,87,0.22)] transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-[12px] font-black text-white shadow-[0_10px_25px_rgba(4,120,87,0.18)] transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-12 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
               >
                 <Save
                   size={17}
@@ -787,8 +869,8 @@ export default function HostOrderDetailPage() {
               <div>
                 <p className="text-sm font-black text-stone-900">
                   {isTerminal
-                    ? 'No further fulfilment action required.'
-                    : 'No controlled transition is available right now.'}
+                    ? 'This order is complete. No more status updates are needed.'
+                    : 'No status update is available right now.'}
                 </p>
                 <p className="mt-1 text-sm text-stone-500">
                   Current status: {label(
@@ -801,7 +883,7 @@ export default function HostOrderDetailPage() {
         </section>
 
         {order.fulfillment?.deliveryAddressSnapshot && (
-          <section className="mt-5 rounded-[26px] border border-emerald-200 bg-[#eaf9f3] p-5 shadow-sm sm:p-6">
+          <section className="mt-2.5 rounded-[18px] border border-emerald-200 bg-[#eaf8f3] p-2.5 shadow-sm sm:mt-5 sm:rounded-[24px] sm:p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white">
                 <MapPin
@@ -811,10 +893,10 @@ export default function HostOrderDetailPage() {
 
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                  Deliver this Host order to
+                  Delivery address
                 </p>
 
-                <p className="mt-1 text-base font-black text-stone-950">
+                <p className="mt-1 text-[12px] font-black text-stone-950 sm:text-base">
                   {order.fulfillment.deliveryAddressSnapshot.recipientName || 'Recipient'}
                   {order.fulfillment.deliveryAddressSnapshot.phone
                     ? ` · ${order.fulfillment.deliveryAddressSnapshot.phone}`
@@ -849,9 +931,9 @@ export default function HostOrderDetailPage() {
           </div>
         )}
 
-        <section className="mt-5 grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
-          <article className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-[0_12px_35px_rgba(28,25,23,0.05)]">
-            <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-4 sm:px-6">
+        <section className="mt-2.5 grid gap-2.5 sm:mt-5 sm:gap-5 xl:grid-cols-[1.05fr_.95fr]">
+          <article className="overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_10px_28px_rgba(28,25,23,0.045)] sm:rounded-[26px] sm:shadow-[0_12px_35px_rgba(28,25,23,0.05)]">
+            <div className="flex items-center gap-2.5 border-b border-stone-100 px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                 <ShieldCheck
                   size={19}
@@ -860,16 +942,16 @@ export default function HostOrderDetailPage() {
 
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                  Customer promise
+                  Customer policies
                 </p>
                 <h2 className="mt-0.5 text-lg font-black text-stone-950">
-                  Captured checkout promise
+                  Cancellation & return terms
                 </h2>
               </div>
             </div>
 
-            <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6">
-              <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4">
+            <div className="grid gap-2 p-3 sm:grid-cols-2 sm:gap-3 sm:p-6">
+              <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-3 sm:p-4">
                 <div className="flex items-center gap-2 text-stone-700">
                   <XCircle
                     size={17}
@@ -879,14 +961,23 @@ export default function HostOrderDetailPage() {
                   </p>
                 </div>
 
-                <p className="mt-3 text-sm leading-6 text-stone-600">
-                  {data?.promise
-                    ?.cancellationPolicySummary ||
-                    'Not captured'}
+                <p className="mt-1.5 text-[11px] leading-5 text-stone-600 sm:mt-3 sm:text-sm sm:leading-6">
+                  <span className="line-clamp-2 sm:hidden">
+                    {mobilePolicySummary(
+                      data?.promise
+                        ?.cancellationPolicySummary,
+                      'cancellation',
+                    )}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {data?.promise
+                      ?.cancellationPolicySummary ||
+                      'Not captured'}
+                  </span>
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
+              <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3 sm:p-4">
                 <div className="flex items-center gap-2 text-sky-700">
                   <RotateCcw
                     size={17}
@@ -896,17 +987,26 @@ export default function HostOrderDetailPage() {
                   </p>
                 </div>
 
-                <p className="mt-3 text-sm leading-6 text-stone-600">
-                  {data?.promise
-                    ?.returnPolicySummary ||
-                    'Not captured'}
+                <p className="mt-1.5 text-[11px] leading-5 text-stone-600 sm:mt-3 sm:text-sm sm:leading-6">
+                  <span className="line-clamp-2 sm:hidden">
+                    {mobilePolicySummary(
+                      data?.promise
+                        ?.returnPolicySummary,
+                      'returns',
+                    )}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {data?.promise
+                      ?.returnPolicySummary ||
+                      'Not captured'}
+                  </span>
                 </p>
               </div>
             </div>
           </article>
 
-          <article className="overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-[0_12px_35px_rgba(28,25,23,0.05)]">
-            <div className="flex items-center justify-between gap-4 border-b border-stone-100 px-5 py-4 sm:px-6">
+          <article className="overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_10px_28px_rgba(28,25,23,0.045)] sm:rounded-[26px] sm:shadow-[0_12px_35px_rgba(28,25,23,0.05)]">
+            <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-3 py-3 sm:gap-4 sm:px-6 sm:py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
                   <PackageCheck
@@ -916,10 +1016,10 @@ export default function HostOrderDetailPage() {
 
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-700">
-                    Order contents
+                    What customer ordered
                   </p>
                   <h2 className="mt-0.5 text-lg font-black text-stone-950">
-                    Items
+                    Order items
                   </h2>
                 </div>
               </div>
@@ -929,7 +1029,7 @@ export default function HostOrderDetailPage() {
               </span>
             </div>
 
-            <div className="space-y-3 p-5 sm:p-6">
+            <div className="space-y-2.5 p-3 sm:space-y-3 sm:p-6">
               {(order.items || []).length ===
               0 ? (
                 <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 text-sm text-stone-500">
@@ -959,7 +1059,7 @@ export default function HostOrderDetailPage() {
                               'Product name unavailable'}
                           </p>
                           <p className="mt-1 truncate text-[10px] font-semibold text-stone-400">
-                            Offer ref {String(
+                            Listing ref {String(
                               item.offerId ||
                                 '—',
                             )}
@@ -983,21 +1083,21 @@ export default function HostOrderDetailPage() {
           </article>
         </section>
 
-        <section className="mt-5 overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_12px_35px_rgba(28,25,23,0.05)]">
-          <div className="flex flex-col justify-between gap-3 border-b border-stone-100 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+        <section className="mt-3 overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_10px_28px_rgba(28,25,23,0.045)] sm:mt-5 sm:rounded-[28px] sm:shadow-[0_12px_35px_rgba(28,25,23,0.05)]">
+          <div className="flex flex-col justify-between gap-2 border-b border-stone-100 px-3 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-6 sm:py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
                 <FileCheck2
                   size={19}
                 />
               </div>
 
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
-                  Audit trail
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-700">
+                  Order progress
                 </p>
                 <h2 className="mt-0.5 text-lg font-black text-stone-950">
-                  Append-only status timeline
+                  Status history
                 </h2>
               </div>
             </div>
@@ -1007,10 +1107,10 @@ export default function HostOrderDetailPage() {
             </span>
           </div>
 
-          <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-[.9fr_1.1fr]">
-            <div className="rounded-[22px] border border-stone-200 bg-[#fbfaf7] p-4 sm:p-5">
+          <div className="grid gap-4 p-3 sm:gap-6 sm:p-6 xl:grid-cols-[.9fr_1.1fr]">
+            <div className="rounded-[16px] border border-stone-200 bg-[#fbfaf7] p-3 sm:rounded-[22px] sm:p-5">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
-                Fulfilment progress
+                Delivery progress
               </p>
 
               <div className="mt-5 space-y-0">
@@ -1054,7 +1154,7 @@ export default function HostOrderDetailPage() {
                               ? 'border-emerald-600 bg-emerald-600 text-white'
                               : state ===
                                   'current'
-                                ? 'border-amber-500 bg-white text-amber-600 shadow-[0_0_0_5px_rgba(245,158,11,0.12)]'
+                                ? 'border-sky-500 bg-white text-sky-600 shadow-[0_0_0_5px_rgba(14,165,233,0.10)]'
                                 : 'border-stone-300 bg-white text-stone-400'
                           }`}
                         >
@@ -1086,7 +1186,7 @@ export default function HostOrderDetailPage() {
 
                             {state ===
                               'current' && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-800">
+                              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-sky-800">
                                 Current
                               </span>
                             )}
@@ -1110,9 +1210,9 @@ export default function HostOrderDetailPage() {
               </div>
             </div>
 
-            <div>
+            <div className="hidden sm:block">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
-                Recorded updates
+                Status updates
               </p>
 
               <div className="mt-4 space-y-3">
@@ -1120,7 +1220,7 @@ export default function HostOrderDetailPage() {
                   .length ===
                 0 ? (
                   <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 text-sm text-stone-500">
-                    No Host status events yet.
+                    No status updates yet.
                   </div>
                 ) : (
                   data.timeline.map(

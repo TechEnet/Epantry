@@ -89,6 +89,9 @@ import {
 const RESERVATION_TTL_SECONDS =
   10 * 60
 
+const HOST_LOW_STOCK_THRESHOLD =
+  5
+
 const HOST_TRANSITIONS =
   Object.freeze({
     confirmed:
@@ -246,6 +249,646 @@ const CUSTOMER_ORDER_PROBLEM_MESSAGES =
     delivery_failed:
       'could not complete the delivery attempt. Open the order to review the latest update.',
   })
+
+
+async function getCurrentOfferInventoryState({
+  organizationId,
+  offerId,
+  session = null,
+}) {
+  const nodeQuery =
+    InventoryNode.find({
+      organizationId,
+      status:
+        'active',
+    }).select('_id')
+
+  if (session) {
+    nodeQuery.session(
+      session,
+    )
+  }
+
+  const nodes =
+    await nodeQuery.lean()
+
+  if (
+    nodes.length ===
+    0
+  ) {
+    return {
+      sellableQuantity:
+        0,
+      snapshotIds:
+        [],
+    }
+  }
+
+  const aggregate =
+    InventorySnapshot.aggregate([
+      {
+        $match: {
+          organizationId:
+            new mongoose.Types.ObjectId(
+              String(
+                organizationId,
+              ),
+            ),
+          offerId:
+            new mongoose.Types.ObjectId(
+              String(
+                offerId,
+              ),
+            ),
+          inventoryNodeId: {
+            $in:
+              nodes.map(
+                (node) =>
+                  node._id,
+              ),
+          },
+        },
+      },
+      {
+        $sort: {
+          observedAt:
+            -1,
+          _id:
+            -1,
+        },
+      },
+      {
+        $group: {
+          _id:
+            '$inventoryNodeId',
+          snapshot: {
+            $first:
+              '$$ROOT',
+          },
+        },
+      },
+      {
+        $replaceRoot: {
+          newRoot:
+            '$snapshot',
+        },
+      },
+    ])
+
+  if (session) {
+    aggregate.session(
+      session,
+    )
+  }
+
+  const snapshots =
+    await aggregate
+
+  return {
+    sellableQuantity:
+      snapshots.reduce(
+        (
+          total,
+          snapshot,
+        ) =>
+          total +
+          getSellableQuantity(
+            snapshot,
+          ),
+        0,
+      ),
+    snapshotIds:
+      snapshots
+        .map(
+          (snapshot) =>
+            stringifyId(
+              snapshot._id,
+            ),
+        )
+        .filter(
+          Boolean,
+        )
+        .sort(),
+  }
+}
+
+async function consumePaidInventoryReservations({
+  parentOrderId,
+  now,
+  session,
+}) {
+  const reservations =
+    await InventoryReservation
+      .find({
+        parentOrderId,
+        status:
+          'active',
+      })
+      .session(
+        session,
+      )
+      .lean()
+
+  if (
+    reservations.length ===
+    0
+  ) {
+    return []
+  }
+
+  const sellerOrders =
+    await SellerOrder
+      .find({
+        parentOrderId,
+      })
+      .select(
+        'organizationId items',
+      )
+      .session(
+        session,
+      )
+      .lean()
+
+  const itemByOffer =
+    new Map()
+
+  for (
+    const sellerOrder
+    of sellerOrders
+  ) {
+    for (
+      const item
+      of sellerOrder.items ||
+      []
+    ) {
+      const offerId =
+        stringifyId(
+          item.offerId,
+        )
+
+      if (
+        offerId &&
+        !itemByOffer.has(
+          offerId,
+        )
+      ) {
+        itemByOffer.set(
+          offerId,
+          {
+            organizationId:
+              sellerOrder.organizationId,
+            displayName:
+              String(
+                item.displayName ||
+                  '',
+              ).trim(),
+          },
+        )
+      }
+    }
+  }
+
+  const grouped =
+    new Map()
+
+  for (
+    const reservation
+    of reservations
+  ) {
+    const key =
+      `${stringifyId(
+        reservation.offerId,
+      )}:${stringifyId(
+        reservation.inventoryNodeId,
+      )}`
+
+    const existing =
+      grouped.get(
+        key,
+      )
+
+    if (existing) {
+      existing.quantity +=
+        Number(
+          reservation.quantity ||
+            0,
+        )
+      continue
+    }
+
+    grouped.set(
+      key,
+      {
+        organizationId:
+          reservation.organizationId,
+        offerId:
+          reservation.offerId,
+        inventoryNodeId:
+          reservation.inventoryNodeId,
+        quantity:
+          Number(
+            reservation.quantity ||
+              0,
+          ),
+      },
+    )
+  }
+
+  const beforeByOffer =
+    new Map()
+
+  const organizationByOffer =
+    new Map()
+
+  for (
+    const group
+    of grouped.values()
+  ) {
+    const offerId =
+      stringifyId(
+        group.offerId,
+      )
+
+    if (
+      !organizationByOffer.has(
+        offerId,
+      )
+    ) {
+      organizationByOffer.set(
+        offerId,
+        stringifyId(
+          group.organizationId,
+        ),
+      )
+    }
+
+    if (
+      beforeByOffer.has(
+        offerId,
+      )
+    ) {
+      continue
+    }
+
+    const state =
+      await getCurrentOfferInventoryState({
+        organizationId:
+          group.organizationId,
+        offerId:
+          group.offerId,
+        session,
+      })
+
+    beforeByOffer.set(
+      offerId,
+      state.sellableQuantity,
+    )
+  }
+
+  for (
+    const group
+    of grouped.values()
+  ) {
+    if (
+      !Number.isInteger(
+        group.quantity,
+      ) ||
+      group.quantity <=
+        0
+    ) {
+      throw new ApiError(
+        409,
+        'Reserved inventory quantity is invalid during payment finalization.',
+        [
+          {
+            code:
+              'PAYMENT_INVENTORY_RESERVATION_INVALID',
+          },
+        ],
+      )
+    }
+
+    const previousSnapshot =
+      await InventorySnapshot
+        .findOne({
+          organizationId:
+            group.organizationId,
+          offerId:
+            group.offerId,
+          inventoryNodeId:
+            group.inventoryNodeId,
+        })
+        .sort({
+          observedAt:
+            -1,
+          _id:
+            -1,
+        })
+        .session(
+          session,
+        )
+        .lean()
+
+    const updatedState =
+      await InventoryReservationState
+        .findOneAndUpdate(
+          {
+            organizationId:
+              group.organizationId,
+            offerId:
+              group.offerId,
+            inventoryNodeId:
+              group.inventoryNodeId,
+            capacityAvailableQuantity: {
+              $gte:
+                group.quantity,
+            },
+            capacitySellableQuantity: {
+              $gte:
+                group.quantity,
+            },
+            checkoutReservedQuantity: {
+              $gte:
+                group.quantity,
+            },
+          },
+          {
+            $inc: {
+              capacityAvailableQuantity:
+                -group.quantity,
+              capacitySellableQuantity:
+                -group.quantity,
+              checkoutReservedQuantity:
+                -group.quantity,
+            },
+            $set: {
+              inventoryObservedAt:
+                now,
+            },
+          },
+          {
+            new:
+              true,
+            session,
+          },
+        )
+        .lean()
+
+    if (
+      !updatedState
+    ) {
+      throw new ApiError(
+        409,
+        'Reserved inventory could not be finalized for the paid order.',
+        [
+          {
+            code:
+              'PAYMENT_INVENTORY_FINALIZATION_CONFLICT',
+            offerId:
+              stringifyId(
+                group.offerId,
+              ),
+            inventoryNodeId:
+              stringifyId(
+                group.inventoryNodeId,
+              ),
+          },
+        ],
+      )
+    }
+
+    await InventorySnapshot.create(
+      [
+        {
+          organizationId:
+            group.organizationId,
+          offerId:
+            group.offerId,
+          inventoryNodeId:
+            group.inventoryNodeId,
+          availableQuantity:
+            updatedState.capacityAvailableQuantity,
+          reservedQuantity:
+            updatedState.capacityBaselineReservedQuantity,
+          sourceType:
+            previousSnapshot?.sourceType ||
+            'manual',
+          sourceReference:
+            `customer_order:${stringifyId(
+              parentOrderId,
+            )}`,
+          observedAt:
+            now,
+          createdByUserId:
+            null,
+        },
+      ],
+      {
+        session,
+      },
+    )
+  }
+
+  await InventoryReservation.updateMany(
+    {
+      _id: {
+        $in:
+          reservations.map(
+            (reservation) =>
+              reservation._id,
+          ),
+      },
+      status:
+        'active',
+    },
+    {
+      $set: {
+        status:
+          'converted',
+      },
+    },
+    {
+      session,
+    },
+  )
+
+  return [
+    ...beforeByOffer.entries(),
+  ].map(
+    ([
+      offerId,
+      beforeQuantity,
+    ]) => {
+      const item =
+        itemByOffer.get(
+          offerId,
+        )
+
+      return {
+        offerId,
+        organizationId:
+          stringifyId(
+            item?.organizationId ||
+              organizationByOffer.get(
+                offerId,
+              ),
+          ),
+        displayName:
+          item?.displayName ||
+          '',
+        beforeQuantity,
+      }
+    },
+  )
+}
+
+async function notifyHostsAboutLowInventory(
+  candidates,
+) {
+  if (
+    !Array.isArray(
+      candidates,
+    ) ||
+    candidates.length ===
+      0
+  ) {
+    return
+  }
+
+  try {
+    for (
+      const candidate
+      of candidates
+    ) {
+      if (
+        Number(
+          candidate.beforeQuantity ||
+            0,
+        ) <
+        HOST_LOW_STOCK_THRESHOLD
+      ) {
+        continue
+      }
+
+      const current =
+        await getCurrentOfferInventoryState({
+          organizationId:
+            candidate.organizationId,
+          offerId:
+            candidate.offerId,
+        })
+
+      if (
+        current.sellableQuantity >=
+        HOST_LOW_STOCK_THRESHOLD
+      ) {
+        continue
+      }
+
+      const offer =
+        await HostOffer
+          .findOne({
+            _id:
+              candidate.offerId,
+            organizationId:
+              candidate.organizationId,
+          })
+          .select(
+            'createdByUserId organizationId merchantSku',
+          )
+          .lean()
+
+      if (!offer) {
+        continue
+      }
+
+      let hostUserId =
+        offer.createdByUserId
+
+      if (!hostUserId) {
+        const organization =
+          await MarketplaceOrganization
+            .findById(
+              offer.organizationId,
+            )
+            .select(
+              'ownerUserId',
+            )
+            .lean()
+
+        hostUserId =
+          organization?.ownerUserId ||
+          null
+      }
+
+      if (!hostUserId) {
+        continue
+      }
+
+      const itemName =
+        String(
+          candidate.displayName ||
+            offer.merchantSku ||
+            'This item',
+        ).trim()
+
+      const snapshotSignature =
+        crypto
+          .createHash(
+            'sha256',
+          )
+          .update(
+            current.snapshotIds.join(
+              ':',
+            ) ||
+              `${candidate.offerId}:${current.sellableQuantity}`,
+          )
+          .digest(
+            'hex',
+          )
+          .slice(
+            0,
+            24,
+          )
+
+      await createNotificationIntentBestEffort({
+        userId:
+          hostUserId,
+        category:
+          'operations',
+        triggerType:
+          'host_inventory_low',
+        reasonCode:
+          'host_inventory_low',
+        explanation:
+          `${itemName} is running low. ${current.sellableQuantity} unit${
+            current.sellableQuantity ===
+            1
+              ? ''
+              : 's'
+          } remain. Open the listing to increase stock.`,
+        relatedEntityType:
+          'host_offer',
+        relatedEntityId:
+          candidate.offerId,
+        sourceDomain:
+          'marketplace',
+        sourceVersion:
+          'inventory-v1',
+        actions: [
+          'dismiss',
+        ],
+        requestedChannels: [
+          'in_app',
+        ],
+        dedupeKey:
+          `host-stock-low:${candidate.offerId}:${snapshotSignature}`,
+      })
+    }
+  } catch {
+    // Low-stock notifications are best-effort and must never block a paid order.
+  }
+}
 
 async function notifyHostsAboutConfirmedOrder(
   parentOrderId,
@@ -3074,6 +3717,9 @@ async function finalizePaidPayment({
   let newlyConfirmedParentOrderId =
     null
 
+  let lowStockCandidates =
+    []
+
   const session =
     await mongoose.startSession()
 
@@ -3201,24 +3847,13 @@ async function finalizePaidPayment({
           },
         )
 
-        await InventoryReservation.updateMany(
-          {
+        lowStockCandidates =
+          await consumePaidInventoryReservations({
             parentOrderId:
               parentOrder._id,
-
-            status:
-              'active',
-          },
-          {
-            $set: {
-              status:
-                'converted',
-            },
-          },
-          {
+            now,
             session,
-          },
-        )
+          })
 
         await MarketplaceCart.updateOne(
           {
@@ -3329,6 +3964,10 @@ async function finalizePaidPayment({
   ) {
     await notifyHostsAboutConfirmedOrder(
       newlyConfirmedParentOrderId,
+    )
+
+    await notifyHostsAboutLowInventory(
+      lowStockCandidates,
     )
   }
 }

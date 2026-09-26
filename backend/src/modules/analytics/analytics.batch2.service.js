@@ -7,10 +7,15 @@ import {
 } from '../../utils/ApiError.js'
 
 import {
+  SellerOrder,
+} from '../commerce/commerce.transaction.models.js'
+
+import {
   HospitalityMemberGrant,
 } from '../hospitality/hospitality.models.js'
 
 import {
+  HostOffer,
   MarketplaceOrganization,
 } from '../marketplace/marketplace.models.js'
 
@@ -1732,6 +1737,213 @@ async function experimentSummary({
   )
 }
 
+const HOST_ANALYTICS_ACTIVE_ORDER_STATUSES = Object.freeze([
+  'confirmed',
+  'seller_accepted',
+  'picking',
+  'packed',
+  'carrier_handoff',
+  'out_for_delivery',
+  'partial_unavailable',
+  'substitution_requested',
+  'delivery_failed',
+  'return_requested',
+])
+
+const HOST_ANALYTICS_COMPLETED_ORDER_STATUSES = Object.freeze([
+  'delivered',
+  'returned',
+  'refunded',
+  'rejected',
+  'customer_cancelled',
+  'seller_cancelled',
+])
+
+const HOST_ANALYTICS_NON_REVENUE_ORDER_STATUSES = Object.freeze([
+  'rejected',
+  'customer_cancelled',
+  'seller_cancelled',
+  'returned',
+  'refunded',
+])
+
+async function hostOperationalSnapshot({
+  organizationId,
+  start,
+  end,
+}) {
+  const orderMatch = {
+    organizationId,
+    createdAt: {
+      $gte: start,
+      $lte: end,
+    },
+    status: {
+      $nin: [
+        'draft',
+        'payment_pending',
+      ],
+    },
+  }
+
+  const [
+    orderRows,
+    activeListings,
+    managedListings,
+  ] = await Promise.all([
+    SellerOrder.aggregate([
+      {
+        $match: orderMatch,
+      },
+      {
+        $project: {
+          status: 1,
+          unitCount: {
+            $sum: {
+              $map: {
+                input: {
+                  $ifNull: [
+                    '$items',
+                    [],
+                  ],
+                },
+                as: 'item',
+                in: {
+                  $ifNull: [
+                    '$$item.packCount',
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+          orderValueMinor: {
+            $ifNull: [
+              '$commercialSnapshot.itemSubtotalMinor',
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          ordersReceived: {
+            $sum: 1,
+          },
+          activeOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $in: [
+                    '$status',
+                    HOST_ANALYTICS_ACTIVE_ORDER_STATUSES,
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          completedOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $in: [
+                    '$status',
+                    HOST_ANALYTICS_COMPLETED_ORDER_STATUSES,
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          deliveredOrders: {
+            $sum: {
+              $cond: [
+                {
+                  $eq: [
+                    '$status',
+                    'delivered',
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          unitsOrdered: {
+            $sum: '$unitCount',
+          },
+          trackedOrderValueMinor: {
+            $sum: {
+              $cond: [
+                {
+                  $in: [
+                    '$status',
+                    HOST_ANALYTICS_NON_REVENUE_ORDER_STATUSES,
+                  ],
+                },
+                0,
+                '$orderValueMinor',
+              ],
+            },
+          },
+        },
+      },
+    ]),
+
+    HostOffer.countDocuments({
+      organizationId,
+      status: 'active',
+    }),
+
+    HostOffer.countDocuments({
+      organizationId,
+      status: {
+        $in: [
+          'draft',
+          'active',
+          'paused',
+        ],
+      },
+    }),
+  ])
+
+  const summary =
+    orderRows[0] ||
+    {}
+
+  return {
+    ordersReceived:
+      summary.ordersReceived ||
+      0,
+    activeOrders:
+      summary.activeOrders ||
+      0,
+    completedOrders:
+      summary.completedOrders ||
+      0,
+    deliveredOrders:
+      summary.deliveredOrders ||
+      0,
+    unitsOrdered:
+      summary.unitsOrdered ||
+      0,
+    trackedOrderValueMinor:
+      summary.trackedOrderValueMinor ||
+      0,
+    currency: 'INR',
+    activeListings:
+      activeListings ||
+      0,
+    managedListings:
+      managedListings ||
+      0,
+  }
+}
+
 function buildNotificationUtility(
   counts,
 ) {
@@ -1794,6 +2006,7 @@ export async function getHostAnalyticsDashboard({
     contexts,
     attribution,
     experiments,
+    operational,
   ] = await Promise.all([
     eventCounts({
       ...range,
@@ -1816,6 +2029,12 @@ export async function getHostAnalyticsDashboard({
       ...range,
       organizationPseudonym,
     }),
+
+    hostOperationalSnapshot({
+      ...range,
+      organizationId:
+        organization._id,
+    }),
   ])
 
   return {
@@ -1833,6 +2052,8 @@ export async function getHostAnalyticsDashboard({
     },
 
     range,
+
+    operational,
 
     funnel:
       buildCoreFunnel(
@@ -1873,16 +2094,24 @@ export async function getHostAnalyticsDashboard({
           0,
 
         orderCreated:
-          counts[
-            'commerce.order_created'
-          ] ||
-          0,
+          Math.max(
+            counts[
+              'commerce.order_created'
+            ] ||
+              0,
+            operational.ordersReceived ||
+              0,
+          ),
 
         orderDelivered:
-          counts[
-            'commerce.order_delivered'
-          ] ||
-          0,
+          Math.max(
+            counts[
+              'commerce.order_delivered'
+            ] ||
+              0,
+            operational.deliveredOrders ||
+              0,
+          ),
       },
 
       recipes: {

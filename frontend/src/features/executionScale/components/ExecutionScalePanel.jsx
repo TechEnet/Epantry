@@ -27,10 +27,10 @@ import {
 } from '../services/executionScale.service'
 
 const inputClass =
-  'focus-ring w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none'
+  'focus-ring w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-900 outline-none sm:px-3.5 sm:py-2.5 sm:text-sm'
 
 const buttonClass =
-  'focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40'
+  'focus-ring inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm'
 
 function titleize(
   value,
@@ -50,6 +50,16 @@ function titleize(
         `${part.charAt(0).toUpperCase()}${part.slice(1)}`,
     )
     .join(' ')
+}
+
+function executionScaleDisplayError(message) {
+  const value = String(message || '')
+
+  if (/M22|execution[- ]scale/i.test(value) && /not enabled|disabled|unavailable/i.test(value)) {
+    return 'Partner execution tools are not available in this environment yet.'
+  }
+
+  return value
 }
 
 function money(
@@ -187,7 +197,7 @@ export default function ExecutionScalePanel() {
     setProcurementReason,
   ] =
     useState(
-      'Create governed supplier Purchase Order drafts from the reviewed M18 Procurement Plan.',
+      'Create purchase-order drafts from the reviewed supplier plan.',
     )
 
   const [
@@ -221,10 +231,12 @@ export default function ExecutionScalePanel() {
           requestError
         ) {
           setError(
-            getExecutionScaleErrorMessage(
-              requestError,
+            executionScaleDisplayError(
+              getExecutionScaleErrorMessage(
+                requestError,
 
-              'Unable to load M22 execution-scale workspace.',
+                'Unable to load partner execution workspace.',
+              ),
             ),
           )
         } finally {
@@ -505,20 +517,22 @@ export default function ExecutionScalePanel() {
   }
 
   return (
-    <section className="mt-7 space-y-6">
-      <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <section className="mt-4 space-y-3 sm:mt-7 sm:space-y-6">
+      <div className="rounded-[20px] border border-emerald-300 bg-emerald-100/70 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+        <div className="flex items-start justify-between gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-              M22 · Production Ecosystem + Execution Scale
+              PARTNER OPERATIONS
             </p>
 
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-stone-950">
-              Partner execution, procurement & finance evidence
+            <h2 className="mt-1 text-[14px] font-black leading-[17px] tracking-tight text-stone-950 sm:mt-2 sm:text-2xl sm:leading-normal">
+              <span className="sm:hidden">Partner operations & finance</span>
+              <span className="hidden sm:inline">Partner connections, purchase orders & finance tracking</span>
             </h2>
 
-            <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-stone-600">
-              M22 executes through existing authorities instead of replacing them: M05 owns Marketplace observations, M11 owns external commerce handoff, M16 owns settlement truth, M18 owns Procurement Plan truth, and M20 owns timeout/circuit reliability.
+            <p className="mt-1 max-w-4xl text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
+              <span className="sm:hidden">Connect partners, prepare purchase orders and track payouts without changing core marketplace records.</span>
+              <span className="hidden sm:inline">Connect approved partners, prepare purchase orders from reviewed plans, and monitor payout progress without changing your core marketplace or settlement records.</span>
             </p>
           </div>
 
@@ -531,19 +545,20 @@ export default function ExecutionScalePanel() {
               loading ||
               busy
             }
-            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-40"
+            className="focus-ring ml-auto inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl border border-violet-200 bg-violet-100 px-3 py-2 text-xs font-black text-violet-800 disabled:opacity-40 sm:ml-0 sm:gap-2 sm:border-emerald-200 sm:bg-white sm:px-4 sm:py-2.5 sm:text-sm sm:text-emerald-800"
           >
             <RefreshCw
               size={16}
               aria-hidden="true"
             />
 
-            Refresh
+            <span className="sm:hidden">Refresh</span>
+            <span className="hidden sm:inline">Refresh data</span>
           </button>
         </div>
 
         <div
-          className="mt-4 min-h-6 text-sm font-bold"
+          className="mt-2 min-h-0 text-xs font-bold sm:mt-4 sm:min-h-6 sm:text-sm"
           aria-live="polite"
         >
           {error ? (
@@ -562,322 +577,352 @@ export default function ExecutionScalePanel() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex items-start gap-3">
+      <div className="grid gap-3 sm:gap-6 xl:grid-cols-2">
+        <section className="rounded-[20px] border border-sky-300 bg-sky-100/70 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+          <div className="flex items-start gap-2 sm:gap-3">
             <PlugZap
-              size={22}
-              className="mt-0.5 text-emerald-700"
+              className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 sm:h-[22px] sm:w-[22px]"
               aria-hidden="true"
             />
 
-            <div>
-              <h3 className="text-lg font-black text-stone-950">
-                Part 1 · Partner Integration Hub
+            <div className="min-w-0 flex-1">
+              <h3 className="whitespace-nowrap text-[15px] font-black leading-4 text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal">
+                Partner connections
               </h3>
 
-              <p className="mt-1 text-sm font-semibold leading-6 text-stone-500">
-                Store server-side connection metadata and environment secret references only. Every connection remains pending until M03 Admin review activates it.
+              <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-sm sm:leading-6">
+                <span className="sm:hidden">Add partner details and secure references. New connections wait for admin approval.</span>
+                <span className="hidden sm:inline">Add partner connection details and secure environment references. New connections stay pending until an admin approves them.</span>
               </p>
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.partnerKey
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 sm:grid-cols-2">
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Partner key</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.partnerKey
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      partnerKey:
-                        event.target.value,
-                    }),
-                  )
-              }
-              placeholder="partner key"
-            />
+                        partnerKey:
+                          event.target.value,
+                      }),
+                    )
+                }
+                placeholder="partner key"
+              />
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.displayName
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Display name</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.displayName
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      displayName:
-                        event.target.value,
-                    }),
-                  )
-              }
-              placeholder="Display name"
-            />
+                        displayName:
+                          event.target.value,
+                      }),
+                    )
+                }
+                placeholder="Display name"
+              />
+            </label>
 
-            <select
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.partnerType
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Partner type</span>
+              <select
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.partnerType
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      partnerType:
-                        event.target.value,
+                        partnerType:
+                          event.target.value,
 
-                      allowCatalogSync:
-                        event.target.value ===
-                        'retailer_sync',
+                        allowCatalogSync:
+                          event.target.value ===
+                          'retailer_sync',
 
-                      allowInventorySync:
-                        event.target.value ===
-                        'retailer_sync',
+                        allowInventorySync:
+                          event.target.value ===
+                          'retailer_sync',
 
-                      allowSupplierPo:
-                        event.target.value ===
-                        'supplier',
+                        allowSupplierPo:
+                          event.target.value ===
+                          'supplier',
 
-                      allowPayout:
-                        event.target.value ===
-                        'payout_provider',
-                    }),
-                  )
-              }
-            >
-              <option value="retailer_sync">
-                Retailer sync
-              </option>
+                        allowPayout:
+                          event.target.value ===
+                          'payout_provider',
+                      }),
+                    )
+                }
+              >
+                <option value="retailer_sync">
+                  Retailer integration
+                </option>
 
-              <option value="supplier">
-                Supplier
-              </option>
+                <option value="supplier">
+                  Supplier connection
+                </option>
 
-              <option value="payout_provider">
-                Payout provider
-              </option>
-            </select>
+                <option value="payout_provider">
+                  Payout provider
+                </option>
+              </select>
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.baseUrl
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Partner URL</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.baseUrl
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      baseUrl:
-                        event.target.value,
-                    }),
-                  )
-              }
-              placeholder="https://partner.example.com"
-            />
+                        baseUrl:
+                          event.target.value,
+                      }),
+                    )
+                }
+                placeholder="https://partner.example.com"
+              />
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.credentialEnvKey
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Credential key</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.credentialEnvKey
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      credentialEnvKey:
-                        event.target.value.toUpperCase(),
-                    }),
-                  )
-              }
-              placeholder="Credential ENV key — not secret"
-            />
+                        credentialEnvKey:
+                          event.target.value.toUpperCase(),
+                      }),
+                    )
+                }
+                placeholder="Credential ENV key — not secret"
+              />
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.webhookSecretEnvKey
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Webhook key</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.webhookSecretEnvKey
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      webhookSecretEnvKey:
-                        event.target.value.toUpperCase(),
-                    }),
-                  )
-              }
-              placeholder="Webhook secret ENV key"
-            />
+                        webhookSecretEnvKey:
+                          event.target.value.toUpperCase(),
+                      }),
+                    )
+                }
+                placeholder="Webhook secret ENV key"
+              />
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.catalogSyncPath
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Catalog path</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.catalogSyncPath
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      catalogSyncPath:
-                        event.target.value,
-                    }),
-                  )
-              }
-              placeholder="/v1/catalog"
-            />
+                        catalogSyncPath:
+                          event.target.value,
+                      }),
+                    )
+                }
+                placeholder="/v1/catalog"
+              />
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.inventorySyncPath
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Inventory path</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.inventorySyncPath
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      inventorySyncPath:
-                        event.target.value,
-                    }),
-                  )
-              }
-              placeholder="/v1/inventory"
-            />
+                        inventorySyncPath:
+                          event.target.value,
+                      }),
+                    )
+                }
+                placeholder="/v1/inventory"
+              />
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.supplierPurchaseOrderPath
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">PO path</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.supplierPurchaseOrderPath
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      supplierPurchaseOrderPath:
-                        event.target.value,
-                    }),
-                  )
-              }
-              placeholder="/v1/purchase-orders"
-            />
+                        supplierPurchaseOrderPath:
+                          event.target.value,
+                      }),
+                    )
+                }
+                placeholder="/v1/purchase-orders"
+              />
+            </label>
 
-            <input
-              className={
-                inputClass
-              }
-              value={
-                partnerForm.payoutExecutionPath
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setPartnerForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Payout path</span>
+              <input
+                className={
+                  inputClass
+                }
+                value={
+                  partnerForm.payoutExecutionPath
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setPartnerForm(
+                      (
+                        current,
+                      ) => ({
+                        ...current,
 
-                      payoutExecutionPath:
-                        event.target.value,
-                    }),
-                  )
-              }
-              placeholder="/v1/payouts"
-            />
+                        payoutExecutionPath:
+                          event.target.value,
+                      }),
+                    )
+                }
+                placeholder="/v1/payouts"
+              />
+            </label>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-3 rounded-2xl bg-stone-50 p-4 text-xs font-bold text-stone-600">
+          <div className="mt-2 flex flex-wrap gap-2 rounded-xl bg-white/65 p-2.5 text-[10px] font-bold text-stone-600 sm:mt-3 sm:gap-3 sm:rounded-2xl sm:bg-stone-50 sm:p-4 sm:text-xs">
             {[
               [
                 'allowCatalogSync',
-                'Catalog sync',
+                'Sync catalog',
               ],
               [
                 'allowInventorySync',
-                'Inventory sync',
+                'Sync inventory',
               ],
               [
                 'allowSupplierPo',
-                'Supplier PO',
+                'Send purchase orders',
               ],
               [
                 'allowPayout',
-                'Payout',
+                'Payout access',
               ],
               [
                 'allowWebhook',
@@ -933,17 +978,17 @@ export default function ExecutionScalePanel() {
               !partnerForm.displayName.trim() ||
               !partnerForm.baseUrl.trim()
             }
-            className={`${buttonClass} mt-4`}
+            className={`${buttonClass} mt-3 sm:mt-4`}
           >
             <ShieldCheck
               size={16}
               aria-hidden="true"
             />
 
-            Propose connection
+            Request connection
           </button>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-3 space-y-2 sm:mt-5 sm:space-y-3">
             {(data?.partnerConnections || []).map(
               (
                 connection,
@@ -952,7 +997,7 @@ export default function ExecutionScalePanel() {
                   key={
                     connection.id
                   }
-                  className="rounded-2xl border border-stone-200 p-4"
+                  className="rounded-xl border border-white/90 bg-white/78 p-3 sm:rounded-2xl sm:p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -1043,32 +1088,35 @@ export default function ExecutionScalePanel() {
             )}
           </div>
 
-          <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-950">
-            M11 retailer checkout handoff remains server-owned through COMMERCE_EXTERNAL_PARTNERS_JSON. M22 does not create a second Customer redirect registry.
+          <p className="mt-3 rounded-xl border border-indigo-300 bg-indigo-100/75 p-2.5 text-[10px] font-semibold leading-4 text-indigo-900 sm:mt-4 sm:rounded-2xl sm:p-4 sm:text-xs sm:leading-5">
+            <span className="sm:hidden">Retailer checkout stays in EPANTRY's existing flow; no second customer route is created.</span>
+            <span className="hidden sm:inline">Retailer checkout links continue through EPANTRY's existing checkout system. This connection does not create a second customer checkout route.</span>
           </p>
         </section>
 
-        <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex items-start gap-3">
+        <section className="rounded-[20px] border border-indigo-300 bg-indigo-100/65 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+          <div className="flex items-start gap-2 sm:gap-3">
             <Truck
-              size={22}
-              className="mt-0.5 text-emerald-700"
+              className="mt-0.5 h-4 w-4 shrink-0 text-indigo-700 sm:h-[22px] sm:w-[22px]"
               aria-hidden="true"
             />
 
-            <div>
-              <h3 className="text-lg font-black text-stone-950">
-                Part 2 · Procurement Execution
+            <div className="min-w-0 flex-1">
+              <h3 className="whitespace-nowrap text-[15px] font-black leading-4 text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal">
+                Purchase-order preparation
               </h3>
 
-              <p className="mt-1 text-sm font-semibold leading-6 text-stone-500">
-                Convert existing M18 supplier selections into explicit Purchase Order drafts. M22 does not recalculate shortages or silently select another supplier.
+              <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-sm sm:leading-6">
+                <span className="sm:hidden">Create purchase-order drafts from the reviewed supplier plan. EPANTRY keeps the selected supplier.</span>
+                <span className="hidden sm:inline">Turn the reviewed supplier plan into purchase-order drafts. EPANTRY keeps the selected supplier and does not switch suppliers automatically.</span>
               </p>
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
-            <input
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:block sm:space-y-3">
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Plan ID</span>
+              <input
               className={
                 inputClass
               }
@@ -1083,26 +1131,28 @@ export default function ExecutionScalePanel() {
                     event.target.value,
                   )
               }
-              placeholder="M18 Procurement Plan ID"
+              placeholder="Procurement plan ID"
             />
+            </label>
 
-            <textarea
-              rows={3}
-              className={
-                inputClass
-              }
-              value={
-                procurementReason
-              }
-              onChange={
-                (
-                  event,
-                ) =>
-                  setProcurementReason(
-                    event.target.value,
-                  )
-              }
-            />
+            <label className="min-w-0">
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Purchase reason</span>
+              <textarea
+                rows={3}
+                className={`${inputClass} h-[38px] resize-none sm:h-auto`}
+                value={
+                  procurementReason
+                }
+                onChange={
+                  (
+                    event,
+                  ) =>
+                    setProcurementReason(
+                      event.target.value,
+                    )
+                }
+              />
+            </label>
 
             <button
               type="button"
@@ -1115,20 +1165,18 @@ export default function ExecutionScalePanel() {
                 procurementReason.trim().length <
                   10
               }
-              className={
-                buttonClass
-              }
+              className={`${buttonClass} col-span-2 w-full sm:w-auto`}
             >
               <Boxes
                 size={16}
                 aria-hidden="true"
               />
 
-              Create PO drafts
+              Create purchase-order drafts
             </button>
           </div>
 
-          <div className="mt-5 space-y-4">
+          <div className="mt-3 space-y-2.5 sm:mt-5 sm:space-y-4">
             {(data?.purchaseOrders || []).length ? (
               data.purchaseOrders.map(
                 (
@@ -1138,7 +1186,7 @@ export default function ExecutionScalePanel() {
                     key={
                       order.id
                     }
-                    className="rounded-2xl border border-stone-200 p-4"
+                    className="rounded-xl border border-white/90 bg-white/78 p-3 sm:rounded-2xl sm:p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -1376,34 +1424,34 @@ export default function ExecutionScalePanel() {
                 ),
               )
             ) : (
-              <p className="rounded-2xl bg-stone-50 p-4 text-sm font-semibold text-stone-500">
-                No M22 Purchase Orders yet.
+              <p className="rounded-xl border border-white/90 bg-white/74 p-2.5 text-[10px] font-semibold leading-4 text-stone-500 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
+                No purchase orders created yet.
               </p>
             )}
           </div>
         </section>
       </div>
 
-      <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex items-start gap-3">
+      <section className="rounded-[20px] border border-cyan-300 bg-cyan-100/65 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+        <div className="flex items-start gap-2 sm:gap-3">
           <WalletCards
-            size={22}
-            className="mt-0.5 text-emerald-700"
+            className="mt-0.5 h-4 w-4 shrink-0 text-cyan-700 sm:h-[22px] sm:w-[22px]"
             aria-hidden="true"
           />
 
-          <div>
-            <h3 className="text-lg font-black text-stone-950">
-              Part 3 · Finance Execution & Reconciliation
+          <div className="min-w-0 flex-1">
+            <h3 className="whitespace-nowrap text-[15px] font-black leading-4 text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal">
+              Finance & payout tracking
             </h3>
 
-            <p className="mt-1 text-sm font-semibold leading-6 text-stone-500">
-              Payout-provider execution is M03 finance.mutate only. Host can observe execution status here, but cannot create settlement, execute payout, reconcile payout or mark settlement paid through Host authority.
+            <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-sm sm:leading-6">
+              <span className="sm:hidden">Track payout progress here. Final settlement stays controlled by EPANTRY finance.</span>
+              <span className="hidden sm:inline">Track payout progress here. Final settlement and paid-status changes stay controlled by EPANTRY's finance workflow.</span>
             </p>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-3 grid gap-2.5 sm:mt-5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(data?.payoutExecutions || []).length ? (
             data.payoutExecutions.map(
               (
@@ -1413,7 +1461,7 @@ export default function ExecutionScalePanel() {
                   key={
                     payout.id
                   }
-                  className="rounded-2xl border border-stone-200 p-4"
+                  className="rounded-xl border border-white/90 bg-white/78 p-3 sm:rounded-2xl sm:p-4"
                 >
                   <p className="text-sm font-black text-stone-950">
                     {money(
@@ -1441,40 +1489,41 @@ export default function ExecutionScalePanel() {
               ),
             )
           ) : (
-            <p className="rounded-2xl bg-stone-50 p-4 text-sm font-semibold text-stone-500">
-              No payout execution evidence yet.
+            <p className="rounded-xl border border-white/90 bg-white/74 p-2.5 text-[10px] font-semibold leading-4 text-stone-500 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
+              No payout activity recorded yet.
             </p>
           )}
         </div>
 
-        <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-100/75 p-2.5 text-rose-900 sm:mt-5 sm:gap-3 sm:rounded-2xl sm:p-4">
           <CircleAlert
             size={18}
             className="mt-0.5 shrink-0"
             aria-hidden="true"
           />
 
-          <p className="text-xs font-semibold leading-5">
-            Provider confirmation is not settlement truth. After payout reconciliation, the existing M16 Admin Host Operations finance workflow must still perform the governed settlement paid transition. No duplicate CommerceLedgerEntry is created by M22.
+          <p className="text-[10px] font-semibold leading-4 sm:text-xs sm:leading-5">
+            <span className="sm:hidden">Provider confirmation shows payout progress only. Final paid status follows EPANTRY finance reconciliation.</span>
+            <span className="hidden sm:inline">A provider confirmation shows payout progress, not final settlement. Final paid status is confirmed only after EPANTRY finance reconciliation.</span>
           </p>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-stone-200 bg-stone-950 p-5 text-white sm:p-7">
-        <div className="flex items-start gap-3">
+      <section className="rounded-[20px] border border-slate-300 bg-slate-100/85 p-3.5 text-stone-900 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+        <div className="flex items-start gap-2 sm:gap-3">
           <ShieldCheck
-            size={22}
-            className="mt-0.5 text-emerald-400"
+            className="mt-0.5 h-4 w-4 shrink-0 text-slate-600 sm:h-[22px] sm:w-[22px]"
             aria-hidden="true"
           />
 
-          <div>
-            <h3 className="text-lg font-black">
-              M22 trust boundary
+          <div className="min-w-0 flex-1">
+            <h3 className="whitespace-nowrap text-[15px] font-black leading-4 sm:whitespace-normal sm:text-lg sm:leading-normal">
+              How partner data is treated
             </h3>
 
-            <p className="mt-2 text-sm font-semibold leading-6 text-stone-300">
-              Partner prediction or provider response is never canonical Product, price, serviceability, inventory, Procurement Plan, ledger or paid-settlement truth. Economic writes use explicit idempotency keys, signed webhooks are evidence-only, and ambiguous external state must reconcile before retry.
+            <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
+              <span className="sm:hidden">Partner updates support decisions but do not replace final product, price, stock, delivery, order or settlement records.</span>
+              <span className="hidden sm:inline">Partner responses are treated as supporting evidence, not final product, price, stock, delivery, purchase-order, ledger or settlement records. EPANTRY reconciles uncertain external updates before retrying.</span>
             </p>
           </div>
         </div>

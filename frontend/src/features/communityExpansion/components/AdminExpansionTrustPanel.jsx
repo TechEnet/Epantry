@@ -47,9 +47,27 @@ function titleize(value) {
     .join(' ')
 }
 
+function formatMoneyMinor(
+  amountMinor,
+  currency = 'INR',
+) {
+  const amount = Number(amountMinor || 0) / 100
+
+  try {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  } catch {
+    return `₹${amount.toLocaleString('en-IN')}`
+  }
+}
+
 export default function AdminExpansionTrustPanel() {
   const {
     hasAdminPermission,
+    isRootSuperAdmin,
   } =
     useAdmin()
 
@@ -57,6 +75,10 @@ export default function AdminExpansionTrustPanel() {
     hasAdminPermission(
       'trust_safety.mutate',
     )
+
+  const canReviewRetailMedia =
+    canMutate &&
+    isRootSuperAdmin
 
   const [reports, setReports] =
     useState([])
@@ -585,9 +607,59 @@ export default function AdminExpansionTrustPanel() {
                       </span>
                     </div>
 
-                    {canMutate &&
+                    <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                            Host payment
+                          </p>
+                          <p className="mt-1 text-xs font-black text-stone-950">
+                            {formatMoneyMinor(
+                              campaign.payment?.requiredAmountMinor,
+                              campaign.payment?.currency || 'INR',
+                            )}
+                          </p>
+                        </div>
+
+                        <span
+                          className={[
+                            'rounded-full px-2.5 py-1 text-[10px] font-black uppercase',
+                            campaign.payment?.status === 'paid'
+                              ? 'bg-emerald-700 text-white'
+                              : 'bg-white text-stone-600',
+                          ].join(' ')}
+                        >
+                          {campaign.payment?.status === 'paid'
+                            ? 'Paid'
+                            : 'Awaiting payment'}
+                        </span>
+                      </div>
+
+                      <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-600">
+                        {campaign.payment?.recipient ||
+                          'EPANTRY platform (Super Admin controlled)'}
+                      </p>
+                    </div>
+
+                    {campaign.status === 'pending_review' &&
+                    campaign.payment?.status !== 'paid' ? (
+                      <p className="mt-3 rounded-xl border border-sky-100 bg-sky-50 p-3 text-[11px] font-semibold leading-5 text-sky-800">
+                        Waiting for the Host to complete the Razorpay test payment before Super Admin approval.
+                      </p>
+                    ) : null}
+
+                    {!isRootSuperAdmin &&
+                    campaign.status === 'pending_review' &&
+                    campaign.payment?.status === 'paid' ? (
+                      <p className="mt-3 rounded-xl border border-violet-100 bg-violet-50 p-3 text-[11px] font-semibold leading-5 text-violet-800">
+                        Payment is complete. Final campaign approval is restricted to the root Super Admin.
+                      </p>
+                    ) : null}
+
+                    {canReviewRetailMedia &&
                     campaign.status ===
-                      'pending_review' ? (
+                      'pending_review' &&
+                    campaign.payment?.status === 'paid' ? (
                       <div className="mt-3 space-y-2">
                         <textarea
                           rows={2}

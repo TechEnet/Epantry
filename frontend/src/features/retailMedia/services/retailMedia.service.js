@@ -80,6 +80,14 @@ export function getRetailMediaErrorMessage(
   )
 }
 
+export async function getHostRetailMediaPricing() {
+  return unwrap(
+    await apiClient.get(
+      '/host/retail-media/pricing',
+    ),
+  )
+}
+
 export async function listHostRetailMediaCampaigns() {
   return unwrap(
     await apiClient.get(
@@ -99,6 +107,37 @@ export async function createRetailMediaCampaignFromBrief({
       )}`,
     data:
       input,
+  })
+}
+
+export async function createRetailMediaCampaignPaymentIntent({
+  campaignId,
+}) {
+  return mutate({
+    url:
+      `/host/retail-media/campaigns/${path(
+        campaignId,
+      )}/payment-intent`,
+    data: {},
+  })
+}
+
+export async function verifyRetailMediaCampaignPayment({
+  campaignId,
+  razorpayPaymentId,
+  razorpayOrderId,
+  razorpaySignature,
+}) {
+  return mutate({
+    url:
+      `/host/retail-media/campaigns/${path(
+        campaignId,
+      )}/payment-verify`,
+    data: {
+      razorpayPaymentId,
+      razorpayOrderId,
+      razorpaySignature,
+    },
   })
 }
 
