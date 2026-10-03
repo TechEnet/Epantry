@@ -12,6 +12,8 @@ import {
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useSearchParams } from "react-router-dom";
+
 import AdminShell from "../../admin/components/AdminShell";
 
 import { useAdmin } from "../../admin/context/AdminContext";
@@ -36,13 +38,17 @@ function labelize(value) {
 export default function AdminCommunityPage() {
   const { hasAdminPermission } = useAdmin();
 
+  const [searchParams] = useSearchParams();
+
   const canRecipeMutate = hasAdminPermission("recipe.mutate");
 
   const canRecipePublish = hasAdminPermission("recipe.publish");
 
   const canCreatorMutate = hasAdminPermission("trust_safety.mutate");
 
-  const [tab, setTab] = useState("recipes");
+  const [tab, setTab] = useState(
+    searchParams.get("tab") === "creators" ? "creators" : "recipes"
+  );
 
   const [recipes, setRecipes] = useState([]);
 
@@ -112,6 +118,12 @@ export default function AdminCommunityPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "creators") {
+      setTab("creators");
+    }
+  }, [searchParams]);
 
   async function openRecipe(recipeId) {
     setDetailBusy(true);
@@ -240,7 +252,7 @@ export default function AdminCommunityPage() {
   return (
     <AdminShell
       title="Community & Creator Ops"
-      description="M15 moderation keeps community contribution separate from platform-calculated truth and reuses M07/M08 governance instead of creating a weaker publication path."
+      description="Customer personal recipes stay private/friend-only. Use Creator verification and Creator content governance here to review professional Chef + Restaurant Host publishing before it reaches customers."
       actions={
         <button
           type="button"
@@ -259,10 +271,9 @@ export default function AdminCommunityPage() {
         <ShieldAlert size={20} className="mt-0.5 shrink-0" />
 
         <p className="text-xs font-semibold leading-5">
-          Public Community Recipe approval requires recipe.mutate +
-          recipe.publish, an approved M08 FoodCalculation, and the existing M07
-          review/publication rules. Creator verification uses
-          trust_safety.mutate and never creates a top-level role.
+          Private and friend-shared Customer recipes never enter an approval queue.
+          This recipe queue is kept only for legacy public Community records.
+          Creator verification and professional course/media approval remain Super Admin governance actions; they do not create a new top-level user role.
         </p>
       </div>
 

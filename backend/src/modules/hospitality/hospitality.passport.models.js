@@ -615,6 +615,16 @@ const hospitalityChangeCaseSchema = new Schema(
       default: [],
     },
 
+    impactedSourceRecipeVersionIds: {
+      type: [
+        {
+          type: objectId,
+          ref: 'RecipeVersion',
+        },
+      ],
+      default: [],
+    },
+
     impactedMenuIds: {
       type: [
         {

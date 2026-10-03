@@ -289,3 +289,29 @@ export async function recordExperimentExposure(
       hostOrganizationHeaders(),
   })
 }
+
+export async function checkItemAvailability(
+  input,
+) {
+  return mutate({
+    method:
+      'post',
+    url:
+      '/notifications/availability/check',
+    data:
+      input,
+  })
+}
+
+export async function createAvailabilityWatch(
+  input,
+) {
+  return mutate({
+    method:
+      'post',
+    url:
+      '/notifications/availability-watches',
+    data:
+      input,
+  })
+}

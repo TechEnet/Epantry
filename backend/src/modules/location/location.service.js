@@ -21,6 +21,9 @@ const PROVIDER_MIN_INTERVAL_MS =
 const reverseGeocodeCache =
   new Map()
 
+const postalCodeGeocodeCache =
+  new Map()
+
 let providerQueue =
   Promise.resolve()
 
@@ -388,3 +391,300 @@ export async function reverseGeocode({
     source: 'provider',
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Forward geocode an Indian pincode
+|--------------------------------------------------------------------------
+|
+| ETA calculations use the geographic centre returned for a pincode.
+| This is deliberately an approximation, not a live road-routing result.
+| Provider access uses the same throttled queue and cache as reverse geocode.
+|--------------------------------------------------------------------------
+*/
+
+function normalizeIndianPostalCode(
+  value,
+) {
+  const postalCode =
+    String(
+      value ||
+        '',
+    )
+      .replace(
+        /\D/g,
+        '',
+      )
+      .slice(
+        0,
+        6,
+      )
+
+  if (
+    !/^\d{6}$/.test(
+      postalCode,
+    )
+  ) {
+    throw new ApiError(
+      400,
+      'Pincode must contain exactly 6 digits.',
+    )
+  }
+
+  return postalCode
+}
+
+function readCachedPostalCode(
+  postalCode,
+) {
+  const cached =
+    postalCodeGeocodeCache.get(
+      postalCode,
+    )
+
+  if (!cached) {
+    return null
+  }
+
+  if (
+    Date.now() -
+      cached.cachedAt >
+    CACHE_TTL_MS
+  ) {
+    postalCodeGeocodeCache.delete(
+      postalCode,
+    )
+
+    return null
+  }
+
+  return cached.value
+}
+
+function writeCachedPostalCode(
+  postalCode,
+  value,
+) {
+  postalCodeGeocodeCache.set(
+    postalCode,
+    {
+      cachedAt:
+        Date.now(),
+
+      value,
+    },
+  )
+}
+
+function normalizeForwardLocation(
+  providerData,
+  postalCode,
+) {
+  const latitude =
+    Number(
+      providerData?.lat,
+    )
+
+  const longitude =
+    Number(
+      providerData?.lon,
+    )
+
+  if (
+    !Number.isFinite(
+      latitude,
+    ) ||
+    !Number.isFinite(
+      longitude,
+    )
+  ) {
+    throw new ApiError(
+      502,
+      'Pincode location provider returned invalid coordinates.',
+    )
+  }
+
+  const address =
+    providerData?.address ||
+    {}
+
+  const city =
+    address.city ||
+    address.town ||
+    address.village ||
+    address.municipality ||
+    address.city_district ||
+    address.county ||
+    ''
+
+  const state =
+    address.state ||
+    address.region ||
+    ''
+
+  const country =
+    address.country ||
+    'India'
+
+  return {
+    postalCode,
+
+    latitude,
+
+    longitude,
+
+    city,
+
+    state,
+
+    country,
+
+    label:
+      [
+        city,
+        state,
+      ]
+        .filter(Boolean)
+        .join(', ') ||
+      `PIN ${postalCode}`,
+
+    provider:
+      'OpenStreetMap Nominatim',
+  }
+}
+
+export async function geocodePostalCode({
+  postalCode,
+}) {
+  const normalizedPostalCode =
+    normalizeIndianPostalCode(
+      postalCode,
+    )
+
+  const cachedLocation =
+    readCachedPostalCode(
+      normalizedPostalCode,
+    )
+
+  if (cachedLocation) {
+    return {
+      ...cachedLocation,
+
+      source:
+        'cache',
+    }
+  }
+
+  const location =
+    await runProviderRequest(
+      async () => {
+        const url =
+          new URL(
+            '/search',
+            env.geocodingBaseUrl,
+          )
+
+        url.searchParams.set(
+          'format',
+          'jsonv2',
+        )
+
+        url.searchParams.set(
+          'q',
+          `${normalizedPostalCode}, India`,
+        )
+
+        url.searchParams.set(
+          'countrycodes',
+          'in',
+        )
+
+        url.searchParams.set(
+          'limit',
+          '1',
+        )
+
+        url.searchParams.set(
+          'addressdetails',
+          '1',
+        )
+
+        url.searchParams.set(
+          'accept-language',
+          'en',
+        )
+
+        let response
+
+        try {
+          response =
+            await fetch(
+              url,
+              {
+                headers: {
+                  Accept:
+                    'application/json',
+
+                  'User-Agent':
+                    env.geocodingUserAgent,
+                },
+
+                signal:
+                  AbortSignal.timeout(
+                    8000,
+                  ),
+              },
+            )
+        } catch {
+          throw new ApiError(
+            502,
+            'Pincode location provider is currently unavailable.',
+          )
+        }
+
+        if (
+          !response.ok
+        ) {
+          throw new ApiError(
+            502,
+            'Pincode location provider returned an error.',
+          )
+        }
+
+        const providerData =
+          await response.json()
+
+        const firstResult =
+          Array.isArray(
+            providerData,
+          )
+            ? providerData[0]
+            : null
+
+        if (!firstResult) {
+          throw new ApiError(
+            422,
+            `Pincode ${normalizedPostalCode} could not be resolved to a location.`,
+          )
+        }
+
+        return normalizeForwardLocation(
+          firstResult,
+          normalizedPostalCode,
+        )
+      },
+    )
+
+  writeCachedPostalCode(
+    normalizedPostalCode,
+    location,
+  )
+
+  return {
+    ...location,
+
+    source:
+      'provider',
+  }
+}
+

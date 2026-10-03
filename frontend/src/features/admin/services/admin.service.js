@@ -1023,3 +1023,67 @@ export async function getAdminAuditEvent(
       null,
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| M3-C EPANTRY Pro control plane
+|--------------------------------------------------------------------------
+*/
+
+export async function getAdminProOverview() {
+  const response = await apiClient.get(
+    '/admin/pro',
+  )
+
+  return unwrapApiData(response)
+}
+
+export async function getAdminProMemberships({
+  status = 'all',
+  page = 1,
+  limit = 25,
+} = {}) {
+  const response = await apiClient.get(
+    '/admin/pro/memberships',
+    {
+      params: normalizeQueryParams({
+        status,
+        page,
+        limit,
+      }),
+    },
+  )
+
+  return unwrapApiData(response)
+}
+
+export async function getAdminProPayments({
+  status = 'all',
+  page = 1,
+  limit = 25,
+} = {}) {
+  const response = await apiClient.get(
+    '/admin/pro/payments',
+    {
+      params: normalizeQueryParams({
+        status,
+        page,
+        limit,
+      }),
+    },
+  )
+
+  return unwrapApiData(response)
+}
+
+export async function updateAdminProPlan({
+  planCode,
+  changes,
+}) {
+  return performAdminMutation({
+    method: 'patch',
+    url: `/admin/pro/plans/${encodePathValue(planCode)}`,
+    data: changes,
+  })
+}
+

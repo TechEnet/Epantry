@@ -1895,6 +1895,86 @@ function serializeCart(rawCart) {
         cart.fulfillmentType ||
         null,
 
+      restaurantOrder:
+        cart.restaurantOrder
+          ? {
+              recipeVersionId:
+                stringifyId(
+                  cart.restaurantOrder
+                    .recipeVersionId,
+                ),
+
+              dishId:
+                stringifyId(
+                  cart.restaurantOrder
+                    .dishId,
+                ),
+
+              recipeSlug:
+                cart.restaurantOrder
+                  .recipeSlug ||
+                '',
+
+              productionRecipeVersionId:
+                stringifyId(
+                  cart.restaurantOrder
+                    .productionRecipeVersionId,
+                ),
+
+              menuItemId:
+                stringifyId(
+                  cart.restaurantOrder
+                    .menuItemId,
+                ),
+
+              organizationId:
+                stringifyId(
+                  cart.restaurantOrder
+                    .organizationId,
+                ),
+
+              outletId:
+                stringifyId(
+                  cart.restaurantOrder
+                    .outletId,
+                ),
+
+              restaurantName:
+                cart.restaurantOrder
+                  .restaurantName ||
+                '',
+
+              outletName:
+                cart.restaurantOrder
+                  .outletName ||
+                '',
+
+              displayName:
+                cart.restaurantOrder
+                  .displayName ||
+                '',
+
+              servings:
+                cart.restaurantOrder
+                  .servings,
+
+              pricePerServing:
+                cart.restaurantOrder
+                  .pricePerServing ||
+                null,
+
+              lineTotal:
+                cart.restaurantOrder
+                  .lineTotal ||
+                null,
+
+              priceSource:
+                cart.restaurantOrder
+                  .priceSource ||
+                'active_hospitality_menu',
+            }
+          : null,
+
       itemSubtotalMinor:
         cart.itemSubtotalMinor,
 

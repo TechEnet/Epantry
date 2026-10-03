@@ -15,6 +15,7 @@ import {
 } from '../households/householdMembership.model.js'
 
 import {
+  HOST_WORKSPACE_TYPES,
   USER_ACTIVE_MODES,
   User,
 } from './user.model.js'
@@ -57,6 +58,9 @@ const CURRENT_USER_PROJECTION = {
     1,
 
   hostAccessStatus:
+    1,
+
+  hostWorkspaceType:
     1,
 
   superAdminEnabled:
@@ -886,6 +890,40 @@ function assertHostRequestAvailable(
   }
 }
 
+function normalizeHostWorkspaceType(
+  value,
+) {
+  const normalized =
+    String(
+      value ||
+      '',
+    )
+      .trim()
+      .toLowerCase()
+
+  if (
+    !HOST_WORKSPACE_TYPES.includes(
+      normalized,
+    )
+  ) {
+    throw new ApiError(
+      400,
+      'Choose a valid Host workspace before submitting your Host application.',
+      [
+        {
+          code:
+            'AUTH_HOST_WORKSPACE_TYPE_INVALID',
+
+          allowedHostWorkspaceTypes:
+            HOST_WORKSPACE_TYPES,
+        },
+      ],
+    )
+  }
+
+  return normalized
+}
+
 /*
 |--------------------------------------------------------------------------
 | Request Host Access
@@ -907,6 +945,7 @@ function assertHostRequestAvailable(
 
 export async function requestHostAccess({
   user,
+  hostWorkspaceType = null,
 }) {
   if (
     !user?._id
@@ -920,6 +959,13 @@ export async function requestHostAccess({
   assertHostRequestAvailable(
     user,
   )
+
+  const normalizedHostWorkspaceType =
+    hostWorkspaceType
+      ? normalizeHostWorkspaceType(
+          hostWorkspaceType,
+        )
+      : null
 
   /*
   |--------------------------------------------------------------------------
@@ -953,14 +999,73 @@ export async function requestHostAccess({
     user.hostAccessStatus ===
     'pending'
   ) {
+    if (
+      user.hostWorkspaceType ||
+      !normalizedHostWorkspaceType
+    ) {
+      return {
+        user,
+
+        requestChanged:
+          false,
+
+        hostRequestState:
+          'already_pending',
+      }
+    }
+
+    const updatedPendingUser =
+      await User.findOneAndUpdate(
+        {
+          _id:
+            user._id,
+
+          hostEnabled:
+            false,
+
+          hostAccessStatus:
+            'pending',
+
+          hostWorkspaceType:
+            null,
+        },
+
+        {
+          $set: {
+            hostWorkspaceType:
+              normalizedHostWorkspaceType,
+
+            activeMode:
+              'customer',
+          },
+        },
+
+        {
+          new:
+            true,
+
+          runValidators:
+            true,
+
+          projection:
+            CURRENT_USER_PROJECTION,
+        },
+      ).lean()
+
     return {
-      user,
+      user:
+        updatedPendingUser ||
+        user,
 
       requestChanged:
-        false,
+        Boolean(
+          updatedPendingUser,
+        ),
 
       hostRequestState:
-        'already_pending',
+        updatedPendingUser
+          ? 'pending_type_added'
+          : 'already_pending',
     }
   }
 
@@ -1042,6 +1147,21 @@ export async function requestHostAccess({
     )
   }
 
+  if (
+    !normalizedHostWorkspaceType
+  ) {
+    throw new ApiError(
+      400,
+      'Choose the Host workspace you are applying for before submitting your Host application.',
+      [
+        {
+          code:
+            'AUTH_HOST_WORKSPACE_TYPE_REQUIRED',
+        },
+      ],
+    )
+  }
+
   /*
   |--------------------------------------------------------------------------
   | not_requested → pending
@@ -1087,6 +1207,9 @@ export async function requestHostAccess({
 
           hostAccessStatus:
             'pending',
+
+          hostWorkspaceType:
+            normalizedHostWorkspaceType,
 
           /*
           |--------------------------------------------------------------------------
@@ -1496,6 +1619,10 @@ export function serializeCurrentUser(
     hostAccessStatus:
       user.hostAccessStatus ||
       'not_requested',
+
+    hostWorkspaceType:
+      user.hostWorkspaceType ||
+      null,
 
     superAdminEnabled:
       hasSuperAdminAccess(

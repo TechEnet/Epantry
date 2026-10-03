@@ -251,32 +251,32 @@ test(
 )
 
 test(
-  'M16 HostShell exposes S01-S11 operational navigation',
+  'M16 HostShell preserves the S01-S11 operational destinations with host-friendly labels',
   () => {
     const source =
       readFrontend(
         'src/features/host/components/HostShell.jsx',
       )
 
-    for (const screen of [
-      'S01 Dashboard',
-      'S02 Catalog',
-      'S03 Product Editor / NPI',
-      'S04 Data Quality',
-      'S05 Pricing & Inventory',
-      'S06 Orders',
-      'S07 Fulfillment',
-      'S08 Finance',
-      'S09 Brand Recipes',
-      'S10 Campaigns',
-      'S11 Documents / Team / API',
+    for (const route of [
+      '/host/operations',
+      '/host/catalog',
+      '/host/product-intelligence',
+      '/host/data-quality',
+      '/host/marketplace',
+      '/host/orders',
+      '/host/fulfillment',
+      '/host/finance',
+      '/host/brand-recipes',
+      '/host/campaigns',
+      '/host/settings',
     ]) {
       assert.equal(
         source.includes(
-          screen,
+          route,
         ),
         true,
-        `${screen} must remain visible in HostShell.`,
+        `${route} must remain reachable from HostShell.`,
       )
     }
   },

@@ -635,19 +635,30 @@ test(
 )
 
 test(
-  'M20 final regression keeps Host authority on hostEnabled plus active status rather than UX activeMode',
+  'M20 final regression keeps Host authority on hostEnabled plus active status while activeMode remains presentation-only',
   () => {
     const routes =
       readFrontend(
         'src/routes/AppRoutes.jsx',
       )
 
+    const hostAccessBranch =
+      routes.match(
+        /case APPLICATION_ACCESS_TYPES\.HOST:[\s\S]*?break/,
+      )?.[0] ||
+      ''
+
     assert.match(
-      routes,
+      hostAccessBranch,
       /hostEnabled\s*===\s*true\s*&&\s*hostAccessStatus\s*===\s*['"]active['"]/,
     )
 
     assert.doesNotMatch(
+      hostAccessBranch,
+      /activeMode/,
+    )
+
+    assert.match(
       routes,
       /activeMode\s*===\s*['"]host['"]/,
     )

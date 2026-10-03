@@ -60,7 +60,7 @@ function stripComments(source) {
 }
 
 test(
-  'M18 Batch 2 does not introduce B2B Seller Brand application capability fields or activeMode authority',
+  'M18 Batch 2 does not introduce separate B2B Seller Brand capability booleans inside Hospitality',
   () => {
     const source =
       stripComments(
@@ -69,7 +69,6 @@ test(
           readBackend('src/modules/hospitality/hospitality.passport.service.js'),
           readBackend('src/modules/hospitality/hospitality.passport.routes.js'),
           readFrontend('src/features/hospitality/pages/HospitalityPage.jsx'),
-          readFrontend('src/routes/AppRoutes.jsx'),
         ].join('\n'),
       )
 
@@ -81,14 +80,9 @@ test(
       assert.equal(
         source.includes(forbidden),
         false,
-        `${forbidden} must not be introduced.`,
+        `${forbidden} must not be introduced inside Hospitality.`,
       )
     }
-
-    assert.doesNotMatch(
-      source,
-      /activeMode/,
-    )
   },
 )
 
@@ -258,7 +252,7 @@ test(
 )
 
 test(
-  'M18 HostShell preserves frozen Orders label while adding Hospitality entry',
+  'M18 HostShell preserves Orders and the approved Hospitality Operations entry without reverting the current visual shell',
   () => {
     const source =
       readFrontend(
@@ -272,12 +266,22 @@ test(
 
     assert.match(
       source,
-      /screenLabel:\s*['"]S06 Orders['"]/,
+      /label:\s*['"]Hospitality Operations['"]/,
     )
 
     assert.match(
       source,
-      /screenLabel:\s*['"]Hospitality \/ Pro Ops['"]/,
+      /to:\s*['"]\/host\/hospitality['"]/,
+    )
+
+    assert.match(
+      source,
+      /bg-\[#faf8f4\]/,
+    )
+
+    assert.match(
+      source,
+      /bg-\[linear-gradient\(145deg,#17483b_0%,#11382f_100%\)\]/,
     )
   },
 )

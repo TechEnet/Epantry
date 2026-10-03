@@ -103,7 +103,7 @@ test(
 )
 
 test(
-  'M07 freeze keeps public Recipe surface read only',
+  'M07 freeze keeps public Recipe data read only while allowing authenticated AI Cook generation',
   () => {
     const source =
       stripComments(
@@ -117,9 +117,20 @@ test(
       /router\.get/,
     )
 
-    assert.doesNotMatch(
+    const postRoutes =
+      source.match(
+        /router\.post\(/g,
+      ) ||
+      []
+
+    assert.equal(
+      postRoutes.length,
+      1,
+    )
+
+    assert.match(
       source,
-      /router\.post/,
+      /router\.post\(\s*['"]\/ai-cook['"][\s\S]*?requireCustomerAccess[\s\S]*?requireCsrfToken[\s\S]*?generateAiCookController/,
     )
 
     assert.doesNotMatch(

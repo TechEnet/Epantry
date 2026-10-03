@@ -406,7 +406,7 @@ export default function ProductPassportPage() {
               ) : null}
 
               <Link
-                to={`/search?q=${encodeURIComponent(
+                to={`/grocery?q=${encodeURIComponent(
                   product.displayName ||
                     '',
                 )}`}

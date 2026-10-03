@@ -147,6 +147,10 @@ export async function requestHostAccessController(
       await requestHostAccess({
         user:
           req.currentUser,
+
+        hostWorkspaceType:
+          req.body?.hostWorkspaceType ||
+          null,
       })
 
     const serializedUser =

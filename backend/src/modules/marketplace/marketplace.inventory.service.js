@@ -3,6 +3,10 @@ import {
 } from '../../utils/ApiError.js'
 
 import {
+  fulfillAvailabilityWatchesForPackBestEffort,
+} from '../notifications/notification.service.js'
+
+import {
   HostOffer,
   InventoryNode,
   InventorySnapshot,
@@ -1188,6 +1192,57 @@ export async function createBulkInventorySnapshots(
           true,
       },
     )
+
+  const availablePackIds =
+    new Set()
+
+  for (
+    const item of
+    input.items
+  ) {
+    const offer =
+      offersById.get(
+        String(
+          item.offerId,
+        ),
+      )
+
+    const sellable =
+      Math.max(
+        0,
+        Number(
+          item.availableQuantity ||
+            0,
+        ) -
+          Number(
+            item.reservedQuantity ||
+              0,
+          ),
+      )
+
+    if (
+      offer?.status ===
+        'active' &&
+      sellable > 0
+    ) {
+      availablePackIds.add(
+        String(
+          offer.packId,
+        ),
+      )
+    }
+  }
+
+  await Promise.all(
+    [
+      ...availablePackIds,
+    ].map(
+      (packId) =>
+        fulfillAvailabilityWatchesForPackBestEffort(
+          packId,
+        ),
+    ),
+  )
 
   return {
     accepted:

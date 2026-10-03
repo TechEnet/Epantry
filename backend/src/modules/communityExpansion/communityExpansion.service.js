@@ -23,6 +23,16 @@ import {
 } from '../community/community.models.js'
 
 import {
+  CourseLesson,
+  CourseMediaAsset,
+  CourseModule,
+} from '../learning/learning.models.js'
+
+import {
+  notifyActiveSuperAdminsBestEffort,
+} from '../notifications/notification.service.js'
+
+import {
   CommunityReport,
   CreatorContent,
 } from './communityExpansion.models.js'
@@ -53,7 +63,7 @@ function actorId(actorUser) {
   if (!value) {
     throw new ApiError(
       401,
-      'Authenticated Customer identity is required.',
+      'Authenticated EPANTRY identity is required.',
       [
         {
           code:
@@ -227,7 +237,7 @@ async function requireOwnedCreatorProfile(
   if (!profile) {
     throw new ApiError(
       404,
-      'Creator profile was not found for this Customer identity.',
+      'Creator profile was not found for this Host identity.',
       [
         {
           code:
@@ -360,15 +370,20 @@ async function resolveOwnedContent({
 
     sourceLineage: {
       sourceContentType:
-        'community_recipe',
+        record.linkedRecipeVersionId
+          ? 'recipe_version'
+          : 'professional_creator_course',
 
       sourceContentId:
         stringId(
-          record.linkedCommunityRecipeId,
+          record.linkedRecipeVersionId ||
+          record._id,
         ),
 
       attributionLabel:
-        'Course linked to governed Community Recipe',
+        record.linkedRecipeVersionId
+          ? 'Course includes a governed EPANTRY Recipe reference'
+          : 'Original professional course created in EPANTRY Creator Studio',
 
       creatorProseCopied:
         false,
@@ -379,6 +394,145 @@ async function resolveOwnedContent({
       foodIntelligenceCopied:
         false,
     },
+  }
+}
+
+async function requireCreatorCourseReadyForReview(
+  course,
+) {
+  if (
+    ![
+      'draft',
+      'rejected',
+    ].includes(
+      course.status,
+    )
+  ) {
+    throw new ApiError(
+      409,
+      course.status === 'in_review'
+        ? 'This course is already waiting for Super Admin review.'
+        : 'Only a draft or rejected course can be submitted for review.',
+      [
+        {
+          code:
+            'M4B_CREATOR_COURSE_NOT_SUBMITTABLE',
+          courseStatus:
+            course.status,
+        },
+      ],
+    )
+  }
+
+  const [
+    publishedModuleCount,
+    publishedLessons,
+  ] =
+    await Promise.all([
+      CourseModule.countDocuments({
+        courseId:
+          course._id,
+        status:
+          'published',
+      }),
+      CourseLesson.find({
+        courseId:
+          course._id,
+        status:
+          'published',
+      })
+        .select('_id lessonType')
+        .lean(),
+    ])
+
+  if (
+    publishedModuleCount < 1 ||
+    publishedLessons.length < 1
+  ) {
+    throw new ApiError(
+      409,
+      'Add and publish at least one module and one lesson before submitting the course for Super Admin review.',
+      [
+        {
+          code:
+            'M4B_CREATOR_COURSE_CONTENT_REQUIRED',
+        },
+      ],
+    )
+  }
+
+  const videoLessons =
+    publishedLessons.filter(
+      (lesson) =>
+        [
+          'video',
+          'live_recording',
+        ].includes(
+          lesson.lessonType,
+        ),
+    )
+
+  for (const lesson of videoLessons) {
+    const availableMedia =
+      await CourseMediaAsset.exists({
+        courseId:
+          course._id,
+        lessonId:
+          lesson._id,
+        mediaType: {
+          $in: [
+            'video',
+            'live_recording',
+          ],
+        },
+        availabilityState:
+          'available',
+      })
+
+    if (!availableMedia) {
+      throw new ApiError(
+        409,
+        'Each published video lesson needs an available video or recording before the course can be submitted for review.',
+        [
+          {
+            code:
+              'M4B_CREATOR_VIDEO_MEDIA_REQUIRED',
+            lessonId:
+              stringId(
+                lesson._id,
+              ),
+          },
+        ],
+      )
+    }
+  }
+}
+
+function creatorCourseRights(
+  course,
+) {
+  return {
+    ownerOrLicensor:
+      course.rights?.ownerOrLicensor ||
+      '',
+    allowedTerritories:
+      course.rights?.allowedTerritories ||
+      [],
+    publishFrom:
+      null,
+    publishUntil:
+      null,
+    downloadAllowed:
+      course.rights?.downloadableMaterialsAllowed ===
+      true,
+    sponsored:
+      course.rights?.sponsored ===
+      true,
+    sponsorLabel:
+      'Sponsored',
+    disclosureText:
+      course.commercialDisclosure ||
+      '',
   }
 }
 
@@ -393,6 +547,28 @@ export async function registerCreatorContentGovernance({
       actorUser,
     )
 
+  if (
+    input.contentType ===
+      'creator_course' &&
+    !(
+      profile.creatorType ===
+        'chef' &&
+      profile.verificationStatus ===
+        'verified'
+    )
+  ) {
+    throw new ApiError(
+      403,
+      'A verified Chef/Creator profile is required before professional course content can be submitted for review.',
+      [
+        {
+          code:
+            'M4B_VERIFIED_CREATOR_REQUIRED',
+        },
+      ],
+    )
+  }
+
   const {
     record,
     sourceLineage,
@@ -400,40 +576,48 @@ export async function registerCreatorContentGovernance({
     await resolveOwnedContent({
       contentType:
         input.contentType,
-
       contentId:
         input.contentId,
-
       actorUser,
     })
 
-  const existing =
-    await CreatorContent.findOne({
-      contentType:
-        input.contentType,
+  if (
+    input.contentType ===
+      'creator_course'
+  ) {
+    await requireCreatorCourseReadyForReview(
+      record,
+    )
+  }
 
-      contentId:
-        record._id,
-    }).lean()
+  const rights =
+    input.contentType ===
+      'creator_course'
+      ? creatorCourseRights(
+          record,
+        )
+      : input.rights
 
-  if (existing) {
-    return {
-      creatorContent:
-        serializeCreatorContent(
-          existing,
-        ),
-
-      deduplicated:
-        true,
-    }
+  if (!rights) {
+    throw new ApiError(
+      400,
+      'Creator content rights information is required.',
+      [
+        {
+          code:
+            'M21_CREATOR_CONTENT_RIGHTS_REQUIRED',
+        },
+      ],
+    )
   }
 
   if (
-    input.rights.sponsored ===
+    rights.sponsored ===
       true &&
-    input.rights.disclosureText
-      .trim().length <
-      5
+    String(
+      rights.disclosureText ||
+        '',
+    ).trim().length < 5
   ) {
     throw new ApiError(
       400,
@@ -447,86 +631,193 @@ export async function registerCreatorContentGovernance({
     )
   }
 
-  const created =
-    await CreatorContent.create({
-      creatorProfileId:
-        profile._id,
-
-      ownerUserId:
-        actorId(
-          actorUser,
-        ),
-
+  let governance =
+    await CreatorContent.findOne({
       contentType:
         input.contentType,
-
       contentId:
         record._id,
-
-      sourceLineage,
-
-      rights: {
-        ownerOrLicensor:
-          input.rights
-            .ownerOrLicensor,
-
-        allowedTerritories:
-          [
-            ...new Set(
-              input.rights.allowedTerritories.map(
-                (value) =>
-                  String(value)
-                    .trim()
-                    .toUpperCase(),
-              ),
-            ),
-          ],
-
-        publishFrom:
-          input.rights.publishFrom,
-
-        publishUntil:
-          input.rights.publishUntil,
-
-        downloadAllowed:
-          input.rights.downloadAllowed,
-
-        sponsored:
-          input.rights.sponsored,
-
-        sponsorLabel:
-          input.rights.sponsorLabel,
-
-        disclosureText:
-          input.rights.disclosureText,
-
-        takedownState:
-          'clear',
-      },
-
-      governanceState:
-        'pending_review',
     })
+
+  const isResubmission =
+    Boolean(
+      governance,
+    )
+
+  if (
+    governance &&
+    governance.governanceState ===
+      'approved'
+  ) {
+    return {
+      creatorContent:
+        serializeCreatorContent(
+          governance,
+        ),
+      deduplicated:
+        true,
+    }
+  }
+
+  if (
+    governance &&
+    governance.governanceState ===
+      'removed'
+  ) {
+    throw new ApiError(
+      409,
+      'Removed Creator content cannot be resubmitted without a separate Super Admin restoration decision.',
+      [
+        {
+          code:
+            'M4B_CREATOR_CONTENT_REMOVED',
+        },
+      ],
+    )
+  }
+
+  if (!governance) {
+    governance =
+      new CreatorContent({
+        creatorProfileId:
+          profile._id,
+        ownerUserId:
+          actorId(
+            actorUser,
+          ),
+        contentType:
+          input.contentType,
+        contentId:
+          record._id,
+        sourceLineage,
+      })
+  }
+
+  governance.sourceLineage =
+    sourceLineage
+
+  governance.rights = {
+    ownerOrLicensor:
+      rights.ownerOrLicensor,
+    allowedTerritories:
+      [
+        ...new Set(
+          (
+            rights.allowedTerritories ||
+            []
+          ).map(
+            (value) =>
+              String(value)
+                .trim()
+                .toUpperCase(),
+          ),
+        ),
+      ],
+    publishFrom:
+      rights.publishFrom ||
+      null,
+    publishUntil:
+      rights.publishUntil ||
+      null,
+    downloadAllowed:
+      rights.downloadAllowed ===
+      true,
+    sponsored:
+      rights.sponsored ===
+      true,
+    sponsorLabel:
+      rights.sponsorLabel ||
+      'Sponsored',
+    disclosureText:
+      rights.disclosureText ||
+      '',
+    takedownState:
+      'clear',
+  }
+
+  governance.governanceState =
+    'pending_review'
+  governance.reviewReason =
+    ''
+  governance.reviewEvidenceRefs =
+    []
+  governance.reviewedByUserId =
+    null
+  governance.reviewedAt =
+    null
+
+  await governance.save()
+
+  if (
+    input.contentType ===
+      'creator_course'
+  ) {
+    await CreatorCourse.updateOne(
+      {
+        _id:
+          record._id,
+        createdByUserId:
+          actorId(
+            actorUser,
+          ),
+      },
+      {
+        $set: {
+          status:
+            'in_review',
+          'rights.takedownState':
+            'clear',
+        },
+      },
+      {
+        runValidators:
+          true,
+      },
+    )
+  }
+
+  await notifyActiveSuperAdminsBestEffort({
+    triggerType:
+      'creator_approval_requested',
+    reasonCode:
+      'creator.content_review_requested',
+    explanation:
+      input.contentType ===
+        'creator_course'
+        ? `${profile.displayName} submitted the course "${record.title}" for Super Admin review.`
+        : `${profile.displayName} submitted professional Creator content for Super Admin review.`,
+    relatedEntityType:
+      'creator_content',
+    relatedEntityId:
+      stringId(
+        governance._id,
+      ),
+    sourceDomain:
+      'creator_studio',
+    sourceVersion:
+      'm4b-v1',
+    dedupeScope:
+      `creator-content-review:${stringId(governance._id)}:${governance.updatedAt?.toISOString() || Date.now()}`,
+  })
 
   return {
     creatorContent:
       serializeCreatorContent(
-        created,
+        governance,
       ),
-
     deduplicated:
       false,
-
+    resubmitted:
+      isResubmission,
     policy: {
+      superAdminApprovalRequired:
+        true,
       creatorAssertionIsFoodTruth:
         false,
-
       foodIntelligenceCopiedFromParent:
         false,
-
       sponsoredDisclosureRequired:
         true,
-
       recipeOrCourseRightsTracked:
         true,
     },
@@ -868,11 +1159,79 @@ export async function listAdminCreatorContent({
       )
       .lean()
 
+  const items = []
+
+  for (const record of records) {
+    const [
+      creator,
+      course,
+    ] =
+      await Promise.all([
+        CreatorProfile.findById(
+          record.creatorProfileId,
+        )
+          .select('displayName slug creatorType verificationStatus')
+          .lean(),
+        record.contentType ===
+          'creator_course'
+          ? CreatorCourse.findById(
+              record.contentId,
+            )
+              .select('title summary status accessType category language commercialDisclosure rights')
+              .lean()
+          : null,
+      ])
+
+    items.push({
+      ...serializeCreatorContent(
+        record,
+      ),
+      creator:
+        creator
+          ? {
+              id:
+                stringId(
+                  creator._id,
+                ),
+              displayName:
+                creator.displayName,
+              slug:
+                creator.slug,
+              creatorType:
+                creator.creatorType,
+              verificationStatus:
+                creator.verificationStatus,
+            }
+          : null,
+      content:
+        course
+          ? {
+              title:
+                course.title,
+              summary:
+                course.summary ||
+                '',
+              status:
+                course.status,
+              accessType:
+                course.accessType,
+              category:
+                course.category ||
+                '',
+              language:
+                course.language ||
+                'en',
+              commercialDisclosure:
+                course.commercialDisclosure ||
+                '',
+            }
+          : null,
+    })
+  }
+
   return {
     creatorContent:
-      records.map(
-        serializeCreatorContent,
-      ),
+      items,
   }
 }
 
@@ -927,6 +1286,14 @@ export async function reviewAdminCreatorContent({
 
   if (
     input.decision ===
+    'approved'
+  ) {
+    record.rights.takedownState =
+      'clear'
+  }
+
+  if (
+    input.decision ===
     'restricted'
   ) {
     record.rights.takedownState =
@@ -942,6 +1309,45 @@ export async function reviewAdminCreatorContent({
   }
 
   await record.save()
+
+  if (
+    record.contentType ===
+      'creator_course'
+  ) {
+    const nextCourseStatus =
+      input.decision ===
+        'approved'
+        ? 'listed'
+        : input.decision ===
+          'removed'
+          ? 'archived'
+          : 'rejected'
+
+    await CreatorCourse.updateOne(
+      {
+        _id:
+          record.contentId,
+      },
+      {
+        $set: {
+          status:
+            nextCourseStatus,
+          'rights.takedownState':
+            input.decision ===
+              'approved'
+              ? 'clear'
+              : input.decision ===
+                'removed'
+                ? 'removed'
+                : 'restricted',
+        },
+      },
+      {
+        runValidators:
+          true,
+      },
+    )
+  }
 
   await recordAdminAuditEvent({
     actorUser,

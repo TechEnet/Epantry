@@ -10,11 +10,13 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../auth/context/AuthContext";
+
+import CreatorProTransactionsPanel from "../../expansionExecution/components/CreatorProTransactionsPanel";
 
 import {
   createCreatorCourse,
@@ -25,6 +27,7 @@ import {
   getMyCreatorProfile,
   listCommunityRecipes,
   listCreatorCourses,
+  listMyCreatorCourses,
   requestCreatorVerification,
 } from "../services/community.service";
 
@@ -72,8 +75,6 @@ export default function CreatorProfilePage() {
   const [verificationStatement, setVerificationStatement] = useState("");
 
   const [courseForm, setCourseForm] = useState({
-    linkedCommunityRecipeId: "",
-
     slug: "",
 
     title: "",
@@ -112,27 +113,28 @@ export default function CreatorProfilePage() {
       const profile = data?.creator;
 
       if (profile?.id) {
-        const [recipeResult, courseResult] = await Promise.all([
-          listCommunityRecipes({
-            creatorId: profile.id,
+        if (isOwnStudio) {
+          const courseResult = await listMyCreatorCourses();
 
-            page: 1,
+          setRecipes([]);
+          setCourses(courseResult?.courses || []);
+        } else {
+          const [recipeResult, courseResult] = await Promise.all([
+            listCommunityRecipes({
+              creatorId: profile.id,
+              page: 1,
+              limit: 30,
+            }),
+            listCreatorCourses({
+              creatorId: profile.id,
+              page: 1,
+              limit: 30,
+            }),
+          ]);
 
-            limit: 30,
-          }),
-
-          listCreatorCourses({
-            creatorId: profile.id,
-
-            page: 1,
-
-            limit: 30,
-          }),
-        ]);
-
-        setRecipes(recipeResult?.recipes || []);
-
-        setCourses(courseResult?.courses || []);
+          setRecipes(recipeResult?.recipes || []);
+          setCourses(courseResult?.courses || []);
+        }
       } else {
         setRecipes([]);
 
@@ -154,15 +156,7 @@ export default function CreatorProfilePage() {
     load();
   }, [load]);
 
-  const publicRecipeOptions = useMemo(
-    () =>
-      recipes.map((item) => ({
-        id: item.communityRecipe.id,
 
-        label: item.dish.name,
-      })),
-    [recipes]
-  );
 
   async function handleCreateProfile(event) {
     event.preventDefault();
@@ -195,7 +189,7 @@ export default function CreatorProfilePage() {
       });
 
       setNotice(
-        "Creator profile created on your existing Customer identity. No new application role was created."
+        "Professional Creator profile created inside your approved Chef + Restaurant Host workspace."
       );
 
       await load();
@@ -281,8 +275,6 @@ export default function CreatorProfilePage() {
 
     try {
       await createCreatorCourse({
-        linkedCommunityRecipeId: courseForm.linkedCommunityRecipeId,
-
         slug: courseForm.slug,
 
         title: courseForm.title,
@@ -314,13 +306,11 @@ export default function CreatorProfilePage() {
       });
 
       setNotice(
-        "Learn / Pro course created. Open Course Builder to add modules, lessons, governed media and publication states. M22 live-session/payment flows remain separate."
+        "Course draft created. Build its modules, lessons and media, then submit it for Super Admin review before it can appear in Learn / Pro."
       );
 
       setCourseForm({
-        linkedCommunityRecipeId: "",
-
-        slug: "",
+            slug: "",
 
         title: "",
 
@@ -367,7 +357,7 @@ export default function CreatorProfilePage() {
           <ChefHat size={34} className="mx-auto text-emerald-700" />
 
           <h1 className="mt-4 text-2xl font-black text-stone-950">
-            Creator Studio requires Customer access
+            Creator Studio requires Chef + Restaurant Host access
           </h1>
 
           <Link
@@ -400,7 +390,7 @@ export default function CreatorProfilePage() {
 
             <div>
               <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                P30 · Creator Studio
+                Professional Creator Studio
               </p>
 
               <h1 className="text-3xl font-black text-stone-950">
@@ -410,9 +400,7 @@ export default function CreatorProfilePage() {
           </div>
 
           <p className="mt-4 text-sm leading-7 text-stone-600">
-            Creator is a profile on your existing Customer identity, not a new
-            top-level access role. Verification is separately reviewed by Trust
-            & Safety.
+            Creator Studio belongs to your approved Chef + Restaurant Host workspace. Professional publishing still requires separate Super Admin verification and governance.
           </p>
 
           <form
@@ -681,8 +669,7 @@ export default function CreatorProfilePage() {
           </div>
 
           <p className="mt-2 text-sm leading-6 text-stone-500">
-            Verification changes only CreatorProfile status. It does not set
-            hostEnabled, superAdminEnabled or any application role.
+            Verification confirms your professional Creator/Chef profile. It does not change your Host workspace type or grant Super Admin access.
           </p>
 
           <textarea
@@ -708,7 +695,11 @@ export default function CreatorProfilePage() {
         </section>
       ) : null}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <div className={[
+        "mt-6 grid gap-6",
+        isOwnStudio ? "" : "xl:grid-cols-2",
+      ].join(" ")}>
+        {!isOwnStudio ? (
         <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-black text-stone-950">
             Published Community Recipes
@@ -750,6 +741,7 @@ export default function CreatorProfilePage() {
             )}
           </div>
         </section>
+        ) : null}
 
         <section className="rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2">
@@ -767,7 +759,7 @@ export default function CreatorProfilePage() {
                   key={item.course.id}
                   to={
                     isOwnStudio
-                      ? `/creator-studio/courses/${encodeURIComponent(item.course.id)}`
+                      ? `/host/creator-studio/courses/${encodeURIComponent(item.course.id)}`
                       : `/learn/courses/${encodeURIComponent(item.course.id)}`
                   }
                   className="focus-ring block rounded-2xl border border-stone-200 p-4 hover:border-emerald-300 hover:bg-emerald-50/30"
@@ -777,9 +769,17 @@ export default function CreatorProfilePage() {
                       {item.course.title}
                     </p>
 
-                    <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-black uppercase text-stone-600">
-                      {item.course.accessType}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {isOwnStudio ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase text-amber-800">
+                          {statusLabel(item.course.status)}
+                        </span>
+                      ) : null}
+
+                      <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-black uppercase text-stone-600">
+                        {item.course.accessType}
+                      </span>
+                    </div>
                   </div>
 
                   <p className="mt-2 text-xs leading-5 text-stone-500">
@@ -809,41 +809,16 @@ export default function CreatorProfilePage() {
           </div>
 
           <p className="mt-2 text-sm leading-6 text-stone-500">
-            Create the governed course record here, then open Course Builder to add
-            modules, lessons, captions/transcripts and media. Pro access remains
-            CourseEntitlement-based; M22 live-session/payment handling stays separate.
+            Create the professional course record here, then open Course Builder to add modules, lessons, captions/transcripts and media. Public or premium content still requires EPANTRY governance before release.
           </p>
 
           <form
             onSubmit={handleCourseCreate}
             className="mt-5 grid gap-4 sm:grid-cols-2"
           >
-            <label className="sm:col-span-2">
-              <span className="text-xs font-black text-stone-500">
-                Linked moderated Community Recipe
-              </span>
-
-              <select
-                required
-                value={courseForm.linkedCommunityRecipeId}
-                onChange={(event) =>
-                  setCourseForm((current) => ({
-                    ...current,
-
-                    linkedCommunityRecipeId: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none"
-              >
-                <option value="">Select recipe</option>
-
-                {publicRecipeOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="sm:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-semibold leading-6 text-sky-900">
+              A professional course can stand on its own. If a lesson teaches a specific EPANTRY recipe, link that published Recipe Version inside the Course Builder as a Recipe lesson.
+            </div>
 
             <label>
               <span className="text-xs font-black text-stone-500">
@@ -972,7 +947,7 @@ export default function CreatorProfilePage() {
 
             <button
               type="submit"
-              disabled={busy || !publicRecipeOptions.length}
+              disabled={busy}
               className="focus-ring sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white disabled:opacity-50"
             >
               <BookOpen size={16} />
@@ -980,6 +955,10 @@ export default function CreatorProfilePage() {
             </button>
           </form>
         </section>
+      ) : null}
+
+      {isOwnStudio ? (
+        <CreatorProTransactionsPanel mode="creator" />
       ) : null}
     </main>
   );

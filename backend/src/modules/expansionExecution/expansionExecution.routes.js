@@ -26,6 +26,7 @@ import {
 } from '../auth/auth.middleware.js'
 
 import {
+  requireChefRestaurantHostAccess,
   requireCustomerAccess,
 } from '../auth/authorization.middleware.js'
 
@@ -485,6 +486,14 @@ const customerSecurity = [
   requireCustomerAccess,
 ]
 
+const creatorHostSecurity = [
+  sensitiveResponseNoStoreMiddleware,
+  authenticateSession,
+  loadCurrentUser,
+  requireActiveAccount,
+  requireChefRestaurantHostAccess,
+]
+
 /*
 | Product / Recipe sponsored units are Customer-context only because the
 | deterministic organic SearchSession belongs to the authenticated Customer.
@@ -572,7 +581,7 @@ router.get(
 router.get(
   '/creator-sessions/mine',
 
-  ...customerSecurity,
+  ...creatorHostSecurity,
 
   wrap(
     async (
@@ -622,7 +631,7 @@ router.get(
 router.post(
   '/creator-sessions',
 
-  ...customerSecurity,
+  ...creatorHostSecurity,
 
   requireCsrfToken,
 
@@ -663,7 +672,7 @@ router.post(
 router.post(
   '/creator-sessions/:sessionId/publish',
 
-  ...customerSecurity,
+  ...creatorHostSecurity,
 
   requireCsrfToken,
 
@@ -863,7 +872,7 @@ router.post(
 router.post(
   '/creator-bookings/:bookingId/attendance',
 
-  ...customerSecurity,
+  ...creatorHostSecurity,
 
   requireCsrfToken,
 

@@ -5,6 +5,7 @@ import {
 } from '../community/community.models.js'
 
 import {
+  findActiveProMembership,
   requireLearningCustomer,
 } from './learning.access.service.js'
 
@@ -57,7 +58,7 @@ export async function getMyLearningDashboard({
   const userId = requireLearningCustomer(actorUser)
   const now = new Date()
 
-  const [entitlements, progressRows] = await Promise.all([
+  const [entitlements, progressRows, proMembership] = await Promise.all([
     CourseEntitlement.find({
       userId,
       status: 'active',
@@ -89,6 +90,11 @@ export async function getMyLearningDashboard({
         updatedAt: -1,
       })
       .lean(),
+
+    findActiveProMembership({
+      userId,
+      now,
+    }),
   ])
 
   const courseIds = [
@@ -143,7 +149,9 @@ export async function getMyLearningDashboard({
       const creator = creatorById.get(idOf(course.creatorProfileId)) || null
 
       const accessAllowed =
-        course.accessType === 'free' || Boolean(entitlement)
+        course.accessType === 'free' ||
+        Boolean(entitlement) ||
+        (course.accessType === 'pro' && Boolean(proMembership))
 
       return {
         course: serializeCourse(course),
@@ -195,7 +203,7 @@ export async function getMyLearningDashboard({
     policy: {
       proIsApplicationRole: false,
       authorizationUsesActiveMode: false,
-      entitlementAuthority: 'CourseEntitlement',
+      entitlementAuthority: 'ProMembership or CourseEntitlement',
       progressIsLearnerOwned: true,
     },
   }

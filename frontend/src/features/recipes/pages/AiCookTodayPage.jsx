@@ -13,16 +13,22 @@ import {
 } from 'lucide-react'
 
 import {
+  useEffect,
+  useRef,
   useState,
 } from 'react'
 
 import {
   Link,
+  useLocation,
 } from 'react-router-dom'
 
 import {
   generateAiCook,
 } from '../services/recipe.service'
+
+const LANDING_COOK_QUERY_KEY =
+  'epantry-cook-today-landing-input'
 
 function displayValue(
   value,
@@ -357,10 +363,41 @@ function FullRecipe({
 }
 
 export default function AiCookTodayPage() {
+  const location =
+    useLocation()
+
+  const [
+    landingHandoffQuery,
+  ] = useState(() => {
+    const navigationQuery =
+      String(
+        location.state
+          ?.landingCookQuery ||
+          '',
+      ).trim()
+
+    if (navigationQuery) {
+      return navigationQuery
+    }
+
+    try {
+      return String(
+        window.sessionStorage.getItem(
+          LANDING_COOK_QUERY_KEY,
+        ) ||
+          '',
+      ).trim()
+    } catch {
+      return ''
+    }
+  })
+
   const [
     ingredients,
     setIngredients,
-  ] = useState('')
+  ] = useState(
+    landingHandoffQuery,
+  )
 
   const [
     suggestions,
@@ -387,21 +424,39 @@ export default function AiCookTodayPage() {
     setError,
   ] = useState('')
 
-  async function handleFindIdeas(
-    event,
-  ) {
-    event.preventDefault()
+  const landingRequestStartedRef =
+    useRef(false)
 
-    const normalizedIngredients =
-      ingredients.trim()
-
-    if (!normalizedIngredients) {
-      setError(
-        'Tell me at least one ingredient you have.',
-      )
+  useEffect(() => {
+    if (
+      !landingHandoffQuery ||
+      landingRequestStartedRef
+        .current
+    ) {
       return
     }
 
+    landingRequestStartedRef.current =
+      true
+
+    try {
+      window.sessionStorage.removeItem(
+        LANDING_COOK_QUERY_KEY,
+      )
+    } catch {
+      // The navigation state already carries the input when storage is unavailable.
+    }
+
+    void requestSuggestions(
+      landingHandoffQuery,
+    )
+  }, [
+    landingHandoffQuery,
+  ])
+
+  async function requestSuggestions(
+    normalizedIngredients,
+  ) {
     setLoadingSuggestions(
       true,
     )
@@ -437,6 +492,26 @@ export default function AiCookTodayPage() {
         false,
       )
     }
+  }
+
+  async function handleFindIdeas(
+    event,
+  ) {
+    event.preventDefault()
+
+    const normalizedIngredients =
+      ingredients.trim()
+
+    if (!normalizedIngredients) {
+      setError(
+        'Tell me at least one ingredient you have.',
+      )
+      return
+    }
+
+    await requestSuggestions(
+      normalizedIngredients,
+    )
   }
 
   async function handleSelectSuggestion(
@@ -484,18 +559,59 @@ export default function AiCookTodayPage() {
   return (
     <div className="px-4 pb-0 pt-0 sm:px-6 sm:pb-8 lg:px-8">
       <div className="w-full max-w-none">
-        <Link
-          to="/dashboard"
-          className="focus-ring inline-flex items-center gap-2 rounded-full px-2 py-2 text-sm font-black text-stone-600 transition hover:text-stone-950"
-        >
-          <ArrowLeft
-            size={17}
-            aria-hidden="true"
-          />
-          Dashboard
-        </Link>
+        {!landingHandoffQuery ? (
+          <Link
+            to="/dashboard"
+            className="focus-ring inline-flex items-center gap-2 rounded-full px-2 py-2 text-sm font-black text-stone-600 transition hover:text-stone-950"
+          >
+            <ArrowLeft
+              size={17}
+              aria-hidden="true"
+            />
+            Dashboard
+          </Link>
+        ) : null}
 
-        <section className="mt-2 min-h-0 overflow-hidden rounded-[30px] border border-sky-200 bg-[#F3FAFF] shadow-[0_24px_70px_rgba(28,25,23,0.08)] sm:mt-3 sm:min-h-[520px]">
+        {landingHandoffQuery ? (
+          <section className="mt-2 overflow-hidden rounded-[28px] border border-emerald-200 bg-[linear-gradient(135deg,#effcf5_0%,#eef8ff_58%,#f8f6ff_100%)] p-5 shadow-[0_18px_50px_rgba(28,25,23,0.07)] sm:mt-3 sm:p-7">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:text-[11px]">
+                  EPANTRY AI · Cook Today
+                </p>
+
+                <p className="mt-2 text-xs font-bold text-stone-500 sm:text-sm">
+                  Your input
+                </p>
+
+                <h1 className="mt-1 break-words text-2xl font-black tracking-tight text-stone-950 sm:text-3xl">
+                  {landingHandoffQuery}
+                </h1>
+              </div>
+
+              <div className="shrink-0 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
+                <p className="flex items-center gap-2 text-xs font-black text-emerald-800">
+                  {loadingSuggestions ? (
+                    <LoaderCircle
+                      size={15}
+                      className="animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Sparkles
+                      size={15}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {loadingSuggestions
+                    ? 'Finding ideas from your input…'
+                    : 'Input carried from Home'}
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section className="mt-2 min-h-0 overflow-hidden rounded-[30px] border border-sky-200 bg-[#F3FAFF] shadow-[0_24px_70px_rgba(28,25,23,0.08)] sm:mt-3 sm:min-h-[520px]">
           <div className="grid h-full min-h-0 sm:min-h-[520px] lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
             <div className="relative overflow-hidden bg-[linear-gradient(145deg,#D8F2FF_0%,#D5F4F0_55%,#E7F2FF_100%)] p-5 text-[#2F1F18] sm:p-11 xl:p-12">
               <div
@@ -616,6 +732,16 @@ export default function AiCookTodayPage() {
             </form>
           </div>
         </section>
+        )}
+
+        {landingHandoffQuery && error ? (
+          <div
+            role="alert"
+            className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800"
+          >
+            {error}
+          </div>
+        ) : null}
 
         {loadingRecipe ? (
           <section className="mt-6 grid min-h-[260px] place-items-center rounded-[28px] border border-emerald-200 bg-white p-8 shadow-sm">

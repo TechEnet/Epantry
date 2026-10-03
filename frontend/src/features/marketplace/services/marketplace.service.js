@@ -264,6 +264,32 @@ export async function createInventoryNode(
   )
 }
 
+export async function updateInventoryNode(
+  inventoryNodeId,
+  input,
+) {
+  const csrfToken =
+    await getCsrfToken()
+
+  const response =
+    await apiClient.patch(
+      `/host/marketplace/inventory-nodes/${encodeURIComponent(
+        inventoryNodeId,
+      )}`,
+      input,
+      {
+        headers: {
+          'x-csrf-token':
+            csrfToken,
+        },
+      },
+    )
+
+  return unwrap(
+    response,
+  )
+}
+
 export async function createInventorySnapshots(
   items,
 ) {

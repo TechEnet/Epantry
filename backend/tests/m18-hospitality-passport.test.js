@@ -311,25 +311,30 @@ test(
 )
 
 test(
-  'M18 frontend exposes B01 through B11 Hospitality navigation',
+  'M18 frontend preserves all B01-B11 Hospitality destinations with host-friendly labels',
   () => {
     const source =
       readFrontend(
         'src/features/hospitality/components/HospitalityShell.jsx',
       )
 
-    for (
-      let index = 1;
-      index <= 11;
-      index += 1
-    ) {
-      const code =
-        `B${String(index).padStart(2, '0')}`
-
+    for (const route of [
+      '/host/hospitality',
+      '/host/hospitality/outlets',
+      '/host/hospitality/suppliers',
+      '/host/hospitality/products',
+      '/host/hospitality/recipes',
+      '/host/hospitality/menus',
+      '/host/hospitality/procurement',
+      '/host/hospitality/costing',
+      '/host/hospitality/dish-passports',
+      '/host/hospitality/grey-book',
+      '/host/hospitality/change-management',
+    ]) {
       assert.equal(
-        source.includes(code),
+        source.includes(route),
         true,
-        `${code} must remain in Hospitality navigation.`,
+        `${route} must remain in Hospitality navigation.`,
       )
     }
   },
@@ -345,12 +350,12 @@ test(
 
     assert.match(
       source,
-      /Unknown allergen evidence is not presented as a free-from claim/,
+      /If an allergen or dietary claim has not been confirmed, this page will not label the dish as free from it\./,
     )
 
     assert.match(
       source,
-      /This is not a blanket free-from statement/,
+      /unknown:\s*['"]Not confirmed['"]/,
     )
   },
 )

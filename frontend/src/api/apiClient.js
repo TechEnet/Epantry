@@ -343,13 +343,8 @@ apiClient.interceptors.response.use(
         status,
       )
 
-    const networkFailure =
-      status === null &&
-      error.code !==
-        'ERR_CANCELED'
-
     if (
-      networkFailure &&
+      offline &&
       typeof window !==
         'undefined'
     ) {

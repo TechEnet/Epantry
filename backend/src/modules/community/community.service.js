@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 import {
+    createHash,
+    randomBytes,
+} from 'node:crypto';
+
+import {
     ApiError,
 } from '../../utils/ApiError.js';
 
@@ -44,8 +49,21 @@ import {
 } from '../recipes/recipe.governance.service.js';
 
 import {
+    User,
+} from '../users/user.model.js';
+
+import {
+    ProMembership,
+} from '../learning/learning.models.js';
+
+import {
+    notifyActiveSuperAdminsBestEffort,
+} from '../notifications/notification.service.js';
+
+import {
     CommunityRecipe,
     CommunityRecipeReview,
+    CommunityRecipeShare,
     CourseEntitlement,
     CreatorCourse,
     CreatorProfile,
@@ -91,6 +109,49 @@ function actorId(
     }
 
     return value;
+}
+
+function requireChefRestaurantHostCapability(
+    actorUser,
+) {
+    const userId =
+        actorId(
+            actorUser,
+        );
+
+    const workspaceType =
+        String(
+            actorUser?.hostWorkspaceType ||
+                '',
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        actorUser?.hostEnabled ===
+            true &&
+        actorUser?.hostAccessStatus ===
+            'active' &&
+        workspaceType ===
+            'chef_restaurant'
+    ) {
+        return userId;
+    }
+
+    throw new ApiError(
+        403,
+        'Creator Studio is available to approved Chef + Restaurant Hosts.',
+        [
+            {
+                code:
+                    'CREATOR_CHEF_RESTAURANT_HOST_REQUIRED',
+
+                hostWorkspaceType:
+                    actorUser?.hostWorkspaceType ||
+                    null,
+            },
+        ],
+    );
 }
 
 function uniqueStrings(
@@ -296,6 +357,175 @@ function serializeCommunityRecipeMeta(
         updatedAt:
             value.updatedAt ||
             null,
+    };
+}
+
+function normalizeEmail(
+    value,
+) {
+    return String(
+        value ||
+            '',
+    )
+        .trim()
+        .toLowerCase();
+}
+
+function hashShareToken(
+    token,
+) {
+    return createHash(
+        'sha256',
+    )
+        .update(
+            String(
+                token ||
+                    '',
+            ),
+        )
+        .digest(
+            'hex',
+        );
+}
+
+function maskEmail(
+    value,
+) {
+    const email =
+        normalizeEmail(
+            value,
+        );
+
+    const [
+        local,
+        domain,
+    ] = email.split(
+        '@',
+    );
+
+    if (
+        !local ||
+        !domain
+    ) {
+        return '';
+    }
+
+    const visible =
+        local.slice(
+            0,
+            Math.min(
+                2,
+                local.length,
+            ),
+        );
+
+    return `${visible}${'*'.repeat(
+        Math.max(
+            2,
+            local.length -
+                visible.length,
+        ),
+    )}@${domain}`;
+}
+
+function serializeShareUser(
+    user,
+) {
+    if (!user) {
+        return null;
+    }
+
+    const value =
+        typeof user.toObject ===
+            'function'
+            ? user.toObject()
+            : user;
+
+    return {
+        id:
+            stringId(
+                value._id ||
+                    value.id,
+            ),
+
+        name:
+            String(
+                value.name ||
+                    'EPANTRY Customer',
+            ).trim(),
+
+        email:
+            normalizeEmail(
+                value.email,
+            ),
+    };
+}
+
+function serializeCommunityRecipeShare({
+    share,
+    recipientUser = null,
+    includeToken = false,
+    rawToken = '',
+}) {
+    const value =
+        typeof share?.toObject ===
+            'function'
+            ? share.toObject()
+            : share;
+
+    if (!value) {
+        return null;
+    }
+
+    return {
+        id:
+            stringId(
+                value._id ||
+                    value.id,
+            ),
+
+        communityRecipeId:
+            stringId(
+                value.communityRecipeId,
+            ),
+
+        friendEmail:
+            normalizeEmail(
+                value.inviteeEmail,
+            ),
+
+        recipient:
+            serializeShareUser(
+                recipientUser,
+            ),
+
+        status:
+            value.status,
+
+        claimedAt:
+            value.claimedAt ||
+            null,
+
+        revokedAt:
+            value.revokedAt ||
+            null,
+
+        createdAt:
+            value.createdAt ||
+            null,
+
+        shareToken:
+            includeToken
+                ? rawToken
+                : undefined,
+
+        sharePath:
+            includeToken &&
+            rawToken
+                ? `/community/shared/${encodeURIComponent(
+                    rawToken,
+                )}`
+                : null,
     };
 }
 
@@ -733,17 +963,23 @@ async function assertCommunityRecipeVisible({
             'friends' &&
         communityRecipe.status ===
             'active' &&
-        viewerUserId &&
-        await isMutualFriend({
-            leftUserId:
-                viewerUserId,
-
-            rightUserId:
-                communityRecipe
-                    .creatorUserId,
-        })
+        viewerUserId
     ) {
-        return;
+        const activeShare =
+            await CommunityRecipeShare.exists({
+                communityRecipeId:
+                    communityRecipe._id,
+
+                inviteeUserId:
+                    viewerUserId,
+
+                status:
+                    'active',
+            });
+
+        if (activeShare) {
+            return;
+        }
     }
 
     throw new ApiError(
@@ -771,6 +1007,7 @@ async function loadCommunityRecipeDetail({
     const [
         recipe,
         creatorProfile,
+        ownerUser,
         fork,
         foodIntelligence,
         ratings,
@@ -789,6 +1026,15 @@ async function loadCommunityRecipeDetail({
                         .creatorProfileId,
                 ).lean()
                 : null,
+
+            User.findById(
+                communityRecipe
+                    .creatorUserId,
+            )
+                .select(
+                    '_id name email',
+                )
+                .lean(),
 
             RecipeFork.findOne({
                 forkedCommunityRecipeId:
@@ -835,6 +1081,11 @@ async function loadCommunityRecipeDetail({
         creator:
             serializeCreatorProfile(
                 creatorProfile,
+            ),
+
+        owner:
+            serializeShareUser(
+                ownerUser,
             ),
 
         recipe,
@@ -918,15 +1169,31 @@ export async function createCommunityRecipe({
         });
     }
 
-    const creatorProfile =
-        await ensureCreatorProfile(
-            actorUser,
+    if (
+        ![
+            'private',
+            'friends',
+        ].includes(
+            input.visibility,
+        )
+    ) {
+        throw new ApiError(
+            400,
+            'Personal Community recipes can only be Private or Friends only.',
+            [
+                {
+                    code:
+                        'COMMUNITY_PERSONAL_RECIPE_VISIBILITY_INVALID',
+                },
+            ],
         );
+    }
 
     const recipeInput =
         buildRecipeInput({
             input,
-            creatorProfile,
+            creatorProfile:
+                null,
         });
 
     const createdRecipe =
@@ -946,32 +1213,19 @@ export async function createCommunityRecipe({
             creatorUserId,
 
             creatorProfileId:
-                creatorProfile._id,
+                null,
 
             visibility:
                 input.visibility,
 
             status:
-                input.visibility ===
-                'public'
-                    ? 'pending_moderation'
-                    : 'active',
+                'active',
 
             moderationState:
-                input.visibility ===
-                'public'
-                    ? 'pending'
-                    : 'not_required',
+                'not_required',
 
             sourceClassification:
-                creatorProfile
-                    .verificationStatus ===
-                    'verified' &&
-                creatorProfile
-                    .creatorType ===
-                    'chef'
-                    ? 'creator_provided'
-                    : 'community_contributed',
+                'community_contributed',
 
             creatorStatement:
                 input.creatorStatement,
@@ -980,27 +1234,11 @@ export async function createCommunityRecipe({
                 input.rights,
 
             submittedForModerationAt:
-                input.visibility ===
-                'public'
-                    ? new Date()
-                    : null,
+                null,
 
             createIdempotencyKey:
                 idempotencyKey,
         });
-
-    if (
-        input.visibility ===
-        'public'
-    ) {
-        await markRecipeVersionForCommunityModeration({
-            recipeVersionId:
-                communityRecipe
-                    .recipeVersionId,
-
-            creatorUserId,
-        });
-    }
 
     return loadCommunityRecipeDetail({
         communityRecipe,
@@ -1012,7 +1250,6 @@ export async function createCommunityRecipe({
 
 export async function submitCommunityRecipeForModeration({
     communityRecipeId,
-    reason,
     actorUser,
 }) {
     const creatorUserId =
@@ -1031,7 +1268,7 @@ export async function submitCommunityRecipeForModeration({
     if (!communityRecipe) {
         throw new ApiError(
             404,
-            'Community Recipe was not found.',
+            'Personal recipe was not found.',
             [
                 {
                     code:
@@ -1041,73 +1278,16 @@ export async function submitCommunityRecipeForModeration({
         );
     }
 
-    if (
-        communityRecipe.status ===
-            'pending_moderation' &&
-        communityRecipe
-            .moderationState ===
-            'pending'
-    ) {
-        return loadCommunityRecipeDetail({
-            communityRecipe,
-
-            viewerUser:
-                actorUser,
-        });
-    }
-
-    if (
-        ![
-            'active',
-            'rejected',
-        ].includes(
-            communityRecipe.status,
-        )
-    ) {
-        throw new ApiError(
-            409,
-            'Community Recipe cannot be submitted from its current state.',
-            [
-                {
-                    code:
-                        'COMMUNITY_RECIPE_SUBMIT_STATE_INVALID',
-                },
-            ],
-        );
-    }
-
-    await markRecipeVersionForCommunityModeration({
-        recipeVersionId:
-            communityRecipe
-                .recipeVersionId,
-
-        creatorUserId,
-    });
-
-    communityRecipe.visibility =
-        'public';
-
-    communityRecipe.status =
-        'pending_moderation';
-
-    communityRecipe.moderationState =
-        'pending';
-
-    communityRecipe.submittedForModerationAt =
-        new Date();
-
-    communityRecipe.moderationReason =
-        reason ||
-        '';
-
-    await communityRecipe.save();
-
-    return loadCommunityRecipeDetail({
-        communityRecipe,
-
-        viewerUser:
-            actorUser,
-    });
+    throw new ApiError(
+        409,
+        'Personal recipes cannot be published publicly. Keep this recipe private or share it directly with a friend.',
+        [
+            {
+                code:
+                    'COMMUNITY_PUBLIC_PUBLISHING_DISABLED',
+            },
+        ],
+    );
 }
 
 export async function forkCommunityRecipe({
@@ -1428,6 +1608,806 @@ export async function createCommunityRecipeReview({
     };
 }
 
+export async function createCommunityRecipeShare({
+    communityRecipeId,
+    friendEmail,
+    actorUser,
+}) {
+    const ownerUserId =
+        actorId(
+            actorUser,
+        );
+
+    const normalizedFriendEmail =
+        normalizeEmail(
+            friendEmail,
+        );
+
+    const ownerEmail =
+        normalizeEmail(
+            actorUser?.email,
+        );
+
+    if (
+        !normalizedFriendEmail ||
+        normalizedFriendEmail ===
+            ownerEmail
+    ) {
+        throw new ApiError(
+            400,
+            'Enter the email address of the friend you want to share this recipe with.',
+            [
+                {
+                    code:
+                        'COMMUNITY_SHARE_FRIEND_EMAIL_INVALID',
+                },
+            ],
+        );
+    }
+
+    const communityRecipe =
+        await CommunityRecipe.findOne({
+            _id:
+                communityRecipeId,
+
+            creatorUserId:
+                ownerUserId,
+        });
+
+    if (!communityRecipe) {
+        throw new ApiError(
+            404,
+            'Personal recipe was not found.',
+            [
+                {
+                    code:
+                        'COMMUNITY_RECIPE_NOT_FOUND',
+                },
+            ],
+        );
+    }
+
+    if (
+        communityRecipe.status !==
+        'active'
+    ) {
+        throw new ApiError(
+            409,
+            'Only an active personal recipe can be shared with a friend.',
+            [
+                {
+                    code:
+                        'COMMUNITY_SHARE_RECIPE_STATE_INVALID',
+                },
+            ],
+        );
+    }
+
+    await CommunityRecipeShare.updateMany(
+        {
+            communityRecipeId:
+                communityRecipe._id,
+
+            ownerUserId,
+
+            inviteeEmail:
+                normalizedFriendEmail,
+
+            status:
+                'active',
+        },
+        {
+            $set: {
+                status:
+                    'revoked',
+
+                revokedAt:
+                    new Date(),
+            },
+        },
+    );
+
+    const existingCustomer =
+        await User.findOne({
+            email:
+                normalizedFriendEmail,
+        })
+            .select(
+                '_id name email customerEnabled',
+            )
+            .lean();
+
+    const rawToken =
+        randomBytes(
+            32,
+        ).toString(
+            'base64url',
+        );
+
+    const share =
+        await CommunityRecipeShare.create({
+            communityRecipeId:
+                communityRecipe._id,
+
+            ownerUserId,
+
+            inviteeEmail:
+                normalizedFriendEmail,
+
+            inviteeUserId:
+                existingCustomer
+                    ?.customerEnabled ===
+                    true
+                    ? existingCustomer._id
+                    : null,
+
+            tokenHash:
+                hashShareToken(
+                    rawToken,
+                ),
+
+            status:
+                'active',
+
+            claimedAt:
+                null,
+        });
+
+    if (
+        communityRecipe.visibility ===
+        'private'
+    ) {
+        communityRecipe.visibility =
+            'friends';
+
+        await communityRecipe.save();
+    }
+
+    return {
+        share:
+            serializeCommunityRecipeShare({
+                share,
+                recipientUser:
+                    existingCustomer,
+                includeToken:
+                    true,
+                rawToken,
+            }),
+
+        message:
+            existingCustomer
+                ?.customerEnabled ===
+                true
+                ? 'Friend access is ready. Send this private link to that EPANTRY customer.'
+                : 'Private invitation created. Your friend can use this link to sign up or log in with the invited email address.',
+    };
+}
+
+export async function listCommunityRecipeShares({
+    communityRecipeId,
+    actorUser,
+}) {
+    const ownerUserId =
+        actorId(
+            actorUser,
+        );
+
+    const communityRecipe =
+        await CommunityRecipe.findOne({
+            _id:
+                communityRecipeId,
+
+            creatorUserId:
+                ownerUserId,
+        })
+            .select(
+                '_id',
+            )
+            .lean();
+
+    if (!communityRecipe) {
+        throw new ApiError(
+            404,
+            'Personal recipe was not found.',
+            [
+                {
+                    code:
+                        'COMMUNITY_RECIPE_NOT_FOUND',
+                },
+            ],
+        );
+    }
+
+    const shares =
+        await CommunityRecipeShare.find({
+            communityRecipeId:
+                communityRecipeId,
+
+            ownerUserId,
+        })
+            .sort({
+                createdAt:
+                    -1,
+            })
+            .lean();
+
+    const recipientIds =
+        shares
+            .map(
+                (
+                    share,
+                ) =>
+                    share.inviteeUserId,
+            )
+            .filter(
+                Boolean,
+            );
+
+    const recipients =
+        recipientIds.length
+            ? await User.find({
+                _id: {
+                    $in:
+                        recipientIds,
+                },
+            })
+                .select(
+                    '_id name email',
+                )
+                .lean()
+            : [];
+
+    const recipientById =
+        new Map(
+            recipients.map(
+                (
+                    user,
+                ) => [
+                    stringId(
+                        user._id,
+                    ),
+                    user,
+                ],
+            ),
+        );
+
+    return {
+        shares:
+            shares.map(
+                (
+                    share,
+                ) =>
+                    serializeCommunityRecipeShare({
+                        share,
+                        recipientUser:
+                            recipientById.get(
+                                stringId(
+                                    share.inviteeUserId,
+                                ),
+                            ) ||
+                            null,
+                    }),
+            ),
+    };
+}
+
+export async function revokeCommunityRecipeShare({
+    shareId,
+    actorUser,
+}) {
+    const ownerUserId =
+        actorId(
+            actorUser,
+        );
+
+    const share =
+        await CommunityRecipeShare.findOne({
+            _id:
+                shareId,
+
+            ownerUserId,
+        });
+
+    if (!share) {
+        throw new ApiError(
+            404,
+            'Friend share was not found.',
+            [
+                {
+                    code:
+                        'COMMUNITY_SHARE_NOT_FOUND',
+                },
+            ],
+        );
+    }
+
+    if (
+        share.status !==
+        'revoked'
+    ) {
+        share.status =
+            'revoked';
+
+        share.revokedAt =
+            new Date();
+
+        await share.save();
+    }
+
+    const remaining =
+        await CommunityRecipeShare.countDocuments({
+            communityRecipeId:
+                share.communityRecipeId,
+
+            status:
+                'active',
+        });
+
+    if (
+        remaining ===
+        0
+    ) {
+        await CommunityRecipe.updateOne(
+            {
+                _id:
+                    share.communityRecipeId,
+
+                creatorUserId:
+                    ownerUserId,
+
+                visibility:
+                    'friends',
+            },
+            {
+                $set: {
+                    visibility:
+                        'private',
+                },
+            },
+        );
+    }
+
+    return {
+        share:
+            serializeCommunityRecipeShare({
+                share,
+            }),
+    };
+}
+
+export async function getCommunityRecipeSharePreview({
+    token,
+    viewerUser = null,
+}) {
+    const share =
+        await CommunityRecipeShare.findOne({
+            tokenHash:
+                hashShareToken(
+                    token,
+                ),
+
+            status:
+                'active',
+        }).lean();
+
+    if (!share) {
+        throw new ApiError(
+            404,
+            'This private recipe link is no longer available.',
+            [
+                {
+                    code:
+                        'COMMUNITY_SHARE_NOT_FOUND',
+                },
+            ],
+        );
+    }
+
+    const [
+        communityRecipe,
+        owner,
+    ] = await Promise.all([
+        CommunityRecipe.findById(
+            share.communityRecipeId,
+        ),
+
+        User.findById(
+            share.ownerUserId,
+        )
+            .select(
+                '_id name email',
+            )
+            .lean(),
+    ]);
+
+    if (!communityRecipe) {
+        throw new ApiError(
+            404,
+            'The shared personal recipe is no longer available.',
+            [
+                {
+                    code:
+                        'COMMUNITY_RECIPE_NOT_FOUND',
+                },
+            ],
+        );
+    }
+
+    const dish =
+        await Dish.findById(
+            communityRecipe.dishId,
+        )
+            .select(
+                '_id name description cuisine course heroImageUrl',
+            )
+            .lean();
+
+    const viewerUserId =
+        viewerUser?._id ||
+        viewerUser?.id ||
+        null;
+
+    const viewerEmail =
+        normalizeEmail(
+            viewerUser?.email,
+        );
+
+    const viewerIsOwner =
+        viewerUserId &&
+        stringId(
+            viewerUserId,
+        ) ===
+            stringId(
+                share.ownerUserId,
+            );
+
+    const claimedByViewer =
+        viewerUserId &&
+        share.inviteeUserId &&
+        stringId(
+            viewerUserId,
+        ) ===
+            stringId(
+                share.inviteeUserId,
+            );
+
+    const emailMatches =
+        Boolean(
+            viewerEmail &&
+            viewerEmail ===
+                normalizeEmail(
+                    share.inviteeEmail,
+                ),
+        );
+
+    const canClaim =
+        Boolean(
+            viewerUserId &&
+            emailMatches &&
+            (
+                !share.inviteeUserId ||
+                claimedByViewer
+            ),
+        );
+
+    let detail =
+        null;
+
+    if (
+        viewerIsOwner ||
+        claimedByViewer
+    ) {
+        detail =
+            await loadCommunityRecipeDetail({
+                communityRecipe,
+                viewerUser,
+                includeReviews:
+                    false,
+            });
+    }
+
+    return {
+        share: {
+            id:
+                stringId(
+                    share._id,
+                ),
+
+            friendEmailMasked:
+                maskEmail(
+                    share.inviteeEmail,
+                ),
+
+            claimed:
+                Boolean(
+                    share.claimedAt,
+                ),
+
+            claimedByViewer:
+                Boolean(
+                    claimedByViewer,
+                ),
+
+            createdAt:
+                share.createdAt ||
+                null,
+        },
+
+        owner:
+            serializeShareUser(
+                owner,
+            ),
+
+        recipe: {
+            id:
+                stringId(
+                    communityRecipe._id,
+                ),
+
+            name:
+                dish?.name ||
+                'Shared recipe',
+
+            description:
+                dish?.description ||
+                '',
+
+            cuisine:
+                dish?.cuisine ||
+                '',
+
+            course:
+                dish?.course ||
+                '',
+
+            heroImageUrl:
+                dish?.heroImageUrl ||
+                '',
+        },
+
+        access: {
+            requiresLogin:
+                !viewerUserId,
+
+            emailMatches,
+
+            canClaim,
+
+            claimedByViewer:
+                Boolean(
+                    claimedByViewer,
+                ),
+
+            viewerIsOwner:
+                Boolean(
+                    viewerIsOwner,
+                ),
+
+            wrongAccount:
+                Boolean(
+                    viewerUserId &&
+                    !viewerIsOwner &&
+                    !emailMatches,
+                ),
+        },
+
+        detail,
+    };
+}
+
+export async function claimCommunityRecipeShare({
+    token,
+    actorUser,
+}) {
+    const userId =
+        actorId(
+            actorUser,
+        );
+
+    const share =
+        await CommunityRecipeShare.findOne({
+            tokenHash:
+                hashShareToken(
+                    token,
+                ),
+
+            status:
+                'active',
+        });
+
+    if (!share) {
+        throw new ApiError(
+            404,
+            'This private recipe link is no longer available.',
+            [
+                {
+                    code:
+                        'COMMUNITY_SHARE_NOT_FOUND',
+                },
+            ],
+        );
+    }
+
+    const actorEmail =
+        normalizeEmail(
+            actorUser?.email,
+        );
+
+    if (
+        actorEmail !==
+        normalizeEmail(
+            share.inviteeEmail,
+        )
+    ) {
+        throw new ApiError(
+            403,
+            'This recipe was shared with a different email address. Sign in with the invited Customer account.',
+            [
+                {
+                    code:
+                        'COMMUNITY_SHARE_WRONG_ACCOUNT',
+                },
+            ],
+        );
+    }
+
+    if (
+        share.inviteeUserId &&
+        stringId(
+            share.inviteeUserId,
+        ) !==
+            stringId(
+                userId,
+            )
+    ) {
+        throw new ApiError(
+            403,
+            'This private recipe invitation has already been accepted by another Customer account.',
+            [
+                {
+                    code:
+                        'COMMUNITY_SHARE_ALREADY_CLAIMED',
+                },
+            ],
+        );
+    }
+
+    if (!share.inviteeUserId) {
+        share.inviteeUserId =
+            userId;
+    }
+
+    if (!share.claimedAt) {
+        share.claimedAt =
+            new Date();
+    }
+
+    await share.save();
+
+    await CommunityRecipe.updateOne(
+        {
+            _id:
+                share.communityRecipeId,
+
+            visibility:
+                'private',
+        },
+        {
+            $set: {
+                visibility:
+                    'friends',
+            },
+        },
+    );
+
+    return getCommunityRecipeSharePreview({
+        token,
+        viewerUser:
+            actorUser,
+    });
+}
+
+export async function listSharedWithMeCommunityRecipes({
+    actorUser,
+}) {
+    const userId =
+        actorId(
+            actorUser,
+        );
+
+    const shares =
+        await CommunityRecipeShare.find({
+            inviteeUserId:
+                userId,
+
+            status:
+                'active',
+        })
+            .sort({
+                createdAt:
+                    -1,
+            })
+            .lean();
+
+    const items = [];
+
+    for (
+        const share of shares
+    ) {
+        const [
+            communityRecipe,
+            owner,
+        ] = await Promise.all([
+            CommunityRecipe.findById(
+                share.communityRecipeId,
+            ).lean(),
+
+            User.findById(
+                share.ownerUserId,
+            )
+                .select(
+                    '_id name email',
+                )
+                .lean(),
+        ]);
+
+        if (!communityRecipe) {
+            continue;
+        }
+
+        const dish =
+            await Dish.findById(
+                communityRecipe.dishId,
+            )
+                .select(
+                    '_id name description cuisine course heroImageUrl',
+                )
+                .lean();
+
+        items.push({
+            share: {
+                id:
+                    stringId(
+                        share._id,
+                    ),
+
+                createdAt:
+                    share.createdAt ||
+                    null,
+            },
+
+            owner:
+                serializeShareUser(
+                    owner,
+                ),
+
+            recipe: {
+                id:
+                    stringId(
+                        communityRecipe._id,
+                    ),
+
+                name:
+                    dish?.name ||
+                    'Shared recipe',
+
+                description:
+                    dish?.description ||
+                    '',
+
+                heroImageUrl:
+                    dish?.heroImageUrl ||
+                    '',
+            },
+        });
+    }
+
+    return {
+        shares:
+            items,
+    };
+}
+
 export async function listPublicCommunityRecipes({
     page,
     limit,
@@ -1726,11 +2706,71 @@ export async function listMyCommunityRecipes({
             ),
         ]);
 
+    const items = [];
+
+    for (
+        const recipe of recipes
+    ) {
+        const [
+            dish,
+            activeShareCount,
+        ] = await Promise.all([
+            Dish.findById(
+                recipe.dishId,
+            )
+                .select(
+                    '_id name description cuisine course heroImageUrl',
+                )
+                .lean(),
+
+            CommunityRecipeShare.countDocuments({
+                communityRecipeId:
+                    recipe._id,
+
+                status:
+                    'active',
+            }),
+        ]);
+
+        items.push({
+            ...serializeCommunityRecipeMeta(
+                recipe,
+            ),
+
+            dish: {
+                id:
+                    stringId(
+                        dish?._id,
+                    ),
+
+                name:
+                    dish?.name ||
+                    'Personal recipe',
+
+                description:
+                    dish?.description ||
+                    '',
+
+                cuisine:
+                    dish?.cuisine ||
+                    '',
+
+                course:
+                    dish?.course ||
+                    '',
+
+                heroImageUrl:
+                    dish?.heroImageUrl ||
+                    '',
+            },
+
+            activeShareCount,
+        });
+    }
+
     return {
         recipes:
-            recipes.map(
-                serializeCommunityRecipeMeta,
-            ),
+            items,
 
         pagination: {
             page,
@@ -1754,7 +2794,7 @@ export async function createCreatorProfile({
     actorUser,
 }) {
     const userId =
-        actorId(
+        requireChefRestaurantHostCapability(
             actorUser,
         );
 
@@ -1849,7 +2889,7 @@ export async function requestCreatorVerification({
     actorUser,
 }) {
     const userId =
-        actorId(
+        requireChefRestaurantHostCapability(
             actorUser,
         );
 
@@ -1909,6 +2949,25 @@ export async function requestCreatorVerification({
     }
 
     await profile.save();
+
+    await notifyActiveSuperAdminsBestEffort({
+        triggerType:
+            'creator_approval_requested',
+        reasonCode:
+            'creator.verification_requested',
+        explanation:
+            `${profile.displayName} requested professional Chef/Creator verification.`,
+        relatedEntityType:
+            'creator_profile',
+        relatedEntityId:
+            stringId(profile._id),
+        sourceDomain:
+            'creator_studio',
+        sourceVersion:
+            'm4b-v1',
+        dedupeScope:
+            `creator-verification:${stringId(profile._id)}:${profile.verificationRequestedAt?.toISOString() || 'pending'}`,
+    });
 
     return {
         creator:
@@ -2770,7 +3829,7 @@ export async function getMyCreatorProfile({
     actorUser,
 }) {
     const userId =
-        actorId(
+        requireChefRestaurantHostCapability(
             actorUser,
         );
 
@@ -3035,7 +4094,7 @@ export async function createCreatorCourse({
     actorUser,
 }) {
     const userId =
-        actorId(
+        requireChefRestaurantHostCapability(
             actorUser,
         );
 
@@ -3044,43 +4103,25 @@ export async function createCreatorCourse({
             actorUser,
         );
 
-    const communityRecipe =
-        await CommunityRecipe.findOne({
-            _id:
-                input.linkedCommunityRecipeId,
-
-            creatorUserId:
-                userId,
-
-            creatorProfileId:
-                creator._id,
-
-            visibility:
-                'public',
-
-            status:
-                'published',
-
-            moderationState:
-                'approved',
-        }).lean();
-
-    if (!communityRecipe) {
+    if (
+        input.rights?.sponsored ===
+            true &&
+        String(
+            input.commercialDisclosure ||
+                '',
+        ).trim().length < 5
+    ) {
         throw new ApiError(
-            409,
-            'A course placeholder must link to your own moderated, published Community Recipe.',
+            400,
+            'Sponsored learning content requires a clear commercial disclosure before the course can be created.',
             [
                 {
                     code:
-                        'CREATOR_COURSE_PUBLISHED_RECIPE_REQUIRED',
+                        'CREATOR_COURSE_SPONSORED_DISCLOSURE_REQUIRED',
                 },
             ],
         );
     }
-
-    await requireApprovedFoodIntelligence(
-        communityRecipe.recipeVersionId,
-    );
 
     const slug =
         normalizeCourseSlug(
@@ -3128,10 +4169,10 @@ export async function createCreatorCourse({
                 userId,
 
             linkedCommunityRecipeId:
-                communityRecipe._id,
+                null,
 
             linkedRecipeVersionId:
-                communityRecipe.recipeVersionId,
+                null,
 
             slug,
 
@@ -3154,7 +4195,7 @@ export async function createCreatorCourse({
                 input.accessType,
 
             status:
-                'listed',
+                'draft',
 
             requiredEquipment:
                 uniqueStrings(
@@ -3210,16 +4251,16 @@ export async function createCreatorCourse({
             ),
 
         capabilities: {
-            coursePlaceholderOnly:
+            courseBuilderAvailable:
                 true,
 
-            liveSessionsAvailable:
-                false,
+            superAdminApprovalRequired:
+                true,
 
-            courseCommerceAvailable:
-                false,
+            recipeLessonsMayLinkPublishedRecipeVersions:
+                true,
 
-            coreRecipeFactsRemainPublic:
+            standaloneProfessionalCourseAllowed:
                 true,
         },
     };
@@ -3286,58 +4327,87 @@ export async function listCreatorCourses({
     for (
         const course of courses
     ) {
-        const [
-            creator,
-            communityRecipe,
-        ] =
-            await Promise.all([
-                CreatorProfile.findById(
-                    course.creatorProfileId,
+        const creator =
+            await CreatorProfile.findById(
+                course.creatorProfileId,
+            )
+                .select(
+                    'slug displayName creatorType verificationStatus biography cuisineSpecialties languages commercialDisclosure isPublic createdAt',
                 )
-                    .select(
-                        'slug displayName creatorType verificationStatus biography cuisineSpecialties languages commercialDisclosure isPublic createdAt',
-                    )
-                    .lean(),
-
-                CommunityRecipe.findOne({
-                    _id:
-                        course.linkedCommunityRecipeId,
-
-                    visibility:
-                        'public',
-
-                    status:
-                        'published',
-
-                    moderationState:
-                        'approved',
-                })
-                    .select(
-                        '_id dishId recipeVersionId',
-                    )
-                    .lean(),
-            ]);
+                .lean();
 
         if (
             !creator ||
             creator.verificationStatus !==
                 'verified' ||
-            !communityRecipe
+            creator.creatorType !==
+                'chef' ||
+            creator.isPublic !==
+                true
         ) {
             continue;
         }
 
-        const dish =
-            await Dish.findById(
-                communityRecipe.dishId,
-            )
-                .select(
-                    'name slug description cuisine course tags heroImageUrl',
-                )
-                .lean();
+        let recipe =
+            null;
 
-        if (!dish) {
-            continue;
+        if (
+            course.linkedRecipeVersionId
+        ) {
+            const recipeVersion =
+                await RecipeVersion.findOne({
+                    _id:
+                        course.linkedRecipeVersionId,
+                    status:
+                        'published',
+                })
+                    .select(
+                        '_id dishId',
+                    )
+                    .lean();
+
+            if (recipeVersion) {
+                const dish =
+                    await Dish.findById(
+                        recipeVersion.dishId,
+                    )
+                        .select(
+                            'name slug description cuisine course tags heroImageUrl',
+                        )
+                        .lean();
+
+                if (dish) {
+                    recipe = {
+                        recipeVersionId:
+                            stringId(
+                                recipeVersion._id,
+                            ),
+
+                        dishId:
+                            stringId(
+                                dish._id,
+                            ),
+
+                        name:
+                            dish.name,
+
+                        slug:
+                            dish.slug,
+
+                        description:
+                            dish.description ||
+                            '',
+
+                        cuisine:
+                            dish.cuisine ||
+                            '',
+
+                        heroImageUrl:
+                            dish.heroImageUrl ||
+                            '',
+                    };
+                }
+            }
         }
 
         items.push({
@@ -3351,50 +4421,17 @@ export async function listCreatorCourses({
                     creator,
                 ),
 
-            recipe: {
-                communityRecipeId:
-                    stringId(
-                        communityRecipe._id,
-                    ),
-
-                recipeVersionId:
-                    stringId(
-                        communityRecipe.recipeVersionId,
-                    ),
-
-                dishId:
-                    stringId(
-                        dish._id,
-                    ),
-
-                name:
-                    dish.name,
-
-                slug:
-                    dish.slug,
-
-                description:
-                    dish.description ||
-                    '',
-
-                cuisine:
-                    dish.cuisine ||
-                    '',
-
-                heroImageUrl:
-                    dish.heroImageUrl ||
-                    '',
-            },
+            recipe,
 
             policy: {
-                coreRecipeFactsRemainPublic:
+                superAdminGovernanceApproved:
                     true,
 
                 liveSessionsAvailable:
-                    false,
+                    true,
 
                 fullCourseBuilderAvailable:
-                    false,
+                    true,
             },
         });
     }
@@ -3417,6 +4454,55 @@ export async function listCreatorCourses({
                             limit,
                     ),
         },
+    };
+}
+
+export async function listMyCreatorCourses({
+    actorUser,
+}) {
+    const userId =
+        requireChefRestaurantHostCapability(
+            actorUser,
+        );
+
+    const creator =
+        await ensureCreatorProfile(
+            actorUser,
+        );
+
+    const courses =
+        await CreatorCourse.find({
+            createdByUserId:
+                userId,
+            creatorProfileId:
+                creator._id,
+            status: {
+                $ne:
+                    'archived',
+            },
+        })
+            .sort({
+                createdAt:
+                    -1,
+            })
+            .lean();
+
+    return {
+        courses:
+            courses.map(
+                (course) => ({
+                    course:
+                        serializeCreatorCourse(
+                            course,
+                        ),
+                    creator:
+                        serializeCreatorProfile(
+                            creator,
+                        ),
+                    recipe:
+                        null,
+                }),
+            ),
     };
 }
 
@@ -3456,6 +4542,20 @@ async function findActiveCourseEntitlement({
     }).lean();
 }
 
+
+async function findActiveProMembership({
+    userId,
+    now = new Date(),
+}) {
+    return ProMembership.findOne({
+        userId,
+        status: 'active',
+        validUntil: {
+            $gt: now,
+        },
+    }).lean();
+}
+
 export async function getLearningPro({
     actorUser,
 }) {
@@ -3466,6 +4566,12 @@ export async function getLearningPro({
 
     const now =
         new Date();
+
+    const proMembership =
+        await findActiveProMembership({
+            userId,
+            now,
+        });
 
     const entitlements =
         await CourseEntitlement.find({
@@ -3591,6 +4697,21 @@ export async function getLearningPro({
                     Boolean,
                 ),
 
+        proMembership:
+            proMembership
+                ? {
+                    id:
+                        stringId(
+                            proMembership._id,
+                        ),
+                    status:
+                        proMembership.status,
+                    validUntil:
+                        proMembership.validUntil ||
+                        null,
+                }
+                : null,
+
         policy: {
             proIsApplicationRole:
                 false,
@@ -3602,7 +4723,7 @@ export async function getLearningPro({
                 false,
 
             subscriptionCheckoutAvailable:
-                false,
+                true,
         },
     };
 }
@@ -3647,22 +4768,30 @@ export async function prepareCreatorCourse({
         course.accessType ===
         'pro'
     ) {
-        const entitlement =
-            await findActiveCourseEntitlement({
-                userId,
+        const [
+            entitlement,
+            proMembership,
+        ] =
+            await Promise.all([
+                findActiveCourseEntitlement({
+                    userId,
 
-                courseId:
-                    course._id,
-            });
+                    courseId:
+                        course._id,
+                }),
+                findActiveProMembership({
+                    userId,
+                }),
+            ]);
 
-        if (!entitlement) {
+        if (!entitlement && !proMembership) {
             throw new ApiError(
                 403,
-                'An active Course entitlement is required to prepare this Pro class.',
+                'An active EPANTRY Pro membership or Course entitlement is required to prepare this Pro class.',
                 [
                     {
                         code:
-                            'COURSE_ENTITLEMENT_REQUIRED',
+                            'PRO_OR_COURSE_ENTITLEMENT_REQUIRED',
                     },
                 ],
             );

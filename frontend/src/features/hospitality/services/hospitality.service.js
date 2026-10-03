@@ -198,6 +198,20 @@ export const createHospitalitySupplier = (
       input,
   })
 
+export const searchHospitalityCanonicalIngredients = ({
+  search,
+  limit = 10,
+} = {}) =>
+  get(
+    '/host/hospitality/catalog/ingredients',
+    {
+      params: {
+        search,
+        limit,
+      },
+    },
+  )
+
 export const listHospitalitySupplierProducts = () =>
   get(
     '/host/hospitality/supplier-products',
@@ -265,6 +279,16 @@ export const createHospitalityMenu = (
       input,
   })
 
+export const deleteHospitalityMenu = (
+  menuId,
+) =>
+  mutate({
+    method:
+      'delete',
+    url:
+      `/host/hospitality/menus/${encodeURIComponent(String(menuId))}`,
+  })
+
 export const addHospitalityMenuItem = (
   menuId,
   input,
@@ -272,6 +296,18 @@ export const addHospitalityMenuItem = (
   mutate({
     url:
       `/host/hospitality/menus/${encodeURIComponent(String(menuId))}/items`,
+    data:
+      input,
+  })
+
+export const setHospitalityMenuItemAvailability = (
+  menuId,
+  menuItemId,
+  input,
+) =>
+  mutate({
+    url:
+      `/host/hospitality/menus/${encodeURIComponent(String(menuId))}/items/${encodeURIComponent(String(menuItemId))}/availability`,
     data:
       input,
   })
@@ -286,6 +322,11 @@ export const calculateHospitalityRecipeCost = (
     data:
       input,
   })
+
+export const listHospitalityCurrentStock = () =>
+  get(
+    '/host/hospitality/stock-observations/current',
+  )
 
 export const createHospitalityStockObservation = (
   input,
@@ -437,4 +478,29 @@ export const publishHospitalityChangeCase = (
       `/host/hospitality/change-cases/${encodeURIComponent(String(id))}/publish`,
     data:
       input,
+  })
+export const listHospitalityRestaurantRecipes = () =>
+  get(
+    '/host/hospitality/restaurant-recipes',
+  )
+
+export const getHospitalityRestaurantRecipe = (recipeVersionId) =>
+  get(
+    `/host/hospitality/restaurant-recipes/${encodeURIComponent(String(recipeVersionId || ''))}`,
+  )
+
+export const createHospitalityRestaurantRecipe = (input) =>
+  mutate({
+    url: '/host/hospitality/restaurant-recipes',
+    data: input,
+  })
+
+export const updateHospitalityRestaurantRecipe = (
+  recipeVersionId,
+  input,
+) =>
+  mutate({
+    method: 'put',
+    url: `/host/hospitality/restaurant-recipes/${encodeURIComponent(String(recipeVersionId || ''))}`,
+    data: input,
   })

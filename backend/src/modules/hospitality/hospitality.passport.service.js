@@ -16,10 +16,22 @@ import {
 } from '../foodIntelligence/foodIntelligence.models.js'
 
 import {
+  MarketplaceOrganization,
+} from '../marketplace/marketplace.models.js'
+
+import {
   Dish,
   RecipeIngredient,
   RecipeVersion,
 } from '../recipes/recipe.models.js'
+
+import {
+  notifyActiveSuperAdminsBestEffort,
+} from '../notifications/notification.service.js'
+
+import {
+  User,
+} from '../users/user.model.js'
 
 import {
   HospitalityMenu,
@@ -31,6 +43,7 @@ import {
 } from './hospitality.models.js'
 
 import {
+  ensureHospitalityProductionRecipePublishedLineage,
   resolveHospitalityContext,
 } from './hospitality.service.js'
 
@@ -68,6 +81,33 @@ function actorId(actorUser) {
         {
           code:
             'HOSPITALITY_HOST_IDENTITY_REQUIRED',
+        },
+      ],
+    )
+  }
+
+  return value
+}
+
+function rootSuperAdminActorId(
+  actorUser,
+) {
+  const value =
+    actorUser?._id ||
+    actorUser?.id
+
+  if (
+    !value ||
+    actorUser?.superAdminEnabled !==
+      true
+  ) {
+    throw new ApiError(
+      403,
+      'Real Super Admin authority is required for Hospitality approval.',
+      [
+        {
+          code:
+            'HOSPITALITY_ROOT_SUPER_ADMIN_REQUIRED',
         },
       ],
     )
@@ -612,6 +652,12 @@ function serializeChangeCase(
         []
       ).map(id),
 
+    impactedSourceRecipeVersionIds:
+      (
+        item.impactedSourceRecipeVersionIds ||
+        []
+      ).map(id),
+
     impactedMenuIds:
       (
         item.impactedMenuIds ||
@@ -693,7 +739,7 @@ async function loadApprovedFoodCalculation(
   if (!calculation) {
     throw new ApiError(
       409,
-      'Dish Passport requires an approved M08 Food Calculation for the linked M07 Recipe Version.',
+      'Food-safety information for this recipe is not approved yet. Ask a Super Admin to review and approve its Food Intelligence details, then try creating the dish record again.',
       [
         {
           code:
@@ -704,6 +750,157 @@ async function loadApprovedFoodCalculation(
   }
 
   return calculation
+}
+
+function recipeSlugCandidate(
+  value,
+) {
+  return String(
+    value ||
+      '',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(
+      /[^a-z0-9]+/g,
+      '-',
+    )
+    .replace(
+      /^-+|-+$/g,
+      '',
+    )
+}
+
+async function resolvePublishedRecipeLineage(
+  productionRecipe,
+) {
+  let dish =
+    null
+
+  let sourceRecipe =
+    null
+
+  if (
+    productionRecipe.sourceRecipeVersionId
+  ) {
+    sourceRecipe =
+      await RecipeVersion.findOne({
+        _id:
+          productionRecipe.sourceRecipeVersionId,
+
+        status:
+          'published',
+      }).lean()
+
+    if (
+      sourceRecipe &&
+      productionRecipe.dishId &&
+      id(
+        sourceRecipe.dishId,
+      ) !==
+        id(
+          productionRecipe.dishId,
+        )
+    ) {
+      sourceRecipe =
+        null
+    }
+  }
+
+  const linkedDishId =
+    productionRecipe.dishId ||
+    sourceRecipe?.dishId ||
+    null
+
+  if (linkedDishId) {
+    dish =
+      await Dish.findOne({
+        _id:
+          linkedDishId,
+
+        status: {
+          $in: [
+            'active',
+            'disabled',
+          ],
+        },
+      }).lean()
+  }
+
+  if (!dish) {
+    const slugCandidates =
+      [
+        recipeSlugCandidate(
+          productionRecipe.recipeKey,
+        ),
+
+        recipeSlugCandidate(
+          productionRecipe.title,
+        ),
+      ].filter(Boolean)
+
+    if (
+      slugCandidates.length
+    ) {
+      dish =
+        await Dish.findOne({
+          slug: {
+            $in:
+              [
+                ...new Set(
+                  slugCandidates,
+                ),
+              ],
+          },
+
+          status:
+            'active',
+        }).lean()
+    }
+  }
+
+  if (
+    dish &&
+    !sourceRecipe
+  ) {
+    sourceRecipe =
+      await RecipeVersion.findOne({
+        dishId:
+          dish._id,
+
+        status:
+          'published',
+      })
+        .sort({
+          versionNumber:
+            -1,
+        })
+        .lean()
+  }
+
+  if (
+    !dish ||
+    !sourceRecipe ||
+    id(
+      sourceRecipe.dishId,
+    ) !==
+      id(
+        dish._id,
+      )
+  ) {
+    return {
+      dish:
+        null,
+
+      sourceRecipe:
+        null,
+    }
+  }
+
+  return {
+    dish,
+    sourceRecipe,
+  }
 }
 
 function calculateVerificationState(
@@ -786,46 +983,13 @@ async function buildPassportProjection({
     )
   }
 
-  if (
-    !productionRecipe.dishId ||
-    !productionRecipe.sourceRecipeVersionId
-  ) {
-    throw new ApiError(
-      409,
-      'Dish Passport requires the Production Recipe to retain M07 Dish and published Recipe Version lineage.',
-      [
-        {
-          code:
-            'HOSPITALITY_PASSPORT_M07_LINEAGE_REQUIRED',
-        },
-      ],
-    )
-  }
-
-  const [
+  const {
     dish,
     sourceRecipe,
-  ] =
-    await Promise.all([
-      Dish.findOne({
-        _id:
-          productionRecipe.dishId,
-
-        status:
-          'active',
-      }).lean(),
-
-      RecipeVersion.findOne({
-        _id:
-          productionRecipe.sourceRecipeVersionId,
-
-        dishId:
-          productionRecipe.dishId,
-
-        status:
-          'published',
-      }).lean(),
-    ])
+  } =
+    await resolvePublishedRecipeLineage(
+      productionRecipe,
+    )
 
   if (
     !dish ||
@@ -833,11 +997,11 @@ async function buildPassportProjection({
   ) {
     throw new ApiError(
       409,
-      'Dish Passport requires an active M07 Dish and published linked Recipe Version.',
+      'This kitchen recipe is not connected to a published EPANTRY recipe yet. EPANTRY also could not find a matching published recipe automatically. Ask a Super Admin to publish or link the matching EPANTRY recipe, then try creating the dish record again.',
       [
         {
           code:
-            'HOSPITALITY_PASSPORT_PUBLISHED_RECIPE_REQUIRED',
+            'HOSPITALITY_PASSPORT_M07_LINEAGE_REQUIRED',
         },
       ],
     )
@@ -1724,6 +1888,70 @@ async function createPassportSnapshot({
   return created
 }
 
+async function notifyDishPassportApprovalRequested({
+  context,
+  snapshot,
+}) {
+  if (
+    snapshot?.status !==
+      'draft' ||
+    snapshot?.verificationState !==
+      'verified'
+  ) {
+    return
+  }
+
+  await notifyActiveSuperAdminsBestEffort({
+    triggerType:
+      'hospitality_approval_requested',
+    reasonCode:
+      'hospitality_dish_record_created',
+    explanation: `${context.organization?.displayName || 'Host'} created the dish record ${snapshot.snapshot?.dish?.name || 'Dish record'} and it is waiting for Super Admin approval.`,
+    relatedEntityType:
+      'hospitality_dish_passport',
+    relatedEntityId:
+      id(
+        snapshot._id,
+      ),
+    sourceDomain:
+      'hospitality',
+    sourceVersion:
+      'hospitality-dish-passport-v1',
+    dedupeScope: `hospitality-dish-passport-approval:${id(snapshot._id)}`,
+  })
+}
+
+async function notifyChangeCaseApprovalRequested({
+  context,
+  changeCase,
+}) {
+  if (
+    changeCase?.status !==
+      'recalculated'
+  ) {
+    return
+  }
+
+  await notifyActiveSuperAdminsBestEffort({
+    triggerType:
+      'hospitality_approval_requested',
+    reasonCode:
+      'hospitality_change_case_recalculated',
+    explanation: `${context.organization?.displayName || 'Host'} completed a Hospitality change review and it is waiting for Super Admin approval.`,
+    relatedEntityType:
+      'hospitality_change_case',
+    relatedEntityId:
+      id(
+        changeCase._id,
+      ),
+    sourceDomain:
+      'hospitality',
+    sourceVersion:
+      'hospitality-change-case-v1',
+    dedupeScope: `hospitality-change-case-approval:${id(changeCase._id)}`,
+  })
+}
+
 export async function listDishPassportSnapshots({
   actorUser,
   organizationIdHint,
@@ -1766,6 +1994,17 @@ export async function listDishPassportSnapshots({
       })
       .limit(300)
       .lean()
+
+  for (
+    const record of
+    records
+  ) {
+    await notifyDishPassportApprovalRequested({
+      context,
+      snapshot:
+        record,
+    })
+  }
 
   return {
     dishPassports:
@@ -1825,6 +2064,11 @@ export async function generateDishPassportSnapshot({
     }
   }
 
+  await ensureHospitalityProductionRecipePublishedLineage({
+    productionRecipeVersionId:
+      input.productionRecipeVersionId,
+  })
+
   const created =
     await createPassportSnapshot({
       context,
@@ -1836,6 +2080,12 @@ export async function generateDishPassportSnapshot({
         input.changeCaseId,
       actorUser,
     })
+
+  await notifyDishPassportApprovalRequested({
+    context,
+    snapshot:
+      created,
+  })
 
   return {
     dishPassport:
@@ -1893,28 +2143,206 @@ async function requireOwnedPassport(
   return snapshot
 }
 
-export async function approveDishPassportSnapshot({
+export async function listAdminDishPassportApprovals({
+  actorUser,
+}) {
+  rootSuperAdminActorId(
+    actorUser,
+  )
+
+  const snapshots =
+    await DishPassportSnapshot.find({
+      status:
+        'draft',
+
+      verificationState:
+        'verified',
+    })
+      .sort({
+        generatedAt:
+          1,
+      })
+      .lean()
+
+  const organizationIds =
+    [
+      ...new Set(
+        snapshots
+          .map(
+            (snapshot) =>
+              id(
+                snapshot.organizationId,
+              ),
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  const organizations =
+    organizationIds.length
+      ? await MarketplaceOrganization.find({
+          _id: {
+            $in:
+              organizationIds,
+          },
+        })
+          .select(
+            'displayName slug ownerUserId',
+          )
+          .lean()
+      : []
+
+  const organizationById =
+    new Map(
+      organizations.map(
+        (organization) => [
+          id(
+            organization._id,
+          ),
+          organization,
+        ],
+      ),
+    )
+
+  const ownerUserIds =
+    [
+      ...new Set(
+        organizations
+          .map(
+            (organization) =>
+              id(
+                organization.ownerUserId,
+              ),
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  const ownerUsers =
+    ownerUserIds.length
+      ? await User.find({
+          _id: {
+            $in:
+              ownerUserIds,
+          },
+        })
+          .select(
+            'name email hostWorkspaceType hostAccessStatus',
+          )
+          .lean()
+      : []
+
+  const ownerUserById =
+    new Map(
+      ownerUsers.map(
+        (user) => [
+          id(
+            user._id,
+          ),
+          user,
+        ],
+      ),
+    )
+
+  return {
+    dishPassports:
+      snapshots.map(
+        (snapshot) => {
+          const organization =
+            organizationById.get(
+              id(
+                snapshot.organizationId,
+              ),
+            ) ||
+            null
+
+          return {
+            ...serializePassport(
+              snapshot,
+            ),
+
+            organizationName:
+              organization?.displayName ||
+              'Hospitality business',
+
+            organizationSlug:
+              organization?.slug ||
+              '',
+
+            hostUser:
+              (() => {
+                const owner =
+                  organization?.ownerUserId
+                    ? ownerUserById.get(
+                        id(
+                          organization.ownerUserId,
+                        ),
+                      )
+                    : null
+
+                return owner
+                  ? {
+                      id:
+                        id(
+                          owner._id,
+                        ),
+
+                      name:
+                        owner.name ||
+                        '',
+
+                      email:
+                        owner.email ||
+                        '',
+
+                      hostWorkspaceType:
+                        owner.hostWorkspaceType ||
+                        null,
+
+                      hostAccessStatus:
+                        owner.hostAccessStatus ||
+                        null,
+                    }
+                  : null
+              })(),
+
+            generatedByUserId:
+              id(
+                snapshot.generatedByUserId,
+              ),
+          }
+        },
+      ),
+  }
+}
+
+export async function approveDishPassportSnapshotAsSuperAdmin({
   snapshotId,
   input,
   actorUser,
-  organizationIdHint,
 }) {
-  const context =
-    await resolveHospitalityContext(
+  const approverUserId =
+    rootSuperAdminActorId(
       actorUser,
-      organizationIdHint,
     )
-
-  assertPermission(
-    context,
-    'hospitality.passports.approve',
-  )
 
   const snapshot =
-    await requireOwnedPassport(
-      context,
+    await DishPassportSnapshot.findById(
       snapshotId,
     )
+
+  if (!snapshot) {
+    throw new ApiError(
+      404,
+      'Dish Passport snapshot was not found.',
+      [
+        {
+          code:
+            'HOSPITALITY_DISH_PASSPORT_NOT_FOUND',
+        },
+      ],
+    )
+  }
 
   if (
     snapshot.status !==
@@ -1948,28 +2376,6 @@ export async function approveDishPassportSnapshot({
     )
   }
 
-  if (
-    id(
-      snapshot.generatedByUserId,
-    ) ===
-    id(
-      actorId(
-        actorUser,
-      ),
-    )
-  ) {
-    throw new ApiError(
-      409,
-      'Dish Passport approval requires a different checker from the generator.',
-      [
-        {
-          code:
-            'HOSPITALITY_PASSPORT_MAKER_CHECKER_REQUIRED',
-        },
-      ],
-    )
-  }
-
   snapshot.status =
     'approved'
 
@@ -1977,45 +2383,75 @@ export async function approveDishPassportSnapshot({
     new Date()
 
   snapshot.approvedByUserId =
-    actorId(
-      actorUser,
-    )
+    approverUserId
 
   snapshot.governanceEvents.push({
     eventType:
       'approved',
+
     actorUserId:
-      actorId(
-        actorUser,
-      ),
+      approverUserId,
+
     reason:
       input.reason,
+
     evidence:
       normalizeEvidence(
         input.evidence,
       ),
+
     occurredAt:
       new Date(),
   })
 
   await snapshot.save()
 
+  const organization =
+    await MarketplaceOrganization.findById(
+      snapshot.organizationId,
+    )
+      .select(
+        'displayName slug',
+      )
+      .lean()
+
   return {
-    dishPassport:
-      serializePassport(
+    dishPassport: {
+      ...serializePassport(
         snapshot,
       ),
 
-    decisionContext: {
-      reason:
-        input.reason,
-
-      evidence:
-        normalizeEvidence(
-          input.evidence,
-        ),
+      organizationName:
+        organization?.displayName ||
+        'Hospitality business',
     },
+
+    approvalAuthority:
+      'root_super_admin',
   }
+}
+
+export async function approveDishPassportSnapshot({
+  snapshotId,
+  input,
+  actorUser,
+  organizationIdHint,
+}) {
+  void snapshotId
+  void input
+  void actorUser
+  void organizationIdHint
+
+  throw new ApiError(
+    403,
+    'Dish record approval is reserved for Super Admin. Generate the record and wait for the Super Admin decision.',
+    [
+      {
+        code:
+          'HOSPITALITY_SUPER_ADMIN_APPROVAL_REQUIRED',
+      },
+    ],
+  )
 }
 
 async function publishPassportDocument({
@@ -2207,7 +2643,7 @@ export async function publishDishPassportSnapshot({
 
   assertPermission(
     context,
-    'hospitality.passports.approve',
+    'hospitality.passports.generate',
   )
 
   const snapshot =
@@ -2505,6 +2941,16 @@ async function createGreyBookSnapshot({
         passportVersionNumber:
           passport.versionNumber,
 
+        productionRecipeVersionId:
+          id(
+            passport.productionRecipeVersionId,
+          ),
+
+        sourceRecipeVersionId:
+          id(
+            passport.sourceRecipeVersionId,
+          ),
+
         sourceFingerprint:
           passport.sourceFingerprint,
 
@@ -2598,6 +3044,10 @@ async function createGreyBookSnapshot({
           (entry) => ({
             passportSnapshotId:
               entry.passportSnapshotId,
+            productionRecipeVersionId:
+              entry.productionRecipeVersionId,
+            sourceRecipeVersionId:
+              entry.sourceRecipeVersionId,
             sourceFingerprint:
               entry.sourceFingerprint,
           }),
@@ -3147,6 +3597,8 @@ async function impactGraph({
     return {
       productionRecipeVersionIds:
         [],
+      sourceRecipeVersionIds:
+        [],
       menuIds:
         [],
       outletIds:
@@ -3157,6 +3609,36 @@ async function impactGraph({
         [],
     }
   }
+
+  const productionRecipes =
+    await HospitalityProductionRecipeVersion.find({
+      organizationId:
+        context.organization._id,
+
+      _id: {
+        $in:
+          productionRecipeVersionIds,
+      },
+    })
+      .select(
+        '_id sourceRecipeVersionId',
+      )
+      .lean()
+
+  const sourceRecipeVersionIds = [
+    ...new Set(
+      productionRecipes
+        .map(
+          (
+            recipe,
+          ) =>
+            id(
+              recipe.sourceRecipeVersionId,
+            ),
+        )
+        .filter(Boolean),
+    ),
+  ]
 
   const menuItems =
     await HospitalityMenuItem.find({
@@ -3293,6 +3775,7 @@ async function impactGraph({
 
   return {
     productionRecipeVersionIds,
+    sourceRecipeVersionIds,
     menuIds,
     outletIds:
       uniqueOutletIds,
@@ -3388,6 +3871,9 @@ export async function detectHospitalityChangeImpact({
 
       impactedProductionRecipeVersionIds:
         graph.productionRecipeVersionIds,
+
+      impactedSourceRecipeVersionIds:
+        graph.sourceRecipeVersionIds,
 
       impactedMenuIds:
         graph.menuIds,
@@ -3797,11 +4283,315 @@ export async function recalculateHospitalityChangeCase({
 
   await changeCase.save()
 
+  await notifyChangeCaseApprovalRequested({
+    context,
+    changeCase,
+  })
+
   return {
     changeCase:
       serializeChangeCase(
         changeCase,
       ),
+  }
+}
+
+export async function listAdminHospitalityChangeCaseApprovals({
+  actorUser,
+}) {
+  rootSuperAdminActorId(
+    actorUser,
+  )
+
+  const changeCases =
+    await HospitalityChangeCase.find({
+      status:
+        'recalculated',
+    })
+      .sort({
+        recalculatedAt:
+          1,
+
+        createdAt:
+          1,
+      })
+      .lean()
+
+  const organizationIds =
+    [
+      ...new Set(
+        changeCases
+          .map(
+            (changeCase) =>
+              id(
+                changeCase.organizationId,
+              ),
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  const organizations =
+    organizationIds.length
+      ? await MarketplaceOrganization.find({
+          _id: {
+            $in:
+              organizationIds,
+          },
+        })
+          .select(
+            'displayName slug ownerUserId',
+          )
+          .lean()
+      : []
+
+  const organizationById =
+    new Map(
+      organizations.map(
+        (organization) => [
+          id(
+            organization._id,
+          ),
+          organization,
+        ],
+      ),
+    )
+
+  const ownerUserIds =
+    [
+      ...new Set(
+        organizations
+          .map(
+            (organization) =>
+              id(
+                organization.ownerUserId,
+              ),
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  const ownerUsers =
+    ownerUserIds.length
+      ? await User.find({
+          _id: {
+            $in:
+              ownerUserIds,
+          },
+        })
+          .select(
+            'name email hostWorkspaceType hostAccessStatus',
+          )
+          .lean()
+      : []
+
+  const ownerUserById =
+    new Map(
+      ownerUsers.map(
+        (user) => [
+          id(
+            user._id,
+          ),
+          user,
+        ],
+      ),
+    )
+
+  return {
+    changeCases:
+      changeCases.map(
+        (changeCase) => {
+          const organization =
+            organizationById.get(
+              id(
+                changeCase.organizationId,
+              ),
+            ) ||
+            null
+
+          return {
+            ...serializeChangeCase(
+              changeCase,
+            ),
+
+            organizationName:
+              organization?.displayName ||
+              'Hospitality business',
+
+            organizationSlug:
+              organization?.slug ||
+              '',
+
+            hostUser:
+              (() => {
+                const owner =
+                  organization?.ownerUserId
+                    ? ownerUserById.get(
+                        id(
+                          organization.ownerUserId,
+                        ),
+                      )
+                    : null
+
+                return owner
+                  ? {
+                      id:
+                        id(
+                          owner._id,
+                        ),
+
+                      name:
+                        owner.name ||
+                        '',
+
+                      email:
+                        owner.email ||
+                        '',
+
+                      hostWorkspaceType:
+                        owner.hostWorkspaceType ||
+                        null,
+
+                      hostAccessStatus:
+                        owner.hostAccessStatus ||
+                        null,
+                    }
+                  : null
+              })(),
+          }
+        },
+      ),
+  }
+}
+
+export async function approveHospitalityChangeCaseAsSuperAdmin({
+  changeCaseId,
+  input,
+  actorUser,
+}) {
+  const approverUserId =
+    rootSuperAdminActorId(
+      actorUser,
+    )
+
+  const changeCase =
+    await HospitalityChangeCase.findById(
+      changeCaseId,
+    )
+
+  if (!changeCase) {
+    throw new ApiError(
+      404,
+      'Hospitality Change Case was not found.',
+      [
+        {
+          code:
+            'HOSPITALITY_CHANGE_CASE_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
+  if (
+    changeCase.status ===
+    'blocked'
+  ) {
+    throw new ApiError(
+      409,
+      'Blocked Change Case cannot be approved until all safety-sensitive recalculations are verification-ready.',
+      [
+        {
+          code:
+            'HOSPITALITY_CHANGE_CASE_VERIFICATION_REQUIRED',
+        },
+      ],
+    )
+  }
+
+  if (
+    changeCase.status !==
+    'recalculated'
+  ) {
+    throw new ApiError(
+      409,
+      'Change Case must be recalculated before Super Admin approval.',
+      [
+        {
+          code:
+            'HOSPITALITY_CHANGE_CASE_DECISION_STATE_INVALID',
+        },
+      ],
+    )
+  }
+
+  if (
+    id(
+      approverUserId,
+    ) ===
+      id(
+        changeCase.createdByUserId,
+      ) ||
+    id(
+      approverUserId,
+    ) ===
+      id(
+        changeCase.recalculatedByUserId,
+      )
+  ) {
+    throw new ApiError(
+      409,
+      'Change Case approval requires an independent Super Admin approval actor.',
+      [
+        {
+          code:
+            'HOSPITALITY_CHANGE_CASE_MAKER_CHECKER_REQUIRED',
+        },
+      ],
+    )
+  }
+
+  changeCase.status =
+    'approved'
+
+  changeCase.approvedByUserId =
+    approverUserId
+
+  changeCase.approvedAt =
+    new Date()
+
+  changeCase.reason =
+    input.reason
+
+  changeCase.evidence =
+    normalizeEvidence([
+      ...(changeCase.evidence || []),
+      ...input.evidence,
+    ])
+
+  await changeCase.save()
+
+  const organization =
+    await MarketplaceOrganization.findById(
+      changeCase.organizationId,
+    )
+      .select(
+        'displayName slug',
+      )
+      .lean()
+
+  return {
+    changeCase: {
+      ...serializeChangeCase(
+        changeCase,
+      ),
+
+      organizationName:
+        organization?.displayName ||
+        'Hospitality business',
+    },
+
+    approvalAuthority:
+      'root_super_admin',
   }
 }
 
@@ -3811,6 +4601,22 @@ export async function decideHospitalityChangeCase({
   actorUser,
   organizationIdHint,
 }) {
+  if (
+    input.decision ===
+    'approve'
+  ) {
+    throw new ApiError(
+      403,
+      'Change approval is reserved for Super Admin. Recalculate the case and wait for the Super Admin decision.',
+      [
+        {
+          code:
+            'HOSPITALITY_SUPER_ADMIN_APPROVAL_REQUIRED',
+        },
+      ],
+    )
+  }
+
   const context =
     await resolveHospitalityContext(
       actorUser,
@@ -3819,7 +4625,7 @@ export async function decideHospitalityChangeCase({
 
   assertPermission(
     context,
-    'hospitality.change.approve',
+    'hospitality.change.manage',
   )
 
   const changeCase =
@@ -3848,62 +4654,8 @@ export async function decideHospitalityChangeCase({
     )
   }
 
-  if (
-    input.decision ===
-    'approve'
-  ) {
-    if (
-      changeCase.status ===
-      'blocked'
-    ) {
-      throw new ApiError(
-        409,
-        'Blocked Change Case cannot be approved until all safety-sensitive recalculations are verification-ready.',
-        [
-          {
-            code:
-              'HOSPITALITY_CHANGE_CASE_VERIFICATION_REQUIRED',
-          },
-        ],
-      )
-    }
-
-    if (
-      id(
-        changeCase.createdByUserId,
-      ) ===
-      id(
-        actorId(
-          actorUser,
-        ),
-      )
-    ) {
-      throw new ApiError(
-        409,
-        'Change Case approval requires a different checker from the case creator.',
-        [
-          {
-            code:
-              'HOSPITALITY_CHANGE_CASE_MAKER_CHECKER_REQUIRED',
-          },
-        ],
-      )
-    }
-
-    changeCase.status =
-      'approved'
-
-    changeCase.approvedByUserId =
-      actorId(
-        actorUser,
-      )
-
-    changeCase.approvedAt =
-      new Date()
-  } else {
-    changeCase.status =
-      'dismissed'
-  }
+  changeCase.status =
+    'dismissed'
 
   changeCase.reason =
     input.reason
@@ -3938,12 +4690,12 @@ export async function publishHospitalityChangeCase({
 
   assertPermission(
     context,
-    'hospitality.change.approve',
+    'hospitality.change.manage',
   )
 
   assertPermission(
     context,
-    'hospitality.passports.approve',
+    'hospitality.passports.generate',
   )
 
   assertPermission(

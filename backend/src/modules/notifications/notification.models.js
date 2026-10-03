@@ -55,6 +55,9 @@ export const NOTIFICATION_TRIGGER_TYPES = Object.freeze([
   'host_listing_created',
   'host_listing_updated',
   'host_inventory_low',
+  'hospitality_approval_requested',
+  'creator_approval_requested',
+  'item_available',
 ])
 
 export const NOTIFICATION_ACTIONS = Object.freeze([
@@ -378,6 +381,109 @@ notificationSchema.index({
   createdAt: -1,
 })
 
+
+
+const availabilityWatchSchema = new Schema(
+  {
+    userId: {
+      type: objectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+
+    watchKey: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 320,
+    },
+
+    query: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 180,
+    },
+
+    normalizedQuery: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      maxlength: 180,
+      index: true,
+    },
+
+    canonicalIngredientId: {
+      type: objectId,
+      ref: 'CanonicalIngredient',
+      default: null,
+      index: true,
+    },
+
+    packId: {
+      type: objectId,
+      ref: 'Pack',
+      default: null,
+      index: true,
+    },
+
+    source: {
+      type: String,
+      enum: [
+        'search',
+        'recipe',
+        'product',
+      ],
+      default: 'search',
+    },
+
+    status: {
+      type: String,
+      enum: [
+        'active',
+        'notified',
+        'cancelled',
+      ],
+      default: 'active',
+      index: true,
+    },
+
+    matchedPackId: {
+      type: objectId,
+      ref: 'Pack',
+      default: null,
+    },
+
+    matchedProductName: {
+      type: String,
+      trim: true,
+      maxlength: 350,
+      default: '',
+    },
+
+    notifiedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    ...baseOptions,
+    collection: 'availabilityWatches',
+  },
+)
+
+availabilityWatchSchema.index(
+  {
+    userId: 1,
+    watchKey: 1,
+  },
+  {
+    unique: true,
+  },
+)
+
 const notificationActionSchema = new Schema(
   {
     actionId: {
@@ -466,6 +572,13 @@ export const Notification =
   mongoose.model(
     'Notification',
     notificationSchema,
+  )
+
+export const AvailabilityWatch =
+  mongoose.models.AvailabilityWatch ||
+  mongoose.model(
+    'AvailabilityWatch',
+    availabilityWatchSchema,
   )
 
 export const NotificationAction =

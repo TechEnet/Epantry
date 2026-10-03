@@ -967,8 +967,19 @@ test(
       /hostEnabled/,
     )
 
+    const hostAuthorizationSection =
+      source.match(
+        /case APPLICATION_ACCESS_TYPES\.HOST:[\s\S]*?(?=case APPLICATION_ACCESS_TYPES\.SUPER_ADMIN:)/,
+      )?.[0] ||
+      ''
+
+    assert.match(
+      hostAuthorizationSection,
+      /hostEnabled\s*===\s*true[\s\S]*?hostAccessStatus\s*===\s*['"]active['"]/,
+    )
+
     assert.doesNotMatch(
-      source,
+      hostAuthorizationSection,
       /activeMode/,
     )
   },

@@ -13,6 +13,18 @@ import {
 } from '../catalog/catalog.models.js'
 
 import {
+  HospitalityMenu,
+  HospitalityMenuAvailability,
+  HospitalityMenuItem,
+  HospitalityOutlet,
+  HospitalityProductionRecipeVersion,
+} from '../hospitality/hospitality.models.js'
+
+import {
+  MarketplaceOrganization,
+} from '../marketplace/marketplace.models.js'
+
+import {
   normalizeRecipeKey,
   normalizeRecipeSlug,
 } from './recipe.constants.js'
@@ -559,9 +571,575 @@ async function findCurrentPublishedRecipeVersion(
     .lean()
 }
 
+function restaurantPriceSnapshot(
+  menuItem,
+) {
+  const amountMinor =
+    Number(
+      menuItem?.sellingPrice
+        ?.amountMinor,
+    )
+
+  if (
+    !Number.isInteger(
+      amountMinor,
+    ) ||
+    amountMinor <
+      0
+  ) {
+    return null
+  }
+
+  return {
+    menuItemId:
+      stringifyId(
+        menuItem?._id,
+      ),
+
+    menuId:
+      stringifyId(
+        menuItem?.menuId,
+      ),
+
+    amountMinor,
+
+    currency:
+      String(
+        menuItem?.sellingPrice
+          ?.currency ||
+          'INR',
+      )
+        .trim()
+        .toUpperCase(),
+
+    basis:
+      'per_serving',
+  }
+}
+
+function buildRestaurantOrderPricing({
+  restaurant,
+  servings,
+}) {
+  const targetServings =
+    Number(
+      servings,
+    )
+
+  const unitPrice =
+    restaurant?.pricePerServing
+
+  if (
+    restaurant?.orderAvailable !==
+      true ||
+    !unitPrice ||
+    !Number.isFinite(
+      targetServings,
+    ) ||
+    targetServings <=
+      0
+  ) {
+    return {
+      available:
+        false,
+
+      servings:
+        Number.isFinite(
+          targetServings,
+        )
+          ? targetServings
+          : null,
+
+      pricePerServing:
+        null,
+
+      totalPrice:
+        null,
+    }
+  }
+
+  return {
+    available:
+      true,
+
+    servings:
+      targetServings,
+
+    pricePerServing:
+      unitPrice,
+
+    totalPrice: {
+      amountMinor:
+        Math.round(
+          unitPrice.amountMinor *
+            targetServings,
+        ),
+
+      currency:
+        unitPrice.currency,
+    },
+  }
+}
+
+async function loadRestaurantPublicContextMap(
+  recipeVersions,
+) {
+  const restaurantVersions =
+    (recipeVersions || [])
+      .filter(
+        (version) =>
+          version?.sourceType ===
+            'chef' &&
+          version?.visibility ===
+            'public',
+      )
+
+  if (
+    restaurantVersions.length ===
+      0
+  ) {
+    return new Map()
+  }
+
+  const versionIds =
+    restaurantVersions.map(
+      (version) =>
+        version._id,
+    )
+
+  const overlays =
+    await HospitalityProductionRecipeVersion.find({
+      sourceRecipeVersionId: {
+        $in:
+          versionIds,
+      },
+
+      recipeFoundationMode:
+        'core_recipe_linked',
+
+      customerVisibility:
+        'public_candidate',
+
+      status:
+        'approved',
+    }).lean()
+
+  if (
+    overlays.length ===
+      0
+  ) {
+    return new Map()
+  }
+
+  const overlayByVersionId =
+    new Map(
+      overlays.map(
+        (overlay) => [
+          stringifyId(
+            overlay.sourceRecipeVersionId,
+          ),
+          overlay,
+        ],
+      ),
+    )
+
+  const organizationIds =
+    restaurantVersions
+      .map(
+        (version) =>
+          version.sourceOrganizationId,
+      )
+      .filter(
+        Boolean,
+      )
+
+  const outletIds =
+    restaurantVersions
+      .map(
+        (version) =>
+          version.sourceOutletId,
+      )
+      .filter(
+        Boolean,
+      )
+
+  const overlayIds =
+    overlays.map(
+      (overlay) =>
+        overlay._id,
+    )
+
+  const [
+    organizations,
+    outlets,
+    menus,
+    menuItems,
+  ] =
+    await Promise.all([
+      MarketplaceOrganization.find({
+        _id: {
+          $in:
+            organizationIds,
+        },
+      })
+        .select(
+          '_id displayName',
+        )
+        .lean(),
+
+      HospitalityOutlet.find({
+        _id: {
+          $in:
+            outletIds,
+        },
+
+        status:
+          'active',
+      })
+        .select(
+          '_id organizationId name address status',
+        )
+        .lean(),
+
+      HospitalityMenu.find({
+        organizationId: {
+          $in:
+            organizationIds,
+        },
+
+        outletId: {
+          $in:
+            outletIds,
+        },
+
+        status:
+          'active',
+      })
+        .select(
+          '_id organizationId outletId name updatedAt',
+        )
+        .sort({
+          updatedAt:
+            -1,
+        })
+        .lean(),
+
+      HospitalityMenuItem.find({
+        productionRecipeVersionId: {
+          $in:
+            overlayIds,
+        },
+
+        status:
+          'active',
+
+        sellingPrice: {
+          $ne:
+            null,
+        },
+      })
+        .select(
+          '_id menuId productionRecipeVersionId displayName sellingPrice updatedAt',
+        )
+        .sort({
+          updatedAt:
+            -1,
+        })
+        .lean(),
+    ])
+
+  const availabilityRecords =
+    menuItems.length
+      ? await HospitalityMenuAvailability.find({
+          menuItemId: {
+            $in:
+              menuItems.map(
+                (
+                  menuItem,
+                ) =>
+                  menuItem._id,
+              ),
+          },
+        })
+          .sort({
+            observedAt:
+              -1,
+
+            createdAt:
+              -1,
+          })
+          .lean()
+      : []
+
+  const availabilityByMenuItemId =
+    new Map()
+
+  for (
+    const availability of
+      availabilityRecords
+  ) {
+    const menuItemId =
+      stringifyId(
+        availability.menuItemId,
+      )
+
+    if (
+      menuItemId &&
+      !availabilityByMenuItemId.has(
+        menuItemId,
+      )
+    ) {
+      availabilityByMenuItemId.set(
+        menuItemId,
+        availability,
+      )
+    }
+  }
+
+  const organizationById =
+    new Map(
+      organizations.map(
+        (organization) => [
+          stringifyId(
+            organization._id,
+          ),
+          organization,
+        ],
+      ),
+    )
+
+  const outletById =
+    new Map(
+      outlets.map(
+        (outlet) => [
+          stringifyId(
+            outlet._id,
+          ),
+          outlet,
+        ],
+      ),
+    )
+
+  const activeMenuById =
+    new Map(
+      menus.map(
+        (menu) => [
+          stringifyId(
+            menu._id,
+          ),
+          menu,
+        ],
+      ),
+    )
+
+  const menuItemByOverlayId =
+    new Map()
+
+  for (
+    const menuItem of
+      menuItems
+  ) {
+    const menu =
+      activeMenuById.get(
+        stringifyId(
+          menuItem.menuId,
+        ),
+      )
+
+    if (!menu) {
+      continue
+    }
+
+    const overlayId =
+      stringifyId(
+        menuItem.productionRecipeVersionId,
+      )
+
+    const availability =
+      availabilityByMenuItemId.get(
+        stringifyId(
+          menuItem._id,
+        ),
+      ) ||
+      null
+
+    const availabilityStatus =
+      availability?.status ||
+      'available'
+
+    const existingSelection =
+      menuItemByOverlayId.get(
+        overlayId,
+      )
+
+    if (
+      !existingSelection ||
+      (
+        existingSelection.availabilityStatus !==
+          'available' &&
+        availabilityStatus ===
+          'available'
+      )
+    ) {
+      menuItemByOverlayId.set(
+        overlayId,
+        {
+          menuItem,
+          menu,
+          availability,
+          availabilityStatus,
+        },
+      )
+    }
+  }
+
+  const contextMap =
+    new Map()
+
+  for (
+    const version of
+      restaurantVersions
+  ) {
+    const versionId =
+      stringifyId(
+        version._id,
+      )
+
+    const overlay =
+      overlayByVersionId.get(
+        versionId,
+      )
+
+    if (!overlay) {
+      continue
+    }
+
+    const organization =
+      organizationById.get(
+        stringifyId(
+          version.sourceOrganizationId,
+        ),
+      )
+
+    const outlet =
+      outletById.get(
+        stringifyId(
+          version.sourceOutletId,
+        ),
+      )
+
+    if (
+      !organization ||
+      !outlet ||
+      String(
+        outlet.organizationId,
+      ) !==
+        String(
+          version.sourceOrganizationId,
+        )
+    ) {
+      continue
+    }
+
+    const menuSelection =
+      menuItemByOverlayId.get(
+        stringifyId(
+          overlay._id,
+        ),
+      )
+
+    const menu =
+      menuSelection?.menu ||
+      null
+
+    const menuItem =
+      menuSelection?.menuItem ||
+      null
+
+    const menuAvailabilityStatus =
+      menuSelection?.availabilityStatus ||
+      menuSelection?.availability
+        ?.status ||
+      'available'
+
+    const menuMatchesOutlet =
+      menu &&
+      String(
+        menu.outletId,
+      ) ===
+        String(
+          outlet._id,
+        )
+
+    const pricePerServing =
+      menuMatchesOutlet
+        ? restaurantPriceSnapshot(
+            menuItem,
+          )
+        : null
+
+    contextMap.set(
+      versionId,
+      {
+        organizationId:
+          stringifyId(
+            organization._id,
+          ),
+
+        restaurantName:
+          organization.displayName ||
+          version.sourceName ||
+          'Restaurant',
+
+        outletId:
+          stringifyId(
+            outlet._id,
+          ),
+
+        outletName:
+          outlet.name ||
+          'Outlet',
+
+        outletAddress:
+          outlet.address ||
+          null,
+
+        productionRecipeVersionId:
+          stringifyId(
+            overlay._id,
+          ),
+
+        menuItemId:
+          pricePerServing
+            ?.menuItemId ||
+          null,
+
+        menuId:
+          pricePerServing
+            ?.menuId ||
+          null,
+
+        pricePerServing,
+
+        menuAvailabilityStatus,
+
+        orderAvailable:
+          Boolean(
+            pricePerServing &&
+            menuAvailabilityStatus ===
+              'available',
+          ),
+      },
+    )
+  }
+
+  return contextMap
+}
+
 function serializePublicRecipeCard({
   dish,
   recipeVersion,
+  restaurant = null,
 }) {
   return {
     dish:
@@ -573,6 +1151,8 @@ function serializePublicRecipeCard({
       serializePublicRecipeVersion(
         recipeVersion,
       ),
+
+    restaurant,
 
     path:
       `/recipes/${dish.slug}`,
@@ -592,15 +1172,38 @@ export async function listPublicRecipes({
   cuisine,
   course,
   tag,
+  sourceScope =
+    'all',
 }) {
   const now =
     new Date()
 
+  const publishedVersionFilter =
+    currentPublishedFilter(
+      now,
+    )
+
+  if (
+    sourceScope ===
+      'restaurant'
+  ) {
+    publishedVersionFilter.sourceType =
+      'chef'
+    publishedVersionFilter.visibility =
+      'public'
+  } else if (
+    sourceScope ===
+      'standard'
+  ) {
+    publishedVersionFilter.sourceType = {
+      $ne:
+        'chef',
+    }
+  }
+
   const publishedVersions =
     await RecipeVersion.find(
-      currentPublishedFilter(
-        now,
-      ),
+      publishedVersionFilter,
     )
       .sort({
         versionNumber:
@@ -628,6 +1231,35 @@ export async function listPublicRecipes({
       versionByDishId.set(
         dishKey,
         version,
+      )
+    }
+  }
+
+  const restaurantContextMap =
+    await loadRestaurantPublicContextMap(
+      [
+        ...versionByDishId.values(),
+      ],
+    )
+
+  for (
+    const [
+      dishId,
+      version,
+    ] of
+      versionByDishId.entries()
+  ) {
+    if (
+      version?.sourceType ===
+        'chef' &&
+      !restaurantContextMap.has(
+        stringifyId(
+          version._id,
+        ),
+      )
+    ) {
+      versionByDishId.delete(
+        dishId,
       )
     }
   }
@@ -792,6 +1424,14 @@ export async function listPublicRecipes({
               dish,
 
               recipeVersion,
+
+              restaurant:
+                restaurantContextMap.get(
+                  stringifyId(
+                    recipeVersion._id,
+                  ),
+                ) ||
+                null,
             })
           },
         )
@@ -874,6 +1514,36 @@ export async function getPublicRecipe(
     )
   }
 
+  const restaurantContextMap =
+    await loadRestaurantPublicContextMap([
+      recipeVersion,
+    ])
+
+  const restaurant =
+    restaurantContextMap.get(
+      stringifyId(
+        recipeVersion._id,
+      ),
+    ) ||
+    null
+
+  if (
+    recipeVersion.sourceType ===
+      'chef' &&
+    !restaurant
+  ) {
+    throw new ApiError(
+      404,
+      'Published Restaurant Recipe was not found.',
+      [
+        {
+          code:
+            'PUBLIC_RESTAURANT_RECIPE_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
   const children =
     await loadPublicRecipeChildren(
       recipeVersion._id,
@@ -889,6 +1559,17 @@ export async function getPublicRecipe(
       serializePublicRecipeVersion(
         recipeVersion,
       ),
+
+    restaurant,
+
+    restaurantOrder:
+      restaurant
+        ? buildRestaurantOrderPricing({
+            restaurant,
+            servings:
+              recipeVersion.baseServings,
+          })
+        : null,
 
     ingredients:
       children.ingredients,
@@ -1067,6 +1748,36 @@ export async function scalePublicRecipe(
     )
   }
 
+  const restaurantContextMap =
+    await loadRestaurantPublicContextMap([
+      recipeVersion,
+    ])
+
+  const restaurant =
+    restaurantContextMap.get(
+      stringifyId(
+        recipeVersion._id,
+      ),
+    ) ||
+    null
+
+  if (
+    recipeVersion.sourceType ===
+      'chef' &&
+    !restaurant
+  ) {
+    throw new ApiError(
+      404,
+      'Published Restaurant Recipe was not found.',
+      [
+        {
+          code:
+            'PUBLIC_RESTAURANT_RECIPE_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
   const children =
     await loadPublicRecipeChildren(
       recipeVersion._id,
@@ -1112,6 +1823,17 @@ export async function scalePublicRecipe(
       serializePublicRecipeVersion(
         recipeVersion,
       ),
+
+    restaurant,
+
+    restaurantOrder:
+      restaurant
+        ? buildRestaurantOrderPricing({
+            restaurant,
+            servings:
+              targetServings,
+          })
+        : null,
 
     scaling: {
       ...scaled,

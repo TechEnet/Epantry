@@ -1,11 +1,16 @@
 import {
+  ArrowRight,
+  Building2,
   Camera,
   CheckCircle2,
   MapPin,
+  MapPinned,
   Pencil,
   Plus,
   Save,
+  Store,
   UserRound,
+  Warehouse,
   X,
 } from 'lucide-react'
 
@@ -14,6 +19,10 @@ import {
   useMemo,
   useState,
 } from 'react'
+
+import {
+  Link,
+} from 'react-router-dom'
 
 import {
   useAuth,
@@ -32,6 +41,21 @@ import {
   updateDeliveryAddress,
 } from '../../deliveryAddresses/services/deliveryAddress.service'
 
+import {
+  getHostOperationalOrganization,
+  getHostOperationsErrorMessage,
+  updateHostOperationalProfile,
+} from '../../hostOperations/services/hostOperations.service'
+
+import {
+  createInventoryNode,
+  createServiceArea,
+  listInventoryNodes,
+  listServiceAreas,
+  updateInventoryNode,
+  updateServiceArea,
+} from '../../marketplace/services/marketplace.service'
+
 const inputClassName =
   'focus-ring w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-950 outline-none transition focus:border-emerald-500'
 
@@ -42,6 +66,177 @@ const ADDRESS_LABELS = [
   'friend',
   'other',
 ]
+
+const HOST_PROFILE_STEPS = [
+  {
+    number: '01',
+    title: 'Account details',
+    description: 'Keep your name and photo current.',
+    className: 'border-emerald-200 bg-emerald-100/75',
+  },
+  {
+    number: '02',
+    title: 'Business address',
+    description: 'Save where your business operates from.',
+    className: 'border-sky-200 bg-sky-100/75',
+  },
+  {
+    number: '03',
+    title: 'Stock & delivery',
+    description: 'Add stores, warehouses and delivery pincodes.',
+    className: 'border-violet-200 bg-violet-100/70',
+  },
+  {
+    number: '04',
+    title: 'Review operations',
+    description: 'Continue to Operations Center when details are ready.',
+    className: 'border-emerald-200 bg-emerald-50',
+  },
+]
+
+const hostInputClassName =
+  'focus-ring w-full rounded-[14px] border border-stone-200 bg-white px-3 py-2.5 text-[12px] font-semibold text-stone-950 outline-none transition focus:border-emerald-500 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm'
+
+function getInitialHostBusinessForm(
+  organization,
+  operationalProfile,
+) {
+  const address =
+    operationalProfile?.registeredAddress ||
+    {}
+
+  return {
+    legalEntityName:
+      operationalProfile?.legalEntityName ||
+      organization?.displayName ||
+      '',
+    businessType:
+      operationalProfile?.businessType ||
+      'other',
+    line1:
+      address.line1 ||
+      '',
+    line2:
+      address.line2 ||
+      '',
+    city:
+      address.city ||
+      '',
+    state:
+      address.state ||
+      '',
+    postalCode:
+      address.postalCode ||
+      '',
+    countryCode:
+      address.countryCode ||
+      'IN',
+    supportEmail:
+      operationalProfile?.supportEmail ||
+      '',
+    supportPhone:
+      operationalProfile?.supportPhone ||
+      '',
+  }
+}
+
+function getInitialInventoryNodeForm(
+  node = null,
+) {
+  return {
+    id:
+      node?.id ||
+      '',
+    name:
+      node?.name ||
+      '',
+    nodeType:
+      node?.nodeType ||
+      'warehouse',
+    line1:
+      node?.address?.line1 ||
+      '',
+    line2:
+      node?.address?.line2 ||
+      '',
+    city:
+      node?.address?.city ||
+      '',
+    state:
+      node?.address?.state ||
+      '',
+    postalCode:
+      node?.address?.postalCode ||
+      '',
+    countryCode:
+      node?.address?.countryCode ||
+      'IN',
+  }
+}
+
+function getInitialServiceAreaForm(
+  area = null,
+) {
+  return {
+    id:
+      area?.id ||
+      '',
+    name:
+      area?.name ||
+      '',
+    inventoryNodeId:
+      area?.inventoryNodeId ||
+      '',
+    postalCodes:
+      Array.isArray(
+        area?.postalCodes,
+      )
+        ? area.postalCodes.join(', ')
+        : '',
+    fulfillmentTypes:
+      area?.fulfillmentTypes?.length
+        ? area.fulfillmentTypes
+        : [
+            'delivery',
+          ],
+  }
+}
+
+function formatNodeType(
+  value,
+) {
+  return String(
+    value ||
+      'location',
+  )
+    .replaceAll(
+      '_',
+      ' ',
+    )
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase(),
+    )
+}
+
+function formatBusinessAddress(
+  form,
+) {
+  return [
+    form?.line1,
+    form?.line2,
+    form?.city,
+    form?.state,
+    form?.postalCode,
+  ]
+    .map((value) =>
+      String(
+        value ||
+          '',
+      ).trim(),
+    )
+    .filter(Boolean)
+    .join(', ')
+}
 
 function getInitialAddressForm(
   profile,
@@ -181,6 +376,67 @@ export default function EditProfilePage({
     setAddressForm,
   ] = useState(null)
 
+
+  const [
+    hostOrganization,
+    setHostOrganization,
+  ] = useState(null)
+
+  const [
+    hostOperationalProfile,
+    setHostOperationalProfile,
+  ] = useState(null)
+
+  const [
+    hostBusinessForm,
+    setHostBusinessForm,
+  ] = useState(() =>
+    getInitialHostBusinessForm(
+      null,
+      null,
+    ),
+  )
+
+  const [
+    editingBusiness,
+    setEditingBusiness,
+  ] = useState(false)
+
+  const [
+    inventoryNodes,
+    setInventoryNodes,
+  ] = useState([])
+
+  const [
+    inventoryNodeForm,
+    setInventoryNodeForm,
+  ] = useState(null)
+
+  const [
+    serviceAreas,
+    setServiceAreas,
+  ] = useState([])
+
+  const [
+    serviceAreaForm,
+    setServiceAreaForm,
+  ] = useState(null)
+
+  const [
+    savingBusiness,
+    setSavingBusiness,
+  ] = useState(false)
+
+  const [
+    savingLocation,
+    setSavingLocation,
+  ] = useState(false)
+
+  const [
+    savingServiceArea,
+    setSavingServiceArea,
+  ] = useState(false)
+
   const [
     loading,
     setLoading,
@@ -228,6 +484,58 @@ export default function EditProfilePage({
         profile?.name,
       ],
     )
+
+  async function loadHostWorkspaceData() {
+    const [
+      organizationResult,
+      nodesResult,
+      areasResult,
+    ] = await Promise.all([
+      getHostOperationalOrganization(),
+      listInventoryNodes({
+        status: 'all',
+        limit: 100,
+      }),
+      listServiceAreas({
+        status: 'all',
+        limit: 100,
+      }),
+    ])
+
+    const organization =
+      organizationResult?.organization ||
+      null
+    const operationalProfile =
+      organizationResult?.operationalProfile ||
+      null
+
+    setHostOrganization(
+      organization,
+    )
+    setHostOperationalProfile(
+      operationalProfile,
+    )
+    setHostBusinessForm(
+      getInitialHostBusinessForm(
+        organization,
+        operationalProfile,
+      ),
+    )
+    setInventoryNodes(
+      Array.isArray(
+        nodesResult?.inventoryNodes,
+      )
+        ? nodesResult.inventoryNodes
+        : [],
+    )
+    setServiceAreas(
+      Array.isArray(
+        areasResult?.serviceAreas,
+      )
+        ? areasResult.serviceAreas
+        : [],
+    )
+  }
 
   async function loadAddresses() {
     if (!isCustomer) {
@@ -292,6 +600,61 @@ export default function EditProfilePage({
                 addressResult?.addresses,
               )
                 ? addressResult.addresses
+                : [],
+            )
+          }
+          else {
+            const [
+              organizationResult,
+              nodesResult,
+              areasResult,
+            ] = await Promise.all([
+              getHostOperationalOrganization(),
+              listInventoryNodes({
+                status: 'all',
+                limit: 100,
+              }),
+              listServiceAreas({
+                status: 'all',
+                limit: 100,
+              }),
+            ])
+
+            if (!active) {
+              return
+            }
+
+            const organization =
+              organizationResult?.organization ||
+              null
+            const operationalProfile =
+              organizationResult?.operationalProfile ||
+              null
+
+            setHostOrganization(
+              organization,
+            )
+            setHostOperationalProfile(
+              operationalProfile,
+            )
+            setHostBusinessForm(
+              getInitialHostBusinessForm(
+                organization,
+                operationalProfile,
+              ),
+            )
+            setInventoryNodes(
+              Array.isArray(
+                nodesResult?.inventoryNodes,
+              )
+                ? nodesResult.inventoryNodes
+                : [],
+            )
+            setServiceAreas(
+              Array.isArray(
+                areasResult?.serviceAreas,
+              )
+                ? areasResult.serviceAreas
                 : [],
             )
           }
@@ -582,12 +945,546 @@ export default function EditProfilePage({
     }
   }
 
+  function hostErrorMessage(
+    requestError,
+    fallback,
+  ) {
+    return getHostOperationsErrorMessage(
+      requestError,
+      fallback,
+    )
+  }
+
+  async function handleHostBusinessSubmit(
+    event,
+  ) {
+    event.preventDefault()
+    setSavingBusiness(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const currentCommercial =
+        hostOperationalProfile?.commercial ||
+        {}
+
+      const result =
+        await updateHostOperationalProfile({
+          legalEntityName:
+            hostBusinessForm.legalEntityName.trim(),
+          businessType:
+            hostBusinessForm.businessType,
+          jurisdictionCountryCode:
+            hostBusinessForm.countryCode ||
+            'IN',
+          registeredAddress: {
+            line1:
+              hostBusinessForm.line1.trim(),
+            line2:
+              hostBusinessForm.line2.trim(),
+            city:
+              hostBusinessForm.city.trim(),
+            state:
+              hostBusinessForm.state.trim(),
+            postalCode:
+              hostBusinessForm.postalCode.trim(),
+            countryCode:
+              hostBusinessForm.countryCode ||
+              'IN',
+          },
+          supportEmail:
+            hostBusinessForm.supportEmail.trim(),
+          supportPhone:
+            hostBusinessForm.supportPhone.trim(),
+          commercial: {
+            settlementCurrency:
+              currentCommercial.settlementCurrency ||
+              'INR',
+            fulfillmentTypes:
+              Array.isArray(
+                currentCommercial.fulfillmentTypes,
+              )
+                ? currentCommercial.fulfillmentTypes
+                : [],
+            cancellationPolicySummary:
+              currentCommercial.cancellationPolicySummary ||
+              '',
+            returnPolicySummary:
+              currentCommercial.returnPolicySummary ||
+              '',
+          },
+        })
+
+      setHostOperationalProfile(
+        result?.operationalProfile ||
+          hostOperationalProfile,
+      )
+      setEditingBusiness(false)
+      setSuccess(
+        'Business location updated.',
+      )
+      await loadHostWorkspaceData()
+    } catch (saveError) {
+      setError(
+        hostErrorMessage(
+          saveError,
+          'Unable to update the business location.',
+        ),
+      )
+    } finally {
+      setSavingBusiness(false)
+    }
+  }
+
+  async function handleInventoryNodeSubmit(
+    event,
+  ) {
+    event.preventDefault()
+
+    if (!inventoryNodeForm) {
+      return
+    }
+
+    setSavingLocation(true)
+    setError('')
+    setSuccess('')
+
+    const payload = {
+      name:
+        inventoryNodeForm.name.trim(),
+      nodeType:
+        inventoryNodeForm.nodeType,
+      address: {
+        line1:
+          inventoryNodeForm.line1.trim(),
+        line2:
+          inventoryNodeForm.line2.trim(),
+        city:
+          inventoryNodeForm.city.trim(),
+        state:
+          inventoryNodeForm.state.trim(),
+        postalCode:
+          inventoryNodeForm.postalCode.trim(),
+        countryCode:
+          inventoryNodeForm.countryCode ||
+          'IN',
+      },
+    }
+
+    try {
+      if (inventoryNodeForm.id) {
+        await updateInventoryNode(
+          inventoryNodeForm.id,
+          payload,
+        )
+      } else {
+        await createInventoryNode(
+          payload,
+        )
+      }
+
+      setInventoryNodeForm(null)
+      setSuccess(
+        inventoryNodeForm.id
+          ? 'Stock location updated.'
+          : 'Stock location added.',
+      )
+      await loadHostWorkspaceData()
+    } catch (saveError) {
+      setError(
+        hostErrorMessage(
+          saveError,
+          'Unable to save this stock location.',
+        ),
+      )
+    } finally {
+      setSavingLocation(false)
+    }
+  }
+
+  async function handleServiceAreaSubmit(
+    event,
+  ) {
+    event.preventDefault()
+
+    if (!serviceAreaForm) {
+      return
+    }
+
+    const postalCodes =
+      serviceAreaForm.postalCodes
+        .split(/[\s,]+/)
+        .map((value) =>
+          value.trim(),
+        )
+        .filter(Boolean)
+
+    setSavingServiceArea(true)
+    setError('')
+    setSuccess('')
+
+    const payload = {
+      name:
+        serviceAreaForm.name.trim(),
+      inventoryNodeId:
+        serviceAreaForm.inventoryNodeId ||
+        null,
+      postalCodes,
+      fulfillmentTypes:
+        serviceAreaForm.fulfillmentTypes?.length
+          ? serviceAreaForm.fulfillmentTypes
+          : [
+              'delivery',
+            ],
+    }
+
+    try {
+      if (serviceAreaForm.id) {
+        await updateServiceArea(
+          serviceAreaForm.id,
+          payload,
+        )
+      } else {
+        await createServiceArea(
+          payload,
+        )
+      }
+
+      setServiceAreaForm(null)
+      setSuccess(
+        serviceAreaForm.id
+          ? 'Delivery area updated.'
+          : 'Delivery area added.',
+      )
+      await loadHostWorkspaceData()
+    } catch (saveError) {
+      setError(
+        hostErrorMessage(
+          saveError,
+          'Unable to save this delivery area.',
+        ),
+      )
+    } finally {
+      setSavingServiceArea(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6 sm:p-8 lg:p-10">
         <div className="rounded-[24px] border border-stone-200 bg-white p-6 text-sm font-bold text-stone-500 shadow-sm">
           Loading your profile…
         </div>
+      </div>
+    )
+  }
+
+  if (!isCustomer) {
+    const businessAddress =
+      formatBusinessAddress(
+        hostBusinessForm,
+      )
+
+    return (
+      <div className="px-2.5 pb-4 pt-0 sm:px-5 sm:pb-6 lg:px-6 lg:pb-7">
+        <header className="rounded-[22px] border border-emerald-200 bg-[linear-gradient(135deg,#dcf7e9_0%,#e9f6fb_58%,#f1ecff_100%)] p-3.5 shadow-[0_10px_28px_rgba(23,72,59,0.08)] sm:rounded-[28px] sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-700 sm:text-[10px]">
+                Host profile
+              </p>
+              <h1 className="mt-1 text-[21px] font-black tracking-[-0.035em] text-stone-950 sm:mt-2 sm:text-3xl">
+                Profile & business locations
+              </h1>
+              <p className="mt-1 max-w-3xl text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
+                Keep your account, business address, stock locations and delivery pincodes up to date.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+            {HOST_PROFILE_STEPS.map((step) => (
+              <div
+                key={step.number}
+                className={`rounded-[15px] border p-2.5 sm:rounded-[20px] sm:p-4 ${step.className}`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
+                    {step.number}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black leading-[13px] text-stone-950 sm:text-xs sm:leading-4">
+                      {step.title}
+                    </p>
+                    <p className="mt-1 text-[9px] font-semibold leading-[13px] text-stone-600 sm:text-[11px] sm:leading-4">
+                      {step.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </header>
+
+        {error ? (
+          <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-[11px] font-bold text-red-700 sm:mt-4 sm:px-4 sm:py-3 sm:text-sm">
+            {error}
+          </div>
+        ) : null}
+
+        {success ? (
+          <div className="mt-3 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] font-bold text-emerald-800 sm:mt-4 sm:px-4 sm:py-3 sm:text-sm">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            {success}
+          </div>
+        ) : null}
+
+        <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-[250px_minmax(0,1fr)]">
+          <section className="rounded-[20px] border border-emerald-200 bg-emerald-50/80 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
+            <div className="flex items-center gap-3 xl:flex-col xl:text-center">
+              <div className="relative shrink-0">
+                {profile?.profilePhotoUrl ? (
+                  <img
+                    src={profile.profilePhotoUrl}
+                    alt="Profile"
+                    className="size-[76px] rounded-full border-[3px] border-white object-cover shadow-sm sm:size-24 xl:size-28"
+                  />
+                ) : (
+                  <div className="grid size-[76px] place-items-center rounded-full border-[3px] border-white bg-emerald-700 text-2xl font-black text-white shadow-sm sm:size-24 sm:text-3xl xl:size-28">
+                    {identityInitial}
+                  </div>
+                )}
+
+                <label className="focus-ring absolute bottom-0 right-0 grid size-8 cursor-pointer place-items-center rounded-full border-[3px] border-white bg-stone-950 text-white shadow-sm transition hover:bg-emerald-700 sm:size-9">
+                  <Camera size={14} aria-hidden="true" />
+                  <span className="sr-only">Change profile photo</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    disabled={uploadingPhoto}
+                    onChange={handlePhotoChange}
+                  />
+                </label>
+              </div>
+
+              <div className="min-w-0 xl:mt-3">
+                <p className="truncate text-sm font-black text-stone-950 sm:text-base">
+                  {profile?.name || currentUser?.name || 'Host'}
+                </p>
+                <p className="mt-0.5 truncate text-[10px] font-semibold text-stone-500 sm:text-xs">
+                  {profile?.email || currentUser?.email || ''}
+                </p>
+                <p className="mt-1 text-[9px] font-bold text-stone-400 sm:text-[10px]">
+                  {uploadingPhoto ? 'Uploading photo…' : 'Tap the camera to change photo'}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <form
+            onSubmit={handleProfileSubmit}
+            className="rounded-[20px] border border-sky-200 bg-sky-50/80 p-3 shadow-sm sm:rounded-[24px] sm:p-5"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="grid size-8 place-items-center rounded-xl bg-white text-sky-700 shadow-sm sm:size-10 sm:rounded-2xl">
+                <UserRound size={17} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-stone-950 sm:text-lg">Account details</h2>
+                <p className="text-[9px] font-semibold text-stone-500 sm:text-xs">This name is visible across your Host workspace.</p>
+              </div>
+            </div>
+
+            <div className="mt-3 sm:mt-4 sm:max-w-xl">
+              <Field label="Name">
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className={hostInputClassName}
+                  required
+                  minLength={2}
+                  maxLength={120}
+                />
+              </Field>
+            </div>
+
+            <div className="mt-3 flex justify-end sm:mt-4">
+              <button
+                type="submit"
+                disabled={savingProfile}
+                className="focus-ring inline-flex items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 py-2.5 text-[11px] font-black text-white transition hover:bg-emerald-800 disabled:opacity-60 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
+              >
+                <Save size={15} aria-hidden="true" />
+                {savingProfile ? 'Saving…' : 'Save account'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <section className="mt-3 rounded-[20px] border border-sky-200 bg-[linear-gradient(135deg,#e8f5fb_0%,#eef9f4_100%)] p-3 shadow-sm sm:mt-4 sm:rounded-[24px] sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-2.5">
+              <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-sky-700 shadow-sm sm:size-10 sm:rounded-2xl">
+                <Building2 size={17} aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-black text-stone-950 sm:text-lg">Business address & contact</h2>
+                <p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-xs">Keep the main address and contact details for your business current.</p>
+              </div>
+            </div>
+            {!editingBusiness ? (
+              <button
+                type="button"
+                onClick={() => setEditingBusiness(true)}
+                className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[10px] font-black text-sky-800 sm:text-xs"
+              >
+                <Pencil size={13} aria-hidden="true" />
+                Edit
+              </button>
+            ) : null}
+          </div>
+
+          {!editingBusiness ? (
+            <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-3">
+              <div className="rounded-[14px] border border-white/80 bg-white/75 p-3 sm:rounded-[18px]">
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700">Business</p>
+                <p className="mt-1 text-[11px] font-black text-stone-950 sm:text-sm">{hostBusinessForm.legalEntityName || hostOrganization?.displayName || 'Add business name'}</p>
+                <p className="mt-0.5 text-[9px] font-semibold capitalize text-stone-500 sm:text-[11px]">{String(hostBusinessForm.businessType || 'other').replaceAll('_', ' ')}</p>
+              </div>
+              <div className="rounded-[14px] border border-white/80 bg-white/75 p-3 sm:rounded-[18px]">
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700">Main location</p>
+                <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-700 sm:text-xs">{businessAddress || 'Add your business address'}</p>
+              </div>
+              <div className="rounded-[14px] border border-white/80 bg-white/75 p-3 sm:rounded-[18px]">
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700">Business contact</p>
+                <p className="mt-1 truncate text-[10px] font-semibold text-stone-700 sm:text-xs">{hostBusinessForm.supportEmail || 'Add support email'}</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-stone-500 sm:text-xs">{hostBusinessForm.supportPhone || 'Add support phone'}</p>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleHostBusinessSubmit} className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field label="Business name">
+                <input required minLength={2} value={hostBusinessForm.legalEntityName} onChange={(event) => setHostBusinessForm((current) => ({ ...current, legalEntityName: event.target.value }))} className={hostInputClassName} />
+              </Field>
+              <Field label="Business type">
+                <select value={hostBusinessForm.businessType} onChange={(event) => setHostBusinessForm((current) => ({ ...current, businessType: event.target.value }))} className={hostInputClassName}>
+                  <option value="proprietorship">Proprietorship</option>
+                  <option value="partnership">Partnership</option>
+                  <option value="llp">LLP</option>
+                  <option value="private_limited">Private limited</option>
+                  <option value="public_limited">Public limited</option>
+                  <option value="other">Other</option>
+                </select>
+              </Field>
+              <Field label="Address line 1"><input value={hostBusinessForm.line1} onChange={(event) => setHostBusinessForm((current) => ({ ...current, line1: event.target.value }))} className={hostInputClassName} /></Field>
+              <Field label="Address line 2"><input value={hostBusinessForm.line2} onChange={(event) => setHostBusinessForm((current) => ({ ...current, line2: event.target.value }))} className={hostInputClassName} /></Field>
+              <Field label="City"><input value={hostBusinessForm.city} onChange={(event) => setHostBusinessForm((current) => ({ ...current, city: event.target.value }))} className={hostInputClassName} /></Field>
+              <Field label="State"><input value={hostBusinessForm.state} onChange={(event) => setHostBusinessForm((current) => ({ ...current, state: event.target.value }))} className={hostInputClassName} /></Field>
+              <Field label="Business pincode"><input value={hostBusinessForm.postalCode} onChange={(event) => setHostBusinessForm((current) => ({ ...current, postalCode: event.target.value }))} className={hostInputClassName} inputMode="numeric" /></Field>
+              <Field label="Support email"><input type="email" value={hostBusinessForm.supportEmail} onChange={(event) => setHostBusinessForm((current) => ({ ...current, supportEmail: event.target.value }))} className={hostInputClassName} /></Field>
+              <Field label="Support phone"><input value={hostBusinessForm.supportPhone} onChange={(event) => setHostBusinessForm((current) => ({ ...current, supportPhone: event.target.value }))} className={hostInputClassName} /></Field>
+              <div className="flex gap-2 sm:col-span-2 lg:col-span-3 lg:justify-end">
+                <button type="button" onClick={() => { setHostBusinessForm(getInitialHostBusinessForm(hostOrganization, hostOperationalProfile)); setEditingBusiness(false) }} className="focus-ring flex-1 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-[11px] font-black text-stone-700 sm:flex-none sm:text-xs">Cancel</button>
+                <button disabled={savingBusiness} className="focus-ring flex-1 rounded-xl bg-emerald-700 px-4 py-2.5 text-[11px] font-black text-white disabled:opacity-60 sm:flex-none sm:text-xs">{savingBusiness ? 'Saving…' : 'Save business details'}</button>
+              </div>
+            </form>
+          )}
+        </section>
+
+        <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-2">
+          <section className="rounded-[20px] border border-emerald-200 bg-emerald-50/75 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 shadow-sm sm:size-10 sm:rounded-2xl"><Warehouse size={17} aria-hidden="true" /></div>
+                <div className="min-w-0"><h2 className="text-sm font-black text-stone-950 sm:text-lg">Stock locations</h2><p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-xs">Add or edit the stores, warehouses or dispatch locations where you keep stock.</p></div>
+              </div>
+              <button type="button" onClick={() => setInventoryNodeForm(getInitialInventoryNodeForm())} className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-xl bg-emerald-700 px-2.5 py-2 text-[10px] font-black text-white sm:px-3 sm:text-xs"><Plus size={13} /> Add</button>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {inventoryNodes.length ? inventoryNodes.map((node) => (
+                <article key={node.id} className="rounded-[14px] border border-emerald-100 bg-white/85 p-3 sm:rounded-[18px]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5"><p className="text-[11px] font-black text-stone-950 sm:text-sm">{node.name}</p><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-emerald-700">{formatNodeType(node.nodeType)}</span></div>
+                      <p className="mt-1 text-[9px] font-semibold leading-4 text-stone-500 sm:text-[11px]">{[node.address?.line1, node.address?.city, node.address?.state, node.address?.postalCode].filter(Boolean).join(', ') || 'Address not added yet'}</p>
+                    </div>
+                    <button type="button" onClick={() => setInventoryNodeForm(getInitialInventoryNodeForm(node))} className="focus-ring grid size-8 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-white text-emerald-700" aria-label={`Edit ${node.name}`}><Pencil size={13} /></button>
+                  </div>
+                </article>
+              )) : (
+                <div className="rounded-[14px] border border-dashed border-emerald-200 bg-white/60 p-4 text-center text-[10px] font-semibold text-stone-500 sm:text-xs">No stock location added yet.</div>
+              )}
+            </div>
+
+            {inventoryNodeForm ? (
+              <form onSubmit={handleInventoryNodeSubmit} className="mt-3 rounded-[16px] border border-emerald-200 bg-white/90 p-3 sm:mt-4 sm:rounded-[20px] sm:p-4">
+                <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-black text-stone-950 sm:text-sm">{inventoryNodeForm.id ? 'Edit stock location' : 'Add stock location'}</h3><button type="button" onClick={() => setInventoryNodeForm(null)} className="focus-ring grid size-8 place-items-center rounded-xl border border-stone-200 bg-white text-stone-600"><X size={14} /></button></div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Location name"><input required value={inventoryNodeForm.name} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, name: event.target.value }))} className={hostInputClassName} placeholder="Main warehouse" /></Field>
+                  <Field label="Location type"><select value={inventoryNodeForm.nodeType} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, nodeType: event.target.value }))} className={hostInputClassName}><option value="warehouse">Warehouse</option><option value="store">Store</option><option value="dark_store">Dark store</option><option value="distribution_center">Distribution center</option><option value="other">Other</option></select></Field>
+                  <Field label="Address line 1"><input value={inventoryNodeForm.line1} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, line1: event.target.value }))} className={hostInputClassName} /></Field>
+                  <Field label="Address line 2"><input value={inventoryNodeForm.line2} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, line2: event.target.value }))} className={hostInputClassName} /></Field>
+                  <Field label="City"><input value={inventoryNodeForm.city} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, city: event.target.value }))} className={hostInputClassName} /></Field>
+                  <Field label="State"><input value={inventoryNodeForm.state} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, state: event.target.value }))} className={hostInputClassName} /></Field>
+                  <Field label="Pincode"><input value={inventoryNodeForm.postalCode} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, postalCode: event.target.value }))} className={hostInputClassName} inputMode="numeric" /></Field>
+                </div>
+                <button disabled={savingLocation} className="focus-ring mt-3 w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-[11px] font-black text-white disabled:opacity-60 sm:text-xs">{savingLocation ? 'Saving…' : inventoryNodeForm.id ? 'Save location' : 'Add location'}</button>
+              </form>
+            ) : null}
+          </section>
+
+          <section className="rounded-[20px] border border-violet-200 bg-violet-50/75 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm sm:size-10 sm:rounded-2xl"><MapPinned size={17} aria-hidden="true" /></div>
+                <div className="min-w-0"><h2 className="text-sm font-black text-stone-950 sm:text-lg">Delivery areas</h2><p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-xs">Choose the customer pincodes you serve. These are the same delivery areas used in Operations Center and Pricing & Stock.</p></div>
+              </div>
+              <button type="button" onClick={() => setServiceAreaForm(getInitialServiceAreaForm())} className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-xl bg-violet-700 px-2.5 py-2 text-[10px] font-black text-white sm:px-3 sm:text-xs"><Plus size={13} /> Add</button>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {serviceAreas.length ? serviceAreas.map((area) => {
+                const linkedNode = inventoryNodes.find((node) => String(node.id) === String(area.inventoryNodeId))
+                return (
+                  <article key={area.id} className="rounded-[14px] border border-violet-100 bg-white/85 p-3 sm:rounded-[18px]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-stone-950 sm:text-sm">{area.name}</p>
+                        <p className="mt-1 text-[9px] font-semibold text-stone-500 sm:text-[11px]">{linkedNode ? `From ${linkedNode.name}` : 'All active stock locations'}</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1">{(area.postalCodes || []).slice(0, 6).map((code) => <span key={code} className="rounded-full bg-violet-100 px-2 py-0.5 text-[8px] font-black text-violet-700">{code}</span>)}{(area.postalCodes || []).length > 6 ? <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[8px] font-black text-stone-600">+{area.postalCodes.length - 6}</span> : null}</div>
+                      </div>
+                      <button type="button" onClick={() => setServiceAreaForm(getInitialServiceAreaForm(area))} className="focus-ring grid size-8 shrink-0 place-items-center rounded-xl border border-violet-200 bg-white text-violet-700" aria-label={`Edit ${area.name}`}><Pencil size={13} /></button>
+                    </div>
+                  </article>
+                )
+              }) : (
+                <div className="rounded-[14px] border border-dashed border-violet-200 bg-white/60 p-4 text-center text-[10px] font-semibold text-stone-500 sm:text-xs">No delivery area added yet.</div>
+              )}
+            </div>
+
+            {serviceAreaForm ? (
+              <form onSubmit={handleServiceAreaSubmit} className="mt-3 rounded-[16px] border border-violet-200 bg-white/90 p-3 sm:mt-4 sm:rounded-[20px] sm:p-4">
+                <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-black text-stone-950 sm:text-sm">{serviceAreaForm.id ? 'Edit delivery area' : 'Add delivery area'}</h3><button type="button" onClick={() => setServiceAreaForm(null)} className="focus-ring grid size-8 place-items-center rounded-xl border border-stone-200 bg-white text-stone-600"><X size={14} /></button></div>
+                <div className="mt-3 grid gap-3">
+                  <Field label="Area name"><input required value={serviceAreaForm.name} onChange={(event) => setServiceAreaForm((current) => ({ ...current, name: event.target.value }))} className={hostInputClassName} placeholder="Delhi Central" /></Field>
+                  <Field label="Use stock location"><select value={serviceAreaForm.inventoryNodeId} onChange={(event) => setServiceAreaForm((current) => ({ ...current, inventoryNodeId: event.target.value }))} className={hostInputClassName}><option value="">All active locations</option>{inventoryNodes.filter((node) => node.status === 'active').map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></Field>
+                  <Field label="Delivery pincodes"><textarea required rows={3} value={serviceAreaForm.postalCodes} onChange={(event) => setServiceAreaForm((current) => ({ ...current, postalCodes: event.target.value }))} className={`${hostInputClassName} resize-y`} placeholder="110001, 110002, 110003" /></Field>
+                </div>
+                <button disabled={savingServiceArea} className="focus-ring mt-3 w-full rounded-xl bg-violet-700 px-4 py-2.5 text-[11px] font-black text-white disabled:opacity-60 sm:text-xs">{savingServiceArea ? 'Saving…' : serviceAreaForm.id ? 'Save delivery area' : 'Add delivery area'}</button>
+              </form>
+            ) : null}
+          </section>
+        </div>
+
+        <section className="mt-3 flex flex-col gap-3 rounded-[20px] border border-emerald-200 bg-emerald-100/65 p-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:rounded-[24px] sm:p-5">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 sm:size-10 sm:rounded-2xl"><Store size={17} aria-hidden="true" /></div>
+            <div><h2 className="text-sm font-black text-stone-950 sm:text-base">Next: review your operations setup</h2><p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-600 sm:text-xs">Check delivery coverage, business readiness and other Host setup details in Operations Center.</p></div>
+          </div>
+          <Link to="/host/operations-center" className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-[11px] font-black text-white sm:text-xs">Open Operations Center <ArrowRight size={14} /></Link>
+        </section>
       </div>
     )
   }

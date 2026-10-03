@@ -248,9 +248,14 @@ function BrandIdentityCard({ brand, index, compact = false, onNavigate }) {
   const name = getBrandName(brand)
   const description = compact ? getPublicDescription(brand) : ''
   const fittedNameSize = compact
-    ? Math.max(13, Math.min(26, 330 / Math.max(name.length * 0.58, 7)))
-    : Math.max(14, Math.min(46, 540 / Math.max(name.length * 0.58, 7)))
-  const nameStyle = { fontSize: `${fittedNameSize.toFixed(1)}px`, whiteSpace: 'nowrap' }
+    ? Math.max(13, Math.min(26, 300 / Math.max(name.length * 0.58, 7)))
+    : Math.max(14, Math.min(44, 430 / Math.max(name.length * 0.58, 7)))
+  const nameStyle = {
+    fontSize: `${fittedNameSize.toFixed(1)}px`,
+    maxWidth: '100%',
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
+  }
   const tones = ['ivory', 'blue', 'midnight', 'blue', 'ivory', 'midnight', 'ivory', 'blue', 'midnight']
   return (
     <Link
@@ -445,7 +450,7 @@ const PAGE_STYLES = `
 .ep-brand-pass__top { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 9px; font-weight: 650; line-height: 1.4; letter-spacing: .17em; text-transform: uppercase; opacity: .75; }
 .ep-brand-pass__number { font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 400; letter-spacing: .03em; }
 .ep-brand-pass__identity { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 18px 0; min-height: 0; }
-.ep-brand-pass__identity h3 { max-width: 100%; font-family: Georgia,'Times New Roman',serif; line-height: 1.02; font-weight: 500; letter-spacing: -.05em; margin: 0; }
+.ep-brand-pass__identity h3 { width: 100%; max-width: 100%; font-family: Georgia,'Times New Roman',serif; line-height: 1.02; font-weight: 500; letter-spacing: -.05em; margin: 0; white-space: normal; overflow-wrap: anywhere; word-break: normal; text-wrap: balance; }
 .ep-brand-pass__verified { margin-top: 12px; display: flex; align-items: center; gap: 5px; font-size: 10px; }
 .ep-brand-pass__markets { margin: 7px 0 0; font-size: 10px; line-height: 1.45; opacity: .75; }
 .ep-brand-pass__bottom { border-top: 1px solid #869ba647; padding-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }

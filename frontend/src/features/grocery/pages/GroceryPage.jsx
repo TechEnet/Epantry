@@ -21,6 +21,7 @@ import {
 } from 'react-router-dom'
 
 import EmptyState from '../../../components/common/EmptyState'
+import { openAvailabilityNotifyModal } from '../../notifications/components/AvailabilityNotifyModal'
 import useGroceryCatalog from '../hooks/useGroceryCatalog'
 
 const PREVIEW_PRODUCT_COUNT = 6
@@ -455,12 +456,83 @@ function lockDialogViewport(dialog, closeRef) {
   }
 }
 
-function ProductDirectory({ products, loading, onClose }) {
+function ProductDirectory({ products, categories, loading, onClose }) {
   const dialogRef = useRef(null)
   const closeRef = useRef(null)
   const backdropPress = useRef(false)
+  const [directorySearch, setDirectorySearch] = useState('')
 
   useEffect(() => lockDialogViewport(dialogRef.current, closeRef), [])
+
+  const filteredProducts = useMemo(() => {
+    const query = directorySearch.trim().toLowerCase()
+    if (!query) return products
+
+    return products.filter((product) => {
+      const searchable = [
+        getProductName(product),
+        product?.category?.name,
+        product?.category?.slug,
+        product?.brand?.name,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return searchable.includes(query)
+    })
+  }, [directorySearch, products])
+
+  const categorySections = useMemo(() => {
+    const knownCategories = new Map(
+      categories.map((category) => [
+        String(category?.slug || category?.name || '').trim().toLowerCase(),
+        category,
+      ]),
+    )
+    const grouped = new Map()
+
+    filteredProducts.forEach((product) => {
+      const productCategory = product?.category || {}
+      const rawKey = String(productCategory.slug || productCategory.name || 'other-groceries')
+        .trim()
+        .toLowerCase()
+      const key = rawKey || 'other-groceries'
+      const knownCategory = knownCategories.get(key)
+      const label = String(
+        knownCategory?.name
+          || productCategory.name
+          || 'Other groceries',
+      ).trim()
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          label,
+          products: [],
+        })
+      }
+
+      grouped.get(key).products.push(product)
+    })
+
+    const ordered = []
+    const added = new Set()
+
+    categories.forEach((category) => {
+      const key = String(category?.slug || category?.name || '').trim().toLowerCase()
+      const section = grouped.get(key)
+      if (!section) return
+      ordered.push(section)
+      added.add(key)
+    })
+
+    grouped.forEach((section, key) => {
+      if (!added.has(key)) ordered.push(section)
+    })
+
+    return ordered
+  }, [categories, filteredProducts])
 
   function isOutside(event) {
     const rect = dialogRef.current?.getBoundingClientRect()
@@ -501,26 +573,70 @@ function ProductDirectory({ products, loading, onClose }) {
           </button>
         </header>
 
+        <div className="ep-grocery-modal__directory-search">
+          <Search size={17} strokeWidth={1.8} aria-hidden="true" />
+          <input
+            type="search"
+            value={directorySearch}
+            onChange={(event) => setDirectorySearch(event.target.value)}
+            placeholder="Search groceries, brands or categories"
+            aria-label="Search groceries in this popup"
+          />
+          {directorySearch ? (
+            <button
+              type="button"
+              onClick={() => setDirectorySearch('')}
+              aria-label="Clear grocery search"
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+
         <div className="ep-grocery-modal__scroll">
           {loading ? (
             <div className="ep-grocery-modal__loading" role="status">Loading groceries…</div>
-          ) : (
-            <div className="ep-grocery-modal__product-grid">
-              {products.map((product) => (
-                <div
-                  key={getProductKey(product)}
-                  className="ep-grocery-modal__product-item"
+          ) : categorySections.length ? (
+            <div className="ep-grocery-modal__category-sections">
+              {categorySections.map((section) => (
+                <section
+                  key={section.key}
+                  className="ep-grocery-modal__category-section"
+                  aria-label={section.label}
                 >
-                  <ProductImageCard
-                    product={product}
-                    compact
-                    onNavigate={onClose}
-                  />
-                  <div className="ep-grocery-modal__product-name">
-                    {getProductName(product)}
+                  <div className="ep-grocery-modal__category-heading">
+                    <div>
+                      <span>Category</span>
+                      <h3>{section.label}</h3>
+                    </div>
+                    <p>{section.products.length} {section.products.length === 1 ? 'product' : 'products'}</p>
                   </div>
-                </div>
+
+                  <div className="ep-grocery-modal__category-products">
+                    {section.products.map((product) => (
+                      <div
+                        key={getProductKey(product)}
+                        className="ep-grocery-modal__product-item"
+                      >
+                        <ProductImageCard
+                          product={product}
+                          compact
+                          onNavigate={onClose}
+                        />
+                        <div className="ep-grocery-modal__product-name">
+                          {getProductName(product)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               ))}
+            </div>
+          ) : (
+            <div className="ep-grocery-modal__empty-search">
+              <Search size={28} strokeWidth={1.35} aria-hidden="true" />
+              <strong>No groceries found</strong>
+              <span>Try another product, brand or category name.</span>
             </div>
           )}
         </div>
@@ -681,13 +797,28 @@ const PAGE_STYLES = `
 .ep-grocery-modal__header h2 { margin: 5px 0 5px; font-family: Georgia,'Times New Roman',serif; font-size: 38px; line-height: 1; font-weight: 500; letter-spacing: -.04em; }
 .ep-grocery-modal__header span { color: #577066; font-size: 11px; }
 .ep-grocery-modal__header > button { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid #ffffffc9; border-radius: 50%; background: #ffffff9e; color: #244f3e; }
+.ep-grocery-modal__directory-search { flex-shrink: 0; display: flex; align-items: center; gap: 10px; margin: 16px 28px 0; min-height: 48px; border: 1px solid #ffffffd4; border-radius: 15px; background: rgba(255,255,255,.74); padding: 0 12px 0 15px; color: #527064; box-shadow: inset 0 1px 0 #ffffff,0 8px 24px #113b2b0b; }
+.ep-grocery-modal__directory-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #173f31; font-size: 13px; font-weight: 700; }
+.ep-grocery-modal__directory-search input::placeholder { color: #718b80; font-weight: 650; }
+.ep-grocery-modal__directory-search button { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border: 1px solid #2b634c24; border-radius: 50%; background: #eef5ef; color: #315f4c; }
 .ep-grocery-modal__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 28px 28px; scrollbar-width: thin; scrollbar-color: #7f9c8d transparent; }
-.ep-grocery-modal__product-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
-.ep-grocery-modal__product-item { min-width: 0; display: flex; flex-direction: column; }
+.ep-grocery-modal__category-sections { display: flex; flex-direction: column; gap: 28px; }
+.ep-grocery-modal__category-section { min-width: 0; }
+.ep-grocery-modal__category-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 11px; padding: 0 2px; }
+.ep-grocery-modal__category-heading span { display: block; margin-bottom: 3px; color: #6f8c7f; font-size: 8px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+.ep-grocery-modal__category-heading h3 { margin: 0; color: #153d2f; font-family: Georgia,'Times New Roman',serif; font-size: 24px; line-height: 1; font-weight: 500; letter-spacing: -.025em; }
+.ep-grocery-modal__category-heading p { margin: 0; color: #718a7f; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.ep-grocery-modal__category-products { display: flex; gap: 13px; width: 100%; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 10px; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: #88a596 transparent; -webkit-overflow-scrolling: touch; }
+.ep-grocery-modal__category-products::-webkit-scrollbar { height: 5px; }
+.ep-grocery-modal__category-products::-webkit-scrollbar-thumb { border-radius: 999px; background: #88a596; }
+.ep-grocery-modal__category-products::-webkit-scrollbar-track { background: transparent; }
+.ep-grocery-modal__product-item { min-width: 0; flex: 0 0 clamp(170px,18vw,212px); display: flex; flex-direction: column; scroll-snap-align: start; }
 .ep-grocery-image-card--compact { height: auto; flex: 0 0 auto; aspect-ratio: 1 / 1; border-radius: 18px; box-shadow: 0 8px 28px #0a2d2116,inset 0 1px 0 #ffffff; }
 .ep-grocery-image-card--compact img { padding: 24px; }
 .ep-grocery-modal__product-name { min-height: 44px; padding: 10px 4px 2px; overflow: visible; white-space: normal; color: #173f31; font-size: 13px; font-weight: 850; line-height: 1.35; overflow-wrap: anywhere; }
-.ep-grocery-modal__loading { display: grid; place-items: center; min-height: 300px; color: #557568; font-size: 13px; }
+.ep-grocery-modal__loading,.ep-grocery-modal__empty-search { display: grid; place-items: center; align-content: center; min-height: 300px; color: #557568; font-size: 13px; text-align: center; }
+.ep-grocery-modal__empty-search strong { margin-top: 12px; color: #234c3c; font-size: 15px; }
+.ep-grocery-modal__empty-search span { margin-top: 4px; color: #6d877b; font-size: 11px; }
 .ep-grocery-modal--categories { width: min(980px,calc(100vw - 56px)); height: min(650px,calc(100svh - 64px)); }
 .ep-grocery-modal__category-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
 .ep-grocery-modal__category-grid button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; min-height: 86px; border: 1px solid #ffffffb3; border-radius: 16px; background: #ffffff88; padding: 14px 16px; text-align: left; color: #173f31; box-shadow: 0 6px 22px #113b2b0d; }
@@ -701,7 +832,6 @@ const PAGE_STYLES = `
   .ep-grocery-flight { width: min(48vw,470px); }
   .ep-grocery-ending__view { left: 53%; width: min(36vw,410px); }
   .ep-grocery-ending__categories { left: calc(34% + 18px); }
-  .ep-grocery-modal__product-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
 }
 
 @media (max-width: 699px) {
@@ -805,9 +935,17 @@ const PAGE_STYLES = `
   .ep-grocery-modal { width: calc(100vw - 22px); height: calc(100svh - 28px); border-radius: 20px; }
   .ep-grocery-modal__header { padding: 18px 16px 13px; }
   .ep-grocery-modal__header h2 { font-size: 29px; }
+  .ep-grocery-modal__directory-search { min-height: 44px; margin: 12px 16px 0; border-radius: 13px; padding-left: 12px; }
+  .ep-grocery-modal__directory-search input { font-size: 11px; }
   .ep-grocery-modal__scroll { padding: 14px 16px 20px; }
-  .ep-grocery-modal__product-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  .ep-grocery-modal__category-sections { gap: 23px; }
+  .ep-grocery-modal__category-heading { align-items: center; margin-bottom: 9px; }
+  .ep-grocery-modal__category-heading h3 { font-size: 21px; }
+  .ep-grocery-modal__category-heading p { font-size: 9px; }
+  .ep-grocery-modal__category-products { gap: 10px; padding-bottom: 8px; }
+  .ep-grocery-modal__product-item { flex-basis: min(42vw,156px); }
   .ep-grocery-image-card--compact img { padding: 15px; }
+  .ep-grocery-modal__product-name { min-height: 40px; padding-top: 8px; font-size: 11px; }
   .ep-grocery-modal__category-grid { grid-template-columns: 1fr; }
   .ep-grocery-static__grid { grid-template-columns: 1fr 1fr; }
 }
@@ -860,6 +998,7 @@ export default function GroceryPage() {
   const pageRef = useRef(null)
   const trackRef = useRef(null)
   const stageRef = useRef(null)
+  const unavailableSearchRef = useRef('')
   const reducedMotion = useReducedMotion()
 
   useNavbarClearance(pageRef)
@@ -891,6 +1030,37 @@ export default function GroceryPage() {
     const total = Number(pagination?.total) || 0
     if (total > limit) setLimit(total)
   }, [productDirectoryOpen, pagination?.total, limit, setLimit])
+
+
+  useEffect(() => {
+    const normalizedSearch = String(search || '').trim()
+
+    if (
+      loading ||
+      error ||
+      normalizedSearch.length < 2 ||
+      products.length > 0
+    ) {
+      if (products.length > 0 || !normalizedSearch) {
+        unavailableSearchRef.current = ''
+      }
+      return
+    }
+
+    const watchKey = normalizedSearch.toLowerCase()
+
+    if (unavailableSearchRef.current === watchKey) {
+      return
+    }
+
+    unavailableSearchRef.current = watchKey
+
+    openAvailabilityNotifyModal({
+      query: normalizedSearch,
+      displayName: normalizedSearch,
+      source: 'search',
+    })
+  }, [loading, error, search, products.length])
 
   function handleSearchSubmit(event) {
     event.preventDefault()
@@ -1151,6 +1321,7 @@ export default function GroceryPage() {
       {productDirectoryOpen && (
         <ProductDirectory
           products={products}
+          categories={categories}
           loading={loading}
           onClose={() => setProductDirectoryOpen(false)}
         />

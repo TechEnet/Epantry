@@ -67,6 +67,7 @@ test(
                 'communityRecipes',
                 'recipeForks',
                 'communityRecipeReviews',
+                'communityRecipeShares',
                 'socialFollows',
                 'creatorProfiles',
                 'creatorCourses',
@@ -254,6 +255,11 @@ test(
         for (
             const route of [
                 '/community-recipes',
+                '/community-recipes/shared/:token',
+                '/community-recipes/:id/share',
+                '/community-recipes/:id/shares',
+                '/community-recipe-shares/:id/revoke',
+                '/me/community-recipes/shared',
                 '/recipes/community',
                 '/recipes/:id/fork',
                 '/recipes/:id/reviews',
@@ -299,6 +305,7 @@ test(
         for (
             const file of [
                 'src/features/community/pages/CommunityRecipesPage.jsx',
+                'src/features/community/pages/SharedCommunityRecipePage.jsx',
                 'src/features/community/pages/CreatorProfilePage.jsx',
                 'src/features/community/pages/LearnProPage.jsx',
                 'src/features/community/pages/AdminCommunityPage.jsx',
@@ -331,6 +338,7 @@ test(
         for (
             const route of [
                 'path="/community"',
+                'path="/community/shared/:shareToken"',
                 'path="/community/:communityRecipeId"',
                 'path="/creators/:creatorProfileId"',
                 'path="/creator-studio"',
@@ -376,12 +384,68 @@ test(
 
         assert.match(
             source,
-            /Share recipe link/,
+            /Private by default/,
         );
 
         assert.match(
             source,
-            /private household or pantry data/i,
+            /Share with friend/,
+        );
+
+        assert.match(
+            source,
+            /Shared with me/,
+        );
+
+        assert.doesNotMatch(
+            source,
+            /Submit public|Public - moderation required/,
         );
     },
 );
+
+test(
+    'M2 personal Community recipes are private or friend-only with revocable targeted shares',
+    () => {
+        const models =
+            readBackend(
+                'src/modules/community/community.models.js',
+            );
+
+        const service =
+            readBackend(
+                'src/modules/community/community.service.js',
+            );
+
+        const validation =
+            readBackend(
+                'src/modules/community/community.validation.js',
+            );
+
+        assert.match(
+            models,
+            /collection:\s*['"]communityRecipeShares['"]/,
+        );
+
+        assert.match(
+            service,
+            /COMMUNITY_PUBLIC_PUBLISHING_DISABLED/,
+        );
+
+        assert.match(
+            service,
+            /randomBytes\(\s*32/,
+        );
+
+        assert.match(
+            service,
+            /tokenHash/,
+        );
+
+        assert.match(
+            validation,
+            /'private',[\s\S]*?'friends'/,
+        );
+    },
+);
+

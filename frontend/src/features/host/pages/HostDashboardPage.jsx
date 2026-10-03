@@ -11,6 +11,7 @@ import {
   Boxes,
   Building2,
   ChefHat,
+  Clapperboard,
   FileSearch,
   LayoutDashboard,
   Settings,
@@ -32,6 +33,11 @@ import {
 import {
   getHostEarningsOverview,
 } from '../../hostOperations/services/hostOperations.service'
+
+import {
+  isHostPathAllowed,
+  normalizeHostWorkspaceType,
+} from '../hostWorkspace.config'
 
 const workflowStages = [
   {
@@ -149,6 +155,12 @@ const quickAccessItems = [
     to: '/host/hospitality',
     icon: LayoutDashboard,
   },
+  {
+    title: 'Creator Studio',
+    description: 'Create professional videos, courses and live sessions for your approved Chef + Restaurant workspace.',
+    to: '/host/creator-studio',
+    icon: Clapperboard,
+  },
 ]
 
 function formatMinorCurrency(
@@ -188,11 +200,44 @@ export default function HostDashboardPage() {
   } = useAuth()
 
 
+  const hostWorkspaceType =
+    normalizeHostWorkspaceType(
+      currentUser,
+    )
+
+  const canViewEarnings =
+    isHostPathAllowed(
+      '/host/earnings',
+      hostWorkspaceType,
+    )
+
+  const visibleWorkflowStages =
+    workflowStages.filter((stage) =>
+      isHostPathAllowed(
+        stage.to,
+        hostWorkspaceType,
+      ),
+    )
+
+  const visibleQuickAccessItems =
+    quickAccessItems.filter((item) =>
+      isHostPathAllowed(
+        item.to,
+        hostWorkspaceType,
+      ),
+    )
+
   const [earnings, setEarnings] = useState(null)
   const [earningsLoading, setEarningsLoading] = useState(true)
   const [earningsError, setEarningsError] = useState('')
 
   const loadEarnings = useCallback(async () => {
+    if (!canViewEarnings) {
+      setEarningsLoading(false)
+      setEarningsError('')
+      return
+    }
+
     try {
       const result =
         await getHostEarningsOverview()
@@ -211,9 +256,14 @@ export default function HostDashboardPage() {
     } finally {
       setEarningsLoading(false)
     }
-  }, [])
+  }, [canViewEarnings])
 
   useEffect(() => {
+    if (!canViewEarnings) {
+      setEarningsLoading(false)
+      return undefined
+    }
+
     loadEarnings()
 
     const interval =
@@ -237,7 +287,7 @@ export default function HostDashboardPage() {
         loadEarnings,
       )
     }
-  }, [loadEarnings])
+  }, [canViewEarnings, loadEarnings])
 
   const name =
     currentUser?.displayName ||
@@ -291,7 +341,8 @@ export default function HostDashboardPage() {
         </div>
       </section>
 
-      <section className="mt-3 sm:mt-6">
+      {canViewEarnings ? (
+        <section className="mt-3 sm:mt-6">
         <Link
           to="/host/earnings"
           className="focus-ring group relative block overflow-hidden rounded-[24px] border border-sky-800 bg-[#123f63] p-4 text-white shadow-[0_24px_60px_-42px_rgba(14,60,95,0.9)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-40px_rgba(14,60,95,0.9)] sm:rounded-[28px] sm:p-6"
@@ -386,8 +437,9 @@ export default function HostDashboardPage() {
               />
             </span>
           </div>
-        </Link>
-      </section>
+          </Link>
+        </section>
+      ) : null}
 
       <section className="mt-3 sm:mt-6">
         <div>
@@ -398,13 +450,13 @@ export default function HostDashboardPage() {
             What to do next
           </h2>
           <p className="mt-1 max-w-3xl text-[10px] leading-4 text-stone-500 sm:mt-2 sm:text-sm sm:leading-6">
-            <span className="sm:hidden">Follow the core Host workflow in four simple steps.</span>
-            <span className="hidden sm:inline">The same Host tools from the sidebar are arranged here in a simple business sequence.</span>
+            <span className="sm:hidden">Follow the workflow available for your approved Host workspace.</span>
+            <span className="hidden sm:inline">The tools approved for your Host workspace are arranged here in a simple business sequence.</span>
           </p>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-1 sm:gap-4 xl:grid-cols-4">
-          {workflowStages.map((stage) => {
+          {visibleWorkflowStages.map((stage) => {
             const Icon = stage.icon
 
             return (
@@ -468,7 +520,7 @@ export default function HostDashboardPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
-          {quickAccessItems.map((item) => {
+          {visibleQuickAccessItems.map((item) => {
             const Icon = item.icon
 
             return (

@@ -47,7 +47,9 @@ export const CREATOR_COURSE_ACCESS_TYPES = Object.freeze([
 
 export const CREATOR_COURSE_STATUSES = Object.freeze([
     'draft',
+    'in_review',
     'listed',
+    'rejected',
     'archived',
 ]);
 
@@ -210,6 +212,88 @@ communityRecipeSchema.index({
     visibility: 1,
     status: 1,
     moderationState: 1,
+    createdAt: -1,
+});
+
+
+const communityRecipeShareSchema = new Schema({
+    communityRecipeId: {
+        type: objectId,
+        ref: 'CommunityRecipe',
+        required: true,
+        index: true,
+    },
+
+    ownerUserId: {
+        type: objectId,
+        ref: 'User',
+        required: true,
+        index: true,
+    },
+
+    inviteeEmail: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true,
+        index: true,
+    },
+
+    inviteeUserId: {
+        type: objectId,
+        ref: 'User',
+        default: null,
+        index: true,
+    },
+
+    tokenHash: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true,
+    },
+
+    status: {
+        type: String,
+        enum: [
+            'active',
+            'revoked',
+        ],
+        required: true,
+        default: 'active',
+        index: true,
+    },
+
+    claimedAt: {
+        type: Date,
+        default: null,
+    },
+
+    revokedAt: {
+        type: Date,
+        default: null,
+    },
+}, {
+    ...baseOptions,
+    collection: 'communityRecipeShares',
+});
+
+communityRecipeShareSchema.index({
+    communityRecipeId: 1,
+    ownerUserId: 1,
+    status: 1,
+    createdAt: -1,
+});
+
+communityRecipeShareSchema.index({
+    inviteeUserId: 1,
+    status: 1,
+    createdAt: -1,
+});
+
+communityRecipeShareSchema.index({
+    inviteeEmail: 1,
+    status: 1,
     createdAt: -1,
 });
 
@@ -606,14 +690,14 @@ const creatorCourseSchema = new Schema({
     linkedCommunityRecipeId: {
         type: objectId,
         ref: 'CommunityRecipe',
-        required: true,
+        default: null,
         index: true,
     },
 
     linkedRecipeVersionId: {
         type: objectId,
         ref: 'RecipeVersion',
-        required: true,
+        default: null,
         index: true,
     },
 
@@ -669,7 +753,7 @@ const creatorCourseSchema = new Schema({
         type: String,
         enum: CREATOR_COURSE_STATUSES,
         required: true,
-        default: 'listed',
+        default: 'draft',
         index: true,
     },
 
@@ -814,6 +898,14 @@ export const CommunityRecipe =
     mongoose.model(
         'CommunityRecipe',
         communityRecipeSchema,
+    );
+
+
+export const CommunityRecipeShare =
+    mongoose.models.CommunityRecipeShare ||
+    mongoose.model(
+        'CommunityRecipeShare',
+        communityRecipeShareSchema,
     );
 
 export const RecipeFork =

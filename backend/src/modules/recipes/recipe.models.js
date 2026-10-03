@@ -526,6 +526,36 @@ const recipeVersionSchema =
           true,
       },
 
+      sourceOutletId: {
+        type:
+          Schema.Types.ObjectId,
+
+        ref:
+          'HospitalityOutlet',
+
+        default:
+          null,
+
+        index:
+          true,
+      },
+
+      visibility: {
+        type:
+          String,
+
+        enum: [
+          'public',
+          'organization_only',
+        ],
+
+        default:
+          'public',
+
+        index:
+          true,
+      },
+
       status: {
         type:
           String,

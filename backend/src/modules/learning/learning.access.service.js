@@ -8,6 +8,10 @@ import {
     CreatorProfile,
 } from '../community/community.models.js';
 
+import {
+    ProMembership,
+} from './learning.models.js';
+
 function idOf(
     value,
 ) {
@@ -117,6 +121,20 @@ export async function findActiveCourseEntitlement({
     }).lean();
 }
 
+
+export async function findActiveProMembership({
+    userId,
+    now = new Date(),
+}) {
+    return ProMembership.findOne({
+        userId,
+        status: 'active',
+        validUntil: {
+            $gt: now,
+        },
+    }).lean();
+}
+
 export async function getLearnerCourseAccess({
     courseId,
     actorUser,
@@ -186,34 +204,51 @@ export async function getLearnerCourseAccess({
         };
     }
 
-    const entitlement =
-        await findActiveCourseEntitlement({
-            userId,
-            courseId:
-                course._id,
-        });
+    const [
+        entitlement,
+        proMembership,
+    ] =
+        await Promise.all([
+            findActiveCourseEntitlement({
+                userId,
+                courseId:
+                    course._id,
+            }),
+            course.accessType === 'pro'
+                ? findActiveProMembership({
+                    userId,
+                })
+                : null,
+        ]);
 
-    if (!entitlement) {
+    if (!entitlement && !proMembership) {
         return {
             userId,
             course,
             entitlement:
                 null,
+            membership:
+                null,
             allowed:
                 false,
             accessReason:
-                'course_entitlement_required',
+                'pro_membership_or_course_entitlement_required',
         };
     }
 
     return {
         userId,
         course,
-        entitlement,
+        entitlement:
+            entitlement || null,
+        membership:
+            proMembership || null,
         allowed:
             true,
         accessReason:
-            'course_entitlement',
+            entitlement
+                ? 'course_entitlement'
+                : 'pro_membership',
     };
 }
 
@@ -234,11 +269,11 @@ export async function requireLearnerCourseAccess({
     if (!access.allowed) {
         throw new ApiError(
             403,
-            'An active Course entitlement is required for this Pro learning content.',
+            'An active EPANTRY Pro membership or Course entitlement is required for this protected learning content.',
             [
                 {
                     code:
-                        'LEARNING_COURSE_ENTITLEMENT_REQUIRED',
+                        'LEARNING_PRO_ACCESS_REQUIRED',
                 },
             ],
         );
@@ -267,7 +302,9 @@ export async function requireCourseAuthor({
             status: {
                 $in: [
                     'draft',
+                    'in_review',
                     'listed',
+                    'rejected',
                 ],
             },
 
@@ -330,6 +367,7 @@ export async function requireCourseAuthor({
 export function serializeLearningAccess({
     course,
     entitlement,
+    membership = null,
     accessReason,
     allowed = true,
 }) {
@@ -368,6 +406,21 @@ export function serializeLearningAccess({
 
                     endsAt:
                         entitlement.endsAt ||
+                        null,
+                }
+                : null,
+
+        proMembership:
+            membership
+                ? {
+                    id:
+                        idOf(
+                            membership._id,
+                        ),
+                    status:
+                        membership.status,
+                    validUntil:
+                        membership.validUntil ||
                         null,
                 }
                 : null,

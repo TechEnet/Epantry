@@ -15,9 +15,11 @@ import {
 import {
   motion,
   useReducedMotion,
+  useScroll,
+  useTransform,
 } from 'motion/react'
 
-import ClosingCtaSection from '../components/ClosingCtaSection'
+// import ClosingCtaSection from '../components/ClosingCtaSection' // Temporarily hidden; keep component for future re-enable
 
 import FeaturedContentSection from '../components/FeaturedContentSection'
 
@@ -28,34 +30,6 @@ import HowItWorksSection from '../components/HowItWorksSection'
 import {
   landingCategories,
 } from '../content/landingContent'
-
-const EXPERIENCE_INTRO_TRANSFORMS = [
-  {
-    x: '72%',
-    y: 18,
-    rotate: -9,
-    scale: 0.95,
-  },
-  {
-    x: '0%',
-    y: 0,
-    rotate: 2,
-    scale: 0.98,
-  },
-  {
-    x: '-72%',
-    y: 18,
-    rotate: 9,
-    scale: 0.95,
-  },
-]
-
-const EXPERIENCE_SETTLED_TRANSFORM = {
-  x: '0%',
-  y: 0,
-  rotate: 0,
-  scale: 1,
-}
 
 const EXPERIENCE_CARD_IMAGES = {
   grocery: '/exploar/Exploar_G.png',
@@ -81,73 +55,85 @@ const CARD_FLIP_EASE = [
   1.275,
 ]
 
-const mobileRailFrames = new WeakMap()
+const EXPERIENCE_BACKDROP_ROWS = [
+  {
+    id: 'row-01',
+    top: '-8%',
+    direction: 'left',
+    duration: 28,
+    cardWidth: 'clamp(82px, 8.8vw, 142px)',
+    opacity: 0.58,
+    sequence: [
+      'grocery',
+      'brands',
+      'recipes',
+      'grocery',
+      'brands',
+      'recipes',
+    ],
+  },
+  {
+    id: 'row-02',
+    top: '38%',
+    direction: 'right',
+    duration: 32,
+    cardWidth: 'clamp(76px, 8.2vw, 132px)',
+    opacity: 0.46,
+    sequence: [
+      'recipes',
+      'grocery',
+      'brands',
+      'recipes',
+      'grocery',
+      'brands',
+    ],
+  },
+  {
+    id: 'row-03',
+    top: '82%',
+    direction: 'left',
+    duration: 30,
+    cardWidth: 'clamp(80px, 8.5vw, 138px)',
+    opacity: 0.52,
+    sequence: [
+      'brands',
+      'recipes',
+      'grocery',
+      'brands',
+      'recipes',
+      'grocery',
+    ],
+  },
+]
 
-function updateMobileRailFocus(rail) {
-  if (!rail?.children?.length) {
-    return
-  }
-
-  const railRect = rail.getBoundingClientRect()
-  const railCenter = railRect.left + railRect.width / 2
-  const focusDistance = Math.max(railRect.width * 0.72, 1)
-
-  Array.from(rail.children).forEach((child) => {
-    const card = child.firstElementChild
-
-    if (!card) {
-      return
+function getExperienceTone(categoryId) {
+  if (categoryId === 'brands') {
+    return {
+      glow: 'bg-[#2563EB]/10',
+      icon: 'bg-[#EFF6FF]/85 text-[#2563EB]',
+      action: 'text-[#2563EB]',
+      frame: 'bg-[#EFF6FF]',
+      glass: 'bg-[#EFF6FF]/60',
     }
-
-    const childRect = child.getBoundingClientRect()
-    const childCenter = childRect.left + childRect.width / 2
-    const distance = Math.min(
-      Math.abs(childCenter - railCenter) / focusDistance,
-      1,
-    )
-    const scale = 1.035 - distance * 0.115
-    const translateY = distance * 8
-    const opacity = 1 - distance * 0.045
-
-    card.style.transform = `translate3d(0, ${translateY.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`
-    card.style.opacity = opacity.toFixed(3)
-  })
-}
-
-function handleMobileRailScroll(event) {
-  const rail = event.currentTarget
-  const previousFrame = mobileRailFrames.get(rail)
-
-  if (previousFrame) {
-    cancelAnimationFrame(previousFrame)
   }
 
-  const nextFrame = requestAnimationFrame(() => {
-    updateMobileRailFocus(rail)
-    mobileRailFrames.delete(rail)
-  })
-
-  mobileRailFrames.set(rail, nextFrame)
-}
-
-function initializeMobileRail(rail) {
-  if (!rail || typeof requestAnimationFrame === 'undefined') {
-    return
-  }
-
-  requestAnimationFrame(() => {
-    const startCard = rail.querySelector('[data-mobile-rail-start]')
-
-    if (startCard) {
-      const centeredScrollLeft =
-        startCard.offsetLeft -
-        (rail.clientWidth - startCard.offsetWidth) / 2
-
-      rail.scrollLeft = Math.max(centeredScrollLeft, 0)
+  if (categoryId === 'recipes') {
+    return {
+      glow: 'bg-[#F59E0B]/10',
+      icon: 'bg-[#FFF7ED]/85 text-[#EA580C]',
+      action: 'text-[#EA580C]',
+      frame: 'bg-[#FFF7ED]',
+      glass: 'bg-[#FFF7ED]/60',
     }
+  }
 
-    updateMobileRailFocus(rail)
-  })
+  return {
+    glow: 'bg-[#16A34A]/10',
+    icon: 'bg-[#F0FDF4]/85 text-[#166534]',
+    action: 'text-[#166534]',
+    frame: 'bg-[#F0FDF4]',
+    glass: 'bg-[#F0FDF4]/60',
+  }
 }
 
 export default function LandingPage() {
@@ -169,19 +155,59 @@ export default function LandingPage() {
   )
 
   const [
-    experienceIntroStarted,
-    setExperienceIntroStarted,
-  ] = useState(false)
-
-  const [
-    experienceCardsSettled,
-    setExperienceCardsSettled,
-  ] = useState(false)
+    activeExperienceIndex,
+    setActiveExperienceIndex,
+  ] = useState(-1)
 
   const [
     hoveredExperienceId,
     setHoveredExperienceId,
   ] = useState(null)
+
+  const [
+    autoRevealExperienceId,
+    setAutoRevealExperienceId,
+  ] = useState(null)
+
+  const {
+    scrollYProgress:
+      experienceScrollProgress,
+  } = useScroll({
+    target:
+      experienceSectionRef,
+
+    offset: [
+      'start start',
+      'end end',
+    ],
+  })
+
+  const backdropVerticalY =
+    useTransform(
+      experienceScrollProgress,
+      [0, 1],
+      shouldReduceMotion
+        ? ['0svh', '0svh']
+        : ['0svh', '-56svh'],
+    )
+
+  const backdropDepthScale =
+    useTransform(
+      experienceScrollProgress,
+      [0, 0.5, 1],
+      shouldReduceMotion
+        ? [1, 1, 1]
+        : [1.025, 1, 1.035],
+    )
+
+  const backdropDepthRotateX =
+    useTransform(
+      experienceScrollProgress,
+      [0, 0.5, 1],
+      shouldReduceMotion
+        ? [0, 0, 0]
+        : [0.8, -0.65, 0.9],
+    )
 
   useEffect(() => {
     if (
@@ -228,96 +254,111 @@ export default function LandingPage() {
   }, [])
 
   useEffect(() => {
-    if (
-      shouldReduceMotion
-    ) {
-      setExperienceIntroStarted(
-        true,
-      )
+    const updateStage = (
+      value,
+    ) => {
+      let nextIndex = -1
 
-      setExperienceCardsSettled(
-        true,
+      if (value >= 0.13 && value < 0.36) {
+        nextIndex = 0
+      } else if (value >= 0.36 && value < 0.59) {
+        nextIndex = 1
+      } else if (value >= 0.59 && value < 0.86) {
+        nextIndex = 2
+      } else if (value >= 0.86) {
+        nextIndex = 2
+      }
+
+      setActiveExperienceIndex(
+        (currentIndex) =>
+          currentIndex === nextIndex
+            ? currentIndex
+            : nextIndex,
       )
     }
+
+    updateStage(
+      experienceScrollProgress.get(),
+    )
+
+    const unsubscribe =
+      experienceScrollProgress.on(
+        'change',
+        updateStage,
+      )
+
+    return unsubscribe
   }, [
-    shouldReduceMotion,
+    experienceScrollProgress,
   ])
 
   useEffect(() => {
-    const sectionNode =
-      experienceSectionRef.current
-
     if (
-      !sectionNode ||
-      !isDesktopHoverDevice ||
+      isDesktopHoverDevice ||
+      activeExperienceIndex < 0 ||
       shouldReduceMotion
     ) {
+      setAutoRevealExperienceId(
+        null,
+      )
+
       return undefined
     }
 
-    const observer =
-      new IntersectionObserver(
-        ([entry]) => {
-          if (
-            !entry.isIntersecting ||
-            entry.intersectionRatio <= 0.16
-          ) {
-            setExperienceIntroStarted(
-              false,
-            )
+    const category =
+      landingCategories[
+        activeExperienceIndex
+      ]
 
-            setExperienceCardsSettled(
-              false,
-            )
+    if (!category) {
+      return undefined
+    }
 
-            setHoveredExperienceId(
-              null,
-            )
-          }
-        },
-        {
-          threshold: [
-            0,
-            0.16,
-            0.42,
-            0.7,
-          ],
-        },
-      )
-
-    observer.observe(
-      sectionNode,
+    setAutoRevealExperienceId(
+      null,
     )
 
+    const revealTimeoutId =
+      window.setTimeout(
+        () => {
+          setAutoRevealExperienceId(
+            category.id,
+          )
+        },
+        520,
+      )
+
+    const resetTimeoutId =
+      window.setTimeout(
+        () => {
+          setAutoRevealExperienceId(
+            null,
+          )
+        },
+        1420,
+      )
+
     return () => {
-      observer.disconnect()
+      window.clearTimeout(
+        revealTimeoutId,
+      )
+
+      window.clearTimeout(
+        resetTimeoutId,
+      )
     }
   }, [
+    activeExperienceIndex,
     isDesktopHoverDevice,
     shouldReduceMotion,
   ])
-
-  const handleExperienceStackEnter = () => {
-    if (
-      !isDesktopHoverDevice ||
-      shouldReduceMotion ||
-      experienceIntroStarted
-    ) {
-      return
-    }
-
-    setExperienceIntroStarted(
-      true,
-    )
-  }
 
   const handleExperienceCardEnter = (
     categoryId,
   ) => {
     if (
       !isDesktopHoverDevice ||
-      shouldReduceMotion ||
-      !experienceCardsSettled
+      shouldReduceMotion
     ) {
       return
     }
@@ -332,22 +373,36 @@ export default function LandingPage() {
   ) => {
     setHoveredExperienceId(
       (currentId) =>
-        currentId ===
-        categoryId
+        currentId === categoryId
           ? null
           : currentId,
     )
   }
 
-  const mobileExperienceCards =
-    landingCategories.map(
-      (category) => ({
-        category,
-      }),
-    )
+  const activeExperience =
+    activeExperienceIndex >= 0
+      ? landingCategories[
+          activeExperienceIndex
+        ]
+      : null
+
+  const activeExperienceTone =
+    activeExperience
+      ? getExperienceTone(
+          activeExperience.id,
+        )
+      : null
+
+  const activeExperienceIsRevealed =
+    activeExperience
+      ? hoveredExperienceId ===
+          activeExperience.id ||
+        autoRevealExperienceId ===
+          activeExperience.id
+      : false
 
   return (
-    <main className="overflow-hidden">
+    <main className="overflow-x-clip">
 
       {/* =============================================================
           HERO
@@ -360,395 +415,268 @@ export default function LandingPage() {
           START YOUR FOOD JOURNEY
       ============================================================= */}
 
-      <ClosingCtaSection />
+      {/* <ClosingCtaSection /> */}
 
 
       {/* =============================================================
           EXPLORE EPANTRY
       ============================================================= */}
 
-      <section
+      <div
         ref={experienceSectionRef}
-        className="relative min-h-[100svh] w-full overflow-hidden bg-[#F8FAF7]"
+        className="relative z-10 h-[430svh] w-full bg-[#1A1A1A] sm:h-[450svh]"
       >
+        <section
+          className="sticky top-0 h-[100svh] w-full overflow-hidden bg-[#1A1A1A] text-white [perspective:1400px]"
+        >
 
-        <SectionTexture
-          variant="dots"
-          position="right"
-        />
+          {/* Dark gallery background */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(255,255,255,0.055),transparent_32%),radial-gradient(circle_at_18%_72%,rgba(22,101,52,0.11),transparent_27%),radial-gradient(circle_at_82%_28%,rgba(37,99,235,0.08),transparent_26%),#1A1A1A]"
+          />
 
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:72px_72px]"
+          />
 
-        <div className="page-shell relative z-10 flex min-h-[100svh] flex-col py-8 sm:py-10">
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-0 h-[32%] bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.018)_38%,rgba(0,0,0,0.72)_100%)]"
+          />
 
-          {/* Heading */}
+          {/* Continuous background rows: alternate directions + scroll-linked vertical drift */}
+          <motion.div
+            aria-hidden="true"
+            style={{
+              y:
+                backdropVerticalY,
+              scale:
+                backdropDepthScale,
+              rotateX:
+                backdropDepthRotateX,
+              transformOrigin:
+                '50% 50%',
+            }}
+            className="absolute -inset-x-[8%] -inset-y-[14%] [transform-style:preserve-3d] [will-change:transform]"
+          >
+            {EXPERIENCE_BACKDROP_ROWS.map(
+              (row, rowIndex) => (
+                <ExperienceBackdropRow
+                  key={row.id}
+                  row={row}
+                  rowIndex={rowIndex}
+                  shouldReduceMotion={shouldReduceMotion}
+                />
+              ),
+            )}
+          </motion.div>
 
-          <div className="max-w-3xl shrink-0">
+          {/* Intro stage */}
+          <motion.div
+            animate={{
+              opacity:
+                activeExperienceIndex === -1
+                  ? 1
+                  : 0,
+              y:
+                activeExperienceIndex === -1
+                  ? 0
+                  : -24,
+              scale:
+                activeExperienceIndex === -1
+                  ? 1
+                  : 0.98,
+            }}
+            transition={{
+              duration: 0.5,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-5 text-center sm:px-8"
+          >
+            <div className="max-w-[760px]">
+              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/50 sm:text-xs">
+                Explore EPANTRY
+              </p>
 
-            <p className="text-sm font-black uppercase tracking-[0.2em] text-[#166534] sm:text-base">
-              Explore EPANTRY
-            </p>
+              <h2 className="mt-5 text-[clamp(40px,7vw,92px)] font-black leading-[0.9] tracking-[-0.055em] text-white">
+                Three experiences.
+                <span className="mt-1 block text-white/42">
+                  One connected food platform.
+                </span>
+              </h2>
 
+              <p className="mx-auto mt-5 max-w-xl text-sm font-medium leading-6 text-white/48 sm:text-base sm:leading-7">
+                Scroll to move through Grocery, Brands and Recipes.
+              </p>
 
-            <h2 className="mt-4 text-4xl font-black leading-[1.02] tracking-[-0.04em] text-[#111827] sm:text-5xl lg:text-[56px]">
-
-              Three experiences.
-
-              <br />
-
-              One connected food platform.
-
-            </h2>
-
-
-            <p className="mt-3 max-w-2xl leading-7 text-[#6B7280]">
-
-              Start with groceries, trusted brands or a recipe
-              and move naturally between each experience.
-
-            </p>
-
-          </div>
-
-
-          {/* Cards */}
-
-          <div className="pb-7 pt-4 sm:flex sm:flex-1 sm:items-center sm:py-6">
-
-            {/* Mobile-only focus rail: the centered card grows while both side cards remain partially visible. */}
-            <div
-              ref={initializeMobileRail}
-              className="-mx-4 flex snap-x snap-mandatory scroll-smooth gap-3 overflow-x-auto overscroll-x-contain pl-4 pr-[12vw] pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden"
-              onScroll={handleMobileRailScroll}
-            >
-
-              {mobileExperienceCards.map(({ category }, index) => {
-                const image = EXPERIENCE_CARD_IMAGES[category.id]
-
-                return (
-                  <motion.article
-                    key={`mobile-experience-${category.id}`}
-                    initial={false}
-                    data-mobile-rail-start={index === 0 ? 'true' : undefined}
-                    className="w-[84vw] shrink-0 snap-center"
-                  >
-                    <Link
-                      to={category.path}
-                      data-mobile-focus-card
-                      className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#E5E7EB] bg-[#111827] shadow-[0_18px_42px_rgba(17,24,39,0.16)] will-change-transform [backface-visibility:hidden]"
-                      style={{
-                        transform:
-                          index === 0
-                            ? 'translate3d(0, 0, 0) scale(1.025)'
-                            : 'translate3d(0, 8px, 0) scale(0.92)',
-                      }}
-                    >
-                      {image ? (
-                        <img
-                          src={image}
-                          alt={category.title || category.label || category.id}
-                          loading="lazy"
-                          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-active:scale-[1.02]"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-[#F8FAF7]" />
-                      )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
-
-                      <div className="absolute inset-x-4 bottom-[30%] rounded-[22px] border border-white/25 bg-white/15 px-4 py-4 text-white shadow-[0_14px_36px_rgba(0,0,0,0.18)] backdrop-blur-md">
-                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">
-                          EPANTRY Experience
-                        </p>
-                        <h3 className="mt-2 text-[27px] font-black leading-[0.98] tracking-[-0.04em]">
-                          {category.title || category.label || category.id}
-                        </h3>
-                        {category.description && (
-                          <p className="mt-3 line-clamp-2 max-w-[235px] text-[11px] font-semibold leading-5 text-white/72">
-                            {category.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/35 bg-white/90 text-[#111827] shadow-sm backdrop-blur">
-                        <ArrowUpRight size={17} aria-hidden="true" />
-                      </span>
-                    </Link>
-                  </motion.article>
-                )
-              })}
-
+              <div className="mx-auto mt-8 flex w-fit items-center gap-3 rounded-full border border-white/10 bg-white/[0.045] px-4 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-white/45 backdrop-blur-md sm:text-[10px]">
+                <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
+                Scroll to explore
+              </div>
             </div>
+          </motion.div>
 
-            <div
-              className="hidden w-full gap-5 sm:grid md:grid-cols-3"
-              onMouseEnter={handleExperienceStackEnter}
-            >
-
-              {landingCategories.map(
-                (
-                  category,
-                  index,
-                ) => {
-                  const Icon =
-                    category.icon
-
-                  const categoryTone =
-                    category.id === 'brands'
-                      ? {
-                          hoverBorder:
-                            'hover:border-[#2563EB]/30',
-
-                          glow:
-                            'bg-[#2563EB]/10',
-
-                          icon:
-                            'bg-[#EFF6FF]/85 text-[#2563EB]',
-
-                          action:
-                            'text-[#2563EB]',
-
-                          frame:
-                            'bg-white/95 lg:bg-[#EFF6FF]',
-
-                          glass:
-                            'bg-[#EFF6FF]/60',
-                        }
-                      : category.id === 'recipes'
-                        ? {
-                            hoverBorder:
-                              'hover:border-[#EA580C]/30',
-
-                            glow:
-                              'bg-[#F59E0B]/10',
-
-                            icon:
-                              'bg-[#FFF7ED]/85 text-[#EA580C]',
-
-                            action:
-                              'text-[#EA580C]',
-
-                            frame:
-                              'bg-white/95 lg:bg-[#FFF7ED]',
-
-                            glass:
-                              'bg-[#FFF7ED]/60',
-                          }
-                        : {
-                            hoverBorder:
-                              'hover:border-[#16A34A]/30',
-
-                            glow:
-                              'bg-[#16A34A]/10',
-
-                            icon:
-                              'bg-[#F0FDF4]/85 text-[#166534]',
-
-                            action:
-                              'text-[#166534]',
-
-                            frame:
-                              'bg-white/95 lg:bg-[#F0FDF4]',
-
-                            glass:
-                              'bg-[#F0FDF4]/60',
-                          }
-
-                  const isHovered =
-                    hoveredExperienceId ===
-                    category.id
-
-                  const introTransform =
-                    isDesktopHoverDevice &&
-                    !shouldReduceMotion &&
-                    !experienceIntroStarted
-                      ? EXPERIENCE_INTRO_TRANSFORMS[
-                          index
-                        ]
-                      : EXPERIENCE_SETTLED_TRANSFORM
-
-                  return (
+          {/* Current experience card */}
+          <div className="absolute inset-0 z-30 flex items-center justify-center px-4 pt-8 sm:px-8 sm:pt-10">
+            {activeExperience && activeExperienceTone ? (
+              <motion.div
+                key={`active-experience-${activeExperience.id}`}
+                initial={
+                  shouldReduceMotion
+                    ? false
+                    : {
+                        opacity: 0,
+                        rotateX: 8,
+                        rotateY: -8,
+                        rotateZ: -2.5,
+                        scale: 0.84,
+                        y: '58svh',
+                      }
+                }
+                animate={{
+                  opacity: 1,
+                  rotateX: 0,
+                  rotateY: 0,
+                  rotateZ: 0,
+                  scale: 1,
+                  y: '0svh',
+                }}
+                transition={{
+                  duration:
+                    shouldReduceMotion
+                      ? 0
+                      : 0.78,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+                className="relative h-[56svh] min-h-[360px] max-h-[610px] w-[78vw] max-w-[350px] sm:h-[62svh] sm:w-[48vw] sm:max-w-[470px] lg:w-[31vw] lg:max-w-[500px] [transform-style:preserve-3d]"
+              >
+                <motion.div
+                  className="relative h-full w-full [transform-style:preserve-3d]"
+                  onMouseEnter={() =>
+                    handleExperienceCardEnter(
+                      activeExperience.id,
+                    )
+                  }
+                  onMouseLeave={() =>
+                    handleExperienceCardLeave(
+                      activeExperience.id,
+                    )
+                  }
+                >
+                  <Link
+                    to={activeExperience.path}
+                    className="focus-ring relative block h-full w-full overflow-hidden rounded-[30px] border-0 bg-transparent outline-none ring-0 shadow-[0_44px_120px_rgba(0,0,0,0.48),0_10px_34px_rgba(0,0,0,0.22)] sm:rounded-[36px] [perspective:1200px]"
+                  >
                     <motion.div
-                      key={
-                        category.id
-                      }
-                      initial={false}
-                      animate={
-                        introTransform
-                      }
+                      className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-[30px] sm:rounded-[36px] [backface-visibility:hidden] [transform-origin:bottom] [will-change:transform]"
+                      animate={{
+                        rotateX:
+                          activeExperienceIsRevealed
+                            ? 90
+                            : 0,
+                      }}
                       transition={{
-                        duration:
-                          isDesktopHoverDevice &&
-                          !shouldReduceMotion
-                            ? 0.58
-                            : 0,
-
-                        delay:
-                          isDesktopHoverDevice &&
-                          !shouldReduceMotion
-                            ? experienceIntroStarted
-                              ? index * 0.07
-                              : (landingCategories.length - 1 - index) * 0.05
-                            : 0,
-
-                        ease: [
-                          0.22,
-                          1,
-                          0.36,
-                          1,
-                        ],
-                      }}
-                      onAnimationComplete={() => {
-                        if (
-                          experienceIntroStarted &&
-                          index ===
-                            landingCategories.length -
-                              1
-                        ) {
-                          setExperienceCardsSettled(
-                            true,
-                          )
-                        }
-                      }}
-                      className="relative h-full"
-                      style={{
-                        willChange: 'transform',
-                        backfaceVisibility: 'hidden',
-                        WebkitBackfaceVisibility: 'hidden',
-                        zIndex:
-                          !experienceIntroStarted
-                            ? index === 1
-                              ? 3
-                              : index === 2
-                                ? 2
-                                : 1
-                            : 1,
+                        duration: 0.6,
+                        ease: CARD_FLIP_EASE,
                       }}
                     >
+                      <ExperienceCardFront
+                        category={activeExperience}
+                        categoryTone={activeExperienceTone}
+                        isExpanded
+                      />
+                    </motion.div>
 
+                    <motion.div
+                      aria-hidden="true"
+                      className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-[30px] p-5 sm:rounded-[36px] sm:p-7 [backface-visibility:hidden] [transform-origin:bottom] [will-change:transform]"
+                      initial={false}
+                      animate={{
+                        rotateX:
+                          activeExperienceIsRevealed
+                            ? 0
+                            : -90,
+                      }}
+                      transition={{
+                        duration: 0.6,
+                        ease: CARD_FLIP_EASE,
+                      }}
+                    >
+                      <ExperienceCardBack
+                        category={activeExperience}
+                        categoryTone={activeExperienceTone}
+                        Icon={activeExperience.icon}
+                      />
+                    </motion.div>
+
+                    {!shouldReduceMotion ? (
                       <motion.div
-                        className="h-full"
-                        style={{
-                          willChange: 'transform',
-                          transformStyle: 'preserve-3d',
+                        key={`shine-${activeExperience.id}`}
+                        aria-hidden="true"
+                        initial={{
+                          x: '-230%',
+                          y: '150%',
+                          opacity: 0,
                         }}
                         animate={{
-                          scale:
-                            isHovered
-                              ? 1.05
-                              : 1,
+                          x: '255%',
+                          y: '-145%',
+                          opacity: [0, 0.9, 0],
                         }}
                         transition={{
-                          duration:
-                            0.6,
-
-                          ease:
-                            CARD_FLIP_EASE,
+                          duration: 1.05,
+                          delay: 0.22,
+                          ease: [0.16, 1, 0.3, 1],
                         }}
-                        onMouseEnter={() =>
-                          handleExperienceCardEnter(
-                            category.id,
-                          )
-                        }
-                        onMouseLeave={() =>
-                          handleExperienceCardLeave(
-                            category.id,
-                          )
-                        }
-                      >
+                        className="pointer-events-none absolute -bottom-[58%] -left-[34%] z-40 h-[180%] w-[32%] -rotate-[34deg] bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[7px]"
+                      />
+                    ) : null}
+                  </Link>
 
-                        <Link
-                          to={
-                            category.path
-                          }
-                          className={`focus-ring group relative block h-full min-h-[260px] overflow-hidden rounded-[24px] md:min-h-[320px] md:rounded-[28px] border border-[#E5E7EB] bg-white/95 shadow-sm transition ${experienceCardsSettled ? `${categoryTone.hoverBorder} hover:shadow-xl hover:shadow-[#111827]/10` : ''} [perspective:1000px]`}
-                        >
-
-                          <motion.div
-                            className={`absolute inset-0 flex h-full flex-col overflow-hidden rounded-[24px] p-5 md:rounded-[28px] md:p-7 lg:p-3 ${categoryTone.frame} [backface-visibility:hidden] [transform-origin:bottom] [will-change:transform]`}
-                            animate={{
-                              rotateX:
-                                isHovered
-                                  ? 90
-                                  : 0,
-                            }}
-                            transition={{
-                              duration:
-                                0.6,
-
-                              ease:
-                                CARD_FLIP_EASE,
-                            }}
-                          >
-
-                            <ExperienceCardFront
-                              category={
-                                category
-                              }
-                              categoryTone={
-                                categoryTone
-                              }
-                              isExpanded={
-                                experienceIntroStarted
-                              }
-                            />
-
-                          </motion.div>
-
-
-                          <motion.div
-                            aria-hidden="true"
-                            className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-[24px] p-5 md:rounded-[28px] md:p-7 [backface-visibility:hidden] [transform-origin:bottom] [will-change:transform]"
-                            initial={false}
-                            animate={{
-                              rotateX:
-                                isHovered
-                                  ? 0
-                                  : -90,
-                            }}
-                            transition={{
-                              duration:
-                                0.6,
-
-                              ease:
-                                CARD_FLIP_EASE,
-                            }}
-                          >
-
-                            <ExperienceCardBack
-                              category={
-                                category
-                              }
-                              categoryTone={
-                                categoryTone
-                              }
-                              Icon={Icon}
-                            />
-
-                          </motion.div>
-
-                        </Link>
-
-                      </motion.div>
-
-                    </motion.div>
-                  )
-                },
-              )}
-
-            </div>
-
+                  {/* Soft reflection like the reference */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-[6%] right-[6%] top-[calc(100%+10px)] h-[22%] overflow-hidden opacity-[0.12] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+                  >
+                    <img
+                      src={EXPERIENCE_CARD_IMAGES[activeExperience.id]}
+                      alt=""
+                      className="h-full w-full origin-top scale-y-[-1] rounded-[30px] object-cover blur-[1px] sm:rounded-[36px]"
+                    />
+                  </div>
+                </motion.div>
+              </motion.div>
+            ) : null}
           </div>
 
-        </div>
+          {/* Minimal sequence cue */}
+          <div className="pointer-events-none absolute right-3 top-1/2 z-40 hidden -translate-y-1/2 lg:block">
+            <div className="flex flex-col items-center gap-3 text-white/35">
+              <span className="text-[9px] font-black tracking-[0.22em] [writing-mode:vertical-rl]">
+                EPANTRY EXPERIENCE
+              </span>
+              <span className="h-9 w-px bg-white/20" />
+              <span className="text-[10px] font-black tabular-nums">
+                {activeExperienceIndex >= 0
+                  ? `0${activeExperienceIndex + 1} / 03`
+                  : '00 / 03'}
+              </span>
+            </div>
+          </div>
 
-      </section>
+        </section>
+      </div>
 
 
       {/* =============================================================
           FEATURED SECTIONS
       ============================================================= */}
 
-      <FeaturedContentSection />
+      <div className="relative z-30 -mt-px">
+        <FeaturedContentSection />
+      </div>
 
 
       {/* =============================================================
@@ -758,6 +686,119 @@ export default function LandingPage() {
       <HowItWorksSection />
 
     </main>
+  )
+}
+
+
+function ExperienceBackdropRow({
+  row,
+  rowIndex,
+  shouldReduceMotion,
+}) {
+  const repeatedGroups = [
+    'copy-a',
+    'copy-b',
+    'copy-c',
+  ]
+
+  const startsLeft =
+    row.direction === 'left'
+
+  return (
+    <div
+      className="absolute left-0 right-0 overflow-visible [transform-style:preserve-3d]"
+      style={{
+        top: row.top,
+        opacity: row.opacity,
+      }}
+    >
+      <motion.div
+        animate={
+          shouldReduceMotion
+            ? undefined
+            : {
+                x: startsLeft
+                  ? ['0%', '-33.333333%']
+                  : ['-33.333333%', '0%'],
+              }
+        }
+        transition={
+          shouldReduceMotion
+            ? undefined
+            : {
+                duration: row.duration,
+                ease: 'linear',
+                repeat: Infinity,
+              }
+        }
+        className="flex w-max items-center [will-change:transform]"
+      >
+        {repeatedGroups.map(
+          (groupId) => (
+            <div
+              key={`${row.id}-${groupId}`}
+              className="flex shrink-0 items-center gap-[clamp(46px,7vw,112px)] pr-[clamp(46px,7vw,112px)]"
+            >
+              {row.sequence.map(
+                (categoryId, itemIndex) => (
+                  <ExperienceBackdropTile
+                    key={`${row.id}-${groupId}-${categoryId}-${itemIndex}`}
+                    categoryId={categoryId}
+                    rowIndex={rowIndex}
+                    itemIndex={itemIndex}
+                    width={row.cardWidth}
+                    direction={row.direction}
+                  />
+                ),
+              )}
+            </div>
+          ),
+        )}
+      </motion.div>
+    </div>
+  )
+}
+
+
+function ExperienceBackdropTile({
+  categoryId,
+  rowIndex,
+  itemIndex,
+  width,
+  direction,
+}) {
+  const imageSrc =
+    EXPERIENCE_CARD_IMAGES[
+      categoryId
+    ]
+
+  const alternatingTilt =
+    ((rowIndex + itemIndex) % 2 === 0
+      ? -1
+      : 1) *
+    (3.5 + (itemIndex % 3) * 1.2)
+
+  const depthOffset =
+    ((itemIndex % 3) - 1) * 16
+
+  return (
+    <div
+      className="relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] [transform-style:preserve-3d] sm:rounded-[11px]"
+      style={{
+        width,
+        transform: `translateZ(${depthOffset}px) rotateZ(${direction === 'left' ? alternatingTilt : -alternatingTilt}deg)`,
+      }}
+    >
+      <img
+        src={imageSrc}
+        alt=""
+        className="h-full w-full object-cover brightness-[0.50] saturate-[0.72] contrast-[1.04]"
+      />
+
+      <div className="absolute inset-0 bg-black/10" />
+
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/42 to-transparent" />
+    </div>
   )
 }
 
@@ -785,19 +826,38 @@ function ExperienceCardFront({
     ]
 
   return (
-    <div className={`relative h-full overflow-hidden rounded-[20px] md:rounded-[24px] ${categoryTone.frame}`}>
+    <div className="relative h-full overflow-hidden rounded-[30px] bg-[#111111] sm:rounded-[36px]">
 
       <img
         src={imageSrc}
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full scale-[1.015] object-cover transition-transform duration-700 ease-out lg:group-hover:scale-[1.035]"
       />
-
 
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-black/5"
+        className="absolute left-[8%] top-[3%] h-[22%] w-[48%] rounded-full bg-white/[0.055] blur-3xl"
+      />
+
+      <div
+        aria-hidden="true"
+        className="absolute -left-[14%] top-[8%] h-[36%] w-[54%] rounded-full bg-white/[0.065] blur-3xl"
+      />
+
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04)_0%,rgba(0,0,0,0.02)_38%,rgba(0,0,0,0.16)_70%,rgba(0,0,0,0.52)_100%)]"
+      />
+
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-[8%] top-0 h-[28%] rounded-b-[50%] bg-white/[0.055] blur-2xl"
+      />
+
+      <div
+        aria-hidden="true"
+        className="absolute bottom-0 left-0 right-0 h-[38%] bg-[radial-gradient(circle_at_50%_110%,rgba(255,255,255,0.10),transparent_58%)]"
       />
 
 
@@ -818,7 +878,7 @@ function ExperienceCardFront({
               ],
             },
           }}
-          className="whitespace-nowrap text-2xl font-black tracking-[-0.03em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] [will-change:transform] md:text-4xl lg:rounded-2xl lg:border lg:border-white/[0.15] lg:bg-black/[0.16] lg:px-4 lg:py-2 lg:shadow-[0_8px_28px_rgba(0,0,0,0.14)] lg:backdrop-blur-[3px] lg:drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+          className="whitespace-nowrap text-2xl font-black tracking-[-0.03em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] [will-change:transform] md:text-4xl lg:rounded-[18px] lg:bg-black/[0.24] lg:px-5 lg:py-2.5 lg:shadow-[0_12px_34px_rgba(0,0,0,0.22)] lg:backdrop-blur-[7px] lg:drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
         >
           {
             category.title
@@ -914,81 +974,3 @@ function ExperienceCardBack({
 }
 
 
-
-/*
-|--------------------------------------------------------------------------
-| Section Texture
-|--------------------------------------------------------------------------
-*/
-
-function SectionTexture({
-  variant = 'dots',
-  position = 'right',
-}) {
-  const shouldReduceMotion =
-    useReducedMotion()
-
-  const blobPosition =
-    position === 'left'
-      ? '-left-24 top-[32%]'
-      : '-right-24 top-[30%]'
-
-  const texture =
-    variant === 'diagonal'
-      ? {
-          backgroundImage:
-            'repeating-linear-gradient(135deg, rgba(22, 101, 52, 0.12) 0px, rgba(22, 101, 52, 0.12) 1px, transparent 1px, transparent 24px)',
-        }
-      : {
-          backgroundImage:
-            'radial-gradient(circle, rgba(22, 101, 52, 0.32) 1.35px, transparent 1.35px)',
-
-          backgroundSize:
-            '26px 26px',
-        }
-
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0"
-    >
-
-      <div
-        className="absolute inset-0 opacity-60"
-        style={texture}
-      />
-
-
-      <motion.div
-        animate={
-          shouldReduceMotion
-            ? undefined
-            : {
-                x: [
-                  0,
-                  30,
-                  0,
-                ],
-
-                y: [
-                  0,
-                  -24,
-                  0,
-                ],
-              }
-        }
-        transition={{
-          duration: 10,
-
-          repeat:
-            Infinity,
-
-          ease:
-            'easeInOut',
-        }}
-        className={`absolute ${blobPosition} h-80 w-80 rounded-full bg-[#16A34A]/20 blur-3xl`}
-      />
-
-    </div>
-  )
-}

@@ -563,7 +563,7 @@ test(
 
     assert.match(
       component,
-      /Creator remains a Customer-side profile/,
+      /Live-session authoring belongs to your approved Chef \+ Restaurant Host workspace/,
     )
 
     assert.match(
@@ -573,7 +573,7 @@ test(
 
     assert.match(
       component,
-      /never claims an automatic refund/,
+      /Paid booking refunds are review-required and are not silently claimed/,
     )
   },
 )

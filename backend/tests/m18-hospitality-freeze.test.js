@@ -46,6 +46,28 @@ function stripComments(
     )
 }
 
+function legacyHospitalitySource() {
+  const source =
+    read(
+      'src/modules/hospitality/hospitality.service.js',
+    )
+
+  const restaurantSectionIndex =
+    source.indexOf(
+      '| M5-B Restaurant Recipe Listings',
+    )
+
+  assert.ok(
+    restaurantSectionIndex > 0,
+    'M5-B Restaurant Recipe section must remain explicitly separated from the legacy M18 Hospitality engine.',
+  )
+
+  return source.slice(
+    0,
+    restaurantSectionIndex,
+  )
+}
+
 test(
   'M18 keeps Customer Host Super Admin architecture and does not introduce B2B capability fields or activeMode authority',
   () => {
@@ -143,20 +165,16 @@ test(
 )
 
 test(
-  'M18 never mutates canonical ProductVersion Pack Ingredient Dish or RecipeVersion truth',
+  'M18 legacy engine never mutates canonical ProductVersion Pack or Ingredient truth and only creates internal Dish Recipe lineage',
   () => {
     const source =
-      read(
-        'src/modules/hospitality/hospitality.service.js',
-      )
+      legacyHospitalitySource()
 
     for (
       const model of [
         'ProductVersion',
         'Pack',
         'CanonicalIngredient',
-        'Dish',
-        'RecipeVersion',
       ]
     ) {
       assert.doesNotMatch(
@@ -167,6 +185,36 @@ test(
         ),
       )
     }
+
+    assert.match(
+      source,
+      /Dish\.create/,
+    )
+
+    assert.match(
+      source,
+      /RecipeVersion\.create/,
+    )
+
+    for (
+      const model of [
+        'Dish',
+        'RecipeVersion',
+      ]
+    ) {
+      assert.doesNotMatch(
+        source,
+        new RegExp(
+          `(^|[^A-Za-z0-9_])${model}\\.(updateOne|updateMany|findOneAndUpdate|deleteOne|deleteMany)`,
+          'm',
+        ),
+      )
+    }
+
+    assert.match(
+      source,
+      /Internal Hospitality lineage record\. This Dish is not a public customer recipe listing\./,
+    )
   },
 )
 
@@ -226,26 +274,29 @@ test(
 )
 
 test(
-  'M18 Production Recipe overlay does not write M07 RecipeVersion',
+  'M18 Production Recipe keeps the Hospitality version and may materialize non-public M07 lineage without rewriting it',
   () => {
     const source =
-      read(
-        'src/modules/hospitality/hospitality.service.js',
-      )
+      legacyHospitalitySource()
 
     assert.match(
       source,
       /HospitalityProductionRecipeVersion\.create/,
     )
 
-    assert.doesNotMatch(
+    assert.match(
       source,
-      /(^|[^A-Za-z0-9_])RecipeVersion\.create/m,
+      /RecipeVersion\.create/,
     )
 
     assert.doesNotMatch(
       source,
-      /(^|[^A-Za-z0-9_])RecipeVersion\.findOneAndUpdate/m,
+      /(^|[^A-Za-z0-9_])RecipeVersion\.(findOneAndUpdate|updateOne|updateMany|deleteOne|deleteMany)/m,
+    )
+
+    assert.match(
+      source,
+      /Internal governed recipe lineage generated from a Super Admin-approved Hospitality kitchen recipe\./,
     )
   },
 )

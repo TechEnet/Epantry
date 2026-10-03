@@ -3,6 +3,10 @@ import {
 } from '../../utils/ApiResponse.js'
 
 import {
+  recordAdminAuditEvent,
+} from '../admin/adminAudit.service.js'
+
+import {
   getMyLearningDashboard,
 } from './learning.dashboard.service.js'
 
@@ -12,17 +16,25 @@ import {
 
 import {
   createCourseLesson,
+  createProMembershipCheckout,
   createCourseModule,
   createLessonBookmark,
   deleteLessonBookmark,
   deleteLessonNote,
+  getAdminProOverview,
   getCourseCurriculum,
   getCreatorCourseCurriculum,
   getLessonLearningExperience,
+  getProMembershipOverview,
+  getPublicProCatalog,
+  listAdminProMemberships,
+  listAdminProPayments,
+  verifyProMembershipPayment,
   registerCourseMediaAsset,
   updateCourseLesson,
   updateCourseMediaAvailability,
   updateCourseModule,
+  updateAdminProPlan,
   updateLessonProgress,
   upsertLessonNote,
 } from './learning.service.js'
@@ -61,6 +73,140 @@ function wrap(handler) {
     }
   }
 }
+
+
+
+
+export const getAdminProOverviewController = wrap(
+  async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await getAdminProOverview(),
+      'EPANTRY Pro administration overview loaded.',
+    ),
+)
+
+export const listAdminProMembershipsController = wrap(
+  async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await listAdminProMemberships({
+        status: req.query?.status,
+        page: req.query?.page,
+        limit: req.query?.limit,
+      }),
+      'EPANTRY Pro memberships loaded.',
+    ),
+)
+
+export const listAdminProPaymentsController = wrap(
+  async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await listAdminProPayments({
+        status: req.query?.status,
+        page: req.query?.page,
+        limit: req.query?.limit,
+      }),
+      'EPANTRY Pro payments loaded.',
+    ),
+)
+
+export const updateAdminProPlanController = wrap(
+  async (req, res) => {
+    const result = await updateAdminProPlan({
+      planCode: req.params?.planCode,
+      input: req.body,
+      actorUser: req.currentUser,
+    })
+
+    await recordAdminAuditEvent({
+      actorUser: req.currentUser,
+      adminAuthorization: req.adminAuthorization,
+      action: 'learning.pro.plan.update',
+      permissionKey: null,
+      entityType: 'pro_plan',
+      entityId: result.plan?.id || req.params?.planCode,
+      reasonCode: 'other.justified',
+      reasonDetails: 'EPANTRY Pro plan configuration updated by the platform owner.',
+      beforeSnapshot: result.beforePlan,
+      afterSnapshot: result.plan,
+      metadata: {
+        changedFields: result.changedFields,
+      },
+      requestId: req.requestId,
+    })
+
+    return sendSuccess(
+      req,
+      res,
+      200,
+      {
+        plan: result.plan,
+      },
+      'EPANTRY Pro plan updated.',
+    )
+  },
+)
+
+export const getPublicProCatalogController = wrap(
+  async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await getPublicProCatalog(),
+      'EPANTRY Pro plans loaded.',
+    ),
+)
+
+export const getProMembershipOverviewController = wrap(
+  async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await getProMembershipOverview({
+        actorUser: req.currentUser,
+      }),
+      'EPANTRY Pro membership loaded.',
+    ),
+)
+
+export const createProMembershipCheckoutController = wrap(
+  async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      201,
+      await createProMembershipCheckout({
+        planCode: req.validated.params.planCode,
+        actorUser: req.currentUser,
+      }),
+      'EPANTRY Pro Razorpay test checkout created.',
+    ),
+)
+
+export const verifyProMembershipPaymentController = wrap(
+  async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await verifyProMembershipPayment({
+        paymentId: req.validated.params.paymentId,
+        input: req.validated.body,
+        actorUser: req.currentUser,
+      }),
+      'EPANTRY Pro payment verified and membership updated.',
+    ),
+)
 
 export const getMyLearningController = wrap(
   async (req, res) =>

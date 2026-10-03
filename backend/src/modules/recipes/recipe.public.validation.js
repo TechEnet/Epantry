@@ -125,6 +125,18 @@ export const listPublicRecipesQuerySchema =
           .default(
             '',
           ),
+
+      sourceScope:
+        z
+          .enum([
+            'all',
+            'standard',
+            'restaurant',
+          ])
+          .optional()
+          .default(
+            'all',
+          ),
     })
     .strict()
 

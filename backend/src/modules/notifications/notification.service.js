@@ -15,6 +15,20 @@ import {
 } from '../users/user.model.js'
 
 import {
+  CanonicalIngredient,
+  Pack,
+  ProductFamily,
+  ProductVariant,
+  ProductVersion,
+} from '../catalog/catalog.models.js'
+
+import {
+  HostOffer,
+  InventorySnapshot,
+} from '../marketplace/marketplace.models.js'
+
+import {
+  AvailabilityWatch,
   Notification,
   NotificationAction,
   NotificationPreference,
@@ -156,11 +170,58 @@ function resolveNotificationDeepLink(
         ? `/orders/${entityId}`
         : '/orders'
 
+    case 'item_available':
+      return entityId
+        ? `/grocery/search-results?q=${entityId}`
+        : '/grocery'
+
     case 'security_notice':
       return '/account/settings'
 
     case 'host_commercial_profile_request':
       return '/admin/host-operations'
+
+    case 'hospitality_approval_requested': {
+      const focusPrefixByEntityType = {
+        restaurant_recipe_listing:
+          'restaurant_recipe',
+        hospitality_production_recipe:
+          'production_recipe',
+        hospitality_dish_passport:
+          'dish_passport',
+        hospitality_change_case:
+          'change_case',
+      }
+
+      const focusPrefix =
+        focusPrefixByEntityType[
+          item.relatedEntityType
+        ]
+
+      if (
+        entityId &&
+        focusPrefix
+      ) {
+        return `/admin/host-operations?tab=hospitality&focus=${encodeURIComponent(
+          `${focusPrefix}:${String(
+            item.relatedEntityId ||
+              '',
+          )}`,
+        )}`
+      }
+
+      return '/admin/host-operations?tab=hospitality'
+    }
+
+    case 'creator_approval_requested':
+      if (
+        item.relatedEntityType ===
+          'creator_profile'
+      ) {
+        return '/admin/community?tab=creators'
+      }
+
+      return '/admin/community#creator-content-governance'
 
     case 'host_registration':
       return '/admin/hosts'
@@ -339,6 +400,756 @@ async function ensurePreferences(
         true,
     },
   )
+}
+
+
+function normalizeAvailabilityTerm(
+  value,
+) {
+  return String(
+    value || '',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function escapeRegex(
+  value,
+) {
+  return String(
+    value || '',
+  ).replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  )
+}
+
+function buildPublishedProductVersionFilter(
+  now = new Date(),
+) {
+  return {
+    publicationStatus:
+      'published',
+    $and: [
+      {
+        $or: [
+          {
+            effectiveFrom:
+              null,
+          },
+          {
+            effectiveFrom: {
+              $lte:
+                now,
+            },
+          },
+        ],
+      },
+      {
+        $or: [
+          {
+            effectiveTo:
+              null,
+          },
+          {
+            effectiveTo: {
+              $gt:
+                now,
+            },
+          },
+        ],
+      },
+    ],
+  }
+}
+
+async function resolveAvailabilityPackProfile(
+  packId,
+) {
+  const pack =
+    await Pack.findOne({
+      _id:
+        packId,
+      status:
+        'active',
+    })
+      .lean()
+
+  if (!pack) {
+    return null
+  }
+
+  const version =
+    await ProductVersion.findOne({
+      packId:
+        pack._id,
+      ...buildPublishedProductVersionFilter(),
+    })
+      .sort({
+        version:
+          -1,
+        publishedAt:
+          -1,
+        updatedAt:
+          -1,
+      })
+      .lean()
+
+  if (!version) {
+    return null
+  }
+
+  const variant =
+    await ProductVariant.findOne({
+      _id:
+        pack.variantId,
+      status:
+        'active',
+    })
+      .lean()
+
+  if (!variant) {
+    return null
+  }
+
+  const family =
+    await ProductFamily.findOne({
+      _id:
+        variant.familyId,
+      status:
+        'active',
+    })
+      .lean()
+
+  if (!family) {
+    return null
+  }
+
+  const labels = [
+    version.displayName,
+    pack.displayName,
+    variant.canonicalName,
+    family.canonicalName,
+  ]
+    .map(
+      normalizeAvailabilityTerm,
+    )
+    .filter(Boolean)
+
+  return {
+    packId:
+      String(
+        pack._id,
+      ),
+    displayName:
+      version.displayName ||
+      pack.displayName ||
+      family.canonicalName,
+    labels,
+    searchText:
+      labels.join(' '),
+  }
+}
+
+async function isPackCurrentlyAvailable(
+  packId,
+) {
+  const offers =
+    await HostOffer.find({
+      packId,
+      status:
+        'active',
+    })
+      .select({
+        _id:
+          1,
+      })
+      .lean()
+
+  if (
+    offers.length ===
+      0
+  ) {
+    return false
+  }
+
+  const offerIds =
+    offers.map(
+      (offer) =>
+        offer._id,
+    )
+
+  const latestSnapshots =
+    await InventorySnapshot.aggregate([
+      {
+        $match: {
+          offerId: {
+            $in:
+              offerIds,
+          },
+        },
+      },
+      {
+        $sort: {
+          observedAt:
+            -1,
+          _id:
+            -1,
+        },
+      },
+      {
+        $group: {
+          _id:
+            '$offerId',
+          availableQuantity: {
+            $first:
+              '$availableQuantity',
+          },
+          reservedQuantity: {
+            $first:
+              '$reservedQuantity',
+          },
+        },
+      },
+    ])
+
+  return latestSnapshots.some(
+    (snapshot) =>
+      Math.max(
+        0,
+        Number(
+          snapshot.availableQuantity ||
+            0,
+        ) -
+          Number(
+            snapshot.reservedQuantity ||
+              0,
+          ),
+      ) > 0,
+  )
+}
+
+async function candidateAvailabilityPackIds({
+  query,
+  packId = null,
+}) {
+  if (packId) {
+    return [
+      String(
+        packId,
+      ),
+    ]
+  }
+
+  const normalized =
+    normalizeAvailabilityTerm(
+      query,
+    )
+
+  if (
+    normalized.length <
+      2
+  ) {
+    return []
+  }
+
+  const regex =
+    new RegExp(
+      escapeRegex(
+        normalized,
+      ).replace(/\\ /g, '\\s+'),
+      'i',
+    )
+
+  const [
+    versions,
+    packs,
+    variants,
+    families,
+  ] =
+    await Promise.all([
+      ProductVersion.find({
+        ...buildPublishedProductVersionFilter(),
+        displayName:
+          regex,
+      })
+        .select({
+          packId:
+            1,
+        })
+        .limit(24)
+        .lean(),
+
+      Pack.find({
+        status:
+          'active',
+        displayName:
+          regex,
+      })
+        .select({
+          _id:
+            1,
+        })
+        .limit(24)
+        .lean(),
+
+      ProductVariant.find({
+        status:
+          'active',
+        canonicalName:
+          regex,
+      })
+        .select({
+          _id:
+            1,
+        })
+        .limit(24)
+        .lean(),
+
+      ProductFamily.find({
+        status:
+          'active',
+        canonicalName:
+          regex,
+      })
+        .select({
+          _id:
+            1,
+        })
+        .limit(24)
+        .lean(),
+    ])
+
+  const variantIds =
+    new Set(
+      variants.map(
+        (variant) =>
+          String(
+            variant._id,
+          ),
+      ),
+    )
+
+  if (
+    families.length >
+      0
+  ) {
+    const familyVariants =
+      await ProductVariant.find({
+        familyId: {
+          $in:
+            families.map(
+              (family) =>
+                family._id,
+            ),
+        },
+        status:
+          'active',
+      })
+        .select({
+          _id:
+            1,
+        })
+        .lean()
+
+    for (
+      const variant of
+      familyVariants
+    ) {
+      variantIds.add(
+        String(
+          variant._id,
+        ),
+      )
+    }
+  }
+
+  const variantPacks =
+    variantIds.size > 0
+      ? await Pack.find({
+          variantId: {
+            $in: [
+              ...variantIds,
+            ],
+          },
+          status:
+            'active',
+        })
+          .select({
+            _id:
+              1,
+          })
+          .lean()
+      : []
+
+  return [
+    ...new Set([
+      ...versions.map(
+        (version) =>
+          String(
+            version.packId,
+          ),
+      ),
+      ...packs.map(
+        (pack) =>
+          String(
+            pack._id,
+          ),
+      ),
+      ...variantPacks.map(
+        (pack) =>
+          String(
+            pack._id,
+          ),
+      ),
+    ]),
+  ].slice(
+    0,
+    30,
+  )
+}
+
+export async function checkItemAvailability({
+  input,
+}) {
+  let query =
+    String(
+      input.query ||
+        '',
+    ).trim()
+
+  if (
+    input.canonicalIngredientId
+  ) {
+    const ingredient =
+      await CanonicalIngredient.findById(
+        input.canonicalIngredientId,
+      )
+        .select({
+          canonicalName:
+            1,
+        })
+        .lean()
+
+    if (
+      ingredient?.canonicalName &&
+      !query
+    ) {
+      query =
+        ingredient.canonicalName
+    }
+  }
+
+  const packIds =
+    await candidateAvailabilityPackIds({
+      query,
+      packId:
+        input.packId,
+    })
+
+  for (
+    const candidatePackId of
+    packIds
+  ) {
+    if (
+      !(
+        await isPackCurrentlyAvailable(
+          candidatePackId,
+        )
+      )
+    ) {
+      continue
+    }
+
+    const profile =
+      await resolveAvailabilityPackProfile(
+        candidatePackId,
+      )
+
+    if (profile) {
+      return {
+        available:
+          true,
+        match:
+          profile,
+      }
+    }
+  }
+
+  return {
+    available:
+      false,
+    match:
+      null,
+  }
+}
+
+export async function createAvailabilityWatch({
+  input,
+  actorUser,
+}) {
+  const userId =
+    actorId(
+      actorUser,
+    )
+
+  const availability =
+    await checkItemAvailability({
+      input,
+    })
+
+  if (
+    availability.available
+  ) {
+    return {
+      alreadyAvailable:
+        true,
+      watch:
+        null,
+      match:
+        availability.match,
+    }
+  }
+
+  const normalizedQuery =
+    normalizeAvailabilityTerm(
+      input.query,
+    )
+
+  const watchKey =
+    input.packId
+      ? `pack:${input.packId}`
+      : input.canonicalIngredientId
+        ? `ingredient:${input.canonicalIngredientId}`
+        : `query:${normalizedQuery}`
+
+  const watch =
+    await AvailabilityWatch.findOneAndUpdate(
+      {
+        userId,
+        watchKey,
+      },
+      {
+        $set: {
+          query:
+            String(
+              input.query,
+            ).trim(),
+          normalizedQuery,
+          canonicalIngredientId:
+            input.canonicalIngredientId ||
+            null,
+          packId:
+            input.packId ||
+            null,
+          source:
+            input.source ||
+            'search',
+          status:
+            'active',
+          matchedPackId:
+            null,
+          matchedProductName:
+            '',
+          notifiedAt:
+            null,
+        },
+        $setOnInsert: {
+          userId,
+          watchKey,
+        },
+      },
+      {
+        upsert:
+          true,
+        new:
+          true,
+        runValidators:
+          true,
+      },
+    )
+
+  return {
+    alreadyAvailable:
+      false,
+    watch: {
+      id:
+        String(
+          watch._id,
+        ),
+      query:
+        watch.query,
+      status:
+        watch.status,
+      source:
+        watch.source,
+    },
+    match:
+      null,
+  }
+}
+
+function watchMatchesPack(
+  watch,
+  profile,
+) {
+  if (
+    watch.packId &&
+    String(
+      watch.packId,
+    ) ===
+      String(
+        profile.packId,
+      )
+  ) {
+    return true
+  }
+
+  const term =
+    normalizeAvailabilityTerm(
+      watch.normalizedQuery ||
+        watch.query,
+    )
+
+  if (!term) {
+    return false
+  }
+
+  return (
+    profile.searchText.includes(
+      term,
+    ) ||
+    profile.labels.some(
+      (label) =>
+        term.includes(
+          label,
+        ),
+    )
+  )
+}
+
+export async function fulfillAvailabilityWatchesForPack(
+  packId,
+) {
+  if (
+    !packId ||
+    !(
+      await isPackCurrentlyAvailable(
+        packId,
+      )
+    )
+  ) {
+    return {
+      notified:
+        0,
+    }
+  }
+
+  const profile =
+    await resolveAvailabilityPackProfile(
+      packId,
+    )
+
+  if (!profile) {
+    return {
+      notified:
+        0,
+    }
+  }
+
+  const watches =
+    await AvailabilityWatch.find({
+      status:
+        'active',
+    })
+      .limit(5000)
+
+  let notified =
+    0
+
+  for (
+    const watch of
+    watches
+  ) {
+    if (
+      !watchMatchesPack(
+        watch,
+        profile,
+      )
+    ) {
+      continue
+    }
+
+    await createNotificationIntent({
+      userId:
+        watch.userId,
+      category:
+        'planning',
+      triggerType:
+        'item_available',
+      reasonCode:
+        'watched_item_available',
+      explanation:
+        `${profile.displayName} is now available on EPANTRY.`,
+      relatedEntityType:
+        'availability_query',
+      relatedEntityId:
+        watch.query,
+      sourceDomain:
+        'marketplace',
+      sourceVersion:
+        'availability-watch-v1',
+      actions: [
+        'dismiss',
+      ],
+      requestedChannels: [
+        'in_app',
+        'email',
+      ],
+      dedupeKey:
+        `availability:${String(
+          watch._id,
+        )}:${profile.packId}`,
+    })
+
+    watch.status =
+      'notified'
+    watch.matchedPackId =
+      profile.packId
+    watch.matchedProductName =
+      profile.displayName
+    watch.notifiedAt =
+      new Date()
+
+    await watch.save()
+
+    notified +=
+      1
+  }
+
+  return {
+    notified,
+  }
+}
+
+export async function fulfillAvailabilityWatchesForPackBestEffort(
+  packId,
+) {
+  try {
+    return await fulfillAvailabilityWatchesForPack(
+      packId,
+    )
+  } catch {
+    return {
+      notified:
+        0,
+      failed:
+        true,
+    }
+  }
 }
 
 export async function getNotificationPreferences({

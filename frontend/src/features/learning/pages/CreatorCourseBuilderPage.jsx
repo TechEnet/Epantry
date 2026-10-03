@@ -33,6 +33,12 @@ import {
   updateLearningCourseModule,
 } from '../services/learning.service'
 
+import {
+  getCommunityExpansionErrorMessage,
+  listMyCreatorContent,
+  registerCreatorContent,
+} from '../../communityExpansion/services/communityExpansion.service'
+
 function statusClass(status) {
   if (status === 'published' || status === 'available') {
     return 'bg-emerald-100 text-emerald-800'
@@ -55,6 +61,7 @@ export default function CreatorCourseBuilderPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [governance, setGovernance] = useState(null)
 
   const [moduleForm, setModuleForm] = useState({
     moduleKey: '',
@@ -97,8 +104,19 @@ export default function CreatorCourseBuilderPage() {
     setError('')
 
     try {
-      const result = await getCreatorCourseCurriculum(courseId)
+      const [result, governanceResult] = await Promise.all([
+        getCreatorCourseCurriculum(courseId),
+        listMyCreatorContent(),
+      ])
+
       setCurriculum(result)
+      setGovernance(
+        (governanceResult?.creatorContent || []).find(
+          (item) =>
+            item.contentType === 'creator_course' &&
+            item.contentId === courseId,
+        ) || null,
+      )
     } catch (requestError) {
       setError(
         getLearningErrorMessage(
@@ -220,6 +238,47 @@ export default function CreatorCourseBuilderPage() {
     }))
   }
 
+  const courseStatus =
+    curriculum?.course?.status ||
+    'draft'
+
+  const canEdit =
+    [
+      'draft',
+      'rejected',
+    ].includes(
+      courseStatus,
+    )
+
+  async function handleSubmitForReview() {
+    setBusy(true)
+    setError('')
+    setNotice('')
+
+    try {
+      await registerCreatorContent({
+        contentType:
+          'creator_course',
+        contentId:
+          courseId,
+      })
+
+      setNotice(
+        'Course submitted to Super Admin. It will appear in Learn / Pro only after approval.',
+      )
+      await load()
+    } catch (requestError) {
+      setError(
+        getCommunityExpansionErrorMessage(
+          requestError,
+          'Unable to submit this course for Super Admin review.',
+        ),
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="page-shell grid min-h-[60vh] place-items-center py-10">
@@ -231,7 +290,7 @@ export default function CreatorCourseBuilderPage() {
   return (
     <main className="page-shell py-8 sm:py-10">
       <Link
-        to="/creator-studio"
+        to="/host/creator-studio"
         className="focus-ring inline-flex items-center gap-2 text-sm font-black text-stone-600 hover:text-emerald-800"
       >
         <ArrowLeft size={16} aria-hidden="true" />
@@ -248,10 +307,10 @@ export default function CreatorCourseBuilderPage() {
               Verified Creator Authoring
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-tight">
-              Course Builder
+              {curriculum?.course?.title || 'Course Builder'}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-400">
-              Build modules, lessons and governed media on the existing M15 CreatorCourse. CourseEntitlement remains the Pro access authority; this builder never creates a new application role.
+              Build modules, lessons and governed media here. When the course is ready, submit it to Super Admin. Customers cannot discover free or Pro content until that review is approved.
             </p>
           </div>
         </div>
@@ -269,6 +328,41 @@ export default function CreatorCourseBuilderPage() {
           {notice}
         </div>
       ) : null}
+
+      <section className="mt-6 rounded-[26px] border border-violet-200 bg-violet-50 p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-700">
+              Super Admin review
+            </p>
+            <h2 className="mt-1 text-xl font-black text-stone-950">
+              {courseStatus === 'listed'
+                ? 'Approved and live'
+                : courseStatus === 'in_review'
+                  ? 'Waiting for Super Admin approval'
+                  : courseStatus === 'rejected'
+                    ? 'Changes required before resubmission'
+                    : 'Draft - not visible to customers'}
+            </h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-stone-600">
+              {governance?.reviewReason
+                ? `Latest review note: ${governance.reviewReason}`
+                : 'Only approved Creator courses become visible in Learn / Pro. Video lessons are reviewed as part of this course submission.'}
+            </p>
+          </div>
+
+          {canEdit ? (
+            <button
+              type="button"
+              disabled={busy || !canEdit}
+              onClick={handleSubmitForReview}
+              className="focus-ring inline-flex shrink-0 items-center justify-center rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white disabled:opacity-50"
+            >
+              Submit to Super Admin
+            </button>
+          ) : null}
+        </div>
+      </section>
 
       <section className="mt-6 rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex items-center gap-2">
@@ -294,7 +388,7 @@ export default function CreatorCourseBuilderPage() {
                   {module.status === 'draft' ? (
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={busy || !canEdit}
                       onClick={() => run(
                         () => updateLearningCourseModule({
                           courseId,
@@ -310,7 +404,7 @@ export default function CreatorCourseBuilderPage() {
                   ) : module.status === 'published' ? (
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={busy || !canEdit}
                       onClick={() => run(
                         () => updateLearningCourseModule({
                           courseId,
@@ -344,7 +438,7 @@ export default function CreatorCourseBuilderPage() {
                         {lesson.status === 'draft' ? (
                           <button
                             type="button"
-                            disabled={busy}
+                            disabled={busy || !canEdit}
                             onClick={() => run(
                               () => updateLearningCourseLesson({
                                 courseId,
@@ -360,7 +454,7 @@ export default function CreatorCourseBuilderPage() {
                         ) : lesson.status === 'published' ? (
                           <button
                             type="button"
-                            disabled={busy}
+                            disabled={busy || !canEdit}
                             onClick={() => run(
                               () => updateLearningCourseLesson({
                                 courseId,
@@ -386,7 +480,7 @@ export default function CreatorCourseBuilderPage() {
                             {media.availabilityState === 'processing' ? (
                               <button
                                 type="button"
-                                disabled={busy}
+                                disabled={busy || !canEdit}
                                 onClick={() => run(
                                   () => updateLearningCourseMedia({
                                     courseId,
@@ -451,7 +545,7 @@ export default function CreatorCourseBuilderPage() {
             onChange={(event) => setModuleForm((current) => ({ ...current, sortOrder: event.target.value }))}
             className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs font-semibold outline-none"
           />
-          <button disabled={busy} className="focus-ring mt-3 w-full rounded-xl bg-stone-950 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50">
+          <button disabled={busy || !canEdit} className="focus-ring mt-3 w-full rounded-xl bg-stone-950 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50">
             Add module
           </button>
         </form>
@@ -529,7 +623,7 @@ export default function CreatorCourseBuilderPage() {
             />
           ) : null}
 
-          <button disabled={busy || !lessonForm.moduleId} className="focus-ring mt-3 w-full rounded-xl bg-stone-950 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50">
+          <button disabled={busy || !canEdit || !lessonForm.moduleId} className="focus-ring mt-3 w-full rounded-xl bg-stone-950 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50">
             Add lesson
           </button>
         </form>
@@ -595,7 +689,7 @@ export default function CreatorCourseBuilderPage() {
             <option value="available">Available</option>
             <option value="restricted">Restricted</option>
           </select>
-          <button disabled={busy || !mediaForm.lessonId} className="focus-ring mt-3 w-full rounded-xl bg-stone-950 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50">
+          <button disabled={busy || !canEdit || !mediaForm.lessonId} className="focus-ring mt-3 w-full rounded-xl bg-stone-950 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50">
             Register media
           </button>
         </form>

@@ -38,6 +38,7 @@ import {
 } from '../auth/auth.middleware.js'
 
 import {
+  requireChefRestaurantHostAccess,
   requireCustomerAccess,
 } from '../auth/authorization.middleware.js'
 
@@ -140,14 +141,15 @@ const registerCreatorContentSchema =
                 .max(2000)
                 .default(''),
           })
-          .strict(),
+          .strict()
+          .optional(),
     })
     .strict()
     .superRefine(
       (value, context) => {
         if (
-          value.rights.publishFrom &&
-          value.rights.publishUntil &&
+          value.rights?.publishFrom &&
+          value.rights?.publishUntil &&
           value.rights.publishUntil <=
             value.rights.publishFrom
         ) {
@@ -166,9 +168,9 @@ const registerCreatorContentSchema =
         }
 
         if (
-          value.rights.sponsored ===
+          value.rights?.sponsored ===
             true &&
-          value.rights.disclosureText.length <
+          String(value.rights?.disclosureText || '').length <
             5
         ) {
           context.addIssue({
@@ -466,6 +468,14 @@ const customerSecurity = [
   requireCustomerAccess,
 ]
 
+const creatorHostSecurity = [
+  sensitiveResponseNoStoreMiddleware,
+  authenticateSession,
+  loadCurrentUser,
+  requireActiveAccount,
+  requireChefRestaurantHostAccess,
+]
+
 const adminSecurity = [
   sensitiveResponseNoStoreMiddleware,
   rejectPrivilegedImpersonation,
@@ -479,7 +489,7 @@ const adminSecurity = [
 
 router.get(
   '/community-trust/creator-content',
-  ...customerSecurity,
+  ...creatorHostSecurity,
   wrap(
     async (req, res) =>
       send(
@@ -497,7 +507,7 @@ router.get(
 
 router.post(
   '/community-trust/creator-content',
-  ...customerSecurity,
+  ...creatorHostSecurity,
   requireCsrfToken,
   wrap(
     async (req, res) => {

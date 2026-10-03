@@ -575,6 +575,23 @@ export const createProductionRecipeBodySchema = z
         .optional()
         .default(null),
 
+    listingOutletId:
+      objectIdSchema
+        .nullable()
+        .optional()
+        .default(null),
+
+    customerVisibility:
+      z
+        .enum([
+          'organization_only',
+          'public_candidate',
+        ])
+        .optional()
+        .default(
+          'organization_only',
+        ),
+
     title:
       z
         .string()
@@ -737,6 +754,40 @@ export const addMenuItemBodySchema = z
   })
   .strict()
 
+export const menuItemAvailabilityParamsSchema = z
+  .object({
+    id:
+      objectIdSchema,
+
+    itemId:
+      objectIdSchema,
+  })
+  .strict()
+
+export const setMenuItemAvailabilityBodySchema = z
+  .object({
+    status:
+      z.enum([
+        'available',
+        'sold_out',
+        'paused',
+      ]),
+
+    note:
+      z
+        .string()
+        .trim()
+        .max(1000)
+        .optional()
+        .default(''),
+
+    observedAt:
+      z.coerce
+        .date()
+        .optional(),
+  })
+  .strict()
+
 export const calculateRecipeCostBodySchema = z
   .object({
     outletId:
@@ -826,5 +877,74 @@ export const createProcurementPlanBodySchema = z
         )
         .min(1)
         .max(100),
+  })
+  .strict()
+
+export const createRestaurantRecipeListingBodySchema = z
+  .object({
+    recipe: z.any(),
+
+    outletId: objectIdSchema,
+
+    customerVisibility: z
+      .enum([
+        'organization_only',
+        'public_candidate',
+      ])
+      .default('public_candidate'),
+
+    kitchenNote: z
+      .string()
+      .trim()
+      .max(1500)
+      .optional()
+      .default(''),
+
+    operationalIngredients: z
+      .array(
+        z
+          .object({
+            canonicalIngredientId: objectIdSchema,
+
+            expectedWastePercentage: z
+              .number()
+              .min(0)
+              .max(95)
+              .default(0),
+
+            preferredSupplierProductId: objectIdSchema
+              .nullable()
+              .optional()
+              .default(null),
+
+            note: z
+              .string()
+              .trim()
+              .max(1000)
+              .optional()
+              .default(''),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(250),
+  })
+  .strict()
+
+export const updateRestaurantRecipeListingBodySchema =
+  createRestaurantRecipeListingBodySchema
+
+export const restaurantRecipeReviewBodySchema = z
+  .object({
+    decision: z.enum([
+      'approve',
+      'reject',
+    ]),
+
+    reason: z
+      .string()
+      .trim()
+      .min(3)
+      .max(1500),
   })
   .strict()

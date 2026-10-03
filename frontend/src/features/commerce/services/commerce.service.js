@@ -282,6 +282,47 @@ export async function createDirectMarketplaceCart({
 }
 
 
+export async function createRestaurantRecipeMarketplaceCart({
+  slug,
+  servings,
+  pincode,
+  fulfillmentType =
+    'delivery',
+  idempotencyKey,
+}) {
+  return csrfRequest({
+    method:
+      'post',
+
+    url:
+      '/cart/restaurant-recipe',
+
+    data: {
+      slug:
+        String(
+          slug ||
+            '',
+        ).trim(),
+
+      servings:
+        Number(
+          servings,
+        ),
+
+      pincode:
+        String(
+          pincode ||
+            '',
+        ).trim(),
+
+      fulfillmentType,
+    },
+
+    idempotencyKey,
+  })
+}
+
+
 export async function updateDirectMarketplaceCartItem({
   cartId,
   itemId,
@@ -353,6 +394,21 @@ export async function getMarketplaceCart(
       `/cart/${encodePathValue(
         cartId,
       )}`,
+    )
+
+  return unwrapApiData(
+    response,
+  )
+}
+
+export async function getMarketplaceCartDeliveryEta(
+  cartId,
+) {
+  const response =
+    await apiClient.get(
+      `/cart/${encodePathValue(
+        cartId,
+      )}/delivery-eta`,
     )
 
   return unwrapApiData(

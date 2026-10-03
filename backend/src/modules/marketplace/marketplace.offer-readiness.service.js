@@ -3,6 +3,10 @@ import {
 } from '../../utils/ApiError.js'
 
 import {
+  fulfillAvailabilityWatchesForPackBestEffort,
+} from '../notifications/notification.service.js'
+
+import {
   HostOffer,
   InventoryNode,
   InventorySnapshot,
@@ -395,6 +399,10 @@ export async function activateHostOffer(
     )
 
   await offer.save()
+
+  await fulfillAvailabilityWatchesForPackBestEffort(
+    offer.packId,
+  )
 
   return {
     offer:

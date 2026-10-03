@@ -51,6 +51,27 @@ function statusClasses(
   }
 }
 
+function hostWorkspaceTypeLabel(
+  value,
+) {
+  switch (value) {
+    case 'b2b':
+      return 'B2B'
+
+    case 'brand_seller':
+      return 'Brand / Seller'
+
+    case 'hybrid':
+      return 'Hybrid'
+
+    case 'chef_restaurant':
+      return 'Chef + Restaurant'
+
+    default:
+      return 'Legacy / not selected'
+  }
+}
+
 function formatDate(
   value,
 ) {
@@ -418,7 +439,7 @@ export default function AdminHostReviewPage() {
         ) : (
           <div className="overflow-x-auto">
 
-            <table className="w-full min-w-[840px] border-collapse">
+            <table className="w-full min-w-[980px] border-collapse">
 
               <thead className="bg-stone-50">
 
@@ -434,6 +455,10 @@ export default function AdminHostReviewPage() {
 
                   <th className="px-5 py-4">
                     Status
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Requested type
                   </th>
 
                   <th className="px-5 py-4">
@@ -527,6 +552,15 @@ export default function AdminHostReviewPage() {
                             }
                           </span>
 
+                        </td>
+
+
+                        <td className="px-5 py-4">
+                          <span className="inline-flex rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-black text-sky-800">
+                            {hostWorkspaceTypeLabel(
+                              host?.hostWorkspaceType,
+                            )}
+                          </span>
                         </td>
 
 
@@ -746,6 +780,22 @@ export default function AdminHostReviewPage() {
               </span>.
               This privileged action will be audited.
             </p>
+
+            <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
+                Requested Host workspace
+              </p>
+              <p className="mt-1 text-sm font-black text-sky-950">
+                {hostWorkspaceTypeLabel(
+                  actionTarget.host?.hostWorkspaceType,
+                )}
+              </p>
+              {!actionTarget.host?.hostWorkspaceType ? (
+                <p className="mt-1 text-xs font-semibold leading-5 text-sky-800">
+                  Legacy application: this record was created before Host workspace selection was required.
+                </p>
+              ) : null}
+            </div>
 
 
             <label className="mt-5 block">

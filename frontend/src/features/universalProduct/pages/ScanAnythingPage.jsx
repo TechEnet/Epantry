@@ -2009,7 +2009,7 @@ export default function ScanAnythingPage({
                     </Link>
                   ) : searchQuery ? (
                     <Link
-                      to={`/search?q=${encodeURIComponent(
+                      to={`/grocery?q=${encodeURIComponent(
                         searchQuery,
                       )}`}
                       className="focus-ring inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800"
@@ -2046,7 +2046,7 @@ export default function ScanAnythingPage({
                   </div>
 
                   <Link
-                    to={`/search?q=${encodeURIComponent(
+                    to={`/grocery?q=${encodeURIComponent(
                       searchQuery,
                     )}`}
                     className="focus-ring mt-3 inline-flex shrink-0 items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800 sm:mt-0"

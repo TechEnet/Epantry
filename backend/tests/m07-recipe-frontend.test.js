@@ -450,7 +450,12 @@ test(
 
     assert.doesNotMatch(
       sources,
-      /activeMode\s*=/,
+      /setActiveMode|activeMode\s*:\s*['"](?:host|customer)['"]/,
+    )
+
+    assert.match(
+      sources,
+      /customerEnabled\s*===\s*true/,
     )
 
     assert.doesNotMatch(

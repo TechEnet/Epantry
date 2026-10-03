@@ -28,6 +28,7 @@ import {
   createPaymentIntent,
   getCommerceErrorMessage,
   getMarketplaceCart,
+  getMarketplaceCartDeliveryEta,
   prepareCheckout,
   verifyPayment,
 } from '../services/commerce.service'
@@ -35,6 +36,10 @@ import {
 import {
   getDefaultDeliveryAddress,
 } from '../../deliveryAddresses/services/deliveryAddress.service'
+
+import {
+  useLocationStore,
+} from '../../location/store/location.store'
 
 const RAZORPAY_CHECKOUT_URL =
   'https://checkout.razorpay.com/v1/checkout.js'
@@ -257,6 +262,12 @@ export default function CheckoutPage() {
 
   const navigate =
     useNavigate()
+
+  const setDeliveryContext =
+    useLocationStore(
+      (state) =>
+        state.setDeliveryContext,
+    )
 
   const checkoutKeyRef =
     useRef(
@@ -499,6 +510,83 @@ export default function CheckoutPage() {
     [
       cartId,
       prepare,
+    ],
+  )
+
+  useEffect(
+    () => {
+      if (
+        !cartId
+      ) {
+        return undefined
+      }
+
+      let active =
+        true
+
+      getMarketplaceCartDeliveryEta(
+        cartId,
+      )
+        .then(
+          (eta) => {
+            if (
+              !active ||
+              !eta?.available
+            ) {
+              return
+            }
+
+            setDeliveryContext({
+              city:
+                eta.destination?.city ||
+                '',
+
+              state:
+                eta.destination?.state ||
+                '',
+
+              country:
+                eta.destination?.country ||
+                'India',
+
+              label:
+                eta.destination?.label ||
+                `PIN ${eta.destination?.postalCode || ''}`,
+
+              estimatedDeliveryMinutes:
+                eta.estimatedDeliveryMinutes,
+
+              estimatedArrivalAt:
+                eta.estimatedArrivalAt,
+
+              estimatedRoadDistanceKm:
+                eta.estimatedRoadDistanceKm,
+
+              averageSpeedKmh:
+                eta.averageSpeedKmh,
+
+              calculationMethod:
+                eta.calculationMethod,
+
+              targetPath:
+                `/delivery-addresses?returnTo=${encodeURIComponent(
+                  `/checkout/${cartId}`,
+                )}`,
+            })
+          },
+        )
+        .catch(
+          () => undefined,
+        )
+
+      return () => {
+        active =
+          false
+      }
+    },
+    [
+      cartId,
+      setDeliveryContext,
     ],
   )
 

@@ -154,6 +154,17 @@ export const ADMIN_AUDIT_REASON_DEFINITIONS =
 
     freezeReasonDefinition({
       code:
+        'hospitality.governance',
+
+      label:
+        'Hospitality governance action',
+
+      requiresDetails:
+        false,
+    }),
+
+    freezeReasonDefinition({
+      code:
         'marketplace.operation',
 
       label:
@@ -303,6 +314,31 @@ export const ADMIN_AUDIT_CRITICAL_ACTION_REASONS =
     'recipe.publish':
       Object.freeze([
         'recipe.governance',
+      ]),
+
+    'hospitality.restaurant_recipe.approve':
+      Object.freeze([
+        'hospitality.governance',
+      ]),
+
+    'hospitality.restaurant_recipe.reject':
+      Object.freeze([
+        'hospitality.governance',
+      ]),
+
+    'hospitality.production_recipe.approve':
+      Object.freeze([
+        'hospitality.governance',
+      ]),
+
+    'hospitality.dish_passport.approve':
+      Object.freeze([
+        'hospitality.governance',
+      ]),
+
+    'hospitality.change_case.approve':
+      Object.freeze([
+        'hospitality.governance',
       ]),
 
     'marketplace.mutate':

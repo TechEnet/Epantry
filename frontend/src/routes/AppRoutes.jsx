@@ -13,6 +13,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
 } from 'react-router-dom'
 
 import {
@@ -50,8 +51,13 @@ import {
 
 import HospitalityShell from '../features/hospitality/components/HospitalityShell'
 import HostShell from '../features/host/components/HostShell'
+import {
+  isHostPathAllowed,
+  normalizeHostWorkspaceType,
+} from '../features/host/hostWorkspace.config'
 import CustomerShell from '../features/customer/components/CustomerShell'
 import RouteLoading from '../features/system/components/RouteLoading'
+import AvailabilityNotifyModal from '../features/notifications/components/AvailabilityNotifyModal'
 
 
 const RECIPE_CART_PENDING_KEY =
@@ -786,12 +792,17 @@ function GlobalFloatingCartCompanion() {
             {items.reduce(
               (total, item) =>
                 total +
-                Math.max(
-                  1,
-                  Number(
-                    item.quantity ||
-                    1,
-                  ),
+                (
+                  item.cartKind ===
+                    'recipe'
+                    ? 1
+                    : Math.max(
+                        1,
+                        Number(
+                          item.quantity ||
+                          1,
+                        ),
+                      )
                 ),
               0,
             )}
@@ -978,6 +989,7 @@ const AboutPage = lazy(() => import('../features/about/pages/AboutPage'))
 const GroceryPage = lazy(() => import('../features/grocery/pages/GroceryPage'))
 const CategoryPage = lazy(() => import('../features/grocery/pages/CategoryPage'))
 const ProductDetailPage = lazy(() => import('../features/grocery/pages/ProductDetailPage'))
+const ProductSearchResultsPage = lazy(() => import('../features/grocery/pages/ProductSearchResultsPage'))
 const ProductFoodIntelligenceBridge = lazy(() => import('../features/foodIntelligence/components/ProductFoodIntelligenceBridge'))
 const BrandsPage = lazy(() => import('../features/brands/pages/BrandsPage'))
 const BrandDetailPage = lazy(() => import('../features/brands/pages/BrandDetailPage'))
@@ -1006,13 +1018,13 @@ const WasteReductionPage = lazy(() => import('../features/planning/pages/WasteRe
 const ScanAnythingPage = lazy(() => import('../features/universalProduct/pages/ScanAnythingPage'))
 const ProductPassportPage = lazy(() => import('../features/universalProduct/pages/ProductPassportPage'))
 const CommunityRecipesPage = lazy(() => import('../features/community/pages/CommunityRecipesPage'))
+const SharedCommunityRecipePage = lazy(() => import('../features/community/pages/SharedCommunityRecipePage'))
 const CreatorProfilePage = lazy(() => import('../features/community/pages/CreatorProfilePage'))
 const LearnProPage = lazy(() => import('../features/community/pages/LearnProPage'))
 const CourseDetailPage = lazy(() => import('../features/learning/pages/CourseDetailPage'))
 const CoursePlayerPage = lazy(() => import('../features/learning/pages/CoursePlayerPage'))
 const MyLearningPage = lazy(() => import('../features/learning/pages/MyLearningPage'))
 const CreatorCourseBuilderPage = lazy(() => import('../features/learning/pages/CreatorCourseBuilderPage'))
-const SearchPage = lazy(() => import('../features/search/pages/SearchPage'))
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'))
 const ForgotPasswordPage = lazy(() => import('../features/auth/pages/ForgotPasswordPage'))
 const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage'))
@@ -1040,6 +1052,7 @@ const HostOperationsPage = lazy(() => import('../features/hostOperations/pages/H
 const HostBusinessProfilePage = lazy(() => import('../features/hostOperations/pages/HostBusinessProfilePage'))
 const HostFulfillmentPage = lazy(() => import('../features/hostOperations/pages/HostFulfillmentPage'))
 const HospitalityPage = lazy(() => import('../features/hospitality/pages/HospitalityPage'))
+const RestaurantRecipesPage = lazy(() => import('../features/hospitality/pages/RestaurantRecipesPage'))
 const HostAnalyticsPage = lazy(() => import('../features/analytics/pages/HostAnalyticsPage'))
 const HostListingHistoryPage = lazy(() => import('../features/listingHistory/pages/HostListingHistoryPage'))
 
@@ -1059,6 +1072,7 @@ const AdminHostReviewPage = lazy(() => import('../features/admin/pages/AdminHost
 const AdminHostOperationsPage = lazy(() => import('../features/hostOperations/pages/AdminHostOperationsPage'))
 const AdminGovernancePage = lazy(() => import('../features/adminGovernance/pages/AdminGovernancePage'))
 const AdminRolesPage = lazy(() => import('../features/admin/pages/AdminRolesPage'))
+const AdminProMembershipPage = lazy(() => import('../features/admin/pages/AdminProMembershipPage'))
 const AdminAuditPage = lazy(() => import('../features/admin/pages/AdminAuditPage'))
 const AdminAnalyticsPage = lazy(() => import('../features/analytics/pages/AdminAnalyticsPage'))
 const AdminListingHistoryPage = lazy(() => import('../features/listingHistory/pages/AdminListingHistoryPage'))
@@ -1589,16 +1603,57 @@ function CustomerWorkspacePresentation({
 function HospitalityRoute({
   section,
 }) {
+  const {
+    currentUser,
+  } = useAuth()
+
+  const hostWorkspaceType =
+    normalizeHostWorkspaceType(
+      currentUser,
+    )
+
+  const canUseHospitality =
+    isHostPathAllowed(
+      '/host/hospitality',
+      hostWorkspaceType,
+    )
+
   return (
     <ApplicationAccessRoute
       access={APPLICATION_ACCESS_TYPES.HOST}
     >
-      <HospitalityShell>
-        <HospitalityPage
-          section={section}
+      {canUseHospitality ? (
+        <HospitalityShell>
+          {section === 'restaurantRecipes' ? (
+            <RestaurantRecipesPage />
+          ) : (
+            <HospitalityPage
+              section={section}
+            />
+          )}
+        </HospitalityShell>
+      ) : (
+        <Navigate
+          to="/host/operations"
+          replace
         />
-      </HospitalityShell>
+      )}
     </ApplicationAccessRoute>
+  )
+}
+
+function LegacyCreatorCourseRedirect() {
+  const {
+    courseId,
+  } = useParams()
+
+  return (
+    <Navigate
+      to={`/host/creator-studio/courses/${encodeURIComponent(
+        courseId || '',
+      )}`}
+      replace
+    />
   )
 }
 
@@ -2330,6 +2385,7 @@ export default function AppRoutes() {
       <ScrollToTop />
       <Navbar />
       <GlobalFloatingCartCompanion />
+      <AvailabilityNotifyModal />
 
       <div className="app-content">
         <Suspense
@@ -2342,6 +2398,7 @@ export default function AppRoutes() {
             <Route path="/about" element={<AboutPage />} />
             <Route path="/grocery" element={<GroceryPage />} />
             <Route path="/grocery/category/:slug" element={<CategoryPage />} />
+            <Route path="/grocery/search-results" element={<ProductSearchResultsPage />} />
 
             <Route
               path="/grocery/product/:slug"
@@ -2375,25 +2432,23 @@ export default function AppRoutes() {
             <Route path="/recipes/:slug/history" element={<RecipeHistoryPage />} />
 
             <Route path="/community" element={<CommunityRecipesPage />} />
+            <Route path="/community/shared/:shareToken" element={<SharedCommunityRecipePage />} />
             <Route path="/community/:communityRecipeId" element={<CommunityRecipesPage />} />
             <Route path="/creators/:creatorProfileId" element={<CreatorProfilePage />} />
 
             <Route
               path="/creator-studio"
               element={
-                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.CUSTOMER}>
-                  <CreatorProfilePage />
-                </ApplicationAccessRoute>
+                <Navigate
+                  to="/host/creator-studio"
+                  replace
+                />
               }
             />
 
             <Route
               path="/creator-studio/courses/:courseId"
-              element={
-                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.CUSTOMER}>
-                  <CreatorCourseBuilderPage />
-                </ApplicationAccessRoute>
-              }
+              element={<LegacyCreatorCourseRedirect />}
             />
 
             <Route path="/learn" element={<LearnProPage />} />
@@ -2440,8 +2495,6 @@ export default function AppRoutes() {
               path="/dish-passports/:publicId"
               element={<PublicDishPassportPage />}
             />
-
-            <Route path="/search" element={<SearchPage />} />
 
             <Route
               path="/login"
@@ -2992,11 +3045,34 @@ export default function AppRoutes() {
               }
             />
 
+            <Route
+              path="/host/creator-studio"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
+                  <HostShell>
+                    <CreatorProfilePage />
+                  </HostShell>
+                </ApplicationAccessRoute>
+              }
+            />
+
+            <Route
+              path="/host/creator-studio/courses/:courseId"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
+                  <HostShell>
+                    <CreatorCourseBuilderPage />
+                  </HostShell>
+                </ApplicationAccessRoute>
+              }
+            />
+
             <Route path="/host/hospitality" element={<HospitalityRoute section="dashboard" />} />
             <Route path="/host/hospitality/outlets" element={<HospitalityRoute section="outlets" />} />
             <Route path="/host/hospitality/suppliers" element={<HospitalityRoute section="suppliers" />} />
             <Route path="/host/hospitality/products" element={<HospitalityRoute section="products" />} />
-            <Route path="/host/hospitality/recipes" element={<HospitalityRoute section="recipes" />} />
+            <Route path="/host/hospitality/recipes" element={<HospitalityRoute section="restaurantRecipes" />} />
+            <Route path="/host/hospitality/legacy-recipes" element={<HospitalityRoute section="recipes" />} />
             <Route path="/host/hospitality/menus" element={<HospitalityRoute section="menus" />} />
             <Route path="/host/hospitality/procurement" element={<HospitalityRoute section="procurement" />} />
             <Route path="/host/hospitality/costing" element={<HospitalityRoute section="costing" />} />
@@ -3330,6 +3406,15 @@ export default function AppRoutes() {
                   ]}
                 >
                   <AdminGovernancePage section="aiQuality" />
+                </AdminPermissionRoute>
+              }
+            />
+
+            <Route
+              path="/admin/pro"
+              element={
+                <AdminPermissionRoute rootOnly>
+                  <AdminProMembershipPage />
                 </AdminPermissionRoute>
               }
             />

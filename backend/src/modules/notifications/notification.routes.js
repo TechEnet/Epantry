@@ -22,6 +22,8 @@ import {
 } from '../auth/auth.middleware.js'
 
 import {
+  checkItemAvailability,
+  createAvailabilityWatch,
   getNotificationPreferences,
   listNotifications,
   markAllNotificationsRead,
@@ -31,6 +33,7 @@ import {
 } from './notification.service.js'
 
 import {
+  availabilityWatchBodySchema,
   notificationActionBodySchema,
   notificationIdParamsSchema,
   notificationListQuerySchema,
@@ -141,6 +144,82 @@ router.use(
   loadCurrentUser,
   requireActiveAccount,
   requireCustomerNotificationAccess,
+)
+
+
+
+router.post(
+  '/availability/check',
+  requireCsrfToken,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const input =
+        parseOrThrow(
+          availabilityWatchBodySchema,
+          req.body,
+          'AVAILABILITY_CHECK_INPUT_INVALID',
+        )
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            {
+              ...(await checkItemAvailability({
+                input,
+              })),
+              requestId:
+                req.requestId,
+            },
+            'Item availability checked.',
+          ),
+        )
+    },
+  ),
+)
+
+router.post(
+  '/availability-watches',
+  requireCsrfToken,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const input =
+        parseOrThrow(
+          availabilityWatchBodySchema,
+          req.body,
+          'AVAILABILITY_WATCH_INPUT_INVALID',
+        )
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            {
+              ...(await createAvailabilityWatch({
+                input,
+                actorUser:
+                  actorUser(
+                    req,
+                  ),
+              })),
+              requestId:
+                req.requestId,
+            },
+            'Availability notification preference saved.',
+          ),
+        )
+    },
+  ),
 )
 
 router.get(

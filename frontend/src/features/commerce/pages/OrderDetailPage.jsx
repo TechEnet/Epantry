@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
+  Clock3,
   Download,
   MapPin,
   PackageCheck,
@@ -17,6 +18,8 @@ import {
 import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../auth/context/AuthContext";
+
+import { useLocationStore } from "../../location/store/location.store";
 
 import {
   getCommerceErrorMessage,
@@ -781,10 +784,43 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
   );
 }
 
+function getRemainingEtaMinutes(eta, nowMs) {
+  if (!eta?.available) {
+    return null;
+  }
+
+  const arrivalAtMs = Date.parse(eta.estimatedArrivalAt || "");
+
+  if (Number.isFinite(arrivalAtMs)) {
+    return Math.max(
+      0,
+      Math.ceil((arrivalAtMs - nowMs) / 60000)
+    );
+  }
+
+  return Number.isFinite(Number(eta.estimatedDeliveryMinutes))
+    ? Math.max(0, Math.ceil(Number(eta.estimatedDeliveryMinutes)))
+    : null;
+}
+
+function formatEtaDistance(value) {
+  const distance = Number(value);
+
+  return Number.isFinite(distance) && distance >= 0
+    ? `${distance.toFixed(distance >= 10 ? 0 : 1)} km approx.`
+    : "Distance estimate unavailable";
+}
+
 export default function OrderDetailPage() {
   const { orderId } = useParams();
 
   const { currentUser } = useAuth();
+
+  const setDeliveryContext = useLocationStore(
+    (state) => state.setDeliveryContext
+  );
+
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const [data, setData] = useState(null);
 
@@ -831,6 +867,45 @@ export default function OrderDetailPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!data?.deliveryEta?.available) {
+      return undefined;
+    }
+
+    setNowMs(Date.now());
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [data?.deliveryEta?.available, data?.deliveryEta?.estimatedArrivalAt]);
+
+  useEffect(() => {
+    const eta = data?.deliveryEta;
+
+    if (!eta?.available) {
+      return;
+    }
+
+    setDeliveryContext({
+      city: eta.destination?.city || "",
+      state: eta.destination?.state || "",
+      country: eta.destination?.country || "India",
+      label:
+        eta.destination?.label ||
+        (eta.destination?.postalCode
+          ? `PIN ${eta.destination.postalCode}`
+          : "Delivery destination"),
+      estimatedDeliveryMinutes: Number(eta.estimatedDeliveryMinutes),
+      estimatedArrivalAt: eta.estimatedArrivalAt || "",
+      estimatedRoadDistanceKm: Number(eta.estimatedRoadDistanceKm),
+      averageSpeedKmh: Number(eta.averageSpeedKmh),
+      targetPath: `/orders/${encodeURIComponent(String(orderId))}`,
+      calculationMethod: eta.calculationMethod || "",
+    });
+  }, [data?.deliveryEta, orderId, setDeliveryContext]);
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f7f5ef]">
@@ -860,6 +935,10 @@ export default function OrderDetailPage() {
   const sellerOrders = data?.sellerOrders || [];
 
   const timeline = data?.timeline || [];
+
+  const deliveryEta = data?.deliveryEta || null;
+
+  const remainingEtaMinutes = getRemainingEtaMinutes(deliveryEta, nowMs);
 
   const orderDisplayTitle = getOrderDisplayTitle(sellerOrders);
 
@@ -1086,34 +1165,62 @@ export default function OrderDetailPage() {
 
         {order.deliveryAddressSnapshot && (
           <section className="mt-2 rounded-[18px] border border-emerald-200 bg-[#eaf9f3] p-2.5 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-6">
-            <div className="flex items-start gap-3">
-              <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-700 text-white sm:h-10 sm:w-10 sm:rounded-2xl">
-                <MapPin size={18} aria-hidden="true" />
-              </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-700 text-white sm:h-10 sm:w-10 sm:rounded-2xl">
+                  <MapPin size={18} aria-hidden="true" />
+                </div>
 
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Delivery address at checkout
-                </p>
-
-                <p className="mt-0.5 text-[11px] font-black text-stone-950 sm:mt-1 sm:text-base">
-                  {order.deliveryAddressSnapshot.recipientName || "Recipient"}
-                  {order.deliveryAddressSnapshot.phone
-                    ? ` · ${order.deliveryAddressSnapshot.phone}`
-                    : ""}
-                </p>
-
-                <p className="mt-0.5 max-w-full truncate whitespace-nowrap text-[10px] font-semibold leading-4 text-stone-600 sm:mt-1 sm:max-w-5xl sm:whitespace-normal sm:text-sm sm:leading-6">
-                  {formatDeliveryAddress(order.deliveryAddressSnapshot)}
-                </p>
-
-                {order.deliveryAddressSnapshot.deliveryInstructions && (
-                  <p className="mt-1 text-[10px] font-semibold text-stone-500 sm:mt-2 sm:text-xs">
-                    Delivery note:{" "}
-                    {order.deliveryAddressSnapshot.deliveryInstructions}
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                    Delivery address at checkout
                   </p>
-                )}
+
+                  <p className="mt-0.5 text-[11px] font-black text-stone-950 sm:mt-1 sm:text-base">
+                    {order.deliveryAddressSnapshot.recipientName || "Recipient"}
+                    {order.deliveryAddressSnapshot.phone
+                      ? ` · ${order.deliveryAddressSnapshot.phone}`
+                      : ""}
+                  </p>
+
+                  <p className="mt-0.5 max-w-full truncate whitespace-nowrap text-[10px] font-semibold leading-4 text-stone-600 sm:mt-1 sm:max-w-5xl sm:whitespace-normal sm:text-sm sm:leading-6">
+                    {formatDeliveryAddress(order.deliveryAddressSnapshot)}
+                  </p>
+
+                  {order.deliveryAddressSnapshot.deliveryInstructions && (
+                    <p className="mt-1 text-[10px] font-semibold text-stone-500 sm:mt-2 sm:text-xs">
+                      Delivery note:{" "}
+                      {order.deliveryAddressSnapshot.deliveryInstructions}
+                    </p>
+                  )}
+                </div>
               </div>
+
+              {deliveryEta?.available && (
+                <div className="flex shrink-0 items-center gap-2 rounded-xl border border-emerald-200 bg-white/80 px-3 py-2 shadow-sm sm:min-w-[190px] sm:rounded-2xl sm:px-4 sm:py-3">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800">
+                    <Clock3 size={16} aria-hidden="true" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-[9px]">
+                      Approx. delivery
+                    </p>
+
+                    <p className="mt-0.5 text-sm font-black text-stone-950 sm:text-base">
+                      {Number.isFinite(remainingEtaMinutes)
+                        ? remainingEtaMinutes <= 0
+                          ? "Arriving now"
+                          : `~${remainingEtaMinutes} min`
+                        : `~${deliveryEta.estimatedDeliveryMinutes} min`}
+                    </p>
+
+                    <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-[10px]">
+                      {formatEtaDistance(deliveryEta.estimatedRoadDistanceKm)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         )}

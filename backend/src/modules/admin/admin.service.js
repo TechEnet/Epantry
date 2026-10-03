@@ -60,6 +60,9 @@ const ADMIN_HOST_PROJECTION = {
   hostAccessStatus:
     1,
 
+  hostWorkspaceType:
+    1,
+
   superAdminEnabled:
     1,
 
@@ -171,6 +174,10 @@ export function serializeAdminHostUser(
     hostAccessStatus:
       user.hostAccessStatus ||
       'not_requested',
+
+    hostWorkspaceType:
+      user.hostWorkspaceType ||
+      null,
 
     activeMode:
       user.activeMode ||

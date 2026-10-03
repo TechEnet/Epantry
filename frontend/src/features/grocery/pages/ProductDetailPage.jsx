@@ -42,6 +42,8 @@ import {
 
 import { listPublicRecipes } from "../../recipes/services/recipe.service";
 
+import { openAvailabilityNotifyModal } from "../../notifications/components/AvailabilityNotifyModal";
+
 function formatQuantity(quantity) {
   if (!quantity || quantity.value === undefined || quantity.value === null) {
     return "Not declared";
@@ -893,6 +895,26 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         sourceElement,
       });
     } catch (cartError) {
+      const errorCodes = Array.isArray(cartError?.response?.data?.errors)
+        ? cartError.response.data.errors.map((entry) => entry?.code)
+        : [];
+
+      const becameUnavailable = [
+        "DIRECT_CART_OFFER_NOT_ELIGIBLE",
+        "DIRECT_CART_PRODUCT_STALE",
+        "DIRECT_CART_INVENTORY_CHANGED",
+        "DIRECT_CART_ITEM_OFFER_STALE",
+      ].some((code) => errorCodes.includes(code));
+
+      if (becameUnavailable) {
+        openAvailabilityNotifyModal({
+          query: product?.displayName || product?.name || "Product",
+          displayName: product?.displayName || product?.name || "Product",
+          packId,
+          source: "product",
+        });
+      }
+
       setError(
         getCommerceErrorMessage(
           cartError,

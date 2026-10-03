@@ -163,6 +163,116 @@ function recipeDietaryKind(item, foodIntelligence = null) {
   return recipeDietaryKindFromIntelligence(foodIntelligence)
 }
 
+function formatRestaurantPrice(
+  price,
+) {
+  const amountMinor =
+    Number(
+      price?.amountMinor,
+    )
+
+  if (
+    !Number.isInteger(
+      amountMinor,
+    ) ||
+    amountMinor <
+      0
+  ) {
+    return ''
+  }
+
+  return new Intl.NumberFormat(
+    'en-IN',
+    {
+      style:
+        'currency',
+      currency:
+        price?.currency ||
+        'INR',
+      maximumFractionDigits:
+        2,
+    },
+  ).format(
+    amountMinor /
+      100,
+  )
+}
+
+function RestaurantRecipeCard({
+  item,
+}) {
+  const dish =
+    item?.dish ||
+    {}
+
+  const restaurant =
+    item?.restaurant ||
+    {}
+
+  const priceLabel =
+    formatRestaurantPrice(
+      restaurant.pricePerServing,
+    )
+
+  return (
+    <Link
+      to={recipePath(item)}
+      className="focus-ring group overflow-hidden rounded-[24px] border border-orange-950/10 bg-[#fff9ef] shadow-[0_14px_38px_rgba(105,50,17,0.10)] transition hover:-translate-y-1 hover:shadow-[0_22px_52px_rgba(105,50,17,0.15)]"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden bg-[#f2d8b6]">
+        {dish.heroImageUrl ? (
+          <img
+            src={dish.heroImageUrl}
+            alt={recipeName(item)}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
+          />
+        ) : (
+          <div className="grid h-full place-items-center bg-gradient-to-br from-orange-100 via-amber-50 to-rose-100 text-orange-800">
+            <ChefHat
+              size={38}
+              aria-hidden="true"
+            />
+          </div>
+        )}
+
+        <span className="absolute left-3 top-3 rounded-full border border-white/65 bg-[#7c2d12]/88 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white shadow-sm backdrop-blur">
+          From restaurant
+        </span>
+      </div>
+
+      <div className="p-4">
+        <h3 className="line-clamp-2 font-serif text-xl font-semibold leading-tight tracking-[-0.02em] text-[#35180d]">
+          {recipeName(item)}
+        </h3>
+
+        <p className="mt-2 text-xs font-black text-[#9a3412]">
+          From {restaurant.restaurantName || 'Restaurant'}
+        </p>
+
+        <p className="mt-1 text-[11px] font-semibold text-stone-500">
+          {restaurant.outletName || 'Restaurant outlet'}
+        </p>
+
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-orange-950/10 pt-3">
+          <span className="text-xs font-black text-stone-800">
+            {priceLabel
+              ? `${priceLabel} / serving`
+              : 'View recipe'}
+          </span>
+
+          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.12em] text-orange-800">
+            Details
+            <ChevronRight
+              size={14}
+              aria-hidden="true"
+            />
+          </span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
 function ModalShell({
   children,
   onClose,
@@ -291,8 +401,11 @@ export default function RecipesPage() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [recipes, setRecipes] = useState([])
+  const [restaurantRecipes, setRestaurantRecipes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [restaurantLoading, setRestaurantLoading] = useState(true)
   const [error, setError] = useState('')
+  const [restaurantError, setRestaurantError] = useState('')
   const [carouselPosition, setCarouselPosition] = useState(0)
   const [recipeModalOpen, setRecipeModalOpen] = useState(false)
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
@@ -311,14 +424,29 @@ export default function RecipesPage() {
   const loadRecipes = useCallback(
     async () => {
       setLoading(true)
+      setRestaurantLoading(true)
       setError('')
+      setRestaurantError('')
 
-      try {
-        const data = await listPublicRecipes({
+      const standardRequest =
+        listPublicRecipes({
           page: 1,
           limit: 48,
           search,
+          sourceScope: 'standard',
         })
+
+      const restaurantRequest =
+        listPublicRecipes({
+          page: 1,
+          limit: 24,
+          search,
+          sourceScope: 'restaurant',
+        })
+
+      try {
+        const data =
+          await standardRequest
 
         setRecipes(
           Array.isArray(data?.recipes)
@@ -332,6 +460,25 @@ export default function RecipesPage() {
         )
       } finally {
         setLoading(false)
+      }
+
+      try {
+        const restaurantData =
+          await restaurantRequest
+
+        setRestaurantRecipes(
+          Array.isArray(restaurantData?.recipes)
+            ? restaurantData.recipes
+            : [],
+        )
+      } catch (loadError) {
+        setRestaurantRecipes([])
+        setRestaurantError(
+          loadError?.message ||
+            'Unable to load Restaurant recipes.',
+        )
+      } finally {
+        setRestaurantLoading(false)
       }
     },
     [search],
@@ -1124,6 +1271,71 @@ export default function RecipesPage() {
               </>
             )}
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-orange-950/10 bg-[linear-gradient(135deg,#ffe8c7_0%,#fff4df_46%,#f9dfc4_100%)] py-12 sm:py-16">
+        <div className="page-shell">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-800">
+                Restaurant recipes
+              </p>
+              <h2 className="mt-2 font-serif text-3xl font-semibold tracking-[-0.035em] text-[#35180d] sm:text-4xl">
+                From Restaurants
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#6f4a36]">
+                Approved dishes from Chef + Restaurant Hosts, with the source restaurant and outlet shown clearly.
+              </p>
+            </div>
+
+            {restaurantRecipes.length > 0 ? (
+              <p className="text-xs font-black text-orange-900/65">
+                {restaurantRecipes.length}{' '}
+                {restaurantRecipes.length === 1
+                  ? 'restaurant recipe'
+                  : 'restaurant recipes'}
+              </p>
+            ) : null}
+          </div>
+
+          {restaurantError ? (
+            <div
+              role="alert"
+              className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-800"
+            >
+              {restaurantError}
+            </div>
+          ) : restaurantLoading ? (
+            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={`restaurant-recipe-loading-${index}`}
+                  className="aspect-[0.78/1] animate-pulse rounded-[24px] border border-orange-950/10 bg-white/45"
+                />
+              ))}
+            </div>
+          ) : restaurantRecipes.length > 0 ? (
+            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+              {restaurantRecipes.map((item, index) => (
+                <RestaurantRecipeCard
+                  key={`restaurant-${recipeKey(item, index)}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-7 rounded-[24px] border border-dashed border-orange-900/20 bg-white/45 px-6 py-10 text-center">
+              <ChefHat
+                size={34}
+                className="mx-auto text-orange-800"
+                aria-hidden="true"
+              />
+              <p className="mt-3 text-sm font-black text-[#4b2818]">
+                No approved Restaurant recipes are available yet.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

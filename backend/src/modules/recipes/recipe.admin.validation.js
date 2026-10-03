@@ -86,6 +86,14 @@ const recipeSourceSchema =
           .default(
             null,
           ),
+
+      outletId:
+        objectIdSchema
+          .nullable()
+          .optional()
+          .default(
+            null,
+          ),
     })
     .strict()
     .superRefine(
@@ -108,6 +116,24 @@ const recipeSourceSchema =
 
             message:
               'Brand-attributed Recipe requires brandId.',
+          })
+        }
+
+        if (
+          value.type ===
+            'chef' &&
+          !value.organizationId
+        ) {
+          context.addIssue({
+            code:
+              z.ZodIssueCode.custom,
+
+            path: [
+              'organizationId',
+            ],
+
+            message:
+              'Chef/Restaurant Recipe requires organizationId.',
           })
         }
       },
@@ -672,7 +698,21 @@ const recipeDraftContentShape = {
 
         organizationId:
           null,
+
+        outletId:
+          null,
       }),
+
+  visibility:
+    z
+      .enum([
+        'public',
+        'organization_only',
+      ])
+      .optional()
+      .default(
+        'public',
+      ),
 
   unsafeIncomplete:
     z

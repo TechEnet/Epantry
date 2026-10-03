@@ -127,6 +127,40 @@ export default function BrandDetailPage() {
 
   const brandName = brand.displayName || brand.name || "Brand";
 
+  const productCards = productFamilies.flatMap((family) =>
+    (family.products || []).map((product) => ({
+      family,
+      product,
+    }))
+  );
+
+  const productCardTones = [
+    {
+      card: "border-[#A9D4BE] bg-[linear-gradient(145deg,#DFF3E8_0%,#F6EBCF_100%)]",
+      image: "border-[#C6E1D2] bg-[#FFFDF7]",
+      badge: "border-[#9BCBB2] bg-[#EAF7EF] text-[#17613D]",
+      family: "bg-[#CDEAD9] text-[#145C39]",
+      primary: "bg-[#17613D] text-white hover:bg-[#104E31]",
+      secondary: "border-[#8FBEA5] bg-[#F6FFF9]/80 text-[#2B6B4C] hover:bg-[#F6FFF9]",
+    },
+    {
+      card: "border-[#EDC3A8] bg-[linear-gradient(145deg,#FBE6D8_0%,#F6E8C9_100%)]",
+      image: "border-[#F0D3BD] bg-[#FFF9F4]",
+      badge: "border-[#E7B894] bg-[#FFF0E5] text-[#9A4D20]",
+      family: "bg-[#F4D1B7] text-[#8A431E]",
+      primary: "bg-[#A65327] text-white hover:bg-[#88411F]",
+      secondary: "border-[#DCB08F] bg-[#FFF9F4]/80 text-[#8A4A29] hover:bg-[#FFF9F4]",
+    },
+    {
+      card: "border-[#B9CCE8] bg-[linear-gradient(145deg,#E1ECF7_0%,#EAE4F6_100%)]",
+      image: "border-[#CAD8ED] bg-[#FAFCFF]",
+      badge: "border-[#ABC2E0] bg-[#EDF4FC] text-[#315C8C]",
+      family: "bg-[#D1DDF1] text-[#31557D]",
+      primary: "bg-[#345E8B] text-white hover:bg-[#294C72]",
+      secondary: "border-[#AFC4DF] bg-[#F8FBFF]/80 text-[#3E6389] hover:bg-[#F8FBFF]",
+    },
+  ];
+
   return (
     <main className="min-h-screen bg-[#F8FAF7]">
       {/* =========================================================
@@ -220,120 +254,113 @@ export default function BrandDetailPage() {
       ========================================================= */}
 
       <div className="page-shell py-4 sm:py-8">
-        {productFamilies.length === 0 ? (
+        {productCards.length === 0 ? (
           <EmptyState
             title="No published products"
             description="Published products from this Brand will appear here."
           />
         ) : (
-          <div className="space-y-5 sm:space-y-8">
-            {productFamilies.map((family) => (
-              <section key={family.id}>
-                <div className="hidden items-center gap-2 sm:mb-4 sm:flex sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
-                  <Box
-                    size={16}
-                    className="shrink-0 text-[#2563EB] sm:h-[18px] sm:w-[18px]"
-                    aria-hidden="true"
-                  />
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {productCards.map(({ family, product }, index) => {
+              const image = product?.currentVersion?.image;
 
-                  <h2 className="min-w-0 text-[15px] font-black leading-tight tracking-tight text-[#111827] sm:text-xl">
-                    {family.name}
-                  </h2>
-                </div>
+              const productName =
+                product?.currentVersion?.displayName ||
+                product.familyName ||
+                "Brand product";
 
-                <div className="grid gap-3 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {family.products.map((product) => {
-                    const image = product?.currentVersion?.image;
+              const tone = productCardTones[index % productCardTones.length];
 
-                    const productName =
-                      product?.currentVersion?.displayName ||
-                      product.familyName ||
-                      "Brand product";
+              return (
+                <article
+                  key={product.packId}
+                  className={`group relative flex min-w-0 flex-col overflow-hidden rounded-[24px] border p-2.5 shadow-[0_18px_48px_-34px_rgba(17,24,39,0.48)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_58px_-34px_rgba(17,24,39,0.58)] sm:rounded-[30px] sm:p-3.5 ${tone.card}`}
+                >
+                  <div
+                    className={`relative aspect-[4/3] overflow-hidden rounded-[19px] border sm:rounded-[23px] ${tone.image}`}
+                  >
+                    {image?.url ? (
+                      <img
+                        src={image.url}
+                        alt={image.alt || productName}
+                        loading="lazy"
+                        className="h-full w-full object-contain p-3 transition duration-500 group-hover:scale-[1.025] sm:p-4"
+                      />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-[#476B59]">
+                        <Package
+                          size={42}
+                          strokeWidth={1.5}
+                          aria-hidden="true"
+                        />
+                      </div>
+                    )}
 
-                    return (
-                      <article
-                        key={product.packId}
-                        className="group overflow-hidden rounded-[20px] border border-[#2563EB]/15 bg-white p-2.5 shadow-sm transition duration-300 hover:border-[#2563EB]/30 hover:shadow-xl hover:shadow-[#111827]/8 sm:rounded-[26px] sm:p-3.5"
+                    <div className="absolute left-2.5 right-2.5 top-2.5 flex items-start justify-between gap-2 sm:left-3.5 sm:right-3.5 sm:top-3.5">
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] shadow-sm backdrop-blur-sm sm:px-3 sm:text-[10px] sm:tracking-[0.12em] ${tone.badge}`}
                       >
-                        {/* =========================================
-                                PRODUCT IMAGE
-                            ========================================= */}
+                        Published
+                      </span>
 
-                        <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] border border-[#E5E7EB] bg-white sm:aspect-[4/3] sm:rounded-[20px]">
-                          {image?.url ? (
-                            <img
-                              src={image.url}
-                              alt={image.alt || productName}
-                              loading="lazy"
-                              className="h-full w-full object-contain p-2 sm:p-3"
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center bg-[#EFF6FF] text-[#2563EB]">
-                              <Package
-                                size={42}
-                                strokeWidth={1.5}
-                                aria-hidden="true"
-                              />
-                            </div>
-                          )}
+                      <span
+                        className={`inline-flex max-w-[58%] items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black leading-tight sm:px-3 sm:text-[10px] ${tone.family}`}
+                      >
+                        <Box
+                          size={12}
+                          className="shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{family.name}</span>
+                      </span>
+                    </div>
+                  </div>
 
-                          <span className="absolute left-2 top-2 rounded-full border border-[#2563EB]/15 bg-white/95 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#1D4ED8] shadow-sm backdrop-blur-sm sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.12em]">
-                            Published
-                          </span>
-                        </div>
+                  <div className="flex flex-1 flex-col px-1 pb-1 pt-3 sm:px-1.5 sm:pb-1.5 sm:pt-4">
+                    <h3 className="line-clamp-2 text-[16px] font-black leading-snug tracking-[-0.02em] text-[#17211C] sm:text-[19px]">
+                      {productName}
+                    </h3>
 
-                        {/* =========================================
-                                PRODUCT CONTENT
-                            ========================================= */}
+                    <p className="mt-1 text-[10px] font-bold leading-4 text-[#536259] sm:mt-2 sm:text-xs sm:leading-5">
+                      {[product.variantName, product.packName]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
 
-                        <div className="px-0.5 pb-0.5 pt-2.5 sm:px-1 sm:pb-1 sm:pt-4">
-                          <h3 className="line-clamp-2 text-[15px] font-black leading-snug text-[#111827] sm:text-lg">
-                            {productName}
-                          </h3>
+                    <p className="mt-2 line-clamp-2 text-[11px] leading-[18px] text-[#5E6C63] sm:mt-3 sm:text-[13px] sm:leading-5">
+                      {getProductDescription({
+                        product,
+                        brand,
+                      })}
+                    </p>
 
-                          <p className="mt-1 text-[10px] font-semibold leading-4 text-[#6B7280] sm:mt-2 sm:text-xs sm:leading-5">
-                            {[product.variantName, product.packName]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
+                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-4 sm:gap-2.5 sm:pt-5">
+                      {product.productPath && (
+                        <Link
+                          to={product.productPath}
+                          className={`focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3.5 text-[11px] font-black transition sm:min-h-10 sm:gap-2 sm:px-4 sm:text-xs ${tone.primary}`}
+                        >
+                          View product
+                          <ArrowRight size={15} aria-hidden="true" />
+                        </Link>
+                      )}
 
-                          <p className="mt-2 line-clamp-2 text-[11px] leading-[18px] text-[#6B7280] sm:mt-3 sm:text-sm sm:leading-6">
-                            {getProductDescription({
-                              product,
-                              brand,
-                            })}
-                          </p>
-
-                          <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
-                            {product.productPath && (
-                              <Link
-                                to={product.productPath}
-                                className="focus-ring inline-flex items-center gap-1.5 text-xs font-black text-[#2563EB] transition hover:text-[#1D4ED8] sm:gap-2 sm:text-sm"
-                              >
-                                View product
-                                <ArrowRight size={16} aria-hidden="true" />
-                              </Link>
-                            )}
-
-                            <Link
-                              to={`/brands/${encodeURIComponent(
-                                resolvedBrandKey
-                              )}/products/${encodeURIComponent(
-                                product.packId
-                              )}/history`}
-                              className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[10px] font-black text-[#6B7280] transition hover:border-[#2563EB]/25 hover:text-[#2563EB] sm:gap-2 sm:px-3.5 sm:py-2 sm:text-xs"
-                            >
-                              <Clock3 size={14} aria-hidden="true" />
-                              Version history
-                            </Link>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+                      <Link
+                        to={`/brands/${encodeURIComponent(
+                          resolvedBrandKey
+                        )}/products/${encodeURIComponent(
+                          product.packId
+                        )}/history`}
+                        className={`focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border px-3 text-[10px] font-black transition sm:min-h-10 sm:gap-2 sm:px-3.5 sm:text-[11px] ${tone.secondary}`}
+                      >
+                        <Clock3 size={14} aria-hidden="true" />
+                        Version history
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

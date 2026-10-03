@@ -49,6 +49,7 @@ import {
 } from './commerce.models.js'
 
 import {
+  calculateDeliveryEtaFromInventoryNodes,
   createCheckout,
   ensureCheckoutDeliveryAddressSnapshot,
   getParentOrder,
@@ -2618,6 +2619,329 @@ async function upgradeCheckoutIfReady({
   }
 }
 
+const DELIVERY_ETA_TERMINAL_SELLER_STATUSES =
+  new Set([
+    'delivered',
+    'rejected',
+    'seller_cancelled',
+  ])
+
+function orderEtaHandlingOverride(
+  sellerStatus,
+) {
+  const normalizedStatus =
+    String(
+      sellerStatus ||
+        '',
+    )
+      .trim()
+      .toLowerCase()
+
+  if (
+    normalizedStatus ===
+      'carrier_handoff' ||
+    normalizedStatus ===
+      'out_for_delivery'
+  ) {
+    return 0
+  }
+
+  return null
+}
+
+function orderSellerInventoryNodeIds({
+  detail,
+  sellerOrder,
+}) {
+  const sellerOrderId =
+    stringifyId(
+      sellerOrder?.id,
+    )
+
+  const reservationNodeIds =
+    (
+      detail?.reservations
+        ?.items ||
+      []
+    )
+      .filter(
+        (reservation) =>
+          stringifyId(
+            reservation?.sellerOrderId,
+          ) ===
+          sellerOrderId,
+      )
+      .map(
+        (reservation) =>
+          stringifyId(
+            reservation?.inventoryNodeId,
+          ),
+      )
+      .filter(Boolean)
+
+  const itemAllocationNodeIds =
+    (
+      sellerOrder?.items ||
+      []
+    ).flatMap(
+      (item) =>
+        (
+          item?.reservationAllocations ||
+          []
+        )
+          .map(
+            (allocation) =>
+              stringifyId(
+                allocation?.inventoryNodeId,
+              ),
+          )
+          .filter(Boolean),
+    )
+
+  return [
+    ...new Set([
+      ...reservationNodeIds,
+      ...itemAllocationNodeIds,
+    ]),
+  ]
+}
+
+async function buildExistingOrderDeliveryEta({
+  detail,
+  now =
+    new Date(),
+}) {
+  const destinationPostalCode =
+    normalizePostalCode(
+      detail?.order
+        ?.deliveryAddressSnapshot
+        ?.postalCode,
+    )
+
+  if (
+    !/^\d{6}$/.test(
+      destinationPostalCode ||
+        '',
+    )
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'order_delivery_pincode_unavailable',
+
+      message:
+        'This order does not have a valid delivery pincode for ETA calculation.',
+    }
+  }
+
+  const activeSellerOrders =
+    (
+      detail?.sellerOrders ||
+      []
+    ).filter(
+      (sellerOrder) =>
+        !DELIVERY_ETA_TERMINAL_SELLER_STATUSES.has(
+          String(
+            sellerOrder?.status ||
+              '',
+          )
+            .trim()
+            .toLowerCase(),
+        ),
+    )
+
+  if (
+    activeSellerOrders.length ===
+    0
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'order_delivery_complete',
+
+      message:
+        'Delivery ETA is no longer needed because this order has no active seller delivery.',
+    }
+  }
+
+  const sellerEtas =
+    []
+
+  for (
+    const sellerOrder
+    of activeSellerOrders
+  ) {
+    const inventoryNodeIds =
+      orderSellerInventoryNodeIds({
+        detail,
+        sellerOrder,
+      })
+
+    if (
+      inventoryNodeIds.length ===
+      0
+    ) {
+      continue
+    }
+
+    try {
+      const eta =
+        await calculateDeliveryEtaFromInventoryNodes({
+          inventoryNodeIds,
+          destinationPostalCode,
+          now,
+          activeInventoryNodesOnly:
+            false,
+          handlingMinutesOverride:
+            orderEtaHandlingOverride(
+              sellerOrder.status,
+            ),
+        })
+
+      if (
+        eta?.available
+      ) {
+        sellerEtas.push({
+          sellerOrderId:
+            stringifyId(
+              sellerOrder.id,
+            ),
+
+          sellerName:
+            sellerOrder.sellerName ||
+            'Host',
+
+          sellerStatus:
+            sellerOrder.status,
+
+          ...eta,
+        })
+      }
+    } catch {
+      // ETA is supplementary order information. Order detail must still load.
+    }
+  }
+
+  if (
+    sellerEtas.length ===
+    0
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'order_delivery_source_unavailable',
+
+      message:
+        'A delivery ETA could not be calculated from the fulfillment locations recorded for this order.',
+    }
+  }
+
+  const slowestEta =
+    [...sellerEtas].sort(
+      (
+        left,
+        right,
+      ) =>
+        Number(
+          right.estimatedDeliveryMinutes ||
+            0,
+        ) -
+        Number(
+          left.estimatedDeliveryMinutes ||
+            0,
+        ),
+    )[0]
+
+  const sourcePincodes =
+    [
+      ...new Set(
+        sellerEtas.flatMap(
+          (eta) =>
+            eta.sourcePincodes ||
+            [],
+        ),
+      ),
+    ]
+
+  return {
+    available:
+      true,
+
+    orderId:
+      stringifyId(
+        detail?.order?.id,
+      ),
+
+    destination:
+      slowestEta.destination,
+
+    sourceCount:
+      sourcePincodes.length,
+
+    sourcePincodes,
+
+    straightLineDistanceKm:
+      Math.max(
+        ...sellerEtas.map(
+          (eta) =>
+            Number(
+              eta.straightLineDistanceKm ||
+                0,
+            ),
+        ),
+      ),
+
+    estimatedRoadDistanceKm:
+      Math.max(
+        ...sellerEtas.map(
+          (eta) =>
+            Number(
+              eta.estimatedRoadDistanceKm ||
+                0,
+            ),
+        ),
+      ),
+
+    averageSpeedKmh:
+      slowestEta.averageSpeedKmh,
+
+    routeDistanceFactor:
+      slowestEta.routeDistanceFactor,
+
+    handlingMinutes:
+      slowestEta.handlingMinutes,
+
+    travelMinutes:
+      slowestEta.travelMinutes,
+
+    estimatedDeliveryMinutes:
+      slowestEta.estimatedDeliveryMinutes,
+
+    generatedAt:
+      slowestEta.generatedAt,
+
+    estimatedArrivalAt:
+      slowestEta.estimatedArrivalAt,
+
+    isApproximate:
+      true,
+
+    calculationMethod:
+      'order_fulfillment_pincode_distance_constant_speed',
+
+    note:
+      'Approximate ETA recalculated from the fulfillment locations recorded on this order and the delivery pincode. Live traffic is not included.',
+
+    sellerEtas,
+  }
+}
+
 async function enrichOrderDetail({
   detail,
 }) {
@@ -2661,6 +2985,26 @@ async function enrichOrderDetail({
         .lean(),
     ])
 
+  let deliveryEta
+
+  try {
+    deliveryEta =
+      await buildExistingOrderDeliveryEta({
+        detail,
+      })
+  } catch {
+    deliveryEta = {
+      available:
+        false,
+
+      reason:
+        'order_delivery_eta_unavailable',
+
+      message:
+        'Delivery ETA is temporarily unavailable.',
+    }
+  }
+
   const promiseBySellerOrder =
     new Map(
       promises.map(
@@ -2678,6 +3022,8 @@ async function enrichOrderDetail({
 
   return {
     ...detail,
+
+    deliveryEta,
 
     sellerOrders:
       (

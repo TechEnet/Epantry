@@ -1,3 +1,5 @@
+import mongoose from 'mongoose'
+
 import brands from '../../../seed-data/brands.js'
 
 import {
@@ -138,7 +140,7 @@ function fillWithDevelopmentPreview(
 |
 | The canonical Grocery browse projection intentionally stays compact.
 | Featured Grocery now needs approved nutrition for the desktop two-phase
-| hover card, so getLandingFeaturedContent enriches only the four featured
+| hover card, so getLandingFeaturedContent enriches only the five featured
 | records through the existing public Product detail service.
 |
 | No new Product truth is created here. Nutrition is passed through exactly
@@ -302,7 +304,7 @@ async function loadFeaturedGroceryDetails(
     )
       ? products.slice(
           0,
-          4,
+          5,
         )
       : []
 
@@ -475,6 +477,39 @@ async function buildFeaturedRecipeCard(
 */
 
 export async function getLandingFeaturedContent() {
+  /*
+  |--------------------------------------------------------------------------
+  | Database Readiness Fallback
+  |--------------------------------------------------------------------------
+  |
+  | Landing is a public shell contract and must not wait for Mongoose query
+  | buffering when the database connection has not been established yet.
+  | Canonical Grocery and Recipe truth is never invented here: disconnected
+  | requests receive empty canonical arrays, while the existing development
+  | Brand preview remains available outside production.
+  |
+  */
+
+  if (
+    mongoose.connection.readyState !==
+    1
+  ) {
+    return {
+      grocery: [],
+
+      brands:
+        env.nodeEnv ===
+          'production'
+          ? []
+          : selectByIds(
+              brands,
+              previewBrandIds,
+            ),
+
+      recipes: [],
+    }
+  }
+
   const [
     publicGroceryResult,
     databaseBrands,
@@ -485,7 +520,7 @@ export async function getLandingFeaturedContent() {
         1,
 
       limit:
-        4,
+        5,
 
       search:
         '',

@@ -182,3 +182,47 @@ export const notificationActionBodySchema = z
       }
     },
   )
+
+export const availabilityWatchBodySchema = z
+  .object({
+    query:
+      z
+        .string()
+        .trim()
+        .min(2)
+        .max(180),
+
+    canonicalIngredientId:
+      z
+        .string()
+        .trim()
+        .regex(
+          /^[a-f\d]{24}$/i,
+          'A valid Canonical Ingredient ObjectId is required.',
+        )
+        .nullable()
+        .optional()
+        .default(null),
+
+    packId:
+      z
+        .string()
+        .trim()
+        .regex(
+          /^[a-f\d]{24}$/i,
+          'A valid Pack ObjectId is required.',
+        )
+        .nullable()
+        .optional()
+        .default(null),
+
+    source:
+      z
+        .enum([
+          'search',
+          'recipe',
+          'product',
+        ])
+        .default('search'),
+  })
+  .strict()

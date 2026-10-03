@@ -587,6 +587,67 @@ export async function reviewAdminBrandRecipe(
   })
 }
 
+export async function listAdminHospitalityApprovals() {
+  return unwrap(
+    await apiClient.get(
+      '/admin/host-operations/hospitality/approvals',
+    ),
+  )
+}
+
+
+export async function reviewAdminHospitalityRestaurantRecipe(
+  recipeVersionId,
+  input,
+) {
+  return mutate({
+    url:
+      `/admin/host-operations/hospitality/restaurant-recipes/${path(recipeVersionId)}/review`,
+
+    data:
+      input,
+  })
+}
+
+export async function approveAdminHospitalityProductionRecipe(
+  productionRecipeId,
+  input,
+) {
+  return mutate({
+    url:
+      `/admin/host-operations/hospitality/production-recipes/${path(productionRecipeId)}/approve`,
+
+    data:
+      input,
+  })
+}
+
+export async function approveAdminHospitalityDishPassport(
+  dishPassportId,
+  input,
+) {
+  return mutate({
+    url:
+      `/admin/host-operations/hospitality/dish-passports/${path(dishPassportId)}/approve`,
+
+    data:
+      input,
+  })
+}
+
+export async function approveAdminHospitalityChangeCase(
+  changeCaseId,
+  input,
+) {
+  return mutate({
+    url:
+      `/admin/host-operations/hospitality/change-cases/${path(changeCaseId)}/approve`,
+
+    data:
+      input,
+  })
+}
+
 export async function listAdminSettlements(params = {}) {
   return unwrap(
     await apiClient.get(

@@ -49,16 +49,28 @@ import {
   } from '../../features/auth/context/AuthContext';
   
   import NavbarLocationStatus from '../../features/location/components/NavbarLocationStatus';
+  import { useLocationStore } from '../../features/location/store/location.store';
   import ModeSwitcher from '../../features/auth/components/ModeSwitcher';
   import NotificationBell from '../../features/notifications/components/NotificationBell';
 
   import {
+    isHostPathAllowed,
+    normalizeHostWorkspaceType,
+  } from '../../features/host/hostWorkspace.config';
+
+  import {
+    getOrder,
     listOrders,
   } from '../../features/commerce/services/commerce.service';
 
   import {
     listNotifications,
   } from '../../features/analytics/services/analytics.service';
+
+  import {
+    getSearchErrorMessage,
+    runSmartSearch,
+  } from '../../features/search/services/search.service';
   
   const RECIPE_CART_PENDING_KEY =
     'epantry-pending-recipe-cart';
@@ -152,7 +164,7 @@ import {
     }
 
     return {
-        href: '/grocery',
+        href: '/cart/recipe',
         count: 0,
     };
   }
@@ -207,6 +219,56 @@ import {
     },
   ];
   
+  const HOST_NAV_ITEMS = [
+    {
+        label:
+            'Dashboard',
+
+        to:
+            '/host/operations',
+    },
+
+    {
+        label:
+            'Catalog',
+
+        to:
+            '/host/catalog',
+    },
+
+    {
+        label:
+            'Recipe Listings',
+
+        to:
+            '/host/brand-recipes',
+    },
+
+    {
+        label:
+            'Hospitality',
+
+        to:
+            '/host/hospitality',
+    },
+
+    {
+        label:
+            'Orders',
+
+        to:
+            '/host/orders',
+    },
+
+    {
+        label:
+            'Analytics',
+
+        to:
+            '/host/analytics',
+    },
+  ];
+
   const MOBILE_COMPACT_SCROLL_Y =
     40;
   
@@ -267,6 +329,20 @@ import {
   }
   
   export default function Navbar() {
+    const setDeliveryContext =
+        useLocationStore(
+            (state) => state.setDeliveryContext,
+        );
+
+    const clearDeliveryContext =
+        useLocationStore(
+            (state) => state.clearDeliveryContext,
+        );
+
+    const storedDeliveryContext =
+        useLocationStore(
+            (state) => state.deliveryContext,
+        );
     const [
         menuOpen,
         setMenuOpen,
@@ -299,6 +375,36 @@ import {
         setLogoutError,
     ] =
         useState('');
+
+    const [
+        navbarSearchLoading,
+        setNavbarSearchLoading,
+    ] =
+        useState(false);
+
+    const [
+        navbarSearchResults,
+        setNavbarSearchResults,
+    ] =
+        useState([]);
+
+    const [
+        navbarSearchMessage,
+        setNavbarSearchMessage,
+    ] =
+        useState('');
+
+    const [
+        navbarSearchQuery,
+        setNavbarSearchQuery,
+    ] =
+        useState('');
+
+    const [
+        navbarSearchResultsOpen,
+        setNavbarSearchResultsOpen,
+    ] =
+        useState(false);
 
     const [
         accountMenuOpen,
@@ -348,30 +454,46 @@ import {
     } =
         useAuth();
   
+    const isHostPresentation =
+        activeMode === 'host' &&
+        hostEnabled === true;
+
+    const hostWorkspaceType =
+        normalizeHostWorkspaceType(
+            user,
+        );
+
     const navItems =
         useMemo(
-            () => [
-                ...BASE_NAV_ITEMS.filter(
-                    (item) =>
-                        item.to !== '/community' ||
-                        (
-                            activeMode === 'host' &&
-                            hostEnabled === true
-                        ),
-                ),
-                {
-                    label:
-                        'Scan',
-  
-                    to:
-                        activeMode === 'host' && hostEnabled
-                            ? '/host/scan'
-                            : '/scan',
-                },
-            ],
+            () => {
+                if (
+                    activeMode === 'host' &&
+                    hostEnabled === true
+                ) {
+                    return HOST_NAV_ITEMS.filter(
+                        (item) =>
+                            isHostPathAllowed(
+                                item.to,
+                                hostWorkspaceType,
+                            ),
+                    );
+                }
+
+                return [
+                    ...BASE_NAV_ITEMS,
+                    {
+                        label:
+                            'Scan',
+
+                        to:
+                            '/scan',
+                    },
+                ];
+            },
             [
                 activeMode,
                 hostEnabled,
+                hostWorkspaceType,
             ],
         );
   
@@ -379,6 +501,20 @@ import {
         hasAdminAccess,
     } =
         useAdmin();
+
+    const isCustomerPresentation =
+        customerEnabled === true &&
+        !isHostPresentation &&
+        !hasAdminAccess &&
+        superAdminEnabled !== true;
+
+    const widePrimaryNavItems =
+        isHostPresentation
+            ? navItems
+            : navItems.filter(
+                (item) =>
+                    item.to !== '/scan',
+            );
   
     const isHomePage =
         location.pathname ===
@@ -543,6 +679,14 @@ import {
             ? '/host/scan'
             : '/scan';
 
+    const canUseScan =
+        isHostPresentation
+            ? isHostPathAllowed(
+                '/host/scan',
+                hostWorkspaceType,
+            )
+            : customerEnabled === true;
+
     const showCustomerCart =
         isAuthenticated &&
         customerEnabled &&
@@ -633,6 +777,13 @@ import {
                     0,
                 );
 
+                if (
+                    storedDeliveryContext?.targetPath
+                        ?.startsWith('/orders/')
+                ) {
+                    clearDeliveryContext();
+                }
+
                 return undefined;
             }
 
@@ -697,6 +848,72 @@ import {
                         setActiveTrackingOrder(
                             activeOrder,
                         );
+
+                        if (
+                            activeOrder
+                        ) {
+                            try {
+                                const orderId =
+                                    activeOrder.id ||
+                                    activeOrder._id;
+
+                                const orderDetail =
+                                    await getOrder(
+                                        orderId,
+                                    );
+
+                                if (cancelled) {
+                                    return;
+                                }
+
+                                const eta =
+                                    orderDetail?.deliveryEta;
+
+                                if (
+                                    eta?.available
+                                ) {
+                                    setDeliveryContext({
+                                        city:
+                                            eta.destination?.city ||
+                                            '',
+                                        state:
+                                            eta.destination?.state ||
+                                            '',
+                                        country:
+                                            eta.destination?.country ||
+                                            'India',
+                                        label:
+                                            eta.destination?.label ||
+                                            (eta.destination?.postalCode
+                                                ? `PIN ${eta.destination.postalCode}`
+                                                : 'Delivery destination'),
+                                        estimatedDeliveryMinutes:
+                                            Number(eta.estimatedDeliveryMinutes),
+                                        estimatedArrivalAt:
+                                            eta.estimatedArrivalAt ||
+                                            '',
+                                        estimatedRoadDistanceKm:
+                                            Number(eta.estimatedRoadDistanceKm),
+                                        averageSpeedKmh:
+                                            Number(eta.averageSpeedKmh),
+                                        targetPath:
+                                            `/orders/${encodeURIComponent(
+                                                String(orderId),
+                                            )}`,
+                                        calculationMethod:
+                                            eta.calculationMethod ||
+                                            '',
+                                    });
+                                }
+                            } catch {
+                                // Navbar ETA is supplementary; order tracking remains available.
+                            }
+                        } else if (
+                            storedDeliveryContext?.targetPath
+                                ?.startsWith('/orders/')
+                        ) {
+                            clearDeliveryContext();
+                        }
                     } else if (
                         !showCustomerCart
                     ) {
@@ -790,6 +1007,9 @@ import {
             isBootstrapping,
             showCustomerCart,
             location.pathname,
+            setDeliveryContext,
+            clearDeliveryContext,
+            storedDeliveryContext?.targetPath,
         ],
     );
   
@@ -808,6 +1028,10 @@ import {
             );
 
             setMobileSearchOpen(
+                false,
+            );
+
+            setNavbarSearchResultsOpen(
                 false,
             );
         },
@@ -1068,28 +1292,138 @@ import {
             );
         };
 
+    const handleSearchResultOpen =
+        (
+            result,
+            searchQuery =
+                navbarSearchQuery,
+        ) => {
+            if (!result?.path) {
+                return;
+            }
+
+            setNavbarSearchResultsOpen(
+                false,
+            );
+
+            setMobileSearchOpen(
+                false,
+            );
+
+            setMenuOpen(
+                false,
+            );
+
+            if (
+                result.type ===
+                    'product' &&
+                String(
+                    result.path,
+                ).startsWith(
+                    '/grocery/product/',
+                )
+            ) {
+                const encodedProductSlug =
+                    String(
+                        result.path,
+                    )
+                        .slice(
+                            '/grocery/product/'.length,
+                        )
+                        .split(
+                            /[?#]/,
+                        )[0];
+
+                const nextSearchParams =
+                    new URLSearchParams();
+
+                const normalizedSearchQuery =
+                    String(
+                        searchQuery ||
+                            result.displayName ||
+                            '',
+                    ).trim();
+
+                if (normalizedSearchQuery) {
+                    nextSearchParams.set(
+                        'q',
+                        normalizedSearchQuery,
+                    );
+                }
+
+                if (encodedProductSlug) {
+                    try {
+                        nextSearchParams.set(
+                            'product',
+                            decodeURIComponent(
+                                encodedProductSlug,
+                            ),
+                        );
+                    } catch {
+                        nextSearchParams.set(
+                            'product',
+                            encodedProductSlug,
+                        );
+                    }
+                }
+
+                navigate(
+                    `/grocery/search-results?${nextSearchParams.toString()}`,
+                );
+
+                return;
+            }
+
+            navigate(
+                result.path,
+            );
+        };
+
     const handleSearch =
         (
             query,
         ) => {
             const normalized =
-                query.trim();
-  
-            if (!normalized) {
+                String(
+                    query ||
+                        '',
+                ).trim();
+
+            if (
+                normalized.length <
+                2
+            ) {
                 return;
             }
-  
-            navigate(
-                `/search?q=${encodeURIComponent(
-                    normalized,
-                )}`,
+
+            setNavbarSearchResultsOpen(
+                false,
             );
-  
+
+            setMobileSearchOpen(
+                false,
+            );
+
             setMenuOpen(
                 false,
             );
+
+            const nextSearchParams =
+                new URLSearchParams();
+
+            nextSearchParams.set(
+                'q',
+                normalized,
+            );
+
+            navigate(
+                `/grocery/search-results?${nextSearchParams.toString()}`,
+            );
         };
-  
+
+    const renderNavbarSearchResults =
+        () => null;
+
     const handleLogout =
         async () => {
             if (isLoggingOut) {
@@ -1185,7 +1519,7 @@ import {
                 path,
             )
                 ? 'bg-emerald-700 text-white'
-                : 'text-stone-600 hover:bg-stone-100 hover:text-stone-950',
+                : 'text-stone-800 hover:bg-white/80 hover:text-stone-950',
         ].join(
             ' ',
         );
@@ -1541,45 +1875,49 @@ import {
                                         </Link>
                                     ) : null}
 
-                                    {activeMode === 'host' && hostEnabled ? (
-                                        <Link
-                                            to="/community"
-                                            onClick={() =>
-                                                setAccountMenuOpen(
-                                                    false,
-                                                )
-                                            }
-                                            className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                            role="menuitem"
-                                        >
-                                            <UsersRound
-                                                size={17}
-                                                className="text-stone-500"
-                                                aria-hidden="true"
-                                            />
-                                            Community
-                                        </Link>
+                                    {isCustomerPresentation ? (
+                                        <>
+                                            <Link
+                                                to="/community"
+                                                onClick={() =>
+                                                    setAccountMenuOpen(
+                                                        false,
+                                                    )
+                                                }
+                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                                                role="menuitem"
+                                            >
+                                                <UsersRound
+                                                    size={17}
+                                                    className="text-stone-500"
+                                                    aria-hidden="true"
+                                                />
+                                                Community
+                                            </Link>
+
+                                            <Link
+                                                to="/learn"
+                                                onClick={() =>
+                                                    setAccountMenuOpen(
+                                                        false,
+                                                    )
+                                                }
+                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                                                role="menuitem"
+                                            >
+                                                <BookOpen
+                                                    size={17}
+                                                    className="text-stone-500"
+                                                    aria-hidden="true"
+                                                />
+                                                Learn / Pro
+                                            </Link>
+                                        </>
                                     ) : null}
 
-                                    <Link
-                                        to="/learn"
-                                        onClick={() =>
-                                            setAccountMenuOpen(
-                                                false,
-                                            )
-                                        }
-                                        className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                        role="menuitem"
-                                    >
-                                        <BookOpen
-                                            size={17}
-                                            className="text-stone-500"
-                                            aria-hidden="true"
-                                        />
-                                        Learn
-                                    </Link>
-
-                                    {!hasAdminAccess && !superAdminEnabled ? (
+                                    {!hasAdminAccess &&
+                                    !superAdminEnabled &&
+                                    canUseScan ? (
                                         <Link
                                             to={scanDestination}
                                             onClick={() =>
@@ -1925,7 +2263,7 @@ import {
                     : '',
   
                 isHeroGlassPage
-                    ? 'fixed left-0 right-0 w-full border-white/35 bg-white/30 shadow-[0_8px_30px_rgba(17,24,39,0.06)] backdrop-blur-2xl'
+                    ? 'fixed left-0 right-0 w-full border-white/80 bg-[#f7f5ef]/94 shadow-[0_10px_32px_rgba(17,24,39,0.10)] backdrop-blur-2xl saturate-150'
                     : 'sticky bg-[#f7f5ef]/95',
             ].join(
                 ' ',
@@ -1942,17 +2280,7 @@ import {
                             className="flex shrink-0 items-center gap-1"
                             aria-label="Primary navigation"
                         >
-                            {navItems
-                                .filter((item) =>
-                                    [
-                                        '/',
-                                        '/grocery',
-                                        '/brands',
-                                        '/recipes',
-                                    ].includes(
-                                        item.to,
-                                    ),
-                                )
+                            {widePrimaryNavItems
                                 .map(
                                     (
                                         item,
@@ -1995,7 +2323,7 @@ import {
                             <NavbarLocationStatus />
                         </div>
   
-                        <div className="min-w-[220px] flex-1">
+                        <div className="relative min-w-[220px] flex-1">
                             <SearchBar
                                 value={
                                     currentQuery
@@ -2005,6 +2333,8 @@ import {
                                 }
                                 compact
                             />
+
+                            {renderNavbarSearchResults()}
                         </div>
   
                         <div className="shrink-0">
@@ -2087,15 +2417,19 @@ import {
                     <div className="mt-3 grid grid-cols-2 gap-3">
                         <NavbarLocationStatus />
   
-                        <SearchBar
-                            value={
-                                currentQuery
-                            }
-                            onSubmit={
-                                handleSearch
-                            }
-                            compact
-                        />
+                        <div className="relative">
+                            <SearchBar
+                                value={
+                                    currentQuery
+                                }
+                                onSubmit={
+                                    handleSearch
+                                }
+                                compact
+                            />
+
+                            {renderNavbarSearchResults()}
+                        </div>
                     </div>
                 </div>
   
@@ -2323,14 +2657,22 @@ import {
                                 }}
                                 className="absolute left-0 right-0 top-[calc(100%+7px)] z-[78] rounded-[22px] border border-white/75 bg-white/62 p-2 shadow-[0_18px_45px_rgba(28,25,23,0.15)] backdrop-blur-2xl"
                             >
-                                <SearchBar
-                                    value={currentQuery}
-                                    onSubmit={handleSearch}
-                                    compact
-                                />
+                                <div className="relative">
+                                    <SearchBar
+                                        value={currentQuery}
+                                        onSubmit={handleSearch}
+                                        compact
+                                    />
+
+                                    {renderNavbarSearchResults()}
+                                </div>
                             </motion.div>
                         ) : null}
                     </AnimatePresence>
+                </div>
+
+                <div className="md:hidden">
+                    <NavbarLocationStatus mobileStripOnly />
                 </div>
   
                 <AnimatePresence>

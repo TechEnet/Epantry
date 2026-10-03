@@ -632,17 +632,22 @@ test(
 
     assert.match(
       source,
-      /P20 · Marketplace Cart/,
+      /Marketplace Cart/,
     )
 
     assert.match(
       source,
-      /Seller split/,
+      /Seller splits/,
     )
 
     assert.match(
       source,
-      /External retailer handoffs are separate transaction/,
+      /Marketplace selections remain seller-specific/,
+    )
+
+    assert.doesNotMatch(
+      source,
+      /external-handoffs|createExternalHandoff|External retailer/i,
     )
   },
 )
@@ -657,12 +662,22 @@ test(
 
     assert.match(
       source,
-      /Checkout total is not complete yet/,
+      /Known item subtotal/,
     )
 
     assert.match(
       source,
-      /does not pretend this subtotal is the final payable total/,
+      /Before delivery fees and final checkout validation/,
+    )
+
+    assert.match(
+      source,
+      /Final total comes at checkout/,
+    )
+
+    assert.match(
+      source,
+      /Delivery fees, cancellation terms and return terms are confirmed before payment becomes available/,
     )
   },
 )
@@ -727,12 +742,12 @@ test(
         section,
         /APPLICATION_ACCESS_TYPES\.(?:HOST|SUPER_ADMIN)/,
       )
-    }
 
-    assert.doesNotMatch(
-      source,
-      /activeMode/,
-    )
+      assert.doesNotMatch(
+        section,
+        /activeMode/,
+      )
+    }
   },
 )
 

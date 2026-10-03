@@ -37,6 +37,24 @@ import {
 } from '../../auth/context/AuthContext'
 
 import {
+  checkItemAvailability,
+} from '../../analytics/services/analytics.service'
+
+import {
+  openAvailabilityNotifyModal,
+} from '../../notifications/components/AvailabilityNotifyModal'
+
+import {
+  createCommerceIdempotencyKey,
+  createRestaurantRecipeMarketplaceCart,
+  getCommerceErrorMessage,
+} from '../../commerce/services/commerce.service'
+
+import {
+  getDefaultDeliveryAddress,
+} from '../../deliveryAddresses/services/deliveryAddress.service'
+
+import {
   getRecipeFoodIntelligence,
 } from '../../foodIntelligence/services/foodIntelligence.service'
 
@@ -81,6 +99,41 @@ function formatQuantity(
     },
   ).format(
     numeric,
+  )
+}
+
+function formatMoney(
+  price,
+) {
+  const amountMinor =
+    Number(
+      price?.amountMinor,
+    )
+
+  if (
+    !Number.isInteger(
+      amountMinor,
+    ) ||
+    amountMinor <
+      0
+  ) {
+    return 'Not available'
+  }
+
+  return new Intl.NumberFormat(
+    'en-IN',
+    {
+      style:
+        'currency',
+      currency:
+        price?.currency ||
+        'INR',
+      maximumFractionDigits:
+        2,
+    },
+  ).format(
+    amountMinor /
+      100,
   )
 }
 
@@ -1016,6 +1069,27 @@ export default function RecipeDetailPage() {
       '',
     )
 
+  const [
+    restaurantOrderSubmitting,
+    setRestaurantOrderSubmitting,
+  ] =
+    useState(
+      false,
+    )
+
+  const [
+    restaurantOrderError,
+    setRestaurantOrderError,
+  ] =
+    useState(
+      '',
+    )
+
+  const restaurantOrderResumeRef =
+    useRef(
+      false,
+    )
+
   const ingredientDecisionLockRef =
     useRef(
       new Set(),
@@ -1608,14 +1682,40 @@ export default function RecipeDetailPage() {
     data?.recipe ||
     {}
 
+  const restaurant =
+    data?.restaurant ||
+    null
+
+  const restaurantOrder =
+    scaledData?.restaurantOrder ||
+    data?.restaurantOrder ||
+    null
+
+  const isRestaurantRecipe =
+    recipe?.source?.type ===
+      'chef' &&
+    Boolean(
+      restaurant,
+    )
+
+  const restaurantOrderPriceCurrent =
+    Number(
+      restaurantOrder?.servings,
+    ) ===
+      Number(
+        servings,
+      )
+
   const recipeDietaryBadge = resolveRecipeDietaryBadge(detailsFoodIntelligence)
 
 
   useEffect(() => {
     ingredientDecisionLockRef.current.clear()
+    restaurantOrderResumeRef.current = false
     setResolvedIngredientIds(new Set())
     setPantrySetupItem(null)
     setSetupError('')
+    setRestaurantOrderError('')
   }, [slug])
 
   useEffect(
@@ -1845,7 +1945,7 @@ export default function RecipeDetailPage() {
     }
   }
 
-  function addIngredientToRecipeCart(ingredient, sourceElement) {
+  async function addIngredientToRecipeCart(ingredient, sourceElement) {
     if (customerContextBlocked) {
       openCustomerAccessRequired()
       return false
@@ -1867,6 +1967,42 @@ export default function RecipeDetailPage() {
     }
 
     setCartError('')
+
+    try {
+      const availability =
+        await checkItemAvailability({
+          query:
+            name,
+          canonicalIngredientId,
+          source:
+            'recipe',
+        })
+
+      if (
+        availability?.available !==
+          true
+      ) {
+        openAvailabilityNotifyModal({
+          query:
+            name,
+          displayName:
+            name,
+          canonicalIngredientId,
+          source:
+            'recipe',
+        })
+
+        return false
+      }
+    } catch (availabilityError) {
+      setCartError(
+        availabilityError?.response?.data?.message ||
+          availabilityError?.message ||
+          'Unable to check whether this ingredient is available on EPANTRY right now.',
+      )
+
+      return false
+    }
     setShoppingTray((current) => {
       const existingIndex = current.findIndex(
         (item) => item.canonicalIngredientId === canonicalIngredientId,
@@ -1890,7 +2026,7 @@ export default function RecipeDetailPage() {
     return true
   }
 
-  function handleMissingIngredient(ingredient, sourceElement) {
+  async function handleMissingIngredient(ingredient, sourceElement) {
     const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
     if (
       !canonicalIngredientId ||
@@ -1898,14 +2034,230 @@ export default function RecipeDetailPage() {
     ) return
 
     ingredientDecisionLockRef.current.add(canonicalIngredientId)
-    const added = addIngredientToRecipeCart(ingredient, sourceElement)
+    try {
+      const added =
+        await addIngredientToRecipeCart(
+          ingredient,
+          sourceElement,
+        )
 
-    if (added) {
-      setIngredientResolved(canonicalIngredientId, true)
+      if (added) {
+        setIngredientResolved(canonicalIngredientId, true)
+      }
+    } finally {
+      ingredientDecisionLockRef.current.delete(canonicalIngredientId)
+    }
+  }
+
+
+  async function handleDirectRestaurantOrder({
+    resumeAfterAddress =
+      false,
+  } = {}) {
+    if (
+      restaurantOrderSubmitting
+    ) {
+      return
     }
 
-    ingredientDecisionLockRef.current.delete(canonicalIngredientId)
+    if (
+      !canUseCustomerFeatures
+    ) {
+      openCustomerAccessRequired()
+      return
+    }
+
+    if (
+      !isRestaurantRecipe ||
+      restaurantOrder?.available !==
+        true ||
+      !restaurantOrderPriceCurrent
+    ) {
+      setRestaurantOrderError(
+        'This prepared dish is not currently available to order at the selected servings.',
+      )
+      return
+    }
+
+    setRestaurantOrderSubmitting(
+      true,
+    )
+    setRestaurantOrderError(
+      '',
+    )
+
+    try {
+      const addressResult =
+        await getDefaultDeliveryAddress()
+
+      const address =
+        addressResult?.address ||
+        null
+
+      const pincode =
+        String(
+          address?.postalCode ||
+            '',
+        )
+          .trim()
+          .replace(
+            /\s+/g,
+            '',
+          )
+
+      if (
+        !/^\d{6}$/.test(
+          pincode,
+        )
+      ) {
+        if (
+          resumeAfterAddress
+        ) {
+          throw new Error(
+            'Choose a delivery address with a valid 6-digit pincode before ordering this Restaurant dish.',
+          )
+        }
+
+        const returnTo =
+          `${location.pathname}${location.search}${location.hash}`
+
+        navigate(
+          `/delivery-addresses?returnTo=${encodeURIComponent(
+            returnTo,
+          )}`,
+          {
+            state: {
+              restaurantRecipeOrderResume:
+                true,
+              restaurantRecipeOrderServings:
+                servings,
+            },
+          },
+        )
+        return
+      }
+
+      const result =
+        await createRestaurantRecipeMarketplaceCart({
+          slug,
+          servings,
+          pincode,
+          fulfillmentType:
+            'delivery',
+          idempotencyKey:
+            createCommerceIdempotencyKey(
+              'restaurant-recipe-order',
+            ),
+        })
+
+      const cartId =
+        result?.cart?.id
+
+      if (!cartId) {
+        throw new Error(
+          'Restaurant order Cart identity was not returned.',
+        )
+      }
+
+      navigate(
+        `/cart/${cartId}`,
+        {
+          state: {
+            restaurantRecipeOrder:
+              true,
+          },
+        },
+      )
+    } catch (orderError) {
+      setRestaurantOrderError(
+        getCommerceErrorMessage(
+          orderError,
+          'Unable to start this Restaurant order.',
+        ),
+      )
+    } finally {
+      setRestaurantOrderSubmitting(
+        false,
+      )
+    }
   }
+
+  useEffect(
+    () => {
+      if (
+        location.state
+          ?.restaurantRecipeOrderResume !==
+          true ||
+        location.state
+          ?.deliveryAddressSaved !==
+          true ||
+        restaurantOrderResumeRef.current
+      ) {
+        return
+      }
+
+      const requestedServings =
+        Number(
+          location.state
+            ?.restaurantRecipeOrderServings ||
+            servings,
+        )
+
+      if (
+        Number.isInteger(
+          requestedServings,
+        ) &&
+        requestedServings >
+          0 &&
+        requestedServings !==
+          servings
+      ) {
+        setServings(
+          requestedServings,
+        )
+        return
+      }
+
+      if (
+        loading ||
+        scaling ||
+        !isRestaurantRecipe ||
+        !restaurantOrderPriceCurrent
+      ) {
+        return
+      }
+
+      restaurantOrderResumeRef.current =
+        true
+
+      navigate(
+        `${location.pathname}${location.search}${location.hash}`,
+        {
+          replace:
+            true,
+          state:
+            null,
+        },
+      )
+
+      handleDirectRestaurantOrder({
+        resumeAfterAddress:
+          true,
+      })
+    },
+    [
+      isRestaurantRecipe,
+      loading,
+      location.hash,
+      location.pathname,
+      location.search,
+      location.state,
+      navigate,
+      restaurantOrderPriceCurrent,
+      scaling,
+      servings,
+    ],
+  )
 
 
   if (loading) {
@@ -2178,6 +2530,157 @@ export default function RecipeDetailPage() {
             }
           </div>
         )}
+
+        {isRestaurantRecipe ? (
+          <section className="mt-5 overflow-hidden rounded-[26px] border border-orange-900/15 bg-[linear-gradient(135deg,#ffe2bd_0%,#fff2d9_52%,#ffd8c0_100%)] shadow-[0_16px_42px_rgba(126,63,22,0.10)]">
+            <div className="grid gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <div className="min-w-0">
+                <span className="inline-flex rounded-full border border-orange-900/15 bg-white/65 px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-orange-900">
+                  Restaurant Recipe
+                </span>
+
+                <h2 className="mt-3 font-serif text-2xl font-semibold tracking-[-0.03em] text-[#4b2412] sm:text-3xl">
+                  From {restaurant?.restaurantName || 'Restaurant'}
+                </h2>
+
+                <div className="mt-2 flex items-center gap-2 text-xs font-bold text-[#7a4a32]">
+                  <MapPin
+                    size={15}
+                    aria-hidden="true"
+                    className="shrink-0 text-orange-800"
+                  />
+                  <span>
+                    {restaurant?.outletName || 'Restaurant outlet'}
+                  </span>
+                </div>
+
+                <p className="mt-3 max-w-2xl text-xs font-semibold leading-5 text-[#77513e]">
+                  Adjust people below. Recipe ingredient quantities and the prepared-dish order price update together.
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-orange-900/12 bg-white/75 p-3 shadow-sm backdrop-blur sm:min-w-[360px] sm:p-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl bg-[#fff8ee] px-3 py-3">
+                    <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-400">
+                      Per serving
+                    </p>
+                    <p className="mt-1 text-base font-black text-[#4b2412]">
+                      {restaurantOrder?.available === true
+                        ? formatMoney(restaurantOrder.pricePerServing)
+                        : 'Not available'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#fff1dc] px-3 py-3">
+                    <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-400">
+                      Total for {servings}
+                    </p>
+                    <p className="mt-1 text-base font-black text-orange-900">
+                      {scaling || !restaurantOrderPriceCurrent
+                        ? 'Updating…'
+                        : restaurantOrder?.available === true
+                          ? formatMoney(restaurantOrder.totalPrice)
+                          : 'Not available'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="flex shrink-0 items-center rounded-xl border border-orange-900/15 bg-white p-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setServings((current) =>
+                          Math.max(1, current - 1),
+                        )
+                      }
+                      disabled={servings <= 1 || restaurantOrderSubmitting}
+                      className="focus-ring grid h-9 w-9 place-items-center rounded-lg text-orange-900 transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label="Decrease Restaurant order servings"
+                    >
+                      <Minus
+                        size={16}
+                        aria-hidden="true"
+                      />
+                    </button>
+
+                    <div className="min-w-12 text-center">
+                      <p className="text-sm font-black text-stone-950">
+                        {servings}
+                      </p>
+                      <p className="text-[7px] font-black uppercase tracking-[0.1em] text-stone-400">
+                        people
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setServings((current) =>
+                          Math.min(1000, current + 1),
+                        )
+                      }
+                      disabled={restaurantOrderSubmitting}
+                      className="focus-ring grid h-9 w-9 place-items-center rounded-lg text-orange-900 transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label="Increase Restaurant order servings"
+                    >
+                      <Plus
+                        size={16}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDirectRestaurantOrder()
+                    }
+                    disabled={
+                      restaurantOrderSubmitting ||
+                      scaling ||
+                      !restaurantOrderPriceCurrent ||
+                      restaurantOrder?.available !== true
+                    }
+                    className="focus-ring inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-[#9a3412] px-4 py-3 text-xs font-black text-white shadow-[0_10px_24px_rgba(154,52,18,0.22)] transition hover:bg-[#7c2d12] disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {restaurantOrderSubmitting ? (
+                      <LoaderCircle
+                        size={16}
+                        className="animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <ShoppingCart
+                        size={16}
+                        aria-hidden="true"
+                      />
+                    )}
+                    {restaurantOrderSubmitting
+                      ? 'Starting order…'
+                      : 'Order prepared dish'}
+                  </button>
+                </div>
+
+                {restaurantOrder?.available !== true ? (
+                  <p className="mt-2 text-[10px] font-bold leading-4 text-[#8a5a40]">
+                    Direct ordering becomes available when this approved dish has an active Restaurant menu price.
+                  </p>
+                ) : null}
+
+                {restaurantOrderError ? (
+                  <div
+                    role="alert"
+                    className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-bold leading-4 text-red-800"
+                  >
+                    {restaurantOrderError}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)] lg:items-start">
 

@@ -6,6 +6,7 @@ import {
     Boxes,
     ChefHat,
     CircleUserRound,
+    Crown,
     DatabaseZap,
     FileSearch,
     Flag,
@@ -561,6 +562,19 @@ import {
                 hasAdminPermission(
                     'trust_safety.read',
                 ),
+        },
+  
+        {
+            label:
+                'EPANTRY Pro',
+            screenLabel:
+                'Pro Plans & Memberships',
+            to:
+                '/admin/pro',
+            icon:
+                Crown,
+            visible:
+                isRootSuperAdmin,
         },
   
         {

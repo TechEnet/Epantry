@@ -319,7 +319,16 @@ export function serializeRecipeVersion(
         stringifyId(
           value.sourceOrganizationId,
         ),
+
+      outletId:
+        stringifyId(
+          value.sourceOutletId,
+        ),
     },
+
+    visibility:
+      value.visibility ||
+      'public',
 
     status:
       value.status,
@@ -693,6 +702,12 @@ function buildVersionValues({
 
     sourceOrganizationId:
       input.source.organizationId,
+
+    sourceOutletId:
+      input.source.outletId,
+
+    visibility:
+      input.visibility,
 
     status:
       'draft',
@@ -1732,6 +1747,13 @@ export async function createNextAdminRecipeVersion(
 
                 sourceOrganizationId:
                   sourceVersion.sourceOrganizationId,
+
+                sourceOutletId:
+                  sourceVersion.sourceOutletId,
+
+                visibility:
+                  sourceVersion.visibility ||
+                  'public',
 
                 status:
                   'draft',

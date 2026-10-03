@@ -9,6 +9,7 @@ import {
   BookOpenCheck,
   Boxes,
   ChefHat,
+  Clapperboard,
   FileSearch,
   History,
   Home,
@@ -26,9 +27,14 @@ import {
   X,
 } from "lucide-react";
 
-import { NavLink, useLocation } from "react-router-dom";
+import { Navigate, NavLink, useLocation } from "react-router-dom";
 
 import { useAuth } from "../../auth/context/AuthContext";
+
+import {
+  isHostPathAllowed,
+  normalizeHostWorkspaceType,
+} from "../hostWorkspace.config";
 
 import ExecutionScalePanel from "../../executionScale/components/ExecutionScalePanel";
 import HostRetailMediaPage from "../../retailMedia/pages/HostRetailMediaPage";
@@ -173,6 +179,18 @@ const navigationGroups = [
     ],
   },
   {
+    id: "creator",
+    label: "Creator Studio",
+    icon: Clapperboard,
+    items: [
+      {
+        label: "Creator Studio",
+        to: "/host/creator-studio",
+        icon: Clapperboard,
+      },
+    ],
+  },
+  {
     id: "account-security",
     label: "Account & Security",
     icon: LockKeyhole,
@@ -212,6 +230,7 @@ const mobileNavigationOrder = [
   "/host/campaigns",
   "/host/settings",
   "/host/hospitality",
+  "/host/creator-studio",
   "/host/analytics",
   "/host/brands",
   "/host/business-profile",
@@ -365,7 +384,20 @@ export default function HostShell({ children }) {
 
   const sidebarOpen = !sidebarCollapsed || sidebarHovered;
 
-  const allNavigationItems = navigationGroups.flatMap((group) => group.items);
+  const hostWorkspaceType = normalizeHostWorkspaceType(currentUser);
+
+  const visibleNavigationGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        isHostPathAllowed(item.to, hostWorkspaceType)
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const allNavigationItems = visibleNavigationGroups.flatMap(
+    (group) => group.items
+  );
 
   const navigationItems = mobileNavigationOrder
     .map((to) => allNavigationItems.find((item) => item.to === to))
@@ -436,6 +468,8 @@ export default function HostShell({ children }) {
 
   const isHostSettingsRoute = location.pathname === "/host/settings";
 
+  const isHostProfileRoute = location.pathname === "/host/profile";
+
   const identityLabel =
     currentUser?.displayName ||
     currentUser?.name ||
@@ -444,6 +478,10 @@ export default function HostShell({ children }) {
 
   const accessLabel =
     hostAccessStatus === "active" ? "Active Host" : "Host workspace";
+
+  if (!isHostPathAllowed(location.pathname, hostWorkspaceType)) {
+    return <Navigate to="/host/operations" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f5ef] pb-0 lg:min-h-[calc(100vh-72px)]">
@@ -490,7 +528,8 @@ export default function HostShell({ children }) {
           isHostFinanceRoute ||
           isHostCampaignsRoute ||
           isHostAnalyticsRoute ||
-          isHostSettingsRoute
+          isHostSettingsRoute ||
+          isHostProfileRoute
             ? "pt-0 pb-5 sm:pt-0 sm:pb-7"
             : "py-5 sm:py-7",
         ].join(" ")}
@@ -595,7 +634,7 @@ export default function HostShell({ children }) {
                   ].join(" ")}
                   aria-label="Host workspace"
                 >
-                  {navigationGroups.map((group) => {
+                  {visibleNavigationGroups.map((group) => {
                     const active = group.items.some((item) =>
                       routeMatchesItem(item, location.pathname)
                     );

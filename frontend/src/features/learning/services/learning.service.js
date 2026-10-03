@@ -61,6 +61,40 @@ export function getLearningErrorMessage(
 
 /* Learner */
 
+
+
+export async function getPublicProCatalog() {
+  const response = await apiClient.get('/learning/pro/catalog')
+  return unwrap(response)
+}
+
+export async function getProMembershipOverview() {
+  const response = await apiClient.get('/learning/pro/overview')
+  return unwrap(response)
+}
+
+export async function createProMembershipCheckout(planCode) {
+  return mutate({
+    url: `/learning/pro/plans/${encodePath(planCode)}/checkout`,
+  })
+}
+
+export async function verifyProMembershipPayment({
+  paymentId,
+  razorpayPaymentId,
+  razorpayOrderId,
+  razorpaySignature,
+}) {
+  return mutate({
+    url: `/learning/pro/payments/${encodePath(paymentId)}/verify`,
+    data: {
+      razorpayPaymentId,
+      razorpayOrderId,
+      razorpaySignature,
+    },
+  })
+}
+
 export async function getMyLearning() {
   const response = await apiClient.get('/learning/me')
   return unwrap(response)

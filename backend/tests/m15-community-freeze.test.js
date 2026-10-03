@@ -321,7 +321,7 @@ test(
 );
 
 test(
-    'M15 frontend Creator Studio stays Customer gated and Admin Community stays permission gated',
+    'M15 frontend Creator Studio redirects to the Host workspace and Admin Community stays permission gated',
     () => {
         const source =
             read(
@@ -349,7 +349,26 @@ test(
                 creatorIndex +
                     500,
             ),
-            /APPLICATION_ACCESS_TYPES\.CUSTOMER/,
+            /Navigate[\s\S]*to="\/host\/creator-studio"/,
+        );
+
+        const hostCreatorIndex =
+            source.indexOf(
+                'path="/host/creator-studio"',
+            );
+
+        assert.notEqual(
+            hostCreatorIndex,
+            -1,
+        );
+
+        assert.match(
+            source.slice(
+                hostCreatorIndex,
+                hostCreatorIndex +
+                    700,
+            ),
+            /APPLICATION_ACCESS_TYPES\.HOST/,
         );
 
         assert.notEqual(

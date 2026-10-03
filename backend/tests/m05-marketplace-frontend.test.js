@@ -101,7 +101,7 @@ test(
 
     assert.match(
       source,
-      /Available Offers/,
+      /Check price by pincode/,
     )
   },
 )
@@ -137,7 +137,7 @@ test(
 )
 
 test(
-  'M05 Host Marketplace UI exposes price inventory serviceability and activation workflow',
+  'M05 Host Marketplace UI exposes price inventory shared serviceability and activation workflow',
   () => {
     const source =
       readFrontendFile(
@@ -156,7 +156,12 @@ test(
 
     assert.match(
       source,
-      /createServiceArea/,
+      /listServiceAreas/,
+    )
+
+    assert.match(
+      source,
+      /updateServiceArea/,
     )
 
     assert.match(

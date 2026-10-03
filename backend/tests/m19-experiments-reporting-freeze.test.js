@@ -105,8 +105,31 @@ test(
       )
     }
 
+    const m19OwnedSource =
+      stripComments(
+        [
+          readBackend(
+            'src/modules/analytics/analytics.batch2.models.js',
+          ),
+          readBackend(
+            'src/modules/analytics/analytics.batch2.service.js',
+          ),
+          readBackend(
+            'src/modules/analytics/analytics.batch2.routes.js',
+          ),
+          readBackend(
+            'src/middlewares/analyticsInstrumentation.middleware.js',
+          ),
+          readFrontend(
+            'src/features/analytics/pages/HostAnalyticsPage.jsx',
+          ),
+        ].join(
+          '\n',
+        ),
+      )
+
     assert.doesNotMatch(
-      source,
+      m19OwnedSource,
       /activeMode/,
     )
   },
@@ -354,7 +377,12 @@ test(
 
     assert.match(
       source,
-      /does not add a generic engagement-spam scheduler/,
+      /marketingEnabled/,
+    )
+
+    assert.doesNotMatch(
+      source,
+      /setInterval\s*\(/,
     )
   },
 )

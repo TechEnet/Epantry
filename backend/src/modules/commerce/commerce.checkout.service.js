@@ -13,6 +13,10 @@ import {
 } from '../deliveryAddresses/deliveryAddress.models.js'
 
 import {
+  geocodePostalCode,
+} from '../location/location.service.js'
+
+import {
   HostOffer,
   InventoryNode,
   InventorySnapshot,
@@ -40,6 +44,10 @@ import {
 import {
   getOutcomePlan,
 } from '../outcomes/outcomePlan.service.js'
+
+import {
+  scalePublicRecipe,
+} from '../recipes/recipe.public.service.js'
 
 import {
   requireCurrentPantryHousehold,
@@ -1383,6 +1391,321 @@ export async function createDirectMarketplaceCart({
   })
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Restaurant Recipe Cart Foundation
+|--------------------------------------------------------------------------
+|
+| M5-C keeps prepared-dish ordering inside the existing Commerce Cart domain.
+| It intentionally does not create a second payment engine. The cart stores a
+| verified active Hospitality menu price snapshot for the selected servings.
+| Final restaurant fulfillment/payment bridging can build on this same cart.
+|
+*/
+
+export async function createRestaurantRecipeMarketplaceCart({
+  slug,
+  servings,
+  pincode,
+  fulfillmentType =
+    'delivery',
+  idempotencyKey,
+  actorUser,
+}) {
+  const ownerUserId =
+    actorIdFromUser(
+      actorUser,
+    )
+
+  const {
+    householdId,
+  } =
+    await requireOrProvisionDirectCommerceHousehold(
+      actorUser,
+    )
+
+  const existing =
+    await MarketplaceCart
+      .findOne({
+        ownerUserId,
+
+        createIdempotencyKey:
+          idempotencyKey,
+      })
+      .lean()
+
+  if (existing) {
+    return getMarketplaceCart({
+      cartId:
+        existing._id,
+
+      actorUser,
+    })
+  }
+
+  const requestedServings =
+    Number(
+      servings,
+    )
+
+  if (
+    !Number.isInteger(
+      requestedServings,
+    ) ||
+    requestedServings <
+      1 ||
+    requestedServings >
+      1000
+  ) {
+    throw new ApiError(
+      400,
+      'Restaurant order servings must be a whole number between 1 and 1000.',
+      [
+        {
+          code:
+            'RESTAURANT_RECIPE_CART_SERVINGS_INVALID',
+        },
+      ],
+    )
+  }
+
+  const normalizedPincode =
+    normalizePostalCode(
+      pincode,
+    )
+
+  const recipeData =
+    await scalePublicRecipe(
+      slug,
+      requestedServings,
+    )
+
+  const restaurant =
+    recipeData?.restaurant
+
+  const restaurantOrder =
+    recipeData?.restaurantOrder
+
+  const totalPrice =
+    restaurantOrder
+      ?.totalPrice
+
+  const pricePerServing =
+    restaurantOrder
+      ?.pricePerServing
+
+  if (
+    !restaurant ||
+    restaurantOrder?.available !==
+      true ||
+    !restaurant.menuItemId ||
+    !restaurant.productionRecipeVersionId ||
+    !restaurant.organizationId ||
+    !restaurant.outletId ||
+    !pricePerServing ||
+    !totalPrice
+  ) {
+    throw new ApiError(
+      409,
+      'This Restaurant Recipe is not currently orderable from an active Restaurant menu.',
+      [
+        {
+          code:
+            'RESTAURANT_RECIPE_ORDER_NOT_AVAILABLE',
+        },
+      ],
+    )
+  }
+
+  const unitAmountMinor =
+    Number(
+      pricePerServing.amountMinor,
+    )
+
+  const totalAmountMinor =
+    Number(
+      totalPrice.amountMinor,
+    )
+
+  if (
+    !Number.isInteger(
+      unitAmountMinor,
+    ) ||
+    unitAmountMinor <
+      0 ||
+    !Number.isInteger(
+      totalAmountMinor,
+    ) ||
+    totalAmountMinor <
+      0
+  ) {
+    throw new ApiError(
+      409,
+      'Restaurant menu price is not valid for ordering.',
+      [
+        {
+          code:
+            'RESTAURANT_RECIPE_ORDER_PRICE_INVALID',
+        },
+      ],
+    )
+  }
+
+  const currency =
+    String(
+      totalPrice.currency ||
+      pricePerServing.currency ||
+      'INR',
+    )
+      .trim()
+      .toUpperCase()
+
+  let cart
+
+  try {
+    cart =
+      await MarketplaceCart.create({
+        ownerUserId,
+        householdId,
+
+        sourceType:
+          'restaurant_recipe',
+
+        outcomePlanId:
+          null,
+
+        outcomePlanRevision:
+          null,
+
+        basketQuoteId:
+          null,
+
+        optionKey:
+          null,
+
+        pincode:
+          normalizedPincode,
+
+        fulfillmentType,
+
+        restaurantOrder: {
+          recipeVersionId:
+            recipeData.recipe.id,
+
+          dishId:
+            recipeData.dish.id,
+
+          recipeSlug:
+            recipeData.dish.slug,
+
+          productionRecipeVersionId:
+            restaurant.productionRecipeVersionId,
+
+          menuItemId:
+            restaurant.menuItemId,
+
+          organizationId:
+            restaurant.organizationId,
+
+          outletId:
+            restaurant.outletId,
+
+          restaurantName:
+            restaurant.restaurantName ||
+            'Restaurant',
+
+          outletName:
+            restaurant.outletName ||
+            'Outlet',
+
+          displayName:
+            recipeData.dish.name ||
+            recipeData.recipe.title ||
+            'Restaurant Recipe',
+
+          servings:
+            requestedServings,
+
+          pricePerServing: {
+            amountMinor:
+              unitAmountMinor,
+
+            currency,
+          },
+
+          lineTotal: {
+            amountMinor:
+              totalAmountMinor,
+
+            currency,
+          },
+
+          priceSource:
+            'active_hospitality_menu',
+        },
+
+        items:
+          [],
+
+        itemSubtotalMinor:
+          totalAmountMinor,
+
+        knownFeesMinor:
+          null,
+
+        totalLandedCostMinor:
+          null,
+
+        landedCostCompleteness:
+          'item_prices_only',
+
+        currency,
+
+        sellerCount:
+          1,
+
+        status:
+          'draft',
+
+        createIdempotencyKey:
+          idempotencyKey,
+      })
+  } catch (error) {
+    if (
+      error?.code ===
+        11000
+    ) {
+      const duplicate =
+        await MarketplaceCart
+          .findOne({
+            ownerUserId,
+
+            createIdempotencyKey:
+              idempotencyKey,
+          })
+          .lean()
+
+      if (duplicate) {
+        return getMarketplaceCart({
+          cartId:
+            duplicate._id,
+
+          actorUser,
+        })
+      }
+    }
+
+    throw error
+  }
+
+  return getMarketplaceCart({
+    cartId:
+      cart._id,
+
+    actorUser,
+  })
+}
 
 export async function updateDirectMarketplaceCartItem({
   cartId,
@@ -4011,3 +4334,1008 @@ export async function getParentOrder({
     },
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Distance-based delivery ETA
+|--------------------------------------------------------------------------
+|
+| This ETA is intentionally transparent and deterministic:
+| - destination: the cart/customer pincode
+| - source: the actual serviceable Inventory Node pincode(s) that currently
+|   have sellable stock for the Cart lines
+| - distance: Haversine distance between pincode centroids
+| - route approximation: straight-line distance * route factor
+| - time: route distance / configured average delivery speed
+| - operational buffer: small fixed pick/pack/handoff allowance
+|
+| It is NOT a live traffic ETA. No fake traffic or courier telemetry is used.
+|--------------------------------------------------------------------------
+*/
+
+const DEFAULT_DELIVERY_SPEED_KMH =
+  24
+
+const DEFAULT_ROUTE_DISTANCE_FACTOR =
+  1.22
+
+const DEFAULT_HANDLING_MINUTES =
+  12
+
+function finitePositiveEnv(
+  name,
+  fallback,
+) {
+  const value =
+    Number(
+      process.env[name],
+    )
+
+  return Number.isFinite(
+    value,
+  ) && value > 0
+    ? value
+    : fallback
+}
+
+function deliveryEtaConfig() {
+  return {
+    averageSpeedKmh:
+      finitePositiveEnv(
+        'DELIVERY_ETA_AVERAGE_SPEED_KMH',
+        DEFAULT_DELIVERY_SPEED_KMH,
+      ),
+
+    routeDistanceFactor:
+      finitePositiveEnv(
+        'DELIVERY_ETA_ROUTE_DISTANCE_FACTOR',
+        DEFAULT_ROUTE_DISTANCE_FACTOR,
+      ),
+
+    handlingMinutes:
+      Math.max(
+        0,
+        Math.round(
+          Number.isFinite(
+            Number(
+              process.env.DELIVERY_ETA_HANDLING_MINUTES,
+            ),
+          )
+            ? Number(
+                process.env.DELIVERY_ETA_HANDLING_MINUTES,
+              )
+            : DEFAULT_HANDLING_MINUTES,
+        ),
+      ),
+  }
+}
+
+function toRadians(
+  degrees,
+) {
+  return (
+    Number(
+      degrees,
+    ) *
+    Math.PI /
+    180
+  )
+}
+
+function haversineDistanceKm(
+  left,
+  right,
+) {
+  const earthRadiusKm =
+    6371.0088
+
+  const latitudeDelta =
+    toRadians(
+      right.latitude -
+        left.latitude,
+    )
+
+  const longitudeDelta =
+    toRadians(
+      right.longitude -
+        left.longitude,
+    )
+
+  const leftLatitude =
+    toRadians(
+      left.latitude,
+    )
+
+  const rightLatitude =
+    toRadians(
+      right.latitude,
+    )
+
+  const a =
+    Math.sin(
+      latitudeDelta / 2,
+    ) ** 2 +
+    Math.cos(
+      leftLatitude,
+    ) *
+      Math.cos(
+        rightLatitude,
+      ) *
+      Math.sin(
+        longitudeDelta / 2,
+      ) ** 2
+
+  const centralAngle =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(
+        Math.max(
+          0,
+          1 - a,
+        ),
+      ),
+    )
+
+  return (
+    earthRadiusKm *
+    centralAngle
+  )
+}
+
+function roundDistance(
+  value,
+) {
+  return Math.round(
+    Number(value) *
+      10,
+  ) / 10
+}
+
+async function loadInventoryNodePostalCodes(
+  nodeIds,
+  {
+    activeOnly =
+      true,
+  } = {},
+) {
+  const uniqueIds =
+    [
+      ...new Set(
+        (
+          nodeIds ||
+          []
+        )
+          .map(
+            stringifyId,
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  if (
+    uniqueIds.length ===
+    0
+  ) {
+    return new Map()
+  }
+
+  const filter = {
+    _id: {
+      $in:
+        uniqueIds,
+    },
+  }
+
+  if (
+    activeOnly
+  ) {
+    filter.status =
+      'active'
+  }
+
+  const nodes =
+    await InventoryNode
+      .find(
+        filter,
+      )
+      .select({
+        _id:
+          1,
+
+        name:
+          1,
+
+        'address.postalCode':
+          1,
+      })
+      .lean()
+
+  return new Map(
+    nodes.map(
+      (node) => [
+        stringifyId(
+          node._id,
+        ),
+        {
+          id:
+            stringifyId(
+              node._id,
+            ),
+
+          name:
+            node.name ||
+            'Inventory node',
+
+          postalCode:
+            normalizePostalCode(
+              node.address
+                ?.postalCode,
+            ),
+        },
+      ],
+    ),
+  )
+}
+
+export async function calculateDeliveryEtaFromInventoryNodes({
+  inventoryNodeIds,
+  destinationPostalCode,
+  now =
+    new Date(),
+  activeInventoryNodesOnly =
+    true,
+  handlingMinutesOverride =
+    null,
+}) {
+  const normalizedDestinationPostalCode =
+    normalizePostalCode(
+      destinationPostalCode,
+    )
+
+  if (
+    !/^\d{6}$/.test(
+      normalizedDestinationPostalCode ||
+        '',
+    )
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'destination_pincode_unavailable',
+
+      message:
+        'A valid delivery pincode is required before ETA can be calculated.',
+    }
+  }
+
+  const uniqueNodeIds =
+    [
+      ...new Set(
+        (
+          inventoryNodeIds ||
+          []
+        )
+          .map(
+            stringifyId,
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  if (
+    uniqueNodeIds.length ===
+    0
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'no_delivery_source',
+
+      message:
+        'Delivery ETA is not available because no fulfillment source was recorded.',
+    }
+  }
+
+  const destination =
+    await geocodePostalCode({
+      postalCode:
+        normalizedDestinationPostalCode,
+    })
+
+  const nodeById =
+    await loadInventoryNodePostalCodes(
+      uniqueNodeIds,
+      {
+        activeOnly:
+          activeInventoryNodesOnly,
+      },
+    )
+
+  const geocodeByPostalCode =
+    new Map()
+
+  async function resolvePostalCode(
+    postalCode,
+  ) {
+    if (
+      geocodeByPostalCode.has(
+        postalCode,
+      )
+    ) {
+      return geocodeByPostalCode.get(
+        postalCode,
+      )
+    }
+
+    const location =
+      await geocodePostalCode({
+        postalCode,
+      })
+
+    geocodeByPostalCode.set(
+      postalCode,
+      location,
+    )
+
+    return location
+  }
+
+  const sourceLegs =
+    []
+
+  for (
+    const nodeId
+    of uniqueNodeIds
+  ) {
+    const node =
+      nodeById.get(
+        nodeId,
+      )
+
+    const sourcePostalCode =
+      normalizePostalCode(
+        node?.postalCode,
+      )
+
+    if (
+      !/^\d{6}$/.test(
+        sourcePostalCode ||
+          '',
+      )
+    ) {
+      continue
+    }
+
+    const sourceLocation =
+      await resolvePostalCode(
+        sourcePostalCode,
+      )
+
+    const straightLineDistanceKm =
+      haversineDistanceKm(
+        sourceLocation,
+        destination,
+      )
+
+    sourceLegs.push({
+      inventoryNodeId:
+        node?.id ||
+        nodeId,
+
+      inventoryNodeName:
+        node?.name ||
+        'Inventory node',
+
+      sourcePostalCode,
+
+      straightLineDistanceKm:
+        roundDistance(
+          straightLineDistanceKm,
+        ),
+    })
+  }
+
+  if (
+    sourceLegs.length ===
+    0
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'source_pincode_unavailable',
+
+      message:
+        'Delivery ETA cannot be calculated because the recorded fulfillment source is missing a valid pincode.',
+    }
+  }
+
+  const config =
+    deliveryEtaConfig()
+
+  const longestStraightLineDistanceKm =
+    Math.max(
+      ...sourceLegs.map(
+        (leg) =>
+          leg.straightLineDistanceKm,
+      ),
+    )
+
+  const estimatedRoadDistanceKm =
+    roundDistance(
+      longestStraightLineDistanceKm *
+        config.routeDistanceFactor,
+    )
+
+  const travelMinutes =
+    Math.max(
+      1,
+      Math.ceil(
+        (
+          estimatedRoadDistanceKm /
+          config.averageSpeedKmh
+        ) *
+          60,
+      ),
+    )
+
+  const handlingMinutes =
+    handlingMinutesOverride !==
+      null &&
+    handlingMinutesOverride !==
+      undefined &&
+    Number.isFinite(
+      Number(
+        handlingMinutesOverride,
+      ),
+    )
+      ? Math.max(
+          0,
+          Math.round(
+            Number(
+              handlingMinutesOverride,
+            ),
+          ),
+        )
+      : config.handlingMinutes
+
+  const estimatedDeliveryMinutes =
+    Math.max(
+      1,
+      handlingMinutes +
+        travelMinutes,
+    )
+
+  const generatedAt =
+    new Date(
+      now,
+    )
+
+  const estimatedArrivalAt =
+    new Date(
+      generatedAt.getTime() +
+        estimatedDeliveryMinutes *
+          60 *
+          1000,
+    )
+
+  return {
+    available:
+      true,
+
+    destination: {
+      postalCode:
+        normalizedDestinationPostalCode,
+
+      city:
+        destination.city ||
+        '',
+
+      state:
+        destination.state ||
+        '',
+
+      country:
+        destination.country ||
+        'India',
+
+      label:
+        destination.label ||
+        `PIN ${normalizedDestinationPostalCode}`,
+    },
+
+    sourceCount:
+      sourceLegs.length,
+
+    straightLineDistanceKm:
+      roundDistance(
+        longestStraightLineDistanceKm,
+      ),
+
+    estimatedRoadDistanceKm,
+
+    averageSpeedKmh:
+      config.averageSpeedKmh,
+
+    routeDistanceFactor:
+      config.routeDistanceFactor,
+
+    handlingMinutes,
+
+    travelMinutes,
+
+    estimatedDeliveryMinutes,
+
+    generatedAt:
+      generatedAt.toISOString(),
+
+    estimatedArrivalAt:
+      estimatedArrivalAt.toISOString(),
+
+    isApproximate:
+      true,
+
+    calculationMethod:
+      'pincode_centroid_distance_constant_speed',
+
+    sourcePincodes:
+      [
+        ...new Set(
+          sourceLegs.map(
+            (leg) =>
+              leg.sourcePostalCode,
+          ),
+        ),
+      ],
+
+    note:
+      'Approximate ETA from recorded fulfillment pincode to delivery pincode using pincode-centroid distance, a road-distance factor and configured average delivery speed. Live traffic is not included.',
+  }
+}
+
+export async function getMarketplaceCartDeliveryEta({
+  cartId,
+  actorUser,
+  now =
+    new Date(),
+}) {
+  const ownerUserId =
+    actorIdFromUser(
+      actorUser,
+    )
+
+  const {
+    householdId,
+  } =
+    await requireCurrentPantryHousehold(
+      actorUser,
+    )
+
+  const cart =
+    await MarketplaceCart
+      .findOne({
+        _id:
+          cartId,
+
+        ownerUserId,
+
+        householdId,
+      })
+      .lean()
+
+  if (!cart) {
+    throw new ApiError(
+      404,
+      'Marketplace Cart was not found.',
+      [
+        {
+          code:
+            'MARKETPLACE_CART_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
+  if (
+    (
+      cart.fulfillmentType ||
+      'delivery'
+    ) !==
+    'delivery'
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'pickup_cart',
+
+      message:
+        'Delivery ETA is not applicable to a pickup Cart.',
+    }
+  }
+
+  const destinationPostalCode =
+    normalizePostalCode(
+      cart.pincode,
+    )
+
+  if (
+    !/^\d{6}$/.test(
+      destinationPostalCode ||
+        '',
+    )
+  ) {
+    throw new ApiError(
+      409,
+      'A valid delivery pincode is required before ETA can be calculated.',
+      [
+        {
+          code:
+            'DELIVERY_ETA_PINCODE_REQUIRED',
+        },
+      ],
+    )
+  }
+
+  const destination =
+    await geocodePostalCode({
+      postalCode:
+        destinationPostalCode,
+    })
+
+  const itemCapacities =
+    []
+
+  const candidateNodeIds =
+    []
+
+  for (
+    const item
+    of cart.items ||
+      []
+  ) {
+    const capacities =
+      await loadServiceableNodeCapacity({
+        offerId:
+          item.offerId,
+
+        pincode:
+          destinationPostalCode,
+
+        fulfillmentType:
+          'delivery',
+      })
+
+    itemCapacities.push({
+      item,
+      capacities,
+    })
+
+    for (
+      const capacity
+      of capacities
+    ) {
+      candidateNodeIds.push(
+        capacity.inventoryNodeId,
+      )
+    }
+  }
+
+  const nodeById =
+    await loadInventoryNodePostalCodes(
+      candidateNodeIds,
+    )
+
+  const geocodeByPostalCode =
+    new Map()
+
+  async function resolvePostalCode(
+    postalCode,
+  ) {
+    if (
+      geocodeByPostalCode.has(
+        postalCode,
+      )
+    ) {
+      return geocodeByPostalCode.get(
+        postalCode,
+      )
+    }
+
+    const location =
+      await geocodePostalCode({
+        postalCode,
+      })
+
+    geocodeByPostalCode.set(
+      postalCode,
+      location,
+    )
+
+    return location
+  }
+
+  const sourceLegs =
+    []
+
+  for (
+    const {
+      item,
+      capacities,
+    }
+    of itemCapacities
+  ) {
+    let remainingQuantity =
+      Math.max(
+        1,
+        Number(
+          item.packCount ||
+            1,
+        ),
+      )
+
+    for (
+      const capacity
+      of capacities
+    ) {
+      if (
+        remainingQuantity <=
+        0
+      ) {
+        break
+      }
+
+      const sellableQuantity =
+        Math.max(
+          0,
+          Number(
+            capacity.sellableQuantity ||
+              0,
+          ),
+        )
+
+      const allocatedQuantity =
+        Math.min(
+          remainingQuantity,
+          sellableQuantity,
+        )
+
+      if (
+        allocatedQuantity <=
+        0
+      ) {
+        continue
+      }
+
+      const node =
+        nodeById.get(
+          stringifyId(
+            capacity.inventoryNodeId,
+          ),
+        )
+
+      const sourcePostalCode =
+        normalizePostalCode(
+          node?.postalCode,
+        )
+
+      if (
+        !/^\d{6}$/.test(
+          sourcePostalCode ||
+            '',
+        )
+      ) {
+        continue
+      }
+
+      const sourceLocation =
+        await resolvePostalCode(
+          sourcePostalCode,
+        )
+
+      const straightLineDistanceKm =
+        haversineDistanceKm(
+          sourceLocation,
+          destination,
+        )
+
+      sourceLegs.push({
+        inventoryNodeId:
+          node?.id ||
+          stringifyId(
+            capacity.inventoryNodeId,
+          ),
+
+        inventoryNodeName:
+          node?.name ||
+          'Inventory node',
+
+        sourcePostalCode,
+
+        quantity:
+          allocatedQuantity,
+
+        straightLineDistanceKm:
+          roundDistance(
+            straightLineDistanceKm,
+          ),
+      })
+
+      remainingQuantity -=
+        allocatedQuantity
+    }
+
+    if (
+      remainingQuantity >
+      0
+    ) {
+      return {
+        available:
+          false,
+
+        reason:
+          'source_pincode_unavailable',
+
+        message:
+          'Delivery ETA cannot be calculated because a serviceable stock location is missing a valid pincode.',
+      }
+    }
+  }
+
+  if (
+    sourceLegs.length ===
+    0
+  ) {
+    return {
+      available:
+        false,
+
+      reason:
+        'no_delivery_source',
+
+      message:
+        'Delivery ETA is not available for this Cart yet.',
+    }
+  }
+
+  const config =
+    deliveryEtaConfig()
+
+  const longestStraightLineDistanceKm =
+    Math.max(
+      ...sourceLegs.map(
+        (leg) =>
+          leg.straightLineDistanceKm,
+      ),
+    )
+
+  const estimatedRoadDistanceKm =
+    roundDistance(
+      longestStraightLineDistanceKm *
+        config.routeDistanceFactor,
+    )
+
+  const travelMinutes =
+    Math.max(
+      1,
+      Math.ceil(
+        (
+          estimatedRoadDistanceKm /
+          config.averageSpeedKmh
+        ) *
+          60,
+      ),
+    )
+
+  const estimatedDeliveryMinutes =
+    Math.max(
+      1,
+      config.handlingMinutes +
+        travelMinutes,
+    )
+
+  const generatedAt =
+    new Date(
+      now,
+    )
+
+  const estimatedArrivalAt =
+    new Date(
+      generatedAt.getTime() +
+        estimatedDeliveryMinutes *
+          60 *
+          1000,
+    )
+
+  return {
+    available:
+      true,
+
+    cartId:
+      stringifyId(
+        cart._id,
+      ),
+
+    destination: {
+      postalCode:
+        destinationPostalCode,
+
+      city:
+        destination.city ||
+        '',
+
+      state:
+        destination.state ||
+        '',
+
+      country:
+        destination.country ||
+        'India',
+
+      label:
+        destination.label ||
+        `PIN ${destinationPostalCode}`,
+    },
+
+    sourceCount:
+      new Set(
+        sourceLegs.map(
+          (leg) =>
+            leg.inventoryNodeId,
+        ),
+      ).size,
+
+    straightLineDistanceKm:
+      roundDistance(
+        longestStraightLineDistanceKm,
+      ),
+
+    estimatedRoadDistanceKm,
+
+    averageSpeedKmh:
+      config.averageSpeedKmh,
+
+    routeDistanceFactor:
+      config.routeDistanceFactor,
+
+    handlingMinutes:
+      config.handlingMinutes,
+
+    travelMinutes,
+
+    estimatedDeliveryMinutes,
+
+    generatedAt:
+      generatedAt.toISOString(),
+
+    estimatedArrivalAt:
+      estimatedArrivalAt.toISOString(),
+
+    isApproximate:
+      true,
+
+    calculationMethod:
+      'pincode_centroid_distance_constant_speed',
+
+    sourcePincodes:
+      [
+        ...new Set(
+          sourceLegs.map(
+            (leg) =>
+              leg.sourcePostalCode,
+          ),
+        ),
+      ],
+
+    note:
+      'Approximate ETA from seller stock pincode to delivery pincode using pincode-centroid distance, a road-distance factor and configured average delivery speed. Live traffic is not included.',
+  }
+}
+

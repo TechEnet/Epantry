@@ -388,6 +388,16 @@ test(
 
     assert.match(
       source,
+      /selectedForContext:\s*true/,
+    )
+
+    assert.match(
+      source,
+      /HouseholdMembership\.updateMany/,
+    )
+
+    assert.doesNotMatch(
+      source,
       /PANTRY_HOUSEHOLD_SELECTION_REQUIRED/,
     )
 

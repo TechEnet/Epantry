@@ -832,7 +832,9 @@ export function AuthProvider({
 
   const requestHostAccess =
     useCallback(
-      async () => {
+      async (
+        hostWorkspaceType,
+      ) => {
         setIsRequestingHostAccess(
           true,
         )
@@ -843,7 +845,9 @@ export function AuthProvider({
 
         try {
           const result =
-            await requestHostAccessService()
+            await requestHostAccessService(
+              hostWorkspaceType,
+            )
 
           if (
             !result?.user

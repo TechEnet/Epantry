@@ -391,12 +391,17 @@ test(
 
     assert.match(
       source,
-      /screenLabel:\s*['"]S06 Orders['"]/,
+      /to:\s*['"]\/host\/orders['"]/,
     )
 
     assert.match(
       source,
-      /screenLabel:\s*['"]Hospitality \/ Pro Ops['"]/,
+      /label:\s*['"]Hospitality Operations['"]/,
+    )
+
+    assert.match(
+      source,
+      /to:\s*['"]\/host\/hospitality['"]/,
     )
 
     assert.match(

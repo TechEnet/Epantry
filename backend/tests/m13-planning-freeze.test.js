@@ -490,12 +490,10 @@ test(
       'frontend/src/features/planning/pages/WasteReductionPage.jsx',
 
       [
-        'Waste Reduction + Next Possibility',
-        'household use-soon date is',
-        'not treated as a verified expiry date',
+        'Use soon. Plan smarter. Waste less.',
+        'household reminder, not an expiry date',
         'Review / correct Pantry evidence',
-        'Correct Pantry evidence',
-        'Next Possibility',
+        'Next possibility',
         'Open Next Basket feedback',
         'does not claim a verified expiry date',
       ],
@@ -511,7 +509,7 @@ test(
 )
 
 test(
-  'M13 Final Next Basket keeps explicit feedback and no automatic Cart promise',
+  'M13 Final Next Basket keeps explicit feedback separate from explicit Add to cart',
 
   async () => {
     const source =
@@ -529,13 +527,24 @@ test(
         'Snooze 7d',
         'Remove',
         'Stop suggesting',
-        'automatically create a Cart',
+        'Accept saves a suggestion.',
+        'Nothing is ordered until you complete checkout.',
       ],
+    )
+
+    assert.match(
+      source,
+      /handleAddToCart/,
+    )
+
+    assert.match(
+      source,
+      /onClick=\{\(\) => feedback\(item, "accept"\)\}/,
     )
 
     assert.doesNotMatch(
       source,
-      /createCart\(|createCheckout\(|createOrder\(/,
+      /feedback\([^)]*['"]accept['"][^)]*\)[\s\S]{0,160}createDirectMarketplaceCart/,
     )
   },
 )

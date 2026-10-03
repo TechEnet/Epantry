@@ -69,6 +69,12 @@ export const HOSPITALITY_MENU_STATUSES = Object.freeze([
   'retired',
 ])
 
+export const HOSPITALITY_MENU_AVAILABILITY_STATUSES = Object.freeze([
+  'available',
+  'sold_out',
+  'paused',
+])
+
 export const HOSPITALITY_PRODUCTION_PLAN_STATUSES = Object.freeze([
   'draft',
   'calculated',
@@ -801,6 +807,33 @@ const hospitalityProductionRecipeVersionSchema = new Schema(
       index: true,
     },
 
+    recipeFoundationMode: {
+      type: String,
+      enum: [
+        'legacy_hospitality',
+        'core_recipe_linked',
+      ],
+      default: 'legacy_hospitality',
+      index: true,
+    },
+
+    listingOutletId: {
+      type: objectId,
+      ref: 'HospitalityOutlet',
+      default: null,
+      index: true,
+    },
+
+    customerVisibility: {
+      type: String,
+      enum: [
+        'organization_only',
+        'public_candidate',
+      ],
+      default: 'organization_only',
+      index: true,
+    },
+
     title: {
       type: String,
       required: true,
@@ -1123,6 +1156,13 @@ const hospitalityMenuItemSchema = new Schema(
       index: true,
     },
 
+    sourceRecipeVersionId: {
+      type: objectId,
+      ref: 'RecipeVersion',
+      default: null,
+      index: true,
+    },
+
     displayName: {
       type: String,
       required: true,
@@ -1163,6 +1203,103 @@ hospitalityMenuItemSchema.index(
 
 /*
 |--------------------------------------------------------------------------
+| Menu Availability
+|--------------------------------------------------------------------------
+|
+| Finished-dish availability is intentionally separate from ingredient stock
+| observations and from Menu Item lifecycle status. Records are append-only so
+| sold-out / pause history remains auditable without rewriting the Menu Item.
+|--------------------------------------------------------------------------
+*/
+
+const hospitalityMenuAvailabilitySchema = new Schema(
+  {
+    organizationId: {
+      type: objectId,
+      ref: 'MarketplaceOrganization',
+      required: true,
+      index: true,
+    },
+
+    outletId: {
+      type: objectId,
+      ref: 'HospitalityOutlet',
+      required: true,
+      index: true,
+    },
+
+    menuId: {
+      type: objectId,
+      ref: 'HospitalityMenu',
+      required: true,
+      index: true,
+    },
+
+    menuItemId: {
+      type: objectId,
+      ref: 'HospitalityMenuItem',
+      required: true,
+      index: true,
+    },
+
+    productionRecipeVersionId: {
+      type: objectId,
+      ref: 'HospitalityProductionRecipeVersion',
+      required: true,
+      index: true,
+    },
+
+    sourceRecipeVersionId: {
+      type: objectId,
+      ref: 'RecipeVersion',
+      default: null,
+      index: true,
+    },
+
+    status: {
+      type: String,
+      enum: HOSPITALITY_MENU_AVAILABILITY_STATUSES,
+      required: true,
+      default: 'available',
+      index: true,
+    },
+
+    note: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: '',
+    },
+
+    observedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+      index: true,
+    },
+
+    changedByUserId: {
+      type: objectId,
+      ref: 'User',
+      required: true,
+    },
+  },
+  {
+    ...baseOptions,
+    collection: 'hospitalityMenuAvailabilities',
+  },
+)
+
+hospitalityMenuAvailabilitySchema.index({
+  organizationId: 1,
+  outletId: 1,
+  menuItemId: 1,
+  observedAt: -1,
+  createdAt: -1,
+})
+
+/*
+|--------------------------------------------------------------------------
 | Recipe Cost Snapshot
 |--------------------------------------------------------------------------
 |
@@ -1190,6 +1327,13 @@ const hospitalityRecipeCostSchema = new Schema(
       type: objectId,
       ref: 'HospitalityProductionRecipeVersion',
       required: true,
+      index: true,
+    },
+
+    sourceRecipeVersionId: {
+      type: objectId,
+      ref: 'RecipeVersion',
+      default: null,
       index: true,
     },
 
@@ -1335,6 +1479,12 @@ const productionPlanItemSchema = new Schema(
       type: objectId,
       ref: 'HospitalityProductionRecipeVersion',
       required: true,
+    },
+
+    sourceRecipeVersionId: {
+      type: objectId,
+      ref: 'RecipeVersion',
+      default: null,
     },
 
     portions: {
@@ -1593,6 +1743,13 @@ export const HospitalityMenuItem =
   mongoose.model(
     'HospitalityMenuItem',
     hospitalityMenuItemSchema,
+  )
+
+export const HospitalityMenuAvailability =
+  mongoose.models.HospitalityMenuAvailability ||
+  mongoose.model(
+    'HospitalityMenuAvailability',
+    hospitalityMenuAvailabilitySchema,
   )
 
 export const HospitalityRecipeCost =

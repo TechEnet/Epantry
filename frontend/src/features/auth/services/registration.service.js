@@ -414,6 +414,7 @@ async function completeApplicationRegistration({
   firebaseUser,
   challengeId,
   registrationProof,
+  hostWorkspaceType = null,
 }) {
   const idToken =
     await firebaseUser.getIdToken(
@@ -430,6 +431,12 @@ async function completeApplicationRegistration({
         challengeId,
 
         registrationProof,
+
+        ...(hostWorkspaceType
+          ? {
+              hostWorkspaceType,
+            }
+          : {}),
       },
     )
 
@@ -505,6 +512,7 @@ export async function completeVerifiedRegistration({
   password,
   challengeId,
   registrationProof,
+  hostWorkspaceType = null,
 }) {
   if (
     !registrationProof ||
@@ -542,6 +550,8 @@ export async function completeVerifiedRegistration({
       challengeId,
 
       registrationProof,
+
+      hostWorkspaceType,
     })
 
   /*

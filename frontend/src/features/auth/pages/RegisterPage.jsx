@@ -7,7 +7,9 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   Building2,
+  ChefHat,
   Check,
   CheckCircle2,
   CircleAlert,
@@ -19,6 +21,7 @@ import {
   RefreshCw,
   ShieldCheck,
   ShoppingBasket,
+  Store,
   Smartphone,
   UserRound,
 } from 'lucide-react'
@@ -68,6 +71,37 @@ const ACCOUNT_TYPES = [
     description:
       'Create a Customer account and submit your Host access for review.',
     icon: Building2,
+  },
+]
+
+const HOST_WORKSPACE_TYPES = [
+  {
+    value: 'b2b',
+    label: 'B2B',
+    description:
+      'Run business-to-business operations and the tools approved for a B2B Host.',
+    icon: Building2,
+  },
+  {
+    value: 'brand_seller',
+    label: 'Brand / Seller',
+    description:
+      'Manage brand, product, listing and selling workflows for your business.',
+    icon: Store,
+  },
+  {
+    value: 'hybrid',
+    label: 'Hybrid',
+    description:
+      'Use the combined Brand / Seller and B2B workspace approved for hybrid businesses.',
+    icon: BadgeCheck,
+  },
+  {
+    value: 'chef_restaurant',
+    label: 'Chef + Restaurant',
+    description:
+      'Run restaurant operations, professional food content and the approved Chef workspace.',
+    icon: ChefHat,
   },
 ]
 
@@ -344,6 +378,76 @@ function AuthNotice({
         {message}
       </p>
     </div>
+  )
+}
+
+function HostWorkspaceTypeCard({
+  item,
+  selected,
+  onSelect,
+}) {
+  const Icon = item.icon
+
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        onSelect(
+          item.value,
+        )
+      }
+      className={[
+        'rounded-xl',
+        'border',
+        'p-3',
+        'text-left',
+        'transition',
+        'duration-200',
+        'focus:outline-none',
+        'focus-visible:ring-2',
+        'focus-visible:ring-emerald-500',
+        selected
+          ? 'border-emerald-500 bg-emerald-50 shadow-[0_10px_28px_rgba(5,150,105,0.10)]'
+          : 'border-stone-100 bg-[#fafafa] hover:border-stone-200 hover:bg-white',
+      ].join(' ')}
+      aria-pressed={selected}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={[
+            'grid',
+            'size-10',
+            'shrink-0',
+            'place-items-center',
+            'rounded-lg',
+            selected
+              ? 'bg-emerald-700 text-white'
+              : 'bg-white text-stone-700 shadow-sm',
+          ].join(' ')}
+        >
+          <Icon size={18} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-black text-stone-950">
+              {item.label}
+            </p>
+
+            {selected ? (
+              <Check
+                size={15}
+                className="shrink-0 text-emerald-700"
+              />
+            ) : null}
+          </div>
+
+          <p className="mt-1 text-[9px] leading-4 text-stone-500">
+            {item.description}
+          </p>
+        </div>
+      </div>
+    </button>
   )
 }
 
@@ -715,6 +819,11 @@ export default function RegisterPage() {
   ] = useState(null)
 
   const [
+    selectedHostWorkspaceType,
+    setSelectedHostWorkspaceType,
+  ] = useState('')
+
+  const [
     resendSeconds,
     setResendSeconds,
   ] = useState(0)
@@ -1003,6 +1112,7 @@ export default function RegisterPage() {
   const completeAccount =
     async (
       proof,
+      hostWorkspaceType = null,
     ) => {
       setStep('creating')
       setIsSubmitting(true)
@@ -1021,6 +1131,8 @@ export default function RegisterPage() {
 
             registrationProof:
               proof.registrationProof,
+
+            hostWorkspaceType,
           })
 
         setResult(
@@ -1122,6 +1234,15 @@ export default function RegisterPage() {
           proof,
         )
 
+        if (
+          form.accountType ===
+          'host'
+        ) {
+          setIsSubmitting(false)
+          setStep('host-intent')
+          return
+        }
+
         await completeAccount(
           proof,
         )
@@ -1134,6 +1255,37 @@ export default function RegisterPage() {
 
         setIsSubmitting(false)
       }
+    }
+
+  const handleHostIntentSubmit =
+    async () => {
+      if (
+        !verificationProof?.registrationProof
+      ) {
+        setErrorMessage(
+          'Email verification is required before choosing your Host workspace.',
+        )
+        setStep('otp')
+        return
+      }
+
+      if (
+        !HOST_WORKSPACE_TYPES.some(
+          (item) =>
+            item.value ===
+            selectedHostWorkspaceType,
+        )
+      ) {
+        setErrorMessage(
+          'Choose the Host workspace you are applying for.',
+        )
+        return
+      }
+
+      await completeAccount(
+        verificationProof,
+        selectedHostWorkspaceType,
+      )
     }
 
   const handleResendOtp =
@@ -1196,10 +1348,82 @@ export default function RegisterPage() {
       setOtp('')
       setChallengeId('')
       setVerificationProof(null)
+      setSelectedHostWorkspaceType('')
       setResendSeconds(0)
       setExpiresSeconds(0)
       setErrorMessage('')
     }
+
+  if (
+    step ===
+    'host-intent'
+  ) {
+    return (
+      <AuthShell
+        eyebrow="Host application"
+        title="What kind of Host are you joining as?"
+        description="Choose the workspace you need. Super Admin will see this before approving Host access. Until approval, your Customer experience stays active."
+        videoSrc={registrationVideoSrc}
+        videoLabel={registrationVideoLabel}
+      >
+        <div className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {HOST_WORKSPACE_TYPES.map(
+              (item) => (
+                <HostWorkspaceTypeCard
+                  key={item.value}
+                  item={item}
+                  selected={
+                    selectedHostWorkspaceType ===
+                    item.value
+                  }
+                  onSelect={(value) => {
+                    setSelectedHostWorkspaceType(value)
+                    setErrorMessage('')
+                  }}
+                />
+              ),
+            )}
+          </div>
+
+          <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-700">
+              Before approval
+            </p>
+            <p className="mt-1 text-[9px] leading-4 text-sky-900">
+              This choice tells EPANTRY why you are applying as a Host. It does not grant Host access. You will continue as a Customer until Super Admin approves the application.
+            </p>
+          </div>
+
+          {errorMessage ? (
+            <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-red-700">
+              <CircleAlert size={16} className="mt-0.5 shrink-0" />
+              <p className="text-[9px] font-semibold leading-4">
+                {errorMessage}
+              </p>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleHostIntentSubmit}
+            disabled={
+              !selectedHostWorkspaceType ||
+              isSubmitting
+            }
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-stone-950 text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isSubmitting ? (
+              <LoaderCircle size={14} className="animate-spin" />
+            ) : (
+              <ArrowRight size={14} />
+            )}
+            Submit Host application
+          </button>
+        </div>
+      </AuthShell>
+    )
+  }
 
   if (
     step ===
@@ -1464,6 +1688,10 @@ export default function RegisterPage() {
 
                 <p className="mt-1 text-[10px] leading-4 text-amber-800">
                   You can continue using EPANTRY as a Customer while your Host application is reviewed.
+                </p>
+
+                <p className="mt-2 text-[9px] font-bold text-amber-900">
+                  Requested workspace: {HOST_WORKSPACE_TYPES.find((item) => item.value === (result?.user?.hostWorkspaceType || selectedHostWorkspaceType))?.label || 'Host'}
                 </p>
               </div>
 

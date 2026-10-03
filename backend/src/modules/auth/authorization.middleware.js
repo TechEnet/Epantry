@@ -530,6 +530,71 @@ export const requireHostAccess =
     'host',
   )
 
+export function requireChefRestaurantHostAccess(
+  req,
+  res,
+  next,
+) {
+  try {
+    const user =
+      requireLoadedUser(
+        req,
+      )
+
+    const hasHostAccess =
+      userHasAnyAccess(
+        user,
+        [
+          'host',
+        ],
+      )
+
+    const workspaceType =
+      String(
+        user?.hostWorkspaceType ||
+          '',
+      )
+        .trim()
+        .toLowerCase()
+
+    if (
+      hasHostAccess &&
+      user?.hostEnabled ===
+        true &&
+      user?.hostAccessStatus ===
+        'active' &&
+      workspaceType ===
+        'chef_restaurant'
+    ) {
+      return next()
+    }
+
+    return next(
+      new ApiError(
+        403,
+        'Chef + Restaurant Host access is required for this action.',
+        [
+          {
+            code:
+              'AUTH_CHEF_RESTAURANT_HOST_REQUIRED',
+
+            hostWorkspaceType:
+              user?.hostWorkspaceType ||
+              null,
+
+            requiredHostWorkspaceType:
+              'chef_restaurant',
+          },
+        ],
+      ),
+    )
+  } catch (error) {
+    return next(
+      error,
+    )
+  }
+}
+
 export const requireSuperAdminAccess =
   requireAnyAccess(
     'super_admin',

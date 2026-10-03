@@ -1,4 +1,6 @@
 import {
+  useEffect,
+  useRef,
   useState,
 } from 'react'
 
@@ -17,6 +19,7 @@ import {
 } from 'react-router-dom'
 
 import {
+  AnimatePresence,
   motion,
   useReducedMotion,
 } from 'motion/react'
@@ -165,16 +168,6 @@ export default function FeaturedContentSection() {
   const recipes =
     data?.recipes || []
 
-  const mobileGroceryItems =
-    grocery.slice(0, 4)
-
-  const mobileGroceryCards =
-    mobileGroceryItems.map(
-      (product) => ({
-        product,
-      }),
-    )
-
   const mobileRecipeItems =
     recipes.slice(0, 4)
 
@@ -217,1356 +210,2969 @@ export default function FeaturedContentSection() {
           FEATURED GROCERY
       ============================================================= */}
 
-      <FeaturedSection
-        texture="grid"
-        tone="grocery"
-      >
-
-        <SectionHeader
-          eyebrow="Featured Grocery"
-          title="Everyday essentials worth discovering."
-          description="A curated preview of grocery products available inside the EPANTRY catalog."
-          path="/grocery"
-          action="Explore Grocery"
-          tone="grocery"
-        />
-
-        <div className="pb-7 pt-4 sm:flex sm:flex-1 sm:items-center sm:py-5">
-
-          {grocery.length > 0 ? (
-            <>
-              {/* Mobile-only focus rail inspired by the supplied reference video. */}
-              <div
-                ref={initializeMobileRail}
-                className="-mx-4 flex snap-x snap-mandatory scroll-smooth gap-3 overflow-x-auto overscroll-x-contain pl-4 pr-[12vw] pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden"
-                onScroll={handleMobileRailScroll}
-              >
-
-                {mobileGroceryCards.map(({ product }, index) => {
-                  return (
-                    <motion.article
-                      key={`mobile-grocery-${product.id || product.slug || index}`}
-                      initial={false}
-                      data-mobile-rail-start={index === 0 ? 'true' : undefined}
-                      className="w-[84vw] shrink-0 snap-center"
-                    >
-                      <Link
-                        to={
-                          product.path ||
-                          (product.slug
-                            ? `/grocery/product/${product.slug}`
-                            : '/grocery')
-                        }
-                        data-mobile-focus-card
-                        className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#E7E5E4] bg-[#F7F7F3] shadow-[0_18px_42px_rgba(17,24,39,0.12)] will-change-transform [backface-visibility:hidden]"
-                        style={{
-                          transform:
-                            index === 0
-                              ? 'translate3d(0, 0, 0) scale(1.025)'
-                              : 'translate3d(0, 8px, 0) scale(0.92)',
-                        }}
-                      >
-                        <div className="absolute inset-0 bg-[#F7F7F3]" />
-                        <div className="absolute inset-x-0 top-0 h-[67%] bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.98),rgba(248,248,244,0.92)_54%,rgba(239,240,234,0.92)_100%)]" />
-                        <div className="absolute inset-x-6 top-12 h-[52%] rounded-[30px] border border-black/[0.05] bg-white/72 shadow-[0_18px_44px_rgba(17,24,39,0.08)] backdrop-blur-sm" />
-
-                        <div className="absolute left-5 top-5 rounded-full border border-black/[0.06] bg-white/88 px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.13em] text-[#35543E] shadow-sm backdrop-blur-md">
-                          {product.subCategory || 'Grocery'}
-                        </div>
-
-                        <div className="absolute inset-x-8 top-[15%] flex h-[43%] items-center justify-center p-2">
-                          {product.image ? (
-                            <img
-                              src={product.image}
-                              alt={product.name || 'Grocery product'}
-                              loading="lazy"
-                              className="max-h-full max-w-full object-contain drop-shadow-[0_14px_18px_rgba(17,24,39,0.12)] transition duration-500 group-active:-translate-y-0.5"
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center text-[#35543E]">
-                              <Package size={46} aria-hidden="true" />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="absolute inset-x-4 bottom-4 rounded-[26px] border border-black/[0.06] bg-white/88 px-4 py-4 text-[#111827] shadow-[0_16px_34px_rgba(17,24,39,0.10)] backdrop-blur-xl">
-                          <p className="text-[8px] font-black uppercase tracking-[0.17em] text-[#55705D]">
-                            EPANTRY Grocery
-                          </p>
-                          <h3 className="mt-1.5 text-[22px] font-black leading-[1.02] tracking-[-0.035em] text-[#111827]">
-                            {product.name || 'Grocery Product'}
-                          </h3>
-                          {(product.quantity || product.unit) && (
-                            <p className="mt-2 text-[10px] font-bold text-[#737A73]">
-                              {product.quantity}{product.quantity && product.unit ? ' ' : ''}{product.unit || ''}
-                            </p>
-                          )}
-                        </div>
-
-                        <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/60 bg-white/90 text-[#166534] shadow-sm backdrop-blur">
-                          <ArrowRight size={17} aria-hidden="true" />
-                        </span>
-                      </Link>
-                    </motion.article>
-                  )
-                })}
-
-                <article className="w-[84vw] shrink-0 snap-center">
-                  <Link
-                    to="/grocery"
-                    data-mobile-focus-card
-                    className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#E7E5E4] bg-[#F7F7F3] shadow-[0_18px_42px_rgba(17,24,39,0.12)] will-change-transform [backface-visibility:hidden]"
-                    style={{
-                      transform: 'translate3d(0, 8px, 0) scale(0.92)',
-                    }}
-                    aria-label="View all groceries"
-                  >
-                    <div className="absolute inset-0 bg-[linear-gradient(155deg,#FCFCF8_0%,#F4F3EE_52%,#ECEAE3_100%)]" />
-                    <div className="absolute -right-10 top-12 h-40 w-40 rounded-full bg-white/70 blur-2xl" />
-                    <div className="absolute -left-12 top-[38%] h-36 w-36 rounded-full bg-[#D7D4CA]/35 blur-2xl" />
-
-                    <div className="absolute inset-x-5 top-7 grid h-[48%] grid-cols-2 grid-rows-2 gap-2.5">
-                      {grocery.slice(0, 3).map((item, previewIndex) => (
-                        <div
-                          key={`grocery-view-all-preview-${item.id || item.slug || previewIndex}`}
-                          className={`overflow-hidden rounded-[18px] border border-white/80 bg-white/80 p-2 shadow-sm backdrop-blur ${
-                            previewIndex === 0 ? 'row-span-2' : ''
-                          }`}
-                        >
-                          {item.image ? (
-                            <img
-                              src={item.image}
-                              alt=""
-                              loading="lazy"
-                              className="h-full w-full object-contain"
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center text-[#166534]">
-                              <Package size={28} aria-hidden="true" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="absolute inset-x-4 bottom-4 rounded-[24px] border border-white/90 bg-white/82 px-4 py-4 text-[#111827] shadow-[0_14px_34px_rgba(15,23,42,0.10)] backdrop-blur-xl">
-                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#166534]/75">
-                        EPANTRY Grocery
-                      </p>
-                      <h3 className="mt-1.5 max-w-[230px] text-[25px] font-black leading-[0.98] tracking-[-0.04em]">
-                        See the full grocery shelf
-                      </h3>
-                      <p className="mt-2.5 max-w-[235px] text-[10px] font-semibold leading-4 text-[#667085]">
-                        Browse every available grocery product in one place.
-                      </p>
-                      <span className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-[#166534] px-4 text-[11px] font-black text-white shadow-sm">
-                        View all
-                        <ArrowRight size={13} aria-hidden="true" />
-                      </span>
-                    </div>
-
-                    <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/70 bg-white/90 text-[#166534] shadow-sm backdrop-blur">
-                      <ArrowRight size={17} aria-hidden="true" />
-                    </span>
-                  </Link>
-                </article>
-
-              </div>
-
-              <div className="hidden w-full sm:grid sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-
-              {grocery.map(
-                (
-                  product,
-                  index,
-                ) => {
-                  const productId =
-                    getProductId(
-                      product,
-                    )
-
-                  const nutrition =
-                    getProductNutrition(
-                      product,
-                    )
-
-                  return (
-                    <motion.article
-                      key={
-                        product.id ||
-                        product.slug
-                      }
-                      initial={
-                        shouldReduceMotion
-                          ? false
-                          : {
-                              opacity: 0,
-                              y: 20,
-                            }
-                      }
-                      whileInView={{
-                        opacity: 1,
-                        y: 0,
-                      }}
-                      viewport={{
-                        once: true,
-                      }}
-                      transition={{
-                        duration: 0.35,
-
-                        delay:
-                          shouldReduceMotion
-                            ? 0
-                            : index *
-                              0.05,
-                      }}
-                      className="group relative h-full"
-                    >
-
-                      {/* =============================================
-                          MOBILE / TABLET
-
-                          Existing grocery card behavior is preserved.
-                          The new two-phase interaction is desktop-only.
-                      ============================================== */}
-
-                      <div className="flex h-full flex-col overflow-hidden rounded-[18px] border border-[#E5E7EB] bg-white p-2 shadow-sm transition-all duration-300 hover:border-[#16A34A]/30 hover:bg-white hover:shadow-xl hover:shadow-[#111827]/10 sm:rounded-[26px] sm:p-3.5 lg:hidden">
-
-                        <div className="relative h-[116px] shrink-0 overflow-hidden rounded-[14px] bg-white sm:h-[210px] sm:rounded-[20px]">
-
-                          {product.image ? (
-                            <img
-                              src={
-                                product.image
-                              }
-                              alt={
-                                product.name ||
-                                'Grocery product'
-                              }
-                              loading="lazy"
-                              className="h-full w-full object-contain"
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center bg-[#F8FAF7] text-[#16A34A]">
-
-                              <Package
-                                size={36}
-                                aria-hidden="true"
-                              />
-
-                            </div>
-                          )}
-
-                        </div>
-
-                        <div className="flex flex-col px-0.5 pt-2.5 sm:flex-1 sm:pt-4 sm:px-1">
-
-                          <p className="text-[9px] font-bold uppercase tracking-[0.10em] text-[#166534] sm:text-[11px] sm:tracking-[0.12em]">
-
-                            {product.subCategory ||
-                              'Grocery'}
-
-                          </p>
-
-                          <h3 className="mt-1.5 text-[12px] font-black leading-[1.12] text-[#111827] break-words sm:mt-2 sm:line-clamp-2 sm:text-lg sm:leading-snug">
-
-                            {product.name ||
-                              'Grocery Product'}
-
-                          </h3>
-
-                          <div className="mt-1.5 flex items-end justify-between gap-2 sm:mt-auto sm:gap-3 sm:pt-4">
-
-                            <div>
-
-                              {(product.quantity ||
-                                product.unit) && (
-                                <p className="text-[10px] font-medium text-[#6B7280]/70 sm:text-xs">
-
-                                  {
-                                    product.quantity
-                                  }{' '}
-                                  {
-                                    product.unit
-                                  }
-
-                                </p>
-                              )}
-
-                              {product.price !=
-                                null && (
-                                <p className="mt-1 text-[15px] font-black text-[#111827] sm:text-lg">
-
-                                  {formatPrice(
-                                    product.price,
-                                    product.currency,
-                                  )}
-
-                                </p>
-                              )}
-
-                            </div>
-
-                            <div className="hidden size-10 shrink-0 place-items-center rounded-full bg-[#F0FDF4] text-[#166534] sm:grid">
-
-                              <ShoppingBasket
-                                size={18}
-                                aria-hidden="true"
-                              />
-
-                            </div>
-
-                          </div>
-
-                          <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:mt-3 sm:gap-2">
-
-                            <Link
-                              to="/grocery"
-                              className="focus-ring flex h-8 items-center justify-center gap-1 rounded-full bg-[#1F2937] px-2 text-[10px] font-bold text-white transition duration-300 hover:bg-[#111827] sm:h-10 sm:gap-1.5 sm:px-3 sm:text-xs"
-                            >
-
-                              <Eye
-                                size={15}
-                                aria-hidden="true"
-                                className="size-3 sm:size-[15px]"
-                              />
-
-                              View
-
-                            </Link>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleAddToCart(
-                                  product,
-                                )
-                              }
-                              className="focus-ring flex h-8 items-center justify-center gap-1 rounded-full bg-[#166534] px-2 text-[10px] font-bold text-white transition duration-300 hover:bg-[#14532D] sm:h-10 sm:gap-1.5 sm:px-3 sm:text-xs"
-                            >
-
-                              <ShoppingBasket
-                                size={15}
-                                aria-hidden="true"
-                                className="size-3 sm:size-[15px]"
-                              />
-
-                              <span className="sm:hidden">Add</span>
-                              <span className="hidden sm:inline">Add to Cart</span>
-
-                            </button>
-
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                      {/* =============================================
-                          DESKTOP TWO-PHASE GROCERY CARD
-
-                          Phase 1:
-                          Only product image + product name.
-
-                          Phase 2:
-                          Image remains behind a glass blur while approved
-                          nutrition is revealed. Existing View/Add actions
-                          remain available so functionality is not removed.
-                      ============================================== */}
-
-                      <div className="relative hidden h-[330px] w-full overflow-hidden rounded-[26px] border border-[#E5E7EB] bg-white shadow-sm transition-all duration-500 ease-out lg:block lg:group-hover:-translate-y-1 lg:group-hover:scale-[1.025] lg:group-hover:border-[#16A34A]/30 lg:group-hover:shadow-2xl lg:group-hover:shadow-[#111827]/12">
-
-                        {/* PHASE 1 */}
-
-                        <div className="absolute inset-0 z-20 overflow-hidden rounded-[26px] bg-white opacity-100 transition-all duration-500 ease-[cubic-bezier(0.20,0.85,0.25,1)] [transform:rotate(0deg)_scale(1)] group-hover:pointer-events-none group-hover:opacity-0 group-hover:[transform:rotate(-4deg)_scale(0.94)]">
-
-                          {product.image ? (
-                            <img
-                              src={
-                                product.image
-                              }
-                              alt={
-                                product.name ||
-                                'Grocery product'
-                              }
-                              loading="lazy"
-                              className="absolute inset-0 h-full w-full object-contain"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 grid place-items-center bg-[#F8FAF7] text-[#16A34A]">
-
-                              <Package
-                                size={44}
-                                aria-hidden="true"
-                              />
-
-                            </div>
-                          )}
-
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" />
-
-                          <div className="absolute inset-x-0 bottom-0 p-5">
-
-                            <div className="inline-flex max-w-full rounded-2xl border border-white/20 bg-black/20 px-3.5 py-2.5 backdrop-blur-[3px]">
-
-                              <h3 className="line-clamp-2 text-xl font-black leading-tight text-white drop-shadow-sm">
-
-                                {product.name ||
-                                  'Grocery Product'}
-
-                              </h3>
-
-                            </div>
-
-                          </div>
-
-                        </div>
-
-                        {/* PHASE 2 BACKGROUND IMAGE */}
-
-                        <div className="absolute inset-0 z-0 overflow-hidden rounded-[26px]">
-
-                          {product.image ? (
-                            <img
-                              src={
-                                product.image
-                              }
-                              alt=""
-                              aria-hidden="true"
-                              className="h-full w-full object-contain blur-[7px] brightness-[0.62] saturate-[0.85]"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-[#F0FDF4]" />
-                          )}
-
-                          <div className="absolute inset-0 bg-gradient-to-br from-[#F8FAF7]/78 via-white/62 to-[#ECFDF5]/72 backdrop-blur-[4px]" />
-
-                        </div>
-
-                        {/* PHASE 2 CONTENT */}
-
-                        <div className="absolute inset-0 z-10 flex h-full w-full rotate-90 scale-75 flex-col p-4 opacity-0 transition-all duration-500 ease-[cubic-bezier(0.20,0.85,0.25,1)] group-hover:rotate-0 group-hover:scale-100 group-hover:opacity-100">
-
-                          <div className="flex items-start justify-between gap-3">
-
-                            <div className="min-w-0">
-
-                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#166534]">
-                                Nutrition
-                              </p>
-
-                              <h3 className="mt-1 line-clamp-1 text-base font-black text-[#111827]">
-
-                                {product.name ||
-                                  'Grocery Product'}
-
-                              </h3>
-
-                            </div>
-
-                            {(product.quantity ||
-                              product.unit) && (
-                              <span className="shrink-0 rounded-full border border-[#16A34A]/15 bg-white/70 px-2.5 py-1 text-[10px] font-black text-[#166534] backdrop-blur-md">
-
-                                {
-                                  product.quantity
-                                }{' '}
-                                {
-                                  product.unit
-                                }
-
-                              </span>
-                            )}
-
-                          </div>
-
-                          <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-[18px] border border-white/60 bg-white/64 p-3 shadow-sm backdrop-blur-xl">
-
-                            {nutrition.length >
-                            0 ? (
-                              <div className="h-full space-y-1.5 overflow-y-auto pr-1">
-
-                                {nutrition.map(
-                                  (
-                                    nutrient,
-                                    nutrientIndex,
-                                  ) => (
-                                    <div
-                                      key={
-                                        nutrient.key ||
-                                        nutrient.name ||
-                                        `${productId}-nutrition-${nutrientIndex}`
-                                      }
-                                      className="flex items-center justify-between gap-3 rounded-xl bg-white/68 px-2.5 py-2 backdrop-blur-md"
-                                    >
-
-                                      <span className="min-w-0 truncate text-[11px] font-bold text-[#6B7280]">
-
-                                        {nutrient.name ||
-                                          nutrient.key ||
-                                          'Nutrient'}
-
-                                      </span>
-
-                                      <span className="shrink-0 text-[11px] font-black text-[#111827]">
-
-                                        {formatNutritionValue(
-                                          nutrient.amount,
-                                          nutrient.unit,
-                                        )}
-
-                                      </span>
-
-                                    </div>
-                                  ),
-                                )}
-
-                              </div>
-                            ) : (
-                              <div className="grid h-full place-items-center text-center">
-
-                                <div>
-
-                                  <p className="text-xs font-black text-[#111827]">
-                                    Nutrition not available
-                                  </p>
-
-                                  <p className="mt-1 text-[10px] font-semibold leading-4 text-[#6B7280]">
-                                    Approved nutrition will appear here once it is available for this product.
-                                  </p>
-
-                                </div>
-
-                              </div>
-                            )}
-
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-
-                            <Link
-                              to="/grocery"
-                              className="focus-ring flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#1F2937]/95 px-3 text-[11px] font-bold text-white transition hover:bg-[#111827]"
-                            >
-
-                              <Eye
-                                size={14}
-                                aria-hidden="true"
-                              />
-
-                              View
-
-                            </Link>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleAddToCart(
-                                  product,
-                                )
-                              }
-                              className="focus-ring flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#166534]/95 px-3 text-[11px] font-bold text-white transition hover:bg-[#14532D]"
-                            >
-
-                              <ShoppingBasket
-                                size={14}
-                                aria-hidden="true"
-                              />
-
-                              Add to Cart
-
-                            </button>
-
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                    </motion.article>
-                  )
-                },
-              )}
-
-              </div>
-            </>
-          ) : (
-            <EmptyState
-              message="Featured grocery products will appear here once catalog data is available."
-            />
-          )}
-
-        </div>
-
-      </FeaturedSection>
+      <FeaturedGroceryScrollStory
+        products={grocery}
+        onAddToCart={handleAddToCart}
+        shouldReduceMotion={shouldReduceMotion}
+      />
 
       {/* =============================================================
           FEATURED RECIPES
       ============================================================= */}
 
-      <FeaturedSection
-        texture="diagonal"
-        tone="recipes"
-      >
-
-        <SectionHeader
-          eyebrow="Featured Recipes"
-          title="Discover a meal, then connect it to your basket."
-          description="Recipes connect ingredients back to grocery products instead of existing as isolated content."
-          path="/recipes"
-          action="Explore Recipes"
-          tone="recipes"
-        />
-
-        <div className="pb-7 pt-4 sm:flex sm:flex-1 sm:items-center sm:py-5">
-
-          {recipes.length > 0 ? (
-            <>
-              {/* Mobile-only focus rail inspired by the supplied reference video. */}
-              <div
-                ref={initializeMobileRail}
-                className="-mx-4 flex snap-x snap-mandatory scroll-smooth gap-3 overflow-x-auto overscroll-x-contain pl-4 pr-[12vw] pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden"
-                onScroll={handleMobileRailScroll}
-              >
-
-                {mobileRecipeCards.map(({ recipe }, index) => {
-                  return (
-                    <motion.article
-                      key={`mobile-recipe-${recipe.id || recipe.slug || index}`}
-                      initial={false}
-                      data-mobile-rail-start={index === 0 ? 'true' : undefined}
-                      className="w-[84vw] shrink-0 snap-center"
-                    >
-                      <Link
-                        to={
-                          recipe.path ||
-                          (recipe.slug
-                            ? `/recipes/${recipe.slug}`
-                            : '/recipes')
-                        }
-                        data-mobile-focus-card
-                        className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#FED7AA]/70 bg-[#FFF7ED] shadow-[0_18px_42px_rgba(154,52,18,0.14)] will-change-transform [backface-visibility:hidden]"
-                        style={{
-                          transform:
-                            index === 0
-                              ? 'translate3d(0, 0, 0) scale(1.025)'
-                              : 'translate3d(0, 8px, 0) scale(0.92)',
-                        }}
-                      >
-                        {recipe.image ? (
-                          <img
-                            src={recipe.image}
-                            alt={recipe.name || 'Recipe'}
-                            loading="lazy"
-                            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-active:scale-[1.02]"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 grid place-items-center bg-[#FFF7ED] text-5xl">
-                            🍽️
-                          </div>
-                        )}
-
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#2A1208]/95 via-[#2A1208]/18 to-transparent" />
-
-                        <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                          <div className="flex flex-wrap gap-1.5">
-                            {recipe.cuisine && (
-                              <span className="rounded-full border border-white/25 bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] backdrop-blur-sm">
-                                {recipe.cuisine}
-                              </span>
-                            )}
-                            {recipe.dietaryType && (
-                              <span className="rounded-full border border-white/25 bg-black/20 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] backdrop-blur-sm">
-                                {recipe.dietaryType}
-                              </span>
-                            )}
-                          </div>
-                          <h3 className="mt-3 text-[23px] font-black leading-[1.02] tracking-[-0.03em]">
-                            {recipe.name || 'Recipe'}
-                          </h3>
-                          <div className="mt-3 flex items-center gap-4 text-[11px] font-bold text-white/75">
-                            {recipe.totalTime > 0 && (
-                              <span className="flex items-center gap-1.5">
-                                <Clock3 size={13} aria-hidden="true" />
-                                {recipe.totalTime} min
-                              </span>
-                            )}
-                            {recipe.servings && (
-                              <span className="flex items-center gap-1.5">
-                                <Users size={13} aria-hidden="true" />
-                                {recipe.servings} servings
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/35 bg-white/90 text-[#C2410C] shadow-sm backdrop-blur">
-                          <ArrowRight size={17} aria-hidden="true" />
-                        </span>
-                      </Link>
-                    </motion.article>
-                  )
-                })}
-
-                <article className="w-[84vw] shrink-0 snap-center">
-                  <Link
-                    to="/recipes"
-                    data-mobile-focus-card
-                    className="focus-ring group relative block h-[70svh] overflow-hidden rounded-[30px] border border-[#FED7AA]/80 bg-[#FFF4E8] shadow-[0_18px_42px_rgba(154,52,18,0.14)] will-change-transform [backface-visibility:hidden]"
-                    style={{
-                      transform: 'translate3d(0, 8px, 0) scale(0.92)',
-                    }}
-                    aria-label="View all recipes"
-                  >
-                    {recipes[0]?.image ? (
-                      <img
-                        src={recipes[0].image}
-                        alt=""
-                        loading="lazy"
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-[linear-gradient(155deg,#FFF7ED_0%,#FED7AA_100%)]" />
-                    )}
-
-                    <div className="absolute inset-0 bg-gradient-to-b from-[#2A1208]/5 via-[#2A1208]/18 to-[#2A1208]/95" />
-
-                    <div className="absolute left-5 top-6 flex -space-x-3">
-                      {recipes.slice(1, 4).map((item, previewIndex) => (
-                        <div
-                          key={`recipe-view-all-preview-${item.id || item.slug || previewIndex}`}
-                          className="h-14 w-14 overflow-hidden rounded-2xl border-2 border-white bg-[#FFF7ED] shadow-md"
-                        >
-                          {item.image ? (
-                            <img
-                              src={item.image}
-                              alt=""
-                              loading="lazy"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center text-lg">
-                              🍽️
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="absolute inset-x-0 bottom-0 px-5 pb-6 pt-24 text-white">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/65">
-                        EPANTRY Recipes
-                      </p>
-                      <h3 className="mt-2 max-w-[220px] text-[28px] font-black leading-[0.98] tracking-[-0.04em]">
-                        Keep exploring recipes
-                      </h3>
-                      <p className="mt-3 max-w-[225px] text-[11px] font-semibold leading-5 text-white/75">
-                        Open the full recipe collection and discover what to cook next.
-                      </p>
-                      <span className="mt-4 inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-xs font-black text-[#C2410C] shadow-sm">
-                        View all
-                        <ArrowRight size={14} aria-hidden="true" />
-                      </span>
-                    </div>
-
-                    <span className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/70 bg-white/90 text-[#C2410C] shadow-sm backdrop-blur">
-                      <ArrowRight size={17} aria-hidden="true" />
-                    </span>
-                  </Link>
-                </article>
-
-              </div>
-
-              <div className="hidden w-full sm:grid sm:grid-cols-1 sm:gap-5 md:grid-cols-3">
-
-              {recipes.map(
-                (
-                  recipe,
-                  index,
-                ) => (
-                  <motion.article
-                    key={
-                      recipe.id ||
-                      recipe.slug
-                    }
-                    initial={
-                      shouldReduceMotion
-                        ? false
-                        : {
-                            opacity: 0,
-                            y: 20,
-                          }
-                    }
-                    whileInView={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    viewport={{
-                      once: true,
-                    }}
-                    transition={{
-                      duration: 0.35,
-
-                      delay:
-                        shouldReduceMotion
-                          ? 0
-                          : index *
-                            0.06,
-                    }}
-                    className={`group relative mx-auto h-full w-full lg:aspect-square lg:max-w-[410px] lg:rounded-[28px] lg:hover:z-20 ${
-                      index >= 3
-                        ? 'sm:hidden'
-                        : ''
-                    }`}
-                  >
-
-                    <div className="flex h-full flex-col overflow-hidden rounded-[18px] border border-[#E5E7EB] bg-white/95 shadow-sm sm:block sm:rounded-[28px] lg:hidden">
-
-                      <Link
-                        to={
-                          recipe.path ||
-                          (recipe.slug
-                            ? `/recipes/${recipe.slug}`
-                            : '/recipes')
-                        }
-                        className="flex h-full flex-col sm:block"
-                      >
-
-                        {recipe.image ? (
-                          <div className="h-[112px] shrink-0 overflow-hidden bg-[#F8FAF7] sm:aspect-[4/3] sm:h-auto">
-
-                            <img
-                              src={recipe.image}
-                              alt={recipe.name || ''}
-                              loading="lazy"
-                              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                            />
-
-                          </div>
-                        ) : (
-                          <div className="grid h-[112px] shrink-0 place-items-center bg-[#F8FAF7] text-3xl sm:aspect-[4/3] sm:h-auto sm:text-4xl">
-                            🍽️
-                          </div>
-                        )}
-
-                        <div className="flex flex-1 flex-col p-3 sm:block sm:p-6">
-
-                          <div className="flex min-h-[20px] flex-wrap gap-1.5 sm:min-h-0 sm:gap-2">
-
-                            {recipe.cuisine && (
-                              <span className="max-w-full truncate rounded-full bg-[#FFF7ED] px-2 py-0.5 text-[9px] font-bold text-[#EA580C] sm:px-3 sm:py-1 sm:text-xs">
-
-                                {
-                                  recipe.cuisine
-                                }
-
-                              </span>
-                            )}
-
-                            {recipe.dietaryType && (
-                              <span className="max-w-full truncate rounded-full bg-[#F8FAF7] px-2 py-0.5 text-[9px] font-bold text-[#6B7280] sm:px-3 sm:py-1 sm:text-xs">
-
-                                {
-                                  recipe.dietaryType
-                                }
-
-                              </span>
-                            )}
-
-                          </div>
-
-                          <h3 className="mt-2 text-[13px] font-black leading-[1.18] text-[#111827] sm:mt-4 sm:text-xl sm:leading-normal">
-
-                            {recipe.name ||
-                              'Recipe'}
-
-                          </h3>
-
-                          {recipe.description && (
-                            <p className="mt-1.5 line-clamp-2 text-[10px] leading-4 text-[#6B7280] sm:mt-2 sm:text-sm sm:leading-6">
-
-                              {
-                                recipe.description
-                              }
-
-                            </p>
-                          )}
-
-                          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-bold text-[#6B7280] sm:mt-5 sm:gap-5 sm:text-xs">
-
-                            {recipe.totalTime >
-                              0 && (
-                              <span className="flex items-center gap-1 sm:gap-1.5">
-
-                                <Clock3
-                                  size={15}
-                                  aria-hidden="true"
-                                  className="h-3 w-3 sm:h-[15px] sm:w-[15px]"
-                                />
-
-                                {
-                                  recipe.totalTime
-                                }{' '}
-                                min
-
-                              </span>
-                            )}
-
-                            {recipe.servings && (
-                              <span className="flex items-center gap-1 sm:gap-1.5">
-
-                                <Users
-                                  size={15}
-                                  aria-hidden="true"
-                                  className="h-3 w-3 sm:h-[15px] sm:w-[15px]"
-                                />
-
-                                {
-                                  recipe.servings
-                                }{' '}
-                                servings
-
-                              </span>
-                            )}
-
-                          </div>
-
-                        </div>
-
-                      </Link>
-
-                    </div>
-
-                    <Link
-                      to={
-                        recipe.path ||
-                        (recipe.slug
-                          ? `/recipes/${recipe.slug}`
-                          : '/recipes')
-                      }
-                      className="relative hidden h-full w-full rounded-[28px] lg:block"
-                      style={{
-                        perspective: '2000px',
-                        WebkitPerspective: '2000px',
-                        perspectiveOrigin: 'left center',
-                        WebkitPerspectiveOrigin: 'left center',
-                        transformStyle: 'preserve-3d',
-                        WebkitTransformStyle: 'preserve-3d',
-                      }}
-                    >
-
-                      <div className="absolute inset-0 overflow-hidden rounded-[28px] border border-[#F59E0B]/20 bg-[#FFF7ED] shadow-sm [transform:translateZ(0)] [backface-visibility:hidden]">
-
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.14),transparent_42%)]" />
-
-                        <div className="relative flex h-full flex-col p-6 sm:p-7">
-
-                          <div>
-
-                            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#EA580C]">
-                              Recipe details
-                            </p>
-
-                            <h3 className="mt-2 line-clamp-2 text-2xl font-black leading-tight text-[#111827]">
-
-                              {recipe.name ||
-                                'Recipe'}
-
-                            </h3>
-
-                          </div>
-
-                          <div className="mt-5 grid grid-cols-2 gap-3">
-
-                            <div className="rounded-2xl border border-[#F59E0B]/20 bg-white/80 p-4 backdrop-blur-sm">
-
-                              <div className="flex items-center gap-2 text-[#EA580C]">
-
-                                <Users
-                                  size={16}
-                                  aria-hidden="true"
-                                />
-
-                                <span className="text-[10px] font-black uppercase tracking-[0.14em]">
-                                  Base servings
-                                </span>
-
-                              </div>
-
-                              <p className="mt-2 text-lg font-black text-[#111827]">
-                                {recipe.servings
-                                  ? `${recipe.servings} servings`
-                                  : '—'}
-                              </p>
-
-                            </div>
-
-                            <div className="rounded-2xl border border-[#F59E0B]/20 bg-white/80 p-4 backdrop-blur-sm">
-
-                              <div className="flex items-center gap-2 text-[#EA580C]">
-
-                                <Clock3
-                                  size={16}
-                                  aria-hidden="true"
-                                />
-
-                                <span className="text-[10px] font-black uppercase tracking-[0.14em]">
-                                  Total time
-                                </span>
-
-                              </div>
-
-                              <p className="mt-2 text-lg font-black text-[#111827]">
-                                {recipe.totalTime >
-                                0
-                                  ? `${recipe.totalTime} min`
-                                  : '—'}
-                              </p>
-
-                            </div>
-
-                          </div>
-
-                          <div className="mt-5 min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#F59E0B]/20 bg-white/85 p-4 backdrop-blur-sm">
-
-                            <div className="flex items-center justify-between gap-3">
-
-                              <h4 className="text-sm font-black text-[#111827]">
-                                Nutrition
-                              </h4>
-
-                              {Array.isArray(
-                                recipe.nutrition,
-                              ) &&
-                                recipe.nutrition.length >
-                                  0 && (
-                                  <span className="rounded-full bg-[#FFF7ED] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#EA580C]">
-                                    Approved data
-                                  </span>
-                                )}
-
-                            </div>
-
-                            {Array.isArray(
-                              recipe.nutrition,
-                            ) &&
-                            recipe.nutrition.length >
-                              0 ? (
-                              <div className="mt-3 max-h-full space-y-2 overflow-y-auto pr-1">
-
-                                {recipe.nutrition.map(
-                                  (
-                                    nutrient,
-                                    nutrientIndex,
-                                  ) => (
-                                    <div
-                                      key={
-                                        nutrient.key ||
-                                        nutrient.nutrientId ||
-                                        `${recipe.id || recipe.slug}-nutrient-${nutrientIndex}`
-                                      }
-                                      className="flex items-center justify-between gap-4 rounded-xl bg-[#F8FAF7] px-3 py-2"
-                                    >
-
-                                      <span className="min-w-0 truncate text-xs font-bold text-[#6B7280]">
-                                        {nutrient.name ||
-                                          nutrient.key ||
-                                          'Nutrient'}
-                                      </span>
-
-                                      <span className="shrink-0 text-xs font-black text-[#111827]">
-                                        {formatNutritionValue(
-                                          nutrient.amount,
-                                          nutrient.unit,
-                                        )}
-                                      </span>
-
-                                    </div>
-                                  ),
-                                )}
-
-                              </div>
-                            ) : (
-                              <div className="mt-3 rounded-xl bg-[#F8FAF7] px-3 py-3 text-xs font-semibold leading-5 text-[#6B7280]">
-                                Nutrition information is not available for this recipe yet.
-                              </div>
-                            )}
-
-                          </div>
-
-                          <p className="mt-4 text-[11px] font-bold text-[#6B7280]">
-                            Click to open the full recipe.
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      <div
-                        className={[
-                          'absolute',
-                          'inset-0',
-                          'z-10',
-                          'overflow-hidden',
-                          'rounded-[28px]',
-                          'border',
-                          'border-[#E5E7EB]',
-                          'bg-white',
-                          'shadow-sm',
-                          '[transform-origin:left_center]',
-                          '[transform:translateZ(1px)_rotateY(0deg)]',
-                          '[backface-visibility:hidden]',
-                          'transition-transform',
-                          'duration-[950ms]',
-                          'ease-[cubic-bezier(0.20,0.85,0.25,1)]',
-                          'will-change-transform',
-                          'lg:group-hover:[transform:translateX(-10px)_translateZ(2px)_rotateY(-88deg)]',
-                        ].join(
-                          ' ',
-                        )}
-                        style={{
-                          WebkitTransformOrigin: 'left center',
-                          WebkitBackfaceVisibility: 'hidden',
-                          WebkitTransformStyle: 'preserve-3d',
-                        }}
-                      >
-
-                        {recipe.image ? (
-                          <img
-                            src={
-                              recipe.image
-                            }
-                            alt={
-                              recipe.name ||
-                              'Recipe'
-                            }
-                            loading="lazy"
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 grid place-items-center bg-[#FFF7ED] text-5xl">
-                            🍽️
-                          </div>
-                        )}
-
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
-                        <div className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
-
-                          <h3 className="text-2xl font-black leading-tight text-white drop-shadow-sm">
-
-                            {recipe.name ||
-                              'Recipe'}
-
-                          </h3>
-
-                        </div>
-
-                      </div>
-
-                    </Link>
-
-                  </motion.article>
-                ),
-              )}
-
-              </div>
-            </>
-          ) : (
-            <EmptyState
-              message="Featured recipes will appear here once recipe data is available."
-            />
-          )}
-
-        </div>
-
-      </FeaturedSection>
+      <FeaturedRecipesScrollStory
+        recipes={recipes}
+        shouldReduceMotion={shouldReduceMotion}
+      />
 
       {/* =============================================================
           FEATURED BRANDS
       ============================================================= */}
 
-      <FeaturedSection
-        texture="dots"
-        tone="brands"
-      >
+      <FeaturedBrandsMotionWall
+        brands={visibleBrands}
+        allBrands={brands}
+        brandFilterGroups={brandFilterGroups}
+        selectedBrandFilter={selectedBrandFilter}
+        onSelectBrandFilter={setSelectedBrandFilter}
+        shouldReduceMotion={shouldReduceMotion}
+      />
 
-        <SectionHeader
-          eyebrow="Featured Brands"
-          title="Know the brands behind the products."
-          description="Discover trusted brands and explore how their products connect across the EPANTRY ecosystem."
-          path="/brands"
-          action="Explore Brands"
-          tone="brands"
-        />
+    </>
+  )
+}
 
-        <div className="flex flex-1 flex-col py-6 sm:py-7">
+/*
+|--------------------------------------------------------------------------
+| Featured Brands Motion Wall
+|--------------------------------------------------------------------------
+|
+| Reference behavior:
+| - one 100svh canvas
+| - fixed editorial heading
+| - two open typographic brand rows
+| - top row continuously travels left
+| - bottom row continuously travels right
+| - lightweight hover separators, no heavy card chrome
+|
+| Existing Brand deep links and range filters remain available.
+|
+*/
 
-          {brands.length > 0 ? (
-            <div className="mt-2 flex flex-1 flex-col rounded-[32px] border border-[#2563EB]/10 bg-white/55 p-4 shadow-[0_20px_70px_rgba(37,99,235,0.08)] backdrop-blur-[2px] sm:p-6">
+function FeaturedBrandsMotionWall({
+  brands,
+  allBrands,
+  brandFilterGroups,
+  selectedBrandFilter,
+  onSelectBrandFilter,
+  shouldReduceMotion,
+}) {
+  const sourceBrands =
+    Array.isArray(brands) &&
+    brands.length > 0
+      ? brands
+      : Array.isArray(allBrands)
+        ? allBrands
+        : []
 
-              <div className="flex flex-wrap items-center gap-2 border-b border-[#2563EB]/10 pb-5">
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedBrandFilter(
-                      'all',
-                    )
-                  }
-                  className={[
-                    'focus-ring',
-                    'rounded-full',
-                    'border',
-                    'px-4',
-                    'py-2',
-                    'text-xs',
-                    'font-black',
-                    'transition',
-                    selectedBrandFilter ===
-                    'all'
-                      ? 'border-[#2563EB] bg-[#2563EB] text-white shadow-sm shadow-[#2563EB]/20'
-                      : 'border-[#2563EB]/15 bg-white text-[#2563EB] hover:border-[#2563EB]/35 hover:bg-[#EFF6FF]',
-                  ].join(
-                    ' ',
-                  )}
-                >
-                  All
-                </button>
-
-                {brandFilterGroups.map(
-                  (group) => (
-                    <button
-                      key={
-                        group.id
-                      }
-                      type="button"
-                      onClick={() =>
-                        setSelectedBrandFilter(
-                          group.id,
-                        )
-                      }
-                      className={[
-                        'focus-ring',
-                        'rounded-full',
-                        'border',
-                        'px-4',
-                        'py-2',
-                        'text-xs',
-                        'font-black',
-                        'transition',
-                        selectedBrandFilter ===
-                        group.id
-                          ? 'border-[#2563EB] bg-[#2563EB] text-white shadow-sm shadow-[#2563EB]/20'
-                          : 'border-[#2563EB]/15 bg-white text-[#2563EB] hover:border-[#2563EB]/35 hover:bg-[#EFF6FF]',
-                      ].join(
-                        ' ',
-                      )}
-                    >
-                      {group.label}
-                    </button>
-                  ),
-                )}
-
-              </div>
-
-              <div className="mt-5 grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
-
-                {visibleBrands.map(
-                  (
-                    brand,
-                    index,
-                  ) => (
-                    <motion.article
-                      key={
-                        brand.id ||
-                        brand.slug ||
-                        brand.name
-                      }
-                      initial={
-                        shouldReduceMotion
-                          ? false
-                          : {
-                              opacity: 0,
-                              y: 14,
-                            }
-                      }
-                      whileInView={{
-                        opacity: 1,
-                        y: 0,
-                      }}
-                      viewport={{
-                        once: true,
-                      }}
-                      transition={{
-                        duration: 0.28,
-                        delay:
-                          shouldReduceMotion
-                            ? 0
-                            : index *
-                              0.025,
-                      }}
-                      whileHover={
-                        shouldReduceMotion
-                          ? undefined
-                          : {
-                              y: -4,
-                            }
-                      }
-                      className={[
-                        'group relative min-h-[118px] overflow-hidden rounded-[20px] border border-[#2563EB]/12 bg-white shadow-[0_8px_28px_rgba(17,24,39,0.06)] transition duration-300 hover:border-[#2563EB]/30 hover:shadow-[0_16px_38px_rgba(37,99,235,0.12)] sm:min-h-[138px] sm:rounded-[22px]',
-                        index >= 6
-                          ? 'hidden sm:block'
-                          : '',
-                      ].join(' ')}
-                    >
-
-                      <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-[#2563EB]/5 transition duration-300 group-hover:scale-125 group-hover:bg-[#2563EB]/10" />
-
-                      <Link
-                        to={getFeaturedBrandPath(
-                          brand,
-                        )}
-                        className="relative flex h-full min-h-[118px] flex-col justify-between p-4 sm:min-h-[138px] sm:p-5"
-                      >
-
-                        <h3 className="line-clamp-2 pr-3 text-[15px] font-black leading-snug text-[#111827] transition duration-300 group-hover:text-[#2563EB] sm:pr-4 sm:text-[17px]">
-
-                          {brand.name ||
-                            'Brand'}
-
-                        </h3>
-
-                        <div className="mt-5">
-
-                          <span className="inline-flex rounded-full border border-[#2563EB]/10 bg-[#EFF6FF] px-2.5 py-1 text-[10px] font-black text-[#2563EB] sm:px-3 sm:py-1.5 sm:text-[11px]">
-                            {formatBrandProductCount(
-                              brand.productCount,
-                            )}
-                          </span>
-
-                        </div>
-
-                      </Link>
-
-                    </motion.article>
-                  ),
-                )}
-
-              </div>
-
-            </div>
-          ) : (
+  if (sourceBrands.length === 0) {
+    return (
+      <section className="flex h-[100svh] min-h-[100svh] items-center bg-[#f4f4f2] px-5 text-black sm:px-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <p className="text-sm font-medium uppercase tracking-[0.18em] text-black/55">
+            Know the brands behind the products.
+          </p>
+          <h2 className="mt-4 text-[clamp(48px,7vw,104px)] font-normal leading-[0.92] tracking-[-0.055em]">
+            Featured Brands
+          </h2>
+          <div className="mt-12">
             <EmptyState
               message="Featured brands will appear here once brand data is available."
             />
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  const splitIndex =
+    Math.max(
+      1,
+      Math.ceil(
+        sourceBrands.length /
+          2,
+      ),
+    )
+
+  const rotatedBrands = [
+    ...sourceBrands.slice(
+      splitIndex,
+    ),
+    ...sourceBrands.slice(
+      0,
+      splitIndex,
+    ),
+  ]
+
+  return (
+    <section
+      className="relative h-[100svh] min-h-[100svh] overflow-hidden bg-[#f4f4f2] text-[#111111]"
+      aria-labelledby="featured-brands-title"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_48%_46%,rgba(255,255,255,0.9),rgba(244,244,242,0)_58%)]" />
+
+      <div className="absolute left-5 right-5 top-[clamp(88px,10svh,118px)] z-20 sm:left-8 sm:right-8 lg:left-10 lg:right-10">
+        <div className="max-w-[min(76rem,calc(100vw-8rem))]">
+          <p className="[font-family:Arial,Helvetica,sans-serif] text-[11px] font-normal tracking-[-0.01em] text-black/70 sm:text-[13px] lg:text-[15px]">
+            Know the brands behind the products.
+          </p>
+
+          <h2
+            id="featured-brands-title"
+            className="mt-3 [font-family:Arial,Helvetica,sans-serif] text-[clamp(46px,6.2vw,104px)] font-normal leading-[0.88] tracking-[-0.06em] text-black"
+          >
+            Featured Brands
+          </h2>
+        </div>
+      </div>
+
+      <div className="absolute right-5 top-[clamp(96px,11svh,128px)] z-30 hidden items-center gap-2 sm:flex lg:right-10">
+        <button
+          type="button"
+          onClick={() =>
+            onSelectBrandFilter(
+              'all',
+            )
+          }
+          className={[
+            'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px] transition-colors duration-300',
+            selectedBrandFilter ===
+            'all'
+              ? 'bg-black text-white'
+              : 'text-black/55 hover:bg-black/5 hover:text-black',
+          ].join(' ')}
+        >
+          All
+        </button>
+
+        {brandFilterGroups.map(
+          (group) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() =>
+                onSelectBrandFilter(
+                  group.id,
+                )
+              }
+              className={[
+                'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px] transition-colors duration-300',
+                selectedBrandFilter ===
+                group.id
+                  ? 'bg-black text-white'
+                  : 'text-black/55 hover:bg-black/5 hover:text-black',
+              ].join(' ')}
+            >
+              {group.label}
+            </button>
+          ),
+        )}
+      </div>
+
+      <div className="absolute inset-x-0 top-[34svh] z-10 sm:top-[35svh] lg:top-[34svh]">
+        <BrandMotionRow
+          brands={sourceBrands}
+          direction="left"
+          duration={26}
+          shouldReduceMotion={shouldReduceMotion}
+        />
+      </div>
+
+      <div className="absolute inset-x-0 top-[66svh] z-10 sm:top-[67svh] lg:top-[68svh]">
+        <BrandMotionRow
+          brands={rotatedBrands}
+          direction="right"
+          duration={29}
+          shouldReduceMotion={shouldReduceMotion}
+        />
+      </div>
+
+      <Link
+        to="/brands"
+        className="focus-ring group absolute bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:bottom-auto sm:right-0 sm:top-1/2 sm:-translate-y-1/2 sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
+      >
+        <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
+          Explore Brands
+        </span>
+        <ArrowRight className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5 sm:hidden" />
+      </Link>
+
+      <div className="absolute bottom-5 left-5 z-20 flex gap-1.5 sm:hidden">
+        <button
+          type="button"
+          onClick={() =>
+            onSelectBrandFilter(
+              'all',
+            )
+          }
+          className={[
+            'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[10px]',
+            selectedBrandFilter ===
+            'all'
+              ? 'bg-black text-white'
+              : 'bg-black/5 text-black/55',
+          ].join(' ')}
+        >
+          All
+        </button>
+        {brandFilterGroups
+          .slice(0, 2)
+          .map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() =>
+                onSelectBrandFilter(
+                  group.id,
+                )
+              }
+              className={[
+                'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[10px]',
+                selectedBrandFilter ===
+                group.id
+                  ? 'bg-black text-white'
+                  : 'bg-black/5 text-black/55',
+              ].join(' ')}
+            >
+              {group.label}
+            </button>
+          ))}
+      </div>
+    </section>
+  )
+}
+
+function BrandMotionRow({
+  brands,
+  direction,
+  duration,
+  shouldReduceMotion,
+}) {
+  const group = (
+    <div className="flex shrink-0 items-center gap-[clamp(24px,4vw,74px)] pr-[clamp(24px,4vw,74px)]">
+      {brands.map(
+        (
+          brand,
+          index,
+        ) => (
+          <BrandMotionItem
+            key={`${direction}-${brand.id || brand.slug || brand.name}-${index}`}
+            brand={brand}
+            index={index}
+          />
+        ),
+      )}
+    </div>
+  )
+
+  return (
+    <div className="w-full overflow-hidden">
+      <motion.div
+        className="flex w-max items-center will-change-transform"
+        initial={false}
+        animate={
+          shouldReduceMotion
+            ? { x: '0%' }
+            : direction ===
+                'left'
+              ? {
+                  x: [
+                    '0%',
+                    '-50%',
+                  ],
+                }
+              : {
+                  x: [
+                    '-50%',
+                    '0%',
+                  ],
+                }
+        }
+        transition={
+          shouldReduceMotion
+            ? undefined
+            : {
+                duration,
+                ease: 'linear',
+                repeat: Infinity,
+              }
+        }
+      >
+        {group}
+        <div aria-hidden="true">
+          {group}
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function BrandMotionItem({
+  brand,
+  index,
+}) {
+  const displayName =
+    String(
+      brand?.name ||
+        'Brand',
+    ).trim()
+
+  const weightClass =
+    index % 3 === 0
+      ? 'font-semibold'
+      : index % 3 === 1
+        ? 'font-normal'
+        : 'font-medium'
+
+  return (
+    <Link
+      to={getFeaturedBrandPath(
+        brand,
+      )}
+      className="focus-ring group relative flex h-[112px] w-[clamp(190px,18vw,330px)] shrink-0 items-center justify-center px-5 sm:h-[132px] lg:h-[148px]"
+      aria-label={`Explore ${displayName}`}
+    >
+      <span className="pointer-events-none absolute inset-y-3 left-0 w-px origin-center scale-y-0 bg-[#d76565]/55 transition-transform duration-300 ease-out group-hover:scale-y-100" />
+      <span className="pointer-events-none absolute inset-y-3 right-0 w-px origin-center scale-y-0 bg-[#d76565]/55 transition-transform duration-300 ease-out group-hover:scale-y-100" />
+
+      <span className="flex max-w-full flex-col items-center text-center">
+        <span
+          className={[
+            '[font-family:Arial,Helvetica,sans-serif] text-[clamp(18px,1.65vw,31px)] leading-[0.96] tracking-[-0.045em] text-black transition-transform duration-300 ease-out group-hover:scale-[1.025]',
+            weightClass,
+          ].join(' ')}
+        >
+          {displayName}
+        </span>
+
+        <span className="mt-2 [font-family:Arial,Helvetica,sans-serif] text-[9px] font-normal tracking-[0.04em] text-black/38 transition-colors duration-300 group-hover:text-black/62 sm:text-[10px]">
+          {formatBrandProductCount(
+            brand?.productCount,
           )}
+        </span>
+      </span>
+    </Link>
+  )
+}
+
+/*
+|--------------------------------------------------------------------------
+| Featured Grocery Scroll Story
+|--------------------------------------------------------------------------
+|
+| The visible scene is always exactly 100svh. The outer track is taller so
+| native page scroll can advance five products plus the final View all card while the scene remains pinned.
+| This is deliberately shared by desktop and mobile so the interaction model
+| does not change between breakpoints.
+|
+*/
+
+const FEATURED_GROCERY_PALETTES = [
+  {
+    base: '#C99A25',
+    deep: '#76500D',
+    glow: '#F4D472',
+  },
+  {
+    base: '#A83C46',
+    deep: '#541821',
+    glow: '#DF7A82',
+  },
+  {
+    base: '#7EA14E',
+    deep: '#3F5D25',
+    glow: '#BFD78A',
+  },
+  {
+    base: '#526D3D',
+    deep: '#26351E',
+    glow: '#8DAA6F',
+  },
+  {
+    base: '#8C6A50',
+    deep: '#493326',
+    glow: '#C8A68B',
+  },
+]
+
+function getFeaturedGroceryPalette(
+  product,
+  index,
+) {
+  const identity =
+    `${product?.name || ''} ${product?.subCategory || ''} ${product?.brand || ''}`
+      .toLowerCase()
+
+  if (
+    identity.includes('mango') ||
+    identity.includes('aam')
+  ) {
+    return FEATURED_GROCERY_PALETTES[0]
+  }
+
+  if (
+    identity.includes('pomegranate') ||
+    identity.includes('anar')
+  ) {
+    return FEATURED_GROCERY_PALETTES[1]
+  }
+
+  if (
+    identity.includes('bottle gourd') ||
+    identity.includes('lauki') ||
+    identity.includes('gourd')
+  ) {
+    return FEATURED_GROCERY_PALETTES[2]
+  }
+
+  if (
+    identity.includes('matcha') ||
+    identity.includes('green tea') ||
+    identity.includes('tea')
+  ) {
+    return FEATURED_GROCERY_PALETTES[3]
+  }
+
+  return FEATURED_GROCERY_PALETTES[
+    index %
+      FEATURED_GROCERY_PALETTES.length
+  ]
+}
+
+function FeaturedGroceryScrollStory({
+  products,
+  onAddToCart,
+  shouldReduceMotion,
+}) {
+  const productItems =
+    Array.isArray(products)
+      ? products.slice(0, 5)
+      : []
+
+  const items = [
+    ...productItems,
+    {
+      id: 'featured-grocery-view-all',
+      name: 'View all',
+      subCategory: 'Grocery catalogue',
+      path: '/grocery',
+      isViewAll: true,
+    },
+  ]
+
+  const sectionRef =
+    useRef(null)
+
+  const targetProgressRef =
+    useRef(0)
+
+  const displayProgressRef =
+    useRef(0)
+
+  const animationFrameRef =
+    useRef(null)
+
+  const progressInitializedRef =
+    useRef(false)
+
+  const lastActiveIndexRef =
+    useRef(0)
+
+  const [
+    activeIndex,
+    setActiveIndex,
+  ] = useState(0)
+
+  const [
+    direction,
+    setDirection,
+  ] = useState(1)
+
+  useEffect(
+    () => {
+      if (
+        items.length <= 1 ||
+        typeof window === 'undefined'
+      ) {
+        return undefined
+      }
+
+      const resolveTargetProgress =
+        () => {
+          const section =
+            sectionRef.current
+
+          if (!section) {
+            return 0
+          }
+
+          const rect =
+            section.getBoundingClientRect()
+
+          const scrollDistance =
+            Math.max(
+              section.offsetHeight -
+                window.innerHeight,
+              1,
+            )
+
+          const consumed =
+            Math.min(
+              Math.max(
+                -rect.top,
+                0,
+              ),
+              scrollDistance,
+            )
+
+          return (
+            consumed /
+            scrollDistance
+          )
+        }
+
+      const applyProgress =
+        (progress) => {
+          const nextIndex =
+            Math.min(
+              items.length - 1,
+              Math.max(
+                0,
+                Math.floor(
+                  Math.min(
+                    progress *
+                      items.length,
+                    items.length -
+                      0.0001,
+                  ),
+                ),
+              ),
+            )
+
+          if (
+            nextIndex !==
+            lastActiveIndexRef.current
+          ) {
+            setDirection(
+              nextIndex >
+                lastActiveIndexRef.current
+                ? 1
+                : -1,
+            )
+
+            lastActiveIndexRef.current =
+              nextIndex
+
+            setActiveIndex(
+              nextIndex,
+            )
+          }
+        }
+
+      const animateTowardsTarget =
+        () => {
+          animationFrameRef.current =
+            null
+
+          const target =
+            targetProgressRef.current
+
+          const current =
+            displayProgressRef.current
+
+          const difference =
+            target -
+            current
+
+          const next =
+            Math.abs(difference) <
+            0.00045
+              ? target
+              : current +
+                difference *
+                  0.16
+
+          displayProgressRef.current =
+            next
+
+          applyProgress(
+            next,
+          )
+
+          if (
+            Math.abs(
+              target -
+                next,
+            ) >
+            0.00045
+          ) {
+            animationFrameRef.current =
+              window.requestAnimationFrame(
+                animateTowardsTarget,
+              )
+          }
+        }
+
+      const scheduleUpdate =
+        () => {
+          const nextTarget =
+            resolveTargetProgress()
+
+          targetProgressRef.current =
+            nextTarget
+
+          if (
+            !progressInitializedRef.current
+          ) {
+            progressInitializedRef.current =
+              true
+
+            displayProgressRef.current =
+              nextTarget
+
+            applyProgress(
+              nextTarget,
+            )
+          }
+
+          if (
+            animationFrameRef.current ===
+            null
+          ) {
+            animationFrameRef.current =
+              window.requestAnimationFrame(
+                animateTowardsTarget,
+              )
+          }
+        }
+
+      scheduleUpdate()
+
+      window.addEventListener(
+        'scroll',
+        scheduleUpdate,
+        {
+          passive: true,
+        },
+      )
+
+      window.addEventListener(
+        'resize',
+        scheduleUpdate,
+      )
+
+      return () => {
+        if (
+          animationFrameRef.current !==
+          null
+        ) {
+          window.cancelAnimationFrame(
+            animationFrameRef.current,
+          )
+
+          animationFrameRef.current =
+            null
+        }
+
+        progressInitializedRef.current =
+          false
+
+        window.removeEventListener(
+          'scroll',
+          scheduleUpdate,
+        )
+
+        window.removeEventListener(
+          'resize',
+          scheduleUpdate,
+        )
+      }
+    },
+    [items.length],
+  )
+
+  if (productItems.length === 0) {
+    return (
+      <section className="relative z-30 h-[100svh] overflow-hidden rounded-t-[30px] bg-[#26351E] shadow-[0_-22px_74px_rgba(17,24,39,0.16)] sm:rounded-t-[38px] lg:rounded-t-[46px]">
+        <div className="page-shell flex h-full items-center justify-center">
+          <EmptyState
+            message="Featured grocery products will appear here once catalog data is available."
+          />
+        </div>
+      </section>
+    )
+  }
+
+  const resolvedActiveIndex =
+    Math.min(
+      activeIndex,
+      items.length - 1,
+    )
+
+  const activeProduct =
+    items[
+      resolvedActiveIndex
+    ]
+
+  const isViewAll =
+    activeProduct?.isViewAll ===
+    true
+
+  const previousProduct =
+    resolvedActiveIndex > 0
+      ? items[
+          resolvedActiveIndex - 1
+        ]
+      : null
+
+  const nextProduct =
+    resolvedActiveIndex <
+    items.length - 1
+      ? items[
+          resolvedActiveIndex + 1
+        ]
+      : null
+
+  const activeNutrition =
+    isViewAll
+      ? []
+      : getProductNutrition(
+          activeProduct,
+        ).slice(
+          0,
+          6,
+        )
+
+  const mobileNutrition =
+    activeNutrition
+
+  const productPath =
+    activeProduct?.path ||
+    (activeProduct?.slug
+      ? `/grocery/product/${activeProduct.slug}`
+      : '/grocery')
+
+  const productKey =
+    activeProduct?.id ||
+    activeProduct?.slug ||
+    `featured-product-${resolvedActiveIndex}`
+
+  const palette =
+    isViewAll
+      ? {
+          base: '#315A42',
+          deep: '#153323',
+          glow: '#8CB795',
+        }
+      : getFeaturedGroceryPalette(
+          activeProduct,
+          resolvedActiveIndex,
+        )
+
+  const motionDuration =
+    shouldReduceMotion
+      ? 0
+      : 0.9
+
+  /*
+   * +1 viewport is intentional: the sticky surface itself consumes one
+   * viewport, while each story card receives one complete viewport
+   * of scroll travel. After the final View all card, the next pixel releases the
+   * scene into the next landing section instead of exposing a blank spacer.
+   */
+  const storyHeight =
+    `${Math.max(items.length + 1, 2) * 100}svh`
+
+  return (
+    <section
+      ref={sectionRef}
+      className="relative z-30 isolate rounded-t-[30px] shadow-[0_-22px_74px_rgba(17,24,39,0.16)] sm:rounded-t-[38px] lg:rounded-t-[46px]"
+      style={{
+        height:
+          storyHeight,
+      }}
+    >
+      <div className="sticky top-0 h-[100svh] overflow-hidden rounded-t-[30px] bg-[#26351E] sm:rounded-t-[38px] lg:rounded-t-[46px]">
+
+        {/* Product-driven colour field. */}
+        <AnimatePresence
+          mode="sync"
+          initial={false}
+        >
+          <motion.div
+            key={`grocery-background-${productKey}`}
+            aria-hidden="true"
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+            }}
+            exit={{
+              opacity: 0,
+            }}
+            transition={{
+              duration:
+                shouldReduceMotion
+                  ? 0
+                  : 0.95,
+
+              ease: [
+                0.22,
+                1,
+                0.36,
+                1,
+              ],
+            }}
+            className="absolute inset-0"
+            style={{
+              background: `radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`,
+            }}
+          >
+            {activeProduct?.image && (
+              <img
+                src={activeProduct.image}
+                alt=""
+                className="absolute left-1/2 top-1/2 h-[125%] w-[125%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.10] blur-[26px] saturate-110 sm:opacity-[0.11] lg:opacity-[0.13] lg:blur-[34px]"
+              />
+            )}
+
+            <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(8,12,9,0.50)_0%,rgba(8,12,9,0.20)_44%,rgba(8,12,9,0.28)_66%,rgba(8,12,9,0.58)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(255,255,255,0.08),transparent_54%)]" />
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="page-shell relative z-10 flex h-full min-h-0 flex-col pb-3 pt-[76px] text-white sm:pb-4 sm:pt-[82px] md:pt-[138px] lg:pt-[138px] xl:pb-6 xl:pt-[86px]">
+
+          <div className="flex shrink-0 items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <p className="truncate text-[9px] font-black uppercase tracking-[0.24em] text-white/92 sm:text-[10px] lg:text-[11px]">
+                Featured Grocery
+              </p>
+
+
+              <p className="shrink-0 text-[9px] font-black tabular-nums tracking-[0.15em] text-white/56 sm:text-[10px]">
+                {String(resolvedActiveIndex + 1).padStart(2, '0')} / {String(items.length).padStart(2, '0')}
+              </p>
+            </div>
+
+            <Link
+              to="/grocery"
+              className="focus-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-white/24 bg-black/15 px-3 text-[9px] font-black text-white shadow-sm backdrop-blur-md transition hover:bg-black/24 sm:h-9 sm:px-3.5 sm:text-[10px] lg:h-10 lg:px-4 lg:text-xs"
+            >
+              Explore Grocery
+              <ArrowRight
+                size={13}
+                aria-hidden="true"
+              />
+            </Link>
+          </div>
+
+          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 py-3 sm:gap-3 sm:py-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(390px,1.2fr)_minmax(0,0.9fr)] lg:grid-rows-1 lg:items-center lg:gap-8 lg:py-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.18fr)_minmax(0,0.92fr)] xl:gap-11">
+
+            {/* Left: current product identity. */}
+            <div className="min-w-0 lg:self-center lg:pb-9">
+              <AnimatePresence
+                mode="wait"
+                initial={false}
+              >
+                <motion.div
+                  key={`grocery-copy-${productKey}`}
+                  initial={
+                    shouldReduceMotion
+                      ? false
+                      : {
+                          opacity: 0,
+                          y:
+                            direction > 0
+                              ? 26
+                              : -26,
+                        }
+                  }
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  exit={
+                    shouldReduceMotion
+                      ? undefined
+                      : {
+                          opacity: 0,
+                          y:
+                            direction > 0
+                              ? -18
+                              : 18,
+                        }
+                  }
+                  transition={{
+                    duration:
+                      motionDuration,
+
+                    ease: [
+                      0.22,
+                      1,
+                      0.36,
+                      1,
+                    ],
+                  }}
+                  className="flex items-end justify-between gap-4 lg:block"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-black uppercase tracking-[0.19em] text-white/56 sm:text-[9px] lg:text-[10px] lg:tracking-[0.22em]">
+                      {activeProduct?.subCategory || 'Grocery'}
+                    </p>
+
+                    <h2 className="mt-1.5 max-w-[82vw] text-[clamp(27px,8vw,38px)] font-black leading-[0.94] tracking-[-0.05em] text-white drop-shadow-sm sm:max-w-[520px] sm:text-[clamp(34px,6vw,48px)] lg:mt-4 lg:max-w-[360px] lg:text-[clamp(34px,3.25vw,58px)]">
+                      {activeProduct?.name || 'Grocery Product'}
+                    </h2>
+                  </div>
+
+                  {(activeProduct?.quantity || activeProduct?.unit) && (
+                    <p className="shrink-0 pb-1 text-[9px] font-bold text-white/55 sm:text-[10px] lg:mt-5 lg:pb-0 lg:text-sm">
+                      {activeProduct?.quantity}{activeProduct?.quantity && activeProduct?.unit ? ' ' : ''}{activeProduct?.unit || ''}
+                    </p>
+                  )}
+
+                  {activeProduct?.brand && (
+                    <p className="mt-2 hidden text-[10px] font-black uppercase tracking-[0.16em] text-white/42 lg:block">
+                      {activeProduct.brand}
+                    </p>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Centre: active visual remains crisp while the scene scrolls. */}
+            <div className="relative flex min-h-0 flex-col items-center justify-center lg:h-full lg:py-[8svh]">
+
+              {previousProduct?.image && (
+                <motion.div
+                  key={`grocery-previous-${previousProduct.id || previousProduct.slug || resolvedActiveIndex}`}
+                  aria-hidden="true"
+                  initial={false}
+                  animate={{
+                    opacity:
+                      shouldReduceMotion
+                        ? 0
+                        : 0.24,
+                    y: 0,
+                  }}
+                  className="pointer-events-none absolute left-1/2 top-0 hidden aspect-[1.25/1] w-[32%] -translate-x-1/2 overflow-hidden rounded-[16px] border border-white/18 bg-black/12 shadow-lg backdrop-blur-sm lg:block"
+                >
+                  <img
+                    src={previousProduct.image}
+                    alt=""
+                    className="h-full w-full object-contain opacity-80"
+                  />
+                </motion.div>
+              )}
+
+              <AnimatePresence
+                mode="popLayout"
+                initial={false}
+                custom={direction}
+              >
+                <motion.div
+                  key={`grocery-visual-${productKey}`}
+                  custom={direction}
+                  initial={
+                    shouldReduceMotion
+                      ? false
+                      : {
+                          opacity: 0,
+                          y:
+                            direction > 0
+                              ? 110
+                              : -110,
+                          scale: 0.88,
+                          rotate:
+                            direction > 0
+                              ? 1.8
+                              : -1.8,
+                        }
+                  }
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    rotate: 0,
+                  }}
+                  exit={
+                    shouldReduceMotion
+                      ? undefined
+                      : {
+                          opacity: 0,
+                          y:
+                            direction > 0
+                              ? -110
+                              : 110,
+                          scale: 0.91,
+                          rotate:
+                            direction > 0
+                              ? -1.4
+                              : 1.4,
+                        }
+                  }
+                  transition={{
+                    duration:
+                      motionDuration,
+
+                    ease: [
+                      0.2,
+                      0.86,
+                      0.24,
+                      1,
+                    ],
+                  }}
+                  className="relative flex min-h-0 w-full flex-1 items-center justify-center lg:absolute lg:inset-0"
+                  style={{
+                    willChange:
+                      'transform, opacity',
+                  }}
+                >
+                  <Link
+                    to={productPath}
+                    className="focus-ring group relative block h-[min(30svh,292px)] w-[min(78vw,380px)] overflow-hidden rounded-[22px] border border-white/38 bg-white/92 p-4 shadow-[0_24px_64px_rgba(0,0,0,0.24)] sm:h-[min(34svh,350px)] sm:w-[min(66vw,460px)] sm:rounded-[26px] sm:p-5 lg:h-auto lg:aspect-[1.12/1] lg:w-[min(34vw,520px)] lg:rounded-[28px] lg:p-6 xl:rounded-[30px] xl:p-7"
+                    aria-label={
+                      isViewAll
+                        ? 'View all grocery products'
+                        : undefined
+                    }
+                  >
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,1),rgba(249,250,247,0.95)_58%,rgba(231,235,228,0.86)_100%)]" />
+
+                    {isViewAll ? (
+                      <div className="relative flex h-full flex-col items-center justify-center px-5 text-center text-[#153323]">
+                        <div className="mb-5 flex -space-x-4 sm:mb-6">
+                          {productItems.slice(0, 3).map((item, previewIndex) => (
+                            <span
+                              key={`view-all-grocery-preview-${item.id || item.slug || previewIndex}`}
+                              className="grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border-2 border-white bg-[#F8FAF7] shadow-md sm:h-16 sm:w-16"
+                            >
+                              {item.image ? (
+                                <img
+                                  src={item.image}
+                                  alt=""
+                                  className="h-full w-full object-contain p-1.5"
+                                />
+                              ) : (
+                                <Package
+                                  size={24}
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </span>
+                          ))}
+                        </div>
+
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#315A42]/65 sm:text-xs">
+                          Explore the full grocery catalogue
+                        </p>
+
+                        <h3 className="mt-2 text-[clamp(32px,9vw,52px)] font-black leading-none tracking-[-0.05em] sm:text-[54px]">
+                          View all
+                        </h3>
+
+                        <span className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[#153323] px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(21,51,35,0.22)] transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-[#214D33]">
+                          Explore Grocery
+                          <ArrowRight
+                            size={15}
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="relative flex h-full items-center justify-center">
+                        {activeProduct?.image ? (
+                          <img
+                            src={activeProduct.image}
+                            alt={activeProduct?.name || 'Grocery product'}
+                            className="max-h-full max-w-full object-contain drop-shadow-[0_20px_24px_rgba(17,24,39,0.16)] transition duration-700 ease-out group-hover:scale-[1.02]"
+                          />
+                        ) : (
+                          <div className="grid h-full w-full place-items-center text-[#166534]">
+                            <Package
+                              size={54}
+                              aria-hidden="true"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Link>
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Actions intentionally arrive from the right and sit under the active card. */}
+              {!isViewAll && (
+                <AnimatePresence
+                  mode="wait"
+                  initial={false}
+                >
+                  <motion.div
+                    key={`grocery-actions-${productKey}`}
+                  initial={
+                    shouldReduceMotion
+                      ? false
+                      : {
+                          opacity: 0,
+                          x: 90,
+                          y: 8,
+                        }
+                  }
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                    y: 0,
+                  }}
+                  exit={
+                    shouldReduceMotion
+                      ? undefined
+                      : {
+                          opacity: 0,
+                          x: -38,
+                          y: -4,
+                        }
+                  }
+                  transition={{
+                    duration:
+                      shouldReduceMotion
+                        ? 0
+                        : 0.68,
+
+                    delay:
+                      shouldReduceMotion
+                        ? 0
+                        : 0.08,
+
+                    ease: [
+                      0.22,
+                      1,
+                      0.36,
+                      1,
+                    ],
+                  }}
+                  className="relative z-20 mt-2 grid w-[min(78vw,380px)] grid-cols-2 gap-2 sm:mt-3 sm:w-[min(66vw,460px)] lg:absolute lg:bottom-[2.4svh] lg:left-1/2 lg:w-[min(34vw,520px)] lg:-translate-x-1/2"
+                >
+                  <Link
+                    to={productPath}
+                    className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-white/28 bg-black/24 px-3 text-[10px] font-black text-white shadow-sm backdrop-blur-md transition hover:bg-black/34 sm:h-10 sm:text-[11px] lg:h-11 lg:text-xs"
+                  >
+                    <Eye
+                      size={14}
+                      aria-hidden="true"
+                    />
+                    View product
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onAddToCart(
+                        activeProduct,
+                      )
+                    }
+                    className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[10px] font-black text-[#132016] shadow-[0_10px_26px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 hover:bg-white sm:h-10 sm:text-[11px] lg:h-11 lg:text-xs"
+                  >
+                    <ShoppingBasket
+                      size={14}
+                      aria-hidden="true"
+                    />
+                    Add to cart
+                  </button>
+                  </motion.div>
+                </AnimatePresence>
+              )}
+
+              {nextProduct?.image && (
+                <motion.div
+                  key={`grocery-next-${nextProduct.id || nextProduct.slug || resolvedActiveIndex}`}
+                  aria-hidden="true"
+                  initial={false}
+                  animate={{
+                    opacity:
+                      shouldReduceMotion
+                        ? 0
+                        : 0.16,
+                  }}
+                  className="pointer-events-none absolute bottom-0 left-1/2 hidden aspect-[1.25/1] w-[27%] -translate-x-1/2 translate-y-[36%] overflow-hidden rounded-[14px] border border-white/14 bg-black/10 shadow-lg backdrop-blur-sm lg:block"
+                >
+                  <img
+                    src={nextProduct.image}
+                    alt=""
+                    className="h-full w-full object-contain opacity-80"
+                  />
+                </motion.div>
+              )}
+            </div>
+
+            {/* Right: approved Nutrition. Mobile keeps the same content below the visual. */}
+            <div className="min-w-0 lg:self-center lg:pb-9">
+              <AnimatePresence
+                mode="wait"
+                initial={false}
+              >
+                <motion.div
+                  key={`grocery-nutrition-${productKey}`}
+                  initial={
+                    shouldReduceMotion
+                      ? false
+                      : {
+                          opacity: 0,
+                          x:
+                            direction > 0
+                              ? 26
+                              : -12,
+                        }
+                  }
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  exit={
+                    shouldReduceMotion
+                      ? undefined
+                      : {
+                          opacity: 0,
+                          x:
+                            direction > 0
+                              ? -18
+                              : 18,
+                        }
+                  }
+                  transition={{
+                    duration:
+                      motionDuration,
+
+                    delay:
+                      shouldReduceMotion
+                        ? 0
+                        : 0.04,
+
+                    ease: [
+                      0.22,
+                      1,
+                      0.36,
+                      1,
+                    ],
+                  }}
+                  className="rounded-[18px] border border-white/14 bg-black/10 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none"
+                >
+                  {isViewAll ? (
+                    <div className="flex min-h-[92px] items-center justify-between gap-4 lg:min-h-0 lg:block">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/88 lg:text-[10px] lg:tracking-[0.24em]">
+                          All Grocery
+                        </p>
+                        <p className="mt-1 max-w-[280px] text-[10px] font-semibold leading-4 text-white/55 sm:text-xs lg:mt-3 lg:text-sm lg:leading-6">
+                          Continue to the full EPANTRY grocery catalogue.
+                        </p>
+                      </div>
+
+                      <ArrowRight
+                        size={20}
+                        aria-hidden="true"
+                        className="shrink-0 text-white/70 lg:mt-5"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                  <div className="flex items-end justify-between gap-4 border-b border-white/18 pb-2.5 lg:pb-3">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/88 lg:text-[10px] lg:tracking-[0.24em]">
+                        Nutrition
+                      </p>
+                      <p className="mt-0.5 hidden text-xs font-semibold text-white/46 sm:block">
+                        Approved product information
+                      </p>
+                    </div>
+
+                    <span className="text-[9px] font-black tabular-nums text-white/38 lg:text-[10px]">
+                      {String(resolvedActiveIndex + 1).padStart(2, '0')}
+                    </span>
+                  </div>
+
+                  {(activeNutrition.length > 0) ? (
+                    <>
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 lg:hidden">
+                        {mobileNutrition.map(
+                          (
+                            nutrient,
+                            nutrientIndex,
+                          ) => (
+                            <div
+                              key={
+                                nutrient.key ||
+                                nutrient.name ||
+                                `${productKey}-mobile-nutrition-${nutrientIndex}`
+                              }
+                              className="flex min-h-[26px] items-center justify-between gap-2 py-1"
+                            >
+                              <span className="min-w-0 pr-1 text-[8px] font-bold leading-3 text-white/58 sm:text-[10px] sm:leading-4">
+                                {nutrient.name || nutrient.key || 'Nutrient'}
+                              </span>
+
+                              <span className="shrink-0 text-[9px] font-black text-white sm:text-[10px]">
+                                {formatNutritionValue(
+                                  nutrient.amount,
+                                  nutrient.unit,
+                                )}
+                              </span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+
+                      <div className="mt-4 hidden space-y-1 lg:block">
+                        {activeNutrition.map(
+                          (
+                            nutrient,
+                            nutrientIndex,
+                          ) => (
+                            <div
+                              key={
+                                nutrient.key ||
+                                nutrient.name ||
+                                `${productKey}-nutrition-${nutrientIndex}`
+                              }
+                              className="flex items-center justify-between gap-5 border-b border-white/[0.10] py-2.5"
+                            >
+                              <span className="min-w-0 truncate text-[12px] font-bold text-white/52">
+                                {nutrient.name || nutrient.key || 'Nutrient'}
+                              </span>
+
+                              <span className="shrink-0 text-[12px] font-black text-white">
+                                {formatNutritionValue(
+                                  nutrient.amount,
+                                  nutrient.unit,
+                                )}
+                              </span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-[10px] font-semibold leading-4 text-white/48 sm:text-xs lg:mt-5 lg:max-w-[270px] lg:text-sm lg:leading-6">
+                      Approved nutrition is not available for this product yet.
+                    </p>
+                  )}
+                    </>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
 
         </div>
+      </div>
+    </section>
+  )
+}
 
-      </FeaturedSection>
+/*
+|--------------------------------------------------------------------------
+| Featured Recipes Scroll Story
+|--------------------------------------------------------------------------
+*/
 
-    </>
+const FEATURED_RECIPE_CAMERA_SEQUENCE = [
+  2,
+  0,
+  3,
+  1,
+]
+
+const RECIPE_WORLD_GEOMETRY = {
+  mobile: {
+    centerScale: 0.88,
+    scaleDrop: 0.14,
+    minScale: 0.58,
+    xRatio: 0.72,
+    xCurve: 0.82,
+    maxXRatio: 0.98,
+    yStep: 18,
+    zStep: 140,
+    rotateY: 10,
+    rotateZ: 1.1,
+  },
+  desktop: {
+    centerScale: 1,
+    scaleDrop: 0.19,
+    minScale: 0.58,
+    xRatio: 0.34,
+    xCurve: 0.84,
+    maxXRatio: 0.58,
+    yStep: 24,
+    zStep: 210,
+    rotateY: 14,
+    rotateZ: 1.5,
+  },
+}
+
+const RECIPE_STAGE_SHARDS = [
+  { left: '3%', top: '79%', size: 48, rotate: -17, opacity: 0.42 },
+  { left: '10%', top: '72%', size: 34, rotate: 26, opacity: 0.32 },
+  { left: '18%', top: '84%', size: 64, rotate: -38, opacity: 0.48 },
+  { left: '27%', top: '75%', size: 40, rotate: 11, opacity: 0.36 },
+  { left: '37%', top: '87%', size: 58, rotate: 41, opacity: 0.44 },
+  { left: '48%', top: '73%', size: 42, rotate: -11, opacity: 0.34 },
+  { left: '56%', top: '86%', size: 72, rotate: 19, opacity: 0.46 },
+  { left: '66%', top: '77%', size: 44, rotate: -32, opacity: 0.38 },
+  { left: '76%', top: '88%', size: 58, rotate: 27, opacity: 0.42 },
+  { left: '86%', top: '74%', size: 38, rotate: -9, opacity: 0.30 },
+  { left: '93%', top: '85%', size: 66, rotate: 34, opacity: 0.40 },
+]
+
+function clampRecipeStoryValue(
+  value,
+  min = 0,
+  max = 1,
+) {
+  return Math.min(
+    Math.max(
+      value,
+      min,
+    ),
+    max,
+  )
+}
+
+function smoothRecipeStoryStep(
+  value,
+) {
+  const resolved =
+    clampRecipeStoryValue(
+      value,
+    )
+
+  return (
+    resolved *
+    resolved *
+    (3 - 2 * resolved)
+  )
+}
+
+function recipePath(
+  recipe,
+) {
+  return (
+    recipe?.path ||
+    (recipe?.slug
+      ? `/recipes/${recipe.slug}`
+      : '/recipes')
+  )
+}
+
+function FeaturedRecipesScrollStory({
+  recipes,
+  shouldReduceMotion,
+}) {
+  const sectionRef =
+    useRef(null)
+
+  const stageRef =
+    useRef(null)
+
+  const animationFrameRef =
+    useRef(null)
+
+  const pointerFrameRef =
+    useRef(null)
+
+  const targetProgressRef =
+    useRef(0)
+
+  const displayedProgressRef =
+    useRef(0)
+
+  const pointerTargetRef =
+    useRef({
+      x: 0.5,
+      y: 0.34,
+    })
+
+  const pointerCurrentRef =
+    useRef({
+      x: 0.5,
+      y: 0.34,
+    })
+
+  const [
+    storyProgress,
+    setStoryProgress,
+  ] = useState(0)
+
+  const [
+    mobileOpenKey,
+    setMobileOpenKey,
+  ] = useState('')
+
+  const worldRecipes =
+    (recipes || []).slice(
+      0,
+      4,
+    )
+
+  const storyItems = [
+    ...worldRecipes.map(
+      (recipe) => ({
+        type: 'recipe',
+        recipe,
+        key:
+          recipe.id ||
+          recipe.slug ||
+          recipe.name,
+      }),
+    ),
+    {
+      type: 'view-all',
+      key: 'view-all-recipes',
+    },
+  ]
+
+  const preferredFocusSequence = [
+    ...FEATURED_RECIPE_CAMERA_SEQUENCE,
+    storyItems.length - 1,
+  ]
+
+  const focusSequence =
+    preferredFocusSequence
+      .filter(
+        (itemIndex, index, all) =>
+          itemIndex >= 0 &&
+          itemIndex < storyItems.length &&
+          all.indexOf(
+            itemIndex,
+          ) === index,
+      )
+
+  for (
+    let itemIndex = 0;
+    itemIndex < storyItems.length;
+    itemIndex += 1
+  ) {
+    if (
+      !focusSequence.includes(
+        itemIndex,
+      )
+    ) {
+      focusSequence.push(
+        itemIndex,
+      )
+    }
+  }
+
+  /*
+   * The reference keeps every card planted in one physical row and moves the
+   * camera forward through that row. The requested focus order is therefore
+   * also the left-to-right stage order. This avoids the backwards camera jumps
+   * caused by keeping the original recipe array order in the world.
+   */
+  const cameraItems =
+    focusSequence
+      .map(
+        (itemIndex) =>
+          storyItems[
+            itemIndex
+          ],
+      )
+      .filter(Boolean)
+
+  /*
+   * Timeline (viewport scroll units):
+   * 0     = closed intro title
+   * 0-1   = curtain opens with the third recipe already framed
+   * 1-5   = camera travels 3rd -> 1st -> 4th -> 2nd -> View all
+   * 5-6   = curtain closes over the final camera position
+   * 6-7   = closed outro title hold
+   *
+   * The cards stay fixed in one horizontal world in the requested focus
+   * sequence. Scroll moves the camera monotonically across that world; cards
+   * never jump or swap positions.
+   */
+  const storyHeight =
+    '800svh'
+
+  useEffect(
+    () => {
+      if (
+        shouldReduceMotion ||
+        typeof window ===
+          'undefined'
+      ) {
+        return undefined
+      }
+
+      const applyProgress =
+        (value) => {
+          displayedProgressRef.current =
+            value
+
+          setStoryProgress(
+            value,
+          )
+        }
+
+      const resolveTargetProgress =
+        () => {
+          const section =
+            sectionRef.current
+
+          if (!section) {
+            return 0
+          }
+
+          const rect =
+            section.getBoundingClientRect()
+
+          const viewportHeight =
+            Math.max(
+              window.innerHeight ||
+                1,
+              1,
+            )
+
+          return clampRecipeStoryValue(
+            -rect.top /
+              viewportHeight,
+            0,
+            7,
+          )
+        }
+
+      const animateProgress =
+        () => {
+          animationFrameRef.current =
+            null
+
+          const current =
+            displayedProgressRef.current
+
+          const target =
+            targetProgressRef.current
+
+          const difference =
+            target -
+            current
+
+          const next =
+            Math.abs(
+              difference,
+            ) < 0.001
+              ? target
+              : current +
+                difference *
+                  0.11
+
+          applyProgress(
+            next,
+          )
+
+          if (
+            Math.abs(
+              target -
+                next,
+            ) > 0.001
+          ) {
+            animationFrameRef.current =
+              window.requestAnimationFrame(
+                animateProgress,
+              )
+          }
+        }
+
+      const scheduleProgress =
+        () => {
+          targetProgressRef.current =
+            resolveTargetProgress()
+
+          if (
+            animationFrameRef.current ===
+            null
+          ) {
+            animationFrameRef.current =
+              window.requestAnimationFrame(
+                animateProgress,
+              )
+          }
+        }
+
+      targetProgressRef.current =
+        resolveTargetProgress()
+
+      displayedProgressRef.current =
+        targetProgressRef.current
+
+      applyProgress(
+        targetProgressRef.current,
+      )
+
+      window.addEventListener(
+        'scroll',
+        scheduleProgress,
+        {
+          passive: true,
+        },
+      )
+
+      window.addEventListener(
+        'resize',
+        scheduleProgress,
+      )
+
+      return () => {
+        if (
+          animationFrameRef.current !==
+          null
+        ) {
+          window.cancelAnimationFrame(
+            animationFrameRef.current,
+          )
+        }
+
+        window.removeEventListener(
+          'scroll',
+          scheduleProgress,
+        )
+
+        window.removeEventListener(
+          'resize',
+          scheduleProgress,
+        )
+      }
+    },
+    [shouldReduceMotion],
+  )
+
+  useEffect(
+    () => {
+      if (
+        shouldReduceMotion ||
+        typeof window ===
+          'undefined'
+      ) {
+        return undefined
+      }
+
+      const animatePointer =
+        () => {
+          pointerFrameRef.current =
+            null
+
+          const current =
+            pointerCurrentRef.current
+
+          const target =
+            pointerTargetRef.current
+
+          const nextX =
+            current.x +
+            (target.x - current.x) *
+              0.09
+
+          const nextY =
+            current.y +
+            (target.y - current.y) *
+              0.09
+
+          pointerCurrentRef.current = {
+            x: nextX,
+            y: nextY,
+          }
+
+          const stage =
+            stageRef.current
+
+          if (stage) {
+            stage.style.setProperty(
+              '--recipe-pointer-x',
+              `${(
+                nextX *
+                100
+              ).toFixed(2)}%`,
+            )
+
+            stage.style.setProperty(
+              '--recipe-pointer-y',
+              `${(
+                nextY *
+                100
+              ).toFixed(2)}%`,
+            )
+
+            stage.style.setProperty(
+              '--recipe-pointer-nx',
+              (
+                (nextX - 0.5) *
+                2
+              ).toFixed(4),
+            )
+
+            stage.style.setProperty(
+              '--recipe-pointer-ny',
+              (
+                (nextY - 0.5) *
+                2
+              ).toFixed(4),
+            )
+          }
+
+          if (
+            Math.abs(
+              target.x - nextX,
+            ) > 0.0005 ||
+            Math.abs(
+              target.y - nextY,
+            ) > 0.0005
+          ) {
+            pointerFrameRef.current =
+              window.requestAnimationFrame(
+                animatePointer,
+              )
+          }
+        }
+
+      const ensurePointerFrame =
+        () => {
+          if (
+            pointerFrameRef.current ===
+            null
+          ) {
+            pointerFrameRef.current =
+              window.requestAnimationFrame(
+                animatePointer,
+              )
+          }
+        }
+
+      ensurePointerFrame()
+
+      return () => {
+        if (
+          pointerFrameRef.current !==
+          null
+        ) {
+          window.cancelAnimationFrame(
+            pointerFrameRef.current,
+          )
+        }
+      }
+    },
+    [shouldReduceMotion],
+  )
+
+  const handlePointerMove =
+    (event) => {
+      if (
+        shouldReduceMotion ||
+        event.pointerType ===
+          'touch'
+      ) {
+        return
+      }
+
+      const stage =
+        stageRef.current
+
+      if (!stage) {
+        return
+      }
+
+      const rect =
+        stage.getBoundingClientRect()
+
+      pointerTargetRef.current = {
+        x:
+          clampRecipeStoryValue(
+            (
+              event.clientX -
+              rect.left
+            ) /
+              Math.max(
+                rect.width,
+                1,
+              ),
+          ),
+        y:
+          clampRecipeStoryValue(
+            (
+              event.clientY -
+              rect.top
+            ) /
+              Math.max(
+                rect.height,
+                1,
+              ),
+          ),
+      }
+
+      if (
+        pointerFrameRef.current ===
+        null &&
+        typeof window !==
+          'undefined'
+      ) {
+        pointerFrameRef.current =
+          window.requestAnimationFrame(
+            function movePointerFrame() {
+              pointerFrameRef.current =
+                null
+
+              const current =
+                pointerCurrentRef.current
+
+              const target =
+                pointerTargetRef.current
+
+              const nextX =
+                current.x +
+                (target.x - current.x) *
+                  0.12
+
+              const nextY =
+                current.y +
+                (target.y - current.y) *
+                  0.12
+
+              pointerCurrentRef.current = {
+                x: nextX,
+                y: nextY,
+              }
+
+              const currentStage =
+                stageRef.current
+
+              if (currentStage) {
+                currentStage.style.setProperty(
+                  '--recipe-pointer-x',
+                  `${(
+                    nextX *
+                    100
+                  ).toFixed(2)}%`,
+                )
+
+                currentStage.style.setProperty(
+                  '--recipe-pointer-y',
+                  `${(
+                    nextY *
+                    100
+                  ).toFixed(2)}%`,
+                )
+
+                currentStage.style.setProperty(
+                  '--recipe-pointer-nx',
+                  (
+                    (nextX - 0.5) *
+                    2
+                  ).toFixed(4),
+                )
+
+                currentStage.style.setProperty(
+                  '--recipe-pointer-ny',
+                  (
+                    (nextY - 0.5) *
+                    2
+                  ).toFixed(4),
+                )
+              }
+
+              if (
+                Math.abs(
+                  target.x - nextX,
+                ) > 0.0005 ||
+                Math.abs(
+                  target.y - nextY,
+                ) > 0.0005
+              ) {
+                pointerFrameRef.current =
+                  window.requestAnimationFrame(
+                    movePointerFrame,
+                  )
+              }
+            },
+          )
+      }
+    }
+
+  const handlePointerLeave =
+    () => {
+      pointerTargetRef.current = {
+        x: 0.5,
+        y: 0.34,
+      }
+    }
+
+  const openingProgress =
+    shouldReduceMotion
+      ? 1
+      : smoothRecipeStoryStep(
+          storyProgress,
+        )
+
+  const closingProgress =
+    shouldReduceMotion
+      ? 0
+      : smoothRecipeStoryStep(
+          storyProgress -
+            5,
+        )
+
+  const curtainOpenAmount =
+    shouldReduceMotion
+      ? 1
+      : clampRecipeStoryValue(
+          openingProgress -
+            closingProgress,
+        )
+
+  const focusTravelProgress =
+    clampRecipeStoryValue(
+      storyProgress -
+        1,
+      0,
+      Math.max(
+        cameraItems.length -
+          1,
+        0,
+      ),
+    )
+
+  const focusSegmentIndex =
+    Math.min(
+      Math.floor(
+        focusTravelProgress,
+      ),
+      Math.max(
+        cameraItems.length -
+          1,
+        0,
+      ),
+    )
+
+  const focusSegmentLocalProgress =
+    focusTravelProgress -
+    focusSegmentIndex
+
+  /*
+   * Keep each target card visually settled for a short beat, then move the
+   * camera through the fixed row. The cards themselves never translate.
+   */
+  const focusSegmentProgress =
+    smoothRecipeStoryStep(
+      clampRecipeStoryValue(
+        (
+          focusSegmentLocalProgress -
+          0.14
+        ) /
+          0.72,
+      ),
+    )
+
+  const cameraFromSlot =
+    focusSegmentIndex
+
+  const cameraToSlot =
+    Math.min(
+      focusSegmentIndex +
+        1,
+      Math.max(
+        cameraItems.length -
+          1,
+        0,
+      ),
+    )
+
+  const cameraWorldSlot =
+    storyProgress < 1
+      ? 0
+      : cameraFromSlot +
+        (
+          cameraToSlot -
+          cameraFromSlot
+        ) *
+          focusSegmentProgress
+
+  const activeSequenceIndex =
+    Math.min(
+      Math.max(
+        Math.round(
+          focusTravelProgress,
+        ),
+        0,
+      ),
+      Math.max(
+        cameraItems.length -
+          1,
+        0,
+      ),
+    )
+
+  const activeItem =
+    cameraItems[
+      activeSequenceIndex
+    ] ||
+    null
+
+  const activeItemKey =
+    activeItem?.key ||
+    'recipe-story-empty'
+
+  const introOpacity =
+    shouldReduceMotion
+      ? 0
+      : clampRecipeStoryValue(
+          1 -
+            storyProgress /
+              0.72,
+        )
+
+  const outroOpacity =
+    shouldReduceMotion
+      ? 0
+      : clampRecipeStoryValue(
+          (
+            storyProgress -
+            5.82
+          ) /
+            0.34,
+        )
+
+  const cardOpacity =
+    shouldReduceMotion
+      ? 1
+      : clampRecipeStoryValue(
+          Math.min(
+            storyProgress,
+            6 -
+              storyProgress,
+          ) /
+            0.72,
+        )
+
+  const activeCardCentered =
+    Math.abs(
+      cameraWorldSlot -
+        activeSequenceIndex,
+    ) < 0.12
+
+  useEffect(
+    () => {
+      if (
+        typeof window ===
+          'undefined' ||
+        !activeItem ||
+        activeItem.type !==
+          'recipe' ||
+        !activeCardCentered ||
+        !window.matchMedia(
+          '(max-width: 767px)',
+        ).matches
+      ) {
+        setMobileOpenKey('')
+        return undefined
+      }
+
+      const openTimer =
+        window.setTimeout(
+          () => {
+            setMobileOpenKey(
+              activeItemKey,
+            )
+          },
+          shouldReduceMotion
+            ? 0
+            : 280,
+        )
+
+      const closeTimer =
+        window.setTimeout(
+          () => {
+            setMobileOpenKey('')
+          },
+          shouldReduceMotion
+            ? 400
+            : 1550,
+        )
+
+      return () => {
+        window.clearTimeout(
+          openTimer,
+        )
+
+        window.clearTimeout(
+          closeTimer,
+        )
+      }
+    },
+    [
+      activeItemKey,
+      activeItem?.type,
+      activeCardCentered,
+      shouldReduceMotion,
+    ],
+  )
+
+  if (
+    storyItems.length ===
+    1 &&
+    storyItems[0]?.type ===
+      'view-all'
+  ) {
+    return (
+      <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-black text-white">
+        <Link
+          to="/recipes"
+          className="focus-ring rounded-full border border-red-500/40 px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-red-400"
+        >
+          Explore Recipes
+        </Link>
+      </section>
+    )
+  }
+
+  return (
+    <section
+      ref={sectionRef}
+      className="relative z-20 isolate bg-black"
+      style={{
+        height:
+          storyHeight,
+      }}
+    >
+      <motion.div
+        ref={stageRef}
+        initial={
+          shouldReduceMotion
+            ? false
+            : {
+                opacity: 0,
+                y: 54,
+              }
+        }
+        whileInView={{
+          opacity: 1,
+          y: 0,
+        }}
+        viewport={{
+          once: true,
+          amount: 0.08,
+        }}
+        transition={{
+          duration:
+            shouldReduceMotion
+              ? 0
+              : 0.9,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        onPointerMove={
+          handlePointerMove
+        }
+        onPointerLeave={
+          handlePointerLeave
+        }
+        className="sticky top-0 h-[100svh] overflow-hidden bg-[#020202] text-white"
+        style={{
+          '--recipe-pointer-x':
+            '50%',
+          '--recipe-pointer-y':
+            '34%',
+          '--recipe-pointer-nx':
+            0,
+          '--recipe-pointer-ny':
+            0,
+        }}
+      >
+        {/* Mouse-responsive red atmosphere from the supplied reference. */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(circle at var(--recipe-pointer-x) var(--recipe-pointer-y), rgba(235,0,0,0.42) 0%, rgba(155,0,0,0.24) 13%, rgba(45,0,0,0.10) 28%, transparent 48%), radial-gradient(circle at 50% 52%, rgba(95,0,0,0.22), transparent 48%), #020202',
+          }}
+        />
+
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 h-[46%] origin-bottom"
+          style={{
+            perspective:
+              '900px',
+          }}
+        >
+          <div
+            className="absolute -inset-x-[16%] -bottom-[32%] h-[150%] opacity-75"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(255,28,28,0.20) 1px, transparent 1px), linear-gradient(90deg, rgba(255,28,28,0.16) 1px, transparent 1px)',
+              backgroundSize:
+                '48px 48px',
+              transform:
+                'rotateX(66deg) translate3d(calc(var(--recipe-pointer-nx) * 8px), calc(var(--recipe-pointer-ny) * 5px), 0)',
+              transformOrigin:
+                'center bottom',
+              transition:
+                'transform 160ms linear',
+              maskImage:
+                'linear-gradient(to top, black 20%, rgba(0,0,0,0.92) 58%, transparent 100%)',
+              WebkitMaskImage:
+                'linear-gradient(to top, black 20%, rgba(0,0,0,0.92) 58%, transparent 100%)',
+            }}
+          />
+
+          {RECIPE_STAGE_SHARDS.map(
+            (
+              shard,
+              index,
+            ) => (
+              <span
+                key={`recipe-stage-shard-${index}`}
+                className="absolute bg-gradient-to-br from-[#F52323] via-[#780000] to-[#160000] shadow-[0_0_28px_rgba(255,0,0,0.12)]"
+                style={{
+                  left:
+                    shard.left,
+                  top:
+                    shard.top,
+                  width:
+                    shard.size,
+                  height:
+                    shard.size *
+                    0.66,
+                  opacity:
+                    shard.opacity,
+                  clipPath:
+                    'polygon(50% 0%, 100% 100%, 0% 78%)',
+                  transform:
+                    `rotate(${shard.rotate}deg) translate3d(calc(var(--recipe-pointer-nx) * ${index % 2 ? -4 : 4}px), calc(var(--recipe-pointer-ny) * ${index % 3 ? 3 : -3}px), 0)`,
+                  transition:
+                    'transform 180ms linear',
+                }}
+              />
+            ),
+          )}
+        </div>
+
+        {/* Intro / outro reference-style title. */}
+        <RecipeStoryTitle
+          opacity={
+            Math.max(
+              introOpacity,
+              outroOpacity,
+            )
+          }
+          closing={
+            outroOpacity >
+            introOpacity
+          }
+        />
+
+        {/* Cards live behind the curtains. */}
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center px-4 pb-9 pt-[78px] sm:px-8 sm:pb-10 sm:pt-[92px] lg:pb-12 lg:pt-[104px]"
+          style={{
+            opacity:
+              cardOpacity,
+            transform:
+              `translate3d(calc(var(--recipe-pointer-nx) * -5px), calc(var(--recipe-pointer-ny) * -3px), 0)`,
+            transition:
+              'opacity 220ms linear, transform 170ms linear',
+          }}
+        >
+          <div className="relative h-full w-full">
+            <div className="absolute left-4 top-0 z-20 sm:left-6 lg:left-8">
+              <p className="text-[8px] font-black uppercase tracking-[0.28em] text-white/54 sm:text-[9px] lg:text-[10px]">
+                Featured Recipes
+              </p>
+              <p className="mt-1 text-[8px] font-bold tabular-nums tracking-[0.14em] text-red-400/70 sm:text-[9px]">
+                {String(
+                  activeSequenceIndex +
+                    1,
+                ).padStart(
+                  2,
+                  '0',
+                )}{' '}
+                /{' '}
+                {String(
+                  cameraItems.length,
+                ).padStart(
+                  2,
+                  '0',
+                )}
+              </p>
+            </div>
+
+            <div className="absolute inset-0 overflow-hidden [perspective:1700px]">
+              {(() => {
+                const viewportWidth =
+                  typeof window !==
+                  'undefined'
+                    ? window.innerWidth
+                    : 1280
+
+                const isMobileViewport =
+                  viewportWidth <
+                  768
+
+                const geometry =
+                  isMobileViewport
+                    ? RECIPE_WORLD_GEOMETRY.mobile
+                    : RECIPE_WORLD_GEOMETRY.desktop
+
+                return (
+                  <div className="absolute inset-0 [transform-style:preserve-3d]">
+                    {cameraItems.map(
+                      (
+                        item,
+                        stageIndex,
+                      ) => {
+                        const relativePosition =
+                          stageIndex -
+                          cameraWorldSlot
+
+                        const distanceFromCamera =
+                          Math.abs(
+                            relativePosition,
+                          )
+
+                        const direction =
+                          relativePosition ===
+                          0
+                            ? 0
+                            : relativePosition >
+                                0
+                              ? 1
+                              : -1
+
+                        const isActive =
+                          stageIndex ===
+                          activeSequenceIndex
+
+                        const curvedDistance =
+                          Math.pow(
+                            distanceFromCamera,
+                            geometry.xCurve,
+                          )
+
+                        const xOffset =
+                          direction *
+                          Math.min(
+                            viewportWidth *
+                              geometry.xRatio *
+                              curvedDistance,
+                            viewportWidth *
+                              geometry.maxXRatio,
+                          )
+
+                        const yOffset =
+                          Math.min(
+                            distanceFromCamera,
+                            2.4,
+                          ) *
+                          geometry.yStep
+
+                        const zOffset =
+                          -Math.min(
+                            distanceFromCamera,
+                            2.6,
+                          ) *
+                          geometry.zStep
+
+                        const cardScale =
+                          Math.max(
+                            geometry.minScale,
+                            geometry.centerScale -
+                              distanceFromCamera *
+                                geometry.scaleDrop,
+                          )
+
+                        const rotateY =
+                          -direction *
+                          Math.min(
+                            distanceFromCamera,
+                            1.35,
+                          ) *
+                          geometry.rotateY
+
+                        const rotateZ =
+                          direction *
+                          Math.min(
+                            distanceFromCamera,
+                            1,
+                          ) *
+                          geometry.rotateZ
+
+                        const cardOpacity =
+                          Math.max(
+                            0.42,
+                            1 -
+                              distanceFromCamera *
+                                0.18,
+                          )
+
+                        return (
+                          <div
+                            key={
+                              item.key
+                            }
+                            className="absolute left-1/2 top-1/2 flex items-center justify-center [transform-style:preserve-3d]"
+                            style={{
+                              pointerEvents:
+                                isActive &&
+                                activeCardCentered
+                                  ? 'auto'
+                                  : 'none',
+                              zIndex:
+                                Math.round(
+                                  80 -
+                                    Math.min(
+                                      distanceFromCamera *
+                                        12,
+                                      60,
+                                    ),
+                                ),
+                              opacity:
+                                cardOpacity,
+                              transform:
+                                `translate3d(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px), ${zOffset}px) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg) scale(${cardScale})`,
+                              transformOrigin:
+                                'center center',
+                              willChange:
+                                'transform, opacity',
+                            }}
+                          >
+                            {item.type ===
+                            'view-all' ? (
+                              <RecipeStoryViewAllCard
+                                recipes={
+                                  worldRecipes
+                                }
+                              />
+                            ) : (
+                              <RecipeStoryBookCard
+                                recipe={
+                                  item.recipe
+                                }
+                                mobileOpen={
+                                  mobileOpenKey ===
+                                  item.key
+                                }
+                                shouldReduceMotion={
+                                  shouldReduceMotion
+                                }
+                              />
+                            )}
+                          </div>
+                        )
+                      },
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+
+        {/* Two curtain leaves: closed on intro, open for cards, closed on outro. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-40"
+        >
+          <div
+            className="absolute inset-y-0 left-0 w-1/2 bg-[linear-gradient(90deg,#020202_0%,#050000_72%,#250000_100%)] shadow-[16px_0_42px_rgba(0,0,0,0.75)]"
+            style={{
+              transform:
+                `translate3d(${-curtainOpenAmount * 100}%, 0, 0)`,
+              transition:
+                shouldReduceMotion
+                  ? 'none'
+                  : 'transform 80ms linear',
+            }}
+          >
+            <span className="absolute inset-y-0 right-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
+          </div>
+
+          <div
+            className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(270deg,#020202_0%,#050000_72%,#250000_100%)] shadow-[-16px_0_42px_rgba(0,0,0,0.75)]"
+            style={{
+              transform:
+                `translate3d(${curtainOpenAmount * 100}%, 0, 0)`,
+              transition:
+                shouldReduceMotion
+                  ? 'none'
+                  : 'transform 80ms linear',
+            }}
+          >
+            <span className="absolute inset-y-0 left-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex items-center justify-between px-5 text-[7px] font-black uppercase tracking-[0.22em] text-white/38 sm:bottom-4 sm:px-8 sm:text-[8px] lg:px-11">
+          <span>Discover</span>
+          <span>Cook</span>
+          <span>Connect</span>
+          <span>Explore</span>
+        </div>
+      </motion.div>
+    </section>
+  )
+}
+
+function RecipeStoryTitle({
+  opacity,
+  closing,
+}) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center px-5 text-center"
+      style={{
+        opacity,
+        transform:
+          `translate3d(0, ${closing ? 0 : 18 * (1 - opacity)}px, 0)`,
+        transition:
+          'opacity 120ms linear',
+      }}
+    >
+      <div className="relative -mt-[3svh]">
+        <p
+          className="relative z-10 -mb-[0.30em] text-[clamp(42px,10vw,112px)] font-normal leading-[0.72] text-[#D30000] sm:text-[clamp(58px,8vw,126px)] lg:text-[clamp(70px,7.4vw,138px)]"
+          style={{
+            fontFamily:
+              "'Brush Script MT', 'Segoe Script', cursive",
+            fontStyle:
+              'italic',
+            letterSpacing:
+              '-0.06em',
+          }}
+        >
+          Featured
+        </p>
+
+        <p className="text-[clamp(48px,13vw,108px)] font-black uppercase leading-[0.78] tracking-[-0.065em] text-[#D30000] sm:text-[clamp(66px,10vw,132px)] lg:text-[clamp(74px,9vw,152px)]">
+          Recipes
+        </p>
+
+        <p className="mx-auto mt-5 max-w-[470px] text-[8px] font-bold uppercase leading-4 tracking-[0.12em] text-red-400/58 sm:mt-7 sm:text-[9px] sm:leading-5">
+          Curated dishes, approved food intelligence and ingredients connected back to EPANTRY Grocery.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function RecipeStoryBookCard({
+  recipe,
+  mobileOpen,
+  shouldReduceMotion,
+}) {
+  const [
+    desktopOpen,
+    setDesktopOpen,
+  ] = useState(false)
+
+  const nutrition =
+    Array.isArray(
+      recipe?.nutrition,
+    )
+      ? recipe.nutrition.slice(
+          0,
+          5,
+        )
+      : []
+
+  const coverOpen =
+    mobileOpen ||
+    desktopOpen
+
+  const openTransform =
+    coverOpen
+      ? 'translate3d(-7px, 0, 2px) rotateY(-84deg)'
+      : 'translateZ(2px) rotateY(0deg)'
+
+  return (
+    <div
+      className="group relative h-[58svh] max-h-[610px] min-h-[390px] w-[72vw] max-w-[420px] sm:h-[62svh] sm:w-[48vw] md:w-[390px] lg:h-[64svh] lg:w-[410px]"
+      onMouseEnter={() =>
+        setDesktopOpen(true)
+      }
+      onMouseLeave={() =>
+        setDesktopOpen(false)
+      }
+      style={{
+        perspective:
+          '1900px',
+        WebkitPerspective:
+          '1900px',
+        perspectiveOrigin:
+          'left center',
+        WebkitPerspectiveOrigin:
+          'left center',
+      }}
+    >
+      <Link
+        to={
+          recipePath(
+            recipe,
+          )
+        }
+        className="absolute inset-0 overflow-hidden rounded-[14px] border border-red-500/20 bg-[#090303] shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:rounded-[16px]"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(225,0,0,0.24),transparent_44%)]" />
+
+        <div className="relative flex h-full flex-col p-5 sm:p-6 lg:p-7">
+          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-red-400 sm:text-[9px]">
+            Recipe details
+          </p>
+
+          <h3 className="mt-2 line-clamp-2 text-[24px] font-black leading-[0.92] tracking-[-0.04em] text-white sm:text-[30px]">
+            {recipe?.name ||
+              'Recipe'}
+          </h3>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
+            <div className="rounded-[12px] border border-red-500/15 bg-white/[0.055] p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 text-red-400">
+                <Users
+                  size={14}
+                  aria-hidden="true"
+                />
+                <span className="text-[7px] font-black uppercase tracking-[0.13em] sm:text-[8px]">
+                  Servings
+                </span>
+              </div>
+              <p className="mt-2 text-sm font-black text-white sm:text-base">
+                {recipe?.servings
+                  ? `${recipe.servings}`
+                  : '—'}
+              </p>
+            </div>
+
+            <div className="rounded-[12px] border border-red-500/15 bg-white/[0.055] p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 text-red-400">
+                <Clock3
+                  size={14}
+                  aria-hidden="true"
+                />
+                <span className="text-[7px] font-black uppercase tracking-[0.13em] sm:text-[8px]">
+                  Total time
+                </span>
+              </div>
+              <p className="mt-2 text-sm font-black text-white sm:text-base">
+                {recipe?.totalTime >
+                0
+                  ? `${recipe.totalTime} min`
+                  : '—'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-[12px] border border-red-500/15 bg-white/[0.05] p-3 sm:mt-4 sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/80 sm:text-xs">
+                Nutrition
+              </p>
+              {nutrition.length >
+                0 && (
+                <span className="text-[7px] font-black uppercase tracking-[0.10em] text-red-400/80 sm:text-[8px]">
+                  Approved
+                </span>
+              )}
+            </div>
+
+            {nutrition.length >
+            0 ? (
+              <div className="mt-2.5 space-y-1.5 sm:mt-3 sm:space-y-2">
+                {nutrition.map(
+                  (
+                    nutrient,
+                    nutrientIndex,
+                  ) => (
+                    <div
+                      key={
+                        nutrient.key ||
+                        nutrient.nutrientId ||
+                        `${recipe?.id || recipe?.slug}-story-nutrient-${nutrientIndex}`
+                      }
+                      className="flex items-center justify-between gap-3 rounded-[9px] bg-black/24 px-2.5 py-2 text-[9px] sm:px-3 sm:text-[10px]"
+                    >
+                      <span className="min-w-0 truncate font-bold text-white/54">
+                        {nutrient.name ||
+                          nutrient.key ||
+                          'Nutrient'}
+                      </span>
+                      <span className="shrink-0 font-black text-white/90">
+                        {formatNutritionValue(
+                          nutrient.amount,
+                          nutrient.unit,
+                        )}
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
+            ) : (
+              <p className="mt-3 text-[9px] font-semibold leading-4 text-white/44 sm:text-[10px] sm:leading-5">
+                Approved nutrition is not available for this recipe yet.
+              </p>
+            )}
+          </div>
+
+          <p className="mt-3 text-[8px] font-bold uppercase tracking-[0.12em] text-white/38 sm:text-[9px]">
+            Open full recipe
+          </p>
+        </div>
+      </Link>
+
+      <Link
+        to={
+          recipePath(
+            recipe,
+          )
+        }
+        className="absolute inset-0 z-20 overflow-hidden rounded-[14px] border border-white/10 bg-[#190000] shadow-[0_30px_80px_rgba(0,0,0,0.56)] [transform-origin:left_center] [backface-visibility:hidden] sm:rounded-[16px]"
+        style={{
+          transform:
+            openTransform,
+          WebkitTransform:
+            openTransform,
+          transformStyle:
+            'preserve-3d',
+          WebkitTransformStyle:
+            'preserve-3d',
+          WebkitTransformOrigin:
+            'left center',
+          transition:
+            shouldReduceMotion
+              ? 'none'
+              : 'transform 920ms cubic-bezier(0.20,0.84,0.22,1)',
+          willChange:
+            'transform',
+        }}
+      >
+        {recipe?.image ? (
+          <img
+            src={
+              recipe.image
+            }
+            alt={
+              recipe.name ||
+              'Recipe'
+            }
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center bg-[#190000] text-5xl">
+            🍽️
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04)_0%,rgba(0,0,0,0.16)_42%,rgba(0,0,0,0.88)_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,35,35,0.20),transparent_36%)]" />
+
+        <div className="absolute left-4 top-4 text-[7px] font-black uppercase tracking-[0.18em] text-white/72 sm:left-5 sm:top-5 sm:text-[8px]">
+          EPANTRY Recipe
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
+          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-red-300/80 sm:text-[9px]">
+            {recipe?.cuisine ||
+              recipe?.dietaryType ||
+              'Featured'}
+          </p>
+          <h3 className="mt-2 text-[28px] font-black leading-[0.9] tracking-[-0.05em] text-white sm:text-[34px]">
+            {recipe?.name ||
+              'Recipe'}
+          </h3>
+        </div>
+      </Link>
+    </div>
+  )
+}
+
+function RecipeStoryViewAllCard({
+  recipes,
+}) {
+  return (
+    <Link
+      to="/recipes"
+      className="focus-ring group relative flex h-[58svh] max-h-[610px] min-h-[390px] w-[72vw] max-w-[420px] flex-col overflow-hidden rounded-[14px] border border-red-500/28 bg-[#130000] p-5 shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:h-[62svh] sm:w-[48vw] sm:rounded-[16px] sm:p-6 md:w-[390px] lg:h-[64svh] lg:w-[410px] lg:p-7"
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_24%,rgba(255,0,0,0.26),transparent_38%),linear-gradient(155deg,#160000_0%,#050202_62%,#000_100%)]" />
+
+      <div className="relative z-10 flex h-full flex-col">
+        <p className="text-[8px] font-black uppercase tracking-[0.22em] text-red-400 sm:text-[9px]">
+          EPANTRY Recipes
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
+          {recipes.slice(
+            0,
+            4,
+          ).map(
+            (
+              recipe,
+              index,
+            ) => (
+              <div
+                key={`recipe-story-view-all-${recipe?.id || recipe?.slug || index}`}
+                className="aspect-square overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
+              >
+                {recipe?.image ? (
+                  <img
+                    src={
+                      recipe.image
+                    }
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                  />
+                ) : (
+                  <div className="grid h-full w-full place-items-center text-2xl">
+                    🍽️
+                  </div>
+                )}
+              </div>
+            ),
+          )}
+        </div>
+
+        <div className="mt-auto pt-5 sm:pt-6">
+          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-white/42 sm:text-[9px]">
+            Full collection
+          </p>
+          <h3 className="mt-2 text-[38px] font-black uppercase leading-[0.82] tracking-[-0.065em] text-white sm:text-[46px]">
+            View all
+          </h3>
+          <p className="mt-3 max-w-[280px] text-[9px] font-semibold leading-4 text-white/48 sm:text-[10px] sm:leading-5">
+            Explore every published EPANTRY recipe and choose what to cook next.
+          </p>
+
+          <span className="mt-4 inline-flex h-10 items-center gap-2 rounded-full border border-red-500/34 bg-red-600 px-4 text-[9px] font-black uppercase tracking-[0.10em] text-white shadow-[0_0_26px_rgba(220,0,0,0.22)] sm:h-11 sm:text-[10px]">
+            Explore Recipes
+            <ArrowRight
+              size={14}
+              aria-hidden="true"
+            />
+          </span>
+        </div>
+      </div>
+    </Link>
   )
 }
 
@@ -1580,9 +3186,17 @@ function FeaturedSection({
   children,
   texture,
   tone = 'grocery',
+  className = '',
 }) {
   return (
-    <section className="relative min-h-[100svh] w-full overflow-hidden bg-[#F8FAF7]">
+    <section
+      className={[
+        'relative min-h-[100svh] w-full overflow-hidden bg-[#F8FAF7]',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
 
       <SectionTexture
         variant={

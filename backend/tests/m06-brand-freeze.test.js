@@ -511,8 +511,24 @@ test(
       /hostEnabled/,
     )
 
+    const hostAccessBranch =
+      source.match(
+        /case APPLICATION_ACCESS_TYPES\.HOST:[\s\S]*?case APPLICATION_ACCESS_TYPES\.SUPER_ADMIN:/,
+      )?.[0] ||
+      ''
+
+    assert.match(
+      hostAccessBranch,
+      /hostEnabled\s*===\s*true/,
+    )
+
+    assert.match(
+      hostAccessBranch,
+      /hostAccessStatus\s*===\s*['"]active['"]/,
+    )
+
     assert.doesNotMatch(
-      source,
+      hostAccessBranch,
       /\bactiveMode\b/,
     )
   },

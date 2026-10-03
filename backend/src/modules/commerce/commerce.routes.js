@@ -41,7 +41,9 @@ import {
 
 import {
   createDirectMarketplaceCart,
+  createRestaurantRecipeMarketplaceCart,
   createValidatedMarketplaceCart,
+  getMarketplaceCartDeliveryEta,
   updateDirectMarketplaceCartItem,
 } from './commerce.checkout.service.js'
 
@@ -171,6 +173,46 @@ export const createDirectCartBodySchema =
           )
           .default(
             1,
+          ),
+
+      pincode:
+        pincodeSchema,
+
+      fulfillmentType:
+        z
+          .enum([
+            'delivery',
+            'pickup',
+          ])
+          .default(
+            'delivery',
+          ),
+    })
+    .strict()
+
+export const createRestaurantRecipeCartBodySchema =
+  z
+    .object({
+      slug:
+        z
+          .string()
+          .trim()
+          .min(
+            1,
+          )
+          .max(
+            220,
+          ),
+
+      servings:
+        z
+          .number()
+          .int()
+          .min(
+            1,
+          )
+          .max(
+            1000,
           ),
 
       pincode:
@@ -603,6 +645,53 @@ commerceRoutes.post(
 )
 
 commerceRoutes.post(
+  '/cart/restaurant-recipe',
+  requireCsrfToken,
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const input =
+        parseOrThrow(
+          createRestaurantRecipeCartBodySchema,
+          req.body,
+          'RESTAURANT_RECIPE_CART_CREATE_INVALID',
+          'Invalid Restaurant Recipe order request.',
+        )
+
+      return sendSuccess(
+        req,
+        res,
+        201,
+        await createRestaurantRecipeMarketplaceCart({
+          slug:
+            input.slug,
+
+          servings:
+            input.servings,
+
+          pincode:
+            input.pincode,
+
+          fulfillmentType:
+            input.fulfillmentType,
+
+          idempotencyKey:
+            requireIdempotencyKey(
+              req,
+            ),
+
+          actorUser:
+            req.currentUser,
+        }),
+        'Restaurant Recipe order Cart created successfully.',
+      )
+    },
+  ),
+)
+
+commerceRoutes.post(
   '/cart',
   requireCsrfToken,
   wrap(
@@ -690,6 +779,40 @@ commerceRoutes.patch(
             req.currentUser,
         }),
         'Direct Marketplace Cart item updated successfully.',
+      )
+    },
+  ),
+)
+
+commerceRoutes.get(
+  '/cart/:id/delivery-eta',
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const {
+        id,
+      } =
+        parseOrThrow(
+          idParamsSchema,
+          req.params,
+          'MARKETPLACE_CART_ID_INVALID',
+          'Invalid Marketplace Cart ID.',
+        )
+
+      return sendSuccess(
+        req,
+        res,
+        200,
+        await getMarketplaceCartDeliveryEta({
+          cartId:
+            id,
+
+          actorUser:
+            req.currentUser,
+        }),
+        'Delivery ETA calculated successfully.',
       )
     },
   ),

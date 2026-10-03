@@ -74,9 +74,9 @@ test(
             );
         }
 
-        assert.doesNotMatch(
+        assert.match(
             source,
-            /activeMode/,
+            /hostEnabled\s*===\s*true\s*&&\s*hostAccessStatus\s*===\s*['"]active['"]/,
         );
     },
 );

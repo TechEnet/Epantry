@@ -158,8 +158,8 @@ test(
     )
 
     assert.match(
-      panel,
-      /COMMERCE_EXTERNAL_PARTNERS_JSON/,
+      service,
+      /externalRetailerHandoffPartners:\s*listExternalCommercePartners\(\)/,
     )
   },
 )
@@ -573,7 +573,7 @@ test(
 
     assert.match(
       panel,
-      /Provider confirmation is not settlement truth/,
+      /A provider confirmation shows payout progress, not final settlement/,
     )
   },
 )

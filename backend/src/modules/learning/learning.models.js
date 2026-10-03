@@ -42,6 +42,26 @@ export const LESSON_PROGRESS_STATUSES = Object.freeze([
     'completed',
 ]);
 
+export const PRO_PLAN_CODES = Object.freeze([
+    'monthly',
+    'quarterly',
+    'half_year',
+    'annual',
+]);
+
+export const PRO_MEMBERSHIP_STATUSES = Object.freeze([
+    'active',
+    'expired',
+    'suspended',
+]);
+
+export const PRO_PAYMENT_STATUSES = Object.freeze([
+    'initiated',
+    'paid',
+    'failed',
+]);
+
+
 const baseOptions = Object.freeze({
     timestamps: true,
     strict: true,
@@ -682,6 +702,304 @@ lessonNoteSchema.index({
     name: 'lesson_note_user_lesson',
 });
 
+
+
+/*
+|--------------------------------------------------------------------------
+| EPANTRY Pro plan catalog + Customer membership
+|--------------------------------------------------------------------------
+|
+| M3 keeps Pro as a Customer entitlement product, not a fourth application
+| role. Plan configuration is additive and existing CourseEntitlement records
+| remain valid. Razorpay transaction evidence is added in the payment part of
+| M3; these models only establish the plan + membership authority.
+|
+*/
+
+const proPlanSchema = new Schema({
+    code: {
+        type: String,
+        enum: PRO_PLAN_CODES,
+        required: true,
+        unique: true,
+        index: true,
+    },
+
+    name: {
+        type: String,
+        trim: true,
+        maxlength: 120,
+        required: true,
+    },
+
+    shortDescription: {
+        type: String,
+        trim: true,
+        maxlength: 600,
+        default: '',
+    },
+
+    priceMinor: {
+        type: Number,
+        min: 0,
+        required: true,
+    },
+
+    currency: {
+        type: String,
+        trim: true,
+        uppercase: true,
+        enum: [
+            'INR',
+        ],
+        required: true,
+        default: 'INR',
+    },
+
+    validityMonths: {
+        type: Number,
+        min: 1,
+        max: 24,
+        required: true,
+    },
+
+    benefits: [{
+        type: String,
+        trim: true,
+        maxlength: 300,
+    }],
+
+    isEnabled: {
+        type: Boolean,
+        required: true,
+        default: true,
+        index: true,
+    },
+
+    sortOrder: {
+        type: Number,
+        min: 0,
+        max: 1000,
+        required: true,
+        default: 0,
+    },
+
+    updatedByAdminUserId: {
+        type: objectId,
+        ref: 'User',
+        default: null,
+    },
+}, {
+    ...baseOptions,
+    collection: 'proPlans',
+});
+
+proPlanSchema.index({
+    isEnabled: 1,
+    sortOrder: 1,
+    priceMinor: 1,
+}, {
+    name: 'pro_plan_public_catalog',
+});
+
+const proMembershipSchema = new Schema({
+    userId: {
+        type: objectId,
+        ref: 'User',
+        required: true,
+        unique: true,
+        index: true,
+    },
+
+    status: {
+        type: String,
+        enum: PRO_MEMBERSHIP_STATUSES,
+        required: true,
+        default: 'active',
+        index: true,
+    },
+
+    startedAt: {
+        type: Date,
+        default: null,
+    },
+
+    validUntil: {
+        type: Date,
+        default: null,
+        index: true,
+    },
+
+    lastActivatedAt: {
+        type: Date,
+        default: null,
+    },
+
+    lastPlanId: {
+        type: objectId,
+        ref: 'ProPlan',
+        default: null,
+    },
+
+    lastPlanCode: {
+        type: String,
+        enum: PRO_PLAN_CODES,
+        default: null,
+    },
+}, {
+    ...baseOptions,
+    collection: 'proMemberships',
+});
+
+proMembershipSchema.index({
+    status: 1,
+    validUntil: 1,
+}, {
+    name: 'pro_membership_status_expiry',
+});
+
+
+const proMembershipPaymentSchema = new Schema({
+    userId: {
+        type: objectId,
+        ref: 'User',
+        required: true,
+        index: true,
+    },
+
+    planId: {
+        type: objectId,
+        ref: 'ProPlan',
+        required: true,
+        index: true,
+    },
+
+    planCode: {
+        type: String,
+        enum: PRO_PLAN_CODES,
+        required: true,
+        index: true,
+    },
+
+    status: {
+        type: String,
+        enum: PRO_PAYMENT_STATUSES,
+        required: true,
+        default: 'initiated',
+        index: true,
+    },
+
+    amountMinor: {
+        type: Number,
+        min: 1,
+        required: true,
+    },
+
+    validityMonths: {
+        type: Number,
+        min: 1,
+        max: 24,
+        required: true,
+    },
+
+    currency: {
+        type: String,
+        trim: true,
+        uppercase: true,
+        enum: ['INR'],
+        required: true,
+        default: 'INR',
+    },
+
+    provider: {
+        type: String,
+        enum: ['razorpay'],
+        required: true,
+        default: 'razorpay',
+    },
+
+    providerMode: {
+        type: String,
+        enum: ['test'],
+        required: true,
+        default: 'test',
+    },
+
+    providerOrderId: {
+        type: String,
+        trim: true,
+        default: undefined,
+    },
+
+    providerPaymentId: {
+        type: String,
+        trim: true,
+        default: undefined,
+    },
+
+    initiatedAt: {
+        type: Date,
+        required: true,
+        default: Date.now,
+    },
+
+    paidAt: {
+        type: Date,
+        default: null,
+    },
+
+    coverageStartAt: {
+        type: Date,
+        default: null,
+    },
+
+    coverageEndAt: {
+        type: Date,
+        default: null,
+    },
+
+    planLockUntil: {
+        type: Date,
+        default: null,
+        index: true,
+    },
+
+    failureCode: {
+        type: String,
+        trim: true,
+        maxlength: 120,
+        default: '',
+    },
+}, {
+    ...baseOptions,
+    collection: 'proMembershipPayments',
+});
+
+proMembershipPaymentSchema.index({
+    userId: 1,
+    planCode: 1,
+    status: 1,
+    planLockUntil: -1,
+}, {
+    name: 'pro_payment_plan_lock',
+});
+
+proMembershipPaymentSchema.index({
+    providerOrderId: 1,
+}, {
+    unique: true,
+    sparse: true,
+    name: 'pro_payment_provider_order_unique',
+});
+
+proMembershipPaymentSchema.index({
+    providerPaymentId: 1,
+}, {
+    unique: true,
+    sparse: true,
+    name: 'pro_payment_provider_payment_unique',
+});
+
 export const CourseModule =
     mongoose.models.CourseModule ||
     mongoose.model(
@@ -730,3 +1048,26 @@ export const LessonNote =
         'LessonNote',
         lessonNoteSchema,
     );
+
+export const ProPlan =
+    mongoose.models.ProPlan ||
+    mongoose.model(
+        'ProPlan',
+        proPlanSchema,
+    );
+
+export const ProMembership =
+    mongoose.models.ProMembership ||
+    mongoose.model(
+        'ProMembership',
+        proMembershipSchema,
+    );
+
+
+export const ProMembershipPayment =
+    mongoose.models.ProMembershipPayment ||
+    mongoose.model(
+        'ProMembershipPayment',
+        proMembershipPaymentSchema,
+    );
+

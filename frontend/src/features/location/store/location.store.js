@@ -85,6 +85,32 @@ export const useLocationStore = create(
                     )
                       ? deliveryContext.estimatedDeliveryMinutes
                       : null,
+
+                  estimatedArrivalAt:
+                    deliveryContext.estimatedArrivalAt ||
+                    '',
+
+                  estimatedRoadDistanceKm:
+                    Number.isFinite(
+                      deliveryContext.estimatedRoadDistanceKm,
+                    )
+                      ? deliveryContext.estimatedRoadDistanceKm
+                      : null,
+
+                  averageSpeedKmh:
+                    Number.isFinite(
+                      deliveryContext.averageSpeedKmh,
+                    )
+                      ? deliveryContext.averageSpeedKmh
+                      : null,
+
+                  targetPath:
+                    deliveryContext.targetPath ||
+                    '',
+
+                  calculationMethod:
+                    deliveryContext.calculationMethod ||
+                    '',
                 }
               : null,
         }),

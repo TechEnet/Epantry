@@ -163,6 +163,9 @@ test(
           'customerEnabled:',
           'hostEnabled:',
           'hostAccessStatus:',
+          'HOST_WORKSPACE_TYPES',
+          'hostWorkspaceType:',
+          'chef_restaurant',
           'superAdminEnabled:',
           'activeMode:',
         ],
@@ -415,8 +418,34 @@ test(
         'customerEnabled:',
         'hostEnabled:',
         'hostAccessStatus:',
+        'hostWorkspaceType:',
+        'AUTH_HOST_WORKSPACE_TYPE_REQUIRED',
         'superAdminEnabled:',
         'activeMode:',
+      ],
+    )
+
+    await assertContains(
+      'frontend/src/features/auth/pages/RegisterPage.jsx',
+
+      [
+        "'host-intent'",
+        "label: 'B2B'",
+        "label: 'Brand / Seller'",
+        "label: 'Hybrid'",
+        "label: 'Chef + Restaurant'",
+        'Submit Host application',
+        'continue as a Customer',
+      ],
+    )
+
+    await assertContains(
+      'frontend/src/features/admin/pages/AdminHostReviewPage.jsx',
+
+      [
+        'Requested type',
+        'Requested Host workspace',
+        'hostWorkspaceTypeLabel',
       ],
     )
 

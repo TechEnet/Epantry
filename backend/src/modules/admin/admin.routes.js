@@ -77,6 +77,13 @@ import {
 } from '../catalog/catalog.admin.controller.js'
 
 import {
+  getAdminProOverviewController,
+  listAdminProMembershipsController,
+  listAdminProPaymentsController,
+  updateAdminProPlanController,
+} from '../learning/learning.controller.js'
+
+import {
   createCanonicalIngredientController,
   createEvidenceSourceController,
   listCanonicalIngredientsController,
@@ -290,6 +297,91 @@ router.patch(
   loadAdminAuthorization,
 
   updateAdminUserRolesController,
+)
+
+/*
+|--------------------------------------------------------------------------
+| M3-C EPANTRY Pro - Root Super Admin ownership
+|--------------------------------------------------------------------------
+|
+| Plan pricing, availability and benefit copy belong to the EPANTRY owner.
+| Membership and payment lists are read-only here; paid Customer validity is
+| never shortened by plan edits.
+|
+*/
+
+router.get(
+  '/pro',
+
+  authenticateSession,
+
+  loadCurrentUser,
+
+  requireActiveAccount,
+
+  ...requirePrivilegedAccess(
+    'super_admin',
+  ),
+
+  loadAdminAuthorization,
+
+  getAdminProOverviewController,
+)
+
+router.get(
+  '/pro/memberships',
+
+  authenticateSession,
+
+  loadCurrentUser,
+
+  requireActiveAccount,
+
+  ...requirePrivilegedAccess(
+    'super_admin',
+  ),
+
+  loadAdminAuthorization,
+
+  listAdminProMembershipsController,
+)
+
+router.get(
+  '/pro/payments',
+
+  authenticateSession,
+
+  loadCurrentUser,
+
+  requireActiveAccount,
+
+  ...requirePrivilegedAccess(
+    'super_admin',
+  ),
+
+  loadAdminAuthorization,
+
+  listAdminProPaymentsController,
+)
+
+router.patch(
+  '/pro/plans/:planCode',
+
+  authenticateSession,
+
+  requireCsrfToken,
+
+  loadCurrentUser,
+
+  requireActiveAccount,
+
+  ...requireRecentPrivilegedAccess(
+    'super_admin',
+  ),
+
+  loadAdminAuthorization,
+
+  updateAdminProPlanController,
 )
 
 /*

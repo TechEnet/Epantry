@@ -603,6 +603,115 @@ const cartItemSchema = new Schema(
 
 /*
 |--------------------------------------------------------------------------
+| Restaurant Recipe Order Foundation
+|--------------------------------------------------------------------------
+|
+| M5-C stores prepared-dish ordering as a Commerce cart source so it can
+| reuse the existing checkout/order/payment engine when that final bridge is
+| enabled. Grocery Product/Offer cart items remain unchanged.
+|
+*/
+
+const restaurantRecipeOrderSchema = new Schema(
+  {
+    recipeVersionId: {
+      type: objectId,
+      ref: 'RecipeVersion',
+      required: true,
+      index: false,
+    },
+
+    dishId: {
+      type: objectId,
+      ref: 'Dish',
+      required: true,
+    },
+
+    recipeSlug: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 220,
+    },
+
+    productionRecipeVersionId: {
+      type: objectId,
+      ref: 'HospitalityProductionRecipeVersion',
+      required: true,
+    },
+
+    menuItemId: {
+      type: objectId,
+      ref: 'HospitalityMenuItem',
+      required: true,
+    },
+
+    organizationId: {
+      type: objectId,
+      ref: 'MarketplaceOrganization',
+      required: true,
+    },
+
+    outletId: {
+      type: objectId,
+      ref: 'HospitalityOutlet',
+      required: true,
+    },
+
+    restaurantName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 220,
+    },
+
+    outletName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 220,
+    },
+
+    displayName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 300,
+    },
+
+    servings: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 1000,
+    },
+
+    pricePerServing: {
+      type: moneySnapshotSchema,
+      required: true,
+    },
+
+    lineTotal: {
+      type: moneySnapshotSchema,
+      required: true,
+    },
+
+    priceSource: {
+      type: String,
+      enum: [
+        'active_hospitality_menu',
+      ],
+      required: true,
+      default: 'active_hospitality_menu',
+    },
+  },
+  {
+    _id: false,
+  },
+)
+
+/*
+|--------------------------------------------------------------------------
 | Marketplace Cart
 |--------------------------------------------------------------------------
 |
@@ -634,6 +743,7 @@ const marketplaceCartSchema = new Schema(
       enum: [
         'basket_quote',
         'direct_product',
+        'restaurant_recipe',
       ],
       required: true,
       default: 'basket_quote',
@@ -680,6 +790,11 @@ const marketplaceCartSchema = new Schema(
         'delivery',
         'pickup',
       ],
+      default: null,
+    },
+
+    restaurantOrder: {
+      type: restaurantRecipeOrderSchema,
       default: null,
     },
 

@@ -1073,7 +1073,7 @@ test(
 
     assert.match(
       source,
-      /planning evidence only|planning constraints only|forecasting overlay/i,
+      /Pantry forecast|Reservations do not consume Pantry/i,
     )
 
     assert.match(
@@ -1098,7 +1098,7 @@ test(
 
     assert.match(
       source,
-      /Why\?|Why is this here\?/,
+      /Check why it is suggested|why it is suggested/i,
     )
 
     assert.match(
@@ -1124,7 +1124,7 @@ test(
 )
 
 test(
-  'M13 P17 explicitly states accepting does not create commerce transaction',
+  'M13 P17 explicitly separates Accept feedback from the user-triggered Add to cart action',
   () => {
     const source =
       readFrontend(
@@ -1133,7 +1133,7 @@ test(
 
     assert.match(
       source,
-      /does not automatically create a Cart|does not create an M11 Cart/i,
+      /Accept saves a suggestion\. Add to cart checks product and delivery[\s\S]*Nothing is ordered until you complete checkout\./i,
     )
   },
 )
@@ -1161,9 +1161,9 @@ test(
       /hostEnabled\s*===\s*true\s*&&\s*hostAccessStatus\s*===\s*'active'/,
     )
 
-    assert.doesNotMatch(
+    assert.match(
       source,
-      /activeMode/,
+      /customerEnabled\s*===\s*true/,
     )
   },
 )

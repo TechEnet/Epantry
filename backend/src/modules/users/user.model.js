@@ -69,6 +69,27 @@ export const HOST_ACCESS_STATUSES =
 
 /*
 |--------------------------------------------------------------------------
+| Host Workspace Types
+|--------------------------------------------------------------------------
+|
+| This is the business intent selected by a Host applicant before approval.
+| It is not a fourth/fifth top-level application role.
+|
+| Existing legacy Host records may have this field unset; later workspace
+| gating must preserve those accounts through an explicit compatibility path.
+|
+*/
+
+export const HOST_WORKSPACE_TYPES =
+  Object.freeze([
+    'b2b',
+    'brand_seller',
+    'hybrid',
+    'chef_restaurant',
+  ])
+
+/*
+|--------------------------------------------------------------------------
 | Global Account Status
 |--------------------------------------------------------------------------
 |
@@ -370,6 +391,22 @@ const userSchema =
 
         default:
           'not_requested',
+
+        index:
+          true,
+      },
+
+      hostWorkspaceType: {
+        type:
+          String,
+
+        enum: [
+          ...HOST_WORKSPACE_TYPES,
+          null,
+        ],
+
+        default:
+          null,
 
         index:
           true,

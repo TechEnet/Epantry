@@ -501,7 +501,7 @@ test(
 */
 
 test(
-  'Customer can submit Host request without receiving Host authorization',
+  'Customer can submit typed Host request without receiving Host authorization',
 
   {
     concurrency:
@@ -528,6 +528,9 @@ test(
 
         activeMode:
           'customer',
+
+        hostWorkspaceType:
+          'b2b',
       })
 
     await withMockedModelMethods(
@@ -560,6 +563,9 @@ test(
         const result =
           await requestHostAccess({
             user,
+
+            hostWorkspaceType:
+              'b2b',
           })
 
         assert.equal(
@@ -645,6 +651,14 @@ test(
         .hostAccessStatus,
 
       'pending',
+    )
+
+    assert.equal(
+      capturedUpdate
+        .$set
+        .hostWorkspaceType,
+
+      'b2b',
     )
 
     assert.equal(

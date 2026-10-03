@@ -171,6 +171,85 @@ export async function listMyCommunityRecipes(
   );
 }
 
+export async function listSharedWithMeCommunityRecipes() {
+  const response =
+      await apiClient.get(
+          '/me/community-recipes/shared',
+      );
+
+  return unwrap(
+      response,
+  );
+}
+
+export async function getSharedCommunityRecipe(
+  shareToken,
+) {
+  const response =
+      await apiClient.get(
+          `/community-recipes/shared/${encodePath(
+              shareToken,
+          )}`,
+      );
+
+  return unwrap(
+      response,
+  );
+}
+
+export async function claimSharedCommunityRecipe(
+  shareToken,
+) {
+  return mutate({
+      url:
+          `/community-recipes/shared/${encodePath(
+              shareToken,
+          )}/claim`,
+  });
+}
+
+export async function createCommunityRecipeShare({
+  communityRecipeId,
+  friendEmail,
+}) {
+  return mutate({
+      url:
+          `/community-recipes/${encodePath(
+              communityRecipeId,
+          )}/share`,
+
+      data: {
+          friendEmail,
+      },
+  });
+}
+
+export async function listCommunityRecipeShares(
+  communityRecipeId,
+) {
+  const response =
+      await apiClient.get(
+          `/community-recipes/${encodePath(
+              communityRecipeId,
+          )}/shares`,
+      );
+
+  return unwrap(
+      response,
+  );
+}
+
+export async function revokeCommunityRecipeShare(
+  shareId,
+) {
+  return mutate({
+      url:
+          `/community-recipe-shares/${encodePath(
+              shareId,
+          )}/revoke`,
+  });
+}
+
 export async function searchCommunityIngredients({
   search,
   limit = 12,
@@ -343,6 +422,17 @@ export async function listCreatorCourses(
           {
               params,
           },
+      );
+
+  return unwrap(
+      response,
+  );
+}
+
+export async function listMyCreatorCourses() {
+  const response =
+      await apiClient.get(
+          '/creators/profile/courses',
       );
 
   return unwrap(

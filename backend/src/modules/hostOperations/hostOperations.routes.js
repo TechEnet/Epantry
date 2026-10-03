@@ -21,6 +21,10 @@ import {
 } from '../admin/adminPermission.middleware.js'
 
 import {
+  recordAdminAuditEvent,
+} from '../admin/adminAudit.service.js'
+
+import {
   rejectPrivilegedImpersonation,
 } from '../admin/adminSafety.middleware.js'
 
@@ -36,6 +40,32 @@ import {
 import {
   requireHostAccess,
 } from '../auth/authorization.middleware.js'
+
+import {
+  approveHospitalityProductionRecipeAsSuperAdmin,
+  listAdminHospitalityProductionRecipeApprovals,
+  listAdminHospitalityRestaurantRecipeApprovals,
+  reviewHospitalityRestaurantRecipeAsSuperAdmin,
+} from '../hospitality/hospitality.service.js'
+
+import {
+  approveDishPassportSnapshotAsSuperAdmin,
+  approveHospitalityChangeCaseAsSuperAdmin,
+  listAdminDishPassportApprovals,
+  listAdminHospitalityChangeCaseApprovals,
+} from '../hospitality/hospitality.passport.service.js'
+
+import {
+  hospitalityIdParamsSchema,
+  productionRecipeActionBodySchema,
+  restaurantRecipeReviewBodySchema,
+} from '../hospitality/hospitality.validation.js'
+
+import {
+  changeCaseDecisionBodySchema,
+  hospitalityPassportIdParamsSchema,
+  passportDecisionBodySchema,
+} from '../hospitality/hospitality.passport.validation.js'
 
 import {
   addOrganizationMember,
@@ -193,6 +223,33 @@ function sendSuccess(
         message,
       ),
     )
+}
+
+function requireResolvedRootSuperAdmin(
+  req,
+  res,
+  next,
+) {
+  if (
+    req.adminAuthorization
+      ?.isRootSuperAdmin ===
+    true
+  ) {
+    return next()
+  }
+
+  return next(
+    new ApiError(
+      403,
+      'Real Super Admin authority is required for Hospitality approval.',
+      [
+        {
+          code:
+            'HOSPITALITY_ROOT_SUPER_ADMIN_REQUIRED',
+        },
+      ],
+    ),
+  )
 }
 
 function requireIdempotencyKey(
@@ -1620,6 +1677,397 @@ adminRouter.post(
             req.requestId,
         }),
         'Host operational activation decision recorded.',
+      )
+    },
+  ),
+)
+
+/*
+|--------------------------------------------------------------------------
+| Hospitality approvals - root Super Admin only
+|--------------------------------------------------------------------------
+*/
+
+adminRouter.get(
+  '/hospitality/approvals',
+
+  requireResolvedRootSuperAdmin,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const [
+        productionRecipes,
+        restaurantRecipes,
+        dishPassports,
+        changeCases,
+      ] =
+        await Promise.all([
+          listAdminHospitalityProductionRecipeApprovals({
+            actorUser:
+              req.currentUser,
+          }),
+
+          listAdminHospitalityRestaurantRecipeApprovals({
+            actorUser:
+              req.currentUser,
+          }),
+
+          listAdminDishPassportApprovals({
+            actorUser:
+              req.currentUser,
+          }),
+
+          listAdminHospitalityChangeCaseApprovals({
+            actorUser:
+              req.currentUser,
+          }),
+        ])
+
+      return sendSuccess(
+        req,
+        res,
+        200,
+        {
+          productionRecipes:
+            productionRecipes.productionRecipes ||
+            [],
+
+          restaurantRecipes:
+            restaurantRecipes.restaurantRecipes ||
+            [],
+
+          dishPassports:
+            dishPassports.dishPassports ||
+            [],
+
+          changeCases:
+            changeCases.changeCases ||
+            [],
+
+          recipeMigrationAudit:
+            productionRecipes.migrationAudit ||
+            null,
+        },
+        'Hospitality approval queue loaded.',
+      )
+    },
+  ),
+)
+
+adminRouter.post(
+  '/hospitality/restaurant-recipes/:id/review',
+
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  requireResolvedRootSuperAdmin,
+
+  wrap(
+    async (req, res) => {
+      const params = parseOrThrow(
+        hospitalityIdParamsSchema,
+        req.params,
+        'ADMIN_HOSPITALITY_RESTAURANT_RECIPE_ID_INVALID',
+        'Invalid Restaurant Recipe ID.',
+      )
+
+      const input = parseOrThrow(
+        restaurantRecipeReviewBodySchema,
+        req.body,
+        'ADMIN_HOSPITALITY_RESTAURANT_RECIPE_REVIEW_INVALID',
+        'Invalid Restaurant Recipe review decision.',
+      )
+
+      const result =
+        await reviewHospitalityRestaurantRecipeAsSuperAdmin({
+          recipeVersionId: params.id,
+          input,
+          actorUser: req.currentUser,
+        })
+
+      await recordAdminAuditEvent({
+        actorUser:
+          req.currentUser,
+        adminAuthorization:
+          req.adminAuthorization,
+        action:
+          input.decision ===
+          'approve'
+            ? 'hospitality.restaurant_recipe.approve'
+            : 'hospitality.restaurant_recipe.reject',
+        entityType:
+          'restaurant_recipe_version',
+        entityId:
+          params.id,
+        reasonCode:
+          'hospitality.governance',
+        reasonDetails:
+          input.reason,
+        afterSnapshot:
+          result,
+        metadata: {
+          governanceArea:
+            'restaurant_recipe',
+          decision:
+            input.decision,
+          source:
+            'admin_host_operations',
+        },
+        requestId:
+          req.requestId,
+      })
+
+      return sendSuccess(
+        req,
+        res,
+        200,
+        result,
+        input.decision === 'approve'
+          ? 'Restaurant Recipe approved and published.'
+          : 'Restaurant Recipe returned to the Host for changes.',
+      )
+    },
+  ),
+)
+
+adminRouter.post(
+  '/hospitality/production-recipes/:id/approve',
+
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  requireResolvedRootSuperAdmin,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const params =
+        parseOrThrow(
+          hospitalityIdParamsSchema,
+          req.params,
+          'ADMIN_HOSPITALITY_PRODUCTION_RECIPE_ID_INVALID',
+          'Invalid Hospitality kitchen recipe ID.',
+        )
+
+      const input =
+        parseOrThrow(
+          productionRecipeActionBodySchema,
+          req.body,
+          'ADMIN_HOSPITALITY_PRODUCTION_RECIPE_APPROVAL_INVALID',
+          'Invalid Hospitality kitchen recipe approval.',
+        )
+
+      const result =
+        await approveHospitalityProductionRecipeAsSuperAdmin({
+          productionRecipeVersionId:
+            params.id,
+
+          input,
+
+          actorUser:
+            req.currentUser,
+        })
+
+      await recordAdminAuditEvent({
+        actorUser:
+          req.currentUser,
+        adminAuthorization:
+          req.adminAuthorization,
+        action:
+          'hospitality.production_recipe.approve',
+        entityType:
+          'hospitality_production_recipe',
+        entityId:
+          params.id,
+        reasonCode:
+          'hospitality.governance',
+        reasonDetails:
+          input.reason,
+        afterSnapshot:
+          result,
+        metadata: {
+          governanceArea:
+            'production_recipe',
+          decision:
+            'approve',
+          source:
+            'admin_host_operations',
+        },
+        requestId:
+          req.requestId,
+      })
+
+      return sendSuccess(
+        req,
+        res,
+        200,
+        result,
+        'Hospitality kitchen recipe approved by Super Admin.',
+      )
+    },
+  ),
+)
+
+adminRouter.post(
+  '/hospitality/dish-passports/:id/approve',
+
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  requireResolvedRootSuperAdmin,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const params =
+        parseOrThrow(
+          hospitalityPassportIdParamsSchema,
+          req.params,
+          'ADMIN_HOSPITALITY_DISH_PASSPORT_ID_INVALID',
+          'Invalid Hospitality dish record ID.',
+        )
+
+      const input =
+        parseOrThrow(
+          passportDecisionBodySchema,
+          req.body,
+          'ADMIN_HOSPITALITY_DISH_PASSPORT_APPROVAL_INVALID',
+          'Invalid Hospitality dish record approval.',
+        )
+
+      const result =
+        await approveDishPassportSnapshotAsSuperAdmin({
+          snapshotId:
+            params.id,
+
+          input,
+
+          actorUser:
+            req.currentUser,
+        })
+
+      await recordAdminAuditEvent({
+        actorUser:
+          req.currentUser,
+        adminAuthorization:
+          req.adminAuthorization,
+        action:
+          'hospitality.dish_passport.approve',
+        entityType:
+          'hospitality_dish_passport',
+        entityId:
+          params.id,
+        reasonCode:
+          'hospitality.governance',
+        reasonDetails:
+          input.reason,
+        afterSnapshot:
+          result,
+        metadata: {
+          governanceArea:
+            'dish_passport',
+          decision:
+            'approve',
+          source:
+            'admin_host_operations',
+        },
+        requestId:
+          req.requestId,
+      })
+
+      return sendSuccess(
+        req,
+        res,
+        200,
+        result,
+        'Hospitality dish record approved by Super Admin.',
+      )
+    },
+  ),
+)
+
+adminRouter.post(
+  '/hospitality/change-cases/:id/approve',
+
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  requireResolvedRootSuperAdmin,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const params =
+        parseOrThrow(
+          hospitalityPassportIdParamsSchema,
+          req.params,
+          'ADMIN_HOSPITALITY_CHANGE_CASE_ID_INVALID',
+          'Invalid Hospitality change case ID.',
+        )
+
+      const input =
+        parseOrThrow(
+          changeCaseDecisionBodySchema,
+          {
+            ...req.body,
+            decision:
+              'approve',
+          },
+          'ADMIN_HOSPITALITY_CHANGE_CASE_APPROVAL_INVALID',
+          'Invalid Hospitality change approval.',
+        )
+
+      const result =
+        await approveHospitalityChangeCaseAsSuperAdmin({
+          changeCaseId:
+            params.id,
+
+          input,
+
+          actorUser:
+            req.currentUser,
+        })
+
+      await recordAdminAuditEvent({
+        actorUser:
+          req.currentUser,
+        adminAuthorization:
+          req.adminAuthorization,
+        action:
+          'hospitality.change_case.approve',
+        entityType:
+          'hospitality_change_case',
+        entityId:
+          params.id,
+        reasonCode:
+          'hospitality.governance',
+        reasonDetails:
+          input.reason,
+        afterSnapshot:
+          result,
+        metadata: {
+          governanceArea:
+            'change_case',
+          decision:
+            'approve',
+          source:
+            'admin_host_operations',
+        },
+        requestId:
+          req.requestId,
+      })
+
+      return sendSuccess(
+        req,
+        res,
+        200,
+        result,
+        'Hospitality change approved by Super Admin.',
       )
     },
   ),

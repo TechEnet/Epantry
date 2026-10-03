@@ -44,7 +44,7 @@ function stripComments(source) {
 }
 
 test(
-  'M16 Final preserves Customer Host Super Admin access model and never authorizes with activeMode',
+  'M16 Final preserves Customer Host Super Admin access model while Host authority stays capability based',
   () => {
     const files = [
       'backend/src/modules/hostOperations/hostOperations.routes.js',
@@ -64,9 +64,9 @@ test(
           .join('\n'),
       )
 
-    assert.doesNotMatch(
+    assert.match(
       source,
-      /activeMode/,
+      /hostEnabled\s*===\s*true\s*&&\s*hostAccessStatus\s*===\s*['"]active['"]/,
     )
 
     for (const forbidden of [

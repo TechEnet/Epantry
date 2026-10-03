@@ -23,6 +23,7 @@ import {
 } from '../notifications/notification.service.js'
 
 import {
+  HOST_WORKSPACE_TYPES,
   User,
 } from '../users/user.model.js'
 
@@ -83,6 +84,13 @@ const completeRegistrationSchema =
           512,
           'Invalid registration verification.',
         ),
+
+    hostWorkspaceType:
+      z.enum(
+        HOST_WORKSPACE_TYPES,
+      )
+        .optional()
+        .nullable(),
   })
 
 /*
@@ -487,6 +495,12 @@ async function createApplicationUser({
         provisioning
           .hostAccessStatus,
 
+      hostWorkspaceType:
+        registration.accountType ===
+          'host'
+          ? registration.hostWorkspaceType || null
+          : null,
+
       superAdminEnabled:
         provisioning
           .superAdminEnabled,
@@ -566,6 +580,43 @@ export async function completeRegistration(
         firebaseIdentity
           .firebaseUid,
     })
+
+  if (
+    registration.accountType ===
+      'host' &&
+    !input.hostWorkspaceType
+  ) {
+    throw new ApiError(
+      400,
+      'Choose the Host workspace you are applying for before submitting your application.',
+      [
+        {
+          code:
+            'AUTH_HOST_WORKSPACE_TYPE_REQUIRED',
+        },
+      ],
+    )
+  }
+
+  if (
+    registration.accountType ===
+      'customer' &&
+    input.hostWorkspaceType
+  ) {
+    throw new ApiError(
+      400,
+      'Host workspace selection is only available for Host applications.',
+      [
+        {
+          code:
+            'AUTH_HOST_WORKSPACE_TYPE_NOT_ALLOWED',
+        },
+      ],
+    )
+  }
+
+  registration.hostWorkspaceType =
+    input.hostWorkspaceType || null
 
   /*
   |--------------------------------------------------------------------------
@@ -677,7 +728,7 @@ export async function completeRegistration(
         'host_registration',
       reasonCode:
         'new_host_registration',
-      explanation: `${registration.name} registered for Host access and is awaiting Host review.`,
+      explanation: `${registration.name} registered for Host access as ${String(applicationUser.hostWorkspaceType || 'legacy').replaceAll('_', ' ')} and is awaiting Host review.`,
       relatedEntityType:
         'host_user',
       relatedEntityId:

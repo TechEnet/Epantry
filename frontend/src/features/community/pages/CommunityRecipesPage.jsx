@@ -36,14 +36,16 @@ import {
   
   import {
     createCommunityRecipe,
+    createCommunityRecipeShare,
     forkCommunityRecipe,
     getCommunityErrorMessage,
     getCommunityRecipe,
-    listCommunityRecipes,
+    listCommunityRecipeShares,
     listMyCommunityRecipes,
+    listSharedWithMeCommunityRecipes,
     reviewCommunityRecipe,
+    revokeCommunityRecipeShare,
     searchCommunityIngredients,
-    submitCommunityRecipe,
   } from '../services/community.service';
   
   const RECIPE_UNITS = [
@@ -966,44 +968,15 @@ import {
                     />
                 </label>
   
-                <label>
-                    <span className="text-xs font-black text-stone-500">
-                        Visibility
-                    </span>
-  
-                    <select
-                        value={
-                            form.visibility
-                        }
-                        onChange={(
-                            event,
-                        ) =>
-                            setForm(
-                                (
-                                    current,
-                                ) => ({
-                                    ...current,
-  
-                                    visibility:
-                                        event.target.value,
-                                }),
-                            )
-                        }
-                        className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none"
-                    >
-                        <option value="private">
-                            Private
-                        </option>
-  
-                        <option value="friends">
-                            Friends only
-                        </option>
-  
-                        <option value="public">
-                            Public - moderation required
-                        </option>
-                    </select>
-                </label>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="text-xs font-black text-emerald-900">
+                        Private by default
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-emerald-800">
+                        This personal recipe is only yours. After saving, you can create a private link for a specific friend. It cannot be published publicly.
+                    </p>
+                </div>
             </div>
   
             <div className="mt-7">
@@ -1357,11 +1330,8 @@ import {
                 )}
   
                 {sourceDetail
-                    ? 'Create adaptation with lineage'
-                    : form.visibility ===
-                        'public'
-                        ? 'Create & send to moderation'
-                        : 'Create Community Recipe'}
+                    ? 'Create private adaptation'
+                    : 'Save private recipe'}
             </button>
         </form>
     );
@@ -1699,6 +1669,11 @@ import {
                                     ? ' · Verified creator'
                                     : ''}
                             </Link>
+                        ) : detail.owner ? (
+                            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-violet-50 px-4 py-2 text-xs font-black text-violet-800">
+                                <Users size={15} />
+                                Personal recipe by {detail.owner.name}
+                            </div>
                         ) : null}
   
                         {detail.communityRecipe.creatorStatement ? (
@@ -1754,19 +1729,9 @@ import {
                             </div>
                         </div>
   
-                        <button
-                            type="button"
-                            onClick={
-                                shareRecipe
-                            }
-                            className="focus-ring mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-700 hover:border-emerald-300 hover:text-emerald-800"
-                        >
-                            <Share2
-                                size={16}
-                            />
-  
-                            Share recipe link
-                        </button>
+                        <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-xs font-semibold leading-5 text-violet-800">
+                            Personal recipes are shared only through a friend-specific private link from My recipes.
+                        </div>
   
                         {isAuthenticated &&
                         customerEnabled ? (
@@ -2046,95 +2011,65 @@ import {
     );
   }
   
-  export default function CommunityRecipesPage() {
-    const {
-        communityRecipeId,
-    } =
-        useParams();
-  
-    const {
-        isAuthenticated,
-        customerEnabled,
-        hostEnabled,
-        activeMode,
-    } =
-        useAuth();
-  
+  function ShareRecipePanel({
+    recipe,
+    onClose,
+    onChanged,
+  }) {
     const [
-        tab,
-        setTab,
-    ] =
-        useState(
-            'discover',
-        );
-  
+        friendEmail,
+        setFriendEmail,
+    ] = useState('');
+
     const [
-        search,
-        setSearch,
-    ] =
-        useState('');
-  
-    const [
-        recipes,
-        setRecipes,
-    ] =
-        useState([]);
-  
-    const [
-        myRecipes,
-        setMyRecipes,
-    ] =
-        useState([]);
-  
+        shares,
+        setShares,
+    ] = useState([]);
+
     const [
         loading,
         setLoading,
-    ] =
-        useState(true);
-  
+    ] = useState(true);
+
+    const [
+        busy,
+        setBusy,
+    ] = useState(false);
+
     const [
         error,
         setError,
-    ] =
-        useState('');
-  
+    ] = useState('');
+
     const [
         notice,
         setNotice,
-    ] =
-        useState('');
-  
-    const canContribute =
-        isAuthenticated &&
-        customerEnabled;
-  
-    const loadDiscover =
+    ] = useState('');
+
+    const [
+        latestShareUrl,
+        setLatestShareUrl,
+    ] = useState('');
+
+    const loadShares =
         useCallback(
             async () => {
                 setLoading(
                     true,
                 );
-  
+
                 setError(
                     '',
                 );
-  
+
                 try {
                     const result =
-                        await listCommunityRecipes({
-                            page:
-                                1,
-  
-                            limit:
-                                30,
-  
-                            search:
-                                search.trim() ||
-                                undefined,
-                        });
-  
-                    setRecipes(
-                        result?.recipes ||
+                        await listCommunityRecipeShares(
+                            recipe.id,
+                        );
+
+                    setShares(
+                        result?.shares ||
                             [],
                     );
                 } catch (
@@ -2143,7 +2078,7 @@ import {
                     setError(
                         getCommunityErrorMessage(
                             requestError,
-                            'Unable to load Community Recipes.',
+                            'Unable to load friend sharing details.',
                         ),
                     );
                 } finally {
@@ -2153,35 +2088,638 @@ import {
                 }
             },
             [
-                search,
+                recipe.id,
             ],
         );
-  
+
+    useEffect(
+        () => {
+            loadShares();
+        },
+        [
+            loadShares,
+        ],
+    );
+
+    async function createShare() {
+        setBusy(
+            true,
+        );
+
+        setError(
+            '',
+        );
+
+        setNotice(
+            '',
+        );
+
+        try {
+            const result =
+                await createCommunityRecipeShare({
+                    communityRecipeId:
+                        recipe.id,
+
+                    friendEmail,
+                });
+
+            const sharePath =
+                result?.share
+                    ?.sharePath ||
+                '';
+
+            const url =
+                sharePath &&
+                typeof window !==
+                    'undefined'
+                    ? `${window.location.origin}${sharePath}`
+                    : sharePath;
+
+            setLatestShareUrl(
+                url,
+            );
+
+            setFriendEmail(
+                '',
+            );
+
+            setNotice(
+                result?.message ||
+                    'Private friend link created.',
+            );
+
+            await loadShares();
+            onChanged?.();
+        } catch (
+            requestError
+        ) {
+            setError(
+                getCommunityErrorMessage(
+                    requestError,
+                    'Unable to create a private friend link.',
+                ),
+            );
+        } finally {
+            setBusy(
+                false,
+            );
+        }
+    }
+
+    async function copyLatestLink() {
+        if (
+            !latestShareUrl ||
+            !navigator?.clipboard
+                ?.writeText
+        ) {
+            setNotice(
+                'Copy the private link shown below.',
+            );
+
+            return;
+        }
+
+        await navigator.clipboard.writeText(
+            latestShareUrl,
+        );
+
+        setNotice(
+            'Private friend link copied.',
+        );
+    }
+
+    async function revokeShare(
+        shareId,
+    ) {
+        setBusy(
+            true,
+        );
+
+        setError(
+            '',
+        );
+
+        try {
+            await revokeCommunityRecipeShare(
+                shareId,
+            );
+
+            setNotice(
+                'Friend access revoked.',
+            );
+
+            await loadShares();
+            onChanged?.();
+        } catch (
+            requestError
+        ) {
+            setError(
+                getCommunityErrorMessage(
+                    requestError,
+                    'Unable to revoke friend access.',
+                ),
+            );
+        } finally {
+            setBusy(
+                false,
+            );
+        }
+    }
+
+    const activeShares =
+        shares.filter(
+            (
+                share,
+            ) =>
+                share.status ===
+                'active',
+        );
+
+    return (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-stone-950/40 p-4 backdrop-blur-sm">
+            <section className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[30px] border border-violet-200 bg-white p-6 shadow-2xl sm:p-7">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-violet-600">
+                            Private friend sharing
+                        </p>
+
+                        <h2 className="mt-2 text-2xl font-black text-stone-950">
+                            {recipe.dish?.name ||
+                                'Personal recipe'}
+                        </h2>
+
+                        <p className="mt-2 text-sm leading-6 text-stone-600">
+                            Enter one friend&apos;s email. The link works only for that Customer account. Create a separate link for another friend.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={
+                            onClose
+                        }
+                        className="focus-ring grid h-10 w-10 shrink-0 place-items-center rounded-full bg-stone-100 text-stone-600"
+                        aria-label="Close friend sharing"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="mt-6 rounded-2xl bg-violet-50 p-4">
+                    <label className="block">
+                        <span className="text-xs font-black text-violet-900">
+                            Friend email
+                        </span>
+
+                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                            <input
+                                type="email"
+                                value={
+                                    friendEmail
+                                }
+                                onChange={(
+                                    event,
+                                ) =>
+                                    setFriendEmail(
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="friend@example.com"
+                                className="min-w-0 flex-1 rounded-xl border border-violet-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-violet-400"
+                            />
+
+                            <button
+                                type="button"
+                                disabled={
+                                    busy ||
+                                    !friendEmail.trim()
+                                }
+                                onClick={
+                                    createShare
+                                }
+                                className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-3 text-sm font-black text-white disabled:opacity-50"
+                            >
+                                <Share2 size={16} />
+                                Create link
+                            </button>
+                        </div>
+                    </label>
+                </div>
+
+                {latestShareUrl ? (
+                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                        <p className="text-xs font-black text-emerald-900">
+                            Send this private link to your friend
+                        </p>
+
+                        <p className="mt-2 break-all rounded-xl bg-white px-3 py-2 text-xs font-semibold text-stone-600">
+                            {latestShareUrl}
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={
+                                copyLatestLink
+                            }
+                            className="focus-ring mt-3 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-black text-white"
+                        >
+                            Copy link
+                        </button>
+                    </div>
+                ) : null}
+
+                {notice ? (
+                    <div className="mt-4 flex items-start gap-2 rounded-2xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800">
+                        <CheckCircle2
+                            size={16}
+                            className="mt-0.5 shrink-0"
+                        />
+                        {notice}
+                    </div>
+                ) : null}
+
+                {error ? (
+                    <div className="mt-4 flex items-start gap-2 rounded-2xl bg-red-50 p-3 text-xs font-bold text-red-700">
+                        <CircleAlert
+                            size={16}
+                            className="mt-0.5 shrink-0"
+                        />
+                        {error}
+                    </div>
+                ) : null}
+
+                <div className="mt-6">
+                    <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-base font-black text-stone-950">
+                            Shared with
+                        </h3>
+
+                        <span className="rounded-full bg-stone-100 px-3 py-1 text-[10px] font-black text-stone-600">
+                            {activeShares.length} active
+                        </span>
+                    </div>
+
+                    {loading ? (
+                        <LoaderCircle className="mt-4 animate-spin text-violet-700" />
+                    ) : activeShares.length ? (
+                        <div className="mt-3 space-y-2">
+                            {activeShares.map(
+                                (
+                                    share,
+                                ) => (
+                                    <div
+                                        key={
+                                            share.id
+                                        }
+                                        className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                        <div>
+                                            <p className="text-sm font-black text-stone-900">
+                                                {share.recipient?.name ||
+                                                    share.friendEmail}
+                                            </p>
+
+                                            <p className="mt-1 text-xs font-semibold text-stone-500">
+                                                {share.friendEmail}
+                                                {' · '}
+                                                {share.claimedAt
+                                                    ? 'Opened by friend'
+                                                    : 'Link ready'}
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            disabled={
+                                                busy
+                                            }
+                                            onClick={() =>
+                                                revokeShare(
+                                                    share.id,
+                                                )
+                                            }
+                                            className="focus-ring rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                        >
+                                            Revoke access
+                                        </button>
+                                    </div>
+                                ),
+                            )}
+                        </div>
+                    ) : (
+                        <p className="mt-3 rounded-2xl border border-dashed border-stone-300 p-5 text-sm font-semibold text-stone-500">
+                            This recipe has not been shared with any friend yet.
+                        </p>
+                    )}
+                </div>
+            </section>
+        </div>
+    );
+  }
+
+  function CommunityGuideCards({
+    isAuthenticated,
+    onCreate,
+    onMyRecipes,
+  }) {
+    const steps = [
+        {
+            number:
+                '01',
+
+            title:
+                'Explore recipe ideas',
+
+            description:
+                'Start with EPANTRY Recipes when you want inspiration for what to cook next.',
+
+            actionLabel:
+                'Browse Recipes',
+
+            icon:
+                BookOpen,
+
+            tone:
+                'border-emerald-200 bg-emerald-100/85 text-emerald-950',
+
+            iconTone:
+                'bg-emerald-700 text-white',
+
+            actionTone:
+                'text-emerald-800',
+
+            to:
+                '/recipes',
+        },
+        {
+            number:
+                '02',
+
+            title:
+                'Create your own recipe',
+
+            description:
+                'Save the dishes you cook at home so your personal collection stays in one place.',
+
+            actionLabel:
+                isAuthenticated
+                    ? 'Create recipe'
+                    : 'Log in to create',
+
+            icon:
+                ChefHat,
+
+            tone:
+                'border-amber-200 bg-amber-100/90 text-amber-950',
+
+            iconTone:
+                'bg-amber-600 text-white',
+
+            actionTone:
+                'text-amber-800',
+
+            to:
+                isAuthenticated
+                    ? null
+                    : '/login?returnTo=%2Fcommunity',
+
+            onClick:
+                isAuthenticated
+                    ? onCreate
+                    : null,
+        },
+        {
+            number:
+                '03',
+
+            title:
+                'Keep it private or share',
+
+            description:
+                'Your recipe stays yours. Share a specific recipe with a friend only when you choose.',
+
+            actionLabel:
+                isAuthenticated
+                    ? 'Open My recipes'
+                    : 'Sign in to manage',
+
+            icon:
+                Share2,
+
+            tone:
+                'border-violet-200 bg-violet-100/85 text-violet-950',
+
+            iconTone:
+                'bg-violet-700 text-white',
+
+            actionTone:
+                'text-violet-800',
+
+            to:
+                isAuthenticated
+                    ? null
+                    : '/login?returnTo=%2Fcommunity',
+
+            onClick:
+                isAuthenticated
+                    ? onMyRecipes
+                    : null,
+        },
+        {
+            number:
+                '04',
+
+            title:
+                'Find what you need',
+
+            description:
+                'When the recipe is ready, move to Grocery to discover ingredients and products.',
+
+            actionLabel:
+                'Go to Grocery',
+
+            icon:
+                Search,
+
+            tone:
+                'border-sky-200 bg-sky-100/90 text-sky-950',
+
+            iconTone:
+                'bg-sky-700 text-white',
+
+            actionTone:
+                'text-sky-800',
+
+            to:
+                '/grocery',
+        },
+    ];
+
+    return (
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3 lg:grid-cols-4">
+            {steps.map(
+                (
+                    step,
+                ) => {
+                    const Icon =
+                        step.icon;
+
+                    const content = (
+                        <>
+                            <div className="flex items-start justify-between gap-2">
+                                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-9 sm:w-9 ${step.iconTone}`}>
+                                    <Icon
+                                        size={16}
+                                        aria-hidden="true"
+                                    />
+                                </span>
+
+                                <span className="text-[9px] font-black tracking-[0.16em] opacity-45 sm:text-[10px]">
+                                    {step.number}
+                                </span>
+                            </div>
+
+                            <h3 className="mt-3 text-[13px] font-black leading-[1.15] sm:text-[15px] lg:text-base">
+                                {step.title}
+                            </h3>
+
+                            <p className="mt-1.5 text-[10px] font-semibold leading-[1.45] opacity-70 sm:text-xs sm:leading-5">
+                                {step.description}
+                            </p>
+
+                            <span className={`mt-3 inline-flex text-[10px] font-black sm:text-xs ${step.actionTone}`}>
+                                {step.actionLabel} →
+                            </span>
+                        </>
+                    );
+
+                    const className = `focus-ring flex min-h-[142px] flex-col rounded-[20px] border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md sm:min-h-[168px] sm:rounded-[24px] sm:p-4 lg:min-h-[184px] lg:p-5 ${step.tone}`;
+
+                    if (step.to) {
+                        return (
+                            <Link
+                                key={
+                                    step.number
+                                }
+                                to={
+                                    step.to
+                                }
+                                className={
+                                    className
+                                }
+                            >
+                                {content}
+                            </Link>
+                        );
+                    }
+
+                    return (
+                        <button
+                            key={
+                                step.number
+                            }
+                            type="button"
+                            onClick={
+                                step.onClick
+                            }
+                            className={
+                                className
+                            }
+                        >
+                            {content}
+                        </button>
+                    );
+                },
+            )}
+        </div>
+    );
+  }
+
+  export default function CommunityRecipesPage() {
+    const {
+        communityRecipeId,
+    } = useParams();
+
+    const {
+        isAuthenticated,
+        customerEnabled,
+        hostEnabled,
+        activeMode,
+        switchMode,
+    } = useAuth();
+
+    const [
+        tab,
+        setTab,
+    ] = useState(
+        'mine',
+    );
+
+    const [
+        myRecipes,
+        setMyRecipes,
+    ] = useState([]);
+
+    const [
+        sharedRecipes,
+        setSharedRecipes,
+    ] = useState([]);
+
+    const [
+        selectedShareRecipe,
+        setSelectedShareRecipe,
+    ] = useState(null);
+
+    const [
+        loading,
+        setLoading,
+    ] = useState(true);
+
+    const [
+        error,
+        setError,
+    ] = useState('');
+
+    const [
+        notice,
+        setNotice,
+    ] = useState('');
+
+    const canUseCustomerCommunity =
+        isAuthenticated &&
+        customerEnabled ===
+            true &&
+        activeMode ===
+            'customer';
+
     const loadMine =
         useCallback(
             async () => {
-                if (!canContribute) {
+                if (
+                    !canUseCustomerCommunity
+                ) {
                     return;
                 }
-  
+
                 setLoading(
                     true,
                 );
-  
+
                 setError(
                     '',
                 );
-  
+
                 try {
                     const result =
                         await listMyCommunityRecipes({
                             page:
                                 1,
-  
+
                             limit:
                                 50,
                         });
-  
+
                     setMyRecipes(
                         result?.recipes ||
                             [],
@@ -2192,7 +2730,7 @@ import {
                     setError(
                         getCommunityErrorMessage(
                             requestError,
-                            'Unable to load your Community Recipes.',
+                            'We could not load your saved recipes right now.',
                         ),
                     );
                 } finally {
@@ -2202,35 +2740,77 @@ import {
                 }
             },
             [
-                canContribute,
+                canUseCustomerCommunity,
             ],
         );
-  
+
+    const loadShared =
+        useCallback(
+            async () => {
+                if (
+                    !canUseCustomerCommunity
+                ) {
+                    return;
+                }
+
+                setLoading(
+                    true,
+                );
+
+                setError(
+                    '',
+                );
+
+                try {
+                    const result =
+                        await listSharedWithMeCommunityRecipes();
+
+                    setSharedRecipes(
+                        result?.shares ||
+                            [],
+                    );
+                } catch (
+                    requestError
+                ) {
+                    setError(
+                        getCommunityErrorMessage(
+                            requestError,
+                            'We could not load recipes shared with you right now.',
+                        ),
+                    );
+                } finally {
+                    setLoading(
+                        false,
+                    );
+                }
+            },
+            [
+                canUseCustomerCommunity,
+            ],
+        );
+
     useEffect(
         () => {
             if (
-                !isAuthenticated ||
-                hostEnabled !== true ||
-                activeMode !== 'host'
+                communityRecipeId ||
+                !canUseCustomerCommunity
             ) {
-                setLoading(false);
+                setLoading(
+                    false,
+                );
                 return;
             }
-  
-            if (communityRecipeId) {
-                return;
-            }
-  
+
             if (
+                tab ===
+                'shared'
+            ) {
+                loadShared();
+            } else if (
                 tab ===
                 'mine'
             ) {
                 loadMine();
-            } else if (
-                tab ===
-                'discover'
-            ) {
-                loadDiscover();
             } else {
                 setLoading(
                     false,
@@ -2240,31 +2820,161 @@ import {
         [
             communityRecipeId,
             tab,
-            loadDiscover,
             loadMine,
-            isAuthenticated,
-            hostEnabled,
-            activeMode,
+            loadShared,
+            canUseCustomerCommunity,
         ],
     );
-  
-    const publicCards =
-        useMemo(
-            () =>
-                recipes,
-            [
-                recipes,
-            ],
+
+    if (!isAuthenticated) {
+        return (
+            <main className="page-shell pb-6 pt-2 sm:pb-8 sm:pt-3">
+                <section className="overflow-hidden rounded-[24px] border border-emerald-200 bg-[linear-gradient(135deg,#DCFCE7_0%,#FEF3C7_48%,#EDE9FE_100%)] p-4 shadow-sm sm:rounded-[30px] sm:p-6 lg:p-8">
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.7fr)] lg:items-end lg:gap-8">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-800 sm:text-xs">
+                                Community · Your recipe space
+                            </p>
+
+                            <h1 className="mt-2 max-w-3xl text-[26px] font-black leading-[1.02] tracking-[-0.04em] text-stone-950 sm:text-4xl lg:text-5xl">
+                                Keep your recipes together. Share only when you want.
+                            </h1>
+
+                            <p className="mt-3 max-w-2xl text-xs font-semibold leading-5 text-stone-700 sm:text-sm sm:leading-6">
+                                Use Community as your personal recipe space: save dishes you cook, open recipes friends send you, and decide exactly what you want to share.
+                            </p>
+
+                            <div className="mt-4 flex flex-wrap gap-2 sm:mt-5">
+                                <Link
+                                    to="/login?returnTo=%2Fcommunity"
+                                    className="focus-ring rounded-xl bg-stone-950 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-800 sm:text-sm"
+                                >
+                                    Log in
+                                </Link>
+
+                                <Link
+                                    to="/register?returnTo=%2Fcommunity"
+                                    className="focus-ring rounded-xl border border-stone-950/15 bg-white/75 px-4 py-2.5 text-xs font-black text-stone-900 backdrop-blur transition hover:bg-white sm:text-sm"
+                                >
+                                    Create Customer account
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div className="rounded-[20px] bg-emerald-900 p-4 text-emerald-50 shadow-sm sm:rounded-[24px] sm:p-5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200 sm:text-xs">
+                                What this page does for you
+                            </p>
+
+                            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                <div className="rounded-2xl bg-white/10 p-2.5">
+                                    <Heart
+                                        size={16}
+                                        className="mx-auto"
+                                        aria-hidden="true"
+                                    />
+                                    <p className="mt-1.5 text-[10px] font-black sm:text-xs">
+                                        Save
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-white/10 p-2.5">
+                                    <Users
+                                        size={16}
+                                        className="mx-auto"
+                                        aria-hidden="true"
+                                    />
+                                    <p className="mt-1.5 text-[10px] font-black sm:text-xs">
+                                        Share
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-white/10 p-2.5">
+                                    <ChefHat
+                                        size={16}
+                                        className="mx-auto"
+                                        aria-hidden="true"
+                                    />
+                                    <p className="mt-1.5 text-[10px] font-black sm:text-xs">
+                                        Cook
+                                    </p>
+                                </div>
+                            </div>
+
+                            <p className="mt-3 text-[10px] font-semibold leading-4 text-emerald-100/80 sm:text-xs sm:leading-5">
+                                Your personal recipes do not become public automatically. You stay in control of who can open them.
+                            </p>
+                        </div>
+                    </div>
+
+                    <CommunityGuideCards
+                        isAuthenticated={
+                            false
+                        }
+                    />
+                </section>
+            </main>
         );
-  
-    if (
-        !isAuthenticated ||
-        hostEnabled !== true ||
-        activeMode !== 'host'
-    ) {
-        return null;
     }
-  
+
+    if (
+        customerEnabled !==
+        true
+    ) {
+        return (
+            <main className="page-shell pb-6 pt-2 sm:pb-8 sm:pt-3">
+                <section className="rounded-[24px] border border-rose-200 bg-rose-100 p-5 shadow-sm sm:rounded-[30px] sm:p-7">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-700 sm:text-xs">
+                        Customer recipe space
+                    </p>
+
+                    <h1 className="mt-2 text-2xl font-black tracking-tight text-stone-950 sm:text-3xl">
+                        This recipe space needs Customer access
+                    </h1>
+
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-stone-700">
+                        Community is where Customers keep personal recipes and receive recipes shared by friends. Your other EPANTRY access stays unchanged.
+                    </p>
+                </section>
+            </main>
+        );
+    }
+
+    if (
+        activeMode !==
+        'customer'
+    ) {
+        return (
+            <main className="page-shell pb-6 pt-2 sm:pb-8 sm:pt-3">
+                <section className="rounded-[24px] border border-sky-200 bg-[linear-gradient(135deg,#DBEAFE_0%,#E0F2FE_48%,#DCFCE7_100%)] p-5 shadow-sm sm:rounded-[30px] sm:p-7">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-700 sm:text-xs">
+                        You are in Host mode
+                    </p>
+
+                    <h1 className="mt-2 text-2xl font-black tracking-tight text-stone-950 sm:text-3xl">
+                        Open Customer mode for your personal recipes
+                    </h1>
+
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-stone-700">
+                        Your Host workspace is for business work. Personal recipes and recipes shared by friends live in your Customer space, so switch modes to continue here.
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() =>
+                            switchMode(
+                                'customer',
+                            )
+                        }
+                        className="focus-ring mt-4 rounded-xl bg-sky-800 px-4 py-2.5 text-sm font-black text-white transition hover:bg-sky-900"
+                    >
+                        Switch to Customer mode
+                    </button>
+                </section>
+            </main>
+        );
+    }
+
     if (communityRecipeId) {
         return (
             <CommunityRecipeDetail
@@ -2274,113 +2984,60 @@ import {
             />
         );
     }
-  
-    async function submitMine(
-        recipeId,
-    ) {
-        setNotice(
-            '',
-        );
-  
-        setError(
-            '',
-        );
-  
-        try {
-            await submitCommunityRecipe(
-                recipeId,
-                'Ready for public Community moderation.',
-            );
-  
-            setNotice(
-                'Recipe submitted. Public discovery remains blocked until moderation and M08 approval are complete.',
-            );
-  
-            await loadMine();
-        } catch (
-            requestError
-        ) {
-            setError(
-                getCommunityErrorMessage(
-                    requestError,
-                    'Unable to submit this recipe.',
-                ),
-            );
-        }
-    }
-  
+
     return (
-        <main className="page-shell py-8 sm:py-10">
-            <section className="rounded-[30px] border border-stone-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-5">
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2.5 lg:gap-3">
-                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white lg:h-12 lg:w-12 lg:rounded-2xl">
-                                <Users
-                                    size={20}
-                                    className="lg:h-[22px] lg:w-[22px]"
-                                />
-                            </div>
-  
-                            <div className="min-w-0">
-                                <h1 className="whitespace-nowrap text-[24px] font-black leading-none tracking-tight text-stone-950 lg:text-4xl">
-                                    Community Recipes
-                                </h1>
-                            </div>
-                        </div>
-  
-                        <p className="mt-3 max-w-[300px] text-[11px] font-medium leading-[1.45] text-stone-600 lg:mt-4 lg:max-w-3xl lg:text-sm lg:leading-7">
-                            Create and adapt recipes freely. EPANTRY keeps creator notes separate from verified Food Intelligence.
+        <main className="page-shell pb-8 pt-2 sm:pb-10 sm:pt-3">
+            <section className="rounded-[24px] border border-emerald-200 bg-[linear-gradient(135deg,#DCFCE7_0%,#FEF3C7_48%,#EDE9FE_100%)] p-4 shadow-sm sm:rounded-[30px] sm:p-6 lg:p-8">
+                <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-800 text-white sm:h-12 sm:w-12">
+                        <Users size={21} />
+                    </div>
+
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-800 sm:text-xs">
+                            Community · Personal recipes
+                        </p>
+
+                        <h1 className="mt-1 text-[25px] font-black tracking-tight text-stone-950 sm:text-4xl">
+                            Your recipe space
+                        </h1>
+
+                        <p className="mt-2 max-w-3xl text-xs font-semibold leading-5 text-stone-700 sm:text-sm sm:leading-6">
+                            Keep your own recipes organised, open recipes friends share with you, and share selected recipes when you choose. Nothing here becomes public automatically.
                         </p>
                     </div>
-  
-                    <div className="flex w-full flex-wrap justify-end gap-2 lg:w-auto lg:justify-start">
-                        {canContribute ? (
-                            <Link
-                                to="/creator-studio"
-                                className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-2 text-[10px] font-black text-stone-600 hover:border-emerald-300 hover:text-emerald-800 lg:gap-2 lg:px-4 lg:py-2.5 lg:text-xs"
-                            >
-                                <ChefHat
-                                    size={15}
-                                />
-  
-                                Creator Studio
-                            </Link>
-                        ) : null}
-  
-                        <Link
-                            to="/learn"
-                            className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-2 text-[10px] font-black text-stone-600 hover:border-emerald-300 hover:text-emerald-800 lg:gap-2 lg:px-4 lg:py-2.5 lg:text-xs"
-                        >
-                            <BookOpen
-                                size={15}
-                            />
-  
-                            Learn / Pro
-                        </Link>
-                    </div>
                 </div>
-  
-                <div className="mt-7 flex flex-wrap gap-2">
+
+                <CommunityGuideCards
+                    isAuthenticated={
+                        true
+                    }
+                    onCreate={() =>
+                        setTab(
+                            'create',
+                        )
+                    }
+                    onMyRecipes={() =>
+                        setTab(
+                            'mine',
+                        )
+                    }
+                />
+
+                <div className="mt-5 flex flex-wrap gap-2 sm:mt-6">
                     {[
                         [
-                            'discover',
-                            'Discover',
+                            'mine',
+                            'My recipes',
                         ],
-  
-                        ...(canContribute
-                            ? [
-                                [
-                                    'mine',
-                                    'My recipes',
-                                ],
-  
-                                [
-                                    'create',
-                                    'Create',
-                                ],
-                            ]
-                            : []),
+                        [
+                            'shared',
+                            'Shared by friends',
+                        ],
+                        [
+                            'create',
+                            'Create recipe',
+                        ],
                     ].map(
                         ([
                             value,
@@ -2397,270 +3054,215 @@ import {
                                     )
                                 }
                                 className={[
-                                    'focus-ring rounded-full px-4 py-2 text-xs font-black transition',
-  
+                                    'focus-ring rounded-full px-3.5 py-2 text-[11px] font-black transition sm:px-4 sm:py-2.5 sm:text-xs',
                                     tab ===
                                     value
-                                        ? 'bg-emerald-700 text-white'
-                                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200',
+                                        ? 'bg-stone-950 text-white shadow-sm'
+                                        : 'border border-stone-950/10 bg-white/70 text-stone-800 hover:bg-white',
                                 ].join(
                                     ' ',
                                 )}
                             >
-                                {
-                                    label
-                                }
+                                {label}
                             </button>
                         ),
                     )}
                 </div>
             </section>
-  
+
+            {notice ? (
+                <div className="mt-4 flex items-start gap-2 rounded-2xl bg-emerald-100 p-4 text-sm font-bold text-emerald-900 sm:mt-5">
+                    <CheckCircle2
+                        size={18}
+                        className="mt-0.5 shrink-0"
+                    />
+                    {notice}
+                </div>
+            ) : null}
+
             {error ? (
-                <div className="mt-5 flex items-start gap-3 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-700">
+                <div className="mt-4 flex items-start gap-2 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700 sm:mt-5">
                     <CircleAlert
                         size={18}
                         className="mt-0.5 shrink-0"
                     />
-  
                     {error}
                 </div>
             ) : null}
-  
-            {notice ? (
-                <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-                    {notice}
-                </div>
-            ) : null}
-  
+
             {tab ===
-            'discover' ? (
-                <>
-                    <div className="mt-6 flex rounded-2xl border border-stone-200 bg-white p-1.5 shadow-sm">
-                        <Search
-                            size={18}
-                            className="ml-3 mt-3 text-stone-400"
-                        />
-  
-                        <input
-                            value={
-                                search
-                            }
-                            onChange={(
-                                event,
-                            ) =>
-                                setSearch(
-                                    event.target.value,
-                                )
-                            }
-                            onKeyDown={(
-                                event,
-                            ) => {
-                                if (
-                                    event.key ===
-                                    'Enter'
-                                ) {
-                                    loadDiscover();
-                                }
-                            }}
-                            placeholder="Search community dishes, cuisine or tags"
-                            className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-semibold outline-none"
-                        />
-  
+            'mine' ? (
+                <section className="mt-4 rounded-[24px] border border-emerald-200 bg-emerald-100/75 p-4 shadow-sm sm:mt-6 sm:rounded-[28px] sm:p-6">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="text-lg font-black text-stone-950 sm:text-xl">
+                                My recipes
+                            </h2>
+
+                            <p className="mt-1 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">
+                                Recipes you have saved for yourself. Open one anytime or share it with a friend when you are ready.
+                            </p>
+                        </div>
+
                         <button
                             type="button"
-                            onClick={
-                                loadDiscover
+                            onClick={() =>
+                                setTab(
+                                    'create',
+                                )
                             }
-                            className="focus-ring rounded-xl bg-stone-950 px-4 text-xs font-black text-white"
+                            className="focus-ring w-fit rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-black text-white"
                         >
-                            Search
+                            Create recipe
                         </button>
                     </div>
-  
+
                     {loading ? (
-                        <div className="grid min-h-72 place-items-center">
-                            <LoaderCircle
-                                className="animate-spin text-emerald-700"
-                            />
+                        <LoaderCircle className="mt-5 animate-spin text-emerald-700" />
+                    ) : myRecipes.length ? (
+                        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+                            {myRecipes.map(
+                                (
+                                    recipe,
+                                ) => (
+                                    <article
+                                        key={
+                                            recipe.id
+                                        }
+                                        className="rounded-2xl border border-emerald-200 bg-white/85 p-4 shadow-sm sm:p-5"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-800">
+                                                    {recipe.visibility ===
+                                                    'friends'
+                                                        ? 'Friends only'
+                                                        : 'Private'}
+                                                </span>
+
+                                                <h3 className="mt-3 text-lg font-black text-stone-950">
+                                                    {recipe.dish?.name ||
+                                                        'My recipe'}
+                                                </h3>
+
+                                                <p className="mt-1 line-clamp-2 text-sm leading-6 text-stone-500">
+                                                    {recipe.dish?.description ||
+                                                        'A recipe saved in your personal EPANTRY collection.'}
+                                                </p>
+                                            </div>
+
+                                            <span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black text-violet-800">
+                                                {recipe.activeShareCount ||
+                                                    0}{' '}
+                                                shared
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-5 flex flex-wrap gap-2">
+                                            <Link
+                                                to={`/community/${encodeURIComponent(
+                                                    recipe.id,
+                                                )}`}
+                                                className="focus-ring rounded-xl bg-stone-100 px-3 py-2 text-xs font-black text-stone-700"
+                                            >
+                                                Open recipe
+                                            </Link>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setSelectedShareRecipe(
+                                                        recipe,
+                                                    )
+                                                }
+                                                className="focus-ring inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-3 py-2 text-xs font-black text-white"
+                                            >
+                                                <Share2 size={14} />
+                                                Share with friend
+                                            </button>
+                                        </div>
+                                    </article>
+                                ),
+                            )}
                         </div>
-                    ) : publicCards.length ? (
-                        <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                            {publicCards.map(
+                    ) : (
+                        <div className="mt-5 rounded-2xl border border-dashed border-emerald-300 bg-white/80 p-6 text-center sm:p-8">
+                            <p className="text-sm font-black text-stone-700">
+                                Your recipe space is empty right now. Create your first recipe to get started.
+                            </p>
+                        </div>
+                    )}
+                </section>
+            ) : null}
+
+            {tab ===
+            'shared' ? (
+                <section className="mt-4 rounded-[24px] border border-sky-200 bg-sky-100/75 p-4 shadow-sm sm:mt-6 sm:rounded-[28px] sm:p-6">
+                    <h2 className="text-lg font-black text-stone-950 sm:text-xl">
+                        Shared by friends
+                    </h2>
+
+                    <p className="mt-1 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">
+                        Recipes friends have chosen to share with your Customer account. Open one here whenever you want to cook it.
+                    </p>
+
+                    {loading ? (
+                        <LoaderCircle className="mt-5 animate-spin text-sky-700" />
+                    ) : sharedRecipes.length ? (
+                        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+                            {sharedRecipes.map(
                                 (
                                     item,
                                 ) => (
                                     <Link
                                         key={
-                                            item.communityRecipe.id
+                                            item.share.id
                                         }
                                         to={`/community/${encodeURIComponent(
-                                            item.communityRecipe.id,
+                                            item.recipe.id,
                                         )}`}
-                                        className="focus-ring overflow-hidden rounded-[26px] border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+                                        className="focus-ring rounded-2xl border border-sky-200 bg-white/85 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
                                     >
-                                        <div className="aspect-[16/9] bg-stone-100">
-                                            {item.dish.heroImageUrl ? (
-                                                <img
-                                                    src={
-                                                        item.dish.heroImageUrl
-                                                    }
-                                                    alt={
-                                                        item.dish.name
-                                                    }
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="grid h-full place-items-center text-stone-300">
-                                                    <ChefHat
-                                                        size={34}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-  
-                                        <div className="p-5">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-800">
-                                                    Community contributed
-                                                </span>
-  
-                                                <span className="inline-flex items-center gap-1 text-xs font-black text-amber-700">
-                                                    <Star
-                                                        size={13}
-                                                        className="fill-current"
-                                                    />
-  
-                                                    {item.ratings.average ?? '—'}
-                                                </span>
-                                            </div>
-  
-                                            <h2 className="mt-3 text-lg font-black text-stone-950">
-                                                {
-                                                    item.dish.name
-                                                }
-                                            </h2>
-  
-                                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-stone-500">
-                                                {item.dish.description ||
-                                                    'Community recipe'}
-                                            </p>
-  
-                                            <div className="mt-4 flex items-center justify-between text-xs font-bold text-stone-500">
-                                                <span>
-                                                    {item.creator?.displayName ||
-                                                        'Community creator'}
-                                                </span>
-  
-                                                <span className="inline-flex items-center gap-1">
-                                                    <Eye
-                                                        size={13}
-                                                    />
-  
-                                                    View
-                                                </span>
-                                            </div>
-                                        </div>
+                                        <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-black text-sky-800">
+                                            From {item.owner?.name ||
+                                                'a friend'}
+                                        </span>
+
+                                        <h3 className="mt-3 text-lg font-black text-stone-950">
+                                            {item.recipe.name}
+                                        </h3>
+
+                                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-stone-500">
+                                            {item.recipe.description ||
+                                                'A recipe a friend shared with you.'}
+                                        </p>
+
+                                        <p className="mt-4 text-xs font-black text-sky-700">
+                                            Open recipe →
+                                        </p>
                                     </Link>
                                 ),
                             )}
                         </div>
                     ) : (
-                        <div className="mt-6 rounded-[26px] border border-dashed border-stone-300 bg-white p-10 text-center">
-                            <ChefHat
-                                size={34}
-                                className="mx-auto text-stone-300"
-                            />
-  
-                            <p className="mt-3 text-sm font-black text-stone-700">
-                                No public Community Recipes found
+                        <div className="mt-5 rounded-2xl border border-dashed border-sky-300 bg-white/80 p-6 text-center sm:p-8">
+                            <p className="text-sm font-black text-stone-700">
+                                Nothing has been shared with you yet. When a friend sends a recipe, it will appear here.
                             </p>
-                        </div>
-                    )}
-                </>
-            ) : null}
-  
-            {tab ===
-                'mine' &&
-            canContribute ? (
-                <section className="mt-6 rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-xl font-black text-stone-950">
-                        My Community Recipes
-                    </h2>
-  
-                    {loading ? (
-                        <LoaderCircle
-                            className="mt-5 animate-spin text-emerald-700"
-                        />
-                    ) : (
-                        <div className="mt-5 space-y-3">
-                            {myRecipes.map(
-                                (
-                                    recipe,
-                                ) => (
-                                    <div
-                                        key={
-                                            recipe.id
-                                        }
-                                        className="flex flex-col gap-3 rounded-2xl border border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-                                    >
-                                        <div>
-                                            <p className="text-sm font-black text-stone-900">
-                                                Recipe Version {recipe.recipeVersionId.slice(-6)}
-                                            </p>
-  
-                                            <p className="mt-1 text-xs font-semibold text-stone-500">
-                                                {recipe.visibility} · {recipe.status} · moderation {recipe.moderationState}
-                                            </p>
-                                        </div>
-  
-                                        <div className="flex gap-2">
-                                            <Link
-                                                to={`/community/${encodeURIComponent(
-                                                    recipe.id,
-                                                )}`}
-                                                className="focus-ring rounded-xl bg-stone-100 px-3 py-2 text-xs font-black text-stone-600"
-                                            >
-                                                Open
-                                            </Link>
-  
-                                            {recipe.status ===
-                                            'active' ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        submitMine(
-                                                            recipe.id,
-                                                        )
-                                                    }
-                                                    className="focus-ring inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white"
-                                                >
-                                                    <Send
-                                                        size={14}
-                                                    />
-  
-                                                    Submit public
-                                                </button>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ),
-                            )}
                         </div>
                     )}
                 </section>
             ) : null}
-  
+
             {tab ===
-                'create' &&
-            canContribute ? (
-                <div className="mt-6">
+            'create' ? (
+                <div className="mt-4 sm:mt-6">
                     <RecipeComposer
                         onCreated={() => {
                             setNotice(
-                                'Community Recipe created. Public recipes remain moderation-gated; private/friends recipes are not broadly discoverable.',
+                                'Recipe saved. Open My recipes whenever you want to view it or share it with a friend.',
                             );
-  
+
                             setTab(
                                 'mine',
                             );
@@ -2668,18 +3270,21 @@ import {
                     />
                 </div>
             ) : null}
-  
-            {!isAuthenticated ? (
-                <div className="mt-6 flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">
-                    <Heart
-                        size={20}
-                        className="mt-0.5 shrink-0 text-emerald-700"
-                    />
-  
-                    <p className="text-sm leading-6 text-stone-600">
-                        Browse is public. Sign in as a Customer to create, adapt, review or follow creators.
-                    </p>
-                </div>
+
+            {selectedShareRecipe ? (
+                <ShareRecipePanel
+                    recipe={
+                        selectedShareRecipe
+                    }
+                    onClose={() =>
+                        setSelectedShareRecipe(
+                            null,
+                        )
+                    }
+                    onChanged={
+                        loadMine
+                    }
+                />
             ) : null}
         </main>
     );

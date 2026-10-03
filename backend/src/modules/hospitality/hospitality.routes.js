@@ -24,6 +24,7 @@ import {
 } from '../auth/auth.middleware.js'
 
 import {
+  requireChefRestaurantHostAccess,
   requireHostAccess,
 } from '../auth/authorization.middleware.js'
 
@@ -36,22 +37,30 @@ import {
   createHospitalityProcurementPlan,
   createHospitalityProductionPlan,
   createHospitalityProductionRecipe,
+  createHospitalityRestaurantRecipe,
   createHospitalityStockObservation,
   createHospitalitySupplier,
+  deleteHospitalityMenu,
   createHospitalitySupplierProduct,
   getHospitalityContext,
   getHospitalityProcurementPlan,
   getHospitalityProductionRecipe,
+  getHospitalityRestaurantRecipe,
   initializeHospitalityProfile,
   listHospitalityMemberGrants,
   listHospitalityMenus,
+  listHospitalityCurrentStock,
   listHospitalityOutlets,
   listHospitalityProductionPlans,
   listHospitalityProductionRecipes,
+  listHospitalityRestaurantRecipes,
   listHospitalitySupplierProducts,
   listHospitalitySuppliers,
+  searchHospitalityCanonicalIngredients,
+  setHospitalityMenuItemAvailability,
   revokeHospitalityMemberGrant,
   submitHospitalityProductionRecipe,
+  updateHospitalityRestaurantRecipe,
   updateHospitalityOutlet,
   updateHospitalitySupplier,
   updateHospitalitySupplierProduct,
@@ -66,14 +75,18 @@ import {
   createProcurementPlanBodySchema,
   createProductionPlanBodySchema,
   createProductionRecipeBodySchema,
+  createRestaurantRecipeListingBodySchema,
   createStockObservationBodySchema,
   createSupplierBodySchema,
   createSupplierProductBodySchema,
   hospitalityIdParamsSchema,
   initializeHospitalityProfileBodySchema,
+  menuItemAvailabilityParamsSchema,
   productionRecipeActionBodySchema,
   revokeMemberGrantBodySchema,
+  setMenuItemAvailabilityBodySchema,
   updateOutletBodySchema,
+  updateRestaurantRecipeListingBodySchema,
   updateSupplierBodySchema,
   updateSupplierProductBodySchema,
   upsertMemberGrantBodySchema,
@@ -658,7 +671,8 @@ router.patch(
 
       const input =
         parseOrThrow(
-          updateSupplierBodySchema,
+          updateRestaurantRecipeListingBodySchema,
+  updateSupplierBodySchema,
           req.body,
           'HOSPITALITY_SUPPLIER_UPDATE_INVALID',
         )
@@ -686,6 +700,47 @@ router.patch(
         'Hospitality supplier updated.',
       )
     },
+  ),
+)
+
+/*
+|--------------------------------------------------------------------------
+| Part 1
+| Host-safe Catalog Lookup
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  '/catalog/ingredients',
+
+  wrap(
+    async (
+      req,
+      res,
+    ) =>
+      send(
+        req,
+        res,
+        200,
+        await searchHospitalityCanonicalIngredients({
+          search:
+            req.query.search,
+
+          limit:
+            req.query.limit,
+
+          actorUser:
+            actorUser(
+              req,
+            ),
+
+          organizationIdHint:
+            organizationIdHint(
+              req,
+            ),
+        }),
+        'Hospitality catalog ingredients loaded.',
+      ),
   ),
 )
 
@@ -818,6 +873,118 @@ router.patch(
 
 /*
 |--------------------------------------------------------------------------
+| M5-B Restaurant Recipe Listings
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  '/restaurant-recipes',
+  requireChefRestaurantHostAccess,
+  wrap(
+    async (req, res) =>
+      send(
+        req,
+        res,
+        200,
+        await listHospitalityRestaurantRecipes({
+          actorUser: actorUser(req),
+          organizationIdHint: organizationIdHint(req),
+        }),
+        'Restaurant Recipes loaded.',
+      ),
+  ),
+)
+
+router.get(
+  '/restaurant-recipes/:id',
+  requireChefRestaurantHostAccess,
+  wrap(
+    async (req, res) => {
+      const params = parseOrThrow(
+        hospitalityIdParamsSchema,
+        req.params,
+        'HOSPITALITY_RESTAURANT_RECIPE_ID_INVALID',
+      )
+
+      return send(
+        req,
+        res,
+        200,
+        await getHospitalityRestaurantRecipe({
+          recipeVersionId: params.id,
+          actorUser: actorUser(req),
+          organizationIdHint: organizationIdHint(req),
+        }),
+        'Restaurant Recipe loaded.',
+      )
+    },
+  ),
+)
+
+router.post(
+  '/restaurant-recipes',
+  requireChefRestaurantHostAccess,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(
+    async (req, res) => {
+      const input = parseOrThrow(
+        createRestaurantRecipeListingBodySchema,
+        req.body,
+        'HOSPITALITY_RESTAURANT_RECIPE_INPUT_INVALID',
+      )
+
+      return send(
+        req,
+        res,
+        201,
+        await createHospitalityRestaurantRecipe({
+          input,
+          actorUser: actorUser(req),
+          organizationIdHint: organizationIdHint(req),
+        }),
+        'Restaurant Recipe submitted for Super Admin review.',
+      )
+    },
+  ),
+)
+
+router.put(
+  '/restaurant-recipes/:id',
+  requireChefRestaurantHostAccess,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(
+    async (req, res) => {
+      const params = parseOrThrow(
+        hospitalityIdParamsSchema,
+        req.params,
+        'HOSPITALITY_RESTAURANT_RECIPE_ID_INVALID',
+      )
+      const input = parseOrThrow(
+        updateRestaurantRecipeListingBodySchema,
+        req.body,
+        'HOSPITALITY_RESTAURANT_RECIPE_UPDATE_INVALID',
+      )
+
+      return send(
+        req,
+        res,
+        200,
+        await updateHospitalityRestaurantRecipe({
+          recipeVersionId: params.id,
+          input,
+          actorUser: actorUser(req),
+          organizationIdHint: organizationIdHint(req),
+        }),
+        'Restaurant Recipe updated and resubmitted for Super Admin review.',
+      )
+    },
+  ),
+)
+
+/*
+|--------------------------------------------------------------------------
 | Part 2
 | Production Recipes
 |--------------------------------------------------------------------------
@@ -904,6 +1071,7 @@ router.post(
       const input =
         parseOrThrow(
           createProductionRecipeBodySchema,
+  createRestaurantRecipeListingBodySchema,
           req.body,
           'HOSPITALITY_PRODUCTION_RECIPE_INPUT_INVALID',
         )
@@ -1109,6 +1277,48 @@ router.post(
   ),
 )
 
+router.delete(
+  '/menus/:id',
+
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const params =
+        parseOrThrow(
+          hospitalityIdParamsSchema,
+          req.params,
+          'HOSPITALITY_MENU_ID_INVALID',
+        )
+
+      return send(
+        req,
+        res,
+        200,
+        await deleteHospitalityMenu({
+          menuId:
+            params.id,
+
+          actorUser:
+            actorUser(
+              req,
+            ),
+
+          organizationIdHint:
+            organizationIdHint(
+              req,
+            ),
+        }),
+        'Hospitality menu deleted.',
+      )
+    },
+  ),
+)
+
 router.post(
   '/menus/:id/items',
 
@@ -1155,6 +1365,60 @@ router.post(
             ),
         }),
         'Hospitality menu item added.',
+      )
+    },
+  ),
+)
+
+router.post(
+  '/menus/:id/items/:itemId/availability',
+
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+
+  wrap(
+    async (
+      req,
+      res,
+    ) => {
+      const params =
+        parseOrThrow(
+          menuItemAvailabilityParamsSchema,
+          req.params,
+          'HOSPITALITY_MENU_ITEM_AVAILABILITY_PARAMS_INVALID',
+        )
+
+      const input =
+        parseOrThrow(
+          setMenuItemAvailabilityBodySchema,
+          req.body,
+          'HOSPITALITY_MENU_ITEM_AVAILABILITY_INPUT_INVALID',
+        )
+
+      return send(
+        req,
+        res,
+        201,
+        await setHospitalityMenuItemAvailability({
+          menuId:
+            params.id,
+
+          menuItemId:
+            params.itemId,
+
+          input,
+
+          actorUser:
+            actorUser(
+              req,
+            ),
+
+          organizationIdHint:
+            organizationIdHint(
+              req,
+            ),
+        }),
+        'Hospitality menu availability recorded.',
       )
     },
   ),
@@ -1224,6 +1488,34 @@ router.post(
 | Stock Observations
 |--------------------------------------------------------------------------
 */
+
+router.get(
+  '/stock-observations/current',
+
+  wrap(
+    async (
+      req,
+      res,
+    ) =>
+      send(
+        req,
+        res,
+        200,
+        await listHospitalityCurrentStock({
+          actorUser:
+            actorUser(
+              req,
+            ),
+
+          organizationIdHint:
+            organizationIdHint(
+              req,
+            ),
+        }),
+        'Hospitality current stock loaded.',
+      ),
+  ),
+)
 
 router.post(
   '/stock-observations',

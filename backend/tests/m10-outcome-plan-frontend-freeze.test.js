@@ -402,7 +402,7 @@ test(
 )
 
 test(
-  'M10 routes do not use activeMode as authorization',
+  'M10 Outcome Plan routes remain Customer-capability gated while activeMode only selects the visible workspace',
 
   () => {
     const source =
@@ -410,10 +410,19 @@ test(
         'src/routes/AppRoutes.jsx',
       )
 
-    assert.doesNotMatch(
+    assert.match(
       source,
+      /path="\/meal-plan"[\s\S]*?APPLICATION_ACCESS_TYPES\.CUSTOMER/,
+    )
 
-      /activeMode/,
+    assert.match(
+      source,
+      /path="\/next-basket"[\s\S]*?APPLICATION_ACCESS_TYPES\.CUSTOMER/,
+    )
+
+    assert.match(
+      source,
+      /customerEnabled\s*===\s*true/,
     )
   },
 )

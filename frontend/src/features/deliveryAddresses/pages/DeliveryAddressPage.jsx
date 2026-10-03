@@ -1,12 +1,14 @@
 import {
   Building2,
   Check,
+  Clock3,
   HeartHandshake,
   Home,
   LocateFixed,
   MapPin,
   Save,
   Tag,
+  Truck,
   UserRound,
   UsersRound,
 } from 'lucide-react'
@@ -30,6 +32,14 @@ import {
 import {
   useCurrentLocation,
 } from '../../location/hooks/useCurrentLocation'
+
+import {
+  useLocationStore,
+} from '../../location/store/location.store'
+
+import {
+  getMarketplaceCartDeliveryEta,
+} from '../../commerce/services/commerce.service'
 
 import {
   createDeliveryAddress,
@@ -167,6 +177,21 @@ function getAddressTitle(
     'Delivery address'
 }
 
+function getCheckoutCartId(
+  returnTo,
+) {
+  const match =
+    String(
+      returnTo ||
+        '',
+    ).match(
+      /^\/checkout\/([a-f\d]{24})(?:[/?#]|$)/i,
+    )
+
+  return match?.[1] ||
+    ''
+}
+
 function Field({
   label,
   required = false,
@@ -213,6 +238,12 @@ export default function DeliveryAddressPage() {
   } =
     useCurrentLocation()
 
+  const setDeliveryContext =
+    useLocationStore(
+      (state) =>
+        state.setDeliveryContext,
+    )
+
   const returnTo =
     useMemo(
       () =>
@@ -224,6 +255,37 @@ export default function DeliveryAddressPage() {
       [
         searchParams,
       ],
+    )
+
+  const checkoutCartId =
+    useMemo(
+      () =>
+        getCheckoutCartId(
+          returnTo,
+        ),
+      [
+        returnTo,
+      ],
+    )
+
+  const [
+    deliveryEta,
+    setDeliveryEta,
+  ] =
+    useState(null)
+
+  const [
+    deliveryEtaLoading,
+    setDeliveryEtaLoading,
+  ] =
+    useState(false)
+
+  const [
+    etaNowMs,
+    setEtaNowMs,
+  ] =
+    useState(
+      () => Date.now(),
     )
 
   const [
@@ -278,6 +340,181 @@ export default function DeliveryAddressPage() {
     setSuccess,
   ] =
     useState('')
+
+  useEffect(
+    () => {
+      if (
+        !checkoutCartId
+      ) {
+        setDeliveryEta(
+          null,
+        )
+
+        return undefined
+      }
+
+      let active =
+        true
+
+      setDeliveryEtaLoading(
+        true,
+      )
+
+      getMarketplaceCartDeliveryEta(
+        checkoutCartId,
+      )
+        .then(
+          (result) => {
+            if (
+              !active
+            ) {
+              return
+            }
+
+            setDeliveryEta(
+              result,
+            )
+
+            if (
+              result?.available
+            ) {
+              setDeliveryContext({
+                city:
+                  result.destination?.city ||
+                  '',
+
+                state:
+                  result.destination?.state ||
+                  '',
+
+                country:
+                  result.destination?.country ||
+                  'India',
+
+                label:
+                  result.destination?.label ||
+                  `PIN ${result.destination?.postalCode || ''}`,
+
+                estimatedDeliveryMinutes:
+                  result.estimatedDeliveryMinutes,
+
+                estimatedArrivalAt:
+                  result.estimatedArrivalAt,
+
+                estimatedRoadDistanceKm:
+                  result.estimatedRoadDistanceKm,
+
+                averageSpeedKmh:
+                  result.averageSpeedKmh,
+
+                calculationMethod:
+                  result.calculationMethod,
+
+                targetPath:
+                  `${location.pathname}${location.search}`,
+              })
+            }
+          },
+        )
+        .catch(
+          () => {
+            if (
+              active
+            ) {
+              setDeliveryEta(
+                null,
+              )
+            }
+          },
+        )
+        .finally(
+          () => {
+            if (
+              active
+            ) {
+              setDeliveryEtaLoading(
+                false,
+              )
+            }
+          },
+        )
+
+      return () => {
+        active =
+          false
+      }
+    },
+    [
+      checkoutCartId,
+      location.pathname,
+      location.search,
+      setDeliveryContext,
+    ],
+  )
+
+  useEffect(
+    () => {
+      if (
+        !deliveryEta?.estimatedArrivalAt
+      ) {
+        return undefined
+      }
+
+      const intervalId =
+        window.setInterval(
+          () => {
+            setEtaNowMs(
+              Date.now(),
+            )
+          },
+          5000,
+        )
+
+      return () =>
+        window.clearInterval(
+          intervalId,
+        )
+    },
+    [
+      deliveryEta?.estimatedArrivalAt,
+    ],
+  )
+
+  const remainingDeliveryMinutes =
+    useMemo(() => {
+      const arrivalAtMs =
+        Date.parse(
+          deliveryEta?.estimatedArrivalAt ||
+            '',
+        )
+
+      if (
+        !Number.isFinite(
+          arrivalAtMs,
+        )
+      ) {
+        return Number.isFinite(
+          deliveryEta?.estimatedDeliveryMinutes,
+        )
+          ? deliveryEta.estimatedDeliveryMinutes
+          : null
+      }
+
+      return Math.max(
+        0,
+        Math.ceil(
+          (
+            arrivalAtMs -
+            etaNowMs
+          ) /
+            60000,
+        ),
+      )
+    }, [
+      deliveryEta?.estimatedArrivalAt,
+      deliveryEta?.estimatedDeliveryMinutes,
+      etaNowMs,
+    ])
 
   useEffect(
     () => {
@@ -594,6 +831,56 @@ export default function DeliveryAddressPage() {
               </div>
             </div>
           </header>
+
+          {checkoutCartId && (
+            <section className="border-b border-stone-200 bg-stone-950 px-6 py-4 text-white sm:px-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300">
+                    <Truck
+                      size={19}
+                      aria-hidden="true"
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-300">
+                      Distance-based delivery estimate
+                    </p>
+                    <p className="mt-0.5 text-sm font-black sm:text-base">
+                      {deliveryEtaLoading
+                        ? 'Calculating from seller pincode...'
+                        : deliveryEta?.available && Number.isFinite(
+                              remainingDeliveryMinutes,
+                            )
+                          ? remainingDeliveryMinutes <= 0
+                            ? 'Estimated arrival: now'
+                            : `Deliver in ~${remainingDeliveryMinutes} min`
+                          : 'ETA will appear when a serviceable stock pincode is available.'}
+                    </p>
+                  </div>
+                </div>
+
+                {deliveryEta?.available && (
+                  <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-white/65 sm:text-xs">
+                    <Clock3
+                      size={14}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      ~{deliveryEta.estimatedRoadDistanceKm} km · {deliveryEta.averageSpeedKmh} km/h model
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {deliveryEta?.available && (
+                <p className="mt-2 text-[10px] leading-4 text-white/45 sm:text-[11px]">
+                  Approximate pincode-to-pincode ETA using current serviceable seller stock location, road-distance factor and a normal delivery speed. Live traffic is not included.
+                </p>
+              )}
+            </section>
+          )}
 
           <div className="p-6 sm:p-8">
             {addresses.length > 0 && (

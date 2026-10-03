@@ -210,12 +210,12 @@ test(
 
       [
         'Living Pantry',
-        'Your household food memory',
-        'not a live warehouse stock counter',
+        'Living Pantry keeps a simple memory of the food you have at home.',
+        'It separates what you confirmed from what EPANTRY only expects',
         'Confirmed',
         'Likely',
         'Running low',
-        'Needs confirmation',
+        'Needs checking',
         'Not tracking',
       ],
     )
@@ -490,7 +490,7 @@ test(
 )
 
 test(
-  'M09 routes never use presentation mode as authorization',
+  'M09 Pantry routes remain Customer-capability gated even when activeMode selects the visible workspace',
 
   async () => {
     const source =
@@ -498,20 +498,19 @@ test(
         'frontend/src/routes/AppRoutes.jsx',
       )
 
-    const forbiddenTerm =
-      [
-        'active',
-        'Mode',
-      ].join(
-        '',
-      )
+    assert.match(
+      source,
+      /path="\/pantry"[\s\S]*?APPLICATION_ACCESS_TYPES\.CUSTOMER/,
+    )
 
-    assert.equal(
-      source.includes(
-        forbiddenTerm,
-      ),
+    assert.match(
+      source,
+      /customerEnabled\s*===\s*true/,
+    )
 
-      false,
+    assert.match(
+      source,
+      /hostEnabled\s*===\s*true\s*&&\s*hostAccessStatus\s*===\s*['"]active['"]/,
     )
   },
 )

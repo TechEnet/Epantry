@@ -258,7 +258,7 @@ test(
 )
 
 test(
-  'M18 Production Recipe approval uses Host maker-checker',
+  'M18 Production Recipe approval is reserved for root Super Admin governance',
   () => {
     const source =
       read(
@@ -277,7 +277,17 @@ test(
 
     assert.match(
       source,
-      /HOSPITALITY_PRODUCTION_RECIPE_MAKER_CHECKER_REQUIRED/,
+      /approveHospitalityProductionRecipeAsSuperAdmin/,
+    )
+
+    assert.match(
+      source,
+      /HOSPITALITY_SUPER_ADMIN_APPROVAL_REQUIRED/,
+    )
+
+    assert.match(
+      source,
+      /approvalAuthority:\s*['"]root_super_admin['"]/,
     )
   },
 )

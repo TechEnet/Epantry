@@ -404,7 +404,7 @@ export default function AdminExpansionTrustPanel() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-stone-200 bg-white p-4">
+        <section id="creator-content-governance" className="rounded-2xl border border-stone-200 bg-white p-4">
           <div className="flex items-start gap-2">
             <BadgeCheck
               size={18}
@@ -414,11 +414,11 @@ export default function AdminExpansionTrustPanel() {
 
             <div>
               <h3 className="text-sm font-black text-stone-950">
-                Creator content provenance
+                Creator course & media approval
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Rights, lineage, sponsored disclosure and takedown state are explicit. Food Intelligence is always recalculated, never copied from a creator/fork.
+                Review professional Chef + Restaurant Host courses before they become visible in Learn / Pro. Course video/media, rights and sponsorship disclosure are governed together.
               </p>
             </div>
           </div>
@@ -434,15 +434,13 @@ export default function AdminExpansionTrustPanel() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-xs font-black text-stone-900">
-                          {titleize(
-                            item.contentType,
-                          )}
+                          {item.content?.title || titleize(item.contentType)}
                         </p>
 
                         <p className="mt-1 text-[11px] font-semibold text-stone-500">
-                          {titleize(
-                            item.governanceState,
-                          )}
+                          {item.creator?.displayName ? `${item.creator.displayName} · ` : ''}
+                          {titleize(item.governanceState)}
+                          {item.content?.accessType ? ` · ${titleize(item.content.accessType)}` : ''}
                         </p>
                       </div>
 
@@ -517,7 +515,7 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(item.id),
                                   }),
-                                'Creator content provenance approved.',
+                                'Creator course approved and released to Learn / Pro.',
                               )
                             }
                             className="focus-ring rounded-lg bg-emerald-700 px-3 py-2 text-[11px] font-black text-white"
@@ -541,12 +539,12 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(item.id),
                                   }),
-                                'Creator content restricted through governed rights workflow.',
+                                'Creator course returned to the Host for changes.',
                               )
                             }
                             className="focus-ring rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-900"
                           >
-                            Restrict
+                            Reject / changes required
                           </button>
                         </div>
                       </div>

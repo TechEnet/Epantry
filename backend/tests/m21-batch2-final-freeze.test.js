@@ -544,7 +544,7 @@ test(
 
     assert.match(
       panel,
-      /Creator content provenance/,
+      /creator provenance/i,
     )
 
     assert.match(

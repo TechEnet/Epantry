@@ -1033,7 +1033,9 @@ export async function switchActiveMode(
 |
 */
 
-export async function requestHostAccess() {
+export async function requestHostAccess(
+  hostWorkspaceType,
+) {
   const csrfToken =
     await requestCsrfToken()
 
@@ -1041,7 +1043,9 @@ export async function requestHostAccess() {
     await apiClient.post(
       '/auth/host/request',
 
-      {},
+      {
+        hostWorkspaceType,
+      },
 
       {
         headers: {

@@ -237,7 +237,7 @@ test(
         'Allergen statement',
         'Nutrition panel',
         'Unverified',
-        'Provisional',
+        'Unverified matches stay reference-only.',
       ]
     ) {
       assert.equal(

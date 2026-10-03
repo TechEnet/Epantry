@@ -261,7 +261,11 @@ function newSessionForm() {
   }
 }
 
-export default function CreatorProTransactionsPanel() {
+export default function CreatorProTransactionsPanel({
+  mode = 'customer',
+} = {}) {
+  const creatorMode =
+    mode === 'creator'
   const [
     sessions,
     setSessions,
@@ -342,38 +346,56 @@ export default function CreatorProTransactionsPanel() {
         )
 
         try {
-          const [
-            publicResult,
-            bookingResult,
-            creatorResult,
-          ] =
-            await Promise.all([
-              listCreatorSessions(),
+          if (creatorMode) {
+            const creatorResult =
+              await listMyCreatorSessions()
 
-              listMyCreatorBookings(),
+            setSessions(
+              [],
+            )
 
-              listMyCreatorSessions(),
-            ])
+            setBookings(
+              [],
+            )
 
-          setSessions(
-            publicResult?.sessions ||
-            [],
-          )
+            setCreatorState(
+              creatorResult || {
+                hasCreatorProfile:
+                  false,
 
-          setBookings(
-            bookingResult?.bookings ||
-            [],
-          )
+                sessions:
+                  [],
+              },
+            )
+          } else {
+            const [
+              publicResult,
+              bookingResult,
+            ] =
+              await Promise.all([
+                listCreatorSessions(),
 
-          setCreatorState(
-            creatorResult || {
+                listMyCreatorBookings(),
+              ])
+
+            setSessions(
+              publicResult?.sessions ||
+              [],
+            )
+
+            setBookings(
+              bookingResult?.bookings ||
+              [],
+            )
+
+            setCreatorState({
               hasCreatorProfile:
                 false,
 
               sessions:
                 [],
-            },
-          )
+            })
+          }
         } catch (
           requestError
         ) {
@@ -389,7 +411,9 @@ export default function CreatorProTransactionsPanel() {
           )
         }
       },
-      [],
+      [
+        creatorMode,
+      ],
     )
 
   useEffect(
@@ -631,7 +655,7 @@ export default function CreatorProTransactionsPanel() {
         )
       },
 
-      'Creator session draft created. It still requires existing M15 course + M21 governance before publication.',
+      'Draft live class created. It cannot be published until the linked course and Creator content are approved by EPANTRY.',
     )
   }
 
@@ -652,15 +676,21 @@ export default function CreatorProTransactionsPanel() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs">
-              Creator sessions & bookings
+              {creatorMode
+                ? 'Creator live sessions'
+                : 'Creator sessions & bookings'}
             </p>
 
             <h2 className="mt-1 whitespace-nowrap text-[17px] font-black tracking-tight text-stone-950 sm:text-xl">
-              Classes, seats & secure checkout
+              {creatorMode
+                ? 'Plan and manage your live classes'
+                : 'Classes, seats & secure checkout'}
             </h2>
 
             <p className="mt-1.5 max-w-4xl text-xs font-semibold leading-5 text-stone-600 sm:text-sm sm:leading-6">
-              Creators stay within Customer profiles. Class bookings use secure EPANTRY checkout, while payment details are handled by Razorpay.
+              {creatorMode
+                ? 'Live-session authoring belongs to your approved Chef + Restaurant Host workspace. Drafts still follow EPANTRY governance before publication.'
+                : 'Browse governed classes, reserve seats and use secure EPANTRY checkout when a paid session requires payment.'}
             </p>
           </div>
 
@@ -699,6 +729,7 @@ export default function CreatorProTransactionsPanel() {
         </div>
       </div>
 
+      {!creatorMode ? (
       <section className="rounded-[24px] border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-start gap-2.5">
           <CalendarDays
@@ -867,7 +898,9 @@ export default function CreatorProTransactionsPanel() {
         </div>
       </section>
 
-      {creatorState.hasCreatorProfile ? (
+      ) : null}
+
+      {creatorMode && creatorState.hasCreatorProfile ? (
         <section className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
           <div className="flex items-start gap-3">
             <ShieldCheck
@@ -882,7 +915,7 @@ export default function CreatorProTransactionsPanel() {
               </h3>
 
               <p className="mt-1 text-sm font-semibold leading-6 text-stone-500">
-                Creating a session does not publish it. Publication rechecks the existing M15 Course and requires an approved M21 CreatorContent governance record.
+                Create a draft live class here. Publishing still rechecks the linked course and approved Creator content governance before customers can book it.
               </p>
             </div>
           </div>
@@ -1218,7 +1251,7 @@ export default function CreatorProTransactionsPanel() {
                               session.id,
                             ),
 
-                          'Creator session published after existing Course and CreatorContent governance checks.',
+                          'Live class published after EPANTRY approval checks passed.',
                         )
                       }
                       className="focus-ring mt-3 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white"
@@ -1233,6 +1266,7 @@ export default function CreatorProTransactionsPanel() {
         </section>
       ) : null}
 
+      {!creatorMode ? (
       <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-amber-950">
         <CircleAlert
           size={18}
@@ -1244,6 +1278,7 @@ export default function CreatorProTransactionsPanel() {
           Payment confirms the booking only. Cancellations may need refund review; payouts and settlements are handled separately.
         </p>
       </div>
+      ) : null}
     </section>
   )
 }
