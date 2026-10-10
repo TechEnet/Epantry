@@ -68,6 +68,8 @@ export default function AdminCommunityPage() {
 
   const [error, setError] = useState("");
 
+  const [queueErrors, setQueueErrors] = useState({});
+
   const [notice, setNotice] = useState("");
 
   const [reason, setReason] = useState("");
@@ -82,32 +84,29 @@ export default function AdminCommunityPage() {
     setError("");
 
     try {
-      const [recipeResult, creatorResult] = await Promise.all([
-        listCommunityModerationQueue({
-          page: 1,
-
-          limit: 50,
-        }),
-
-        listCreatorVerificationQueue({
-          page: 1,
-
-          limit: 50,
-
-          status: "pending",
-        }),
+      // Each review queue must render independently if the other API is unavailable.
+      const [recipeState, creatorState] = await Promise.allSettled([
+        listCommunityModerationQueue({ page: 1, limit: 50 }),
+        listCreatorVerificationQueue({ page: 1, limit: 50, status: "pending" }),
       ]);
-
-      setRecipes(recipeResult?.recipes || []);
-
-      setCreators(creatorResult?.creators || []);
-    } catch (requestError) {
-      setError(
-        getCommunityErrorMessage(
-          requestError,
-          "Unable to load M15 moderation queues."
-        )
-      );
+      const nextErrors = {};
+      if (recipeState.status === "fulfilled") {
+        setRecipes(recipeState.value?.recipes || []);
+      } else {
+        nextErrors.recipes = getCommunityErrorMessage(
+          recipeState.reason,
+          "Recipe reviews could not be loaded. Please try again."
+        );
+      }
+      if (creatorState.status === "fulfilled") {
+        setCreators(creatorState.value?.creators || []);
+      } else {
+        nextErrors.creators = getCommunityErrorMessage(
+          creatorState.reason,
+          "Creator verification requests could not be loaded. Please try again."
+        );
+      }
+      setQueueErrors(nextErrors);
     } finally {
       setLoading(false);
 
@@ -142,7 +141,7 @@ export default function AdminCommunityPage() {
       setError(
         getCommunityErrorMessage(
           requestError,
-          "Unable to load Community Recipe moderation detail."
+          "Could not load this recipe review."
         )
       );
     } finally {
@@ -251,8 +250,8 @@ export default function AdminCommunityPage() {
 
   return (
     <AdminShell
-      title="Community & Creator Ops"
-      description="Customer personal recipes stay private/friend-only. Use Creator verification and Creator content governance here to review professional Chef + Restaurant Host publishing before it reaches customers."
+      title="Community & Creator Reviews"
+      description="Review community reports, check creator requests and manage content before it goes public."
       actions={
         <button
           type="button"
@@ -265,19 +264,37 @@ export default function AdminCommunityPage() {
         </button>
       }
     >
+      <section className="overflow-hidden rounded-[22px] border border-emerald-200 bg-[#e6f3ec]">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-emerald-800">Community & creator safety</p>
+            <h2 className="mt-1 text-xl font-bold leading-tight text-[#164838] sm:text-2xl">Review content before it reaches people.</h2>
+            <p className="mt-1 text-sm leading-5 text-stone-700">Check reported content, verify creators and review professional courses or promotions.</p>
+          </div>
+          <div className="flex shrink-0 gap-3 rounded-xl bg-white/85 px-4 py-2.5 text-center">
+            <div><p className="text-lg font-bold text-[#164838]">{recipes.length}</p><p className="text-xs text-stone-600">Recipe reviews</p></div>
+            <div className="border-l border-stone-200 pl-3"><p className="text-lg font-bold text-[#164838]">{creators.length}</p><p className="text-xs text-stone-600">Creator requests</p></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 border-t border-emerald-200 bg-white/45 text-center text-xs font-semibold text-[#245847] sm:text-sm">
+          <div className="min-w-0 px-1.5 py-3 sm:px-4">01 · Open a report</div>
+          <div className="min-w-0 border-x border-emerald-200 px-1.5 py-3 sm:px-4">02 · Check the facts</div>
+          <div className="min-w-0 px-1.5 py-3 sm:px-4">03 · Save a decision</div>
+        </div>
+      </section>
+
       <AdminExpansionTrustPanel />
 
-      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
-        <ShieldAlert size={20} className="mt-0.5 shrink-0" />
-
-        <p className="text-xs font-semibold leading-5">
-          Private and friend-shared Customer recipes never enter an approval queue.
-          This recipe queue is kept only for legacy public Community records.
-          Creator verification and professional course/media approval remain Super Admin governance actions; they do not create a new top-level user role.
-        </p>
+      <div className="flex items-start gap-2 border-l-4 border-amber-400 bg-amber-50 px-3 py-3 text-amber-950 sm:px-4">
+        <ShieldAlert size={18} className="mt-0.5 shrink-0" />
+        <p className="text-sm leading-5">Private and friend-shared recipes do not need approval. The recipe queue below is only for older public community submissions. Creator verification does not grant new account permissions.</p>
+      </div>
+      <div className="mt-5 border-b border-stone-200 pb-3">
+        <h2 className="text-lg font-bold text-[#164838]">Recipe and creator requests</h2>
+        <p className="mt-1 text-sm text-stone-600">Choose a pending item to read its details and make a decision.</p>
       </div>
 
-      <div className="mt-5 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => {
@@ -295,7 +312,7 @@ export default function AdminCommunityPage() {
               : "bg-white text-stone-600",
           ].join(" ")}
         >
-          Recipe moderation ({recipes.length})
+          Public recipe reviews ({recipes.length})
         </button>
 
         <button
@@ -332,16 +349,20 @@ export default function AdminCommunityPage() {
           <LoaderCircle className="animate-spin text-emerald-700" />
         </div>
       ) : (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <section className="overflow-hidden rounded-[24px] border border-stone-200 bg-white shadow-sm">
+        <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(260px,31%)_minmax(0,1fr)]">
+          <section className="min-w-0 overflow-hidden rounded-[18px] border border-sky-100 bg-[#edf5f8]">
             <div className="border-b border-stone-200 p-4">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-                {tab === "recipes" ? "Pending recipes" : "Pending creators"}
+                {tab === "recipes" ? "Older public recipe requests" : "Creators waiting for verification"}
               </p>
             </div>
 
             <div className="max-h-[700px] overflow-y-auto p-3">
-              {tab === "recipes" ? (
+              {queueErrors[tab] ? (
+                <div className="rounded-xl bg-red-50 px-3 py-3 text-sm text-red-800" role="alert">
+                  {queueErrors[tab]}
+                </div>
+              ) : tab === "recipes" ? (
                 recipes.length ? (
                   recipes.map((recipe) => (
                     <button
@@ -351,7 +372,7 @@ export default function AdminCommunityPage() {
                       className="focus-ring mb-2 block w-full rounded-2xl border border-stone-200 p-4 text-left last:mb-0 hover:border-emerald-300 hover:bg-emerald-50/30"
                     >
                       <p className="text-sm font-black text-stone-900">
-                        Community Recipe {recipe.recipeVersionId.slice(-6)}
+                        Public recipe · {String(recipe.recipeVersionId || recipe.id || "").slice(-6)}
                       </p>
 
                       <p className="mt-1 text-xs font-semibold text-stone-500">
@@ -364,7 +385,7 @@ export default function AdminCommunityPage() {
                     <FileSearch size={28} className="mx-auto text-stone-300" />
 
                     <p className="mt-3 text-sm font-black text-stone-600">
-                      No pending recipes
+                      No older public recipes waiting for review
                     </p>
                   </div>
                 )
@@ -396,14 +417,14 @@ export default function AdminCommunityPage() {
                   <ChefHat size={28} className="mx-auto text-stone-300" />
 
                   <p className="mt-3 text-sm font-black text-stone-600">
-                    No pending Creator verification
+                    No creator verification requests right now
                   </p>
                 </div>
               )}
             </div>
           </section>
 
-          <section className="min-w-0 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+          <section className="min-w-0 rounded-[18px] border border-stone-200 bg-white p-4 sm:p-6">
             {detailBusy ? (
               <div className="grid min-h-72 place-items-center">
                 <LoaderCircle className="animate-spin text-emerald-700" />
@@ -413,11 +434,11 @@ export default function AdminCommunityPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black text-amber-800">
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
                         Creator-provided content
                       </span>
 
-                      <span className="rounded-full bg-stone-100 px-3 py-1 text-[10px] font-black text-stone-600">
+                      <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-black text-stone-600">
                         {selectedRecipe.communityRecipe.moderationState}
                       </span>
                     </div>
@@ -463,8 +484,8 @@ export default function AdminCommunityPage() {
                       {labelize(foodState?.state || "unknown")}
                     </p>
 
-                    <p className="mt-1 text-[11px] leading-5 opacity-80">
-                      Parent calculations copied:{" "}
+                    <p className="mt-1 text-[13px] leading-5 opacity-80">
+                      Using an existing approved calculation:{" "}
                       {foodState?.copiedFromParent ? "yes" : "no"}.
                     </p>
                   </div>
@@ -472,7 +493,7 @@ export default function AdminCommunityPage() {
 
                 {selectedRecipe.communityRecipe.creatorStatement ? (
                   <div className="mt-4 rounded-2xl bg-stone-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-400">
+                    <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
                       Creator statement
                     </p>
 
@@ -484,7 +505,7 @@ export default function AdminCommunityPage() {
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl bg-stone-50 p-4">
-                    <p className="text-[10px] font-black uppercase text-stone-400">
+                    <p className="text-xs font-black uppercase text-stone-400">
                       Ingredients
                     </p>
 
@@ -494,7 +515,7 @@ export default function AdminCommunityPage() {
                   </div>
 
                   <div className="rounded-2xl bg-stone-50 p-4">
-                    <p className="text-[10px] font-black uppercase text-stone-400">
+                    <p className="text-xs font-black uppercase text-stone-400">
                       Method steps
                     </p>
 
@@ -533,7 +554,7 @@ export default function AdminCommunityPage() {
                         className="focus-ring inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <BadgeCheck size={15} />
-                        Approve & publish
+                        Approve public recipe
                       </button>
 
                       <button
@@ -556,16 +577,15 @@ export default function AdminCommunityPage() {
                     </div>
 
                     {!canRecipePublish ? (
-                      <p className="mt-3 text-[11px] font-semibold text-stone-400">
-                        recipe.publish permission is required for approval.
+                      <p className="mt-3 text-[13px] font-semibold text-stone-400">
+                        Publishing access is required for approval.
                         Read/reject workflows do not create Super Admin
                         authority.
                       </p>
                     ) : foodState?.state !==
                       "approved_calculation_available" ? (
-                      <p className="mt-3 text-[11px] font-semibold text-amber-700">
-                        Approval is locked until this exact RecipeVersion has an
-                        approved M08 FoodCalculation.
+                      <p className="mt-3 text-[13px] font-semibold text-amber-700">
+                        This recipe needs verified food information before it can be published.
                       </p>
                     ) : null}
                   </div>
@@ -607,9 +627,7 @@ export default function AdminCommunityPage() {
                     <ShieldCheck size={18} className="mt-0.5 shrink-0" />
 
                     <p className="text-xs font-semibold leading-5">
-                      Verification updates CreatorProfile only. It must never
-                      set superAdminEnabled, hostEnabled, customerEnabled or
-                      activeMode authority.
+                      Verifying a creator confirms their profile only. It does not change account access.
                     </p>
                   </div>
                 </div>
@@ -653,13 +671,12 @@ export default function AdminCommunityPage() {
                   </div>
                 ) : (
                   <p className="mt-5 text-xs font-semibold text-stone-400">
-                    trust_safety.mutate permission is required to decide Creator
-                    verification.
+                    You need permission to approve or reject creators.
                   </p>
                 )}
               </>
             ) : (
-              <div className="grid min-h-[520px] place-items-center text-center">
+              <div className="grid min-h-[210px] place-items-center text-center sm:min-h-[320px]">
                 <div>
                   {tab === "recipes" ? (
                     <FileSearch size={34} className="mx-auto text-stone-300" />
@@ -668,7 +685,7 @@ export default function AdminCommunityPage() {
                   )}
 
                   <h2 className="mt-4 text-lg font-black text-stone-800">
-                    Choose an item from the queue
+                    Select a request to see its details
                   </h2>
                 </div>
               </div>

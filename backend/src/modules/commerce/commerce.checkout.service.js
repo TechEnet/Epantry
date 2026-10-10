@@ -1394,6 +1394,123 @@ export async function createDirectMarketplaceCart({
 
 /*
 |--------------------------------------------------------------------------
+| One validated Marketplace order (Grocery / Brand / Recipe ingredients)
+|--------------------------------------------------------------------------
+| Recipe ingredients must first be priced and matched to eligible Host offers
+| using the existing Outcome Plan -> Basket Quote -> Marketplace Cart flow.
+| Neither client-supplied prices nor unpriced ingredient names are accepted.
+| Existing Razorpay order/payment handling then operates on ONE cart.
+*/
+export async function mergeRecipeCartIntoMarketplaceCart({
+  cartId,
+  recipeCartId,
+  actorUser,
+}) {
+  const ownerUserId = actorIdFromUser(actorUser)
+  if (String(cartId) === String(recipeCartId)) {
+    throw new ApiError(400, 'Choose two different carts to combine.', [
+      { code: 'COMBINED_CART_SAME_SOURCE' },
+    ])
+  }
+
+  // No untrusted client amount/offer is accepted; both carts and every line
+  // were created from backend governed HostOffer prices.
+  const session = await mongoose.startSession()
+  let destinationId = null
+  try {
+    await session.withTransaction(async () => {
+      // MongoDB transactions must not run parallel queries on one session.
+      const target = await MarketplaceCart.findOne({
+        _id: cartId, ownerUserId,
+      }).session(session)
+      const source = await MarketplaceCart.findOne({
+        _id: recipeCartId, ownerUserId,
+      }).session(session)
+      if (!target || !source) {
+        throw new ApiError(404, 'One of the selected carts is no longer available.', [
+          { code: 'COMBINED_CART_NOT_FOUND' },
+        ])
+      }
+      destinationId = target._id
+
+      // Idempotent retry: if an earlier request already moved the exact cart,
+      // do not copy the priced items again.
+      if (source.status === 'abandoned' &&
+          String(source.mergedIntoCartId || '') === String(target._id)) {
+        return
+      }
+      if (target.status !== 'draft' || source.status !== 'draft' ||
+          target.sourceType !== 'direct_product' ||
+          source.sourceType !== 'basket_quote') {
+        throw new ApiError(409, 'These carts cannot be combined in their current state.', [
+          { code: 'COMBINED_CART_STATE_INVALID' },
+        ])
+      }
+      if (String(target.householdId) !== String(source.householdId) ||
+          String(target.pincode) !== String(source.pincode) ||
+          String(target.fulfillmentType || 'delivery') !== String(source.fulfillmentType || 'delivery') ||
+          target.currency !== source.currency) {
+        throw new ApiError(409, 'All items must use the same delivery PIN and currency. Update the address and try again.', [
+          { code: 'COMBINED_CART_CONTEXT_MISMATCH' },
+        ])
+      }
+      if (!source.items.length || !target.items.length) {
+        throw new ApiError(409, 'Both carts must contain priced products.', [
+          { code: 'COMBINED_CART_EMPTY' },
+        ])
+      }
+
+      const combinedLines = [...target.items, ...source.items]
+      let totalMinor = 0
+      for (const item of combinedLines) {
+        const unit = Number(item.unitPrice?.amountMinor)
+        const quantity = Number(item.packCount)
+        const lineTotal = Number(item.lineTotal?.amountMinor)
+        if (!Number.isSafeInteger(unit) || unit <= 0 ||
+            !Number.isSafeInteger(quantity) || quantity < 1 ||
+            !Number.isSafeInteger(lineTotal) || lineTotal !== unit * quantity ||
+            item.unitPrice?.currency !== target.currency ||
+            item.lineTotal?.currency !== target.currency) {
+          throw new ApiError(409, 'Every ingredient and product needs a verified Host price before placing one order.', [
+            { code: 'COMBINED_CART_PRICE_INCOMPLETE' },
+          ])
+        }
+        totalMinor += lineTotal
+      }
+      if (!Number.isSafeInteger(totalMinor) || totalMinor <= 0) {
+        throw new ApiError(409, 'Combined order total is invalid.', [
+          { code: 'COMBINED_CART_TOTAL_INVALID' },
+        ])
+      }
+
+      // The snapshot is still checked against real offers and inventory by
+      // createCheckout, including seller splits and per-line reservation.
+      target.items.push(...source.items.map((item) => ({
+        ...item.toObject(),
+        _id: new mongoose.Types.ObjectId(),
+      })))
+      target.itemSubtotalMinor = totalMinor
+      target.sellerCount = new Set(target.items.map(
+        (item) => String(item.organizationId),
+      )).size
+      target.knownFeesMinor = null
+      target.totalLandedCostMinor = null
+      target.landedCostCompleteness = 'item_prices_only'
+
+      source.status = 'abandoned'
+      source.mergedIntoCartId = target._id
+      await target.save({ session })
+      await source.save({ session })
+    })
+  } finally {
+    await session.endSession()
+  }
+
+  return getMarketplaceCart({ cartId: destinationId, actorUser })
+}
+
+/*
+|--------------------------------------------------------------------------
 | Restaurant Recipe Cart Foundation
 |--------------------------------------------------------------------------
 |

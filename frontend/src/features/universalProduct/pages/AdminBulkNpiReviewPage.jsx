@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AdminShell from "../../admin/components/AdminShell";
 
@@ -69,6 +69,35 @@ function labelize(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function reviewFieldLabel(fieldPath) {
+  const labels = {
+    displayName: "Product name",
+    brandName: "Brand",
+    gtin: "Barcode number",
+    netQuantity: "Pack size",
+    ingredientDeclarationText: "Ingredients",
+    allergens: "Allergy information",
+    nutrition: "Nutrition details",
+    manufacturerName: "Manufacturer",
+    countryOfOrigin: "Country of origin",
+    claims: "Product claims",
+    certifications: "Certifications",
+  };
+
+  return labels[fieldPath] || labelize(fieldPath);
+}
+
+function reviewSourceLabel(source) {
+  const value = String(source || "").toLowerCase();
+
+  if (value.includes("user") || value.includes("host")) return "Provided by Host";
+  if (value.includes("open_food") || value.includes("food_facts")) return "Open Food Facts";
+  if (value.includes("ai") || value.includes("extract")) return "Auto-read from evidence";
+  if (value.includes("external")) return "External source";
+
+  return "Submitted information";
+}
+
 function candidateValue(draft, fieldPath) {
   return draft?.candidateFields?.[fieldPath]?.value ?? null;
 }
@@ -104,7 +133,7 @@ function statusClasses(status) {
     case "ready_for_review":
       return "bg-blue-100 text-blue-800";
     case "needs_more_evidence":
-      return "bg-amber-100 text-amber-800";
+      return "bg-orange-100 text-orange-800";
     case "rejected":
       return "bg-red-100 text-red-700";
     default:
@@ -119,9 +148,9 @@ function batchStatusClasses(status) {
     case "in_review":
       return "bg-blue-100 text-blue-800";
     case "needs_attention":
-      return "bg-amber-100 text-amber-800";
+      return "bg-orange-100 text-orange-800";
     default:
-      return "bg-violet-100 text-violet-800";
+      return "bg-slate-100 text-slate-700";
   }
 }
 
@@ -132,9 +161,9 @@ function commerceStatusClasses(status) {
     case "prepared":
       return "bg-blue-100 text-blue-800";
     case "action_required":
-      return "bg-amber-100 text-amber-800";
+      return "bg-orange-100 text-orange-800";
     case "processing":
-      return "bg-violet-100 text-violet-800";
+      return "bg-sky-100 text-sky-800";
     case "skipped":
       return "bg-stone-100 text-stone-600";
     default:
@@ -142,9 +171,212 @@ function commerceStatusClasses(status) {
   }
 }
 
-function printable(value) {
+
+function nutritionReviewData(value) {
+  let nutritionValue = value;
+
+  if (typeof nutritionValue === "string") {
+    try {
+      nutritionValue = JSON.parse(nutritionValue);
+    } catch {
+      return {
+        basis: "",
+        serving: "",
+        rows: nutritionValue.trim()
+          ? [{ label: "Nutrition", value: nutritionValue.trim() }]
+          : [],
+      };
+    }
+  }
+
+  if (!nutritionValue || typeof nutritionValue !== "object" || Array.isArray(nutritionValue)) {
+    return { basis: "", serving: "", rows: [] };
+  }
+
+  const basisRaw = nutritionValue.basis || nutritionValue.per || nutritionValue.reference || "";
+  const basisMap = {
+    per_100g: "Per 100 g",
+    per_100ml: "Per 100 ml",
+    per_serving: "Per serving",
+    per_pack: "Per pack",
+    serving: "Per serving",
+  };
+  const normalizedBasis = String(basisRaw).toLowerCase();
+  const basis = normalizedBasis === "unknown"
+    ? ""
+    : basisMap[normalizedBasis] ||
+      (basisRaw ? labelize(String(basisRaw).replace(/^per[_\s-]*/i, "Per ")) : "");
+
+  const servingSize = nutritionValue.servingSize || nutritionValue.serving || null;
+  let serving = "";
+  if (servingSize && typeof servingSize === "object" && !Array.isArray(servingSize)) {
+    const amount = servingSize.value ?? servingSize.amount ?? servingSize.quantity;
+    const unit = servingSize.unit || servingSize.unitText || "";
+    if (amount !== null && amount !== undefined && amount !== "") {
+      serving = `Serving size ${amount}${unit ? ` ${unit}` : ""}`;
+    }
+  } else if (servingSize !== null && servingSize !== undefined && servingSize !== "") {
+    serving = `Serving size ${servingSize}`;
+  }
+
+  const nutrientLabels = {
+    energy: "Energy",
+    calories: "Calories",
+    calorie: "Calories",
+    protein: "Protein",
+    carbohydrate: "Carbohydrates",
+    carbohydrates: "Carbohydrates",
+    totalcarbohydrate: "Carbohydrates",
+    totalcarbohydrates: "Carbohydrates",
+    fat: "Total fat",
+    totalfat: "Total fat",
+    saturatedfat: "Saturated fat",
+    transfat: "Trans fat",
+    sugar: "Total sugars",
+    sugars: "Total sugars",
+    totalsugars: "Total sugars",
+    addedsugar: "Added sugars",
+    addedsugars: "Added sugars",
+    fiber: "Dietary fibre",
+    fibre: "Dietary fibre",
+    dietaryfiber: "Dietary fibre",
+    dietaryfibre: "Dietary fibre",
+    sodium: "Sodium",
+    salt: "Salt",
+    cholesterol: "Cholesterol",
+    calcium: "Calcium",
+    iron: "Iron",
+    potassium: "Potassium",
+  };
+
+  const formatNutrientLabel = (name) => {
+    const raw = String(name || "Nutrient").trim();
+    const lookup = raw.replace(/[\s_-]/g, "").toLowerCase();
+    return nutrientLabels[lookup] || labelize(raw);
+  };
+
+  const rows = [];
+  const pushRow = (name, amount, unit = "") => {
+    if (amount === null || amount === undefined || amount === "" || typeof amount === "object") return;
+    rows.push({
+      label: formatNutrientLabel(name),
+      value: `${amount}${unit ? ` ${unit}` : ""}`,
+    });
+  };
+
+  if (Array.isArray(nutritionValue.nutrients)) {
+    nutritionValue.nutrients.forEach((nutrient) => {
+      if (!nutrient) return;
+
+      if (typeof nutrient !== "object") {
+        pushRow("Nutrition", nutrient);
+        return;
+      }
+
+      const name = nutrient.name || nutrient.label || nutrient.nutrient || nutrient.key || "Nutrient";
+      const amount = nutrient.amount ?? nutrient.value ?? nutrient.quantity ?? nutrient.per100g ?? null;
+      const unit = nutrient.unit || nutrient.unitText || "";
+      pushRow(name, amount, unit);
+    });
+  } else {
+    const nutrientSource =
+      nutritionValue.nutrients && typeof nutritionValue.nutrients === "object"
+        ? nutritionValue.nutrients
+        : nutritionValue;
+
+    Object.entries(nutrientSource).forEach(([key, item]) => {
+      if (["basis", "per", "reference", "servingSize", "serving", "nutrients", "confidence"].includes(key)) return;
+
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        const amount = item.value ?? item.amount ?? item.quantity ?? null;
+        const unit = item.unit || item.unitText || "";
+        pushRow(key, amount, unit);
+        return;
+      }
+
+      pushRow(key, item);
+    });
+  }
+
+  return { basis, serving, rows };
+}
+
+function readableReviewValue(fieldPath, value) {
   if (value === null || value === undefined || value === "") {
-    return "—";
+    return "Not provided";
+  }
+
+  if (fieldPath === "netQuantity" && typeof value === "object") {
+    if (value.rawText) {
+      return String(value.rawText);
+    }
+
+    const amount = value.value ?? value.amount;
+    const unit = value.unit || value.unitText || "";
+    return amount !== null && amount !== undefined
+      ? `${amount}${unit ? ` ${unit}` : ""}`
+      : "Not provided";
+  }
+
+  if (fieldPath === "allergens" && typeof value === "object") {
+    const statement = value.statement || value.text || "";
+    const items = Array.isArray(value.items)
+      ? value.items
+          .map((item) => item?.name || item?.label || item)
+          .filter(Boolean)
+      : [];
+
+    if (statement && items.length) {
+      return `${statement}
+${items.join(", ")}`;
+    }
+
+    if (statement) return String(statement);
+    if (items.length) return items.join(", ");
+    return "No allergens declared";
+  }
+
+  if (fieldPath === "nutrition" && typeof value === "object") {
+    const lines = [];
+    const basis = value.basis || value.per || value.reference;
+    if (basis) lines.push(`Values ${String(basis).replace(/_/g, " ")}`);
+
+    const nutrients = value.nutrients && typeof value.nutrients === "object"
+      ? value.nutrients
+      : value;
+
+    Object.entries(nutrients).forEach(([key, item]) => {
+      if (["basis", "per", "reference", "servingSize"].includes(key)) return;
+
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        const amount = item.value ?? item.amount;
+        const unit = item.unit || "";
+        if (amount !== null && amount !== undefined) {
+          lines.push(`${labelize(key)}: ${amount}${unit ? ` ${unit}` : ""}`);
+        }
+        return;
+      }
+
+      if (item !== null && item !== undefined && typeof item !== "object") {
+        lines.push(`${labelize(key)}: ${item}`);
+      }
+    });
+
+    return lines.length ? lines.join("\n") : "Nutrition details not provided";
+  }
+
+  if (["claims", "certifications"].includes(fieldPath)) {
+    const items = Array.isArray(value) ? value : [value];
+    const labels = items
+      .map((item) => {
+        if (item && typeof item === "object") {
+          return item.label || item.name || item.title || item.statement || null;
+        }
+        return item;
+      })
+      .filter(Boolean);
+
+    return labels.length ? labels.join(", ") : "None listed";
   }
 
   if (
@@ -155,7 +387,34 @@ function printable(value) {
     return String(value);
   }
 
-  return JSON.stringify(value, null, 2);
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => {
+        if (item && typeof item === "object") {
+          return item.label || item.name || item.title || item.value || null;
+        }
+        return item;
+      })
+      .filter(Boolean);
+
+    return parts.length ? parts.join(", ") : "Not provided";
+  }
+
+  if (typeof value === "object") {
+    const lines = Object.entries(value)
+      .filter(([, item]) => item !== null && item !== undefined && item !== "")
+      .map(([key, item]) => {
+        if (typeof item === "object") {
+          return null;
+        }
+        return `${labelize(key)}: ${item}`;
+      })
+      .filter(Boolean);
+
+    return lines.length ? lines.join("\n") : "Not provided";
+  }
+
+  return String(value);
 }
 
 function csvEscape(value) {
@@ -259,6 +518,7 @@ export default function AdminBulkNpiReviewPage() {
   const [singleReason, setSingleReason] = useState("");
   const [singleSubmitting, setSingleSubmitting] = useState(false);
   const [singleNotice, setSingleNotice] = useState("");
+  const draftRequestIdRef = useRef(0);
 
   const loadBatches = useCallback(
     async (background = false) => {
@@ -295,7 +555,7 @@ export default function AdminBulkNpiReviewPage() {
         setError(
           getUniversalProductErrorMessage(
             requestError,
-            "Unable to load Bulk NPI review batches."
+            "Unable to load bulk product review batches."
           )
         );
       } finally {
@@ -325,7 +585,7 @@ export default function AdminBulkNpiReviewPage() {
       setError(
         getUniversalProductErrorMessage(
           requestError,
-          "Unable to load this Bulk NPI batch."
+          "Unable to load this product batch."
         )
       );
     } finally {
@@ -408,12 +668,12 @@ export default function AdminBulkNpiReviewPage() {
     }
 
     if (!bulkReason.trim()) {
-      setBulkNotice("Add a review reason before applying a bulk decision.");
+      setBulkNotice("Add a short review note before applying this decision.");
       return;
     }
 
     if (decision === "approve_for_catalog" && !canCatalogMutate) {
-      setBulkNotice("catalog.mutate permission is required for bulk approval.");
+      setBulkNotice("You do not have permission to approve catalog products.");
       return;
     }
 
@@ -481,7 +741,7 @@ export default function AdminBulkNpiReviewPage() {
       setBulkNotice(
         getUniversalProductErrorMessage(
           requestError,
-          "Unable to apply this bulk review decision."
+          "Unable to apply this bulk decision."
         )
       );
     } finally {
@@ -490,11 +750,18 @@ export default function AdminBulkNpiReviewPage() {
   }
 
   async function openDraft(draftId) {
+    const requestId = draftRequestIdRef.current + 1;
+    draftRequestIdRef.current = requestId;
     setLoadingDraft(true);
     setSingleNotice("");
 
     try {
       const result = await getAdminNpiDraft(draftId);
+
+      if (draftRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setSelectedDraft(result);
       setFieldStates(
         Object.fromEntries(
@@ -505,6 +772,10 @@ export default function AdminBulkNpiReviewPage() {
       );
       setSingleReason("");
     } catch (requestError) {
+      if (draftRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setSingleNotice(
         getUniversalProductErrorMessage(
           requestError,
@@ -512,8 +783,18 @@ export default function AdminBulkNpiReviewPage() {
         )
       );
     } finally {
-      setLoadingDraft(false);
+      if (draftRequestIdRef.current === requestId) {
+        setLoadingDraft(false);
+      }
     }
+  }
+
+  function closeDraftReview() {
+    draftRequestIdRef.current += 1;
+    setSelectedDraft(null);
+    setLoadingDraft(false);
+    setSingleNotice("");
+    setSingleReason("");
   }
 
   function allowedFieldForMutation(fieldPath) {
@@ -553,12 +834,12 @@ export default function AdminBulkNpiReviewPage() {
     }
 
     if (!singleReason.trim()) {
-      setSingleNotice("Add a review reason before recording the decision.");
+      setSingleNotice("Add a short review note before recording the decision.");
       return;
     }
 
     if (decision === "approve_for_catalog" && !canCatalogMutate) {
-      setSingleNotice("catalog.mutate permission is required for approval.");
+      setSingleNotice("You do not have permission to approve catalog products.");
       return;
     }
 
@@ -597,7 +878,7 @@ export default function AdminBulkNpiReviewPage() {
       setSingleNotice(
         getUniversalProductErrorMessage(
           requestError,
-          "Unable to record this product review decision."
+          "Unable to save this product review decision."
         )
       );
     } finally {
@@ -612,483 +893,465 @@ export default function AdminBulkNpiReviewPage() {
   return (
     <AdminShell
       title="Bulk Product Review"
-      description="Review Host warehouse-scale NPI batches in a web dashboard. Excel is the Host input format; Super Admin reviews normalized products, evidence, duplicates and commercial drafts here."
+      description={<>
+        <span className="sm:hidden">Review Host batches, fix issues, and approve clean products.</span>
+        <span className="hidden sm:inline">Review product batches submitted by Hosts, check issues and duplicates, and approve clean listings without opening the source spreadsheet.</span>
+      </>}
       actions={
         <button
           type="button"
           disabled={refreshing}
           onClick={() => loadBatches(true)}
-          className="focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-60"
+          className="focus-ring inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 shadow-sm disabled:opacity-60"
         >
           <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
           Refresh
         </button>
       }
     >
-      <section className="overflow-hidden rounded-[26px] bg-gradient-to-br from-violet-950 via-violet-900 to-fuchsia-800 p-5 text-white shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section className="overflow-hidden rounded-[18px] bg-[#0f5148] text-white sm:rounded-[22px]">
+        <div className="grid gap-3 px-4 py-4 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] lg:items-end">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-200">
-              Warehouse-scale governance
+            <p className="text-[10px] font-bold tracking-[0.04em] text-emerald-200 sm:text-[11px] sm:tracking-[0.08em]">
+              Batch review workspace
             </p>
-            <h2 className="mt-2 text-2xl font-black">Bulk NPI batches</h2>
-            <p className="mt-2 max-w-3xl text-xs font-semibold leading-5 text-violet-100/80">
-              Review normalized product rows without opening the Host workbook. Potential duplicates and evidence problems stay visible and can be opened individually before any decision.
+            <h2 className="mt-1.5 max-w-3xl text-xl font-extrabold leading-[1.15] sm:mt-2 sm:text-3xl sm:leading-tight">
+              <span className="sm:hidden">Review Host batches faster.</span>
+              <span className="hidden sm:inline">Review Host product batches in one clear workflow.</span>
+            </h2>
+            <p className="mt-1.5 max-w-2xl text-xs font-medium leading-4 text-emerald-50/80 sm:mt-2 sm:text-sm sm:leading-6">
+              <span className="sm:hidden">Choose a batch, check issues, then decide.</span>
+              <span className="hidden sm:inline">Choose a submission, check anything that needs attention, then review or approve the products. Clean rows can be handled together.</span>
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-4 border-t border-white/15 sm:border-l sm:border-t-0">
             {[
               [summary.submitted || 0, "Submitted"],
-              [summary.reviewReady || 0, "Review-ready"],
-              [summary.issues || 0, "Issues"],
+              [summary.reviewReady || 0, "Ready"],
+              [summary.issues || 0, "Need attention"],
               [summary.potentialDuplicates || 0, "Duplicates"],
             ].map(([value, label]) => (
-              <div key={label} className="rounded-2xl bg-white/12 px-4 py-3 backdrop-blur-sm">
-                <p className="text-xl font-black">{value}</p>
-                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.1em] text-violet-100/75">
-                  {label}
+              <div key={label} className="border-r border-white/15 px-2 py-2 last:border-r-0 sm:px-4">
+                <p className="text-lg font-extrabold sm:text-2xl">{value}</p>
+                <p className="mt-0.5 text-[9px] font-semibold leading-3 text-emerald-100/70 sm:mt-1 sm:text-[11px]">
+                  <span className="sm:hidden">{label === "Need attention" ? "Issues" : label}</span>
+                  <span className="hidden sm:inline">{label}</span>
                 </p>
               </div>
             ))}
           </div>
+        </div>
 
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <span className="rounded-full bg-emerald-300/20 px-3 py-1.5 text-[10px] font-black text-emerald-100">
-              {summary.live || 0} customer-live
-            </span>
-            <span className="rounded-full bg-amber-300/20 px-3 py-1.5 text-[10px] font-black text-amber-100">
-              {summary.commerceActionRequired || 0} commerce action required
-            </span>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/15 bg-[#0b433d] px-4 py-2 text-[10px] font-semibold text-emerald-50/85 sm:gap-x-6 sm:gap-y-2 sm:px-7 sm:py-3 sm:text-xs">
+          <span><span className="sm:hidden">{summary.live || 0} live</span><span className="hidden sm:inline">{summary.live || 0} customer live</span></span>
+          <span><span className="sm:hidden">{summary.commerceActionRequired || 0} need setup</span><span className="hidden sm:inline">{summary.commerceActionRequired || 0} need selling setup</span></span>
+          <span><span className="sm:hidden">{pagination?.total ?? batches.length} batches</span><span className="hidden sm:inline">{pagination?.total ?? batches.length} Host submissions</span></span>
         </div>
       </section>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_210px_190px_150px]">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            setSearch(searchInput.trim());
-          }}
-          className="flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-2"
-        >
-          <SearchIcon size={17} className="ml-2 text-sky-700" />
-          <input
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search Host organization or source workbook..."
-            className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm font-semibold text-slate-800 outline-none"
-          />
-          <button className="rounded-xl bg-sky-700 px-4 py-2.5 text-xs font-black text-white hover:bg-sky-800">
-            Search
-          </button>
-        </form>
+      <section className="mt-3 border-y border-[#c9dfdb] bg-[#eef7f5] px-3 py-3 sm:mt-5 sm:px-5 sm:py-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3 lg:grid-cols-[minmax(0,1fr)_190px_190px]">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              setSearch(searchInput.trim());
+            }}
+            className="col-span-2 flex min-w-0 items-center gap-2 border border-[#c7ddd9] bg-white px-2.5 py-1.5 sm:col-span-1 sm:border-x-0 sm:border-t-0 sm:border-b sm:border-[#a9cbc5] sm:px-3 sm:py-2.5 lg:border-b-0"
+          >
+            <SearchIcon size={17} className="shrink-0 text-[#176d62]" />
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search Host or file name..."
+              className="h-8 min-w-0 flex-1 bg-transparent text-sm font-medium text-stone-800 outline-none sm:h-9"
+            />
+            <button className="rounded-lg bg-[#155f57] px-4 py-2 text-xs font-bold text-white hover:bg-[#104f48]">
+              Search
+            </button>
+          </form>
 
-        <select
-          value={listingType}
-          onChange={(event) => setListingType(event.target.value)}
-          className="h-[58px] rounded-2xl border border-violet-200 bg-violet-50 px-4 text-sm font-black text-violet-900 outline-none"
-        >
-          {LISTING_FILTERS.map(([value, label]) => (
-            <option key={value || "all"} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+          <select
+            value={listingType}
+            onChange={(event) => setListingType(event.target.value)}
+            className="h-10 min-w-0 border border-[#bdd5e2] bg-[#edf5f8] px-2 text-xs font-semibold text-slate-800 outline-none sm:h-[52px] sm:px-3 sm:text-sm"
+          >
+            {LISTING_FILTERS.map(([value, label]) => (
+              <option key={value || "all"} value={value}>{label}</option>
+            ))}
+          </select>
 
-        <select
-          value={batchStatus}
-          onChange={(event) => setBatchStatus(event.target.value)}
-          className="h-[58px] rounded-2xl border border-amber-200 bg-amber-50 px-4 text-sm font-black text-amber-900 outline-none"
-        >
-          {BATCH_STATUS_FILTERS.map(([value, label]) => (
-            <option key={value || "all"} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-
-        <div className="grid place-items-center rounded-2xl border border-stone-200 bg-white px-4 text-center">
-          <p className="text-xs font-black text-stone-700">
-            {pagination?.total ?? batches.length} batches
-          </p>
+          <select
+            value={batchStatus}
+            onChange={(event) => setBatchStatus(event.target.value)}
+            className="h-10 min-w-0 border border-[#c8d2dc] bg-white px-2 text-xs font-semibold text-slate-800 outline-none sm:h-[52px] sm:px-3 sm:text-sm"
+          >
+            {BATCH_STATUS_FILTERS.map(([value, label]) => (
+              <option key={value || "all"} value={value}>{label}</option>
+            ))}
+          </select>
         </div>
-      </div>
+      </section>
 
       {error ? (
-        <div className="mt-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+        <div className="mt-4 flex items-start gap-3 border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           <CircleAlert size={18} className="mt-0.5 shrink-0" />
           {error}
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[330px_minmax(0,1fr)]">
-        <section className="overflow-hidden rounded-[24px] border border-stone-200 bg-white shadow-sm">
-          <div className="border-b border-stone-200 bg-stone-950 p-4 text-white">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-300">
-              Review batches
-            </p>
-            <p className="mt-1 text-sm font-black">Select a Host submission</p>
+      <section className="mt-3 border border-stone-200 bg-white sm:mt-5">
+        <div className="grid gap-2 border-b border-stone-200 bg-[#f7f6f2] px-3 py-3 sm:grid-cols-[220px_minmax(0,1fr)] sm:items-center sm:gap-3 sm:px-5 sm:py-4">
+          <div>
+            <p className="text-sm font-bold text-stone-900">Choose a Host submission</p>
+            <p className="mt-0.5 text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">Pick a batch to review.</p>
           </div>
 
           {loading ? (
-            <div className="grid min-h-72 place-items-center">
-              <LoaderCircle size={28} className="animate-spin text-violet-700" />
+            <div className="flex h-12 items-center gap-2 border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-500">
+              <LoaderCircle size={17} className="animate-spin text-[#176d62]" />
+              Loading submissions...
             </div>
           ) : visibleBatches.length ? (
-            <div className="max-h-[760px] overflow-y-auto p-3">
+            <select
+              value={selectedBatchId}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value) openBatch(value);
+              }}
+              className="h-10 w-full border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-800 outline-none focus:border-[#438d83] sm:h-12"
+            >
+              <option value="">Select a submission</option>
               {visibleBatches.map((batch) => (
-                <button
-                  key={batch.id}
-                  type="button"
-                  onClick={() => openBatch(batch.id)}
-                  className={[
-                    "focus-ring mb-2 block w-full rounded-2xl border p-4 text-left transition last:mb-0",
-                    selectedBatchId === batch.id
-                      ? "border-violet-300 bg-violet-50"
-                      : "border-stone-200 hover:border-violet-200 hover:bg-stone-50",
-                  ].join(" ")}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-stone-900">
-                        {batch.organization?.displayName || "Host organization"}
-                      </p>
-                      <p className="mt-1 truncate text-[10px] font-semibold text-stone-500">
-                        {batch.sourceFileName || "Bulk workbook"}
-                      </p>
-                    </div>
-                    <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${batchStatusClasses(batch.status)}`}>
-                      {labelize(batch.status)}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-                    <div className="rounded-xl bg-blue-50 p-2">
-                      <p className="text-sm font-black text-blue-800">{batch.review?.reviewReady || 0}</p>
-                      <p className="text-[8px] font-black uppercase text-blue-600">Ready</p>
-                    </div>
-                    <div className="rounded-xl bg-amber-50 p-2">
-                      <p className="text-sm font-black text-amber-800">{batch.review?.validationIssues || 0}</p>
-                      <p className="text-[8px] font-black uppercase text-amber-600">Issues</p>
-                    </div>
-                    <div className="rounded-xl bg-rose-50 p-2">
-                      <p className="text-sm font-black text-rose-700">{batch.review?.potentialDuplicates || 0}</p>
-                      <p className="text-[8px] font-black uppercase text-rose-600">Duplicates</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[8px] font-black uppercase text-emerald-700">
-                      {batch.review?.live || 0} live
-                    </span>
-                    {batch.review?.commerceActionRequired ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[8px] font-black uppercase text-amber-700">
-                        {batch.review.commerceActionRequired} action required
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
+                <option key={batch.id} value={batch.id}>
+                  {(batch.organization?.displayName || "Host organization")} · {labelize(batch.status)} · {batch.review?.submittedRows || 0} products
+                </option>
               ))}
-            </div>
+            </select>
           ) : (
-            <div className="grid min-h-72 place-items-center p-6 text-center">
-              <div>
-                <FileSearch size={30} className="mx-auto text-stone-300" />
-                <p className="mt-3 text-sm font-black text-stone-700">No bulk batches found</p>
-              </div>
+            <div className="border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-500">
+              No submissions match these filters.
             </div>
           )}
-        </section>
+        </div>
 
-        <section className="min-w-0 overflow-hidden rounded-[24px] border border-stone-200 bg-white shadow-sm">
-          {loadingBatch ? (
-            <div className="grid min-h-[620px] place-items-center">
-              <LoaderCircle size={30} className="animate-spin text-violet-700" />
-            </div>
-          ) : batchDetail?.batch ? (
-            <>
-              <div className="border-b border-stone-200 bg-violet-50 p-5 sm:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-3 py-1 text-[10px] font-black ${batchStatusClasses(batchDetail.batch.status)}`}>
-                        {labelize(batchDetail.batch.status)}
-                      </span>
-                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-violet-700">
-                        {labelize(batchDetail.batch.listingType)}
-                      </span>
-                    </div>
-                    <h2 className="mt-3 text-xl font-black text-stone-950">
-                      {batchDetail.batch.organization?.displayName || "Host organization"}
-                    </h2>
-                    <p className="mt-1 text-xs font-semibold text-stone-500">
-                      {batchDetail.batch.sourceFileName || "Bulk workbook"} · {batchDetail.batch.review?.submittedRows || 0} submitted products
-                    </p>
+        {loadingBatch ? (
+          <div className="grid min-h-[360px] place-items-center">
+            <LoaderCircle size={30} className="animate-spin text-[#176d62]" />
+          </div>
+        ) : batchDetail?.batch ? (
+          <>
+            <div className="border-b border-stone-200 bg-[#eaf4f7]">
+              <div className="flex flex-col gap-2 px-3 py-3 sm:gap-4 sm:px-5 sm:py-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${batchStatusClasses(batchDetail.batch.status)}`}>
+                      {labelize(batchDetail.batch.status)}
+                    </span>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-700">
+                      {labelize(batchDetail.batch.listingType)}
+                    </span>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => downloadBatchReport(batchDetail.batch, batchDetail.drafts || [])}
-                    className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-800"
-                  >
-                    <Download size={14} />
-                    Download review report
-                  </button>
+                  <h2 className="mt-1.5 text-lg font-extrabold text-stone-950 sm:mt-2 sm:text-xl">
+                    {batchDetail.batch.organization?.displayName || "Host organization"}
+                  </h2>
+                  <p className="mt-0.5 truncate text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">
+                    {batchDetail.batch.sourceFileName || "Submitted file"}
+                  </p>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {[
-                    [batchDetail.batch.review?.submittedRows || 0, "Submitted", "bg-white text-stone-900"],
-                    [batchDetail.batch.review?.reviewReady || 0, "Review-ready", "bg-blue-100 text-blue-900"],
-                    [batchDetail.batch.review?.validationIssues || 0, "Workbook issues", "bg-amber-100 text-amber-900"],
-                    [batchDetail.batch.review?.potentialDuplicates || 0, "Potential duplicates", "bg-rose-100 text-rose-900"],
-                  ].map(([value, label, className]) => (
-                    <div key={label} className={`rounded-2xl p-3 ${className}`}>
-                      <p className="text-lg font-black">{value}</p>
-                      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.08em] opacity-70">{label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[10px] font-black text-emerald-800">
-                    {batchDetail.batch.review?.live || 0} customer-live
-                  </span>
-                  <span className="rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-800">
-                    {batchDetail.batch.review?.commerceActionRequired || 0} commerce action required
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadBatchReport(batchDetail.batch, batchDetail.drafts || [])}
+                  className="focus-ring inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[#165f75] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#104f62]"
+                >
+                  <Download size={14} />
+                  <span className="sm:hidden">Report</span><span className="hidden sm:inline">Download review report</span>
+                </button>
               </div>
 
-              <div className="p-5 sm:p-6">
-                {batchDetail.validationIssues?.length ? (
-                  <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <div className="flex items-center gap-2 text-amber-900">
-                      <ShieldAlert size={17} />
-                      <p className="text-xs font-black">Workbook validation issues</p>
-                    </div>
-                    <div className="mt-3 max-h-36 space-y-2 overflow-y-auto">
-                      {batchDetail.validationIssues.map((item) => (
-                        <p key={`${item.rowNumber}-${item.merchantSku}`} className="text-xs font-semibold text-amber-800">
-                          Row {item.rowNumber} · {item.merchantSku || item.productName || "Product"}: {(item.issues || []).join("; ")}
-                        </p>
-                      ))}
-                    </div>
+              <div className="grid grid-cols-2 border-t border-[#c9dce3] sm:grid-cols-4">
+                {[
+                  [batchDetail.batch.review?.submittedRows || 0, "Products"],
+                  [batchDetail.batch.review?.reviewReady || 0, "Ready"],
+                  [batchDetail.batch.review?.validationIssues || 0, "Need attention"],
+                  [batchDetail.batch.review?.potentialDuplicates || 0, "Duplicates"],
+                ].map(([value, label], index) => (
+                  <div key={label} className={["px-2 py-2 sm:px-4 sm:py-3", index ? "border-l border-[#c9dce3]" : ""].join(" ")}>
+                    <p className="text-lg font-extrabold text-stone-900 sm:text-xl">{value}</p>
+                    <p className="mt-0.5 text-[9px] font-semibold leading-3 text-stone-500 sm:text-[11px]">
+                      <span className="sm:hidden">{label === "Products" ? "Items" : label === "Need attention" ? "Issues" : label === "Duplicates" ? "Dupes" : label}</span>
+                      <span className="hidden sm:inline">{label}</span>
+                    </p>
                   </div>
-                ) : null}
+                ))}
+              </div>
+            </div>
 
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    {ROW_FILTERS.map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setRowFilter(value)}
-                        className={[
-                          "focus-ring rounded-full px-3 py-2 text-[10px] font-black transition",
-                          rowFilter === value
-                            ? "bg-stone-950 text-white"
-                            : "border border-stone-200 bg-white text-stone-600 hover:border-violet-300",
-                        ].join(" ")}
-                      >
-                        {label}
-                      </button>
+            <div className="px-3 py-3 sm:px-5 sm:py-5">
+              {batchDetail.validationIssues?.length ? (
+                <div className="mb-3 border-l-4 border-orange-500 bg-[#fff5ee] px-3 py-2.5 sm:mb-5 sm:px-4 sm:py-3">
+                  <div className="flex items-center gap-2 text-orange-900">
+                    <ShieldAlert size={17} />
+                    <p className="text-sm font-bold">Products that need attention</p>
+                  </div>
+                  <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                    {batchDetail.validationIssues.map((item) => (
+                      <p key={`${item.rowNumber}-${item.merchantSku}`} className="text-xs font-medium leading-5 text-orange-800">
+                        Row {item.rowNumber} · {item.merchantSku || item.productName || "Product"}: {(item.issues || []).join("; ")}
+                      </p>
                     ))}
                   </div>
+                </div>
+              ) : null}
 
+              <div className="flex items-center justify-between gap-2 border-b border-stone-200 pb-2.5 sm:flex-col sm:items-start sm:gap-3 sm:pb-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-stone-900">Products in this batch</p>
+                  <p className="mt-1 hidden text-xs font-medium text-stone-500 sm:block">Filter the list or open a product when it needs a closer look.</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={selectCleanRows}
+                  className="focus-ring shrink-0 self-start rounded-lg bg-[#dff3eb] px-2.5 py-1.5 text-[11px] font-bold text-[#176a55] hover:bg-[#d2ecdf] sm:px-3 sm:py-2 sm:text-xs"
+                >
+                  Select clean rows
+                </button>
+              </div>
+
+              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 sm:mt-3 sm:gap-2">
+                {ROW_FILTERS.map(([value, label]) => (
                   <button
+                    key={value}
                     type="button"
-                    onClick={selectCleanRows}
-                    className="focus-ring rounded-xl bg-emerald-100 px-3 py-2 text-[10px] font-black text-emerald-800 hover:bg-emerald-200"
+                    onClick={() => setRowFilter(value)}
+                    className={[
+                      "focus-ring shrink-0 rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition sm:px-3 sm:py-2 sm:text-xs",
+                      rowFilter === value
+                        ? "bg-[#17364a] text-white"
+                        : "border border-stone-200 bg-white text-stone-600 hover:border-[#8cb6c5]",
+                    ].join(" ")}
                   >
-                    Select all clean review-ready rows
+                    {label}
                   </button>
-                </div>
+                ))}
+              </div>
 
-                <div className="mt-4 overflow-x-auto rounded-2xl border border-stone-200">
-                  <table className="min-w-[1120px] w-full border-collapse text-left">
-                    <thead className="bg-stone-950 text-white">
-                      <tr className="text-[9px] font-black uppercase tracking-[0.08em]">
-                        <th className="px-3 py-3">Select</th>
-                        <th className="px-3 py-3">Row / SKU</th>
-                        <th className="px-3 py-3">Product</th>
-                        <th className="px-3 py-3">Price</th>
-                        <th className="px-3 py-3">Stock</th>
-                        <th className="px-3 py-3">Review state</th>
-                        <th className="px-3 py-3">Customer status</th>
-                        <th className="px-3 py-3">Attention</th>
-                        <th className="px-3 py-3">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredDrafts.map((draft) => {
-                        const draftCommercial = draft.commercialDraft || {};
-                        const terminal = ["approved_for_catalog", "rejected"].includes(draft.status);
+              <div className="mt-4 hidden overflow-x-auto border border-stone-200 lg:block">
+                <table className="min-w-[1080px] w-full border-collapse text-left">
+                  <thead className="bg-[#17364a] text-white">
+                    <tr className="text-[10px] font-semibold">
+                      <th className="px-3 py-3">Select</th>
+                      <th className="px-3 py-3">Row / SKU</th>
+                      <th className="px-3 py-3">Product</th>
+                      <th className="px-3 py-3">Price</th>
+                      <th className="px-3 py-3">Stock</th>
+                      <th className="px-3 py-3">Review</th>
+                      <th className="px-3 py-3">Customer</th>
+                      <th className="px-3 py-3">Needs attention</th>
+                      <th className="px-3 py-3">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-200">
+                    {filteredDrafts.map((draft) => {
+                      const draftCommercial = draft.commercialDraft || {};
+                      const terminal = ["approved_for_catalog", "rejected"].includes(draft.status);
 
-                        return (
-                          <tr key={draft.id} className="border-t border-stone-100 text-xs">
-                            <td className="px-3 py-3">
-                              <input
-                                type="checkbox"
-                                disabled={terminal}
-                                checked={selectedDraftIds.includes(draft.id)}
-                                onChange={() => toggleDraftSelection(draft.id)}
-                                className="h-4 w-4 accent-violet-700 disabled:opacity-40"
-                              />
-                            </td>
-                            <td className="px-3 py-3">
-                              <p className="font-black text-stone-800">#{draft.bulkRowNumber || "—"}</p>
-                              <p className="mt-1 font-semibold text-stone-500">{draft.merchantSku || "No SKU"}</p>
-                            </td>
-                            <td className="px-3 py-3">
-                              <p className="max-w-[250px] font-black text-stone-900">{candidateTitle(draft)}</p>
-                              <p className="mt-1 text-[10px] font-semibold text-stone-500">{labelize(draft.listingType)}</p>
-                            </td>
-                            <td className="px-3 py-3 font-black text-stone-800">
-                              {moneyFromMinor(
-                                draftCommercial.salePriceMinor || draftCommercial.listPriceMinor,
-                                draftCommercial.currency
-                              )}
-                            </td>
-                            <td className="px-3 py-3 font-black text-stone-800">
-                              {draftCommercial.availableQuantity ?? "—"}
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${statusClasses(draft.status)}`}>
-                                {labelize(draft.status)}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${commerceStatusClasses(draft.commercializationStatus)}`}>
-                                {draft.commercializationStatus === "live"
-                                  ? "Customer live"
-                                  : labelize(draft.commercializationStatus || "pending")}
-                              </span>
-                              {draft.commercializationStatus === "action_required" && draft.commercializationError ? (
-                                <p className="mt-1 max-w-[220px] text-[9px] font-semibold leading-4 text-amber-700">
-                                  {draft.commercializationError}
-                                </p>
-                              ) : null}
-                            </td>
-                            <td className="px-3 py-3">
-                              {draft.duplicateCandidateProductVersionId ? (
-                                <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[9px] font-black text-rose-700">
-                                  Duplicate check
-                                </span>
-                              ) : draft.bulkReviewEligible ? (
-                                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700">
-                                  Bulk eligible
-                                </span>
-                              ) : (
-                                <div>
-                                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-black text-amber-700">
-                                    Individual review
-                                  </span>
-                                  {draft.bulkReviewBlockers?.length ? (
-                                    <p className="mt-1 max-w-[190px] text-[9px] font-semibold leading-4 text-amber-700">
-                                      {draft.bulkReviewBlockers.join(" · ")}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-3 py-3">
-                              <button
-                                type="button"
-                                onClick={() => openDraft(draft.id)}
-                                className="focus-ring rounded-xl bg-sky-700 px-3 py-2 text-[10px] font-black text-white hover:bg-sky-800"
-                              >
-                                Open product
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                      return (
+                        <tr key={draft.id} className="bg-white text-xs hover:bg-[#fafaf8]">
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              disabled={terminal}
+                              checked={selectedDraftIds.includes(draft.id)}
+                              onChange={() => toggleDraftSelection(draft.id)}
+                              className="h-4 w-4 accent-[#176d62] disabled:opacity-40"
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="font-bold text-stone-800">#{draft.bulkRowNumber || "—"}</p>
+                            <p className="mt-0.5 font-medium text-stone-500">{draft.merchantSku || "No SKU"}</p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="max-w-[260px] font-bold text-stone-900">{candidateTitle(draft)}</p>
+                            <p className="mt-0.5 text-[10px] font-medium text-stone-500">{labelize(draft.listingType)}</p>
+                          </td>
+                          <td className="px-3 py-3 font-bold text-stone-800">
+                            {moneyFromMinor(draftCommercial.salePriceMinor || draftCommercial.listPriceMinor, draftCommercial.currency)}
+                          </td>
+                          <td className="px-3 py-3 font-bold text-stone-800">{draftCommercial.availableQuantity ?? "—"}</td>
+                          <td className="px-3 py-3">
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${statusClasses(draft.status)}`}>
+                              {labelize(draft.status)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${commerceStatusClasses(draft.commercializationStatus)}`}>
+                              {draft.commercializationStatus === "live" ? "Customer live" : labelize(draft.commercializationStatus || "pending")}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            {draft.duplicateCandidateProductVersionId ? (
+                              <span className="text-xs font-semibold text-red-700">Possible duplicate</span>
+                            ) : draft.bulkReviewEligible ? (
+                              <span className="text-xs font-semibold text-emerald-700">Ready for bulk review</span>
+                            ) : (
+                              <div>
+                                <span className="text-xs font-semibold text-orange-700">Review individually</span>
+                                {draft.bulkReviewBlockers?.length ? (
+                                  <p className="mt-1 max-w-[220px] text-[10px] font-medium leading-4 text-orange-700">
+                                    {draft.bulkReviewBlockers.join(" · ")}
+                                  </p>
+                                ) : null}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <button
+                              type="button"
+                              onClick={() => openDraft(draft.id)}
+                              className="focus-ring rounded-lg bg-[#126f9a] px-3 py-2 text-[11px] font-bold text-white hover:bg-[#0e5c80]"
+                            >
+                              Review product
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                  {!filteredDrafts.length ? (
-                    <div className="grid min-h-40 place-items-center bg-stone-50 p-5 text-center">
-                      <p className="text-sm font-black text-stone-500">No products in this filter.</p>
-                    </div>
-                  ) : null}
-                </div>
+              <div className="mt-3 space-y-2 sm:space-y-0 sm:divide-y sm:divide-stone-200 sm:border-y sm:border-stone-200 lg:hidden">
+                {filteredDrafts.map((draft) => {
+                  const draftCommercial = draft.commercialDraft || {};
+                  const terminal = ["approved_for_catalog", "rejected"].includes(draft.status);
 
-                {(canCatalogMutate || canTrustSafetyMutate) ? (
-                  <div className="mt-5 rounded-[22px] border border-violet-200 bg-violet-50 p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-                      <label className="block min-w-0 flex-1">
-                        <span className="text-[10px] font-black uppercase tracking-[0.1em] text-violet-700">
-                          Bulk review reason
-                        </span>
+                  return (
+                    <div key={draft.id} className="border-l-4 border-[#b7ccd7] bg-[#f8fafb] px-3 py-2.5 sm:border-l-0 sm:bg-white sm:px-1 sm:py-3">
+                      <div className="flex items-start gap-3">
                         <input
-                          value={bulkReason}
-                          onChange={(event) => setBulkReason(event.target.value)}
-                          placeholder="Example: Selected clean rows verified against submitted package evidence."
-                          className="mt-2 h-11 w-full rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold outline-none focus:border-violet-400"
+                          type="checkbox"
+                          disabled={terminal}
+                          checked={selectedDraftIds.includes(draft.id)}
+                          onChange={() => toggleDraftSelection(draft.id)}
+                          className="mt-1 h-4 w-4 shrink-0 accent-[#176d62] disabled:opacity-40"
                         />
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={bulkSubmitting || !selectedDraftIds.length || !canCatalogMutate}
-                          onClick={() => submitBulkDecision("approve_for_catalog")}
-                          className="focus-ring rounded-xl bg-emerald-700 px-4 py-3 text-xs font-black text-white hover:bg-emerald-800 disabled:opacity-40"
-                        >
-                          Approve selected ({selectedDraftIds.length})
-                        </button>
-                        <button
-                          type="button"
-                          disabled={bulkSubmitting || !selectedDraftIds.length}
-                          onClick={() => submitBulkDecision("request_more_evidence")}
-                          className="focus-ring rounded-xl bg-amber-500 px-4 py-3 text-xs font-black text-amber-950 hover:bg-amber-400 disabled:opacity-40"
-                        >
-                          Request info
-                        </button>
-                        <button
-                          type="button"
-                          disabled={bulkSubmitting || !selectedDraftIds.length}
-                          onClick={() => submitBulkDecision("reject")}
-                          className="focus-ring rounded-xl bg-red-600 px-4 py-3 text-xs font-black text-white hover:bg-red-700 disabled:opacity-40"
-                        >
-                          Reject selected
-                        </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-[13px] font-bold text-stone-900">{candidateTitle(draft)}</p>
+                              <p className="mt-0.5 truncate text-[10px] font-medium text-stone-500">#{draft.bulkRowNumber || "—"} · {draft.merchantSku || "No SKU"}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => openDraft(draft.id)}
+                              className="focus-ring shrink-0 rounded-md bg-[#126f9a] px-2.5 py-1.5 text-[10px] font-bold text-white"
+                            >
+                              Review
+                            </button>
+                          </div>
+
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-stone-600">
+                            <span>{moneyFromMinor(draftCommercial.salePriceMinor || draftCommercial.listPriceMinor, draftCommercial.currency)}</span>
+                            <span>Stock {draftCommercial.availableQuantity ?? "—"}</span>
+                            <span className={statusClasses(draft.status)}>{labelize(draft.status)}</span>
+                          </div>
+
+                          <p className="mt-1.5 text-[10px] font-medium leading-4 text-stone-500">
+                            {draft.duplicateCandidateProductVersionId
+                              ? "Possible duplicate — review individually."
+                              : draft.bulkReviewEligible
+                              ? "Clean and ready for bulk review."
+                              : "Needs an individual check before a decision."}
+                          </p>
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <p className="mt-3 text-[10px] font-semibold leading-4 text-violet-800/75">
-                      Bulk approval is intentionally restricted to clean review-ready rows. Potential duplicates, privacy/evidence holds and non-review-ready rows are skipped and remain available for individual review.
-                    </p>
+              {!filteredDrafts.length ? (
+                <div className="grid min-h-32 place-items-center border-b border-stone-200 bg-[#fafaf8] p-5 text-center">
+                  <p className="text-sm font-semibold text-stone-500">No products match this filter.</p>
+                </div>
+              ) : null}
 
-                    {bulkNotice ? (
-                      <p className="mt-3 rounded-xl bg-white p-3 text-xs font-bold text-violet-900">
-                        {bulkNotice}
-                      </p>
-                    ) : null}
+              {(canCatalogMutate || canTrustSafetyMutate) ? (
+                <section className="mt-3 border-t border-[#cbdde8] bg-[#edf5fa] px-3 py-3 sm:mt-5 sm:px-5 sm:py-4">
+                  <div className="grid gap-2 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                    <label className="block min-w-0">
+                      <span className="text-sm font-bold text-[#17364a]"><span className="sm:hidden">Bulk decision</span><span className="hidden sm:inline">Apply one decision to selected products</span></span>
+                      <input
+                        value={bulkReason}
+                        onChange={(event) => setBulkReason(event.target.value)}
+                        placeholder="Why are you making this decision?"
+                        className="mt-1.5 h-10 w-full border border-[#bfd2df] bg-white px-3 text-sm font-medium outline-none focus:border-[#6aa0bd] sm:mt-2 sm:h-11"
+                      />
+                    </label>
+
+                    <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+                      <button
+                        type="button"
+                        disabled={bulkSubmitting || !selectedDraftIds.length || !canCatalogMutate}
+                        onClick={() => submitBulkDecision("approve_for_catalog")}
+                        className="focus-ring rounded-lg bg-[#147554] px-4 py-3 text-xs font-bold text-white hover:bg-[#106346] disabled:opacity-40"
+                      >
+                        <span className="sm:hidden">Approve</span><span className="hidden sm:inline">Approve selected ({selectedDraftIds.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={bulkSubmitting || !selectedDraftIds.length}
+                        onClick={() => submitBulkDecision("request_more_evidence")}
+                        className="focus-ring rounded-lg bg-[#d66a2c] px-4 py-3 text-xs font-bold text-white hover:bg-[#bd5821] disabled:opacity-40"
+                      >
+                        <span className="sm:hidden">Need info</span><span className="hidden sm:inline">Ask for information</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={bulkSubmitting || !selectedDraftIds.length}
+                        onClick={() => submitBulkDecision("reject")}
+                        className="focus-ring rounded-lg bg-red-600 px-4 py-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40"
+                      >
+                        <span className="sm:hidden">Reject</span><span className="hidden sm:inline">Reject selected</span>
+                      </button>
+                    </div>
                   </div>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <div className="grid min-h-[620px] place-items-center p-8 text-center">
-              <div>
-                <Boxes size={34} className="mx-auto text-stone-300" />
-                <p className="mt-3 text-base font-black text-stone-700">Select a Bulk NPI batch</p>
-                <p className="mt-1 text-xs font-semibold text-stone-400">The Host workbook is normalized into a review table here.</p>
-              </div>
+
+                  <p className="mt-2 text-[10px] font-medium leading-4 text-slate-600 sm:mt-3 sm:text-xs sm:leading-5">
+                    <span className="sm:hidden">Only clean rows can be approved together.</span>
+                    <span className="hidden sm:inline">Only clean products that are ready for review can be approved together. Products with duplicates or other checks stay available for individual review.</span>
+                  </p>
+
+                  {bulkNotice ? (
+                    <p className="mt-3 border border-[#c9dce8] bg-white px-3 py-2.5 text-xs font-semibold text-[#17364a]">
+                      {bulkNotice}
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
             </div>
-          )}
-        </section>
-      </div>
+          </>
+        ) : (
+          <div className="grid min-h-[320px] place-items-center p-8 text-center">
+            <div>
+              <Boxes size={32} className="mx-auto text-stone-300" />
+              <p className="mt-3 text-base font-bold text-stone-700">Choose a submission to start review</p>
+              <p className="mt-1 text-sm font-medium text-stone-400">Select a Host batch above to see its products.</p>
+            </div>
+          </div>
+        )}
+      </section>
 
       {selectedDraft || loadingDraft ? (
-        <div className="fixed inset-0 z-[90] bg-stone-950/55 p-3 backdrop-blur-sm sm:p-6">
-          <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-[#f7f5ef] shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-stone-200 bg-stone-950 p-5 text-white">
+        <div className="fixed inset-0 z-[200] bg-stone-950/55 p-0 backdrop-blur-sm sm:p-6">
+          <div className="relative mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-[#f7f5ef] shadow-2xl sm:rounded-[28px]">
+            <div className="sticky top-0 z-[205] flex items-start justify-between gap-3 border-b border-stone-200 bg-stone-950 px-4 py-3 text-white sm:static sm:gap-4 sm:p-5">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-300">Individual product review</p>
-                <h2 className="mt-1 text-xl font-black">{detailDraft ? candidateTitle(detailDraft) : "Loading product..."}</h2>
+                <p className="text-[10px] font-bold text-sky-300">Product review</p>
+                <h2 className="mt-0.5 text-base font-extrabold sm:mt-1 sm:text-xl sm:font-black">{detailDraft ? candidateTitle(detailDraft) : "Loading product..."}</h2>
                 {detailDraft ? (
                   <p className="mt-1 text-xs font-semibold text-stone-300">
                     Row #{detailDraft.bulkRowNumber || "—"} · SKU {detailDraft.merchantSku || "—"}
@@ -1097,8 +1360,8 @@ export default function AdminBulkNpiReviewPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedDraft(null)}
-                className="focus-ring grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+                onClick={closeDraftReview}
+                className="focus-ring relative z-[210] grid h-9 w-9 shrink-0 touch-manipulation place-items-center rounded-full bg-white/15 text-white hover:bg-white/25 sm:h-10 sm:w-10"
                 aria-label="Close product review"
               >
                 <X size={18} />
@@ -1110,23 +1373,26 @@ export default function AdminBulkNpiReviewPage() {
                 <LoaderCircle size={30} className="animate-spin text-violet-700" />
               </div>
             ) : detailDraft ? (
-              <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-6">
                 {detailDraft.duplicateCandidateProductVersionId ? (
-                  <div className="mb-5 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900">
+                  <div className="mb-3 flex items-start gap-2 border-l-4 border-rose-500 bg-rose-50 px-3 py-2.5 text-rose-900 sm:mb-5 sm:gap-3 sm:rounded-2xl sm:border sm:border-rose-200 sm:p-4">
                     <ShieldAlert size={18} className="mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs font-black">Potential canonical duplicate</p>
-                      <p className="mt-1 break-all text-xs font-semibold">Existing ProductVersion candidate: {detailDraft.duplicateCandidateProductVersionId}</p>
+                      <p className="text-xs font-bold"><span className="sm:hidden">Possible duplicate found</span><span className="hidden sm:inline">Potential canonical duplicate</span></p>
+                      <p className="mt-0.5 text-[11px] font-medium leading-4 sm:mt-1 sm:break-all sm:text-xs sm:font-semibold">
+                        <span className="sm:hidden">This product may already exist in the catalog. Compare it before approving.</span>
+                        <span className="hidden sm:inline">Existing ProductVersion candidate: {detailDraft.duplicateCandidateProductVersionId}</span>
+                      </p>
                     </div>
                   </div>
                 ) : null}
 
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                  <section className="rounded-[24px] border border-sky-200 bg-sky-50 p-4 sm:p-5">
+                <div className="grid gap-3 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                  <section className="border-y border-sky-200 bg-[#f3f8fb] px-3 py-3 sm:rounded-[24px] sm:border sm:bg-sky-50 sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">Candidate product fields</p>
-                        <p className="mt-1 text-sm font-black text-sky-950">Review each submitted fact</p>
+                        <p className="text-[10px] font-bold text-sky-700">Product details</p>
+                        <p className="mt-0.5 text-sm font-bold text-sky-950 sm:mt-1 sm:font-black">Check each detail before approving</p>
                       </div>
                       <button
                         type="button"
@@ -1134,28 +1400,73 @@ export default function AdminBulkNpiReviewPage() {
                         disabled={!canCatalogMutate || singleSubmitting}
                         className="focus-ring rounded-xl bg-sky-700 px-3 py-2 text-[10px] font-black text-white hover:bg-sky-800 disabled:opacity-40"
                       >
-                        Accept all submitted fields
+                        Mark all correct
                       </button>
                     </div>
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="mt-2 grid gap-0 sm:mt-4 sm:gap-3 md:grid-cols-2">
                       {reviewableFields.map(([fieldPath, item]) => {
                         const mutable = allowedFieldForMutation(fieldPath);
                         const safety = SAFETY_FIELDS.has(fieldPath);
 
                         return (
-                          <div key={fieldPath} className="rounded-2xl border border-sky-100 bg-white p-4">
+                          <div key={fieldPath} className="border-b border-sky-100 bg-transparent px-0 py-2.5 sm:rounded-2xl sm:border sm:bg-white sm:p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-xs font-black text-stone-800">{labelize(fieldPath)}</p>
-                                <p className="mt-1 text-[9px] font-semibold text-stone-400">Source: {labelize(item?.source || "unknown")}</p>
+                                <p className="text-xs font-bold text-stone-800 sm:font-black">{reviewFieldLabel(fieldPath)}</p>
+                                <p className="mt-0.5 text-[9px] font-medium text-stone-400 sm:mt-1 sm:font-semibold">{reviewSourceLabel(item?.source)}</p>
                               </div>
                               {safety ? <ShieldAlert size={15} className="shrink-0 text-amber-600" /> : null}
                             </div>
 
-                            <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-stone-50 p-3 text-xs font-semibold leading-5 text-stone-700">
-                              {printable(item?.value)}
-                            </pre>
+                            {fieldPath === "nutrition" ? (() => {
+                              const nutrition = nutritionReviewData(item?.value);
+
+                              return (
+                                <div className="mt-2 border-y border-sky-100 bg-white py-2 sm:mt-3 sm:rounded-xl sm:border sm:bg-stone-50 sm:p-3">
+                                  {(nutrition.basis || nutrition.serving) ? (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {nutrition.basis ? (
+                                        <span className="rounded-md bg-sky-100 px-2 py-1 text-[9px] font-bold text-sky-800 sm:text-[10px]">
+                                          {nutrition.basis}
+                                        </span>
+                                      ) : null}
+                                      {nutrition.serving ? (
+                                        <span className="rounded-md bg-stone-100 px-2 py-1 text-[9px] font-bold text-stone-600 sm:text-[10px]">
+                                          {nutrition.serving}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+
+                                  {nutrition.rows.length ? (
+                                    <div className={`${nutrition.basis || nutrition.serving ? "mt-2" : ""} grid grid-cols-2 gap-x-3 sm:gap-x-4`}>
+                                      {nutrition.rows.map((nutrient) => (
+                                        <div
+                                          key={`${nutrient.label}-${nutrient.value}`}
+                                          className="flex min-w-0 items-center justify-between gap-2 border-b border-stone-100 py-1.5 last:border-b-0"
+                                        >
+                                          <span className="truncate text-[10px] font-semibold text-stone-500 sm:text-[11px]">
+                                            {nutrient.label}
+                                          </span>
+                                          <span className="shrink-0 text-[10px] font-black text-stone-900 sm:text-[11px]">
+                                            {nutrient.value}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[10px] font-semibold text-stone-500 sm:text-[11px]">
+                                      Nutrition details not provided.
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })() : (
+                              <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-words bg-white p-2 text-[11px] font-medium leading-4 text-stone-700 sm:mt-3 sm:max-h-40 sm:rounded-xl sm:bg-stone-50 sm:p-3 sm:text-xs sm:font-semibold sm:leading-5">
+                                {readableReviewValue(fieldPath, item?.value)}
+                              </pre>
+                            )}
 
                             <select
                               value={fieldStates[fieldPath] || "pending_review"}
@@ -1163,12 +1474,26 @@ export default function AdminBulkNpiReviewPage() {
                               onChange={(event) =>
                                 setFieldStates((current) => ({ ...current, [fieldPath]: event.target.value }))
                               }
-                              className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black outline-none disabled:bg-stone-100 disabled:text-stone-400"
+                              className="mt-2 h-9 w-full border border-stone-200 bg-white px-2.5 text-[11px] font-bold outline-none disabled:bg-stone-100 disabled:text-stone-400 sm:hidden"
                             >
-                              <option value="pending_review">Pending review</option>
-                              <option value="accepted">Accept evidence field</option>
-                              <option value="needs_evidence">Needs more evidence</option>
-                              <option value="rejected">Reject field</option>
+                              <option value="pending_review">Not reviewed</option>
+                              <option value="accepted">Looks correct</option>
+                              <option value="needs_evidence">Need more proof</option>
+                              <option value="rejected">Mark incorrect</option>
+                            </select>
+
+                            <select
+                              value={fieldStates[fieldPath] || "pending_review"}
+                              disabled={!mutable || singleSubmitting}
+                              onChange={(event) =>
+                                setFieldStates((current) => ({ ...current, [fieldPath]: event.target.value }))
+                              }
+                              className="mt-3 hidden w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black outline-none disabled:bg-stone-100 disabled:text-stone-400 sm:block"
+                            >
+                              <option value="pending_review">Not reviewed</option>
+                              <option value="accepted">Looks correct</option>
+                              <option value="needs_evidence">Need more proof</option>
+                              <option value="rejected">Mark incorrect</option>
                             </select>
                           </div>
                         );
@@ -1176,9 +1501,9 @@ export default function AdminBulkNpiReviewPage() {
                     </div>
                   </section>
 
-                  <div className="space-y-5">
-                    <section className="rounded-[24px] bg-emerald-950 p-5 text-white">
-                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-300">Commercial draft from Host workbook</p>
+                  <div className="space-y-3 sm:space-y-5">
+                    <section className="bg-emerald-950 p-3 text-white sm:rounded-[24px] sm:p-5">
+                      <p className="text-[10px] font-bold text-emerald-300">Selling details from Host</p>
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${commerceStatusClasses(detailDraft.commercializationStatus)}`}>
@@ -1199,19 +1524,19 @@ export default function AdminBulkNpiReviewPage() {
                         </p>
                       ) : null}
 
-                      <div className="mt-4 space-y-3 text-xs">
+                      <div className="mt-3 space-y-2 text-[11px] sm:mt-4 sm:space-y-3 sm:text-xs">
                         {[
-                          ["Merchant SKU", detailDraft.merchantSku || "—"],
-                          ["List price", moneyFromMinor(commercial.listPriceMinor, commercial.currency)],
-                          ["Sale price", commercial.salePriceMinor ? moneyFromMinor(commercial.salePriceMinor, commercial.currency) : "—"],
-                          ["Available", commercial.availableQuantity ?? "—"],
-                          ["Inventory node", commercial.inventoryNodeName || "—"],
-                          ["Node type", labelize(commercial.inventoryNodeType || "") || "—"],
+                          ["Host product code", detailDraft.merchantSku || "—"],
+                          ["Regular price", moneyFromMinor(commercial.listPriceMinor, commercial.currency)],
+                          ["Selling price", commercial.salePriceMinor ? moneyFromMinor(commercial.salePriceMinor, commercial.currency) : "—"],
+                          ["Stock available", commercial.availableQuantity ?? "—"],
+                          ["Stock location", commercial.inventoryNodeName || "—"],
+                          ["Location type", labelize(commercial.inventoryNodeType || "") || "—"],
                           ["Location", [commercial.city, commercial.state, commercial.pincode].filter(Boolean).join(", ") || "—"],
-                          ["Service area", commercial.serviceAreaName || "—"],
-                          ["Marketplace offer", detailDraft.marketplaceOfferId || "—"],
-                          ["Price rule", detailDraft.marketplacePriceRuleId || "—"],
-                          ["Inventory snapshot", detailDraft.marketplaceInventorySnapshotId || "—"],
+                          ["Delivery area", commercial.serviceAreaName || "—"],
+                          ["Store listing", detailDraft.marketplaceOfferId ? "Created" : "Not created"],
+                          ["Pricing setup", detailDraft.marketplacePriceRuleId ? "Applied" : "Not set"],
+                          ["Stock sync", detailDraft.marketplaceInventorySnapshotId ? "Connected" : "Not connected"],
                         ].map(([label, value]) => (
                           <div key={label} className="flex items-start justify-between gap-4 border-b border-white/10 pb-2 last:border-0 last:pb-0">
                             <span className="font-semibold text-emerald-100/65">{label}</span>
@@ -1221,10 +1546,10 @@ export default function AdminBulkNpiReviewPage() {
                       </div>
                     </section>
 
-                    <section className="rounded-[24px] border border-violet-200 bg-violet-50 p-5">
+                    <section className="border-y border-violet-200 bg-violet-50 p-3 sm:rounded-[24px] sm:border sm:p-5">
                       <div className="flex items-center gap-2">
                         <ImageIcon size={17} className="text-violet-700" />
-                        <p className="text-xs font-black text-violet-950">Product evidence</p>
+                        <p className="text-xs font-bold text-violet-950">Uploaded proof</p>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         {(selectedDraft.evidence || []).map((evidence) => (
@@ -1249,12 +1574,12 @@ export default function AdminBulkNpiReviewPage() {
                       ) : null}
                     </section>
 
-                    <section className="rounded-[24px] border border-amber-200 bg-amber-50 p-5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">Review context</p>
-                      <div className="mt-3 space-y-2 text-xs font-semibold text-amber-950">
-                        <p>Extraction: {selectedDraft.extraction?.status ? labelize(selectedDraft.extraction.status) : "Manual / no extraction job"}</p>
-                        <p>Safety flags: {selectedDraft.extraction?.safetyFlags?.length ? selectedDraft.extraction.safetyFlags.map(labelize).join(", ") : "None reported"}</p>
-                        <p>Previous governance decisions: {selectedDraft.decisions?.length || 0}</p>
+                    <section className="border-y border-slate-200 bg-slate-50 p-3 sm:rounded-[24px] sm:border sm:border-amber-200 sm:bg-amber-50 sm:p-5">
+                      <p className="text-[10px] font-bold text-slate-700 sm:font-black sm:text-amber-700">Review history</p>
+                      <div className="mt-2 space-y-1 text-[11px] font-medium text-slate-700 sm:mt-3 sm:space-y-2 sm:text-xs sm:font-semibold sm:text-amber-950">
+                        <p>How details were added: {selectedDraft.extraction?.status ? labelize(selectedDraft.extraction.status) : "Entered by Host"}</p>
+                        <p>Safety notes: {selectedDraft.extraction?.safetyFlags?.length ? selectedDraft.extraction.safetyFlags.map(labelize).join(", ") : "No safety concerns reported"}</p>
+                        <p>Previous decisions: {selectedDraft.decisions?.length || 0}</p>
                       </div>
 
                       {selectedDraft.decisions?.length ? (
@@ -1272,18 +1597,18 @@ export default function AdminBulkNpiReviewPage() {
                 </div>
 
                 {(canCatalogMutate || canTrustSafetyMutate) && !["approved_for_catalog", "rejected"].includes(detailDraft.status) ? (
-                  <section className="mt-5 rounded-[24px] border border-stone-200 bg-white p-5">
+                  <section className="mt-3 border-y border-stone-200 bg-white p-3 sm:mt-5 sm:rounded-[24px] sm:border sm:p-5">
                     <div className="flex items-center gap-2">
                       <BadgeCheck size={18} className="text-emerald-700" />
-                      <h3 className="text-sm font-black text-stone-900">Record individual governance decision</h3>
+                      <h3 className="text-sm font-bold text-stone-900">Make a decision</h3>
                     </div>
 
                     <textarea
                       value={singleReason}
                       onChange={(event) => setSingleReason(event.target.value)}
-                      placeholder="Review reason"
+                      placeholder="Reason for this decision"
                       rows={3}
-                      className="mt-4 w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm font-semibold outline-none focus:border-emerald-300"
+                      className="mt-2 h-16 w-full border border-stone-200 bg-stone-50 p-2.5 text-sm font-medium outline-none focus:border-emerald-300 sm:mt-4 sm:h-auto sm:rounded-2xl sm:p-3 sm:font-semibold"
                     />
 
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -1294,7 +1619,7 @@ export default function AdminBulkNpiReviewPage() {
                         className="focus-ring inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-xs font-black text-white hover:bg-emerald-800 disabled:opacity-40"
                       >
                         <CheckCircle2 size={14} />
-                        Approve for catalog
+                        <span className="sm:hidden">Approve</span><span className="hidden sm:inline">Approve for catalog</span>
                       </button>
                       <button
                         type="button"
@@ -1302,7 +1627,7 @@ export default function AdminBulkNpiReviewPage() {
                         onClick={() => submitSingleDecision("request_more_evidence")}
                         className="focus-ring rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-amber-950 hover:bg-amber-300 disabled:opacity-40"
                       >
-                        Request more information
+                        <span className="sm:hidden">Need info</span><span className="hidden sm:inline">Request more information</span>
                       </button>
                       <button
                         type="button"
@@ -1310,7 +1635,7 @@ export default function AdminBulkNpiReviewPage() {
                         onClick={() => submitSingleDecision("reject")}
                         className="focus-ring rounded-xl bg-red-600 px-4 py-3 text-xs font-black text-white hover:bg-red-700 disabled:opacity-40"
                       >
-                        Reject product
+                        <span className="sm:hidden">Reject</span><span className="hidden sm:inline">Reject product</span>
                       </button>
                     </div>
 

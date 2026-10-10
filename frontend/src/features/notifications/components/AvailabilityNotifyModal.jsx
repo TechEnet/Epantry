@@ -408,7 +408,8 @@ export default function AvailabilityNotifyModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="availability-notify-title"
-        className="relative w-full max-w-[390px] overflow-hidden rounded-[24px] border border-emerald-200 bg-[#fbfcf7] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:p-6"
+        className="relative max-h-[calc(100dvh-32px)] overflow-y-auto rounded-[24px] border border-emerald-200 bg-[#fbfcf7] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:p-6"
+        style={{ width: 'min(460px, calc(100vw - 32px))', maxWidth: '100%' }}
       >
         <button
           type="button"

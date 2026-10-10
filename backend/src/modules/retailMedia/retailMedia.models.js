@@ -22,6 +22,50 @@ export const RETAIL_MEDIA_PLACEMENTS = Object.freeze([
   'post_purchase',
 ])
 
+export const RETAIL_MEDIA_PLACEMENT_SLOTS = Object.freeze({
+  home: Object.freeze([
+    Object.freeze({ key: 'hero', label: 'Hero section' }),
+    Object.freeze({ key: 'explore_epantry', label: 'Explore EPANTRY' }),
+    Object.freeze({ key: 'featured_content', label: 'Featured content' }),
+  ]),
+  search: Object.freeze([
+    Object.freeze({ key: 'search_top', label: 'Top of search results' }),
+    Object.freeze({ key: 'search_best_match', label: 'After best match' }),
+    Object.freeze({ key: 'search_more_options', label: 'Before more options' }),
+  ]),
+  recipe: Object.freeze([
+    Object.freeze({ key: 'recipe_hero', label: 'Recipe hero' }),
+    Object.freeze({ key: 'recipe_collection', label: 'Recipe collection' }),
+    Object.freeze({ key: 'recipe_restaurants', label: 'Restaurant recipes' }),
+  ]),
+  product_detail: Object.freeze([
+    Object.freeze({ key: 'product_overview', label: 'Product overview' }),
+    Object.freeze({ key: 'product_details', label: 'Product details' }),
+    Object.freeze({ key: 'product_recommendations', label: 'Product recommendations' }),
+  ]),
+  pantry_replenishment: Object.freeze([
+    Object.freeze({ key: 'pantry_header', label: 'Next Basket header' }),
+    Object.freeze({ key: 'pantry_steps', label: 'How this page works' }),
+    Object.freeze({ key: 'pantry_suggestions', label: 'Shopping suggestions' }),
+  ]),
+  basket_compare: Object.freeze([
+    Object.freeze({ key: 'basket_compare_header', label: 'Compare header' }),
+    Object.freeze({ key: 'basket_compare_results', label: 'Comparison results' }),
+    Object.freeze({ key: 'basket_compare_checkout', label: 'Before checkout options' }),
+  ]),
+  post_purchase: Object.freeze([
+    Object.freeze({ key: 'post_purchase_summary', label: 'Order summary' }),
+    Object.freeze({ key: 'post_purchase_items', label: 'Order items' }),
+    Object.freeze({ key: 'post_purchase_follow_up', label: 'After-order actions' }),
+  ]),
+})
+
+export const RETAIL_MEDIA_SLOT_KEYS = Object.freeze(
+  Object.values(RETAIL_MEDIA_PLACEMENT_SLOTS)
+    .flat()
+    .map((slot) => slot.key),
+)
+
 export const RETAIL_MEDIA_SPONSOR_LABELS = Object.freeze([
   'Sponsored',
   'Ad',
@@ -32,6 +76,16 @@ export const RETAIL_MEDIA_PAYMENT_STATUSES = Object.freeze([
   'unpaid',
   'initiated',
   'paid',
+])
+
+export const RETAIL_MEDIA_DURATION_MINUTES = Object.freeze([
+  240,
+  720,
+  1440,
+  4320,
+  10080,
+  20160,
+  43200,
 ])
 
 const baseOptions = Object.freeze({
@@ -70,6 +124,13 @@ const creativeSchema = new Schema(
       required: true,
       default: 'Sponsored',
     },
+
+    imageUrl: {
+      type: String,
+      trim: true,
+      maxlength: 1200,
+      default: '',
+    },
   },
   {
     _id: false,
@@ -88,6 +149,33 @@ const placementChargeSchema = new Schema(
     amountMinor: {
       type: Number,
       min: 0,
+      required: true,
+    },
+  },
+  {
+    _id: false,
+    strict: true,
+  },
+)
+
+const placementSelectionSchema = new Schema(
+  {
+    placement: {
+      type: String,
+      enum: RETAIL_MEDIA_PLACEMENTS,
+      required: true,
+    },
+
+    slotKey: {
+      type: String,
+      enum: RETAIL_MEDIA_SLOT_KEYS,
+      required: true,
+    },
+
+    slotLabel: {
+      type: String,
+      trim: true,
+      maxlength: 120,
       required: true,
     },
   },
@@ -275,6 +363,19 @@ const campaignSchema = new Schema(
       default: [],
     },
 
+    placementSelections: {
+      type: [placementSelectionSchema],
+      required: true,
+      default: [],
+    },
+
+    durationMinutes: {
+      type: Number,
+      enum: RETAIL_MEDIA_DURATION_MINUTES,
+      required: true,
+      default: 1440,
+    },
+
     startsAt: {
       type: Date,
       default: null,
@@ -282,6 +383,24 @@ const campaignSchema = new Schema(
     },
 
     endsAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    scheduledStartsAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    scheduledEndsAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    reservationHeldUntil: {
       type: Date,
       default: null,
       index: true,
@@ -441,6 +560,13 @@ campaignSchema.index({
   endsAt: 1,
 })
 
+campaignSchema.index({
+  'placementSelections.placement': 1,
+  'placementSelections.slotKey': 1,
+  scheduledStartsAt: 1,
+  scheduledEndsAt: 1,
+})
+
 campaignSchema.pre(
   'validate',
   function validateCampaignWindow(next) {
@@ -492,6 +618,14 @@ const adDecisionLogSchema = new Schema(
       type: String,
       enum: RETAIL_MEDIA_PLACEMENTS,
       required: true,
+      immutable: true,
+      index: true,
+    },
+
+    slotKey: {
+      type: String,
+      enum: ['', ...RETAIL_MEDIA_SLOT_KEYS],
+      default: '',
       immutable: true,
       index: true,
     },

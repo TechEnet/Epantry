@@ -160,6 +160,41 @@ function getMobileOrderDisplayTitle(order) {
   return primaryItemName || 'EPANTRY order'
 }
 
+function isPaidOrder(order) {
+  return [
+    'paid',
+    'captured',
+    'completed',
+    'success',
+    'succeeded',
+  ].includes(
+    String(order?.paymentStatus || '')
+      .trim()
+      .toLowerCase(),
+  )
+}
+
+function getOrderPaidAmountMinor(order) {
+  const candidates = [
+    order?.totals?.totalLandedCostMinor,
+    order?.totals?.itemSubtotalMinor,
+    order?.totalLandedCostMinor,
+    order?.payment?.amountMinor,
+    order?.paymentAmountMinor,
+    order?.amountMinor,
+  ]
+
+  for (const candidate of candidates) {
+    const value = Number(candidate)
+
+    if (Number.isFinite(value) && value > 0) {
+      return value
+    }
+  }
+
+  return 0
+}
+
 export default function CustomerSpendingPage() {
   const [
     orders,
@@ -310,11 +345,12 @@ export default function CustomerSpendingPage() {
 
         const paidOrders =
           orders.filter(
-            (
-              order,
-            ) =>
-              order?.paymentStatus ===
-                'paid' &&
+            isPaidOrder,
+          )
+
+        const monthPaidOrders =
+          paidOrders.filter(
+            (order) =>
               isSameMonth(
                 order?.createdAt,
                 now,
@@ -328,10 +364,8 @@ export default function CustomerSpendingPage() {
               order,
             ) =>
               total +
-              Number(
-                order?.totals
-                  ?.totalLandedCostMinor ||
-                  0,
+              getOrderPaidAmountMinor(
+                order,
               ),
             0,
           )
@@ -349,6 +383,7 @@ export default function CustomerSpendingPage() {
 
         return {
           paidOrders,
+          monthPaidOrderCount: monthPaidOrders.length,
           amountMinor,
           currency,
           monthLabel:
@@ -418,10 +453,10 @@ export default function CustomerSpendingPage() {
               </div>
 
               <h1 className="mt-1 text-[21px] font-black leading-none tracking-tight sm:mt-3 sm:text-4xl sm:leading-normal">
-                Your monthly spending
+                Your spending
               </h1>
               <p className="mt-1 max-w-none whitespace-nowrap text-[9px] font-medium leading-4 tracking-[-0.01em] text-[#e6eee9]/80 sm:mt-2 sm:max-w-2xl sm:whitespace-normal sm:text-sm sm:leading-6">
-                Your paid orders this month, with full details one tap away.
+                See every paid EPANTRY order and your total spending in one place.
               </p>
             </div>
 
@@ -429,7 +464,7 @@ export default function CustomerSpendingPage() {
               <div className="flex items-center gap-2 text-[#f1d9a7]">
                 <CalendarDays size={13} className="sm:h-[15px] sm:w-[15px]" aria-hidden="true" />
                 <p className="text-[10px] font-black uppercase tracking-[0.14em]">
-                  {summary.monthLabel}
+                  All time
                 </p>
               </div>
               <p className="mt-0.5 text-[22px] font-black leading-none tracking-tight text-white sm:mt-2 sm:text-3xl sm:leading-normal">
@@ -443,7 +478,7 @@ export default function CustomerSpendingPage() {
               <p className="mt-0.5 text-[10px] font-semibold leading-4 text-[#e7efe9]/75 sm:mt-1 sm:text-xs">
                 {loading
                   ? 'Loading paid orders…'
-                  : `${summary.paidOrders.length} paid ${summary.paidOrders.length === 1 ? 'order' : 'orders'} this month`}
+                  : `${summary.paidOrders.length} paid ${summary.paidOrders.length === 1 ? 'order' : 'orders'} overall · ${summary.monthPaidOrderCount} in ${summary.monthLabel}`}
               </p>
             </div>
           </div>
@@ -461,7 +496,7 @@ export default function CustomerSpendingPage() {
               Payment activity
             </p>
             <h2 className="mt-0.5 text-[18px] font-black leading-tight text-[#1f2924] sm:mt-1 sm:text-2xl sm:leading-normal">
-              Paid orders this month
+              Paid order history
             </h2>
           </div>
 
@@ -484,7 +519,7 @@ export default function CustomerSpendingPage() {
                 <ShoppingBag size={21} aria-hidden="true" />
               </div>
               <h3 className="mt-3 text-sm font-black text-[#1f2924] sm:mt-4 sm:text-base">
-                No paid orders this month
+                No paid orders yet
               </h3>
               <p className="mt-1.5 text-xs text-[#756b61] sm:mt-2 sm:text-sm">
                 Your paid EPANTRY orders will appear here automatically.
@@ -521,8 +556,7 @@ export default function CustomerSpendingPage() {
                     <div className="flex items-center justify-between gap-2 sm:gap-4 sm:justify-end">
                       <p className="text-[15px] font-black leading-none text-[#17483b] sm:text-lg">
                         {formatMoney(
-                          order?.totals
-                            ?.totalLandedCostMinor,
+                          getOrderPaidAmountMinor(order),
                           order?.totals
                             ?.currency,
                         )}

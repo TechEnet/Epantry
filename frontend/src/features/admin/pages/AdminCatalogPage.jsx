@@ -1,73 +1,77 @@
 import {
   Apple,
   BadgeCheck,
+  ChefHat,
   CircleAlert,
-  History,
-  ImagePlus,
   Leaf,
   LoaderCircle,
   Package,
+  Pencil,
   RefreshCw,
+  Search,
   Send,
-  Upload,
-  X,
+  Trash2,
 } from "lucide-react";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Link } from "react-router-dom";
-
-import { extractMediaPrivacyHolds } from "../../mediaPrivacy/services/mediaPrivacy.service";
+import { useNavigate } from "react-router-dom";
 
 import {
-  createAdminNpiFromImages,
-  getUniversalProductErrorMessage,
-  uploadProductEvidenceBatch,
+  listAdminNpiReviewQueue,
 } from "../../universalProduct/services/universalProduct.service";
 
+import {
+  changeAdminDishLifecycle,
+  listAdminRecipes,
+} from "../../recipes/services/recipe.service";
+
 import AdminShell from "../components/AdminShell";
-
 import { useAdmin } from "../context/AdminContext";
-
 import useAdminCatalog from "../hooks/useAdminCatalog";
 
-const LISTING_TYPES = [
-  ["packaged", "Packaged Food", "Existing catalog workflow"],
-  ["vegetable", "Vegetables", "Fresh vegetable listing"],
-  ["fruit", "Fruits", "Fresh fruit listing"],
+const CATALOG_SECTIONS = [
+  ["packaged", "Packaged Food", Package],
+  ["vegetable", "Vegetables", Leaf],
+  ["fruit", "Fruits", Apple],
+  ["recipe", "Recipes", ChefHat],
 ];
 
-const PRODUCE_NUTRIENTS = [
-  ["energy", "Energy", "kcal"],
-  ["protein", "Protein", "g"],
-  ["carbohydrate", "Carbohydrate", "g"],
-  ["total_fat", "Total Fat", "g"],
-  ["saturated_fat", "Saturated Fat", "g"],
-  ["dietary_fibre", "Dietary Fibre", "g"],
-  ["total_sugars", "Total Sugars", "g"],
-  ["sodium", "Sodium", "mg"],
-];
+function titleize(value) {
+  return String(value || "unknown")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
 
-const EMPTY_PRODUCE_DETAILS = {
-  name: "",
-  brandName: "",
-  quantityValue: "",
-  quantityUnit: "kg",
-  countryOfOrigin: "",
-  manufacturerName: "",
-  nutrients: Object.fromEntries(
-    PRODUCE_NUTRIENTS.map(([key]) => [key, ""])
-  ),
-};
+function formatDate(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleString();
+}
 
 function getStatusClasses(status) {
   switch (status) {
+    case "active":
     case "published":
       return "bg-emerald-50 text-emerald-800";
 
-    case "in_review":
-      return "bg-amber-50 text-amber-800";
+    case "draft":
+      return "bg-blue-50 text-blue-800";
 
+    case "in_review":
+      return "bg-violet-50 text-violet-800";
+
+    case "disabled":
     case "retired":
       return "bg-stone-200 text-stone-600";
 
@@ -76,499 +80,366 @@ function getStatusClasses(status) {
   }
 }
 
+function StatusBadge({ status }) {
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${getStatusClasses(
+        status,
+      )}`}
+    >
+      {titleize(status)}
+    </span>
+  );
+}
+
 function errorMessage(error, fallback) {
   return error?.response?.data?.message || error?.message || fallback;
 }
 
-function buildProduceDeclarations(details) {
-  return {
-    ingredientDeclarationText: "",
-    allergenStatement: "",
-    allergens: [],
-    nutrition: {
-      basis: "per_100g",
-      servingSize: null,
-      nutrients: PRODUCE_NUTRIENTS.map(([key, label, unit]) => ({
-        name: label,
-        amount: Number(details.nutrients?.[key]),
-        unit,
-      })).filter(
-        (item) => Number.isFinite(item.amount) && item.amount >= 0
-      ),
-    },
-    countryOfOrigin: details.countryOfOrigin.trim(),
-    manufacturerName: details.manufacturerName.trim(),
-    claims: [],
-  };
+function getRecipeRows(result) {
+  return Array.isArray(result?.recipes) ? result.recipes : [];
 }
 
-function AdminProduceNpiForm({ listingType }) {
-  const [market, setMarket] = useState("IN");
-  const [details, setDetails] = useState(EMPTY_PRODUCE_DETAILS);
-  const [evidenceFiles, setEvidenceFiles] = useState([]);
-  const [privacyPendingAssets, setPrivacyPendingAssets] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [progress, setProgress] = useState(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const isVegetable = listingType === "vegetable";
-  const typeLabel = isVegetable ? "Vegetable" : "Fruit";
-  const TypeIcon = isVegetable ? Leaf : Apple;
-
-  function addProduceFiles(event) {
-    setPrivacyPendingAssets([]);
-    setError("");
-
-    const files = Array.from(event.target.files || []).filter((file) =>
-      ["image/jpeg", "image/png", "image/webp"].includes(file.type)
-    );
-
-    event.target.value = "";
-
-    setEvidenceFiles((current) =>
-      [
-        ...current,
-        ...files.map((file) => ({
-          id: `${Date.now()}-${Math.random()}`,
-          purpose: "front_pack",
-          file,
-        })),
-      ].slice(0, 4)
-    );
-  }
-
-  async function submitProduce(event) {
-    event.preventDefault();
-
-    const quantityValue = Number(details.quantityValue);
-    const nutritionComplete = PRODUCE_NUTRIENTS.every(([key]) => {
-      const value = Number(details.nutrients?.[key]);
-      return details.nutrients?.[key] !== "" && Number.isFinite(value) && value >= 0;
-    });
-
-    if (!details.name.trim()) {
-      setError(`${typeLabel} name is required.`);
-      return;
-    }
-
-    if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
-      setError(`Enter a valid ${typeLabel.toLowerCase()} quantity.`);
-      return;
-    }
-
-    if (!details.countryOfOrigin.trim()) {
-      setError("Country of origin is required for fresh produce.");
-      return;
-    }
-
-    if (!nutritionComplete) {
-      setError("Complete all required nutrition values per 100 g.");
-      return;
-    }
-
-    if (!evidenceFiles.length && !privacyPendingAssets.length) {
-      setError(`Add at least one ${typeLabel.toLowerCase()} photo.`);
-      return;
-    }
-
-    setSubmitting(true);
-    setError("");
-    setSuccess("");
-    setProgress({
-      completed: 0,
-      total: evidenceFiles.length,
-    });
-
-    let assets = privacyPendingAssets;
-
-    try {
-      if (!assets.length) {
-        assets = await uploadProductEvidenceBatch({
-          evidenceFiles,
-          scope: "admin",
-          onProgress: setProgress,
-        });
-      }
-
-      const result = await createAdminNpiFromImages({
-        assets,
-        market,
-        listingType,
-        hints: {
-          title: details.name.trim(),
-          brandName: details.brandName.trim() || "Fresh Produce",
-          barcode: "",
-          netQuantityText: `${quantityValue} ${details.quantityUnit}`,
-        },
-        hostDeclarations: buildProduceDeclarations(details),
-      });
-
-      setSuccess(
-        result?.resolution?.draft?.status === "ready_for_review"
-          ? `${typeLabel} draft created. It is now in the governed Product Intelligence review queue.`
-          : `${typeLabel} evidence saved. Review the draft status in Product Intelligence.`
-      );
-
-      setDetails(EMPTY_PRODUCE_DETAILS);
-      setEvidenceFiles([]);
-      setPrivacyPendingAssets([]);
-    } catch (requestError) {
-      const holds = extractMediaPrivacyHolds(requestError);
-
-      if (holds.length) {
-        setPrivacyPendingAssets(assets);
-      }
-
-      setError(
-        getUniversalProductErrorMessage(
-          requestError,
-          holds.length
-            ? "The product photo is waiting for privacy clearance before the draft can enter review."
-            : `Unable to create the ${typeLabel.toLowerCase()} NPI draft.`
-        )
-      );
-    } finally {
-      setSubmitting(false);
-      setProgress(null);
-    }
-  }
-
-  return (
-    <section className="rounded-[22px] border border-stone-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
-          <TypeIcon size={20} aria-hidden="true" />
-        </div>
-
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-            New {typeLabel.toLowerCase()} draft
-          </p>
-          <h2 className="text-lg font-black text-stone-950">
-            Create fresh {typeLabel.toLowerCase()} listing
-          </h2>
-        </div>
-      </div>
-
-      <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-500">
-        Enter the fresh-produce facts and photo here. The draft still goes through
-        Product Intelligence review before the existing governed catalog handoff
-        and publication flow.
-      </p>
-
-      {error ? (
-        <div className="mt-4 flex items-start gap-3 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-700">
-          <CircleAlert size={18} className="mt-0.5 shrink-0" />
-          {error}
-        </div>
-      ) : null}
-
-      {success ? (
-        <div className="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-          <p>{success}</p>
-          <Link
-            to="/admin/product-intelligence"
-            className="focus-ring mt-3 inline-flex rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-black text-white hover:bg-emerald-800"
-          >
-            Open Product Intelligence Review
-          </Link>
-        </div>
-      ) : null}
-
-      <form onSubmit={submitProduce} className="mt-5 space-y-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <label>
-            <span className="text-xs font-black text-stone-500">
-              {typeLabel} name *
-            </span>
-            <input
-              value={details.name}
-              onChange={(event) =>
-                setDetails((current) => ({
-                  ...current,
-                  name: event.target.value,
-                }))
-              }
-              placeholder={isVegetable ? "Example: Tomato" : "Example: Banana"}
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-            />
-          </label>
-
-          <label>
-            <span className="text-xs font-black text-stone-500">Market</span>
-            <input
-              value={market}
-              onChange={(event) =>
-                setMarket(event.target.value.toUpperCase().slice(0, 10))
-              }
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-            />
-          </label>
-
-          <label>
-            <span className="text-xs font-black text-stone-500">
-              Country of origin *
-            </span>
-            <input
-              value={details.countryOfOrigin}
-              onChange={(event) =>
-                setDetails((current) => ({
-                  ...current,
-                  countryOfOrigin: event.target.value,
-                }))
-              }
-              placeholder="Example: India"
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-            />
-          </label>
-
-          <label>
-            <span className="text-xs font-black text-stone-500">Quantity *</span>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={details.quantityValue}
-              onChange={(event) =>
-                setDetails((current) => ({
-                  ...current,
-                  quantityValue: event.target.value,
-                }))
-              }
-              placeholder="Example: 1"
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-            />
-          </label>
-
-          <label>
-            <span className="text-xs font-black text-stone-500">Unit *</span>
-            <select
-              value={details.quantityUnit}
-              onChange={(event) =>
-                setDetails((current) => ({
-                  ...current,
-                  quantityUnit: event.target.value,
-                }))
-              }
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-            >
-              <option value="g">g</option>
-              <option value="kg">kg</option>
-              <option value="piece">piece</option>
-              <option value="dozen">dozen</option>
-            </select>
-          </label>
-
-          <label>
-            <span className="text-xs font-black text-stone-500">
-              Grower / brand (optional)
-            </span>
-            <input
-              value={details.brandName}
-              onChange={(event) =>
-                setDetails((current) => ({
-                  ...current,
-                  brandName: event.target.value,
-                }))
-              }
-              placeholder="Defaults to Fresh Produce"
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-            />
-          </label>
-
-          <label className="md:col-span-2 xl:col-span-3">
-            <span className="text-xs font-black text-stone-500">
-              Grower / supplier name (optional)
-            </span>
-            <input
-              value={details.manufacturerName}
-              onChange={(event) =>
-                setDetails((current) => ({
-                  ...current,
-                  manufacturerName: event.target.value,
-                }))
-              }
-              className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-            />
-          </label>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
-            Nutrition per 100 g · required
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {PRODUCE_NUTRIENTS.map(([key, label, unit]) => (
-              <label key={key}>
-                <span className="text-[10px] font-black uppercase tracking-[0.08em] text-stone-500">
-                  {label} ({unit}) *
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={details.nutrients[key]}
-                  onChange={(event) =>
-                    setDetails((current) => ({
-                      ...current,
-                      nutrients: {
-                        ...current.nutrients,
-                        [key]: event.target.value,
-                      },
-                    }))
-                  }
-                  className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
-                />
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          <p className="text-xs font-black text-stone-700">
-            {typeLabel} photo *
-          </p>
-          <p className="mt-1 text-[11px] font-semibold leading-5 text-stone-500">
-            Add a clear product photo for governed evidence.
-          </p>
-
-          <label className="focus-ring mt-3 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-2.5 text-xs font-black text-white hover:bg-stone-800">
-            <Upload size={15} />
-            Add {typeLabel.toLowerCase()} photo
-            <input
-              type="file"
-              multiple
-              accept="image/jpeg,image/png,image/webp"
-              onChange={addProduceFiles}
-              className="sr-only"
-            />
-          </label>
-
-          {evidenceFiles.length ? (
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {evidenceFiles.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 rounded-xl bg-white p-3"
-                >
-                  <ImagePlus size={15} className="text-emerald-700" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-black text-stone-800">
-                      {item.file.name}
-                    </p>
-                    <p className="text-[11px] font-semibold text-stone-500">
-                      Product photo
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPrivacyPendingAssets([]);
-                      setEvidenceFiles((current) =>
-                        current.filter((candidate) => candidate.id !== item.id)
-                      );
-                    }}
-                    className="focus-ring grid h-8 w-8 place-items-center rounded-full text-stone-400 hover:bg-stone-50 hover:text-red-600"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <button
-          type="submit"
-          disabled={submitting || (!evidenceFiles.length && !privacyPendingAssets.length)}
-          className="focus-ring inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {submitting ? (
-            <LoaderCircle size={17} className="animate-spin" />
-          ) : (
-            <TypeIcon size={17} />
-          )}
-          {submitting
-            ? progress
-              ? `Uploading ${progress.completed}/${progress.total}…`
-              : "Submitting…"
-            : `Create ${typeLabel.toLowerCase()} NPI draft`}
-        </button>
-      </form>
-    </section>
-  );
+function getDraftRows(result) {
+  return Array.isArray(result?.drafts) ? result.drafts : [];
 }
 
 export default function AdminCatalogPage() {
+  const navigate = useNavigate();
   const { hasAdminPermission } = useAdmin();
 
-  const canMutate = hasAdminPermission("catalog.mutate");
+  const canReadCatalog = hasAdminPermission("catalog.read");
+  const canMutateCatalog = hasAdminPermission("catalog.mutate");
+  const canReadRecipes = hasAdminPermission("recipe.read");
+  const canMutateRecipes = hasAdminPermission("recipe.mutate");
 
   const {
     versions,
-    loading,
+    loading: catalogLoading,
     mutating,
-    error,
+    error: catalogError,
     loadVersions,
     submitForReview,
     publishVersion,
+    retireVersion,
   } = useAdminCatalog();
 
-  const [listingType, setListingType] = useState("packaged");
-  const [statusFilter, setStatusFilter] = useState("current");
+  const [activeSection, setActiveSection] = useState(
+    canReadCatalog ? "packaged" : "recipe",
+  );
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [actionNotice, setActionNotice] = useState("");
+  const [localError, setLocalError] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [recipeLoading, setRecipeLoading] = useState(false);
+  const [recipes, setRecipes] = useState([]);
+  const [listingTypeByVersionId, setListingTypeByVersionId] = useState({});
+  const [listingTypeByPackId, setListingTypeByPackId] = useState({});
+  const [showAllRecords, setShowAllRecords] = useState(false);
+  const [isDesktopView, setIsDesktopView] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 640px)").matches
+      : true,
+  );
 
-  useEffect(() => {
-    loadVersions({
-      page: 1,
-      limit: 100,
-    }).catch(() => {});
-  }, [loadVersions]);
-
-  const filteredVersions = useMemo(() => {
-    if (statusFilter === "current") {
-      return versions.filter(
-        (version) => version.publicationStatus !== "retired"
-      );
+  const loadListingTypeMap = useCallback(async () => {
+    if (!canReadCatalog) {
+      setListingTypeByVersionId({});
+      setListingTypeByPackId({});
+      return;
     }
 
-    return versions.filter(
-      (version) => version.publicationStatus === statusFilter
-    );
-  }, [versions, statusFilter]);
-
-  async function refreshVersions() {
-    await loadVersions({
+    const firstPage = await listAdminNpiReviewQueue({
       page: 1,
       limit: 100,
+      status: "approved_for_catalog",
     });
-  }
+
+    const firstDrafts = getDraftRows(firstPage);
+    const totalPages = Number(firstPage?.pagination?.pages || 1);
+    let drafts = firstDrafts;
+
+    if (totalPages > 1) {
+      const requests = [];
+
+      for (let page = 2; page <= totalPages; page += 1) {
+        requests.push(
+          listAdminNpiReviewQueue({
+            page,
+            limit: 100,
+            status: "approved_for_catalog",
+          }),
+        );
+      }
+
+      const remainingPages = await Promise.all(requests);
+      drafts = [
+        ...firstDrafts,
+        ...remainingPages.flatMap((result) => getDraftRows(result)),
+      ];
+    }
+
+    const nextVersionMap = {};
+    const nextPackMap = {};
+
+    drafts.forEach((draft) => {
+      const listingType = draft?.listingType || "packaged";
+      const versionId = draft?.catalogProductVersionId;
+      const packId = draft?.catalogPackId;
+
+      if (versionId) {
+        nextVersionMap[String(versionId)] = listingType;
+      }
+
+      if (packId) {
+        nextPackMap[String(packId)] = listingType;
+      }
+    });
+
+    setListingTypeByVersionId(nextVersionMap);
+    setListingTypeByPackId(nextPackMap);
+  }, [canReadCatalog]);
+
+  const loadRecipes = useCallback(async () => {
+    if (!canReadRecipes) {
+      setRecipes([]);
+      return;
+    }
+
+    setRecipeLoading(true);
+
+    try {
+      const result = await listAdminRecipes({
+        page: 1,
+        limit: 100,
+        status: "all",
+      });
+
+      setRecipes(getRecipeRows(result));
+    } finally {
+      setRecipeLoading(false);
+    }
+  }, [canReadRecipes]);
+
+  const refreshWorkspace = useCallback(async () => {
+    setLocalError("");
+
+    try {
+      const requests = [];
+
+      if (canReadCatalog) {
+        requests.push(
+          loadVersions({
+            page: 1,
+            limit: 100,
+          }),
+        );
+        requests.push(loadListingTypeMap());
+      }
+
+      if (canReadRecipes) {
+        requests.push(loadRecipes());
+      }
+
+      await Promise.all(requests);
+    } catch (requestError) {
+      setLocalError(
+        errorMessage(
+          requestError,
+          "Unable to refresh Catalog & Listings.",
+        ),
+      );
+    }
+  }, [
+    canReadCatalog,
+    canReadRecipes,
+    loadListingTypeMap,
+    loadRecipes,
+    loadVersions,
+  ]);
+
+  useEffect(() => {
+    refreshWorkspace().catch(() => {});
+  }, [refreshWorkspace]);
+
+  useEffect(() => {
+    if (!canReadCatalog && canReadRecipes) {
+      setActiveSection("recipe");
+    }
+  }, [canReadCatalog, canReadRecipes]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 640px)");
+    const syncViewport = () => setIsDesktopView(mediaQuery.matches);
+
+    syncViewport();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncViewport);
+      return () => mediaQuery.removeEventListener("change", syncViewport);
+    }
+
+    mediaQuery.addListener(syncViewport);
+    return () => mediaQuery.removeListener(syncViewport);
+  }, []);
+
+  const productRowsByType = useMemo(() => {
+    const groups = {
+      packaged: [],
+      vegetable: [],
+      fruit: [],
+    };
+
+    versions.forEach((version) => {
+      const versionId = String(version?.id || version?._id || "");
+      const packId = String(version?.packId || "");
+      const listingType =
+        listingTypeByVersionId[versionId] ||
+        listingTypeByPackId[packId] ||
+        "packaged";
+
+      if (listingType === "vegetable" || listingType === "fruit") {
+        groups[listingType].push(version);
+      } else {
+        groups.packaged.push(version);
+      }
+    });
+
+    return groups;
+  }, [listingTypeByPackId, listingTypeByVersionId, versions]);
+
+  const normalizedSearch = search.trim().toLowerCase();
+
+  useEffect(() => {
+    setShowAllRecords(false);
+  }, [activeSection, statusFilter, normalizedSearch, isDesktopView]);
+
+  const visibleProducts = useMemo(() => {
+    if (activeSection === "recipe") {
+      return [];
+    }
+
+    const source = productRowsByType[activeSection] || [];
+
+    return source.filter((version) => {
+      if (
+        statusFilter !== "all" &&
+        statusFilter !== "current" &&
+        version.publicationStatus !== statusFilter
+      ) {
+        return false;
+      }
+
+      if (
+        statusFilter === "current" &&
+        version.publicationStatus === "retired"
+      ) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return [
+        version.displayName,
+        version.gtin,
+        version.packId,
+        version.id,
+        version._id,
+        version.publicationStatus,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(normalizedSearch),
+        );
+    });
+  }, [
+    activeSection,
+    normalizedSearch,
+    productRowsByType,
+    statusFilter,
+  ]);
+
+  const visibleRecipes = useMemo(() => {
+    if (activeSection !== "recipe") {
+      return [];
+    }
+
+    return recipes.filter((item) => {
+      const dish = item?.dish || {};
+      const version = item?.latestVersion || {};
+      const effectiveStatus = version.status || dish.status;
+
+      if (
+        statusFilter !== "all" &&
+        statusFilter !== "current" &&
+        effectiveStatus !== statusFilter
+      ) {
+        return false;
+      }
+
+      if (statusFilter === "current" && dish.status === "retired") {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return [
+        dish.name,
+        dish.cuisine,
+        dish.course,
+        dish.id,
+        dish.status,
+        version.id,
+        version.status,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(normalizedSearch),
+        );
+    });
+  }, [activeSection, normalizedSearch, recipes, statusFilter]);
+
+  const sectionCounts = useMemo(
+    () => ({
+      packaged: productRowsByType.packaged.length,
+      vegetable: productRowsByType.vegetable.length,
+      fruit: productRowsByType.fruit.length,
+      recipe: recipes.length,
+    }),
+    [productRowsByType, recipes.length],
+  );
 
   async function handleSubmitForReview(version) {
     const versionId = version?.id || version?._id;
 
-    if (!versionId || mutating) {
+    if (!versionId || mutating || !canMutateCatalog) {
       return;
     }
 
     setActionNotice("");
+    setLocalError("");
 
     try {
       await submitForReview(versionId);
-
       setActionNotice(
-        `${version.displayName || "Product Version"} moved to M04 review.`
+        `${version.displayName || "Product Version"} moved to M04 review.`,
       );
-
-      await refreshVersions();
+      await refreshWorkspace();
     } catch (requestError) {
-      setActionNotice(
+      setLocalError(
         errorMessage(
           requestError,
-          "Unable to submit this Product Version for M04 review."
-        )
+          "Unable to submit this Product Version for review.",
+        ),
       );
     }
   }
@@ -576,247 +447,561 @@ export default function AdminCatalogPage() {
   async function handlePublish(version) {
     const versionId = version?.id || version?._id;
 
-    if (!versionId || mutating) {
+    if (!versionId || mutating || !canMutateCatalog) {
       return;
     }
 
     setActionNotice("");
+    setLocalError("");
 
     try {
       await publishVersion(versionId, {
         reasonCode: "catalog.governance",
         reasonDetails:
-          "Governed M04 publication after approved NPI evidence handoff and Product Version review.",
+          "Governed M04 publication after approved evidence handoff and Product Version review.",
       });
 
       setActionNotice(
-        `${version.displayName || "Product Version"} published to the canonical M04 catalog.`
+        `${version.displayName || "Product Version"} published to the canonical catalog.`,
       );
-
-      await refreshVersions();
+      await refreshWorkspace();
     } catch (requestError) {
-      setActionNotice(
-        errorMessage(
-          requestError,
-          "Unable to publish this Product Version."
-        )
+      setLocalError(
+        errorMessage(requestError, "Unable to publish this Product Version."),
       );
     }
   }
 
+  async function deleteProduct(version) {
+    const versionId = version?.id || version?._id;
+
+    if (
+      !versionId ||
+      !canMutateCatalog ||
+      version.publicationStatus === "retired" ||
+      busyId
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${version.displayName || "this product listing"}"? The Product Version will be retired so governed history remains intact.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBusyId(`product:${versionId}`);
+    setActionNotice("");
+    setLocalError("");
+
+    try {
+      await retireVersion(versionId, {
+        reasonCode: "catalog.deleted_by_admin",
+        reasonDetails:
+          "Deleted from the merged Catalog & Listings workspace. Canonical history is retained as a retired Product Version.",
+      });
+
+      setActionNotice(
+        "Product listing removed from the current catalog. Governed history is retained.",
+      );
+      await refreshWorkspace();
+    } catch (requestError) {
+      setLocalError(
+        errorMessage(requestError, "Unable to delete product listing."),
+      );
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function deleteRecipe(dish) {
+    if (
+      !dish?.id ||
+      !canMutateRecipes ||
+      dish.status === "retired" ||
+      busyId
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${dish.name || "this Recipe"}"? The Dish will be retired so governed Recipe history remains available for audit.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBusyId(`recipe:${dish.id}`);
+    setActionNotice("");
+    setLocalError("");
+
+    try {
+      await changeAdminDishLifecycle(dish.id, {
+        action: "retire",
+        reason:
+          "Deleted from the merged Catalog & Listings workspace. Governed Recipe history is retained as retired.",
+      });
+
+      setActionNotice(
+        "Recipe removed from current listings. Governed history is retained.",
+      );
+      await refreshWorkspace();
+    } catch (requestError) {
+      setLocalError(errorMessage(requestError, "Unable to delete Recipe listing."));
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  const activeLabel =
+    CATALOG_SECTIONS.find(([value]) => value === activeSection)?.[1] ||
+    "Packaged Food";
+  const pageLoading = catalogLoading || recipeLoading;
+  const visibleCount =
+    activeSection === "recipe" ? visibleRecipes.length : visibleProducts.length;
+  const recordLimit = isDesktopView ? 20 : 8;
+  const displayedProducts = showAllRecords
+    ? visibleProducts
+    : visibleProducts.slice(0, recordLimit);
+  const displayedRecipes = showAllRecords
+    ? visibleRecipes
+    : visibleRecipes.slice(0, recordLimit);
+  const displayedCount = showAllRecords
+    ? visibleCount
+    : Math.min(visibleCount, recordLimit);
+  const hasHiddenRecords = !showAllRecords && visibleCount > recordLimit;
+
   return (
     <AdminShell
-      title="Catalog Products"
-      description="Manage canonical Product Versions separately from seller pricing and inventory."
+      title="Catalog & Listings"
+      description="Manage approved catalog records and governed listing history from one workspace. Recipe creation and review remain in Recipe Management."
       actions={
         <button
           type="button"
-          onClick={() => refreshVersions().catch(() => {})}
-          className="focus-ring inline-flex items-center gap-2 rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-black text-white"
+          onClick={() => refreshWorkspace().catch(() => {})}
+          disabled={pageLoading}
+          className="focus-ring inline-flex items-center gap-2 rounded-xl bg-stone-950 px-4 py-2.5 text-sm font-black text-white disabled:opacity-60"
         >
-          <RefreshCw size={15} aria-hidden="true" />
+          <RefreshCw
+            size={15}
+            className={pageLoading ? "animate-spin" : ""}
+            aria-hidden="true"
+          />
           Refresh
         </button>
       }
     >
-      <div className="grid gap-3 md:grid-cols-3">
-        {LISTING_TYPES.map(([value, label, description]) => {
-          const selected = listingType === value;
-          const TypeIcon =
-            value === "packaged" ? Package : value === "vegetable" ? Leaf : Apple;
-
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setListingType(value)}
-              className={[
-                "focus-ring flex min-h-24 items-center gap-4 rounded-[22px] border p-4 text-left transition",
-                selected
-                  ? "border-emerald-700 bg-emerald-700 text-white shadow-sm"
-                  : "border-stone-200 bg-white text-stone-800 hover:border-emerald-300 hover:bg-emerald-50/40",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "grid h-12 w-12 shrink-0 place-items-center rounded-2xl",
-                  selected ? "bg-white/15 text-white" : "bg-emerald-50 text-emerald-700",
-                ].join(" ")}
-              >
-                <TypeIcon size={22} aria-hidden="true" />
-              </span>
-
-              <span>
-                <span className="block text-sm font-black">{label}</span>
-                <span
-                  className={[
-                    "mt-1 block text-xs font-semibold",
-                    selected ? "text-emerald-50" : "text-stone-500",
-                  ].join(" ")}
-                >
-                  {description}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {listingType !== "packaged" ? (
-        <div className="mt-5">
-          {canMutate ? (
-            <AdminProduceNpiForm key={listingType} listingType={listingType} />
-          ) : (
-            <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900">
-              catalog.mutate permission is required to create a fresh-produce NPI draft.
+      <div className="space-y-4 sm:space-y-5">
+        <section className="overflow-hidden rounded-[22px] bg-[#083E35] text-white sm:rounded-[26px]">
+          <div className="grid gap-5 px-5 py-5 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="max-w-3xl">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8CE2BF] sm:text-[11px]">
+                Catalog workspace
+              </p>
+              <h2 className="mt-2 text-[24px] font-black leading-[1.08] tracking-[-0.035em] text-white sm:text-[30px]">
+                Govern every listing from one clear workspace.
+              </h2>
+              <p className="mt-2 max-w-2xl text-[13px] font-semibold leading-5 text-white/72 sm:text-[15px] sm:leading-6">
+                Review current records, edit governed details and retire listings without splitting history across separate pages.
+              </p>
             </div>
-          )}
-        </div>
-      ) : (
-        <>
-          <section className="mt-5 rounded-[22px] border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="font-black text-stone-950">Product Versions</h2>
 
-                <p className="mt-1 text-sm text-stone-500">
-                  {versions.length} records loaded
+            <div className="grid grid-cols-2 gap-5 border-t border-white/15 pt-4 lg:min-w-[250px] lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#8CE2BF] sm:text-[10px]">
+                  Matching records
+                </p>
+                <p className="mt-1 text-3xl font-black tracking-[-0.04em] text-white">
+                  {visibleCount}
                 </p>
               </div>
-
-              <div className="flex flex-wrap gap-2">
-                <select
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                  className="focus-ring h-10 rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm font-bold text-stone-700 outline-none"
-                >
-                  <option value="current">Current governance queue</option>
-                  <option value="draft">Draft</option>
-                  <option value="in_review">In review</option>
-                  <option value="published">Published</option>
-                </select>
-
-                <Link
-                  to="/admin/listing-history"
-                  className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 text-sm font-black text-stone-700 hover:bg-stone-50"
-                >
-                  <History size={15} aria-hidden="true" />
-                  Listing History
-                </Link>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#8CE2BF] sm:text-[10px]">
+                  Active category
+                </p>
+                <p className="mt-2 text-sm font-black text-white">
+                  {activeLabel}
+                </p>
               </div>
             </div>
-          </section>
+          </div>
 
-          {error ? (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-              {error}
-            </div>
-          ) : null}
+          <div className="grid grid-cols-2 border-t border-white/15 sm:grid-cols-4">
+            {CATALOG_SECTIONS.map(([value, label, Icon], index) => {
+              const selected = activeSection === value;
+              const allowed = value === "recipe" ? canReadRecipes : canReadCatalog;
 
-          {actionNotice ? (
-            <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm font-semibold text-stone-700">
-              {actionNotice}
-            </div>
-          ) : null}
+              if (!allowed) {
+                return null;
+              }
 
-          <section className="mt-5">
-            {loading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-24 animate-pulse rounded-[20px] border border-stone-200 bg-white"
-                  />
-                ))}
-              </div>
-            ) : filteredVersions.length > 0 ? (
-              <div className="space-y-3">
-                {filteredVersions.map((version) => (
-                  <article
-                    key={version.id || version._id}
-                    className="rounded-[22px] border border-stone-200 bg-white p-5 shadow-sm"
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setActiveSection(value)}
+                  className={[
+                    "focus-ring flex min-h-[68px] items-center gap-2.5 px-3.5 py-3 text-left transition sm:min-h-[78px] sm:px-5 sm:py-4",
+                    index % 2 === 1 ? "border-l border-white/15" : "",
+                    index > 1 ? "border-t border-white/15 sm:border-t-0" : "",
+                    index > 0 ? "sm:border-l sm:border-white/15" : "",
+                    selected
+                      ? "bg-[#18A36B] text-white"
+                      : "bg-transparent text-white hover:bg-white/10",
+                  ].join(" ")}
+                >
+                  <span
+                    className={[
+                      "grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10",
+                      selected
+                        ? "bg-white/18 text-white"
+                        : "bg-white/10 text-[#A7EBCF]",
+                    ].join(" ")}
                   >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex min-w-0 items-start gap-4">
-                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
-                          <Package size={20} aria-hidden="true" />
+                    <Icon size={18} aria-hidden="true" />
+                  </span>
+
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-black sm:text-sm">
+                      {label}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-semibold text-white/65 sm:text-xs">
+                      {sectionCounts[value]} records
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[22px] border border-[#BBDACF] bg-[#E7F4EF] sm:rounded-[24px]">
+          <div className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:px-6 sm:py-5">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B7154]">
+                Listing controls
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-[-0.025em] text-stone-950 sm:text-[22px]">
+                {activeLabel}
+              </h2>
+              <p className="mt-1 text-[13px] font-semibold text-stone-600 sm:text-sm">
+                Filter the governed record set before editing or retiring anything.
+              </p>
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="focus-ring h-11 rounded-xl border border-[#AFCFC3] bg-white px-3 text-sm font-bold text-stone-700 outline-none"
+            >
+              <option value="all">All records</option>
+              <option value="current">Current only</option>
+              <option value="draft">Draft</option>
+              <option value="in_review">In review</option>
+              <option value="published">Published</option>
+              <option value="retired">Retired</option>
+            </select>
+          </div>
+
+          <div className="border-t border-[#C6E0D7] px-5 py-3.5 sm:px-6 sm:py-4">
+            <div className="relative">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
+                aria-hidden="true"
+              />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={`Search ${activeLabel.toLowerCase()}...`}
+                className="focus-ring h-11 w-full rounded-xl border border-[#AFCFC3] bg-white pl-10 pr-3 text-sm font-semibold text-stone-800 outline-none"
+              />
+            </div>
+          </div>
+        </section>
+
+        {catalogError || localError ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
+            <CircleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+            {localError || catalogError}
+          </div>
+        ) : null}
+
+        {actionNotice ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+            {actionNotice}
+          </div>
+        ) : null}
+
+        <section className="overflow-hidden rounded-[22px] border border-stone-200 bg-[#FBFAF7] sm:rounded-[24px]">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-stone-200 bg-[#F4F1EA] px-5 py-4 sm:px-6 sm:py-5">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#204B63]">
+                Governed catalog
+              </p>
+              <h2 className="mt-1 text-lg font-black tracking-[-0.02em] text-stone-950 sm:text-xl">
+                {activeLabel} records
+              </h2>
+              <p className="mt-1 text-[12px] font-semibold text-stone-500 sm:text-[13px]">
+                Showing {displayedCount} of {visibleCount} matching records
+              </p>
+            </div>
+
+            <span className="rounded-full bg-[#DDEAF1] px-3 py-1.5 text-xs font-black text-[#204B63]">
+              {visibleCount} items
+            </span>
+          </div>
+
+          {pageLoading ? (
+            <div className="grid min-h-56 place-items-center">
+              <LoaderCircle
+                size={28}
+                className="animate-spin text-[#0B6A50]"
+                aria-label="Loading catalog listings"
+              />
+            </div>
+          ) : activeSection === "recipe" ? (
+            visibleRecipes.length > 0 ? (
+              <div className="divide-y divide-stone-200">
+                {displayedRecipes.map((item) => {
+                  const dish = item?.dish || {};
+                  const version = item?.latestVersion || {};
+                  const foodIntelligence = item?.foodIntelligence || {};
+                  const canEdit = Boolean(version.id) && dish.status !== "retired";
+                  const canDelete = canMutateRecipes && dish.status !== "retired";
+
+                  return (
+                    <article
+                      key={dish.id || version.id}
+                      className="grid gap-3 px-5 py-4 transition hover:bg-white/70 sm:px-6 sm:py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+                    >
+                      <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E4ECF2] text-[#204B63] sm:h-11 sm:w-11">
+                          <ChefHat size={19} aria-hidden="true" />
                         </div>
 
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="truncate font-black text-stone-950">
-                              {version.displayName || "Unnamed product"}
-                            </h2>
-
+                            <h3 className="min-w-0 truncate text-[15px] font-black text-stone-950 sm:text-base">
+                              {dish.name || "Untitled Recipe"}
+                            </h3>
+                            <StatusBadge status={version.status || dish.status} />
                             <span
-                              className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${getStatusClasses(
-                                version.publicationStatus
-                              )}`}
+                              className={[
+                                "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em]",
+                                foodIntelligence.approved
+                                  ? "bg-emerald-50 text-emerald-800"
+                                  : foodIntelligence.status === "requires_review"
+                                    ? "bg-violet-50 text-violet-800"
+                                    : "bg-rose-50 text-rose-700",
+                              ].join(" ")}
                             >
-                              {version.publicationStatus || "draft"}
+                              Food: {foodIntelligence.approved
+                                ? "approved"
+                                : foodIntelligence.status === "requires_review"
+                                  ? "review required"
+                                  : "missing"}
                             </span>
                           </div>
 
-                          <p className="mt-1 text-xs font-semibold text-stone-500">
-                            Version {version.version || 1}
-                            {" · "}
-                            {version.gtin || "No GTIN"}
-                          </p>
+                          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-stone-500">
+                            <span>{dish.cuisine || "Cuisine not set"}</span>
+                            <span>{dish.course || "Course not set"}</span>
+                            <span>Version {version.versionNumber || "-"}</span>
+                          </div>
 
-                          <p className="mt-1 break-all text-[11px] font-semibold text-stone-400">
-                            Pack ID: {version.packId || "—"}
-                          </p>
-
-                          <p className="mt-1 break-all text-[11px] font-semibold text-stone-400">
-                            ProductVersion ID: {version.id || version._id || "—"}
-                          </p>
+                          <div className="mt-2 grid gap-1 text-[11px] font-semibold text-stone-400 sm:grid-cols-2 sm:gap-x-5">
+                            <p className="break-all">RecipeVersion ID: {version.id || "-"}</p>
+                            <p>Updated {formatDate(version.updatedAt || dish.updatedAt)}</p>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        {version.publicationStatus === "draft" ? (
+                      <div className="flex shrink-0 flex-wrap gap-2 pl-[52px] sm:pl-[60px] lg:pl-0">
+                        {canEdit ? (
                           <button
                             type="button"
-                            disabled={mutating}
-                            onClick={() => handleSubmitForReview(version)}
-                            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-black text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                            onClick={() =>
+                              navigate(`/admin/recipes/${encodeURIComponent(version.id)}`)
+                            }
+                            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800"
                           >
-                            <Send size={15} aria-hidden="true" />
-                            Submit for review
+                            <Pencil size={14} aria-hidden="true" />
+                            Edit
                           </button>
                         ) : null}
 
-                        {version.publicationStatus === "in_review" ? (
+                        {canDelete ? (
                           <button
                             type="button"
-                            disabled={mutating}
-                            onClick={() => handlePublish(version)}
-                            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                            disabled={Boolean(busyId)}
+                            onClick={() => deleteRecipe(dish)}
+                            className="focus-ring inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-50"
                           >
-                            <BadgeCheck size={15} aria-hidden="true" />
-                            Publish ProductVersion
+                            {busyId === `recipe:${dish.id}` ? (
+                              <LoaderCircle
+                                size={14}
+                                className="animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Trash2 size={14} aria-hidden="true" />
+                            )}
+                            Delete
                           </button>
-                        ) : null}
-
-                        {version.publicationStatus === "published" ? (
-                          <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800">
-                            <BadgeCheck size={15} aria-hidden="true" />
-                            Canonical published
+                        ) : (
+                          <span className="rounded-xl bg-stone-100 px-3 py-2 text-xs font-bold text-stone-500">
+                            {dish.status === "retired"
+                              ? "Historical record"
+                              : "Read-only permission"}
                           </span>
-                        ) : null}
+                        )}
                       </div>
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  );
+                })}
               </div>
             ) : (
-              <div className="rounded-[22px] border border-stone-200 bg-white p-7 text-sm text-stone-500">
-                No Product Versions match this filter.
+              <div className="px-5 py-8 text-sm font-semibold text-stone-500 sm:px-6">
+                No Recipe records match this filter.
               </div>
-            )}
-          </section>
-        </>
-      )}
+            )
+          ) : visibleProducts.length > 0 ? (
+            <div className="divide-y divide-stone-200">
+              {displayedProducts.map((version) => {
+                const versionId = version.id || version._id;
+                const canEdit = Boolean(versionId) && version.publicationStatus !== "retired";
+                const canDelete =
+                  canMutateCatalog && version.publicationStatus !== "retired";
+
+                return (
+                  <article
+                    key={versionId}
+                    className="grid gap-3 px-5 py-4 transition hover:bg-white/70 sm:px-6 sm:py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+                  >
+                    <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#DDF4E8] text-[#0B6A50] sm:h-11 sm:w-11">
+                        {activeSection === "vegetable" ? (
+                          <Leaf size={19} aria-hidden="true" />
+                        ) : activeSection === "fruit" ? (
+                          <Apple size={19} aria-hidden="true" />
+                        ) : (
+                          <Package size={19} aria-hidden="true" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="min-w-0 truncate text-[15px] font-black text-stone-950 sm:text-base">
+                            {version.displayName || "Unnamed product"}
+                          </h3>
+                          <StatusBadge status={version.publicationStatus} />
+                        </div>
+
+                        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-stone-500">
+                          <span>Version {version.version || 1}</span>
+                          <span>{version.gtin || "No GTIN"}</span>
+                        </div>
+
+                        <div className="mt-2 grid gap-1 text-[11px] font-semibold text-stone-400 sm:grid-cols-2 sm:gap-x-5">
+                          <p className="break-all">Pack ID: {version.packId || "-"}</p>
+                          <p className="break-all">ProductVersion ID: {versionId || "-"}</p>
+                          <p>Updated {formatDate(version.updatedAt || version.createdAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap gap-2 pl-[52px] sm:pl-[60px] lg:pl-0">
+                      {version.publicationStatus === "draft" && canMutateCatalog ? (
+                        <button
+                          type="button"
+                          disabled={mutating || Boolean(busyId)}
+                          onClick={() => handleSubmitForReview(version)}
+                          className="focus-ring inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-700 disabled:opacity-60"
+                        >
+                          <Send size={14} aria-hidden="true" />
+                          Submit for review
+                        </button>
+                      ) : null}
+
+                      {version.publicationStatus === "in_review" && canMutateCatalog ? (
+                        <button
+                          type="button"
+                          disabled={mutating || Boolean(busyId)}
+                          onClick={() => handlePublish(version)}
+                          className="focus-ring inline-flex items-center gap-2 rounded-xl bg-[#0B6A50] px-3 py-2 text-xs font-black text-white hover:bg-[#095640] disabled:opacity-60"
+                        >
+                          <BadgeCheck size={14} aria-hidden="true" />
+                          Publish
+                        </button>
+                      ) : null}
+
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/admin/catalog/products/${encodeURIComponent(versionId)}`)
+                          }
+                          className="focus-ring inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800"
+                        >
+                          <Pencil size={14} aria-hidden="true" />
+                          Edit
+                        </button>
+                      ) : null}
+
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          disabled={Boolean(busyId) || mutating}
+                          onClick={() => deleteProduct(version)}
+                          className="focus-ring inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-50"
+                        >
+                          {busyId === `product:${versionId}` ? (
+                            <LoaderCircle
+                              size={14}
+                              className="animate-spin"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Trash2 size={14} aria-hidden="true" />
+                          )}
+                          Delete
+                        </button>
+                      ) : version.publicationStatus === "retired" ? (
+                        <span className="rounded-xl bg-stone-100 px-3 py-2 text-xs font-bold text-stone-500">
+                          Historical record
+                        </span>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="px-5 py-8 text-sm font-semibold text-stone-500 sm:px-6">
+              No {activeLabel.toLowerCase()} records match this filter.
+            </div>
+          )}
+
+          {hasHiddenRecords ? (
+            <div className="border-t border-stone-200 bg-white px-5 py-4 text-center sm:px-6">
+              <button
+                type="button"
+                onClick={() => setShowAllRecords(true)}
+                className="focus-ring inline-flex min-h-10 items-center justify-center rounded-xl bg-[#204B63] px-5 py-2.5 text-sm font-black text-white transition hover:bg-[#173A4D]"
+              >
+                View all {visibleCount} records
+              </button>
+              <p className="mt-2 text-[11px] font-semibold text-stone-500 sm:text-xs">
+                Showing the first {recordLimit} records for this screen size.
+              </p>
+            </div>
+          ) : null}
+        </section>
+      </div>
     </AdminShell>
   );
 }

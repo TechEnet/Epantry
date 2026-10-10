@@ -13,9 +13,12 @@ import {
 import {
   assertSessionEligibleAccount,
   getMfaPolicyForUser,
+  hasHostAccess,
+  hasSuperAdminAccess,
   recordSuccessfulLogin,
   requireUserByFirebaseUid,
   serializeCurrentUser,
+  switchUserActiveMode,
 } from '../users/user.service.js'
 
 import {
@@ -305,13 +308,25 @@ export async function createSessionController(
     applicationUser,
   )
 
+  // A fresh Host login starts in Host mode, even if the previous
+  // session was manually switched to Customer mode. Explicit mode
+  // switches later in this session remain handled by /auth/mode.
+  const loginUser =
+    hasHostAccess(applicationUser) &&
+    !hasSuperAdminAccess(applicationUser)
+      ? await switchUserActiveMode({
+          user: applicationUser,
+          mode: 'host',
+        })
+      : applicationUser
+
   const lastLoginAt =
     await recordSuccessfulLogin(
-      applicationUser._id,
+      loginUser._id,
     )
 
   const currentUser = {
-    ...applicationUser,
+    ...loginUser,
 
     lastLoginAt,
   }

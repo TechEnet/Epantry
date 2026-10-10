@@ -36,6 +36,7 @@ import {
   createMarketplaceCart,
   getCommerceErrorMessage,
   getMarketplaceCart,
+  mergeRecipeMarketplaceCart,
   optimizeBasket,
   updateDirectMarketplaceCartItem,
 } from '../services/commerce.service'
@@ -43,6 +44,10 @@ import {
 import {
   getDefaultDeliveryAddress,
 } from '../../deliveryAddresses/services/deliveryAddress.service'
+
+import {
+  useLocationStore,
+} from '../../location/store/location.store'
 
 import {
   createOutcomePlanIdempotencyKey,
@@ -55,6 +60,12 @@ const RECIPE_CART_PENDING_KEY =
 
 const FLOATING_MARKETPLACE_CART_KEY =
   'epantry-floating-marketplace-cart'
+
+const RECIPE_CHECKOUT_CART_KEY =
+  'epantry-recipe-checkout-cart'
+
+const RECIPE_PENDING_MERGE_KEY =
+  'epantry-recipe-pending-merge'
 
 function notifyFloatingCartUpdated() {
   window.dispatchEvent(
@@ -72,6 +83,8 @@ function notifyFloatingCartUpdated() {
 function saveFloatingMarketplaceCart({
   cartId,
   items,
+  pincode = '',
+  fulfillmentType = 'delivery',
 }) {
   try {
     window.sessionStorage.setItem(
@@ -79,6 +92,8 @@ function saveFloatingMarketplaceCart({
       JSON.stringify({
         cartId,
         items,
+        pincode,
+        fulfillmentType,
         updatedAt:
           new Date().toISOString(),
       }),
@@ -89,6 +104,32 @@ function saveFloatingMarketplaceCart({
   } catch {
     // Session persistence is best-effort UX state only.
   }
+}
+
+function readFloatingMarketplaceCart() {
+  try {
+    const raw = window.sessionStorage.getItem(
+      FLOATING_MARKETPLACE_CART_KEY,
+    )
+    const parsed = raw ? JSON.parse(raw) : null
+    return parsed?.cartId && Array.isArray(parsed?.items)
+      ? parsed
+      : null
+  } catch {
+    return null
+  }
+}
+
+function mapDirectCartItems(data) {
+  return (Array.isArray(data?.items) ? data.items : []).map((item) => ({
+    id: item.id || item.packId || item.displayName,
+    packId: item.packId || '',
+    offerId: item.offerId || '',
+    organizationId: item.organizationId || '',
+    sellerName: item.sellerName || 'Marketplace Host',
+    name: item.displayName || 'Product',
+    quantity: Number(item.packCount || 1),
+  }))
 }
 
 function readRecipeCart() {
@@ -305,11 +346,52 @@ export default function MarketplaceCartPage() {
     setRecipeCart,
   ] =
     useState(
-      () =>
-        isRecipeCart
-          ? readRecipeCart()
-          : null,
+      () => readRecipeCart(),
     )
+
+  // Recipe ingredients live in session state, while Grocery products belong to
+  // an actual Marketplace Cart. Keep both sources visible and independently
+  // mutable; never replace an existing direct cart with a recipe quote cart.
+  const [
+    grocerySnapshot,
+    setGrocerySnapshot,
+  ] = useState(() => readFloatingMarketplaceCart())
+
+  const [
+    groceryCartData,
+    setGroceryCartData,
+  ] = useState(null)
+
+  const [
+    groceryLoading,
+    setGroceryLoading,
+  ] = useState(false)
+
+  const [
+    groceryError,
+    setGroceryError,
+  ] = useState('')
+
+  const [
+    updatingGroceryItemId,
+    setUpdatingGroceryItemId,
+  ] = useState('')
+
+  const currentLocation = useLocationStore((state) => state.currentLocation)
+  const detectedPincode = /^\d{6}$/.test(String(currentLocation?.postcode || '').trim())
+    ? String(currentLocation.postcode).trim()
+    : ''
+  const [savedAddressPincode, setSavedAddressPincode] = useState('')
+  const [manualRecipePincode, setManualRecipePincode] = useState(null)
+  const [recipePincodeDraft, setRecipePincodeDraft] = useState('')
+  const [recipePinEditorOpen, setRecipePinEditorOpen] = useState(false)
+  const [recipePinError, setRecipePinError] = useState('')
+  const [recipePinCoverage, setRecipePinCoverage] = useState({
+    status: 'idle',
+    pincode: '',
+    unmatchedNames: [],
+  })
+  const recipeCheckSequence = useRef(0)
 
   const [
     placingRecipeOrder,
@@ -416,6 +498,7 @@ export default function MarketplaceCartPage() {
   useEffect(
     () => {
       loadCart()
+      setRecipeCart(readRecipeCart())
     },
     [
       loadCart,
@@ -433,6 +516,7 @@ export default function MarketplaceCartPage() {
 
       const handleFloatingCartUpdated =
         () => {
+          setRecipeCart(readRecipeCart())
           loadCart({
             refresh: true,
           })
@@ -456,6 +540,59 @@ export default function MarketplaceCartPage() {
       loadCart,
     ],
   )
+
+  useEffect(() => {
+    if (!isRecipeCart) return undefined
+
+    let alive = true
+    const refreshGrocery = async () => {
+      const snapshot = readFloatingMarketplaceCart()
+      if (!alive) return
+      setGrocerySnapshot(snapshot)
+      setGroceryCartData(null)
+      setGroceryError('')
+      if (!snapshot?.cartId) {
+        setGroceryLoading(false)
+        return
+      }
+
+      setGroceryLoading(true)
+      try {
+        const response = await getMarketplaceCart(snapshot.cartId)
+        if (alive) setGroceryCartData(response)
+      } catch (loadError) {
+        if (alive) {
+          setGroceryError(getCommerceErrorMessage(
+            loadError,
+            'Grocery Cart could not be refreshed. Your saved items are still shown.',
+          ))
+        }
+      } finally {
+        if (alive) setGroceryLoading(false)
+      }
+    }
+
+    void refreshGrocery()
+    window.addEventListener('epantry-cart-updated', refreshGrocery)
+    window.addEventListener('storage', refreshGrocery)
+    return () => {
+      alive = false
+      window.removeEventListener('epantry-cart-updated', refreshGrocery)
+      window.removeEventListener('storage', refreshGrocery)
+    }
+  }, [isRecipeCart])
+
+  useEffect(() => {
+    if (!isRecipeCart || detectedPincode) return undefined
+    let cancelled = false
+    getDefaultDeliveryAddress()
+      .then((result) => {
+        const value = String(result?.address?.postalCode || '').trim()
+        if (!cancelled && /^\d{6}$/.test(value)) setSavedAddressPincode(value)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [isRecipeCart, detectedPincode])
 
   const sellerGroups =
     useMemo(
@@ -529,11 +666,144 @@ export default function MarketplaceCartPage() {
       ? recipeCart.items
       : []
 
+  const groceryItems = isRecipeCart
+    ? (Array.isArray(groceryCartData?.items)
+        ? groceryCartData.items
+        : grocerySnapshot?.items || [])
+    : []
+  const groceryCartId = groceryCartData?.cart?.id || grocerySnapshot?.cartId || ''
+  const totalBasketItems = recipeItems.length + groceryItems.length
+  const selectedRecipePincode = manualRecipePincode === null
+    ? detectedPincode || savedAddressPincode
+    : manualRecipePincode
+  const recipeIngredientSignature = recipeItems
+    .map((item) => String(item?.canonicalIngredientId || '').trim())
+    .filter(Boolean)
+    .sort()
+    .join('|')
+
+  // Use the same server-side Host-coverage optimizer as Recipe checkout.
+  // It validates serviceable ZIP/PIN, current offers and inventory; a PIN
+  // string match alone must never be treated as delivery availability.
+  useEffect(() => {
+    if (!isRecipeCart) return undefined
+    const sequence = ++recipeCheckSequence.current
+    const pin = selectedRecipePincode.trim()
+    if (!/^\d{6}$/.test(pin) || !recipeCart?.slug || !recipeIngredientSignature) {
+      setRecipePinCoverage({ status: 'idle', pincode: pin, unmatchedNames: [] })
+      return undefined
+    }
+
+    let cancelled = false
+    setRecipePinCoverage({ status: 'checking', pincode: pin, unmatchedNames: [] })
+    const check = async () => {
+      try {
+        const selectedIds = [...new Set(recipeIngredientSignature.split('|'))]
+        const outcome = await createRecipeOutcomePlan(recipeCart.slug, {
+          targetServings: Number(recipeCart.servings || 1),
+          purchaseMode: 'full_recipe',
+          selectedCanonicalIngredientIds: selectedIds,
+          idempotencyKey: createOutcomePlanIdempotencyKey('recipe-pin-availability'),
+        })
+        if (!outcome?.plan?.id) throw new Error('Unable to resolve recipe ingredients.')
+        const quoteData = await optimizeBasket({
+          outcomePlanId: outcome.plan.id,
+          pincode: pin,
+          objective: 'best_value',
+          fulfillmentType: 'delivery',
+          idempotencyKey: createCommerceIdempotencyKey('recipe-pin-availability'),
+        })
+        if (cancelled || sequence !== recipeCheckSequence.current) return
+        const preferred = quoteData?.quote?.recommendedOptionKey || 'best_value'
+        const options = Array.isArray(quoteData?.options) ? quoteData.options : []
+        const option = options.find((item) => item.optionKey === preferred)
+          || options.find((item) => item.optionKey === 'best_value')
+          || null
+        const required = Number(option?.totalRequirementCount || 0)
+        const matched = Number(option?.matchedRequirementCount || 0)
+        const unmatchedIds = new Set(
+          (quoteData?.unmatchedRequirementLineIds || []).map((id) => String(id)),
+        )
+        const unmatchedNames = [...new Set((outcome?.requirements || [])
+          .filter((item) => unmatchedIds.has(String(item?.id || '')))
+          .map((item) => String(item?.label || '').trim())
+          .filter(Boolean))]
+        setRecipePinCoverage({
+          status: required > 0
+            ? (option && matched === required ? 'available' : 'unavailable')
+            : 'error',
+          pincode: pin,
+          unmatchedNames,
+        })
+      } catch (checkError) {
+        if (cancelled || sequence !== recipeCheckSequence.current) return
+        setRecipePinCoverage({
+          status: 'error',
+          pincode: pin,
+          unmatchedNames: [],
+          message: getCommerceErrorMessage(checkError, 'Unable to check delivery right now.'),
+        })
+      }
+    }
+    void check()
+    return () => { cancelled = true }
+  }, [
+    isRecipeCart,
+    recipeCart?.slug,
+    recipeCart?.servings,
+    recipeIngredientSignature,
+    selectedRecipePincode,
+  ])
+
+  function handleCheckRecipePincode(event) {
+    event.preventDefault()
+    const pin = recipePincodeDraft.replace(/\s/g, '')
+    if (!/^\d{6}$/.test(pin)) {
+      setRecipePinError('Enter a valid 6-digit PIN code.')
+      return
+    }
+    setRecipePinError('')
+    setManualRecipePincode(pin)
+    setRecipePinEditorOpen(false)
+    setRecipeCoverageIssue(null)
+  }
+
+  async function handleRemoveGroceryItem(item) {
+    const itemId = String(item?.id || item?.packId || '').trim()
+    if (!groceryCartId || !itemId || updatingGroceryItemId || groceryLoading || groceryError) return
+    setUpdatingGroceryItemId(itemId)
+    setError('')
+    try {
+      const result = await updateDirectMarketplaceCartItem({
+        cartId: groceryCartId,
+        itemId,
+        operation: 'remove',
+      })
+      const items = mapDirectCartItems(result)
+      setGroceryCartData(result)
+      if (items.length) {
+        saveFloatingMarketplaceCart({
+          cartId: result?.cart?.id || groceryCartId,
+          items,
+          pincode: result?.cart?.pincode || grocerySnapshot?.pincode || '',
+          fulfillmentType: result?.cart?.fulfillmentType || grocerySnapshot?.fulfillmentType || 'delivery',
+        })
+      } else {
+        window.sessionStorage.removeItem(FLOATING_MARKETPLACE_CART_KEY)
+      }
+      notifyFloatingCartUpdated()
+    } catch (removeError) {
+      setError(getCommerceErrorMessage(removeError, 'Unable to remove this Grocery item.'))
+    } finally {
+      setUpdatingGroceryItemId('')
+    }
+  }
+
   const finalizeRecipeOrder =
     useCallback(
-      async () => {
+      async (targetCartId = '') => {
         if (
-          !isRecipeCart ||
+          (!isRecipeCart && !targetCartId) ||
           placingRecipeOrder ||
           recipeItems.length ===
             0
@@ -546,6 +816,26 @@ export default function MarketplaceCartPage() {
         setRecipeCoverageIssue(null)
 
         try {
+          const mergeIntoCartId = targetCartId || (isRecipeCart ? groceryCartId : '')
+          // Do not merge the same pending recipe selection again after a
+          // customer returns from an unfinished combined order.
+          let previousCheckout = null
+          try {
+            previousCheckout = JSON.parse(window.sessionStorage.getItem(RECIPE_CHECKOUT_CART_KEY) || 'null')
+          } catch {
+            previousCheckout = null
+          }
+          if (
+            mergeIntoCartId &&
+            String(previousCheckout?.cartId || '') === String(mergeIntoCartId)
+          ) {
+            if (JSON.stringify(previousCheckout?.items || []) !== JSON.stringify(recipeItems)) {
+              throw new Error('This order already contains an earlier recipe selection. Review or remove those priced items from your order before adding a changed recipe selection.')
+            }
+            navigate(`/checkout/${mergeIntoCartId}`)
+            return
+          }
+
           const addressResult =
             await getDefaultDeliveryAddress()
 
@@ -561,11 +851,46 @@ export default function MarketplaceCartPage() {
               .trim()
               .toUpperCase()
 
+          if (mergeIntoCartId && !isRecipeCart &&
+              String(data?.cart?.pincode || '') !== normalizedPincode) {
+            throw new Error('Your saved delivery address must match this cart PIN. Please choose an address for the same PIN before placing the order.')
+          }
+
+          // Reuse a previously created quote cart if the merge response was
+          // lost. The server also marks the source cart as merged exactly once.
+          let pendingMerge = null
+          try {
+            pendingMerge = JSON.parse(window.sessionStorage.getItem(RECIPE_PENDING_MERGE_KEY) || 'null')
+          } catch {
+            pendingMerge = null
+          }
+          if (mergeIntoCartId && pendingMerge &&
+              String(pendingMerge.cartId) === String(mergeIntoCartId) &&
+              pendingMerge.pincode === normalizedPincode &&
+              JSON.stringify(pendingMerge.items || []) === JSON.stringify(recipeItems) &&
+              pendingMerge.recipeCartId) {
+            const previouslyMerged = await mergeRecipeMarketplaceCart({
+              cartId: mergeIntoCartId,
+              recipeCartId: pendingMerge.recipeCartId,
+            })
+            const readyId = previouslyMerged?.cart?.id
+            if (!readyId) throw new Error('Unable to confirm this combined order.')
+            window.sessionStorage.setItem(RECIPE_CHECKOUT_CART_KEY,
+              JSON.stringify({ cartId: readyId, items: recipeItems }))
+            window.sessionStorage.removeItem(RECIPE_PENDING_MERGE_KEY)
+            navigate(`/checkout/${readyId}`, { replace: true })
+            return
+          }
+
           if (
             !/^\d{6}$/.test(
               normalizedPincode,
             )
           ) {
+            if (mergeIntoCartId) {
+              navigate(`/delivery-addresses?returnTo=${encodeURIComponent(`/cart/${mergeIntoCartId}`)}`)
+              return
+            }
             throw new Error(
               'Your selected delivery address does not contain a valid 6-digit pincode. Please update the address and try again.',
             )
@@ -787,6 +1112,9 @@ export default function MarketplaceCartPage() {
               unmatchedNames,
             })
 
+            if (!isRecipeCart) {
+              setError(`One order cannot be prepared yet. ${unmatchedNames.length ? `${unmatchedNames.join(', ')} ${unmatchedNames.length === 1 ? 'is' : 'are'} unavailable or unpriced for PIN ${normalizedPincode}.` : 'Some recipe ingredients do not have an available Host offer and verified price.'} Please update the items or delivery PIN before continuing.`)
+            }
             return
           }
 
@@ -813,30 +1141,46 @@ export default function MarketplaceCartPage() {
             )
           }
 
-          saveFloatingMarketplaceCart({
-            cartId:
-              marketplaceCartId,
-            items:
-              recipeItems.map(
-                (item) => ({
-                  id:
-                    item.canonicalIngredientId,
-                  packId:
-                    item.canonicalIngredientId,
-                  name:
-                    item.name ||
-                    'Ingredient',
-                  quantity:
-                    item.quantity,
-                }),
-              ),
-          })
+          // Merge the server-priced Recipe Cart into the existing Grocery/
+          // Brand cart. Only ONE Marketplace Cart proceeds to order payment.
+          // The backend checks ownership, PIN, currency, prices and draft state.
+          if (mergeIntoCartId) {
+            try {
+              window.sessionStorage.setItem(RECIPE_PENDING_MERGE_KEY,
+                JSON.stringify({ cartId: mergeIntoCartId, recipeCartId: marketplaceCartId,
+                  pincode: normalizedPincode, items: recipeItems }))
+            } catch {
+              // The server still enforces one-time merge using source cart state.
+            }
+          }
+          const finalCartId = mergeIntoCartId
+            ? (await mergeRecipeMarketplaceCart({
+                cartId: mergeIntoCartId,
+                recipeCartId: marketplaceCartId,
+              }))?.cart?.id
+            : marketplaceCartId
+          if (!finalCartId) {
+            throw new Error('Unable to prepare one complete order for all items.')
+          }
+          try {
+            window.sessionStorage.removeItem(RECIPE_PENDING_MERGE_KEY)
+          } catch {
+            // Storage is best effort.
+          }
 
-          clearRecipeCart()
-          notifyFloatingCartUpdated()
+          // Do not discard the pending ingredient selection until this EXACT
+          // combined cart is verified paid by CheckoutPage.
+          try {
+            window.sessionStorage.setItem(
+              RECIPE_CHECKOUT_CART_KEY,
+              JSON.stringify({ cartId: String(finalCartId), items: recipeItems }),
+            )
+          } catch {
+            // Server checkout remains authoritative if browser storage fails.
+          }
 
           navigate(
-            `/checkout/${marketplaceCartId}`,
+            `/checkout/${finalCartId}`,
             {
               replace:
                 true,
@@ -864,6 +1208,8 @@ export default function MarketplaceCartPage() {
         placingRecipeOrder,
         recipeCart,
         recipeItems,
+        groceryCartId,
+        data?.cart?.pincode,
       ],
     )
 
@@ -993,7 +1339,7 @@ export default function MarketplaceCartPage() {
                     size={13}
                     aria-hidden="true"
                   />
-                  Recipe basket
+                  Your basket
                 </div>
 
                 <h1 className="mt-2 text-[24px] font-black leading-[1.02] tracking-[-0.04em] text-white sm:mt-3 sm:text-4xl">
@@ -1001,7 +1347,7 @@ export default function MarketplaceCartPage() {
                 </h1>
 
                 <p className="mt-1.5 max-w-2xl text-[11px] font-medium leading-5 text-white/72 sm:mt-3 sm:text-sm sm:leading-6">
-                  Keep the ingredients you want to buy. Next, choose a delivery address and EPANTRY will find eligible Host offers for you.
+                  Review your recipe ingredients and Grocery products together. Delivery is checked against eligible Host offers before checkout.
                 </p>
               </div>
 
@@ -1017,7 +1363,7 @@ export default function MarketplaceCartPage() {
                     In your basket
                   </p>
                   <p className="mt-0.5 text-sm font-black text-white sm:text-lg">
-                    {recipeItems.length} ingredient{recipeItems.length === 1 ? '' : 's'}
+                    {totalBasketItems} item{totalBasketItems === 1 ? '' : 's'}
                   </p>
                 </div>
               </div>
@@ -1135,7 +1481,7 @@ export default function MarketplaceCartPage() {
                   </h2>
                 </div>
                 <span className="shrink-0 rounded-full bg-[#dcf7e8] px-2.5 py-1 text-[10px] font-black text-emerald-900 sm:px-3 sm:py-1.5 sm:text-xs">
-                  {recipeItems.length} item{recipeItems.length === 1 ? '' : 's'}
+                  {totalBasketItems} item{totalBasketItems === 1 ? '' : 's'}
                 </span>
               </header>
 
@@ -1218,6 +1564,49 @@ export default function MarketplaceCartPage() {
                   </div>
                 </div>
               )}
+
+              {(groceryItems.length > 0 || groceryLoading || groceryError) && (
+                <div className="border-t border-stone-200 bg-[#f4f9f6] px-3 py-3 sm:px-5 sm:py-4">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">From Grocery</p>
+                      <h3 className="text-sm font-black text-stone-900 sm:text-base">
+                        {groceryItems.length} grocery product{groceryItems.length === 1 ? '' : 's'}
+                      </h3>
+                    </div>
+                    {groceryCartId && (
+                      <Link to={`/cart/${groceryCartId}`} className="focus-ring rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-50">
+                        Review Grocery Cart
+                      </Link>
+                    )}
+                  </div>
+                  {groceryLoading && <p className="text-xs text-stone-600">Checking your saved grocery items...</p>}
+                  {groceryError && <p role="status" className="my-2 text-xs text-amber-800">{groceryError}</p>}
+                  <div className="grid gap-2">
+                    {groceryItems.map((item, index) => (
+                      <article key={`grocery-${item.id || item.packId || index}`} className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-white p-3 sm:gap-3">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-100 text-xs font-black text-emerald-900">{recipeItems.length + index + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-black text-stone-950">{item.displayName || item.name || 'Grocery product'}</p>
+                          <p className="text-[11px] text-stone-500">{item.sellerName || 'Grocery'} · {Number(item.packCount || item.quantity || 1)} pack{Number(item.packCount || item.quantity || 1) === 1 ? '' : 's'}</p>
+                        </div>
+                        {item.lineTotal?.amountMinor !== undefined && (
+                          <span className="text-xs font-bold text-stone-800">{formatMoney(item.lineTotal.amountMinor, item.lineTotal.currency || 'INR')}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGroceryItem(item)}
+                          disabled={Boolean(updatingGroceryItemId) || groceryLoading || Boolean(groceryError) || groceryCartData?.cart?.sourceType !== 'direct_product'}
+                          className="focus-ring rounded-lg border border-rose-100 px-2.5 py-2 text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+                          aria-label={`Remove ${item.displayName || item.name || 'grocery product'}`}
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
 
             <aside className="lg:sticky lg:top-24">
@@ -1248,20 +1637,102 @@ export default function MarketplaceCartPage() {
                         Basket
                       </p>
                       <p className="mt-0.5 text-xs font-black text-stone-800 sm:text-sm">
-                        {recipeItems.length} recipe item{recipeItems.length === 1 ? '' : 's'}
+                        {totalBasketItems} item{totalBasketItems === 1 ? '' : 's'} · {recipeItems.length} recipe
                       </p>
                     </div>
                     <span className="grid size-8 place-items-center rounded-full bg-[#dcf7e8] text-sm font-black text-emerald-900">
-                      {recipeItems.length}
+                      {totalBasketItems}
                     </span>
                   </div>
+
+                  {recipeItems.length > 0 && (
+                    <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-wide text-emerald-800">Recipe delivery PIN</p>
+                          <p className="mt-0.5 text-sm font-black text-stone-900">
+                            {selectedRecipePincode || 'Choose a 6-digit PIN code'}
+                            {manualRecipePincode === null && selectedRecipePincode
+                              ? <span className="ml-1 text-[10px] font-medium text-stone-500">{detectedPincode ? '· Current location' : '· Saved address'}</span>
+                              : null}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecipePincodeDraft(selectedRecipePincode)
+                            setRecipePinError('')
+                            setRecipePinEditorOpen((open) => !open)
+                          }}
+                          className="focus-ring rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50"
+                        >
+                          {recipePinEditorOpen ? 'Cancel' : 'Change PIN'}
+                        </button>
+                      </div>
+                      {(recipePinEditorOpen || !selectedRecipePincode) && (
+                        <form onSubmit={handleCheckRecipePincode} className="mt-3 space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              inputMode="numeric"
+                              autoComplete="postal-code"
+                              maxLength={6}
+                              pattern="[0-9]{6}"
+                              value={recipePincodeDraft}
+                              onChange={(event) => setRecipePincodeDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                              placeholder="Enter 6-digit PIN"
+                              aria-label="Recipe delivery PIN code"
+                              className="min-w-0 flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-900"
+                            />
+                            <button type="submit" className="focus-ring rounded-lg bg-emerald-800 px-3 py-2 text-xs font-bold text-white">Check</button>
+                          </div>
+                          {recipePinError && <p role="alert" className="text-xs text-rose-700">{recipePinError}</p>}
+                          {detectedPincode && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setManualRecipePincode(null)
+                                setRecipePinEditorOpen(false)
+                                setRecipePinError('')
+                              }}
+                              className="text-left text-xs font-bold text-emerald-700 underline"
+                            >
+                              Use current-location PIN {detectedPincode}
+                            </button>
+                          )}
+                        </form>
+                      )}
+                      {selectedRecipePincode && (
+                        <p role="status" className={`mt-2 text-xs font-semibold leading-5 ${
+                          recipePinCoverage.status === 'available' ? 'text-emerald-800'
+                            : recipePinCoverage.status === 'unavailable' ? 'text-rose-700'
+                              : 'text-stone-600'
+                        }`}>
+                          {recipePinCoverage.pincode !== selectedRecipePincode || recipePinCoverage.status === 'checking'
+                            ? `Checking Host delivery for PIN ${selectedRecipePincode}...`
+                            : recipePinCoverage.status === 'available'
+                              ? `Recipe ingredients are available for delivery to PIN ${selectedRecipePincode}.`
+                              : recipePinCoverage.status === 'unavailable'
+                                ? `Delivery to PIN ${selectedRecipePincode} is currently unavailable${recipePinCoverage.unmatchedNames.length ? ` for ${recipePinCoverage.unmatchedNames.join(', ')}` : ' for the selected recipe ingredients'}. Please try another PIN code.`
+                                : recipePinCoverage.status === 'error'
+                                  ? (recipePinCoverage.message || 'Unable to confirm delivery right now. Please try a different PIN or choose an address.')
+                                  : 'Enter your delivery PIN to check available Hosts.'}
+                        </p>
+                      )}
+                      <p className="mt-1.5 text-[10px] text-stone-500">Final delivery and pricing are confirmed for your selected checkout address.</p>
+                    </div>
+                  )}
 
                   <button
                     type="button"
                     onClick={handlePlaceRecipeOrder}
                     disabled={
                       placingRecipeOrder ||
-                      recipeItems.length === 0
+                      recipeItems.length === 0 ||
+                      (Boolean(selectedRecipePincode) && (
+                        recipePinCoverage.pincode !== selectedRecipePincode ||
+                        recipePinCoverage.status === 'checking' ||
+                        recipePinCoverage.status === 'unavailable'
+                      ))
                     }
                     className={`focus-ring inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-black text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-45 sm:rounded-2xl sm:text-sm ${
                       recipeCoverageIssue
@@ -1273,12 +1744,19 @@ export default function MarketplaceCartPage() {
                       ? 'Preparing your basket…'
                       : recipeCoverageIssue
                         ? 'Choose another address'
-                        : 'Choose delivery address'}
+                        : 'Review & place order'}
                     <ArrowRight
                       size={16}
                       aria-hidden="true"
                     />
                   </button>
+
+                  {groceryItems.length > 0 && groceryCartId && (
+                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50 p-3">
+                      <p className="text-xs font-bold text-emerald-950">{groceryItems.length} Grocery product{groceryItems.length === 1 ? '' : 's'} saved</p>
+                      <p className="mt-1 text-[11px] leading-4 text-emerald-900/80">Priced Host offers for these ingredients will be added to your Grocery/Brand basket before one order is placed.</p>
+                    </div>
+                  )}
 
                   <div className="grid gap-2 border-t border-[#c9e0d5] pt-3 text-[10px] font-semibold leading-4 text-stone-600 sm:text-xs sm:leading-5">
                     <div className="flex items-start gap-2">
@@ -1631,6 +2109,20 @@ export default function MarketplaceCartPage() {
     )
   }
 
+  let recipeIncludedInThisCart = false
+  try {
+    const previousCheckout = JSON.parse(window.sessionStorage.getItem(RECIPE_CHECKOUT_CART_KEY) || 'null')
+    recipeIncludedInThisCart =
+      String(previousCheckout?.cartId || '') === String(cartId) &&
+      JSON.stringify(previousCheckout?.items || []) === JSON.stringify(recipeCart?.items || [])
+  } catch {
+    recipeIncludedInThisCart = false
+  }
+  const pendingRecipeItems = recipeIncludedInThisCart
+    ? []
+    : (Array.isArray(recipeCart?.items) ? recipeCart.items : [])
+  const pendingRecipeCount = pendingRecipeItems.length
+
   const itemCount =
     (data?.items ||
       []).reduce(
@@ -1816,7 +2308,7 @@ export default function MarketplaceCartPage() {
             <div className="mt-7 grid gap-2 sm:grid-cols-3">
               {[
                 ['01', 'Review', true],
-                ['02', 'Checkout', false],
+                ['02', 'Order details', false],
                 ['03', 'Payment', false],
               ].map(([step, label, active]) => (
                 <div
@@ -1868,6 +2360,11 @@ export default function MarketplaceCartPage() {
                 <h2 className="mt-1 text-xl font-black tracking-tight text-stone-950 sm:text-2xl">
                   Items grouped by seller
                 </h2>
+                {pendingRecipeCount > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-emerald-800">
+                    {itemCount} grocery pack{itemCount === 1 ? '' : 's'} + {pendingRecipeCount} recipe ingredient{pendingRecipeCount === 1 ? '' : 's'} in your basket
+                  </p>
+                )}
               </div>
 
               <div className="rounded-full border border-stone-200 bg-white/80 px-3 py-1.5 text-xs font-black text-stone-500 shadow-sm backdrop-blur-lg">
@@ -1878,6 +2375,31 @@ export default function MarketplaceCartPage() {
                   : 's'}
               </div>
             </div>
+
+            {pendingRecipeCount > 0 && (
+              <section aria-label="Recipe ingredients in your basket" className="overflow-hidden rounded-[26px] border border-emerald-200 bg-white shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-4 py-4 sm:px-5">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Recipe Cart</p>
+                    <h3 className="mt-1 text-lg font-black text-stone-950">{pendingRecipeCount} recipe ingredient{pendingRecipeCount === 1 ? '' : 's'}</h3>
+                  </div>
+                  <Link to="/cart/recipe" className="focus-ring inline-flex items-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900">
+                    Review recipe items <ArrowRight size={15} aria-hidden="true" />
+                  </Link>
+                </div>
+                <div className="divide-y divide-stone-100 px-4 sm:px-5">
+                  {pendingRecipeItems.map((item, index) => (
+                    <div key={`${item.canonicalIngredientId || item.id || item.name}-${index}`} className="flex items-center justify-between gap-3 py-3">
+                      <span className="min-w-0 text-sm font-bold text-stone-900">{item.name || 'Ingredient'}</span>
+                      <span className="shrink-0 text-xs font-semibold text-stone-600">{formatRecipeQuantity(item)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="border-t border-emerald-100 px-4 py-3 text-xs leading-5 text-stone-600 sm:px-5">
+                  Recipe ingredients will be priced using available Host offers and added to the same order before payment. Unpriced or unavailable ingredients will pause the order.
+                </p>
+              </section>
+            )}
 
             {sellerGroups.map(
               (
@@ -2135,11 +2657,8 @@ export default function MarketplaceCartPage() {
                       Items
                     </p>
                     <p className="mt-1.5 text-base font-black text-stone-950">
-                      {itemCount} pack
-                      {itemCount ===
-                      1
-                        ? ''
-                        : 's'}
+                      {itemCount} grocery pack{itemCount === 1 ? '' : 's'}
+                      {pendingRecipeCount > 0 ? ` + ${pendingRecipeCount} recipe` : ''}
                     </p>
                   </div>
 
@@ -2157,11 +2676,11 @@ export default function MarketplaceCartPage() {
                   <div className="flex items-end justify-between gap-4">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.13em] text-emerald-800">
-                        Known item subtotal
+                        {pendingRecipeCount > 0 ? 'Priced products so far' : 'Item subtotal'}
                       </p>
 
                       <p className="mt-1 text-[11px] font-semibold leading-4 text-emerald-900/55">
-                        Before delivery fees and final checkout validation
+                        {pendingRecipeCount > 0 ? 'Recipe item prices are added after Host verification' : 'Before delivery fees and final order validation'}
                       </p>
                     </div>
 
@@ -2174,20 +2693,27 @@ export default function MarketplaceCartPage() {
                   </div>
                 </div>
 
-                <Link
-                  to={`/checkout/${cartId}`}
-                  className="ep-cart-sheen focus-ring group relative inline-flex w-full overflow-hidden items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#065f46_0%,#047857_100%)] px-5 py-3.5 text-sm font-black text-white shadow-[0_12px_26px_rgba(6,95,70,0.22)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(6,95,70,0.28)]"
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pendingRecipeCount > 0) {
+                      void finalizeRecipeOrder(cartId)
+                    } else {
+                      navigate(`/checkout/${cartId}`)
+                    }
+                  }}
+                  disabled={placingRecipeOrder}
+                  className="ep-cart-sheen focus-ring group relative inline-flex w-full overflow-hidden items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#065f46_0%,#047857_100%)] px-5 py-3.5 text-sm font-black text-white shadow-[0_12px_26px_rgba(6,95,70,0.22)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(6,95,70,0.28)] disabled:cursor-wait disabled:opacity-60"
                 >
                   <span className="relative z-10">
-                    Continue to Checkout
+                    {placingRecipeOrder ? 'Checking all items…' : 'Review & place order'}
                   </span>
-
                   <ArrowRight
                     size={17}
                     className="relative z-10 transition-transform duration-300 group-hover:translate-x-1"
                     aria-hidden="true"
                   />
-                </Link>
+                </button>
 
                 <div className="grid gap-2.5 pt-1 text-xs font-semibold text-stone-600">
                   <div className="flex items-start gap-2.5">

@@ -49,6 +49,10 @@ import {
   uploadRecipeImage,
 } from '../../recipes/services/recipe.service'
 
+import {
+  getAdminIngredients,
+} from '../services/catalogAdmin.service'
+
 const RECIPE_UNITS = [
   'mg',
   'g',
@@ -416,7 +420,7 @@ function foodIntelligenceStatusLabel(
         'Host declaration · review required',
 
       className:
-        'border-amber-200 bg-amber-50 text-amber-800',
+        'border-violet-200 bg-violet-50 text-violet-800',
     }
   }
 
@@ -459,6 +463,210 @@ function numericOrNull(
   )
     ? numeric
     : null
+}
+
+
+const RECIPE_IMAGE_TARGET_BYTES =
+  Math.floor(
+    7.5 *
+      1024 *
+      1024,
+  )
+
+const RECIPE_IMAGE_MAX_EDGE =
+  2048
+
+function canvasToBlob(
+  canvas,
+  type,
+  quality,
+) {
+  return new Promise(
+    (
+      resolve,
+      reject,
+    ) => {
+      canvas.toBlob(
+        (
+          blob,
+        ) => {
+          if (blob) {
+            resolve(
+              blob,
+            )
+
+            return
+          }
+
+          reject(
+            new Error(
+              'Unable to optimize this Recipe image.',
+            ),
+          )
+        },
+        type,
+        quality,
+      )
+    },
+  )
+}
+
+async function prepareRecipeImageForUpload(
+  file,
+) {
+  if (
+    !file ||
+    file.size <=
+      RECIPE_IMAGE_TARGET_BYTES
+  ) {
+    return file
+  }
+
+  if (
+    typeof document ===
+      'undefined' ||
+    typeof createImageBitmap !==
+      'function'
+  ) {
+    return file
+  }
+
+  const bitmap =
+    await createImageBitmap(
+      file,
+    )
+
+  try {
+    const largestEdge =
+      Math.max(
+        bitmap.width,
+        bitmap.height,
+      )
+
+    const scale =
+      Math.min(
+        1,
+        RECIPE_IMAGE_MAX_EDGE /
+          largestEdge,
+      )
+
+    const canvas =
+      document.createElement(
+        'canvas',
+      )
+
+    canvas.width =
+      Math.max(
+        1,
+        Math.round(
+          bitmap.width *
+            scale,
+        ),
+      )
+
+    canvas.height =
+      Math.max(
+        1,
+        Math.round(
+          bitmap.height *
+            scale,
+        ),
+      )
+
+    const context =
+      canvas.getContext(
+        '2d',
+      )
+
+    if (!context) {
+      return file
+    }
+
+    context.drawImage(
+      bitmap,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    )
+
+    const outputType =
+      file.type ===
+        'image/png'
+        ? 'image/webp'
+        : file.type ||
+          'image/jpeg'
+
+    let quality =
+      0.86
+
+    let blob =
+      await canvasToBlob(
+        canvas,
+        outputType,
+        quality,
+      )
+
+    while (
+      blob.size >
+        RECIPE_IMAGE_TARGET_BYTES &&
+      quality >
+        0.5
+    ) {
+      quality -=
+        0.08
+
+      blob =
+        await canvasToBlob(
+          canvas,
+          outputType,
+          quality,
+        )
+    }
+
+    if (
+      blob.size >
+      RECIPE_IMAGE_TARGET_BYTES
+    ) {
+      throw new Error(
+        'This image is too large to optimize safely. Choose a smaller Recipe image.',
+      )
+    }
+
+    const extension =
+      outputType ===
+        'image/webp'
+        ? 'webp'
+        : outputType ===
+            'image/png'
+          ? 'png'
+          : 'jpg'
+
+    const baseName =
+      String(
+        file.name ||
+          'recipe-image',
+      ).replace(
+        /\.[^.]+$/,
+        '',
+      )
+
+    return new File(
+      [
+        blob,
+      ],
+      `${baseName}.${extension}`,
+      {
+        type:
+          outputType,
+
+        lastModified:
+          Date.now(),
+      },
+    )
+  } finally {
+    bitmap.close?.()
+  }
 }
 
 function buildDraftState(
@@ -689,7 +897,7 @@ function statusClass(
     status ===
     'draft'
   ) {
-    return 'bg-amber-50 text-amber-800'
+    return 'bg-sky-50 text-sky-800'
   }
 
   if (
@@ -961,6 +1169,184 @@ function AdminRecipeDetailsSheet({
   )
 }
 
+function canonicalIngredientId(ingredient) {
+  return String(
+    ingredient?.id ||
+      ingredient?._id ||
+      '',
+  )
+}
+
+function canonicalIngredientName(ingredient) {
+  return String(
+    ingredient?.canonicalName ||
+      ingredient?.name ||
+      ingredient?.normalizedKey ||
+      ingredient?.slug ||
+      'Canonical ingredient',
+  )
+}
+
+function CanonicalIngredientPicker({
+  value,
+  selectedName,
+  disabled,
+  onSelect,
+}) {
+  const [query, setQuery] = useState(selectedName || '')
+  const [options, setOptions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+
+  useEffect(
+    () => {
+      setQuery(selectedName || '')
+    },
+    [selectedName, value],
+  )
+
+  useEffect(
+    () => {
+      if (!open || disabled) {
+        return undefined
+      }
+
+      let cancelled = false
+
+      const timer = window.setTimeout(
+        async () => {
+          setLoading(true)
+          setLookupError('')
+
+          try {
+            const result = await getAdminIngredients({
+              page: 1,
+              limit: 15,
+              status: 'active',
+              search: query.trim(),
+            })
+
+            if (cancelled) {
+              return
+            }
+
+            setOptions(
+              Array.isArray(result?.ingredients)
+                ? result.ingredients
+                : [],
+            )
+          } catch (error) {
+            if (cancelled) {
+              return
+            }
+
+            setOptions([])
+            setLookupError(
+              error?.message ||
+                'Unable to search the Ingredient Dictionary.',
+            )
+          } finally {
+            if (!cancelled) {
+              setLoading(false)
+            }
+          }
+        },
+        180,
+      )
+
+      return () => {
+        cancelled = true
+        window.clearTimeout(timer)
+      }
+    },
+    [disabled, open, query],
+  )
+
+  function chooseIngredient(ingredient) {
+    const id = canonicalIngredientId(ingredient)
+    const name = canonicalIngredientName(ingredient)
+
+    if (!id) {
+      return
+    }
+
+    setQuery(name)
+    setOpen(false)
+    onSelect({ id, name })
+  }
+
+  return (
+    <div className="relative min-w-0">
+      <input
+        type="text"
+        value={query}
+        disabled={disabled}
+        onFocus={() => {
+          if (!disabled) {
+            setOpen(true)
+          }
+        }}
+        onChange={(event) => {
+          const nextValue = event.target.value
+          setQuery(nextValue)
+          setOpen(true)
+
+          if (value) {
+            onSelect({ id: '', name: '' })
+          }
+        }}
+        className="focus-ring h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm font-bold text-stone-900 outline-none disabled:bg-stone-100"
+        placeholder="Search ingredient name"
+        autoComplete="off"
+      />
+
+      {open && !disabled && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-56 overflow-y-auto rounded-xl border border-stone-200 bg-white p-1.5 shadow-xl">
+          {loading ? (
+            <p className="px-3 py-2 text-xs font-bold text-stone-500">
+              Searching ingredients…
+            </p>
+          ) : lookupError ? (
+            <p className="px-3 py-2 text-xs font-bold text-red-600">
+              {lookupError}
+            </p>
+          ) : options.length ? (
+            options.map((option) => {
+              const id = canonicalIngredientId(option)
+              const name = canonicalIngredientName(option)
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => chooseIngredient(option)}
+                  className="block w-full rounded-lg px-3 py-2 text-left hover:bg-emerald-50"
+                >
+                  <span className="block text-sm font-black text-stone-950">
+                    {name}
+                  </span>
+                  {option?.normalizedKey &&
+                    option.normalizedKey !== name && (
+                      <span className="mt-0.5 block text-[11px] font-semibold text-stone-500">
+                        {option.normalizedKey}
+                      </span>
+                    )}
+                </button>
+              )
+            })
+          ) : (
+            <p className="px-3 py-2 text-xs font-bold text-stone-500">
+              No canonical ingredient found.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminRecipeEditorPage() {
   const {
     versionId,
@@ -1023,6 +1409,14 @@ export default function AdminRecipeEditorPage() {
   ] =
     useState(
       false,
+    )
+
+  const [
+    imageError,
+    setImageError,
+  ] =
+    useState(
+      '',
     )
 
   const [
@@ -1090,6 +1484,10 @@ export default function AdminRecipeEditorPage() {
         )
 
         setError(
+          '',
+        )
+
+        setImageError(
           '',
         )
 
@@ -1166,9 +1564,14 @@ export default function AdminRecipeEditorPage() {
     )
 
   const editable =
-    recipe.status ===
-      'draft' &&
-    canMutate
+    canMutate &&
+    dish.status !==
+      'retired'
+
+  const editingGovernedVersion =
+    editable &&
+    recipe.status !==
+      'draft'
 
   const pendingHostIngredientCount =
     (
@@ -1616,6 +2019,10 @@ export default function AdminRecipeEditorPage() {
       true,
     )
 
+    setImageError(
+      '',
+    )
+
     setError(
       '',
     )
@@ -1625,9 +2032,15 @@ export default function AdminRecipeEditorPage() {
     )
 
     try {
+      const preparedFile =
+        await prepareRecipeImageForUpload(
+          file,
+        )
+
       const uploaded =
         await uploadRecipeImage({
-          file,
+          file:
+            preparedFile,
           scope:
             'admin',
         })
@@ -1638,12 +2051,15 @@ export default function AdminRecipeEditorPage() {
       )
 
       setSuccess(
-        'Recipe image uploaded and attached successfully.',
+        preparedFile.size <
+          file.size
+          ? 'Recipe image optimized, uploaded and attached successfully.'
+          : 'Recipe image uploaded and attached successfully.',
       )
 
       await load()
     } catch (uploadError) {
-      setError(
+      setImageError(
         uploadError?.response?.data?.message ||
           uploadError?.message ||
           'Unable to upload Recipe image.',
@@ -1678,6 +2094,10 @@ export default function AdminRecipeEditorPage() {
       true,
     )
 
+    setImageError(
+      '',
+    )
+
     setError(
       '',
     )
@@ -1698,7 +2118,7 @@ export default function AdminRecipeEditorPage() {
 
       await load()
     } catch (removeError) {
-      setError(
+      setImageError(
         removeError?.response?.data?.message ||
           removeError?.message ||
           'Unable to remove Recipe image.',
@@ -1711,15 +2131,118 @@ export default function AdminRecipeEditorPage() {
   }
 
   async function handleSave() {
-    await runAction(
-      () =>
-        updateAdminRecipeDraft(
-          versionId,
-          buildPayload(),
-        ),
+    if (
+      !editable ||
+      busy
+    ) {
+      return
+    }
 
-      'Recipe draft saved.',
+    if (
+      recipe.status ===
+      'draft'
+    ) {
+      await runAction(
+        () =>
+          updateAdminRecipeDraft(
+            versionId,
+            buildPayload(),
+          ),
+
+        'Recipe draft saved.',
+      )
+
+      return
+    }
+
+    if (
+      !requireReason()
+    ) {
+      return
+    }
+
+    setBusy(
+      true,
     )
+
+    setError(
+      '',
+    )
+
+    setSuccess(
+      '',
+    )
+
+    try {
+      if (
+        dish.status ===
+        'disabled'
+      ) {
+        await changeAdminDishLifecycle(
+          dish.id,
+          {
+            action:
+              'restore',
+
+            reason:
+              governanceReason.trim(),
+          },
+        )
+      }
+
+      if (
+        dish.status ===
+        'retired'
+      ) {
+        throw new Error(
+          'This Dish is retired and cannot create a new editable version.',
+        )
+      }
+
+      const created =
+        await createNextAdminRecipeVersion(
+          dish.id,
+          {
+            sourceRecipeVersionId:
+              versionId,
+
+            changeReason:
+              governanceReason.trim(),
+          },
+        )
+
+      const nextVersionId =
+        created?.recipeVersion?.id
+
+      if (!nextVersionId) {
+        throw new Error(
+          'The editable Recipe Version could not be created.',
+        )
+      }
+
+      await updateAdminRecipeDraft(
+        nextVersionId,
+        buildPayload(),
+      )
+
+      setSuccess(
+        'Editable Recipe Version created and saved. Historical Recipe data was preserved.',
+      )
+
+      navigate(
+        `/admin/recipes/${nextVersionId}`,
+      )
+    } catch (saveError) {
+      setError(
+        saveError?.response?.data?.message ||
+          saveError?.message ||
+          'Unable to save Recipe changes.',
+      )
+    } finally {
+      setBusy(
+        false,
+      )
+    }
   }
 
   async function handleSubmitReview() {
@@ -1963,8 +2486,33 @@ export default function AdminRecipeEditorPage() {
     }
 
     await runAction(
-      () =>
-        createNextAdminRecipeVersion(
+      async () => {
+        if (
+          dish.status ===
+          'disabled'
+        ) {
+          await changeAdminDishLifecycle(
+            dish.id,
+            {
+              action:
+                'restore',
+
+              reason:
+                governanceReason.trim(),
+            },
+          )
+        }
+
+        if (
+          dish.status ===
+          'retired'
+        ) {
+          throw new Error(
+            'This Dish is retired and cannot create a new Recipe Version.',
+          )
+        }
+
+        return createNextAdminRecipeVersion(
           dish.id,
           {
             sourceRecipeVersionId:
@@ -1973,7 +2521,8 @@ export default function AdminRecipeEditorPage() {
             changeReason:
               governanceReason.trim(),
           },
-        ),
+        )
+      },
 
       'Next Recipe Version created.',
     )
@@ -2052,7 +2601,7 @@ export default function AdminRecipeEditorPage() {
         dish.name ||
         'Recipe Editor'
       }
-      description="Edit draft formulation, review governed versions and publish approved Recipe truth."
+      description="Review, correct and version governed Recipe data without rewriting history."
       actions={
         <button
           type="button"
@@ -2093,11 +2642,11 @@ export default function AdminRecipeEditorPage() {
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
 
-        <div className="space-y-5">
+        <div className="space-y-6">
 
-          <section className="rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+          <section className="rounded-[28px] border border-[#B8DECf] bg-[#E9F6F0] p-5 sm:p-6">
 
             <div className="flex flex-wrap items-start justify-between gap-4">
 
@@ -2140,7 +2689,19 @@ export default function AdminRecipeEditorPage() {
 
             </div>
 
-            <div className="mt-5 rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-4">
+            {editingGovernedVersion ? (
+              <div className="mt-4 rounded-2xl border border-[#B9D9E8] bg-[#EEF6FB] px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[#245E7B]">
+                  Editable correction mode
+                </p>
+                <p className="mt-1 text-sm font-semibold leading-5 text-stone-700">
+                  Edit the fields normally. Saving creates a new draft version and keeps this governed Version {recipe.versionNumber} unchanged.
+                  {dish.status === 'disabled' ? ' The Dish will be restored before the new draft is created.' : ''}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="mt-5 rounded-2xl border border-[#C6DED3] bg-white/80 p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
                 <div className="grid gap-3 sm:grid-cols-2 lg:w-[620px] lg:shrink-0">
                   {dish.heroImageUrl ? (
@@ -2173,7 +2734,7 @@ export default function AdminRecipeEditorPage() {
                     Recipe image
                   </p>
                   <p className="mt-1 text-xs leading-5 text-stone-500">
-                    Upload or replace the Dish hero image without rewriting immutable Recipe Version history. This works for existing published Recipes too. JPEG, PNG, and WebP up to 8 MB are supported.
+                    Upload or replace the Dish hero image without rewriting Recipe Version history. JPEG, PNG and WebP are supported; oversized images are automatically optimized before upload.
                   </p>
 
                   {canMutate && dish.status !== 'retired' ? (
@@ -2227,6 +2788,12 @@ export default function AdminRecipeEditorPage() {
                           Remove image
                         </button>
                       ) : null}
+                    </div>
+                  ) : null}
+
+                  {imageError ? (
+                    <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-700">
+                      {imageError}
                     </div>
                   ) : null}
                 </div>
@@ -2498,7 +3065,7 @@ export default function AdminRecipeEditorPage() {
           </section>
 
           {draft && (
-            <section className="rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+            <section className="rounded-[28px] border border-[#C9D9F0] bg-[#F1F6FC] p-5 sm:p-6">
 
               <div className="flex items-center justify-between gap-3">
 
@@ -2598,28 +3165,46 @@ export default function AdminRecipeEditorPage() {
                       className="grid gap-2 rounded-2xl bg-stone-50 p-3 lg:grid-cols-[minmax(220px,1fr)_100px_90px_120px_1fr_42px]"
                     >
 
-                      {!editable &&
-                      ingredient.canonicalIngredient ? (
+                      {editable ? (
+                        <CanonicalIngredientPicker
+                          value={ingredient.canonicalIngredientId}
+                          selectedName={
+                            ingredient.canonicalIngredient?.canonicalName ||
+                            ingredient.canonicalIngredientName ||
+                            ''
+                          }
+                          disabled={!editable}
+                          onSelect={({ id, name }) => {
+                            setDraft((current) => ({
+                              ...current,
+                              ingredients: current.ingredients.map(
+                                (row, rowIndex) =>
+                                  rowIndex === index
+                                    ? {
+                                        ...row,
+                                        canonicalIngredientId: id,
+                                        canonicalIngredient: id
+                                          ? {
+                                              ...(row.canonicalIngredient || {}),
+                                              canonicalName: name,
+                                            }
+                                          : null,
+                                      }
+                                    : row,
+                              ),
+                            }))
+                          }}
+                        />
+                      ) : ingredient.canonicalIngredient ? (
                         <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
                           <p className="text-sm font-black text-stone-950">
-                            {
-                              ingredient
-                                .canonicalIngredient
-                                .canonicalName
-                            }
+                            {ingredient.canonicalIngredient.canonicalName}
                           </p>
 
-                          {ingredient
-                            .canonicalIngredient
-                            .attributes
-                            ?.hostRecipeProposal
-                            ?.state ===
-                            'pending' ||
-                          ingredient
-                            .canonicalIngredient
-                            .status ===
-                            'disabled' ? (
-                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em] text-amber-700">
+                          {ingredient.canonicalIngredient.attributes
+                            ?.hostRecipeProposal?.state === 'pending' ||
+                          ingredient.canonicalIngredient.status === 'disabled' ? (
+                            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.08em] text-violet-700">
                               Host proposed · Editorial approval verifies this ingredient
                             </p>
                           ) : (
@@ -2629,25 +3214,11 @@ export default function AdminRecipeEditorPage() {
                           )}
                         </div>
                       ) : (
-                        <input
-                          value={
-                            ingredient.canonicalIngredientId
-                          }
-                          disabled={
-                            !editable
-                          }
-                          onChange={(
-                            event,
-                          ) =>
-                            updateIngredient(
-                              index,
-                              'canonicalIngredientId',
-                              event.target.value,
-                            )
-                          }
-                          className="focus-ring h-10 rounded-xl border border-stone-200 bg-white px-3 font-mono text-xs outline-none disabled:bg-stone-100"
-                          placeholder="Canonical Ingredient ObjectId"
-                        />
+                        <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
+                          <p className="text-sm font-bold text-stone-500">
+                            Ingredient name unavailable
+                          </p>
+                        </div>
                       )}
 
                       <input
@@ -2811,7 +3382,7 @@ export default function AdminRecipeEditorPage() {
           )}
 
           {draft && (
-            <section className="rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+            <section className="rounded-[28px] border border-[#CFE6DC] bg-[#F1F8F5] p-5 sm:p-6">
 
               <div className="flex items-center justify-between gap-3">
 
@@ -2989,7 +3560,7 @@ export default function AdminRecipeEditorPage() {
             ) &&
             (canMutate ||
               canPublish) && (
-              <section className="rounded-[26px] border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm sm:p-6">
+              <section className="rounded-[28px] border border-[#B9E2D0] bg-[#E7F4ED] p-5 sm:p-6">
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 
@@ -3019,7 +3590,7 @@ export default function AdminRecipeEditorPage() {
 
                 {foodIntelligenceStatus?.latest?.status ===
                   'requires_review' ? (
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900">
+                  <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-xs leading-5 text-violet-900">
                     A Host Food Intelligence declaration is waiting for review. Verify the values against the Recipe formulation, correct anything necessary, then use <strong>Save & approve Recipe Food Intelligence</strong>. The Host declaration itself never becomes public safety truth without Super Admin approval.
                   </div>
                 ) : null}
@@ -3291,7 +3862,7 @@ export default function AdminRecipeEditorPage() {
             )}
 
           {draft && (
-            <section className="rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+            <section className="rounded-[28px] border border-[#D9D7E8] bg-[#F6F5FA] p-5 sm:p-6">
 
               <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
                 Source & safety
@@ -3428,7 +3999,7 @@ export default function AdminRecipeEditorPage() {
                   </>
                 )}
 
-                <label className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 md:col-span-2">
+                <label className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 md:col-span-2">
 
                   <input
                     type="checkbox"
@@ -3453,11 +4024,11 @@ export default function AdminRecipeEditorPage() {
 
                   <span>
 
-                    <span className="block text-sm font-black text-amber-950">
+                    <span className="block text-sm font-black text-rose-900">
                       Mark unsafe / incomplete
                     </span>
 
-                    <span className="mt-1 block text-xs leading-5 text-amber-800">
+                    <span className="mt-1 block text-xs leading-5 text-rose-700">
                       This blocks publication until corrected.
                     </span>
 
@@ -3507,38 +4078,40 @@ export default function AdminRecipeEditorPage() {
               disabled={
                 busy
               }
-              className="focus-ring inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-stone-950 px-5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:opacity-60"
+              className="focus-ring inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5F4B] px-5 text-sm font-black text-white transition hover:bg-[#094B3B] disabled:opacity-60"
             >
               <Save
                 size={17}
                 aria-hidden="true"
               />
 
-              Save draft
+              {editingGovernedVersion
+                ? 'Save as new editable version'
+                : 'Save draft'}
             </button>
           )}
 
         </div>
 
-        <aside className="space-y-5">
+        <aside className="space-y-4">
 
-          <section className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+          <section className="rounded-[24px] border border-[#0D5F4B] bg-[#0D5F4B] p-5 text-white shadow-sm">
 
             <div className="flex items-center gap-2">
 
               <ShieldAlert
                 size={18}
-                className="text-emerald-700"
+                className="text-emerald-100"
                 aria-hidden="true"
               />
 
-              <h2 className="font-black text-stone-950">
+              <h2 className="font-black text-white">
                 Governance
               </h2>
 
             </div>
 
-            <p className="mt-2 text-xs leading-5 text-stone-500">
+            <p className="mt-2 text-xs leading-5 text-emerald-50/80">
               Every privileged transition requires an explicit reason and is
               audited.
             </p>
@@ -3556,14 +4129,14 @@ export default function AdminRecipeEditorPage() {
               }
               rows={4}
               placeholder="Governance reason..."
-              className="focus-ring mt-4 w-full rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm outline-none"
+              className="focus-ring mt-4 w-full rounded-xl border border-white/20 bg-white p-3 text-sm text-stone-900 outline-none"
             />
 
             {recipe.status ===
               'in_review' &&
               pendingHostIngredientCount >
                 0 && (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-semibold leading-5 text-amber-800">
+                <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3 text-[11px] font-semibold leading-5 text-violet-800">
                   {pendingHostIngredientCount}{' '}
                   Host-proposed ingredient{pendingHostIngredientCount === 1 ? '' : 's'} awaiting verification. Review the names above, then record an Editorial approval to promote them into the canonical Ingredient Dictionary.
                 </div>
@@ -3656,7 +4229,7 @@ export default function AdminRecipeEditorPage() {
                     disabled={
                       busy
                     }
-                    className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-3 text-sm font-black text-stone-800 hover:bg-stone-50 disabled:opacity-60"
+                    className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white px-4 py-3 text-sm font-black text-stone-800 hover:bg-stone-50 disabled:opacity-60"
                   >
                     <FileCheck2
                       size={16}
@@ -3693,7 +4266,7 @@ export default function AdminRecipeEditorPage() {
                 </button>
               )}
 
-            <div className="mt-4 rounded-xl bg-amber-50 p-3 text-[11px] leading-5 text-amber-800">
+            <div className="mt-4 rounded-xl border border-white/15 bg-white/10 p-3 text-[11px] leading-5 text-emerald-50">
               Publication still passes backend readiness, Recipe publish permission,
               recent MFA and immutable audit checks. EPANTRY has one root Super Admin,
               so that same Super Admin may submit, review and publish a Recipe.
@@ -3707,7 +4280,7 @@ export default function AdminRecipeEditorPage() {
           {canMutate &&
             recipe.status !==
               'draft' && (
-              <section className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+              <section className="rounded-[24px] border border-[#C9D9F0] bg-[#EEF5FB] p-5 shadow-sm">
 
                 <h2 className="font-black text-stone-950">
                   Version correction
@@ -3739,7 +4312,7 @@ export default function AdminRecipeEditorPage() {
             )}
 
           {canMutate && (
-            <section className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+            <section className="rounded-[24px] border border-stone-200 bg-[#F8F7F4] p-5 shadow-sm">
 
               <h2 className="font-black text-stone-950">
                 Recovery controls

@@ -113,8 +113,6 @@ const heroMessages = [
       'to cooking,',
     tail:
       'everything stays connected.',
-    description:
-      'Discover groceries, trusted brands and recipes in one connected food experience.',
   },
   {
     id:
@@ -125,8 +123,6 @@ const heroMessages = [
       'before it reaches your basket.',
     tail:
       '',
-    description:
-      'Products, brands, ingredients and food intelligence stay connected so every choice is easier to understand.',
   },
   {
     id:
@@ -137,8 +133,6 @@ const heroMessages = [
       'into something worth cooking.',
     tail:
       '',
-    description:
-      'Move from recipe ideas to ingredient needs and grocery discovery without breaking your flow.',
   },
   {
     id:
@@ -149,8 +143,6 @@ const heroMessages = [
       'to cook today?',
     tail:
       '',
-    description:
-      'Tell EPANTRY what ingredients you have, and we’ll show you what delicious meals you can make with them.',
     interactive:
       true,
   },
@@ -178,9 +170,6 @@ function messageWordCount(
     ).length +
     splitWords(
       message?.tail,
-    ).length +
-    splitWords(
-      message?.description,
     ).length
   )
 }
@@ -591,10 +580,7 @@ export default function HeroSection() {
     tailWords.length
 
   const totalCurrentMessageWords =
-    headlineWordCount +
-    splitWords(
-      currentMessage.description,
-    ).length
+    headlineWordCount
 
   const messageComplete =
     revealedWordCount >=
@@ -1327,7 +1313,7 @@ export default function HeroSection() {
 
       <div className="page-shell relative z-10 flex min-h-[100svh] w-full items-center py-6 sm:py-8 lg:py-10">
 
-        <div className="w-full max-w-3xl">
+        <div className="w-full max-w-3xl lg:w-[70%] lg:max-w-none">
 
           {/* Eyebrow */}
 
@@ -1374,7 +1360,7 @@ export default function HeroSection() {
 
           <div
             ref={heroMessageRef}
-            className="relative mt-6 min-h-[330px] max-w-3xl overflow-hidden rounded-[24px] border border-white/20 bg-white/10 p-4 shadow-md shadow-[#111827]/5 backdrop-blur-[2px] sm:min-h-[320px] md:min-h-[300px] md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none lg:min-h-[335px]">
+            className="relative mt-7 min-h-[265px] max-w-3xl overflow-hidden rounded-[24px] border border-white/20 bg-white/10 p-4 shadow-md shadow-[#111827]/5 backdrop-blur-[2px] sm:min-h-[255px] md:min-h-[235px] md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none lg:min-h-[285px] lg:max-w-none">
 
             <div
               aria-hidden="true"
@@ -1409,7 +1395,7 @@ export default function HeroSection() {
                 ]
                   .filter(Boolean)
                   .join(' ')}
-                className="max-w-3xl text-[2.2rem] font-normal uppercase leading-[0.96] tracking-[0.045em] text-[#111827] drop-shadow-[0_1px_1px_rgba(255,255,255,0.72)] sm:text-[2.9rem] md:drop-shadow-none lg:text-[3.95rem]"
+                className="max-w-3xl text-[2.2rem] font-semibold uppercase leading-[1.08] tracking-[0.045em] text-[#111827] drop-shadow-[0_1px_1px_rgba(255,255,255,0.72)] sm:text-[2.9rem] md:drop-shadow-none lg:max-w-none lg:text-[3.95rem]"
                 style={{
                   fontFamily:
                     '"Avenir Next", "Helvetica Neue", Arial, sans-serif',
@@ -1471,28 +1457,6 @@ export default function HeroSection() {
                   </>
                 ) : null}
               </h1>
-
-              <p
-                aria-label={
-                  currentMessage.description
-                }
-                className="mt-5 max-w-xl text-[0.95rem] font-medium leading-7 tracking-[0.012em] text-[#1F2937] drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] sm:text-base md:font-normal md:text-[#5F6672] md:drop-shadow-none"
-              >
-                <WordSequence
-                  text={
-                    currentMessage.description
-                  }
-                  startIndex={
-                    headlineWordCount
-                  }
-                  revealedWordCount={
-                    revealedWordCount
-                  }
-                  shouldReduceMotion={
-                    shouldReduceMotion
-                  }
-                />
-              </p>
 
               {currentMessage.interactive ? (
                 <div className="min-h-[86px] sm:min-h-[68px]">

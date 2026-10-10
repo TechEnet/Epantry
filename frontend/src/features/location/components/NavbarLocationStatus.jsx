@@ -45,10 +45,17 @@ function buildLocationLabel(
     return ''
   }
 
+  const locality =
+    location.neighbourhood ||
+    location.suburb ||
+    location.road ||
+    ''
+
   const parts = [
-    location.city,
+    locality,
+    location.city || location.district,
     location.state,
-  ].filter(Boolean)
+  ].filter((part, index, items) => part && items.indexOf(part) === index)
 
   return parts.length
     ? parts.join(', ')
@@ -181,26 +188,21 @@ export default function NavbarLocationStatus({
   }, [hasDeliveryContext])
 
   useEffect(() => {
-    if (
-      !isDesktop ||
-      !currentLocation ||
-      !isOrderEtaContext ||
-      shouldReduceMotion
-    ) {
+    // Keep alternating the delivery ETA and location even when the browser
+    // has not provided geolocation yet. Reduced motion affects the visual
+    // transition, not the five-second content update.
+    if (!isDesktop || !isOrderEtaContext) {
       setShowDelivery(false)
       return undefined
     }
 
-    // Hover must lock the compact navbar card on the delivery state.
-    // The previous implementation reset this to false as soon as hover
-    // started, which also prevented the hover detail panel from appearing.
+    // Pause the rotation on whichever state is currently visible.
+    // Hovering must not force the navbar into delivery/ETA mode.
     if (etaHovered) {
-      setShowDelivery(true)
       return undefined
     }
 
     // Resume the normal location <-> ETA rotation after hover ends.
-    setShowDelivery(false)
 
     const intervalId =
       window.setInterval(
@@ -217,11 +219,9 @@ export default function NavbarLocationStatus({
         intervalId,
       )
   }, [
-    currentLocation,
     etaHovered,
     isDesktop,
     isOrderEtaContext,
-    shouldReduceMotion,
   ])
 
   const currentLabel =
@@ -286,7 +286,7 @@ export default function NavbarLocationStatus({
   const activeView =
     isDesktop &&
     isOrderEtaContext &&
-    (showDelivery || !currentLocation)
+    showDelivery
       ? 'delivery'
       : 'current'
 
@@ -419,13 +419,8 @@ export default function NavbarLocationStatus({
     <div
       className="group relative w-full min-w-0"
       onMouseEnter={() => {
-        if (
-          isDesktop &&
-          isOrderEtaContext &&
-          !panelOpen
-        ) {
+        if (isDesktop && !panelOpen) {
           setEtaHovered(true)
-          setShowDelivery(true)
         }
       }}
       onMouseLeave={() =>
@@ -466,7 +461,7 @@ export default function NavbarLocationStatus({
         </div>
 
         <div className="min-w-0 flex-1 overflow-hidden">
-          {!currentLocation ? (
+          {activeView === 'current' && !currentLocation ? (
             <>
               <p className="text-[7px] font-black uppercase leading-none tracking-[0.12em] text-stone-400 md:text-[8px] md:tracking-[0.15em]">
                 Delivery location
@@ -552,6 +547,7 @@ export default function NavbarLocationStatus({
 
       {isDesktop &&
         etaHovered &&
+        activeView === 'delivery' &&
         isOrderEtaContext && (
           <div className="absolute left-0 top-full z-[75] hidden w-[330px] max-w-[calc(100vw-1rem)] pt-2 md:block">
             <motion.div
@@ -627,8 +623,42 @@ export default function NavbarLocationStatus({
         )}
 
 
+      {isDesktop &&
+        etaHovered &&
+        activeView === 'current' &&
+        !currentLocation && (
+          <div className="absolute left-0 top-full z-[75] hidden w-[310px] max-w-[calc(100vw-1rem)] pt-2 md:block">
+            <div className="rounded-[20px] border border-stone-200 bg-white p-4 shadow-[0_22px_55px_rgba(28,25,23,0.14)]">
+              <p className="text-xs font-black text-stone-900">
+                Delivery location
+              </p>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Use your current location to see nearby delivery options.
+              </p>
+              <button
+                type="button"
+                onClick={requestCurrentLocation}
+                disabled={requesting}
+                className="focus-ring mt-3 w-full rounded-xl bg-[#173f35] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#0f3028] disabled:cursor-wait disabled:opacity-60"
+              >
+                {requesting
+                  ? 'Finding your location…'
+                  : 'Use current location'}
+              </button>
+              {error && (
+                <p className="mt-3 text-xs leading-5 text-red-600">
+                  {error}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
       <AnimatePresence>
-        {panelOpen &&
+        {(panelOpen ||
+          (isDesktop &&
+            etaHovered &&
+            activeView === 'current')) &&
           currentLocation && (
             <motion.div
               initial={{
@@ -649,7 +679,7 @@ export default function NavbarLocationStatus({
               transition={{
                 duration: 0.18,
               }}
-              className="absolute left-0 top-[calc(100%+10px)] z-[70] w-[310px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[20px] border border-stone-200 bg-white shadow-[0_22px_55px_rgba(28,25,23,0.14)]"
+              className="absolute left-0 top-full z-[70] w-[310px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[20px] border border-stone-200 bg-white shadow-[0_22px_55px_rgba(28,25,23,0.14)]"
             >
               <div className="p-4">
                 <div className="flex items-start gap-3">
@@ -677,9 +707,9 @@ export default function NavbarLocationStatus({
                         currentLabel}
                     </p>
 
-                    {approximate && (
+                    {approximate && currentLocation.source === 'device' && Number.isFinite(currentLocation.accuracyMeters) && (
                       <p className="mt-2 text-[10px] leading-4 text-amber-700">
-                        Precise device location was unavailable, so this location is approximate.
+                        Device accuracy: ~{Math.round(currentLocation.accuracyMeters)} m
                       </p>
                     )}
                   </div>
@@ -721,7 +751,7 @@ export default function NavbarLocationStatus({
                 </button>
 
                 {error && (
-                  <p className="mt-3 text-xs leading-5 text-red-600">
+                  <p role="status" aria-live="polite" className="mt-3 text-xs leading-5 text-amber-800">
                     {error}
                   </p>
                 )}
@@ -731,7 +761,8 @@ export default function NavbarLocationStatus({
       </AnimatePresence>
 
       {!currentLocation &&
-        error && (
+        error &&
+        !etaHovered && (
           <p className="absolute left-0 top-[calc(100%+6px)] z-[70] w-[300px] max-w-[calc(100vw-1rem)] rounded-xl border border-red-100 bg-white p-3 text-xs leading-5 text-red-600 shadow-lg">
             {error}
           </p>

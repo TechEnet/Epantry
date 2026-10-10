@@ -14,6 +14,11 @@ import {
 } from 'react'
 
 import {
+  Link,
+  useSearchParams,
+} from 'react-router-dom'
+
+import {
   useAdmin,
 } from '../../admin/context/AdminContext'
 
@@ -65,6 +70,9 @@ function formatMoneyMinor(
 }
 
 export default function AdminExpansionTrustPanel() {
+  const [searchParams] = useSearchParams()
+  const focusCampaignId = searchParams.get('focusCampaign') || ''
+
   const {
     hasAdminPermission,
     isRootSuperAdmin,
@@ -101,6 +109,8 @@ export default function AdminExpansionTrustPanel() {
   const [error, setError] =
     useState('')
 
+  const [loadErrors, setLoadErrors] = useState({})
+
   const [notice, setNotice] =
     useState('')
 
@@ -117,53 +127,28 @@ export default function AdminExpansionTrustPanel() {
         setError('')
 
         try {
-          const [
-            reportResult,
-            creatorContentResult,
-            campaignResult,
-            logResult,
-          ] =
-            await Promise.all([
-              listAdminCommunityReports({
-                limit: 50,
-              }),
-              listAdminCreatorContent({
-                limit: 50,
-              }),
-              listAdminRetailMediaCampaigns({
-                limit: 50,
-              }),
-              listAdminAdDecisionLogs({
-                limit: 50,
-              }),
-            ])
-
-          setReports(
-            reportResult?.reports ||
-              [],
-          )
-
-          setCreatorContent(
-            creatorContentResult?.creatorContent ||
-              [],
-          )
-
-          setCampaigns(
-            campaignResult?.campaigns ||
-              [],
-          )
-
-          setDecisionLogs(
-            logResult?.adDecisionLogs ||
-              [],
-          )
-        } catch (requestError) {
-          setError(
-            getCommunityExpansionErrorMessage(
-              requestError,
-              'Unable to load M21 expansion governance.',
-            ),
-          )
+          // One unavailable feature must not hide other successful review queues.
+          const results = await Promise.allSettled([
+            listAdminCommunityReports({ limit: 50 }),
+            listAdminCreatorContent({ limit: 50 }),
+            listAdminRetailMediaCampaigns({ limit: 50 }),
+            listAdminAdDecisionLogs({ limit: 50 }),
+          ])
+          const nextErrors = {}
+          const keys = ['reports', 'creatorContent', 'campaigns', 'logs']
+          const setters = [setReports, setCreatorContent, setCampaigns, setDecisionLogs]
+          const fields = ['reports', 'creatorContent', 'campaigns', 'adDecisionLogs']
+          results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+              setters[index](result.value?.[fields[index]] || [])
+            } else {
+              const message = getCommunityExpansionErrorMessage(result.reason)
+              nextErrors[keys[index]] = message.includes('not enabled for this environment')
+                ? 'This feature is not enabled here yet. Other review queues remain available.'
+                : message
+            }
+          })
+          setLoadErrors(nextErrors)
         } finally {
           setLoading(false)
         }
@@ -177,6 +162,21 @@ export default function AdminExpansionTrustPanel() {
     },
     [load],
   )
+
+  useEffect(() => {
+    if (!focusCampaignId || loading) return undefined
+
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .getElementById(`retail-media-campaign-${focusCampaignId}`)
+        ?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [focusCampaignId, campaigns, loading])
 
   function evidenceRefs(id) {
     return String(
@@ -214,38 +214,25 @@ export default function AdminExpansionTrustPanel() {
   }
 
   return (
-    <section className="mb-6 rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-            M21 Expansion Governance
-          </p>
-
-          <h2 className="mt-2 text-xl font-black text-stone-950">
-            Community trust, creator provenance & Retail Media policy
-          </h2>
-
-          <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-stone-600">
-            M03 remains the permission and immutable audit authority. M15 remains Community/Creator truth, M16 remains Host Campaign Brief truth, M19 keeps organic and sponsored analytics separated, and M20 launch controls remain release authority.
-          </p>
+    <section className="mt-5 min-w-0 space-y-4 sm:mt-6">
+      <div className="flex flex-col gap-3 border-b border-stone-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-emerald-700">Reports, courses & promotions</p>
+          <h2 className="mt-1 text-lg font-bold text-[#164838] sm:text-xl">Keep public content safe and trustworthy.</h2>
+          <p className="mt-1 text-sm leading-5 text-stone-600">Check reported posts, review creator courses and confirm that promotions follow the rules.</p>
         </div>
-
         <button
           type="button"
           onClick={load}
           disabled={loading || busy}
-          className="focus-ring inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-40"
+          className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 disabled:opacity-50"
         >
-          <RefreshCw
-            size={16}
-            aria-hidden="true"
-          />
-          Refresh
+          <RefreshCw size={16} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
+          Refresh reviews
         </button>
       </div>
-
       <div
-        className="mt-4 min-h-6 text-sm font-bold"
+        className="text-sm font-medium"
         aria-live="polite"
       >
         {error ? (
@@ -258,13 +245,20 @@ export default function AdminExpansionTrustPanel() {
           </p>
         ) : loading ? (
           <p className="text-stone-500">
-            Loading expansion trust evidence…
+            Loading review activity…
           </p>
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-3">
-        <section className="rounded-2xl border border-stone-200 bg-white p-4">
+      {Object.values(loadErrors).some((message) => message.includes('not enabled here yet')) ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-l-4 border-sky-500 bg-sky-50 px-3 py-3 text-sm text-sky-950">
+          <p>Community Trust is switched off in this environment. Reports and creator courses need this feature enabled to load.</p>
+          <Link to="/admin/policy" className="focus-ring shrink-0 font-bold underline underline-offset-2">Open Feature Access</Link>
+        </div>
+      ) : null}
+
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <section className="min-w-0 rounded-[18px] border border-amber-100 bg-[#fff9eb] p-4 sm:p-5">
           <div className="flex items-start gap-2">
             <FileWarning
               size={18}
@@ -274,17 +268,19 @@ export default function AdminExpansionTrustPanel() {
 
             <div>
               <h3 className="text-sm font-black text-stone-950">
-                Community reports
+                Community safety reports
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Spam, unsafe advice, copyright, fake review, undisclosed sponsorship and dangerous allergen claims are governed without direct DB deletion.
+                Review reports about spam, unsafe advice, false claims, copyright or undisclosed ads.
               </p>
             </div>
           </div>
 
-          <div className="mt-4 max-h-[540px] space-y-3 overflow-y-auto pr-1">
-            {reports.length ? (
+          <div className="mt-4 max-h-[460px] space-y-3 overflow-y-auto pr-1">
+            {loadErrors.reports ? (
+              <p role="alert" className="rounded-xl bg-red-50 px-3 py-3 text-sm text-red-800">{loadErrors.reports}</p>
+            ) : reports.length ? (
               reports.map(
                 (report) => (
                   <article
@@ -297,7 +293,7 @@ export default function AdminExpansionTrustPanel() {
                       )}
                     </p>
 
-                    <p className="mt-1 text-[11px] font-semibold text-stone-500">
+                    <p className="mt-1 text-[13px] font-semibold text-stone-500">
                       {titleize(
                         report.subjectType,
                       )} · {titleize(
@@ -323,7 +319,7 @@ export default function AdminExpansionTrustPanel() {
                               }),
                             )
                           }
-                          placeholder="Resolution reason"
+                          placeholder="Why are you making this decision?"
                         />
 
                         <textarea
@@ -339,7 +335,7 @@ export default function AdminExpansionTrustPanel() {
                               }),
                             )
                           }
-                          placeholder="Evidence refs, one per line"
+                          placeholder="Evidence or reference, one per line"
                         />
 
                         <div className="flex flex-wrap gap-2">
@@ -359,10 +355,10 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(report.id),
                                   }),
-                                'Community content quarantined through governed Trust & Safety workflow.',
+                                'Reported content was restricted.',
                               )
                             }
-                            className="focus-ring rounded-lg bg-amber-600 px-3 py-2 text-[11px] font-black text-white"
+                            className="focus-ring rounded-lg bg-amber-600 px-3 py-2 text-[13px] font-black text-white"
                           >
                             Quarantine
                           </button>
@@ -383,10 +379,10 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(report.id),
                                   }),
-                                'Community report dismissed with evidence.',
+                                'Community report dismissed.',
                               )
                             }
-                            className="focus-ring rounded-lg border border-stone-200 px-3 py-2 text-[11px] font-black"
+                            className="focus-ring rounded-lg border border-stone-200 px-3 py-2 text-[13px] font-black"
                           >
                             Dismiss
                           </button>
@@ -398,13 +394,13 @@ export default function AdminExpansionTrustPanel() {
               )
             ) : (
               <p className="rounded-xl bg-stone-50 p-3 text-xs font-semibold text-stone-500">
-                No Community trust reports.
+                No community reports available.
               </p>
             )}
           </div>
         </section>
 
-        <section id="creator-content-governance" className="rounded-2xl border border-stone-200 bg-white p-4">
+        <section id="creator-content-governance" className="min-w-0 rounded-[18px] border border-sky-100 bg-[#f0f7fc] p-4 sm:p-5">
           <div className="flex items-start gap-2">
             <BadgeCheck
               size={18}
@@ -414,17 +410,19 @@ export default function AdminExpansionTrustPanel() {
 
             <div>
               <h3 className="text-sm font-black text-stone-950">
-                Creator course & media approval
+                Creator courses & videos
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Review professional Chef + Restaurant Host courses before they become visible in Learn / Pro. Course video/media, rights and sponsorship disclosure are governed together.
+                Check course content, video rights and sponsorship details before publication.
               </p>
             </div>
           </div>
 
-          <div className="mt-4 max-h-[540px] space-y-3 overflow-y-auto pr-1">
-            {creatorContent.length ? (
+          <div className="mt-4 max-h-[460px] space-y-3 overflow-y-auto pr-1">
+            {loadErrors.creatorContent ? (
+              <p role="alert" className="rounded-xl bg-red-50 px-3 py-3 text-sm text-red-800">{loadErrors.creatorContent}</p>
+            ) : creatorContent.length ? (
               creatorContent.map(
                 (item) => (
                   <article
@@ -437,7 +435,7 @@ export default function AdminExpansionTrustPanel() {
                           {item.content?.title || titleize(item.contentType)}
                         </p>
 
-                        <p className="mt-1 text-[11px] font-semibold text-stone-500">
+                        <p className="mt-1 text-[13px] font-semibold text-stone-500">
                           {item.creator?.displayName ? `${item.creator.displayName} · ` : ''}
                           {titleize(item.governanceState)}
                           {item.content?.accessType ? ` · ${titleize(item.content.accessType)}` : ''}
@@ -445,19 +443,19 @@ export default function AdminExpansionTrustPanel() {
                       </div>
 
                       {item.rights?.sponsored ? (
-                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase text-amber-900">
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-black uppercase text-amber-900">
                           {item.rights?.sponsorLabel ||
                             'Sponsored'}
                         </span>
                       ) : null}
                     </div>
 
-                    <p className="mt-2 text-[11px] font-semibold leading-5 text-stone-500">
-                      Owner/licensor: {item.rights?.ownerOrLicensor || '—'} · Takedown: {item.rights?.takedownState || 'clear'}
+                    <p className="mt-2 text-[13px] font-semibold leading-5 text-stone-500">
+                      Content owner: {item.rights?.ownerOrLicensor || '—'} · Removal status: {item.rights?.takedownState || 'clear'}
                     </p>
 
                     {item.rights?.sponsored ? (
-                      <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] font-semibold text-amber-900">
+                      <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[13px] font-semibold text-amber-900">
                         Disclosure: {item.rights?.disclosureText || 'Missing'}
                       </p>
                     ) : null}
@@ -479,7 +477,7 @@ export default function AdminExpansionTrustPanel() {
                               }),
                             )
                           }
-                          placeholder="Governance reason"
+                          placeholder="Reason for your decision"
                         />
 
                         <textarea
@@ -495,7 +493,7 @@ export default function AdminExpansionTrustPanel() {
                               }),
                             )
                           }
-                          placeholder="Evidence refs, one per line"
+                          placeholder="Evidence or reference, one per line"
                         />
 
                         <div className="flex flex-wrap gap-2">
@@ -515,10 +513,10 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(item.id),
                                   }),
-                                'Creator course approved and released to Learn / Pro.',
+                                'Creator content approved.',
                               )
                             }
-                            className="focus-ring rounded-lg bg-emerald-700 px-3 py-2 text-[11px] font-black text-white"
+                            className="focus-ring rounded-lg bg-emerald-700 px-3 py-2 text-[13px] font-black text-white"
                           >
                             Approve
                           </button>
@@ -539,12 +537,12 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(item.id),
                                   }),
-                                'Creator course returned to the Host for changes.',
+                                'Creator content sent back for changes.',
                               )
                             }
-                            className="focus-ring rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-900"
+                            className="focus-ring rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-black text-amber-900"
                           >
-                            Reject / changes required
+                            Request changes
                           </button>
                         </div>
                       </div>
@@ -554,13 +552,13 @@ export default function AdminExpansionTrustPanel() {
               )
             ) : (
               <p className="rounded-xl bg-stone-50 p-3 text-xs font-semibold text-stone-500">
-                No Creator content governance records.
+                No creator courses awaiting review.
               </p>
             )}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-stone-200 bg-white p-4">
+        <section id="retail-media-review" className="min-w-0 scroll-mt-28 rounded-[18px] border border-emerald-100 bg-[#edf6ef] p-4 sm:p-5 lg:col-span-2">
           <div className="flex items-start gap-2">
             <Megaphone
               size={18}
@@ -570,22 +568,30 @@ export default function AdminExpansionTrustPanel() {
 
             <div>
               <h3 className="text-sm font-black text-stone-950">
-                Retail Media policy
+                Sponsored promotions
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Sponsored ranking is a separate lane. Hard safety and organic relevance are not purchasable, and sensitive health/allergy data is not a targeting segment.
+                Review paid campaigns. Ads cannot override food-safety rules or use private health information for targeting.
               </p>
             </div>
           </div>
 
-          <div className="mt-4 max-h-[390px] space-y-3 overflow-y-auto pr-1">
-            {campaigns.length ? (
+          <div className="mt-4 max-h-[400px] space-y-3 overflow-y-auto pr-1">
+            {loadErrors.campaigns ? (
+              <p role="alert" className="rounded-xl bg-red-50 px-3 py-3 text-sm text-red-800">{loadErrors.campaigns}</p>
+            ) : campaigns.length ? (
               campaigns.map(
                 (campaign) => (
                   <article
+                    id={`retail-media-campaign-${campaign.id}`}
                     key={campaign.id}
-                    className="rounded-xl border border-stone-200 p-3"
+                    className={[
+                      'scroll-mt-32 rounded-xl border p-3 transition',
+                      focusCampaignId === campaign.id
+                        ? 'border-emerald-400 bg-emerald-50/70 ring-4 ring-emerald-100'
+                        : 'border-stone-200 bg-white',
+                    ].join(' ')}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -593,14 +599,14 @@ export default function AdminExpansionTrustPanel() {
                           {campaign.title}
                         </p>
 
-                        <p className="mt-1 text-[11px] font-semibold text-stone-500">
+                        <p className="mt-1 text-[13px] font-semibold text-stone-500">
                           {titleize(
                             campaign.status,
                           )} · {campaign.promotedEntityType}
                         </p>
                       </div>
 
-                      <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase text-amber-900">
+                      <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-black uppercase text-amber-900">
                         {campaign.creative?.sponsorLabel || 'Sponsored'}
                       </span>
                     </div>
@@ -608,7 +614,7 @@ export default function AdminExpansionTrustPanel() {
                     <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                          <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
                             Host payment
                           </p>
                           <p className="mt-1 text-xs font-black text-stone-950">
@@ -621,7 +627,7 @@ export default function AdminExpansionTrustPanel() {
 
                         <span
                           className={[
-                            'rounded-full px-2.5 py-1 text-[10px] font-black uppercase',
+                            'rounded-full px-2.5 py-1 text-xs font-black uppercase',
                             campaign.payment?.status === 'paid'
                               ? 'bg-emerald-700 text-white'
                               : 'bg-white text-stone-600',
@@ -633,7 +639,7 @@ export default function AdminExpansionTrustPanel() {
                         </span>
                       </div>
 
-                      <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-600">
+                      <p className="mt-1 text-xs font-semibold leading-4 text-stone-600">
                         {campaign.payment?.recipient ||
                           'EPANTRY platform (Super Admin controlled)'}
                       </p>
@@ -641,7 +647,7 @@ export default function AdminExpansionTrustPanel() {
 
                     {campaign.status === 'pending_review' &&
                     campaign.payment?.status !== 'paid' ? (
-                      <p className="mt-3 rounded-xl border border-sky-100 bg-sky-50 p-3 text-[11px] font-semibold leading-5 text-sky-800">
+                      <p className="mt-3 rounded-xl border border-sky-100 bg-sky-50 p-3 text-[13px] font-semibold leading-5 text-sky-800">
                         Waiting for the Host to complete the Razorpay test payment before Super Admin approval.
                       </p>
                     ) : null}
@@ -649,7 +655,7 @@ export default function AdminExpansionTrustPanel() {
                     {!isRootSuperAdmin &&
                     campaign.status === 'pending_review' &&
                     campaign.payment?.status === 'paid' ? (
-                      <p className="mt-3 rounded-xl border border-violet-100 bg-violet-50 p-3 text-[11px] font-semibold leading-5 text-violet-800">
+                      <p className="mt-3 rounded-xl border border-violet-100 bg-violet-50 p-3 text-[13px] font-semibold leading-5 text-violet-800">
                         Payment is complete. Final campaign approval is restricted to the root Super Admin.
                       </p>
                     ) : null}
@@ -672,7 +678,7 @@ export default function AdminExpansionTrustPanel() {
                               }),
                             )
                           }
-                          placeholder="Ad policy reason"
+                          placeholder="Promotion review reason"
                         />
 
                         <textarea
@@ -688,7 +694,7 @@ export default function AdminExpansionTrustPanel() {
                               }),
                             )
                           }
-                          placeholder="Evidence refs, one per line"
+                          placeholder="Evidence or reference, one per line"
                         />
 
                         <div className="flex flex-wrap gap-2">
@@ -708,10 +714,10 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(campaign.id),
                                   }),
-                                'Retail Media campaign approved for Host activation.',
+                                'Promotion approved.',
                               )
                             }
-                            className="focus-ring rounded-lg bg-emerald-700 px-3 py-2 text-[11px] font-black text-white"
+                            className="focus-ring rounded-lg bg-emerald-700 px-3 py-2 text-[13px] font-black text-white"
                           >
                             Approve
                           </button>
@@ -732,10 +738,10 @@ export default function AdminExpansionTrustPanel() {
                                     evidenceRefs:
                                       evidenceRefs(campaign.id),
                                   }),
-                                'Retail Media campaign rejected.',
+                                'Promotion rejected.',
                               )
                             }
-                            className="focus-ring rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-black text-red-700"
+                            className="focus-ring rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-black text-red-700"
                           >
                             Reject
                           </button>
@@ -747,7 +753,7 @@ export default function AdminExpansionTrustPanel() {
               )
             ) : (
               <p className="rounded-xl bg-stone-50 p-3 text-xs font-semibold text-stone-500">
-                No Retail Media campaigns.
+                No promotions found in this review queue.
               </p>
             )}
           </div>
@@ -760,27 +766,28 @@ export default function AdminExpansionTrustPanel() {
                 aria-hidden="true"
               />
 
-              <p className="text-[11px] font-semibold leading-5 text-stone-600">
-                AdDecisionLog is append-only evidence. A served impression is not transaction revenue and does not create billing or settlement truth.
+              <p className="text-[13px] font-semibold leading-5 text-stone-600">
+                Decision history is kept for review. Ad views do not count as sales or payments.
               </p>
             </div>
 
-            <p className="mt-2 text-xs font-black text-stone-900">
-              Recent decision evidence: {decisionLogs.length}
+            <p className="mt-2 text-sm font-semibold text-stone-900">
+              Recorded promotion decisions: {loadErrors.logs ? "Unavailable" : decisionLogs.length}
             </p>
+            {loadErrors.logs ? <p role="alert" className="mt-1 text-sm text-red-700">{loadErrors.logs}</p> : null}
           </div>
         </section>
       </div>
 
-      <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+      <div className="flex items-start gap-2 border-l-4 border-amber-400 bg-amber-50 px-3 py-3 text-amber-950">
         <CircleAlert
           size={18}
           className="mt-0.5 shrink-0"
           aria-hidden="true"
         />
 
-        <p className="text-xs font-semibold leading-5">
-          Creator/Community content cannot bypass M07/M08 food governance. Retail Media cannot bypass dietary, allergen, serviceability or organic ranking rules. No Creator, Advertiser, Brand, Seller or B2B top-level application role is introduced.
+        <p className="text-sm leading-5">
+          Creator content and promotions must still meet food, allergen and delivery rules. Verification does not grant new account roles or permissions.
         </p>
       </div>
     </section>

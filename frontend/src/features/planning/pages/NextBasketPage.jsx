@@ -53,6 +53,8 @@ import {
   getCommerceErrorMessage,
 } from "../../commerce/services/commerce.service";
 
+import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
+
 const FLOATING_MARKETPLACE_CART_KEY =
   "epantry-floating-marketplace-cart";
 
@@ -778,6 +780,12 @@ export default function NextBasketPage() {
             </div>
           </header>
 
+          <SponsoredCampaignSlot
+            placement="pantry_replenishment"
+            slotKey="pantry_header"
+            embedded
+          />
+
           {error && (
             <div
               role="alert"
@@ -858,6 +866,18 @@ export default function NextBasketPage() {
               </div>
             </div>
           </section>
+
+          <SponsoredCampaignSlot
+            placement="pantry_replenishment"
+            slotKey="pantry_steps"
+            embedded
+          />
+
+          <SponsoredCampaignSlot
+            placement="pantry_replenishment"
+            slotKey="pantry_suggestions"
+            embedded
+          />
 
           <section
             className="mt-3 rounded-[22px] border border-teal-300/80 bg-[#dff6f1] p-3 sm:mt-5 sm:rounded-3xl sm:p-5"

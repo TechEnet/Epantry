@@ -41,9 +41,19 @@ const PROFILE_TYPES = [
     description: 'Manage a brand presence and products. Brand approval is handled separately.',
   },
   {
+    value: 'restaurant',
+    label: 'Restaurant',
+    description: 'Run a restaurant or food outlet with dishes, recipes and hospitality operations.',
+  },
+  {
+    value: 'chef',
+    label: 'Chef',
+    description: 'Publish chef-led recipes, food expertise and supported culinary offerings.',
+  },
+  {
     value: 'hybrid',
     label: 'Hybrid',
-    description: 'Use more than one business model under the same Host account.',
+    description: 'Use more than one model — Seller, Brand, B2B, Restaurant or Chef — under one Host account.',
   },
 ]
 
@@ -254,7 +264,7 @@ export default function HostBusinessProfilePage() {
                 How do you operate?
               </h2>
               <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-600 sm:text-sm">
-                Pick the option that best describes how your business works today.
+                Choose the closest match. Seller, Brand, B2B, Restaurant and Chef are all supported; use Hybrid when more than one applies.
               </p>
             </div>
 
@@ -300,7 +310,7 @@ export default function HostBusinessProfilePage() {
                 onChange={(event) => setNote(event.target.value)}
                 rows={4}
                 maxLength={1200}
-                placeholder="Example: We supply hospitality businesses across Delhi NCR."
+                placeholder="Example: We run a restaurant in Delhi NCR and also publish chef-led recipes on EPANTRY."
                 className="focus-ring mt-1.5 h-20 w-full resize-y rounded-[14px] border border-sky-200 bg-white/90 px-3 py-2.5 text-[10px] font-semibold text-stone-900 outline-none sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
               />
             </label>

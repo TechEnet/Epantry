@@ -80,6 +80,208 @@ export function getRetailMediaErrorMessage(
   )
 }
 
+function appendCloudinaryParameter(
+  formData,
+  key,
+  value,
+) {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return
+  }
+
+  formData.append(
+    key,
+    Array.isArray(value)
+      ? value.join(',')
+      : String(value),
+  )
+}
+
+async function createRetailMediaImageUploadIntent() {
+  return mutate({
+    url:
+      '/host/retail-media/image-upload-intent',
+    data: {},
+  })
+}
+
+export async function uploadRetailMediaImage({
+  file,
+}) {
+  if (!file) {
+    throw new Error(
+      'Choose a campaign image first.',
+    )
+  }
+
+  const data =
+    await createRetailMediaImageUploadIntent()
+
+  const intent =
+    data?.uploadIntent
+
+  if (
+    !intent?.uploadUrl ||
+    !intent?.apiKey ||
+    !intent?.signature ||
+    !intent?.signedParameters
+  ) {
+    throw new Error(
+      'Campaign image upload could not be prepared.',
+    )
+  }
+
+  const maxBytes =
+    Number(intent.constraints?.maxBytes || 0)
+  const allowedMimeTypes =
+    Array.isArray(intent.constraints?.allowedMimeTypes)
+      ? intent.constraints.allowedMimeTypes
+      : []
+
+  if (maxBytes > 0 && file.size > maxBytes) {
+    throw new Error(
+      'This campaign image is larger than the allowed upload size.',
+    )
+  }
+
+  if (
+    allowedMimeTypes.length > 0 &&
+    !allowedMimeTypes.includes(file.type)
+  ) {
+    throw new Error(
+      'Use a JPEG, PNG, or WebP campaign image.',
+    )
+  }
+
+  const formData =
+    new FormData()
+
+  formData.append(
+    'file',
+    file,
+  )
+  formData.append(
+    'api_key',
+    intent.apiKey,
+  )
+  formData.append(
+    'signature',
+    intent.signature,
+  )
+
+  for (
+    const [key, value] of Object.entries(intent.signedParameters)
+  ) {
+    appendCloudinaryParameter(
+      formData,
+      key,
+      value,
+    )
+  }
+
+  const response =
+    await fetch(
+      intent.uploadUrl,
+      {
+        method: 'POST',
+        body: formData,
+      },
+    )
+
+  let payload = null
+
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.error?.message ||
+        'Campaign image upload failed.',
+    )
+  }
+
+  const imageUrl =
+    String(
+      payload?.secure_url ||
+        payload?.url ||
+        '',
+    ).trim()
+
+  if (!imageUrl) {
+    throw new Error(
+      'Campaign image upload did not return an image URL.',
+    )
+  }
+
+  return {
+    imageUrl,
+    publicId:
+      payload?.public_id || '',
+  }
+}
+
+export async function getHostRetailMediaPlacementAvailability({
+  placement,
+  slotKey,
+  durationMinutes,
+  requestedStartAt = null,
+}) {
+  return unwrap(
+    await apiClient.get(
+      '/host/retail-media/placement-availability',
+      {
+        params: {
+          placement,
+          slotKey,
+          durationMinutes,
+          ...(requestedStartAt
+            ? { requestedStartAt }
+            : {}),
+        },
+      },
+    ),
+  )
+}
+
+export async function getPublicRetailMediaPromotion({
+  campaignId,
+}) {
+  return unwrap(
+    await apiClient.get(
+      `/retail-media/campaigns/${path(
+        campaignId,
+      )}`,
+    ),
+  )
+}
+
+export async function getPublicSponsoredPlacement({
+  placement,
+  slotKey,
+  marketCode = 'IN',
+  viewerKey = '',
+}) {
+  return unwrap(
+    await apiClient.get(
+      '/retail-media/placement',
+      {
+        params: {
+          placement,
+          slotKey,
+          marketCode,
+          ...(viewerKey ? { viewerKey } : {}),
+        },
+      },
+    ),
+  )
+}
+
 export async function getHostRetailMediaPricing() {
   return unwrap(
     await apiClient.get(
@@ -104,6 +306,22 @@ export async function createRetailMediaCampaignFromBrief({
     url:
       `/host/retail-media/campaigns/from-brief/${path(
         briefId,
+      )}`,
+    data:
+      input,
+  })
+}
+
+export async function updateHostRetailMediaCampaign({
+  campaignId,
+  input,
+}) {
+  return mutate({
+    method:
+      'patch',
+    url:
+      `/host/retail-media/campaigns/${path(
+        campaignId,
       )}`,
     data:
       input,

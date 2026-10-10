@@ -48,6 +48,39 @@ export const SEARCH_EVENT_TYPES =
     'no_result',
   ])
 
+const searchAreaSchema =
+  new Schema(
+    {
+      city: {
+        type: String,
+        trim: true,
+        maxlength: 120,
+        default: '',
+      },
+      state: {
+        type: String,
+        trim: true,
+        maxlength: 120,
+        default: '',
+      },
+      country: {
+        type: String,
+        trim: true,
+        maxlength: 120,
+        default: '',
+      },
+      postcode: {
+        type: String,
+        trim: true,
+        maxlength: 24,
+        default: '',
+      },
+    },
+    {
+      _id: false,
+    },
+  )
+
 const searchConstraintSchema =
   new Schema(
     {
@@ -245,6 +278,11 @@ const searchSessionSchema =
           500,
       },
 
+      area: {
+        type: searchAreaSchema,
+        default: () => ({}),
+      },
+
       mode: {
         type:
           String,
@@ -349,6 +387,11 @@ const searchEventSchema =
           500,
       },
 
+      area: {
+        type: searchAreaSchema,
+        default: () => ({}),
+      },
+
       mode: {
         type:
           String,
@@ -413,6 +456,59 @@ searchEventSchema.index({
 
   occurredAt:
     -1,
+})
+
+const searchDemandEventSchema =
+  new Schema(
+    {
+      ownerUserId: {
+        type: objectId,
+        ref: 'User',
+        required: true,
+        index: true,
+      },
+      normalizedQuery: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 500,
+        index: true,
+      },
+      displayQuery: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 500,
+      },
+      surface: {
+        type: String,
+        enum: ['global', 'grocery', 'recipes'],
+        required: true,
+        index: true,
+      },
+      area: {
+        type: searchAreaSchema,
+        default: () => ({}),
+      },
+      occurredAt: {
+        type: Date,
+        default: Date.now,
+        required: true,
+        index: true,
+      },
+    },
+    baseSchemaOptions,
+  )
+
+searchDemandEventSchema.index({
+  occurredAt: -1,
+  ownerUserId: 1,
+})
+
+searchDemandEventSchema.index({
+  normalizedQuery: 1,
+  'area.postcode': 1,
+  occurredAt: -1,
 })
 
 const candidateSchema =
@@ -798,6 +894,11 @@ blockAppendOnlyMutation(
 )
 
 blockAppendOnlyMutation(
+  searchDemandEventSchema,
+  'SearchDemandEvent',
+)
+
+blockAppendOnlyMutation(
   candidateSetSchema,
   'CandidateSet',
 )
@@ -826,6 +927,14 @@ export const SearchEvent =
     'SearchEvent',
     searchEventSchema,
     'searchEvents',
+  )
+
+export const SearchDemandEvent =
+  mongoose.models.SearchDemandEvent ||
+  mongoose.model(
+    'SearchDemandEvent',
+    searchDemandEventSchema,
+    'searchDemandEvents',
   )
 
 export const CandidateSet =

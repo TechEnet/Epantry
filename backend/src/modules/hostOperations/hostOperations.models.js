@@ -27,6 +27,8 @@ export const HOST_COMMERCIAL_PROFILE_TYPES = Object.freeze([
   'seller',
   'brand',
   'b2b',
+  'restaurant',
+  'chef',
   'hybrid',
 ])
 

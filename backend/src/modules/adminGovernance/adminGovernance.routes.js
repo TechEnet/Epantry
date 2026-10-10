@@ -41,11 +41,15 @@ import {
   createAdminSupportCase,
   decideAdminReviewCase,
   executeAdminGovernanceAction,
+  getAdminEarningsOverview,
   getAdminGovernanceCommandCenter,
+  getAdminIntegrationOverview,
   getAdminPolicyOverview,
+  getAdminSearchDemand,
   getAdminReviewCase,
   listAdminFeatureFlags,
   listAdminIncidents,
+  listAdminMarketplaceOrderExceptions,
   listAdminReviewCases,
   listAdminSupportCases,
   searchAdminGovernance,
@@ -57,6 +61,7 @@ import {
 import {
   adminGovernanceIdParamsSchema,
   adminGovernanceSearchQuerySchema,
+  adminSearchDemandQuerySchema,
   assignReviewCaseBodySchema,
   createFeatureFlagBodySchema,
   createIncidentBodySchema,
@@ -277,6 +282,87 @@ adminRouter.get(
         'Admin governance command center loaded.',
       ),
   ),
+)
+
+adminRouter.get(
+  '/integrations',
+  requireAnyAdminPermission(
+    'marketplace.read',
+    'host.review.read',
+    'admin.dashboard.read',
+  ),
+  wrap(async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await getAdminIntegrationOverview({
+        adminAuthorization:
+          req.adminAuthorization,
+        limit:
+          req.query?.limit,
+      }),
+      'Integration health loaded.',
+    )),
+)
+
+adminRouter.get(
+  '/marketplace-order-exceptions',
+  requireAnyAdminPermission(
+    'marketplace.read',
+  ),
+  wrap(async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await listAdminMarketplaceOrderExceptions({
+        adminAuthorization:
+          req.adminAuthorization,
+      }),
+      'Marketplace order issues loaded.',
+    )),
+)
+
+adminRouter.get(
+  '/earnings',
+  requireAnyAdminPermission(
+    'finance.read',
+    'admin.dashboard.read',
+  ),
+  wrap(async (req, res) =>
+    sendSuccess(
+      req,
+      res,
+      200,
+      await getAdminEarningsOverview(),
+      'Admin earnings overview loaded.',
+    )),
+)
+
+adminRouter.get(
+  '/search-demand',
+  requireAnyAdminPermission(
+    'admin.dashboard.read',
+    'marketplace.read',
+    'catalog.read',
+  ),
+  wrap(async (req, res) => {
+    const query = parseOrThrow(
+      adminSearchDemandQuerySchema,
+      req.query,
+      'ADMIN_SEARCH_DEMAND_QUERY_INVALID',
+      'Invalid customer demand query.',
+    )
+
+    return sendSuccess(
+      req,
+      res,
+      200,
+      await getAdminSearchDemand({ query }),
+      'Customer search demand loaded.',
+    )
+  }),
 )
 
 adminRouter.get(

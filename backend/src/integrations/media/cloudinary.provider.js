@@ -264,6 +264,115 @@ export function createProductEvidenceUploadIntent({
   }
 }
 
+function retailMediaImageUserPrefix(
+  userId,
+) {
+  const safe =
+    clean(
+      userId,
+    ).replace(
+      /[^a-zA-Z0-9_-]/g,
+      '',
+    )
+
+  return `epantry/retail-media/${safe}/public-v1`
+}
+
+function retailMediaImageUploadFolder(
+  userId,
+) {
+  return (
+    `${retailMediaImageUserPrefix(
+      userId,
+    )}/` +
+    new Date()
+      .toISOString()
+      .slice(
+        0,
+        7,
+      )
+  )
+}
+
+export function createRetailMediaImageUploadIntent({
+  userId,
+}) {
+  const value =
+    requireConfig()
+
+  const timestamp =
+    Math.floor(
+      Date.now() /
+        1000,
+    )
+
+  const publicId =
+    `${retailMediaImageUploadFolder(
+      userId,
+    )}/creative-${crypto.randomUUID()}`
+
+  const signedParameters = {
+    allowed_formats:
+      'jpg,jpeg,png,webp',
+
+    overwrite:
+      false,
+
+    public_id:
+      publicId,
+
+    timestamp,
+
+    transformation:
+      'c_limit,h_1600,w_2400',
+
+    type:
+      'upload',
+  }
+
+  return {
+    provider:
+      'cloudinary',
+
+    uploadUrl:
+      `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+        value.cloudName,
+      )}/image/upload`,
+
+    cloudName:
+      value.cloudName,
+
+    apiKey:
+      value.apiKey,
+
+    resourceType:
+      'image',
+
+    deliveryType:
+      'upload',
+
+    publicId,
+
+    timestamp,
+
+    signature:
+      signParams(
+        signedParameters,
+        value.apiSecret,
+      ),
+
+    signedParameters,
+
+    constraints: {
+      maxBytes:
+        MAX_BYTES,
+
+      allowedMimeTypes:
+        MIME_TYPES,
+    },
+  }
+}
+
 function recipeImageUserPrefix(
   userId,
 ) {

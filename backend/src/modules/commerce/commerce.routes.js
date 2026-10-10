@@ -43,6 +43,7 @@ import {
   createDirectMarketplaceCart,
   createRestaurantRecipeMarketplaceCart,
   createValidatedMarketplaceCart,
+  mergeRecipeCartIntoMarketplaceCart,
   getMarketplaceCartDeliveryEta,
   updateDirectMarketplaceCartItem,
 } from './commerce.checkout.service.js'
@@ -229,6 +230,12 @@ export const createRestaurantRecipeCartBodySchema =
           ),
     })
     .strict()
+
+export const combineCartBodySchema =
+  z.object({
+    cartId: objectIdSchema,
+    recipeCartId: objectIdSchema,
+  }).strict()
 
 export const checkoutBodySchema =
   z
@@ -732,6 +739,25 @@ commerceRoutes.post(
   ),
 )
 
+
+// Combine only server-priced Marketplace carts. No client totals accepted.
+commerceRoutes.post(
+  '/cart/merge-recipe',
+  requireCsrfToken,
+  wrap(async (req, res) => {
+    const input = parseOrThrow(
+      combineCartBodySchema,
+      req.body,
+      'COMBINED_CART_INVALID',
+      'Invalid combined order request.',
+    )
+    return sendSuccess(req, res, 200, await mergeRecipeCartIntoMarketplaceCart({
+      cartId: input.cartId,
+      recipeCartId: input.recipeCartId,
+      actorUser: req.currentUser,
+    }), 'Marketplace items combined successfully.')
+  }),
+)
 
 commerceRoutes.patch(
   '/cart/:id/items/:itemId',

@@ -53,6 +53,7 @@ import {
 import {
   createSmartSearch,
   explainSearchDecision,
+  recordCustomerSearchDemand,
   refineSmartSearch,
 } from './search.service.js'
 
@@ -76,6 +77,16 @@ const sessionTokenSchema =
       200,
       'Search session token is invalid.',
     )
+
+const searchAreaInputSchema =
+  z
+    .object({
+      city: z.string().trim().max(120).optional().default(''),
+      state: z.string().trim().max(120).optional().default(''),
+      country: z.string().trim().max(120).optional().default(''),
+      postcode: z.string().trim().max(24).optional().default(''),
+    })
+    .strict()
 
 export const smartSearchBodySchema =
   z
@@ -101,6 +112,20 @@ export const smartSearchBodySchema =
           .default(
             'all',
           ),
+
+      area:
+        searchAreaInputSchema
+          .optional()
+          .default({}),
+    })
+    .strict()
+
+export const searchDemandBodySchema =
+  z
+    .object({
+      query: z.string().trim().min(2).max(500),
+      surface: z.enum(['global', 'grocery', 'recipes']),
+      area: searchAreaInputSchema.optional().default({}),
     })
     .strict()
 
@@ -478,12 +503,40 @@ const searchRoutes =
 searchRoutes.use(
   [
     '/search',
+    '/search/demand-event',
     '/search/refine',
     '/decision-explain',
     '/copilot/messages',
   ],
   sensitiveResponseNoStoreMiddleware,
   loadOptionalSearchActor,
+)
+
+searchRoutes.post(
+  '/search/demand-event',
+  wrap(
+    async (req, res) => {
+      const input = parseOrThrow(
+        searchDemandBodySchema,
+        req.body,
+        'SEARCH_DEMAND_EVENT_INVALID',
+        'Invalid customer search demand event.',
+      )
+
+      return sendSuccess(
+        req,
+        res,
+        200,
+        await recordCustomerSearchDemand({
+          query: input.query,
+          surface: input.surface,
+          area: input.area,
+          actorContext: req.searchActorContext,
+        }),
+        'Search demand recorded.',
+      )
+    },
+  ),
 )
 
 searchRoutes.post(
@@ -514,6 +567,9 @@ searchRoutes.post(
 
           actorContext:
             req.searchActorContext,
+
+          area:
+            input.area,
         }),
         'Smart Search completed successfully.',
       )

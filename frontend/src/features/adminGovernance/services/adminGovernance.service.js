@@ -90,6 +90,54 @@ export async function getAdminCommandCenter() {
     );
 }
 
+export async function getAdminIntegrationOverview({ limit = 250 } = {}) {
+    return unwrapApiData(
+        await apiClient.get(
+            '/admin/governance/integrations',
+            {
+                params: normalizeQueryParams({ limit }),
+            },
+        ),
+    );
+}
+
+export async function listAdminMarketplaceOrderExceptions() {
+    return unwrapApiData(
+        await apiClient.get(
+            '/admin/governance/marketplace-order-exceptions',
+        ),
+    );
+}
+
+export async function getAdminEarningsOverview() {
+    return unwrapApiData(
+        await apiClient.get(
+            '/admin/governance/earnings',
+        ),
+    );
+}
+
+export async function getAdminSearchDemand({
+    days = 30,
+    limit = 40,
+    q = '',
+    area = '',
+} = {}) {
+    return unwrapApiData(
+        await apiClient.get(
+            '/admin/governance/search-demand',
+            {
+                params: normalizeQueryParams({
+                    days,
+                    limit,
+                    q,
+                    area,
+                }),
+            },
+        ),
+    );
+}
+
 export async function searchAdminGovernance({
     q,
     limit = 25,
@@ -282,5 +330,16 @@ export async function executeAdminGovernanceAction(input) {
             '/admin/governance/actions/execute',
         data:
             input,
+    });
+}
+// Food-rule changes use the existing M08 admin API and its safety/MFA guards.
+export async function createAdminFoodRuleDraft(input) {
+    return mutate({ url: '/admin/food-rules', data: input });
+}
+
+export async function activateAdminFoodRule(ruleId, reason) {
+    return mutate({
+        url: `/admin/food-rules/${encodeURIComponent(String(ruleId))}/activate`,
+        data: { reason },
     });
 }

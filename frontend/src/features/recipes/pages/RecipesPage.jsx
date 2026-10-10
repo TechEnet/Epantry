@@ -26,6 +26,10 @@ import {
   getRecipeFoodIntelligence,
 } from '../../foodIntelligence/services/foodIntelligence.service'
 
+import { recordCustomerSearchDemand } from '../../search/services/search.service'
+
+import SponsoredCampaignSlot from '../../retailMedia/components/SponsoredCampaignSlot'
+
 const FEATURED_RECIPE_COUNT = 8
 const VISIBLE_CATEGORY_COUNT = 6
 const SCROLL_STEP_VH = 58
@@ -778,7 +782,17 @@ export default function RecipesPage() {
 
   function handleSearch(event) {
     event.preventDefault()
-    setSearch(searchInput.trim())
+
+    const normalizedSearch = searchInput.trim()
+
+    if (normalizedSearch.length >= 2) {
+      void recordCustomerSearchDemand({
+        query: normalizedSearch,
+        surface: 'recipes',
+      })
+    }
+
+    setSearch(normalizedSearch)
   }
 
   function scrollToSlide(nextIndex) {
@@ -968,6 +982,16 @@ export default function RecipesPage() {
           <span className="h-8 w-px bg-gradient-to-b from-[#9a4b24] to-transparent" />
         </button>
       </section>
+
+      <SponsoredCampaignSlot
+        placement="recipe"
+        slotKey="recipe_hero"
+      />
+
+      <SponsoredCampaignSlot
+        placement="recipe"
+        slotKey="recipe_collection"
+      />
 
       <section
         ref={showcaseRef}
@@ -1273,6 +1297,11 @@ export default function RecipesPage() {
           </div>
         </div>
       </section>
+
+      <SponsoredCampaignSlot
+        placement="recipe"
+        slotKey="recipe_restaurants"
+      />
 
       <section className="border-t border-orange-950/10 bg-[linear-gradient(135deg,#ffe8c7_0%,#fff4df_46%,#f9dfc4_100%)] py-12 sm:py-16">
         <div className="page-shell">

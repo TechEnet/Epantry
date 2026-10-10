@@ -9,12 +9,35 @@ import {
 } from '../../utils/ApiError.js'
 
 import {
+  createRetailMediaImageUploadIntent,
+} from '../../integrations/media/cloudinary.provider.js'
+
+import {
   recordAdminAuditEvent,
 } from '../admin/adminAudit.service.js'
 
 import {
   AdminFeatureFlag,
 } from '../adminGovernance/adminGovernance.models.js'
+
+import {
+  Brand,
+  Pack,
+  ProductFamily,
+  ProductVariant,
+  ProductVersion,
+} from '../catalog/catalog.models.js'
+
+import {
+  buildPublicProductSlug,
+  getPublicProductBySlug,
+} from '../catalog/catalog.public.service.js'
+
+import {
+  HostOffer,
+  MarketplaceOrganization,
+  PriceRule,
+} from '../marketplace/marketplace.models.js'
 
 import {
   createRazorpayOrder,
@@ -28,6 +51,11 @@ import {
 } from '../hostOperations/hostOperations.models.js'
 
 import {
+  createNotificationIntentBestEffort,
+  notifyActiveSuperAdminsBestEffort,
+} from '../notifications/notification.service.js'
+
+import {
   assertHostOperationsPermission,
   resolveHostOperationsContext,
 } from '../hostOperations/hostOperations.service.js'
@@ -35,6 +63,8 @@ import {
 import {
   AdDecisionLog,
   Campaign,
+  RETAIL_MEDIA_DURATION_MINUTES,
+  RETAIL_MEDIA_PLACEMENT_SLOTS,
 } from './retailMedia.models.js'
 
 export const M21_RETAIL_MEDIA_FEATURE_FLAG =
@@ -49,6 +79,18 @@ export const RETAIL_MEDIA_PLACEMENT_PRICING_MINOR = Object.freeze({
   basket_compare: 180000,
   post_purchase: 80000,
 })
+
+const RETAIL_MEDIA_DEFAULT_DURATION_MINUTES = 1440
+const RETAIL_MEDIA_RESERVATION_HOLD_MINUTES = 15
+const RETAIL_MEDIA_DURATION_OPTIONS = Object.freeze([
+  { durationMinutes: 240, label: '4 hours' },
+  { durationMinutes: 720, label: '12 hours' },
+  { durationMinutes: 1440, label: '1 day' },
+  { durationMinutes: 4320, label: '3 days' },
+  { durationMinutes: 10080, label: '7 days' },
+  { durationMinutes: 20160, label: '14 days' },
+  { durationMinutes: 43200, label: '30 days' },
+])
 
 const RETAIL_MEDIA_PAYMENT_CURRENCY = 'INR'
 const RETAIL_MEDIA_PAYMENT_RECIPIENT =
@@ -123,19 +165,518 @@ function razorpayModeFromKeyId(keyId) {
   return 'unknown'
 }
 
-function placementPricingRows(placements = []) {
+function normalizeDurationMinutes(value) {
+  const durationMinutes = Number(value || 0)
+
+  return RETAIL_MEDIA_DURATION_MINUTES.includes(durationMinutes)
+    ? durationMinutes
+    : RETAIL_MEDIA_DEFAULT_DURATION_MINUTES
+}
+
+function durationAdjustedAmountMinor(
+  amountMinor,
+  durationMinutes = RETAIL_MEDIA_DEFAULT_DURATION_MINUTES,
+) {
+  const normalizedDurationMinutes =
+    normalizeDurationMinutes(durationMinutes)
+
+  return Math.max(
+    1,
+    Math.round(
+      (Number(amountMinor || 0) * normalizedDurationMinutes) /
+        RETAIL_MEDIA_DEFAULT_DURATION_MINUTES,
+    ),
+  )
+}
+
+function placementPricingRows(
+  placements = [],
+  durationMinutes = RETAIL_MEDIA_DEFAULT_DURATION_MINUTES,
+) {
   return placements.map((placement) => ({
     placement,
     amountMinor:
-      RETAIL_MEDIA_PLACEMENT_PRICING_MINOR[placement] || 0,
+      durationAdjustedAmountMinor(
+        RETAIL_MEDIA_PLACEMENT_PRICING_MINOR[placement] || 0,
+        durationMinutes,
+      ),
   }))
 }
 
-function placementPricingTotalMinor(placements = []) {
-  return placementPricingRows(placements).reduce(
+function placementPricingTotalMinor(
+  placements = [],
+  durationMinutes = RETAIL_MEDIA_DEFAULT_DURATION_MINUTES,
+) {
+  return placementPricingRows(placements, durationMinutes).reduce(
     (total, row) => total + Number(row.amountMinor || 0),
     0,
   )
+}
+
+function placementSlotDefinition(
+  placement,
+  slotKey,
+) {
+  return (
+    RETAIL_MEDIA_PLACEMENT_SLOTS[placement] || []
+  ).find((slot) => slot.key === slotKey) || null
+}
+
+function normalizePlacementSelections({
+  placements = [],
+  placementSelections = [],
+}) {
+  const uniquePlacements = [
+    ...new Set(
+      (placements || [])
+        .map((value) => String(value || '').trim())
+        .filter(Boolean),
+    ),
+  ]
+
+  return uniquePlacements.map((placement) => {
+    const requested =
+      (placementSelections || []).find(
+        (selection) => selection?.placement === placement,
+      ) || null
+
+    const slot =
+      placementSlotDefinition(
+        placement,
+        requested?.slotKey,
+      ) ||
+      RETAIL_MEDIA_PLACEMENT_SLOTS[placement]?.[0] ||
+      null
+
+    if (!slot) {
+      throw new ApiError(
+        400,
+        'Choose a valid page position for every selected placement.',
+        [
+          {
+            code: 'M21_RETAIL_MEDIA_PLACEMENT_SLOT_INVALID',
+            placement,
+          },
+        ],
+      )
+    }
+
+    return {
+      placement,
+      slotKey: slot.key,
+      slotLabel: slot.label,
+    }
+  })
+}
+
+function campaignReservationWindow(campaign) {
+  const startValue =
+    campaign?.scheduledStartsAt ||
+    campaign?.startsAt ||
+    null
+
+  if (!startValue) {
+    return {
+      startsAt: null,
+      endsAt: null,
+    }
+  }
+
+  const startsAt = new Date(startValue)
+  const explicitEnd =
+    campaign?.scheduledEndsAt ||
+    campaign?.endsAt ||
+    null
+
+  const endsAt = explicitEnd
+    ? new Date(explicitEnd)
+    : new Date(
+        startsAt.getTime() +
+          normalizeDurationMinutes(campaign?.durationMinutes) * 60 * 1000,
+      )
+
+  return {
+    startsAt,
+    endsAt,
+  }
+}
+
+function reservationBlocksSlot(
+  campaign,
+  now = new Date(),
+) {
+  if (
+    !campaign ||
+    ['rejected', 'ended'].includes(campaign.status)
+  ) {
+    return false
+  }
+
+  if (campaign.payment?.status === 'paid') {
+    return true
+  }
+
+  if (
+    campaign.payment?.status === 'initiated' &&
+    campaign.reservationHeldUntil &&
+    new Date(campaign.reservationHeldUntil) > now
+  ) {
+    return true
+  }
+
+  return false
+}
+
+async function findSlotAvailability({
+  placement,
+  slotKey,
+  durationMinutes,
+  requestedStartAt = null,
+  excludeCampaignId = null,
+  now = new Date(),
+}) {
+  const slot =
+    placementSlotDefinition(
+      placement,
+      slotKey,
+    )
+
+  if (!slot) {
+    throw new ApiError(
+      400,
+      'Choose a valid page position.',
+      [
+        {
+          code: 'M21_RETAIL_MEDIA_PLACEMENT_SLOT_INVALID',
+          placement,
+          slotKey,
+        },
+      ],
+    )
+  }
+
+  const duration =
+    normalizeDurationMinutes(
+      durationMinutes,
+    )
+
+  const requested =
+    requestedStartAt
+      ? new Date(requestedStartAt)
+      : new Date(now)
+
+  const requestedStartsAt =
+    Number.isNaN(requested.getTime()) || requested < now
+      ? new Date(now)
+      : requested
+
+  const filter = {
+    status: {
+      $nin: ['rejected', 'ended'],
+    },
+    placementSelections: {
+      $elemMatch: {
+        placement,
+        slotKey,
+      },
+    },
+  }
+
+  if (excludeCampaignId) {
+    filter._id = {
+      $ne: excludeCampaignId,
+    }
+  }
+
+  const candidates =
+    await Campaign.find(filter)
+      .select(
+        '_id status payment durationMinutes startsAt endsAt scheduledStartsAt scheduledEndsAt reservationHeldUntil placementSelections',
+      )
+      .sort({
+        scheduledStartsAt: 1,
+        startsAt: 1,
+      })
+      .lean()
+
+  const reservations =
+    candidates
+      .filter((campaign) => reservationBlocksSlot(campaign, now))
+      .map((campaign) => ({
+        campaignId: stringId(campaign._id),
+        ...campaignReservationWindow(campaign),
+      }))
+      .filter(
+        (reservation) =>
+          reservation.startsAt &&
+          reservation.endsAt &&
+          reservation.endsAt > now,
+      )
+      .sort(
+        (left, right) =>
+          left.startsAt.getTime() - right.startsAt.getTime(),
+      )
+
+  let cursor = new Date(requestedStartsAt)
+  const durationMs = duration * 60 * 1000
+
+  for (const reservation of reservations) {
+    const requestedEnd =
+      new Date(cursor.getTime() + durationMs)
+
+    if (reservation.endsAt <= cursor) {
+      continue
+    }
+
+    if (reservation.startsAt >= requestedEnd) {
+      break
+    }
+
+    cursor = new Date(reservation.endsAt)
+  }
+
+  const availableEndsAt =
+    new Date(cursor.getTime() + durationMs)
+
+  return {
+    placement,
+    slotKey: slot.key,
+    slotLabel: slot.label,
+    durationMinutes: duration,
+    requestedStartsAt,
+    requestedEndsAt:
+      new Date(requestedStartsAt.getTime() + durationMs),
+    available:
+      cursor.getTime() === requestedStartsAt.getTime(),
+    nextAvailableAt: cursor,
+    nextAvailableEndsAt: availableEndsAt,
+  }
+}
+
+async function findCommonPlacementWindow({
+  placementSelections,
+  durationMinutes,
+  requestedStartAt = null,
+  excludeCampaignId = null,
+}) {
+  let candidateStart =
+    requestedStartAt
+      ? new Date(requestedStartAt)
+      : new Date()
+
+  if (
+    Number.isNaN(candidateStart.getTime()) ||
+    candidateStart < new Date()
+  ) {
+    candidateStart = new Date()
+  }
+
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const availability =
+      await Promise.all(
+        placementSelections.map((selection) =>
+          findSlotAvailability({
+            placement: selection.placement,
+            slotKey: selection.slotKey,
+            durationMinutes,
+            requestedStartAt: candidateStart,
+            excludeCampaignId,
+          }),
+        ),
+      )
+
+    const nextStartMs =
+      Math.max(
+        candidateStart.getTime(),
+        ...availability.map((item) =>
+          new Date(item.nextAvailableAt).getTime(),
+        ),
+      )
+
+    if (nextStartMs === candidateStart.getTime()) {
+      const duration = normalizeDurationMinutes(durationMinutes)
+
+      return {
+        scheduledStartsAt: candidateStart,
+        scheduledEndsAt:
+          new Date(
+            candidateStart.getTime() + duration * 60 * 1000,
+          ),
+        availability,
+      }
+    }
+
+    candidateStart = new Date(nextStartMs)
+  }
+
+  throw new ApiError(
+    409,
+    'A common free window could not be found for the selected ad positions.',
+    [
+      {
+        code: 'M21_RETAIL_MEDIA_PLACEMENT_WINDOW_UNAVAILABLE',
+      },
+    ],
+  )
+}
+
+async function endExpiredRetailMediaCampaigns(now = new Date()) {
+  await Campaign.updateMany(
+    {
+      status: {
+        $in: ['active', 'paused'],
+      },
+      endsAt: {
+        $ne: null,
+        $lte: now,
+      },
+    },
+    {
+      $set: {
+        status: 'ended',
+      },
+    },
+  )
+}
+
+async function activateApprovedRetailMediaCampaign(
+  campaign,
+  {
+    now = new Date(),
+  } = {},
+) {
+  if (
+    !campaign ||
+    campaign.status !== 'approved' ||
+    campaign.payment?.status !== 'paid' ||
+    campaign.review?.decision !== 'approved'
+  ) {
+    return false
+  }
+
+  const durationMinutes =
+    normalizeDurationMinutes(
+      campaign.durationMinutes,
+    )
+
+  const placementSelections =
+    normalizePlacementSelections({
+      placements:
+        campaign.placements || [],
+      placementSelections:
+        campaign.placementSelections || [],
+    })
+
+  const bookedStartsAt =
+    campaign.scheduledStartsAt
+      ? new Date(campaign.scheduledStartsAt)
+      : null
+
+  const bookedEndsAt =
+    campaign.scheduledEndsAt
+      ? new Date(campaign.scheduledEndsAt)
+      : null
+
+  const hasFutureBookedWindow =
+    bookedStartsAt &&
+    bookedEndsAt &&
+    bookedStartsAt > now &&
+    bookedEndsAt > bookedStartsAt
+
+  let activationStartsAt =
+    hasFutureBookedWindow
+      ? bookedStartsAt
+      : null
+
+  let activationEndsAt =
+    hasFutureBookedWindow
+      ? bookedEndsAt
+      : null
+
+  if (!activationStartsAt || !activationEndsAt) {
+    const bookingWindow =
+      await findCommonPlacementWindow({
+        placementSelections,
+        durationMinutes,
+        requestedStartAt: now,
+        excludeCampaignId:
+          campaign._id,
+      })
+
+    activationStartsAt =
+      bookingWindow.scheduledStartsAt
+    activationEndsAt =
+      bookingWindow.scheduledEndsAt
+
+    campaign.scheduledStartsAt =
+      activationStartsAt
+    campaign.scheduledEndsAt =
+      activationEndsAt
+  }
+
+  campaign.durationMinutes =
+    durationMinutes
+  campaign.placementSelections =
+    placementSelections
+  campaign.status =
+    'active'
+  campaign.activatedAt =
+    now
+  campaign.startsAt =
+    activationStartsAt
+  campaign.endsAt =
+    activationEndsAt
+  campaign.pausedAt =
+    null
+
+  await campaign.save()
+
+  return true
+}
+
+async function activateApprovedRetailMediaCampaignsForServing({
+  placement,
+  slotKey = '',
+  marketCode,
+  now = new Date(),
+}) {
+  const filter = {
+    status: 'approved',
+    'payment.status': 'paid',
+    'review.decision': 'approved',
+    placements: placement,
+    marketCodes: marketCode,
+  }
+
+  if (slotKey) {
+    filter.placementSelections = {
+      $elemMatch: {
+        placement,
+        slotKey,
+      },
+    }
+  }
+
+  const campaigns =
+    await Campaign.find(filter)
+      .sort({
+        scheduledStartsAt: 1,
+        createdAt: 1,
+      })
+      .limit(100)
+
+  for (const campaign of campaigns) {
+    try {
+      await activateApprovedRetailMediaCampaign(
+        campaign,
+        { now },
+      )
+    } catch {
+      // Public ad delivery must not fail because one legacy approved
+      // campaign cannot be normalized. Other eligible campaigns can
+      // still be considered by the serving query below.
+    }
+  }
 }
 
 function assertRetailMediaTestPaymentConfiguration() {
@@ -215,6 +756,76 @@ function actorId(actorUser) {
   }
 
   return value
+}
+
+function campaignNotificationId(campaign) {
+  return String(
+    campaign?._id ||
+      campaign?.id ||
+      '',
+  ).trim()
+}
+
+async function notifyCampaignReadyForAdminReviewBestEffort(campaign) {
+  const campaignId = campaignNotificationId(campaign)
+
+  if (
+    !campaignId ||
+    campaign?.status !== 'pending_review' ||
+    campaign?.payment?.status !== 'paid'
+  ) {
+    return []
+  }
+
+  const title = String(campaign?.title || 'Sponsored campaign').trim()
+
+  return notifyActiveSuperAdminsBestEffort({
+    triggerType: 'retail_media_campaign_review_requested',
+    reasonCode: 'retail_media_campaign_review_requested',
+    explanation: `${title} is paid and ready for Super Admin review. Open the campaign to approve or reject it.`,
+    relatedEntityType: 'retail_media_campaign',
+    relatedEntityId: campaignId,
+    sourceDomain: 'retail_media',
+    sourceVersion: 'm21-v2',
+    dedupeScope: `retail-media-review-ready:${campaignId}`,
+  })
+}
+
+async function notifyHostCampaignReviewResultBestEffort(campaign) {
+  const campaignId = campaignNotificationId(campaign)
+  const hostUserId = campaign?.createdByUserId
+  const decision = String(campaign?.review?.decision || '').trim()
+
+  if (
+    !campaignId ||
+    !hostUserId ||
+    !['approved', 'rejected'].includes(decision)
+  ) {
+    return null
+  }
+
+  const title = String(campaign?.title || 'Sponsored campaign').trim()
+  const approved = decision === 'approved'
+  const reviewNote = String(campaign?.review?.reason || '').trim()
+
+  return createNotificationIntentBestEffort({
+    userId: hostUserId,
+    category: 'operations',
+    triggerType: 'retail_media_campaign_review_result',
+    reasonCode: approved
+      ? 'retail_media_campaign_approved'
+      : 'retail_media_campaign_rejected',
+    explanation: approved
+      ? `${title} was approved by Super Admin. EPANTRY will publish it automatically in its booked ad position and stop it when the purchased duration ends.`
+      : `${title} was not approved.${reviewNote ? ` Review note: ${reviewNote}` : ' Open your campaign to review the decision.'}`,
+    relatedEntityType: 'retail_media_campaign',
+    relatedEntityId: campaignId,
+    sourceDomain: 'retail_media',
+    sourceVersion: 'm21-v2',
+    actions: ['dismiss'],
+    requestedChannels: ['in_app'],
+    dedupeKey: `retail-media-review-result:${campaignId}:${decision}`,
+  })
 }
 
 function normalizeTag(value) {
@@ -318,11 +929,28 @@ function serializeCampaign(value) {
     placements:
       item.placements || [],
 
+    placementSelections:
+      item.placementSelections || [],
+
+    durationMinutes:
+      normalizeDurationMinutes(
+        item.durationMinutes,
+      ),
+
     startsAt:
       item.startsAt || null,
 
     endsAt:
       item.endsAt || null,
+
+    scheduledStartsAt:
+      item.scheduledStartsAt || null,
+
+    scheduledEndsAt:
+      item.scheduledEndsAt || null,
+
+    reservationHeldUntil:
+      item.reservationHeldUntil || null,
 
     budget:
       item.budget || {},
@@ -394,6 +1022,7 @@ function serializeCampaign(value) {
           item.payment?.requiredAmountMinor ||
             placementPricingTotalMinor(
               item.placements || [],
+              item.durationMinutes,
             ),
         ),
 
@@ -402,6 +1031,7 @@ function serializeCampaign(value) {
           ? item.payment.placementCharges
           : placementPricingRows(
               item.placements || [],
+              item.durationMinutes,
             ),
 
       providerOrderId:
@@ -459,6 +1089,9 @@ function serializeDecisionLog(value) {
 
     placement:
       item.placement,
+
+    slotKey:
+      item.slotKey || '',
 
     marketCode:
       item.marketCode,
@@ -633,11 +1266,39 @@ export async function createRetailMediaCampaignFromBrief({
       ? input.placements
       : brief.requestedPlacements
 
+  const durationMinutes =
+    normalizeDurationMinutes(
+      input.durationMinutes,
+    )
+
+  const placementSelections =
+    normalizePlacementSelections({
+      placements,
+      placementSelections:
+        input.placementSelections || [],
+    })
+
+  const bookingWindow =
+    await findCommonPlacementWindow({
+      placementSelections,
+      durationMinutes,
+      requestedStartAt:
+        input.startsAt ||
+        brief.startsAt ||
+        null,
+    })
+
   const paymentPlacementCharges =
-    placementPricingRows(placements)
+    placementPricingRows(
+      placements,
+      durationMinutes,
+    )
 
   const paymentRequiredAmountMinor =
-    placementPricingTotalMinor(placements)
+    placementPricingTotalMinor(
+      placements,
+      durationMinutes,
+    )
 
   await reconcileRetailMediaCampaignIndexes()
 
@@ -666,14 +1327,23 @@ export async function createRetailMediaCampaignFromBrief({
 
       placements,
 
+      placementSelections,
+
+      durationMinutes,
+
       startsAt:
-        input.startsAt ||
-        brief.startsAt ||
         null,
 
       endsAt:
-        input.endsAt ||
-        brief.endsAt ||
+        null,
+
+      scheduledStartsAt:
+        bookingWindow.scheduledStartsAt,
+
+      scheduledEndsAt:
+        bookingWindow.scheduledEndsAt,
+
+      reservationHeldUntil:
         null,
 
       budget: {
@@ -719,6 +1389,9 @@ export async function createRetailMediaCampaignFromBrief({
 
         sponsorLabel:
           input.sponsorLabel,
+
+        imageUrl:
+          input.imageUrl || '',
       },
 
       commercialDisclosure:
@@ -783,6 +1456,299 @@ export async function createRetailMediaCampaignFromBrief({
   }
 }
 
+export async function updateHostRetailMediaCampaign({
+  campaignId,
+  input,
+  actorUser,
+}) {
+  await requireRetailMediaFeature()
+
+  const context =
+    await resolveHostOperationsContext(
+      actorUser,
+    )
+
+  assertHostOperationsPermission(
+    context,
+    'campaigns.manage',
+  )
+
+  await endExpiredRetailMediaCampaigns()
+
+  const campaign =
+    await Campaign.findOne({
+      _id:
+        campaignId,
+
+      organizationId:
+        context.organization._id,
+    })
+
+  if (!campaign) {
+    throw new ApiError(
+      404,
+      'Retail Media Campaign was not found for this organization.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_CAMPAIGN_NOT_FOUND',
+        },
+      ],
+    )
+  }
+
+  if (
+    ['active', 'paused', 'ended'].includes(
+      campaign.status,
+    )
+  ) {
+    throw new ApiError(
+      409,
+      'Running or ended campaigns cannot be edited. Pause is for delivery control only; create a new campaign for a new run.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_CAMPAIGN_EDIT_LOCKED',
+        },
+      ],
+    )
+  }
+
+  const placements =
+    [...new Set(input.placements || [])]
+
+  const durationMinutes =
+    normalizeDurationMinutes(
+      input.durationMinutes,
+    )
+
+  const placementSelections =
+    normalizePlacementSelections({
+      placements,
+      placementSelections:
+        input.placementSelections || [],
+    })
+
+  const currentSelections =
+    normalizePlacementSelections({
+      placements:
+        campaign.placements || [],
+      placementSelections:
+        campaign.placementSelections || [],
+    })
+
+  const normalizeSelectionFingerprint =
+    (selections) =>
+      JSON.stringify(
+        [...selections]
+          .map((selection) => ({
+            placement:
+              selection.placement,
+            slotKey:
+              selection.slotKey,
+          }))
+          .sort((left, right) =>
+            `${left.placement}:${left.slotKey}`.localeCompare(
+              `${right.placement}:${right.slotKey}`,
+            ),
+          ),
+      )
+
+  const requestedStartsAt =
+    input.startsAt
+      ? new Date(input.startsAt)
+      : null
+
+  const currentScheduledStartsAt =
+    campaign.scheduledStartsAt
+      ? new Date(campaign.scheduledStartsAt)
+      : null
+
+  const placementChanged =
+    normalizeSelectionFingerprint(
+      placementSelections,
+    ) !==
+    normalizeSelectionFingerprint(
+      currentSelections,
+    )
+
+  const durationChanged =
+    durationMinutes !==
+    normalizeDurationMinutes(
+      campaign.durationMinutes,
+    )
+
+  const requestedStartChanged =
+    Boolean(requestedStartsAt) !==
+      Boolean(currentScheduledStartsAt) ||
+    (
+      requestedStartsAt &&
+      currentScheduledStartsAt &&
+      requestedStartsAt.getTime() !==
+        currentScheduledStartsAt.getTime()
+    )
+
+  const paidCampaign =
+    campaign.payment?.status === 'paid'
+
+  const legacyPaidBookingIncomplete =
+    paidCampaign &&
+    (campaign.placementSelections || []).length <
+      (campaign.placements || []).length
+
+  const placementCategoryChanged =
+    JSON.stringify(
+      [...placements].sort(),
+    ) !==
+    JSON.stringify(
+      [...(campaign.placements || [])].sort(),
+    )
+
+  const bookingChanged =
+    legacyPaidBookingIncomplete ||
+    placementChanged ||
+    durationChanged ||
+    requestedStartChanged
+
+  if (
+    paidCampaign &&
+    bookingChanged &&
+    (
+      !legacyPaidBookingIncomplete ||
+      placementCategoryChanged ||
+      durationChanged
+    )
+  ) {
+    throw new ApiError(
+      409,
+      'Page position, duration and booked start are locked after payment. You can still edit the ad image, headline, message and landing destination.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PAID_BOOKING_LOCKED',
+        },
+      ],
+    )
+  }
+
+  const contextualTags =
+    uniqueTags(
+      input.contextualTags,
+    )
+
+  assertNoSensitiveTargeting(
+    contextualTags,
+  )
+
+  if (bookingChanged) {
+    const bookingWindow =
+      await findCommonPlacementWindow({
+        placementSelections,
+        durationMinutes,
+        requestedStartAt:
+          requestedStartsAt,
+        excludeCampaignId:
+          campaign._id,
+      })
+
+    campaign.placements =
+      placements
+    campaign.placementSelections =
+      placementSelections
+    campaign.durationMinutes =
+      durationMinutes
+    campaign.scheduledStartsAt =
+      bookingWindow.scheduledStartsAt
+    campaign.scheduledEndsAt =
+      bookingWindow.scheduledEndsAt
+    campaign.startsAt =
+      null
+    campaign.endsAt =
+      null
+    campaign.reservationHeldUntil =
+      null
+
+    const requiredAmountMinor =
+      placementPricingTotalMinor(
+        placements,
+        durationMinutes,
+      )
+
+    campaign.budget.lifetimeAmountMinor =
+      requiredAmountMinor
+
+    if (!paidCampaign) {
+      campaign.payment.status =
+        'unpaid'
+      campaign.payment.providerMode =
+        'unknown'
+      campaign.payment.requiredAmountMinor =
+        requiredAmountMinor
+      campaign.payment.placementCharges =
+        placementPricingRows(
+          placements,
+          durationMinutes,
+        )
+      campaign.payment.providerOrderId =
+        ''
+      campaign.payment.providerPaymentId =
+        ''
+      campaign.payment.paidAt =
+        null
+    }
+  }
+
+  campaign.contextualTags =
+    contextualTags
+  campaign.frequencyCapPerContext =
+    input.frequencyCapPerContext
+  campaign.creative = {
+    headline:
+      input.headline,
+    body:
+      input.body,
+    landingRef:
+      input.landingRef,
+    sponsorLabel:
+      input.sponsorLabel,
+    imageUrl:
+      input.imageUrl || '',
+  }
+
+  campaign.status =
+    'pending_review'
+  campaign.review = {
+    decision:
+      'pending',
+    reason:
+      '',
+    evidenceRefs:
+      [],
+    reviewedByUserId:
+      null,
+    reviewedAt:
+      null,
+  }
+
+  await campaign.save()
+
+  if (campaign.payment?.status === 'paid') {
+    await notifyCampaignReadyForAdminReviewBestEffort(
+      campaign,
+    )
+  }
+
+  return {
+    campaign:
+      serializeCampaign(
+        campaign,
+      ),
+
+    bookingLocked:
+      campaign.payment?.status === 'paid',
+  }
+}
+
 export async function listHostRetailMediaCampaigns({
   actorUser,
 }) {
@@ -798,6 +1764,8 @@ export async function listHostRetailMediaCampaigns({
     'campaigns.read',
   )
 
+  await endExpiredRetailMediaCampaigns()
+
   const campaigns =
     await Campaign.find({
       organizationId:
@@ -808,6 +1776,21 @@ export async function listHostRetailMediaCampaigns({
           -1,
       })
       .lean()
+
+  await Promise.all(
+    campaigns
+      .filter(
+        (campaign) =>
+          campaign.status === 'pending_review' &&
+          campaign.payment?.status === 'paid',
+      )
+      .map(
+        (campaign) =>
+          notifyCampaignReadyForAdminReviewBestEffort(
+            campaign,
+          ),
+      ),
+  )
 
   return {
     campaigns:
@@ -844,7 +1827,18 @@ export async function getHostRetailMediaPricing({
       RETAIL_MEDIA_PAYMENT_RECIPIENT,
 
     pricingModel:
-      'fixed_placement_test_fee',
+      'fixed_placement_duration_test_fee',
+
+    baseDurationMinutes:
+      RETAIL_MEDIA_DEFAULT_DURATION_MINUTES,
+
+    durationOptions:
+      RETAIL_MEDIA_DURATION_OPTIONS.map((option) => ({
+        ...option,
+        priceMultiplier:
+          option.durationMinutes /
+          RETAIL_MEDIA_DEFAULT_DURATION_MINUTES,
+      })),
 
     placementPricing:
       Object.entries(
@@ -855,6 +1849,9 @@ export async function getHostRetailMediaPricing({
           amountMinor,
         }),
       ),
+
+    placementSlots:
+      RETAIL_MEDIA_PLACEMENT_SLOTS,
 
     paymentProvider: {
       provider: 'razorpay',
@@ -869,6 +1866,74 @@ export async function getHostRetailMediaPricing({
     testModeBypass:
       feature.testModeBypass ===
       true,
+  }
+}
+
+export async function getHostRetailMediaPlacementAvailability({
+  placement,
+  slotKey,
+  durationMinutes,
+  requestedStartAt = null,
+  actorUser,
+}) {
+  await requireRetailMediaFeature()
+
+  const context =
+    await resolveHostOperationsContext(
+      actorUser,
+    )
+
+  assertHostOperationsPermission(
+    context,
+    'campaigns.read',
+  )
+
+  return {
+    availability:
+      await findSlotAvailability({
+        placement,
+        slotKey,
+        durationMinutes,
+        requestedStartAt,
+      }),
+  }
+}
+
+export async function createRetailMediaCampaignImageUploadIntent({
+  actorUser,
+}) {
+  await requireRetailMediaFeature()
+
+  const context =
+    await resolveHostOperationsContext(
+      actorUser,
+    )
+
+  assertHostOperationsPermission(
+    context,
+    'campaigns.manage',
+  )
+
+  try {
+    return {
+      uploadIntent:
+        createRetailMediaImageUploadIntent({
+          userId:
+            actorId(actorUser),
+        }),
+    }
+  } catch (error) {
+    throw new ApiError(
+      503,
+      'Campaign image upload is temporarily unavailable.',
+      [
+        {
+          code:
+            error?.code ||
+            'M21_RETAIL_MEDIA_IMAGE_PROVIDER_UNAVAILABLE',
+        },
+      ],
+    )
   }
 }
 
@@ -941,6 +2006,7 @@ export async function createRetailMediaCampaignPaymentIntent({
       campaign.payment?.requiredAmountMinor ||
         placementPricingTotalMinor(
           campaign.placements,
+          campaign.durationMinutes,
         ),
     )
 
@@ -957,11 +2023,87 @@ export async function createRetailMediaCampaignPaymentIntent({
     )
   }
 
+  const placementSelections =
+    normalizePlacementSelections({
+      placements:
+        campaign.placements,
+      placementSelections:
+        campaign.placementSelections || [],
+    })
+
+  const scheduledStartsAt =
+    campaign.scheduledStartsAt ||
+    new Date()
+
+  const scheduledEndsAt =
+    campaign.scheduledEndsAt ||
+    new Date(
+      new Date(scheduledStartsAt).getTime() +
+        normalizeDurationMinutes(campaign.durationMinutes) * 60 * 1000,
+    )
+
+  const availabilityChecks =
+    await Promise.all(
+      placementSelections.map((selection) =>
+        findSlotAvailability({
+          placement:
+            selection.placement,
+          slotKey:
+            selection.slotKey,
+          durationMinutes:
+            campaign.durationMinutes,
+          requestedStartAt:
+            scheduledStartsAt,
+          excludeCampaignId:
+            campaign._id,
+        }),
+      ),
+    )
+
+  const blockedPosition =
+    availabilityChecks.find(
+      (item) => !item.available,
+    )
+
+  if (blockedPosition) {
+    throw new ApiError(
+      409,
+      `${blockedPosition.slotLabel} is already booked for this time. It is next available from ${new Date(
+        blockedPosition.nextAvailableAt,
+      ).toISOString()}. Choose that time or another position before payment.`,
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_POSITION_NO_LONGER_AVAILABLE',
+          placement:
+            blockedPosition.placement,
+          slotKey:
+            blockedPosition.slotKey,
+          nextAvailableAt:
+            blockedPosition.nextAvailableAt,
+        },
+      ],
+    )
+  }
+
+  campaign.placementSelections =
+    placementSelections
+  campaign.scheduledStartsAt =
+    scheduledStartsAt
+  campaign.scheduledEndsAt =
+    scheduledEndsAt
+  campaign.reservationHeldUntil =
+    new Date(
+      Date.now() +
+        RETAIL_MEDIA_RESERVATION_HOLD_MINUTES * 60 * 1000,
+    )
+
   if (
     campaign.payment?.status ===
       'initiated' &&
     campaign.payment?.providerOrderId
   ) {
+    await campaign.save()
     return {
       campaign:
         serializeCampaign(campaign),
@@ -1019,6 +2161,7 @@ export async function createRetailMediaCampaignPaymentIntent({
         ? campaign.payment.placementCharges
         : placementPricingRows(
             campaign.placements,
+            campaign.durationMinutes,
           ),
     providerOrderId:
       providerOrder.providerOrderId,
@@ -1090,6 +2233,10 @@ export async function verifyRetailMediaCampaignPayment({
   }
 
   if (campaign.payment?.status === 'paid') {
+    await notifyCampaignReadyForAdminReviewBestEffort(
+      campaign,
+    )
+
     return {
       campaign:
         serializeCampaign(campaign),
@@ -1189,8 +2336,14 @@ export async function verifyRetailMediaCampaignPayment({
     providerPayment.providerPaymentId
   campaign.payment.paidAt =
     new Date()
+  campaign.reservationHeldUntil =
+    null
 
   await campaign.save()
+
+  await notifyCampaignReadyForAdminReviewBestEffort(
+    campaign,
+  )
 
   return {
     campaign:
@@ -1216,6 +2369,8 @@ export async function transitionHostRetailMediaCampaign({
     context,
     'campaigns.manage',
   )
+
+  await endExpiredRetailMediaCampaigns()
 
   const campaign =
     await Campaign.findOne({
@@ -1277,32 +2432,81 @@ export async function transitionHostRetailMediaCampaign({
     const now =
       new Date()
 
-    if (
-      campaign.endsAt &&
-      campaign.endsAt <= now
-    ) {
-      campaign.status =
-        'ended'
-
-      await campaign.save()
-
-      throw new ApiError(
-        409,
-        'Expired Retail Media Campaign cannot be activated.',
-        [
-          {
-            code:
-              'M21_RETAIL_MEDIA_CAMPAIGN_EXPIRED',
-          },
-        ],
+    const durationMinutes =
+      normalizeDurationMinutes(
+        campaign.durationMinutes,
       )
+
+    const bookedStartsAt =
+      campaign.scheduledStartsAt
+        ? new Date(campaign.scheduledStartsAt)
+        : null
+
+    const bookedEndsAt =
+      campaign.scheduledEndsAt
+        ? new Date(campaign.scheduledEndsAt)
+        : null
+
+    let activationStartsAt =
+      bookedStartsAt && bookedStartsAt > now
+        ? bookedStartsAt
+        : now
+
+    let activationEndsAt =
+      bookedStartsAt &&
+      bookedStartsAt > now &&
+      bookedEndsAt
+        ? bookedEndsAt
+        : null
+
+    if (!activationEndsAt) {
+      const placementSelections =
+        normalizePlacementSelections({
+          placements:
+            campaign.placements,
+          placementSelections:
+            campaign.placementSelections || [],
+        })
+
+      const bookingWindow =
+        await findCommonPlacementWindow({
+          placementSelections,
+          durationMinutes,
+          requestedStartAt: now,
+          excludeCampaignId:
+            campaign._id,
+        })
+
+      activationStartsAt =
+        bookingWindow.scheduledStartsAt
+      activationEndsAt =
+        bookingWindow.scheduledEndsAt
+      campaign.placementSelections =
+        placementSelections
+      campaign.scheduledStartsAt =
+        activationStartsAt
+      campaign.scheduledEndsAt =
+        activationEndsAt
     }
+
+    campaign.durationMinutes =
+      durationMinutes
 
     campaign.status =
       'active'
 
     campaign.activatedAt =
       now
+
+    campaign.startsAt =
+      activationStartsAt
+
+    campaign.endsAt =
+      activationEndsAt ||
+      new Date(
+        activationStartsAt.getTime() +
+          durationMinutes * 60 * 1000,
+      )
 
     campaign.pausedAt =
       null
@@ -1348,6 +2552,30 @@ export async function transitionHostRetailMediaCampaign({
       )
     }
 
+    const now =
+      new Date()
+
+    if (
+      campaign.endsAt &&
+      campaign.endsAt <= now
+    ) {
+      campaign.status =
+        'ended'
+
+      await campaign.save()
+
+      throw new ApiError(
+        409,
+        'This Retail Media Campaign has reached its selected duration and cannot be resumed.',
+        [
+          {
+            code:
+              'M21_RETAIL_MEDIA_CAMPAIGN_DURATION_ENDED',
+          },
+        ],
+      )
+    }
+
     campaign.status =
       'active'
 
@@ -1370,6 +2598,8 @@ export async function listAdminRetailMediaCampaigns({
   limit = 100,
 }) {
   await requireRetailMediaFeature()
+
+  await endExpiredRetailMediaCampaigns()
 
   const filter =
     status
@@ -1398,11 +2628,93 @@ export async function listAdminRetailMediaCampaigns({
       )
       .lean()
 
+  const organizationIds =
+    [
+      ...new Set(
+        campaigns
+          .map((campaign) => stringId(campaign.organizationId))
+          .filter(Boolean),
+      ),
+    ]
+
+  const brandIds =
+    [
+      ...new Set(
+        campaigns
+          .map((campaign) => stringId(campaign.brandId))
+          .filter(Boolean),
+      ),
+    ]
+
+  const [organizations, brands] =
+    await Promise.all([
+      organizationIds.length
+        ? MarketplaceOrganization.find({
+            _id: {
+              $in: organizationIds,
+            },
+          })
+            .select('_id displayName organizationType status')
+            .lean()
+        : [],
+
+      brandIds.length
+        ? Brand.find({
+            _id: {
+              $in: brandIds,
+            },
+          })
+            .select('_id name status')
+            .lean()
+        : [],
+    ])
+
+  const organizationById =
+    new Map(
+      organizations.map((organization) => [
+        stringId(organization._id),
+        organization,
+      ]),
+    )
+
+  const brandById =
+    new Map(
+      brands.map((brand) => [
+        stringId(brand._id),
+        brand,
+      ]),
+    )
+
   return {
     campaigns:
-      campaigns.map(
-        serializeCampaign,
-      ),
+      campaigns.map((campaign) => {
+        const serialized =
+          serializeCampaign(campaign)
+
+        const organization =
+          organizationById.get(serialized.organizationId) ||
+          null
+
+        const brand =
+          brandById.get(serialized.brandId) ||
+          null
+
+        return {
+          ...serialized,
+          organizationName:
+            organization?.displayName ||
+            'Host business',
+          organizationType:
+            organization?.organizationType ||
+            '',
+          organizationStatus:
+            organization?.status ||
+            '',
+          brandName:
+            brand?.name ||
+            '',
+        }
+      }),
   }
 }
 
@@ -1486,7 +2798,16 @@ export async function reviewAdminRetailMediaCampaign({
       new Date(),
   }
 
-  await campaign.save()
+  if (input.decision === 'approve') {
+    await activateApprovedRetailMediaCampaign(
+      campaign,
+      {
+        now: campaign.review.reviewedAt,
+      },
+    )
+  } else {
+    await campaign.save()
+  }
 
   await recordAdminAuditEvent({
     actorUser,
@@ -1537,6 +2858,10 @@ export async function reviewAdminRetailMediaCampaign({
     requestId,
   })
 
+  await notifyHostCampaignReviewResultBestEffort(
+    campaign,
+  )
+
   return {
     campaign:
       serializeCampaign(
@@ -1547,10 +2872,11 @@ export async function reviewAdminRetailMediaCampaign({
 
 function activeCampaignFilter({
   placement,
+  slotKey = '',
   marketCode,
   now,
 }) {
-  return {
+  const filter = {
     status:
       'active',
 
@@ -1597,6 +2923,17 @@ function activeCampaignFilter({
       },
     ],
   }
+
+  if (slotKey) {
+    filter.placementSelections = {
+      $elemMatch: {
+        placement,
+        slotKey,
+      },
+    }
+  }
+
+  return filter
 }
 
 function sponsoredScore({
@@ -1673,6 +3010,7 @@ function sponsoredScore({
 async function writeDecisionLog({
   campaign,
   placement,
+  slotKey = '',
   marketCode,
   contextFingerprint,
   outcome,
@@ -1690,6 +3028,7 @@ async function writeDecisionLog({
         null,
 
       placement,
+      slotKey,
       marketCode,
       contextFingerprint,
 
@@ -1733,6 +3072,679 @@ async function writeDecisionLog({
   )
 }
 
+function publicCampaignProductPrice({
+  priceRule,
+}) {
+  if (!priceRule?.listPrice) {
+    return null
+  }
+
+  const listAmountMinor =
+    Number(
+      priceRule.listPrice.amountMinor,
+    )
+
+  const saleAmountMinor =
+    priceRule.salePrice?.amountMinor === null ||
+    priceRule.salePrice?.amountMinor === undefined
+      ? null
+      : Number(
+          priceRule.salePrice.amountMinor,
+        )
+
+  const effectiveAmountMinor =
+    saleAmountMinor ??
+    listAmountMinor
+
+  const discountPercent =
+    saleAmountMinor !== null &&
+    listAmountMinor > 0 &&
+    saleAmountMinor < listAmountMinor
+      ? Math.round(
+          (
+            (
+              listAmountMinor -
+              saleAmountMinor
+            ) /
+            listAmountMinor
+          ) *
+            100,
+        )
+      : 0
+
+  return {
+    listAmountMinor,
+    saleAmountMinor,
+    effectiveAmountMinor,
+    currency:
+      priceRule.salePrice?.currency ||
+      priceRule.listPrice.currency ||
+      'INR',
+    discountPercent,
+  }
+}
+
+async function listPublicCampaignProducts({
+  campaign,
+  now,
+}) {
+  const offers =
+    await HostOffer.find({
+      organizationId:
+        campaign.organizationId,
+      status:
+        'active',
+    })
+      .sort({
+        updatedAt:
+          -1,
+        _id:
+          -1,
+      })
+      .lean()
+
+  if (!offers.length) {
+    return []
+  }
+
+  const offerIds =
+    offers.map(
+      (offer) =>
+        offer._id,
+    )
+
+  const packIds =
+    offers.map(
+      (offer) =>
+        offer.packId,
+    )
+
+  const [
+    priceRules,
+    packs,
+    versions,
+  ] =
+    await Promise.all([
+      PriceRule.find({
+        organizationId:
+          campaign.organizationId,
+        offerId: {
+          $in:
+            offerIds,
+        },
+        status: {
+          $ne:
+            'disabled',
+        },
+        effectiveFrom: {
+          $lte:
+            now,
+        },
+        $or: [
+          {
+            effectiveTo:
+              null,
+          },
+          {
+            effectiveTo: {
+              $gt:
+                now,
+            },
+          },
+        ],
+      })
+        .sort({
+          effectiveFrom:
+            -1,
+          _id:
+            -1,
+        })
+        .lean(),
+
+      Pack.find({
+        _id: {
+          $in:
+            packIds,
+        },
+        status:
+          'active',
+      })
+        .select(
+          '_id variantId packKey displayName packType',
+        )
+        .lean(),
+
+      ProductVersion.find({
+        packId: {
+          $in:
+            packIds,
+        },
+        publicationStatus:
+          'published',
+        $and: [
+          {
+            $or: [
+              {
+                effectiveFrom:
+                  null,
+              },
+              {
+                effectiveFrom: {
+                  $lte:
+                    now,
+                },
+              },
+            ],
+          },
+          {
+            $or: [
+              {
+                effectiveTo:
+                  null,
+              },
+              {
+                effectiveTo: {
+                  $gt:
+                    now,
+                },
+              },
+            ],
+          },
+        ],
+      })
+        .select(
+          '_id packId variantId version displayName netQuantity images',
+        )
+        .sort({
+          packId:
+            1,
+          version:
+            -1,
+          _id:
+            -1,
+        })
+        .lean(),
+    ])
+
+  const priceRuleByOfferId =
+    new Map()
+
+  for (const rule of priceRules) {
+    const key =
+      stringId(
+        rule.offerId,
+      )
+
+    if (
+      key &&
+      !priceRuleByOfferId.has(key)
+    ) {
+      priceRuleByOfferId.set(
+        key,
+        rule,
+      )
+    }
+  }
+
+  const packById =
+    new Map(
+      packs.map(
+        (pack) => [
+          stringId(pack._id),
+          pack,
+        ],
+      ),
+    )
+
+  const versionByPackId =
+    new Map()
+
+  for (const version of versions) {
+    const key =
+      stringId(
+        version.packId,
+      )
+
+    if (
+      key &&
+      !versionByPackId.has(key)
+    ) {
+      versionByPackId.set(
+        key,
+        version,
+      )
+    }
+  }
+
+  const variantIds =
+    [
+      ...new Set(
+        packs
+          .map(
+            (pack) =>
+              stringId(
+                pack.variantId,
+              ),
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  const variants =
+    variantIds.length
+      ? await ProductVariant.find({
+          _id: {
+            $in:
+              variantIds,
+          },
+          status:
+            'active',
+        })
+          .select(
+            '_id familyId variantKey canonicalName',
+          )
+          .lean()
+      : []
+
+  const variantById =
+    new Map(
+      variants.map(
+        (variant) => [
+          stringId(variant._id),
+          variant,
+        ],
+      ),
+    )
+
+  const familyIds =
+    [
+      ...new Set(
+        variants
+          .map(
+            (variant) =>
+              stringId(
+                variant.familyId,
+              ),
+          )
+          .filter(Boolean),
+      ),
+    ]
+
+  const families =
+    familyIds.length
+      ? await ProductFamily.find({
+          _id: {
+            $in:
+              familyIds,
+          },
+          status:
+            'active',
+        })
+          .select(
+            '_id brandId slug canonicalName',
+          )
+          .lean()
+      : []
+
+  const familyById =
+    new Map(
+      families.map(
+        (family) => [
+          stringId(family._id),
+          family,
+        ],
+      ),
+    )
+
+  const campaignBrandId =
+    stringId(
+      campaign.brandId,
+    )
+
+  const products = []
+
+  for (const offer of offers) {
+    const offerId =
+      stringId(
+        offer._id,
+      )
+    const packId =
+      stringId(
+        offer.packId,
+      )
+    const pack =
+      packById.get(
+        packId,
+      )
+    const version =
+      versionByPackId.get(
+        packId,
+      )
+    const priceRule =
+      priceRuleByOfferId.get(
+        offerId,
+      )
+
+    if (
+      !pack ||
+      !version ||
+      !priceRule
+    ) {
+      continue
+    }
+
+    const variant =
+      variantById.get(
+        stringId(
+          pack.variantId ||
+            version.variantId,
+        ),
+      )
+
+    const family =
+      variant
+        ? familyById.get(
+            stringId(
+              variant.familyId,
+            ),
+          )
+        : null
+
+    if (
+      campaignBrandId &&
+      stringId(
+        family?.brandId,
+      ) !== campaignBrandId
+    ) {
+      continue
+    }
+
+    const sortedImages =
+      Array.isArray(
+        version.images,
+      )
+        ? [
+            ...version.images,
+          ].sort(
+            (left, right) =>
+              Number(
+                left?.sortOrder ||
+                  0,
+              ) -
+              Number(
+                right?.sortOrder ||
+                  0,
+              ),
+          )
+        : []
+
+    const image =
+      sortedImages.find(
+        (item) =>
+          Boolean(
+            String(
+              item?.url ||
+                '',
+            ).trim(),
+          ),
+      )
+
+    const price =
+      publicCampaignProductPrice({
+        priceRule,
+      })
+
+    if (!price) {
+      continue
+    }
+
+    products.push({
+      offerId,
+      packId,
+      productVersionId:
+        stringId(
+          version._id,
+        ),
+      displayName:
+        version.displayName ||
+        pack.displayName ||
+        family?.canonicalName ||
+        'Product',
+      slug:
+        buildPublicProductSlug({
+          familySlug:
+            family?.slug,
+          variantKey:
+            variant?.variantKey,
+          packKey:
+            pack.packKey,
+        }),
+      image: image
+        ? {
+            url:
+              image.url ||
+              '',
+            alt:
+              image.alt ||
+              version.displayName ||
+              '',
+          }
+        : null,
+      netQuantity:
+        version.netQuantity ||
+        null,
+      price,
+    })
+  }
+
+  const imageReadyProducts =
+    await Promise.all(
+      products.map(
+        async (product) => {
+          if (
+            product?.image?.url ||
+            !product?.slug
+          ) {
+            return product
+          }
+
+          try {
+            const publicProduct =
+              await getPublicProductBySlug(
+                product.slug,
+              )
+
+            if (
+              publicProduct?.image?.url
+            ) {
+              return {
+                ...product,
+                image: {
+                  url:
+                    publicProduct.image.url,
+                  alt:
+                    publicProduct.image.alt ||
+                    product.displayName ||
+                    '',
+                },
+              }
+            }
+          } catch {
+            // Keep the promotion usable when a governed image is unavailable.
+          }
+
+          return product
+        },
+      ),
+    )
+
+  return imageReadyProducts
+}
+
+export async function getPublicRetailMediaPromotion({
+  campaignId,
+}) {
+  await requireRetailMediaFeature()
+
+  const now =
+    new Date()
+
+  await endExpiredRetailMediaCampaigns(
+    now,
+  )
+
+  const campaign =
+    await Campaign.findOne({
+      _id:
+        campaignId,
+      status:
+        'active',
+      'payment.status':
+        'paid',
+      'review.decision':
+        'approved',
+      $and: [
+        {
+          $or: [
+            {
+              startsAt:
+                null,
+            },
+            {
+              startsAt: {
+                $lte:
+                  now,
+              },
+            },
+          ],
+        },
+        {
+          $or: [
+            {
+              endsAt:
+                null,
+            },
+            {
+              endsAt: {
+                $gt:
+                  now,
+              },
+            },
+          ],
+        },
+      ],
+    }).lean()
+
+  if (!campaign) {
+    throw new ApiError(
+      404,
+      'This promotion is not currently available.',
+      [
+        {
+          code:
+            'M21_RETAIL_MEDIA_PUBLIC_PROMOTION_NOT_AVAILABLE',
+        },
+      ],
+    )
+  }
+
+  const [
+    organization,
+    brand,
+    products,
+  ] =
+    await Promise.all([
+      MarketplaceOrganization.findById(
+        campaign.organizationId,
+      )
+        .select(
+          '_id displayName slug organizationType status',
+        )
+        .lean(),
+
+      campaign.brandId
+        ? Brand.findById(
+            campaign.brandId,
+          )
+            .select(
+              '_id name slug logoUrl',
+            )
+            .lean()
+        : null,
+
+      listPublicCampaignProducts({
+        campaign,
+        now,
+      }),
+    ])
+
+  const sponsorName =
+    String(
+      brand?.name ||
+        organization?.displayName ||
+        campaign.title ||
+        'EPANTRY partner',
+    ).trim()
+
+  return {
+    promotion: {
+      id:
+        stringId(
+          campaign._id,
+        ),
+      title:
+        campaign.title ||
+        '',
+      objective:
+        campaign.objective ||
+        'promotion',
+      sponsor: {
+        organizationId:
+          stringId(
+            campaign.organizationId,
+          ),
+        brandId:
+          stringId(
+            campaign.brandId,
+          ),
+        name:
+          sponsorName,
+        logoUrl:
+          brand?.logoUrl ||
+          '',
+      },
+      creative: {
+        headline:
+          campaign.creative?.headline ||
+          '',
+        body:
+          campaign.creative?.body ||
+          '',
+        imageUrl:
+          campaign.creative?.imageUrl ||
+          '',
+        sponsorLabel:
+          campaign.creative?.sponsorLabel ||
+          'Sponsored',
+      },
+      startsAt:
+        campaign.startsAt ||
+        null,
+      endsAt:
+        campaign.endsAt ||
+        null,
+      durationMinutes:
+        normalizeDurationMinutes(
+          campaign.durationMinutes,
+        ),
+      placements:
+        campaign.placementSelections ||
+        [],
+    },
+    products,
+  }
+}
+
 export async function decideLowRiskSponsoredPlacement({
   input,
 }) {
@@ -1760,19 +3772,39 @@ export async function decideLowRiskSponsoredPlacement({
       placement:
         input.placement,
 
+      slotKey:
+        input.slotKey || '',
+
       marketCode,
 
       contextTags,
+
+      viewerKey:
+        String(input.viewerKey || '').trim(),
     })
 
   const now =
     new Date()
+
+  await endExpiredRetailMediaCampaigns(now)
+
+  await activateApprovedRetailMediaCampaignsForServing({
+    placement:
+      input.placement,
+    slotKey:
+      input.slotKey || '',
+    marketCode,
+    now,
+  })
 
   const campaigns =
     await Campaign.find(
       activeCampaignFilter({
         placement:
           input.placement,
+
+        slotKey:
+          input.slotKey || '',
 
         marketCode,
 
@@ -1797,6 +3829,9 @@ export async function decideLowRiskSponsoredPlacement({
 
         placement:
           input.placement,
+
+        slotKey:
+          input.slotKey || '',
 
         marketCode,
 
@@ -1911,6 +3946,9 @@ export async function decideLowRiskSponsoredPlacement({
         placement:
           input.placement,
 
+        slotKey:
+          input.slotKey || '',
+
         marketCode,
 
         contextFingerprint,
@@ -1959,6 +3997,9 @@ export async function decideLowRiskSponsoredPlacement({
       placement:
         input.placement,
 
+      slotKey:
+        input.slotKey || '',
+
       marketCode,
 
       contextFingerprint,
@@ -1977,6 +4018,38 @@ export async function decideLowRiskSponsoredPlacement({
         selected.score,
     })
 
+  const [
+    sponsorOrganization,
+    sponsorBrand,
+  ] =
+    await Promise.all([
+      MarketplaceOrganization.findById(
+        selected.campaign.organizationId,
+      )
+        .select(
+          '_id displayName',
+        )
+        .lean(),
+
+      selected.campaign.brandId
+        ? Brand.findById(
+            selected.campaign.brandId,
+          )
+            .select(
+              '_id name logoUrl',
+            )
+            .lean()
+        : null,
+    ])
+
+  const sponsorName =
+    String(
+      sponsorBrand?.name ||
+        sponsorOrganization?.displayName ||
+        selected.campaign.title ||
+        'EPANTRY partner',
+    ).trim()
+
   return {
     sponsored: {
       campaignId:
@@ -1989,6 +4062,28 @@ export async function decideLowRiskSponsoredPlacement({
           selected.campaign
             .organizationId,
         ),
+
+      sponsorName,
+
+      sponsorLogoUrl:
+        sponsorBrand?.logoUrl ||
+        '',
+
+      campaignTitle:
+        selected.campaign.title ||
+        '',
+
+      objective:
+        selected.campaign.objective ||
+        'promotion',
+
+      startsAt:
+        selected.campaign.startsAt ||
+        null,
+
+      endsAt:
+        selected.campaign.endsAt ||
+        null,
 
       promotedEntityType:
         selected.campaign
@@ -2021,6 +4116,18 @@ export async function decideLowRiskSponsoredPlacement({
           .creative
           ?.sponsorLabel ||
         'Sponsored',
+
+      imageUrl:
+        selected.campaign
+          .creative
+          ?.imageUrl ||
+        '',
+
+      placement:
+        input.placement,
+
+      slotKey:
+        input.slotKey || '',
 
       whyAmISeeingThis: [
         'This is a paid placement.',

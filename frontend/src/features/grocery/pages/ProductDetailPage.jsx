@@ -35,6 +35,9 @@ import { getPublicPackOffers } from "../../marketplace/services/marketplace.serv
 
 import useProductDetail from "../hooks/useProductDetail";
 
+import { useCurrentLocation } from "../../location/hooks/useCurrentLocation";
+import { useLocationStore } from "../../location/store/location.store";
+
 import {
   getCatalogCategoryProducts,
   getCatalogProducts,
@@ -43,6 +46,8 @@ import {
 import { listPublicRecipes } from "../../recipes/services/recipe.service";
 
 import { openAvailabilityNotifyModal } from "../../notifications/components/AvailabilityNotifyModal";
+
+import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
 
 function formatQuantity(quantity) {
   if (!quantity || quantity.value === undefined || quantity.value === null) {
@@ -533,10 +538,11 @@ function DetailCard({
   accent = false,
   description = "",
   icon: Icon = null,
+  defaultOpen = false,
 }) {
   if (!Icon && !description) {
     return (
-      <details className="group border-b border-stone-200 last:border-b-0">
+      <details open={defaultOpen} className="group border-b border-stone-200 last:border-b-0">
         <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-6 sm:py-4">
           <div>
             <h3
@@ -571,7 +577,7 @@ function DetailCard({
   }
 
   return (
-    <details className="group border-b border-stone-200 last:border-b-0">
+    <details open={defaultOpen} className="group border-b border-stone-200 last:border-b-0">
       <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-6 sm:py-4">
         <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
           {Icon && (
@@ -614,13 +620,27 @@ function DetailCard({
 }
 
 function MarketplaceOffers({ product, onOffersResolved }) {
-  const [pincode, setPincode] = useState("");
+  const currentLocation = useLocationStore((state) => state.currentLocation);
+  const { requestCurrentLocation, status: locationStatus } = useCurrentLocation();
+  // Only a complete Indian PIN is safe for an availability lookup. Never use
+  // an approximate city name or partial postcode as proof of delivery.
+  const detectedPincode = String(currentLocation?.postcode || "")
+    .replace(/\s/g, "")
+    .match(/^\d{6}$/)?.[0] || "";
+  const [manualPincode, setManualPincode] = useState(null);
+  const [manualDraft, setManualDraft] = useState("");
+  const [manualEditorOpen, setManualEditorOpen] = useState(false);
+  const [pinEntryError, setPinEntryError] = useState("");
+  const pincode = manualPincode === null ? detectedPincode : manualPincode;
+  const isLocationApproximate =
+    currentLocation?.source === "network" || currentLocation?.accuracyMode === "approximate";
 
   const [offers, setOffers] = useState([]);
 
   const [loading, setLoading] = useState(false);
 
   const [checked, setChecked] = useState(false);
+  const [checkedPincode, setCheckedPincode] = useState("");
 
   const [error, setError] = useState(null);
 
@@ -753,86 +773,108 @@ function MarketplaceOffers({ product, onOffersResolved }) {
     }
   }
 
-  async function handleCheckOffers(event) {
-    event.preventDefault();
+  // The public offers endpoint already checks each Host's delivery service
+  // areas, active listing, valid price and available stock for this exact PIN.
+  // Auto-check the detected PIN and re-check whenever a different PIN or Pack
+  // is selected. Ignore responses from superseded requests.
+  useEffect(() => {
+    let cancelled = false;
+    const lookupPincode = pincode.trim();
+    const lookupKey = `${packId || ""}:${lookupPincode}`;
 
-    if (!packId) {
-      setError("Marketplace Pack identity is unavailable for this Product.");
+    setOffers([]);
+    setError(null);
+    setChecked(false);
+    setCheckedPincode("");
 
-      return;
+    if (!packId || !/^\d{6}$/.test(lookupPincode)) {
+      setLoading(false);
+      onOffersResolved?.({ offer: null, pincode: lookupPincode });
+      return () => { cancelled = true; };
     }
 
     setLoading(true);
 
-    setChecked(false);
+    async function checkDelivery() {
+      try {
+        const result = await getPublicPackOffers({
+          packId,
+          pincode: lookupPincode,
+          fulfillmentType: "delivery",
+        });
+        if (cancelled) return;
 
-    setError(null);
-
-    try {
-      const result = await getPublicPackOffers({
-        packId,
-
-        pincode: pincode.trim(),
-
-        fulfillmentType: "delivery",
-      });
-
-      const nextOffers = result?.offers || [];
-
-      setOffers(nextOffers);
-
-      onOffersResolved?.({
-        offer: nextOffers[0] || null,
-
-        pincode: pincode.trim(),
-      });
-
-      setQuantityByOfferId((current) => {
-        const next = {};
-
-        const floatingCart = readFloatingMarketplaceCart();
-
-        const floatingItem = floatingCart?.items?.find(
-          (item) => String(item?.packId || "") === String(packId || "")
-        );
-
-        for (const offer of nextOffers) {
-          const { minimum, maximum } = getOfferQuantityBounds(offer);
-
-          const cartQuantity = Number(floatingItem?.quantity);
-
-          const existing = Number.isInteger(cartQuantity)
-            ? cartQuantity
-            : Number(current[offer.id]);
-
-          next[offer.id] = Number.isInteger(existing)
-            ? Math.min(maximum, Math.max(minimum, existing))
-            : minimum;
-        }
-
-        return next;
-      });
-
-      setChecked(true);
-    } catch (nextError) {
-      setOffers([]);
-
-      onOffersResolved?.({
-        offer: null,
-
-        pincode: pincode.trim(),
-      });
-
-      setChecked(true);
-
-      setError(nextError?.message || "Unable to check Marketplace Offers.");
-    } finally {
-      setLoading(false);
+        const nextOffers = Array.isArray(result?.offers) ? result.offers : [];
+        setOffers(nextOffers);
+        setQuantityByOfferId((current) => {
+          const next = {};
+          const floatingCart = readFloatingMarketplaceCart();
+          const floatingItem = floatingCart?.items?.find(
+            (item) => String(item?.packId || "") === String(packId)
+          );
+          for (const offer of nextOffers) {
+            const minimum = Math.max(1, Number(offer?.minimumOrderQuantity || 1));
+            const rawMax = offer?.maximumOrderQuantity;
+            const maximum = Math.max(
+              minimum,
+              rawMax === null || rawMax === undefined || !Number.isFinite(Number(rawMax))
+                ? 100000 : Math.floor(Number(rawMax))
+            );
+            const cartQuantity = Number(floatingItem?.quantity);
+            const existing = Number.isInteger(cartQuantity)
+              ? cartQuantity : Number(current[offer.id]);
+            next[offer.id] = Number.isInteger(existing)
+              ? Math.min(maximum, Math.max(minimum, existing)) : minimum;
+          }
+          return next;
+        });
+        setCheckedPincode(lookupKey);
+        setChecked(true);
+        onOffersResolved?.({ offer: nextOffers[0] || null, pincode: lookupPincode });
+      } catch (nextError) {
+        if (cancelled) return;
+        setOffers([]);
+        setCheckedPincode(lookupKey);
+        setChecked(true);
+        onOffersResolved?.({ offer: null, pincode: lookupPincode });
+        setError(nextError?.message || "Unable to check delivery availability.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
+
+    void checkDelivery();
+    return () => { cancelled = true; };
+    // Only the Pack ID and chosen PIN determine when availability is rechecked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packId, pincode]);
+
+  const verifiedForCurrentPin =
+    checked && checkedPincode === `${packId || ""}:${pincode.trim()}`;
+  const visibleOffers = verifiedForCurrentPin && !error ? offers : [];
+  const needsManualPin = !pincode || manualEditorOpen;
+
+  function handleManualPinCheck(event) {
+    event.preventDefault();
+    const nextPin = manualDraft.replace(/\s/g, "");
+    if (!/^\d{6}$/.test(nextPin)) {
+      setPinEntryError("Enter a valid 6-digit PIN code.");
+      return;
+    }
+    setPinEntryError("");
+    setManualPincode(nextPin);
+    setManualEditorOpen(false);
+  }
+
+  function openManualPinEditor() {
+    setManualDraft(pincode);
+    setPinEntryError("");
+    setManualEditorOpen(true);
   }
 
   async function handleAddToCart(offer, sourceElement) {
-    if (!packId || !offer?.id || !pincode.trim() || addingOfferId) {
+    if (!packId || !offer?.id || !/^\d{6}$/.test(pincode.trim()) ||
+        !verifiedForCurrentPin || !visibleOffers.some((item) => item.id === offer.id) || addingOfferId) {
       return;
     }
 
@@ -932,73 +974,140 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm">
           <Store size={19} aria-hidden="true" />
         </div>
-
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-black text-stone-950">
-            Check price by pincode
+            {pincode ? "Delivery availability" : "Check price by pincode"}
           </h2>
-          <p className="mt-0.5 text-[11px] leading-4 text-stone-500">
-            See prices and delivery options available for your area.
+          <p className="mt-0.5 text-xs leading-4 text-stone-600">
+            {pincode
+              ? `Delivery PIN ${pincode}${manualPincode === null ? (isLocationApproximate ? " · Estimated location" : " · Current location") : " · Selected address"}`
+              : "Choose a delivery PIN to see prices and Add to Cart."}
           </p>
         </div>
+        {pincode && !manualEditorOpen && (
+          <button
+            type="button"
+            onClick={openManualPinEditor}
+            className="focus-ring shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"
+          >
+            Change PIN
+          </button>
+        )}
       </div>
 
-      <form
-        onSubmit={handleCheckOffers}
-        className="grid gap-2 px-4 pb-4 pt-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-      >
-        <div className="relative min-w-0">
-          <MapPin
-            size={16}
-            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
-            aria-hidden="true"
-          />
-
-          <input
-            required
-            inputMode="numeric"
-            pattern="[0-9 ]{6,7}"
-            value={pincode}
-            onChange={(event) => setPincode(event.target.value)}
-            className="focus-ring h-11 w-full rounded-xl border border-stone-300 bg-white pl-10 pr-3 text-sm font-bold text-stone-900 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-            placeholder="Enter 6-digit pincode"
-          />
+      {pincode && !manualEditorOpen && (
+        <div className="px-4 pb-3">
+          {!packId ? (
+            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+              Delivery details are not available for this product yet.
+            </p>
+          ) : loading || !verifiedForCurrentPin ? (
+            <p role="status" className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-stone-600">
+              Checking delivery to {pincode}...
+            </p>
+          ) : !error && visibleOffers.length > 0 ? (
+            <p role="status" className="rounded-lg bg-emerald-100/70 px-3 py-2 text-xs font-bold text-emerald-800">
+              Delivery is available to PIN {pincode}. Choose a price and add to cart below.
+            </p>
+          ) : !error ? (
+            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
+              We don't deliver this product to this PIN code or location right now.
+            </p>
+          ) : null}
         </div>
+      )}
 
-        <button
-          disabled={loading}
-          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-center text-[12px] font-black leading-4 text-white shadow-[0_8px_20px_rgba(4,120,87,0.18)] transition hover:bg-emerald-800 disabled:opacity-50 sm:h-11 sm:px-5 sm:py-0 sm:text-sm sm:leading-normal"
+      {needsManualPin && (
+        <form
+          onSubmit={handleManualPinCheck}
+          className="space-y-2 px-4 pb-4 pt-2"
         >
-          <Search size={15} className="shrink-0" aria-hidden="true" />
-          <span className="min-w-0 text-center">
-            {loading
-              ? "Checking pincode..."
-              : "Check pincode to unlock Add to Cart"}
-          </span>
-        </button>
-      </form>
+          <label htmlFor="product-delivery-pincode" className="block text-xs font-semibold text-stone-700">
+            {pincode ? "Check delivery to another location" : "Enter your delivery PIN code"}
+          </label>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="relative min-w-0">
+              <MapPin
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
+                aria-hidden="true"
+              />
+              <input
+                id="product-delivery-pincode"
+                required
+                inputMode="numeric"
+                autoComplete="postal-code"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                value={manualDraft}
+                onFocus={() => {
+                  setManualEditorOpen(true);
+                  if (!detectedPincode && locationStatus !== "requesting") {
+                    void requestCurrentLocation();
+                  }
+                }}
+                onChange={(event) => {
+                  setManualDraft(event.target.value.replace(/\D/g, "").slice(0, 6));
+                  setPinEntryError("");
+                }}
+                className="focus-ring h-11 w-full rounded-xl border border-stone-300 bg-white pl-10 pr-3 text-sm font-bold text-stone-900 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                placeholder="Enter 6-digit pincode"
+              />
+            </div>
+            <button
+              type="submit"
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2 text-sm font-black text-white transition hover:bg-emerald-800"
+            >
+              <Search size={15} aria-hidden="true" />
+              Check delivery
+            </button>
+          </div>
+          {detectedPincode && (
+            <button
+              type="button"
+              onClick={() => {
+                setManualDraft(detectedPincode);
+                setManualPincode(null);
+                setManualEditorOpen(false);
+                setPinEntryError("");
+              }}
+              className="focus-ring inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+            >
+              Use suggested current-location PIN {detectedPincode}
+            </button>
+          )}
+          {!detectedPincode && locationStatus === "requesting" && (
+            <p className="text-xs text-stone-500">Finding your location PIN...</p>
+          )}
+          {pinEntryError && (
+            <p role="alert" className="text-xs font-bold text-rose-700">{pinEntryError}</p>
+          )}
+          {pincode && manualEditorOpen && (
+            <button
+              type="button"
+              onClick={() => { setManualEditorOpen(false); setPinEntryError(""); }}
+              className="text-xs font-bold text-stone-600 underline"
+            >
+              Cancel
+            </button>
+          )}
+        </form>
+      )}
 
-      {error && (
-        <p className="mx-4 mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+      {error && verifiedForCurrentPin && (
+        <p role="alert" className="mx-4 mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
           {error}
         </p>
       )}
 
-      {checked && !error && offers.length === 0 && (
-        <div className="mx-4 mb-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-3">
-          <p className="text-xs font-black text-stone-800">
-            No eligible Offers for this pincode.
-          </p>
-          <p className="mt-1 text-[11px] leading-4 text-stone-500">
-            Availability can depend on serviceability, current price and
-            inventory.
-          </p>
-        </div>
-      )}
-
-      {offers.length > 0 && (
-        <div className="space-y-3 border-t border-emerald-100 px-4 py-4">
-          {offers.map((offer) => (
+      {visibleOffers.length > 0 && (
+        <div
+          className="max-h-[340px] space-y-3 overflow-y-auto overscroll-contain border-t border-emerald-100 px-4 py-4 sm:max-h-[400px]"
+          role="region"
+          aria-label="Available delivery offers"
+          tabIndex={0}
+        >
+          {visibleOffers.map((offer) => (
             <article
               key={offer.id}
               className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_10px_28px_rgba(4,120,87,0.08)]"
@@ -2328,9 +2437,17 @@ export default function ProductDetailPage() {
               <div className="mt-5">
                 <MarketplaceOffers product={product} />
               </div>
+
+
             </div>
           </div>
         </section>
+
+        <SponsoredCampaignSlot
+          placement="product_detail"
+          slotKey="product_overview"
+          embedded
+        />
 
         {showAllImages && (
           <div
@@ -2495,6 +2612,12 @@ export default function ProductDetailPage() {
           </div>
         ) : null}
 
+        <SponsoredCampaignSlot
+          placement="product_detail"
+          slotKey="product_details"
+          embedded
+        />
+
         <section className="mt-4 grid gap-3 sm:mt-6 sm:gap-5 xl:grid-cols-2 xl:items-stretch">
           <section className="h-full overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_8px_24px_rgba(28,25,23,0.05)] sm:rounded-[24px] sm:shadow-[0_12px_34px_rgba(28,25,23,0.06)]">
             <div className="border-b border-stone-200 bg-stone-50/70 px-4 py-3 sm:px-6 sm:py-5">
@@ -2509,6 +2632,7 @@ export default function ProductDetailPage() {
             <div className="divide-y divide-stone-200">
               <DetailCard
                 title="Ingredients"
+                defaultOpen
                 icon={Package}
                 description="Reviewed ingredient declaration and recognized ingredients"
               >
@@ -2575,6 +2699,7 @@ export default function ProductDetailPage() {
 
               <DetailCard
                 title="Product origin"
+                defaultOpen
                 icon={Globe2}
                 description="Where this product comes from and who made or packed it"
               >
@@ -2645,6 +2770,7 @@ export default function ProductDetailPage() {
 
               <DetailCard
                 title="Allergens"
+                defaultOpen
                 icon={ShieldCheck}
                 description="Reviewed allergen declaration and governed relationships"
               >
@@ -2758,6 +2884,12 @@ export default function ProductDetailPage() {
             </div>
           </section>
         </section>
+
+        <SponsoredCampaignSlot
+          placement="product_detail"
+          slotKey="product_recommendations"
+          embedded
+        />
 
         <div className="mt-12 space-y-12 border-t border-stone-200/80 pt-10 sm:mt-14 sm:pt-12">
           <ProductRecommendationShelf

@@ -2,6 +2,8 @@ import {
   ApiError,
 } from '../../utils/ApiError.js'
 
+import { getNotificationAudienceFromUser } from '../auth/authorization.middleware.js'
+
 import {
   recordAnalyticsEventBestEffort,
 } from '../analytics/analytics.service.js'
@@ -174,6 +176,16 @@ function resolveNotificationDeepLink(
       return entityId
         ? `/grocery/search-results?q=${entityId}`
         : '/grocery'
+
+    case 'retail_media_campaign_review_requested':
+      return entityId
+        ? `/admin/community?focusCampaign=${entityId}#retail-media-review`
+        : '/admin/community#retail-media-review'
+
+    case 'retail_media_campaign_review_result':
+      return entityId
+        ? `/host/campaigns?focusCampaign=${entityId}`
+        : '/host/campaigns'
 
     case 'security_notice':
       return '/account/settings'
@@ -850,28 +862,36 @@ export async function checkItemAvailability({
         input.packId,
     })
 
+  let catalogMatch =
+    null
+
   for (
     const candidatePackId of
     packIds
   ) {
-    if (
-      !(
-        await isPackCurrentlyAvailable(
-          candidatePackId,
-        )
-      )
-    ) {
-      continue
-    }
-
     const profile =
       await resolveAvailabilityPackProfile(
         candidatePackId,
       )
 
-    if (profile) {
+    if (!profile) {
+      continue
+    }
+
+    if (!catalogMatch) {
+      catalogMatch =
+        profile
+    }
+
+    if (
+      await isPackCurrentlyAvailable(
+        candidatePackId,
+      )
+    ) {
       return {
         available:
+          true,
+        catalogAvailable:
           true,
         match:
           profile,
@@ -882,8 +902,12 @@ export async function checkItemAvailability({
   return {
     available:
       false,
+    catalogAvailable:
+      Boolean(
+        catalogMatch,
+      ),
     match:
-      null,
+      catalogMatch,
   }
 }
 
@@ -1612,6 +1636,55 @@ export async function notifyActiveSuperAdminsBestEffort({
   }
 }
 
+/*
+ * Notification audiences are derived from the controlled trigger taxonomy.
+ * A user may own both Customer and Host identities, but viewing one workspace
+ * must not expose or mutate the other workspace's notifications.
+ * Legacy notifications need no migration: their trigger and entity type are
+ * already stored and can be matched in MongoDB.
+ */
+const ADMIN_NOTIFICATION_TRIGGERS = [
+  'retail_media_campaign_review_requested',
+  'host_commercial_profile_request',
+  'hospitality_approval_requested',
+  'creator_approval_requested',
+  'host_registration',
+  'host_listing_created',
+  'host_listing_updated',
+]
+
+const HOST_NOTIFICATION_TRIGGERS = [
+  'retail_media_campaign_review_result',
+  'host_inventory_low',
+]
+
+const HOST_NOTIFICATION_RULES = [
+  { triggerType: { $in: HOST_NOTIFICATION_TRIGGERS } },
+  { triggerType: 'order_milestone', relatedEntityType: 'host_seller_order' },
+]
+
+const ADMIN_NOTIFICATION_RULES = [
+  { triggerType: { $in: ADMIN_NOTIFICATION_TRIGGERS } },
+]
+
+function notificationAudienceFilter(actorUser) {
+  const audience = getNotificationAudienceFromUser(actorUser)
+  if (audience === 'super_admin') {
+    return { $or: [...ADMIN_NOTIFICATION_RULES, { triggerType: 'security_notice' }] }
+  }
+
+  if (audience === 'host') {
+    return { $or: [...HOST_NOTIFICATION_RULES, { triggerType: 'security_notice' }] }
+  }
+
+  if (audience === 'customer') {
+    return { $nor: [...HOST_NOTIFICATION_RULES, ...ADMIN_NOTIFICATION_RULES, { category: 'operations' }] }
+  }
+
+  // No matching active account context: never fall back to every notification.
+  return { _id: { $in: [] } }
+}
+
 export async function listNotifications({
   actorUser,
   input,
@@ -1623,6 +1696,7 @@ export async function listNotifications({
 
   const filter = {
     userId,
+    ...notificationAudienceFilter(actorUser),
     status: {
       $ne:
         'suppressed',
@@ -1670,6 +1744,7 @@ export async function markNotificationRead({
     await Notification.findOne({
       _id: notificationId,
       userId,
+      ...notificationAudienceFilter(actorUser),
       status: {
         $ne: 'suppressed',
       },
@@ -1730,6 +1805,7 @@ export async function markAllNotificationsRead({
     await Notification.updateMany(
       {
         userId,
+        ...notificationAudienceFilter(actorUser),
         status: {
           $in: [
             'pending',
@@ -1857,6 +1933,7 @@ export async function performNotificationAction({
       _id:
         notificationId,
       userId,
+      ...notificationAudienceFilter(actorUser),
       status: {
         $ne:
           'suppressed',

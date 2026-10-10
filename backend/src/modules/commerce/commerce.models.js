@@ -855,6 +855,14 @@ const marketplaceCartSchema = new Schema(
       default: 'draft',
     },
 
+    // Records the destination for a recipe quote cart merged into a direct
+    // Marketplace cart. Prevents the same quote lines being charged twice.
+    mergedIntoCartId: {
+      type: objectId,
+      ref: 'MarketplaceCart',
+      default: null,
+    },
+
     createIdempotencyKey: {
       type: String,
       required: true,

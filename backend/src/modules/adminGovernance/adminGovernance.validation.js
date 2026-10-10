@@ -201,6 +201,43 @@ export const adminGovernanceSearchQuerySchema =
     })
     .strict()
 
+export const adminSearchDemandQuerySchema =
+  z
+    .object({
+      days:
+        z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(3650)
+          .default(30),
+
+      limit:
+        z.coerce
+          .number()
+          .int()
+          .min(5)
+          .max(100)
+          .default(40),
+
+      q:
+        z
+          .string()
+          .trim()
+          .max(120)
+          .optional()
+          .default(''),
+
+      area:
+        z
+          .string()
+          .trim()
+          .max(120)
+          .optional()
+          .default(''),
+    })
+    .strict()
+
 export const listReviewCasesQuerySchema =
   z
     .object({

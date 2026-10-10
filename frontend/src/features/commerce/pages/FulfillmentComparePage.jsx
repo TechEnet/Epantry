@@ -18,6 +18,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
+  useSearchParams,
 } from 'react-router-dom'
 
 import {
@@ -26,6 +27,8 @@ import {
   getCommerceErrorMessage,
   optimizeBasket,
 } from '../services/commerce.service'
+
+import SponsoredCampaignSlot from '../../retailMedia/components/SponsoredCampaignSlot'
 
 const FLOATING_MARKETPLACE_CART_KEY =
   'epantry-floating-marketplace-cart'
@@ -395,6 +398,12 @@ export default function FulfillmentComparePage() {
     planId,
   } =
     useParams()
+
+  const [searchParams] =
+    useSearchParams()
+
+  const retailMediaPreview =
+    searchParams.get('retailMediaPreview') === '1'
 
   const location =
     useLocation()
@@ -856,6 +865,12 @@ export default function FulfillmentComparePage() {
           </div>
         </section>
 
+        <SponsoredCampaignSlot
+          placement="basket_compare"
+          slotKey="basket_compare_header"
+          embedded
+        />
+
         <section className="mt-5 rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
           <p className="text-xs font-black uppercase tracking-[0.13em] text-stone-500">
             Ranking objective
@@ -914,8 +929,30 @@ export default function FulfillmentComparePage() {
           </div>
         )}
 
+        {retailMediaPreview && !quoteData ? (
+          <>
+            <SponsoredCampaignSlot
+              placement="basket_compare"
+              slotKey="basket_compare_results"
+              embedded
+            />
+
+            <SponsoredCampaignSlot
+              placement="basket_compare"
+              slotKey="basket_compare_checkout"
+              embedded
+            />
+          </>
+        ) : null}
+
         {quoteData && (
           <>
+            <SponsoredCampaignSlot
+              placement="basket_compare"
+              slotKey="basket_compare_results"
+              embedded
+            />
+
             <section className="mt-5 grid gap-4 lg:grid-cols-3">
               {(quoteData.options || []).map(
                 (
@@ -1001,6 +1038,14 @@ export default function FulfillmentComparePage() {
                   </div>
                 </div>
               </section>
+            )}
+
+            {selectedOption && (
+              <SponsoredCampaignSlot
+                placement="basket_compare"
+                slotKey="basket_compare_checkout"
+                embedded
+              />
             )}
 
             {selectedOption && (

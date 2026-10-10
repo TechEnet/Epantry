@@ -509,10 +509,6 @@ function JourneyScene({
 
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(35,27,22,0.02)_28%,rgba(35,27,22,0.08)_55%,rgba(35,27,22,0.78)_100%)]" />
 
-          <div className="absolute left-4 top-4 z-10 rounded-full border border-white/30 bg-black/20 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.24em] text-white backdrop-blur-md sm:left-5 sm:top-5 sm:text-[10px]">
-            Step {item.step}
-          </div>
-
           <div className="absolute bottom-4 left-4 right-4 z-10 sm:bottom-5 sm:left-5 sm:right-5 lg:bottom-6 lg:left-6 lg:right-6">
             <div className="max-w-[12ch] text-[clamp(25px,3vw,46px)] font-medium leading-[0.92] tracking-[-0.045em] text-white drop-shadow-[0_5px_16px_rgba(0,0,0,0.3)]">
               {item.title}
@@ -533,19 +529,14 @@ function JourneyScene({
               : 'lg:text-right'
           } text-center`}
         >
-          <div className="text-[10px] font-black uppercase tracking-[0.26em] text-[#F7EACB]/55 sm:text-xs">
+          <div className="text-[12px] font-bold uppercase tracking-[0.2em] text-[#F7EACB]/85 sm:text-[13px] lg:text-sm">
             Step {item.step}
           </div>
 
-          <h3 className="mt-3 text-[clamp(28px,3.3vw,52px)] font-medium leading-[0.96] tracking-[-0.045em] text-[#F7EACB]">
+          <h3 className="mt-2.5 text-[clamp(34px,4.2vw,68px)] font-bold leading-[0.95] tracking-[-0.045em] text-[#F7EACB]">
             {item.title}
           </h3>
 
-          <div className="mx-auto mt-4 h-px w-20 bg-[#F7EACB]/30 lg:mx-0 lg:w-28" />
-
-          <p className="mt-4 text-[13px] leading-6 text-[#F7EACB]/72 sm:text-[15px] sm:leading-7 lg:text-base">
-            {item.description}
-          </p>
         </motion.div>
       </div>
     </motion.div>
@@ -687,7 +678,9 @@ function WhyBenefitScene({
       progress,
       [
         start,
-        enter,
+        index === 0
+          ? start + (end - start) * 0.4
+          : enter,
         exit,
         end,
       ],
@@ -698,19 +691,26 @@ function WhyBenefitScene({
             '0vw',
             '0vw',
           ]
-        : index === WHY_CUSTOMER_BENEFITS.length - 1
+        : index === 0
           ? [
-              '-7vw',
-              '0vw',
-              '0vw',
-              '0vw',
+              '-58%',
+              '0%',
+              '0%',
+              '-7%',
             ]
-          : [
-              '-7vw',
-              '0vw',
-              '0vw',
-              '-3vw',
-            ],
+          : index === WHY_CUSTOMER_BENEFITS.length - 1
+            ? [
+                '-7vw',
+                '0vw',
+                '0vw',
+                '0vw',
+              ]
+            : [
+                '-7vw',
+                '0vw',
+                '0vw',
+                '-3vw',
+              ],
     )
 
   const copyX =
@@ -807,15 +807,6 @@ function WhyBenefitScene({
             />
           ) : null}
 
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.02)_30%,rgba(0,0,0,0.12)_58%,rgba(0,0,0,0.82)_100%)]" />
-
-          <div className="absolute left-4 top-4 z-10 rounded-full border border-white/25 bg-black/20 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/82 backdrop-blur-md sm:left-5 sm:top-5 sm:text-[10px]">
-            0{index + 1}
-          </div>
-
-          <div className="absolute bottom-4 left-4 right-4 z-10 max-w-[82%] text-[clamp(22px,2.1vw,36px)] font-semibold uppercase leading-[0.9] tracking-[-0.045em] text-white drop-shadow-[0_4px_14px_rgba(0,0,0,0.35)] sm:bottom-5 sm:left-5 sm:right-5">
-            {benefit.title}
-          </div>
         </motion.div>
 
         <motion.div
@@ -825,43 +816,67 @@ function WhyBenefitScene({
           }}
           className="mx-auto w-full max-w-[650px] lg:mx-0"
         >
-          <div className="text-[9px] font-semibold uppercase tracking-[0.22em] text-white/35 sm:text-[10px]">
+          <div className="text-[13px] font-bold uppercase tracking-[0.18em] text-white/65 sm:text-sm">
             Why EPANTRY
           </div>
 
-          <h3 className="mt-3 max-w-[16ch] text-[clamp(24px,2.7vw,44px)] font-medium leading-[1.02] tracking-[-0.045em] text-[#F3F1EB]">
+          <h3 className="mt-3 max-w-[16ch] text-[clamp(34px,3.4vw,60px)] font-medium leading-[0.98] tracking-[-0.045em] text-[#F3F1EB]">
             {benefit.title}
           </h3>
 
-          <p className="mt-4 max-w-[58ch] text-[12px] leading-5 text-white/48 sm:text-[13px] sm:leading-6 lg:text-sm lg:leading-6">
-            {benefit.description}
-          </p>
         </motion.div>
 
         <div className="hidden self-start pt-3 lg:block">
-          <div className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/28">
-            Why EPANTRY
-          </div>
+          <div className="w-full border-t border-white/25 pt-5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[12px] font-bold uppercase tracking-[0.15em] text-white/75">
+                Why EPANTRY
+              </span>
+              <span className="shrink-0 text-[11px] font-semibold tabular-nums tracking-[0.12em] text-white/45">
+                01 — 05
+              </span>
+            </div>
 
-          <div className="mt-4 space-y-2.5">
-            {WHY_CUSTOMER_BENEFITS.map(
-              (
-                item,
-                itemIndex,
-              ) => (
-                <div
-                  key={item.id}
-                  className={`text-[10px] leading-4 transition-opacity duration-300 ${
-                    itemIndex ===
-                    index
-                      ? 'text-white/75'
-                      : 'text-white/24'
-                  }`}
-                >
-                  {item.title}
-                </div>
-              ),
-            )}
+            <div className="mt-6 border-l border-white/20">
+              {WHY_CUSTOMER_BENEFITS.map(
+                (
+                  item,
+                  itemIndex,
+                ) => (
+                  <div
+                    key={item.id}
+                    className={`relative grid grid-cols-[24px_minmax(0,1fr)] items-center gap-3 border-b border-white/10 py-3 pl-4 pr-1 transition-colors duration-300 ${
+                      itemIndex === index
+                        ? 'bg-[linear-gradient(90deg,rgba(255,255,255,0.09),transparent)] text-[#F3F1EB]'
+                        : 'text-white/45'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`absolute -left-px bottom-2 top-2 w-[2px] transition-colors duration-300 ${
+                        itemIndex === index
+                          ? 'bg-[#CDEDDC]'
+                          : 'bg-transparent'
+                      }`}
+                    />
+                    <span className={`text-[11px] font-bold tabular-nums tracking-[0.04em] ${
+                      itemIndex === index
+                        ? 'text-[#CDEDDC]'
+                        : 'text-white/35'
+                    }`}>
+                      {String(itemIndex + 1).padStart(2, '0')}
+                    </span>
+                    <span className={`text-[clamp(12px,0.95vw,15px)] leading-[1.4] tracking-[-0.015em] ${
+                      itemIndex === index
+                        ? 'font-semibold'
+                        : 'font-medium'
+                    }`}>
+                      {item.title}
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -996,18 +1011,11 @@ function WhyEpantrySection({
           }}
           className="pointer-events-none absolute left-5 right-5 top-[max(88px,7svh)] z-30 sm:left-8 sm:right-8 lg:left-[5vw] lg:right-[5vw]"
         >
-          <div className="grid items-start gap-5 lg:grid-cols-[minmax(160px,0.46fr)_minmax(520px,1.55fr)_minmax(180px,0.42fr)] lg:gap-[5vw]">
-            <div className="text-[9px] font-semibold uppercase tracking-[0.24em] text-white/58 sm:text-[10px]">
+          <div className="flex items-start justify-between gap-6">
+            <div className="text-[13px] font-bold uppercase tracking-[0.2em] text-white/72 sm:text-sm">
               Why EPANTRY
             </div>
 
-            <h2 className="max-w-[19ch] text-[clamp(26px,3vw,48px)] font-medium leading-[0.98] tracking-[-0.045em] text-[#F3F1EB]">
-              More intelligence behind every food decision.
-            </h2>
-
-            <div className="hidden text-[8px] font-semibold uppercase tracking-[0.2em] text-white/25 lg:block">
-              01 — 05
-            </div>
           </div>
         </motion.header>
 
@@ -1197,23 +1205,16 @@ export default function HowItWorksSection() {
           <div className="h-px w-8 bg-[#F7EACB]/80 sm:w-10" />
 
           <div className="mt-3 flex flex-col gap-1 sm:mt-4">
-            <div className="flex items-baseline gap-2 sm:gap-3">
-              <span className="font-serif text-[clamp(28px,3.5vw,52px)] italic leading-none text-[#F7EACB]">
+            <div className="flex items-baseline gap-3 sm:gap-4">
+              <span className="font-serif text-[clamp(28px,3.5vw,52px)] italic leading-none tracking-[-0.025em] text-[#F7EACB]">
                 How EPANTRY
               </span>
 
-              <span className="text-[clamp(28px,4vw,58px)] font-medium uppercase leading-none tracking-[-0.045em] text-[#F7EACB]">
+              <span className="text-[clamp(28px,4vw,58px)] font-semibold uppercase leading-none tracking-[-0.035em] text-[#F7EACB]">
                 Works
               </span>
             </div>
 
-            <p className="max-w-xl text-[11px] leading-5 text-[#F7EACB]/70 sm:text-sm sm:leading-6">
-              One food journey. Everything stays connected.
-            </p>
-
-            <p className="hidden max-w-2xl text-[11px] leading-5 text-[#F7EACB]/58 sm:block sm:text-xs sm:leading-5 lg:text-sm">
-              From discovering food to understanding products, building a basket and cooking with confidence.
-            </p>
           </div>
         </motion.header>
 

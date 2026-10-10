@@ -738,16 +738,16 @@ export default function AdminRecipesPage() {
     )
 
   const [
-    status,
-    setStatus,
+    showCreate,
+    setShowCreate,
   ] =
     useState(
-      'active',
+      false,
     )
 
   const [
-    showCreate,
-    setShowCreate,
+    showAllRecentMobile,
+    setShowAllRecentMobile,
   ] =
     useState(
       false,
@@ -838,7 +838,7 @@ export default function AdminRecipesPage() {
         )
 
         try {
-          const data =
+          const firstPage =
             await listAdminRecipes({
               page:
                 1,
@@ -846,23 +846,81 @@ export default function AdminRecipesPage() {
               limit:
                 100,
 
-              status,
+              status:
+                'all',
 
               search:
                 search.trim(),
             })
 
-          setRecipes(
+          const combined =
             Array.isArray(
-              data?.recipes,
+              firstPage?.recipes,
             )
-              ? data.recipes
-              : [],
+              ? [
+                  ...firstPage.recipes,
+                ]
+              : []
+
+          const pageCount =
+            Number(
+              firstPage?.pagination?.pages ||
+                0,
+            )
+
+          if (
+            pageCount >
+            1
+          ) {
+            const remainingPages =
+              await Promise.all(
+                Array.from(
+                  {
+                    length:
+                      pageCount -
+                      1,
+                  },
+                  (_, index) =>
+                    listAdminRecipes({
+                      page:
+                        index +
+                        2,
+
+                      limit:
+                        100,
+
+                      status:
+                        'all',
+
+                      search:
+                        search.trim(),
+                    }),
+                ),
+              )
+
+            for (
+              const pageData
+              of remainingPages
+            ) {
+              if (
+                Array.isArray(
+                  pageData?.recipes,
+                )
+              ) {
+                combined.push(
+                  ...pageData.recipes,
+                )
+              }
+            }
+          }
+
+          setRecipes(
+            combined,
           )
         } catch (loadError) {
           setError(
             loadError?.message ||
-            'Unable to load Recipe administration.',
+            'Unable to load Recipe workspace.',
           )
         } finally {
           setLoading(
@@ -872,7 +930,6 @@ export default function AdminRecipesPage() {
       },
       [
         search,
-        status,
       ],
     )
 
@@ -921,6 +978,126 @@ export default function AdminRecipesPage() {
         recipes,
       ],
     )
+
+  const recipeSummary =
+    useMemo(
+      () => {
+        const summary = {
+          total:
+            recipes.length,
+
+          pending:
+            0,
+
+          drafts:
+            0,
+
+          published:
+            0,
+
+          needsFoodCheck:
+            0,
+        }
+
+        for (
+          const item
+          of recipes
+        ) {
+          const versionStatus =
+            item?.latestVersion
+              ?.status ||
+            ''
+
+          if (
+            versionStatus ===
+            'in_review'
+          ) {
+            summary.pending +=
+              1
+          }
+
+          if (
+            versionStatus ===
+            'draft'
+          ) {
+            summary.drafts +=
+              1
+          }
+
+          if (
+            versionStatus ===
+            'published'
+          ) {
+            summary.published +=
+              1
+          }
+
+          if (
+            item?.foodIntelligence
+              ?.approved !==
+            true
+          ) {
+            summary.needsFoodCheck +=
+              1
+          }
+        }
+
+        return summary
+      },
+      [
+        recipes,
+      ],
+    )
+
+  const sortedRecentRecipes =
+    useMemo(
+      () =>
+        [
+          ...recipes,
+        ].sort(
+          (
+            left,
+            right,
+          ) =>
+            new Date(
+              right?.latestVersion
+                ?.updatedAt ||
+                right?.dish
+                  ?.updatedAt ||
+                0,
+            ).getTime() -
+            new Date(
+              left?.latestVersion
+                ?.updatedAt ||
+                left?.dish
+                  ?.updatedAt ||
+                0,
+            ).getTime(),
+        ),
+      [
+        recipes,
+      ],
+    )
+
+  const recentRecipes =
+    useMemo(
+      () =>
+        sortedRecentRecipes.slice(
+          0,
+          8,
+        ),
+      [
+        sortedRecentRecipes,
+      ],
+    )
+
+  const mobileRecentRecipes =
+    showAllRecentMobile
+      ? sortedRecentRecipes
+      : sortedRecentRecipes.slice(
+          0,
+          6,
+        )
 
   const validIngredients =
     useMemo(
@@ -1431,8 +1608,8 @@ export default function AdminRecipesPage() {
 
   return (
     <AdminShell
-      title="Recipe Management"
-      description="Create and govern versioned Recipe objects. Published Recipe Versions remain immutable; corrections create new versions."
+      title="Recipe Review & Creation"
+      description="Create EPANTRY recipes and review Host submissions before anything is published."
       actions={
         canMutate ? (
           <button
@@ -1446,200 +1623,315 @@ export default function AdminRecipesPage() {
                     !current,
                 )
             }
-            className="focus-ring inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
+            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800"
           >
             <CirclePlus
               size={17}
               aria-hidden="true"
             />
 
-            New Recipe
+            {showCreate
+              ? 'Close form'
+              : 'New Recipe'}
           </button>
         ) : null
       }
     >
+      <div className="flex min-h-[100svh] flex-col bg-[#f6f4ee] pb-8">
+        <section className="overflow-hidden border-b border-emerald-900/20 bg-[#0f5f49] text-white">
+          <div className="px-4 py-5 sm:px-7 sm:py-7">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-100">
+                  Recipe workspace
+                </p>
 
-      {error && (
-        <div
-          role="alert"
-          className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800"
-        >
-          {
-            error
-          }
-        </div>
-      )}
+                <h2 className="mt-2 max-w-2xl text-2xl font-black leading-tight sm:text-3xl">
+                  <span className="sm:hidden">Create recipes and review Host submissions.</span>
+                  <span className="hidden sm:inline">Create recipes. Review Host submissions. Keep publishing controlled.</span>
+                </h2>
 
-      <section className="mb-6 rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-blue-800">
-                Live review queue
-              </span>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/90">
+                  <span className="sm:hidden">Create new recipes here and decide on Host submissions. Existing recipes stay in Catalog & Listings.</span>
+                  <span className="hidden sm:inline">Use this page for new EPANTRY recipes and recipes waiting for your decision. Existing published, draft or retired records stay in Catalog & Listings.</span>
+                </p>
+              </div>
 
-              <span className="text-xs font-bold text-stone-500">
-                {pendingReviews.length} pending
-              </span>
-            </div>
-
-            <h2 className="mt-3 text-lg font-black text-stone-950">
-              Recipes awaiting Super Admin review
-            </h2>
-
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-stone-500">
-              Host-submitted Recipes appear here as soon as they enter M07 review. This is an active review queue, not Listing History. Open a Recipe to review its content, Food Intelligence declaration and publication gates.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={
-              loadRecipes
-            }
-            disabled={
-              loading
-            }
-            className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black text-stone-700 hover:bg-stone-100 disabled:opacity-50"
-          >
-            <RefreshCw
-              size={14}
-              className={
-                loading
-                  ? 'animate-spin'
-                  : ''
-              }
-              aria-hidden="true"
-            />
-
-            Refresh queue
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="mt-5 flex items-center gap-2 rounded-2xl bg-stone-50 p-4 text-sm font-bold text-stone-500">
-            <LoaderCircle
-              size={16}
-              className="animate-spin"
-              aria-hidden="true"
-            />
-            Loading pending Recipe reviews…
-          </div>
-        ) : pendingReviews.length ===
-          0 ? (
-          <div className="mt-5 rounded-2xl border border-dashed border-stone-200 bg-stone-50 p-5">
-            <p className="text-sm font-black text-stone-800">
-              No Recipe is waiting for review.
-            </p>
-            <p className="mt-1 text-xs leading-5 text-stone-500">
-              A Host submission will appear here automatically after it is submitted for Super Admin review.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-5 grid gap-3">
-            {pendingReviews.map(
-              (
-                item,
-              ) => {
-                const dish =
-                  item?.dish ||
-                  {}
-
-                const version =
-                  item?.latestVersion ||
-                  {}
-
-                const isHostSubmission =
-                  Boolean(
-                    version?.source
-                      ?.organizationId,
-                  ) ||
-                  version?.source
-                    ?.type ===
-                    'community' ||
-                  version?.source
-                    ?.type ===
-                    'brand'
-
-                return (
-                  <article
-                    key={
-                      version.id ||
-                      dish.id
-                    }
-                    className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4"
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3 border-t border-white/15 pt-4 sm:grid-cols-4 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
+                {[
+                  ['Waiting', recipeSummary.pending],
+                  ['Drafts', recipeSummary.drafts],
+                  ['Published', recipeSummary.published],
+                  ['Loaded', recipeSummary.total],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className={label === 'Drafts' || label === 'Loaded' ? 'text-right sm:text-left' : ''}
                   >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${statusClass(
-                              version.status,
-                            )}`}
-                          >
-                            {String(
-                              version.status ||
-                                'in_review',
-                            ).replace(
-                              /_/g,
-                              ' ',
-                            )}
-                          </span>
+                    <p className="text-2xl font-black">{value}</p>
+                    <p className="mt-0.5 text-xs font-semibold text-emerald-100">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
 
-                          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-stone-600">
-                            {isHostSubmission
-                              ? 'Host submitted'
-                              : 'Editorial submission'}
-                          </span>
-
-                          <span className="text-[11px] font-bold text-stone-500">
-                            Version {version.versionNumber || '—'}
-                          </span>
-                        </div>
-
-                        <h3 className="mt-2 truncate text-base font-black text-stone-950">
-                          {dish.name ||
-                            version.title ||
-                            'Untitled Recipe'}
-                        </h3>
-
-                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
-                          <span>
-                            Source: <strong className="text-stone-700">{version?.source?.name || 'EPANTRY'}</strong>
-                          </span>
-
-                          <span>
-                            Submitted: <strong className="text-stone-700">{formatDateTime(version.submittedAt)}</strong>
-                          </span>
-
-                          {dish.cuisine ? (
-                            <span>
-                              Cuisine: <strong className="text-stone-700">{dish.cuisine}</strong>
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={
-                          () =>
-                            navigate(
-                              `/admin/recipes/${version.id}`,
-                            )
-                        }
-                        className="focus-ring inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-stone-950 px-4 text-xs font-black text-white transition hover:bg-emerald-700"
-                      >
-                        Open Review
-                      </button>
-                    </div>
-                  </article>
-                )
+          <div className="grid grid-cols-2 border-t border-white/15 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                number: '01',
+                title: 'Check new submissions',
+                text: 'Open recipes waiting for your review.',
               },
-            )}
+              {
+                number: '02',
+                title: 'Review the recipe',
+                text: 'Check ingredients, method, image and source details.',
+              },
+              {
+                number: '03',
+                title: 'Confirm food checks',
+                text: 'Make sure food and safety information is ready.',
+              },
+              {
+                number: '04',
+                title: 'Make the decision',
+                text: 'Approve, return for changes or continue the publishing flow.',
+              },
+            ].map((step, index) => (
+              <div
+                key={step.number}
+                className={`px-4 py-4 sm:px-6 ${index === 1 || index === 3 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l' : ''}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-emerald-100">{step.number}</p>
+                  {index === 0 ? <Search size={16} aria-hidden="true" className="text-emerald-200" /> : null}
+                  {index === 1 ? <ChefHat size={16} aria-hidden="true" className="text-emerald-200" /> : null}
+                  {index === 2 ? <RefreshCw size={16} aria-hidden="true" className="text-emerald-200" /> : null}
+                  {index === 3 ? <CirclePlus size={16} aria-hidden="true" className="text-emerald-200" /> : null}
+                </div>
+                <p className="mt-2 text-sm font-bold">{step.title}</p>
+                <p className="mt-1 text-xs leading-5 text-emerald-50/80">{step.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="border-b border-stone-200 bg-white px-4 py-4 sm:px-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="relative flex-1">
+              <Search
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+              />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search recipes by name, cuisine or course"
+                className="focus-ring h-11 w-full rounded-xl border border-stone-200 bg-stone-50 pl-10 pr-3 text-sm outline-none"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={loadRecipes}
+              disabled={loading}
+              className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-sm font-bold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+            >
+              <RefreshCw
+                size={15}
+                className={loading ? 'animate-spin' : ''}
+                aria-hidden="true"
+              />
+              Refresh
+            </button>
+          </div>
+        </section>
+
+        {error && (
+          <div
+            role="alert"
+            className="mx-4 mt-4 border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 sm:mx-7"
+          >
+            {error}
           </div>
         )}
-      </section>
+
+        <section className="border-b border-stone-200 bg-[#edf7f2] px-4 py-5 sm:px-7 sm:py-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.13em] text-emerald-700">
+                Review queue
+              </p>
+              <h2 className="mt-1 text-xl font-black text-stone-950">
+                Recipes waiting for your decision
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
+                <span className="sm:hidden">Host recipes waiting for a decision appear here. Open one to review and act.</span>
+                <span className="hidden sm:inline">Host submissions appear here after they are sent for review. Open one to check the recipe and decide what happens next.</span>
+              </p>
+            </div>
+
+            <p className="text-sm font-bold text-emerald-800">
+              {pendingReviews.length} waiting
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="mt-4 flex items-center gap-2 border-t border-emerald-900/10 pt-4 text-sm font-semibold text-stone-600">
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+              Loading recipes…
+            </div>
+          ) : pendingReviews.length === 0 ? (
+            <div className="mt-4 border-t border-emerald-900/10 pt-4">
+              <p className="text-sm font-bold text-stone-900">Nothing is waiting for review.</p>
+              <p className="mt-1 text-sm text-stone-600">New Host submissions will appear here automatically.</p>
+            </div>
+          ) : (
+            <div className="mt-4 border-t border-emerald-900/10">
+              {pendingReviews.map((item, index) => {
+                const dish = item?.dish || {}
+                const version = item?.latestVersion || {}
+                const isHostSubmission = Boolean(version?.source?.organizationId) || version?.source?.type === 'community' || version?.source?.type === 'brand'
+
+                return (
+                  <div
+                    key={version.id || dish.id}
+                    className={`flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between ${index > 0 ? 'border-t border-emerald-900/10' : ''}`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800">Waiting for review</span>
+                        <span className="text-xs font-semibold text-stone-500">{isHostSubmission ? 'Host submission' : 'EPANTRY submission'}</span>
+                        <span className="text-xs font-semibold text-stone-500">Version {version.versionNumber || '—'}</span>
+                      </div>
+                      <h3 className="mt-2 truncate text-base font-black text-stone-950">{dish.name || version.title || 'Untitled recipe'}</h3>
+                      <p className="mt-1 text-xs text-stone-600">
+                        {version?.source?.name || 'EPANTRY'} · Submitted {formatDateTime(version.submittedAt)}{dish.cuisine ? ` · ${dish.cuisine}` : ''}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/recipes/${version.id}`)}
+                      className="focus-ring inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-[#173b4f] px-4 text-sm font-bold text-white hover:bg-[#0f5f49]"
+                    >
+                      Review recipe
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="border-b border-stone-200 bg-white px-4 py-5 sm:px-7 sm:py-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.13em] text-[#315f7a]">
+                Recent recipe activity
+              </p>
+              <h2 className="mt-1 text-xl font-black text-stone-950">
+                See what is already in the recipe system
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
+                <span className="sm:hidden">Recent recipes confirm data is loading. Manage existing records in Catalog & Listings.</span>
+                <span className="hidden sm:inline">This confirms that recipe data is loading even when the review queue is empty. Manage existing records in Catalog & Listings.</span>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/admin/catalog')}
+              className="focus-ring inline-flex min-h-10 items-center justify-center rounded-xl border border-[#bfd3df] bg-[#edf5f9] px-4 text-sm font-bold text-[#173b4f] hover:bg-[#e3eff5]"
+            >
+              Open Catalog & Listings
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="mt-4 border-t border-stone-200 pt-4 text-sm text-stone-500">Loading recent recipes…</div>
+          ) : recentRecipes.length === 0 ? (
+            <div className="mt-4 border-t border-stone-200 pt-4 text-sm text-stone-600">No recipes have been created yet.</div>
+          ) : (
+            <>
+              <div className="mt-4 border-t border-stone-200 sm:hidden">
+                {mobileRecentRecipes.map((item, index) => {
+                  const dish = item?.dish || {}
+                  const version = item?.latestVersion || {}
+                  const foodReady = item?.foodIntelligence?.approved === true
+                  const isPending = version.status === 'in_review'
+
+                  return (
+                    <div
+                      key={version.id || dish.id || index}
+                      className={`grid gap-2 py-3 ${index > 0 ? 'border-t border-stone-100' : ''}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-stone-950">{dish.name || version.title || 'Untitled recipe'}</p>
+                        <p className="mt-0.5 text-xs text-stone-500">{dish.cuisine || 'Cuisine not set'} · Version {version.versionNumber || '—'}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <p className="text-xs font-semibold text-stone-600">{String(version.status || 'draft').replace(/_/g, ' ')}</p>
+                        <p className={`text-xs font-semibold ${foodReady ? 'text-emerald-700' : 'text-orange-700'}`}>{foodReady ? 'Food check approved' : 'Food check needed'}</p>
+                        <button
+                          type="button"
+                          onClick={() => isPending && version.id ? navigate(`/admin/recipes/${version.id}`) : navigate('/admin/catalog')}
+                          className="focus-ring ml-auto rounded-lg text-xs font-bold text-[#315f7a] underline-offset-4 hover:underline"
+                        >
+                          {isPending ? 'Review' : 'Manage'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {sortedRecentRecipes.length > 6 ? (
+                  <div className="border-t border-stone-200 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllRecentMobile((current) => !current)}
+                      className="focus-ring inline-flex min-h-9 items-center justify-center rounded-lg border border-[#bfd3df] bg-[#edf5f9] px-3 text-xs font-bold text-[#173b4f] hover:bg-[#e3eff5]"
+                    >
+                      {showAllRecentMobile ? 'Show fewer' : `View all (${sortedRecentRecipes.length})`}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 hidden border-t border-stone-200 sm:block">
+                {recentRecipes.map((item, index) => {
+                  const dish = item?.dish || {}
+                  const version = item?.latestVersion || {}
+                  const foodReady = item?.foodIntelligence?.approved === true
+                  const isPending = version.status === 'in_review'
+
+                  return (
+                    <div
+                      key={version.id || dish.id || index}
+                      className={`grid gap-2 py-3 sm:grid-cols-[minmax(0,1.5fr)_160px_150px_auto] sm:items-center ${index > 0 ? 'border-t border-stone-100' : ''}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-stone-950">{dish.name || version.title || 'Untitled recipe'}</p>
+                        <p className="mt-0.5 text-xs text-stone-500">{dish.cuisine || 'Cuisine not set'} · Version {version.versionNumber || '—'}</p>
+                      </div>
+                      <p className="text-xs font-semibold text-stone-600">{String(version.status || 'draft').replace(/_/g, ' ')}</p>
+                      <p className={`text-xs font-semibold ${foodReady ? 'text-emerald-700' : 'text-orange-700'}`}>{foodReady ? 'Food check approved' : 'Food check needed'}</p>
+                      <button
+                        type="button"
+                        onClick={() => isPending && version.id ? navigate(`/admin/recipes/${version.id}`) : navigate('/admin/catalog')}
+                        className="focus-ring justify-self-start rounded-lg text-xs font-bold text-[#315f7a] underline-offset-4 hover:underline sm:justify-self-end"
+                      >
+                        {isPending ? 'Review' : 'Manage'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </section>
 
       {showCreate &&
         canMutate && (
@@ -1647,7 +1939,7 @@ export default function AdminRecipesPage() {
             onSubmit={
               handleCreate
             }
-            className="mb-6 rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6"
+            className="order-[-1] border-b border-stone-200 bg-[#f8fbfa] p-4 sm:order-none sm:p-7"
           >
 
             <div className="flex items-center gap-3">
@@ -1662,11 +1954,11 @@ export default function AdminRecipesPage() {
               <div>
 
                 <h2 className="text-xl font-black text-stone-950">
-                  Create Recipe v1
+                  Create a new EPANTRY recipe
                 </h2>
 
                 <p className="mt-1 text-xs text-stone-500">
-                  Draft only. Publication still requires normal review and QA.
+                  Start a draft here. It must still pass the normal review and publishing checks before customers can see it.
                 </p>
 
               </div>
@@ -2400,18 +2692,21 @@ export default function AdminRecipesPage() {
           </form>
         )}
 
-      <div className="rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
-        <p className="text-sm font-black text-stone-950">Completed and historical Recipe listings live in Listing History</p>
-        <p className="mt-1 text-xs leading-5 text-stone-500">
-          Pending review work stays on this Recipe Management page. Use the dedicated Listing History workspace for existing draft/published/retired Recipe versions, Food Intelligence status, Edit and Delete actions.
-        </p>
-        <button
-          type="button"
-          onClick={() => navigate('/admin/listing-history')}
-          className="focus-ring mt-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-black text-stone-700 hover:bg-stone-100"
-        >
-          Open Listing History
-        </button>
+      <section className="bg-[#173b4f] px-4 py-5 text-white sm:px-7">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold">Need to edit, retire or manage an existing recipe?</p>
+            <p className="mt-1 text-xs leading-5 text-sky-100">Catalog & Listings is the single place for existing recipe records and their current status.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/catalog')}
+            className="focus-ring inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-[#173b4f] hover:bg-sky-50"
+          >
+            Open Catalog & Listings
+          </button>
+        </div>
+      </section>
       </div>
 
     </AdminShell>

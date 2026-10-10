@@ -146,10 +146,15 @@ import {
             ? marketplaceCart.items
             : [];
 
+    const groceryPackCount = marketplaceItems.reduce(
+        (sum, item) => sum + Math.max(1, Number(item?.quantity || 1)),
+        0,
+    );
+
     if (recipeItems.length > 0) {
         return {
             href: '/cart/recipe',
-            count: recipeItems.length,
+            count: recipeItems.length + groceryPackCount,
         };
     }
 
@@ -159,7 +164,7 @@ import {
     ) {
         return {
             href: `/cart/${marketplaceCart.cartId}`,
-            count: marketplaceItems.length,
+            count: groceryPackCount,
         };
     }
 
@@ -204,18 +209,10 @@ import {
   
     {
         label:
-            'Community',
-  
+            'About',
+
         to:
-            '/community',
-    },
-  
-    {
-        label:
-            'Learn',
-  
-        to:
-            '/learn',
+            '/about',
     },
   ];
   
@@ -454,9 +451,15 @@ import {
     } =
         useAuth();
   
+    const retailMediaPreview =
+        typeof window !== 'undefined' &&
+        window.self !== window.top &&
+        new URLSearchParams(location.search).get('retailMediaPreview') === '1';
+
     const isHostPresentation =
         activeMode === 'host' &&
-        hostEnabled === true;
+        hostEnabled === true &&
+        !retailMediaPreview;
 
     const hostWorkspaceType =
         normalizeHostWorkspaceType(
@@ -467,8 +470,7 @@ import {
         useMemo(
             () => {
                 if (
-                    activeMode === 'host' &&
-                    hostEnabled === true
+                    isHostPresentation
                 ) {
                     return HOST_NAV_ITEMS.filter(
                         (item) =>
@@ -491,9 +493,8 @@ import {
                 ];
             },
             [
-                activeMode,
-                hostEnabled,
                 hostWorkspaceType,
+                isHostPresentation,
             ],
         );
   
@@ -638,7 +639,7 @@ import {
         hasAdminAccess ||
         superAdminEnabled
             ? '/admin'
-            : activeMode === 'host' && hostEnabled
+            : isHostPresentation
                 ? '/host/operations'
                 : customerEnabled
                     ? '/dashboard'
@@ -670,12 +671,12 @@ import {
         hasAdminAccess ||
         superAdminEnabled
             ? 'Super Admin'
-            : activeMode === 'host' && hostEnabled
+            : isHostPresentation
                 ? 'Host'
                 : 'Customer';
 
     const scanDestination =
-        activeMode === 'host' && hostEnabled
+        isHostPresentation
             ? '/host/scan'
             : '/scan';
 
@@ -690,7 +691,7 @@ import {
     const showCustomerCart =
         isAuthenticated &&
         customerEnabled &&
-        !(activeMode === 'host' && hostEnabled) &&
+        !isHostPresentation &&
         !hasAdminAccess &&
         !superAdminEnabled;
 
@@ -1875,46 +1876,6 @@ import {
                                         </Link>
                                     ) : null}
 
-                                    {isCustomerPresentation ? (
-                                        <>
-                                            <Link
-                                                to="/community"
-                                                onClick={() =>
-                                                    setAccountMenuOpen(
-                                                        false,
-                                                    )
-                                                }
-                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                                role="menuitem"
-                                            >
-                                                <UsersRound
-                                                    size={17}
-                                                    className="text-stone-500"
-                                                    aria-hidden="true"
-                                                />
-                                                Community
-                                            </Link>
-
-                                            <Link
-                                                to="/learn"
-                                                onClick={() =>
-                                                    setAccountMenuOpen(
-                                                        false,
-                                                    )
-                                                }
-                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                                role="menuitem"
-                                            >
-                                                <BookOpen
-                                                    size={17}
-                                                    className="text-stone-500"
-                                                    aria-hidden="true"
-                                                />
-                                                Learn / Pro
-                                            </Link>
-                                        </>
-                                    ) : null}
-
                                     {!hasAdminAccess &&
                                     !superAdminEnabled &&
                                     canUseScan ? (
@@ -1972,6 +1933,47 @@ import {
                                         />
                                         Account Settings
                                     </Link>
+
+                                    {isCustomerPresentation ? (
+                                        <>
+                                            <Link
+                                                to="/community"
+                                                onClick={() =>
+                                                    setAccountMenuOpen(
+                                                        false,
+                                                    )
+                                                }
+                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                                                role="menuitem"
+                                            >
+                                                <UsersRound
+                                                    size={17}
+                                                    className="text-stone-500"
+                                                    aria-hidden="true"
+                                                />
+                                                Community
+                                            </Link>
+
+                                            <Link
+                                                to="/learn"
+                                                onClick={() =>
+                                                    setAccountMenuOpen(
+                                                        false,
+                                                    )
+                                                }
+                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                                                role="menuitem"
+                                            >
+                                                <BookOpen
+                                                    size={17}
+                                                    className="text-stone-500"
+                                                    aria-hidden="true"
+                                                />
+                                                Learn
+                                            </Link>
+                                        </>
+                                    ) : null}
+
                                 </div>
 
                                 {!hasAdminAccess && !superAdminEnabled ? (
@@ -2192,7 +2194,26 @@ import {
                 </div>
 
                 {mobileMenuUtilities}
-  
+
+                {isCustomerPresentation ? (
+                    <>
+                        <Link
+                            to="/community"
+                            onClick={() => setMenuOpen(false)}
+                            className={getNavClasses('/community')}
+                        >
+                            Community
+                        </Link>
+                        <Link
+                            to="/learn"
+                            onClick={() => setMenuOpen(false)}
+                            className={getNavClasses('/learn')}
+                        >
+                            Learn
+                        </Link>
+                    </>
+                ) : null}
+
                 <button
                     type="button"
                     onClick={
@@ -2276,6 +2297,24 @@ import {
                             {brandCluster}
                         </div>
   
+                        <div className="relative min-w-[220px] flex-1">
+                            <SearchBar
+                                value={
+                                    currentQuery
+                                }
+                                onSubmit={
+                                    handleSearch
+                                }
+                                compact
+                            />
+
+                            {renderNavbarSearchResults()}
+                        </div>
+  
+                        <div className="w-[168px] shrink-0">
+                            <NavbarLocationStatus />
+                        </div>
+
                         <nav
                             className="flex shrink-0 items-center gap-1"
                             aria-label="Primary navigation"
@@ -2305,37 +2344,7 @@ import {
                                     ),
                                 )}
   
-                            {!isAuthenticated ? (
-                                <Link
-                                    to="/about"
-                                    className={
-                                        getNavClasses(
-                                            '/about',
-                                        )
-                                    }
-                                >
-                                    About
-                                </Link>
-                            ) : null}
                         </nav>
-  
-                        <div className="w-[190px] shrink-0">
-                            <NavbarLocationStatus />
-                        </div>
-  
-                        <div className="relative min-w-[220px] flex-1">
-                            <SearchBar
-                                value={
-                                    currentQuery
-                                }
-                                onSubmit={
-                                    handleSearch
-                                }
-                                compact
-                            />
-
-                            {renderNavbarSearchResults()}
-                        </div>
   
                         <div className="shrink-0">
                             {wideDesktopAuth}
@@ -2376,7 +2385,7 @@ import {
                             )}
   
                             <div className="ml-1">
-                                {desktopAuth}
+                                {isCustomerPresentation ? wideDesktopAuth : desktopAuth}
                             </div>
                         </nav>
   
@@ -2415,8 +2424,6 @@ import {
                     </div>
   
                     <div className="mt-3 grid grid-cols-2 gap-3">
-                        <NavbarLocationStatus />
-  
                         <div className="relative">
                             <SearchBar
                                 value={
@@ -2430,6 +2437,8 @@ import {
 
                             {renderNavbarSearchResults()}
                         </div>
+
+                        <NavbarLocationStatus />
                     </div>
                 </div>
   
@@ -2474,29 +2483,6 @@ import {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setMobileLocationOpen((value) => !value);
-                                    setMobileSearchOpen(false);
-                                    setMenuOpen(false);
-                                }}
-                                className={[
-                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
-                                    mobileLocationOpen
-                                        ? 'border-emerald-200/80 bg-emerald-50/90 text-emerald-800'
-                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
-                                ].join(' ')}
-                                aria-label="Choose location"
-                                aria-expanded={mobileLocationOpen}
-                            >
-                                <MapPin
-                                    size={17}
-                                    strokeWidth={2.15}
-                                    aria-hidden="true"
-                                />
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
                                     setMobileSearchOpen((value) => !value);
                                     setMobileLocationOpen(false);
                                     setMenuOpen(false);
@@ -2511,6 +2497,29 @@ import {
                                 aria-expanded={mobileSearchOpen}
                             >
                                 <Search
+                                    size={17}
+                                    strokeWidth={2.15}
+                                    aria-hidden="true"
+                                />
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMobileLocationOpen((value) => !value);
+                                    setMobileSearchOpen(false);
+                                    setMenuOpen(false);
+                                }}
+                                className={[
+                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
+                                    mobileLocationOpen
+                                        ? 'border-emerald-200/80 bg-emerald-50/90 text-emerald-800'
+                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
+                                ].join(' ')}
+                                aria-label="Choose location"
+                                aria-expanded={mobileLocationOpen}
+                            >
+                                <MapPin
                                     size={17}
                                     strokeWidth={2.15}
                                     aria-hidden="true"

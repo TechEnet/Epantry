@@ -1625,6 +1625,7 @@ export async function listAdminSettlements({
   const [
     records,
     total,
+    summaryRows,
   ] =
     await Promise.all([
       HostSettlement.find(
@@ -1645,13 +1646,261 @@ export async function listAdminSettlements({
       HostSettlement.countDocuments(
         filter,
       ),
+
+      HostSettlement.aggregate([
+        {
+          $group: {
+            _id:
+              null,
+
+            total: {
+              $sum:
+                1,
+            },
+
+            pendingApproval: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      '$status',
+                      'pending_approval',
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            approved: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      '$status',
+                      'approved',
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            paid: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      '$status',
+                      'paid',
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            rejected: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      '$status',
+                      'rejected',
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            waitingAmountMinor: {
+              $sum: {
+                $cond: [
+                  {
+                    $in: [
+                      '$status',
+                      [
+                        'pending_approval',
+                        'approved',
+                      ],
+                    ],
+                  },
+                  {
+                    $ifNull: [
+                      '$totals.netPayableMinor',
+                      0,
+                    ],
+                  },
+                  0,
+                ],
+              },
+            },
+
+            paidAmountMinor: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      '$status',
+                      'paid',
+                    ],
+                  },
+                  {
+                    $ifNull: [
+                      '$totals.netPayableMinor',
+                      0,
+                    ],
+                  },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
     ])
+
+  const organizationIds = [
+    ...new Set(
+      records
+        .map(
+          (record) =>
+            stringifyId(
+              record.organizationId,
+            ),
+        )
+        .filter(
+          Boolean,
+        ),
+    ),
+  ]
+
+  const organizations =
+    organizationIds.length
+      ? await MarketplaceOrganization.find({
+          _id: {
+            $in:
+              organizationIds,
+          },
+        })
+          .select(
+            'displayName slug organizationType status',
+          )
+          .lean()
+      : []
+
+  const organizationById =
+    new Map(
+      organizations.map(
+        (organization) => [
+          stringifyId(
+            organization._id,
+          ),
+          organization,
+        ],
+      ),
+    )
+
+  const summary =
+    summaryRows[0] ||
+    {}
 
   return {
     settlements:
       records.map(
-        serializeSettlement,
+        (record) => {
+          const serialized =
+            serializeSettlement(
+              record,
+            )
+
+          const organization =
+            organizationById.get(
+              serialized.organizationId,
+            ) ||
+            null
+
+          return {
+            ...serialized,
+
+            organization:
+              organization
+                ? {
+                    id:
+                      stringifyId(
+                        organization._id,
+                      ),
+
+                    displayName:
+                      organization.displayName ||
+                      organization.slug ||
+                      'Host business',
+
+                    slug:
+                      organization.slug ||
+                      '',
+
+                    organizationType:
+                      organization.organizationType ||
+                      '',
+
+                    status:
+                      organization.status ||
+                      '',
+                  }
+                : null,
+          }
+        },
       ),
+
+    summary: {
+      total:
+        Number(
+          summary.total ||
+          0,
+        ),
+
+      pendingApproval:
+        Number(
+          summary.pendingApproval ||
+          0,
+        ),
+
+      approved:
+        Number(
+          summary.approved ||
+          0,
+        ),
+
+      paid:
+        Number(
+          summary.paid ||
+          0,
+        ),
+
+      rejected:
+        Number(
+          summary.rejected ||
+          0,
+        ),
+
+      waitingAmountMinor:
+        Number(
+          summary.waitingAmountMinor ||
+          0,
+        ),
+
+      paidAmountMinor:
+        Number(
+          summary.paidAmountMinor ||
+          0,
+        ),
+    },
 
     pagination: {
       page,

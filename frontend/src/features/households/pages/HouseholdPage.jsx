@@ -934,8 +934,8 @@ export default function HouseholdPage() {
 
   if (isLoadingHousehold) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="flex min-h-[360px] items-center justify-center rounded-[28px] border border-stone-200 bg-white">
+      <div className="min-h-screen bg-[#f7f5ef] p-4 sm:p-6 lg:p-8">
+        <div className="flex min-h-[360px] items-center justify-center rounded-[28px] border border-[#d9e3dd] bg-white">
           <div className="text-center">
             <LoaderCircle
               size={30}
@@ -956,7 +956,7 @@ export default function HouseholdPage() {
     !household
   ) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="min-h-screen bg-[#f7f5ef] p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-xl rounded-[28px] border border-red-200 bg-white p-6 shadow-sm sm:p-8">
           <CircleAlert
             size={32}
@@ -997,9 +997,9 @@ export default function HouseholdPage() {
       'active'
 
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mx-auto max-w-4xl rounded-[30px] border border-stone-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
-          <div className="grid size-14 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+      <div className="min-h-screen bg-[#f7f5ef] p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-4xl rounded-[30px] border border-[#d9e3dd] bg-white p-6 shadow-sm sm:p-8 lg:p-10">
+          <div className="grid size-14 place-items-center rounded-2xl bg-[#dcf7e8] text-[#173f35]">
             <Home
               size={27}
               aria-hidden="true"
@@ -1098,7 +1098,7 @@ export default function HouseholdPage() {
               <button
                 type="submit"
                 disabled={isCreatingHousehold}
-                className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#173f35] px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#205545] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isCreatingHousehold ? (
                   <LoaderCircle
@@ -1124,12 +1124,14 @@ export default function HouseholdPage() {
   }
 
   return (
-    <div className="w-full px-3 pb-5 pt-3 sm:px-6 sm:pb-8 sm:pt-5 lg:px-8">
+    <div className="w-full bg-[#f7f5ef] px-3 pb-5 pt-3 sm:px-6 sm:pb-8 sm:pt-5 lg:px-8">
       <div className="w-full max-w-none">
-        <header className="rounded-[24px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-4 text-stone-950 shadow-sm sm:rounded-[28px] sm:border-0 sm:bg-stone-950 sm:p-8 sm:text-white">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 sm:flex sm:items-end sm:justify-between sm:gap-5">
+        <header className="relative overflow-hidden rounded-[22px] border border-[#24594c] bg-[#173f35] p-4 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:rounded-[30px] sm:p-8">
+          <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-amber-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-1/4 size-64 rounded-full bg-emerald-300/10 blur-3xl" />
+          <div className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 sm:flex sm:items-end sm:justify-between sm:gap-5">
             <div className="contents sm:block">
-              <p className="col-span-2 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:text-[10px] sm:tracking-[0.18em] sm:text-emerald-400">
+              <p className="col-span-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#eed9ac] sm:text-[10px] sm:tracking-[0.18em]">
                 Household
               </p>
 
@@ -1137,7 +1139,7 @@ export default function HouseholdPage() {
                 {household.name}
               </h1>
 
-              <p className="col-span-2 text-[9.5px] font-semibold leading-4 text-stone-600 sm:mt-3 sm:text-sm sm:font-normal sm:leading-6 sm:text-stone-400">
+              <p className="col-span-2 text-[9.5px] font-semibold leading-4 text-white/70 sm:mt-3 sm:text-sm sm:leading-6">
                 Shared Customer context for pantry, planning and household decisions.
               </p>
             </div>
@@ -1155,7 +1157,7 @@ export default function HouseholdPage() {
                   () => undefined,
                 )
               }}
-              className="focus-ring row-start-2 col-start-2 inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 text-[11px] font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 sm:min-h-11 sm:border-0 sm:px-4 sm:text-sm sm:text-stone-950 sm:hover:bg-stone-100"
+              className="focus-ring row-start-2 col-start-2 inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white px-3 text-[11px] font-black text-[#173f35] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f6f0e4] sm:min-h-11 sm:rounded-2xl sm:px-4 sm:text-sm"
             >
               <RefreshCw
                 size={14}
@@ -1171,25 +1173,25 @@ export default function HouseholdPage() {
           notice={notice}
         />
 
-        <section className="mt-4 rounded-[24px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-3.5 shadow-sm sm:mt-6 sm:rounded-[28px] sm:border-stone-200 sm:bg-white sm:p-6">
+        <section className="mt-4 rounded-[22px] border border-[#d9e3dd] bg-white p-3.5 shadow-sm sm:mt-6 sm:rounded-[28px] sm:p-6">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
               How your household works
             </p>
-            <h2 className="mt-1 whitespace-nowrap text-[17px] sm:whitespace-normal font-black tracking-tight text-stone-950 sm:mt-2 sm:text-2xl">
+            <h2 className="mt-1 text-[17px] font-black tracking-tight text-stone-950 sm:mt-2 sm:text-2xl">
               <span className="sm:hidden">One account, multiple households.</span>
               <span className="hidden sm:inline">Your account can belong to more than one household.</span>
             </h2>
-            <p className="mt-1 whitespace-nowrap text-[9.5px] sm:whitespace-normal font-semibold text-stone-600 sm:mt-2 sm:max-w-3xl sm:text-sm sm:font-normal sm:leading-6 sm:text-stone-500">
+            <p className="mt-1 text-[9.5px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:max-w-3xl sm:text-sm sm:font-normal sm:leading-6 sm:text-stone-500">
               <span className="sm:hidden">Switch households anytime; your role stays with each one.</span>
               <span className="hidden sm:inline">Use your own EPANTRY login, switch the household you are working in, and keep the role you were given in each household.</span>
             </p>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-2.5 sm:border-stone-200 sm:bg-stone-50 sm:p-4">
+            <div className="rounded-[16px] border border-amber-200 bg-[#fff2c9] p-2.5 sm:rounded-[22px] sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700 sm:size-9 sm:rounded-xl">
+                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-white/75 text-[#173f35] shadow-sm sm:size-9 sm:rounded-xl">
                   <Home
                     size={17}
                     aria-hidden="true"
@@ -1205,15 +1207,15 @@ export default function HouseholdPage() {
                   </p>
                 </div>
               </div>
-              <p className="mt-2 ml-auto whitespace-nowrap text-right text-[8.5px] font-semibold text-stone-600 sm:mt-3 sm:ml-0 sm:whitespace-normal sm:text-left sm:text-xs sm:font-normal sm:leading-5">
+              <p className="mt-2 text-[8.5px] font-semibold leading-4 text-stone-600 sm:mt-3 sm:text-xs sm:font-normal sm:leading-5">
                 <span className="sm:hidden">Pick your active household.</span>
                 <span className="hidden sm:inline">Choose which household is active before using shared Pantry, meal planning and other household features.</span>
               </p>
             </div>
 
-            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-2.5 sm:border-stone-200 sm:bg-stone-50 sm:p-4">
+            <div className="rounded-[16px] border border-sky-200 bg-[#e5f4ff] p-2.5 sm:rounded-[22px] sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700 sm:size-9 sm:rounded-xl">
+                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-white/75 text-[#173f35] shadow-sm sm:size-9 sm:rounded-xl">
                   <Send
                     size={17}
                     aria-hidden="true"
@@ -1229,15 +1231,15 @@ export default function HouseholdPage() {
                   </p>
                 </div>
               </div>
-              <p className="mt-2 ml-auto whitespace-nowrap text-right text-[8.5px] font-semibold text-stone-600 sm:mt-3 sm:ml-0 sm:whitespace-normal sm:text-left sm:text-xs sm:font-normal sm:leading-5">
+              <p className="mt-2 text-[8.5px] font-semibold leading-4 text-stone-600 sm:mt-3 sm:text-xs sm:font-normal sm:leading-5">
                 <span className="sm:hidden">Invite with the right role.</span>
                 <span className="hidden sm:inline">If you are Owner or Admin, choose the household, role and verified email address before sending an invite.</span>
               </p>
             </div>
 
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-2.5 sm:border-stone-200 sm:bg-stone-50 sm:p-4">
+            <div className="rounded-[16px] border border-emerald-200 bg-[#dcf7e8] p-2.5 sm:rounded-[22px] sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700 sm:size-9 sm:rounded-xl">
+                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-white/75 text-[#173f35] shadow-sm sm:size-9 sm:rounded-xl">
                   <Users
                     size={17}
                     aria-hidden="true"
@@ -1253,15 +1255,15 @@ export default function HouseholdPage() {
                   </p>
                 </div>
               </div>
-              <p className="mt-2 ml-auto whitespace-nowrap text-right text-[8.5px] font-semibold text-stone-600 sm:mt-3 sm:ml-0 sm:whitespace-normal sm:text-left sm:text-xs sm:font-normal sm:leading-5">
+              <p className="mt-2 text-[8.5px] font-semibold leading-4 text-stone-600 sm:mt-3 sm:text-xs sm:font-normal sm:leading-5">
                 <span className="sm:hidden">Review and accept access.</span>
                 <span className="hidden sm:inline">A new person registers as a Customer, reviews who invited them and accepts or rejects the requested role.</span>
               </p>
             </div>
 
-            <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-2.5 sm:border-stone-200 sm:bg-stone-50 sm:p-4">
+            <div className="rounded-[16px] border border-violet-200 bg-[#eee8ff] p-2.5 sm:rounded-[22px] sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700 sm:size-9 sm:rounded-xl">
+                <div className="grid size-6 shrink-0 place-items-center rounded-lg bg-white/75 text-[#173f35] shadow-sm sm:size-9 sm:rounded-xl">
                   <ShieldCheck
                     size={17}
                     aria-hidden="true"
@@ -1277,7 +1279,7 @@ export default function HouseholdPage() {
                   </p>
                 </div>
               </div>
-              <p className="mt-2 ml-auto whitespace-nowrap text-right text-[8.5px] font-semibold text-stone-600 sm:mt-3 sm:ml-0 sm:whitespace-normal sm:text-left sm:text-xs sm:font-normal sm:leading-5">
+              <p className="mt-2 text-[8.5px] font-semibold leading-4 text-stone-600 sm:mt-3 sm:text-xs sm:font-normal sm:leading-5">
                 <span className="sm:hidden">Roles stay household-specific.</span>
                 <span className="hidden sm:inline">Each household keeps its own Owner, Admin or Member role. Invitations never grant Owner access.</span>
               </p>
@@ -1285,18 +1287,18 @@ export default function HouseholdPage() {
           </div>
         </section>
 
-        <div className="mt-4 rounded-[24px] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-3.5 shadow-sm sm:mt-0 sm:contents">
-          <section className="border-0 bg-transparent p-0 shadow-none sm:mt-6 sm:rounded-[28px] sm:border sm:border-stone-200 sm:bg-white sm:p-6 sm:shadow-sm">
+        <div className="mt-4 rounded-[22px] border border-[#d9e3dd] bg-white p-3.5 shadow-sm sm:mt-0 sm:contents">
+          <section className="border-0 bg-transparent p-0 shadow-none sm:mt-6 sm:rounded-[28px] sm:border sm:border-[#d9e3dd] sm:bg-white sm:p-6 sm:shadow-sm">
           <div className="flex flex-col gap-1 sm:gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-700 sm:text-[10px] sm:tracking-[0.18em] sm:text-emerald-700">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:text-[10px] sm:tracking-[0.18em]">
                 Your households
               </p>
-              <h2 className="mt-1 whitespace-nowrap text-[16px] sm:whitespace-normal font-black tracking-tight text-stone-950 sm:mt-2 sm:text-2xl">
+              <h2 className="mt-1 text-[16px] font-black tracking-tight text-stone-950 sm:mt-2 sm:text-2xl">
                 <span className="sm:hidden">Your household access at a glance.</span>
                 <span className="hidden sm:inline">See where you belong and what role you have.</span>
               </h2>
-              <p className="mt-1 whitespace-nowrap text-[9px] sm:whitespace-normal font-semibold text-stone-600 sm:mt-2 sm:text-sm sm:font-normal sm:leading-6 sm:text-stone-500">
+              <p className="mt-1 text-[9px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:font-normal sm:leading-6 sm:text-stone-500">
                 <span className="sm:hidden">Active household powers shared Pantry and planning.</span>
                 <span className="hidden sm:inline">The active household is the one EPANTRY uses for Pantry, meal planning and other shared household features.</span>
               </p>
@@ -1313,7 +1315,7 @@ export default function HouseholdPage() {
                 return (
                   <div
                     key={entry.household.id}
-                    className="rounded-2xl border border-sky-200 bg-white/80 p-3 sm:border-stone-200 sm:bg-stone-50 sm:p-4"
+                    className="rounded-2xl border border-emerald-200 bg-[#eefaf4] p-3 sm:p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -1327,8 +1329,8 @@ export default function HouseholdPage() {
                       <span className={[
                         'rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide',
                         isActive
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-white text-stone-600',
+                          ? 'bg-emerald-700 text-white'
+                          : 'border border-stone-200 bg-white text-stone-600',
                       ].join(' ')}>
                         {isActive
                           ? 'Active'
@@ -1370,7 +1372,7 @@ export default function HouseholdPage() {
                               setActionKey('')
                             })
                         }}
-                        className="focus-ring mt-4 inline-flex min-h-10 items-center justify-center rounded-xl border border-stone-200 bg-white px-3 text-xs font-black text-stone-800 transition hover:border-emerald-200 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="focus-ring mt-4 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#173f35] px-3 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-[#205545] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Use this household
                       </button>
@@ -1383,7 +1385,7 @@ export default function HouseholdPage() {
         </section>
 
         <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-4">
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-2.5 shadow-sm sm:border-stone-200 sm:bg-white sm:p-5">
+          <div className="rounded-2xl border border-amber-200 bg-[#fff2c9] p-2.5 shadow-sm sm:p-5">
             <Home
               size={16}
               className="text-emerald-700"
@@ -1397,7 +1399,7 @@ export default function HouseholdPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-2.5 shadow-sm sm:border-stone-200 sm:bg-white sm:p-5">
+          <div className="rounded-2xl border border-sky-200 bg-[#e5f4ff] p-2.5 shadow-sm sm:p-5">
             <Users
               size={16}
               className="text-emerald-700"
@@ -1411,7 +1413,7 @@ export default function HouseholdPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-2.5 shadow-sm sm:border-stone-200 sm:bg-white sm:p-5">
+          <div className="rounded-2xl border border-violet-200 bg-[#eee8ff] p-2.5 shadow-sm sm:p-5">
             <ShieldCheck
               size={16}
               className="text-emerald-700"
@@ -1430,9 +1432,9 @@ export default function HouseholdPage() {
         </div>
         </div>
 
-        <div className="mt-4 rounded-[24px] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-3.5 shadow-sm sm:mt-0 sm:contents">
+        <div className="mt-4 rounded-[22px] border border-[#d9e3dd] bg-[#f7fbf8] p-3.5 shadow-sm sm:mt-0 sm:contents">
         {canSendInvites ? (
-          <section className="border-0 bg-transparent p-0 shadow-none sm:mt-6 sm:rounded-[28px] sm:border sm:border-stone-200 sm:bg-white sm:p-7 sm:shadow-sm">
+          <section className="border-0 bg-transparent p-0 shadow-none sm:mt-6 sm:rounded-[28px] sm:border sm:border-[#cfe2d8] sm:bg-[#eefaf4] sm:p-7 sm:shadow-sm">
             <div className="flex items-center justify-between gap-3 sm:flex-row sm:items-end">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
@@ -1441,13 +1443,13 @@ export default function HouseholdPage() {
                 <h2 className="mt-1 text-[16px] font-black text-stone-950 sm:mt-2 sm:text-2xl">
                   Add household members
                 </h2>
-                <p className="mt-1 whitespace-nowrap text-[9px] sm:whitespace-normal font-semibold text-stone-600 sm:mt-2 sm:max-w-2xl sm:text-sm sm:font-normal sm:leading-6 sm:text-stone-500">
+                <p className="mt-1 text-[9px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:max-w-2xl sm:text-sm sm:font-normal sm:leading-6 sm:text-stone-500">
                   <span className="sm:hidden">Invite by email; they join with the same verified address.</span>
                   <span className="hidden sm:inline">Invitations are sent by email. The invited account must sign in with the same verified email address before joining.</span>
                 </p>
               </div>
 
-              <div className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[9px] font-black text-amber-800 sm:border-stone-200 sm:bg-stone-50 sm:px-3 sm:py-1.5 sm:text-xs sm:text-stone-600">
+              <div className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[9px] font-black text-emerald-800 sm:px-3 sm:py-1.5 sm:text-xs">
                 {activeInvitationCount} pending
               </div>
             </div>
@@ -1480,7 +1482,7 @@ export default function HouseholdPage() {
                     )
                     setNotice(null)
                   }}
-                  className="focus-ring min-h-10 w-full min-w-0 rounded-xl border border-amber-200 bg-white px-2 text-[9.5px] font-bold text-stone-800 sm:min-h-12 sm:rounded-2xl sm:border-stone-200 sm:px-4 sm:text-sm"
+                  className="focus-ring min-h-10 w-full min-w-0 rounded-xl border border-[#cfe2d8] bg-white px-2 text-[9.5px] font-bold text-stone-800 sm:min-h-12 sm:rounded-2xl sm:px-4 sm:text-sm"
                 >
                   {manageableHouseholds.map(
                     (entry) => (
@@ -1518,7 +1520,7 @@ export default function HouseholdPage() {
                     setNotice(null)
                   }}
                   placeholder="family@example.com"
-                  className="focus-ring min-h-10 w-full min-w-0 rounded-xl border border-amber-200 bg-white px-2 text-[9.5px] font-semibold text-stone-950 placeholder:text-[9.5px] sm:min-h-12 sm:rounded-2xl sm:border-stone-200 sm:px-4 sm:text-sm sm:placeholder:text-sm"
+                  className="focus-ring min-h-10 w-full min-w-0 rounded-xl border border-[#cfe2d8] bg-white px-2 text-[9.5px] font-semibold text-stone-950 placeholder:text-[9.5px] sm:min-h-12 sm:rounded-2xl sm:px-4 sm:text-sm sm:placeholder:text-sm"
                 />
               </div>
 
@@ -1547,7 +1549,7 @@ export default function HouseholdPage() {
                     )
                     setNotice(null)
                   }}
-                  className="focus-ring min-h-10 w-full min-w-0 rounded-xl border border-amber-200 bg-white px-2 text-[9.5px] font-bold text-stone-800 sm:min-h-12 sm:rounded-2xl sm:border-stone-200 sm:px-4 sm:text-sm"
+                  className="focus-ring min-h-10 w-full min-w-0 rounded-xl border border-[#cfe2d8] bg-white px-2 text-[9.5px] font-bold text-stone-800 sm:min-h-12 sm:rounded-2xl sm:px-4 sm:text-sm"
                 >
                   <option value="member">
                     Member
@@ -1589,7 +1591,7 @@ export default function HouseholdPage() {
                     }}
                     placeholder="e.g. Sister, Caregiver"
                     aria-label="Custom household role name"
-                    className="focus-ring mt-2 min-h-10 w-full rounded-xl border border-amber-200 bg-white px-3 text-[11px] font-semibold text-stone-950 sm:min-h-12 sm:rounded-2xl sm:border-stone-200 sm:px-4 sm:text-sm"
+                    className="focus-ring mt-2 min-h-10 w-full rounded-xl border border-[#cfe2d8] bg-white px-3 text-[11px] font-semibold text-stone-950 sm:min-h-12 sm:rounded-2xl sm:px-4 sm:text-sm"
                   />
                 ) : null}
               </div>
@@ -1597,7 +1599,7 @@ export default function HouseholdPage() {
               <button
                 type="submit"
                 disabled={Boolean(actionKey)}
-                className="focus-ring col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-100 px-4 text-[11px] font-black text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1 sm:min-h-12 sm:rounded-2xl sm:border-0 sm:bg-emerald-700 sm:px-5 sm:text-sm sm:text-white sm:hover:bg-emerald-800"
+                className="focus-ring col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#173f35] px-4 text-[11px] font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#205545] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1 sm:min-h-12 sm:rounded-2xl sm:px-5 sm:text-sm"
               >
                 {actionKey ===
                 'create-invitation' ? (
@@ -1624,7 +1626,7 @@ export default function HouseholdPage() {
           </section>
         ) : null}
 
-        <section className="mt-4 border-t border-amber-200 bg-transparent pt-3 shadow-none sm:mt-6 sm:rounded-[28px] sm:border sm:border-stone-200 sm:bg-white sm:p-7 sm:shadow-sm">
+        <section className="mt-4 rounded-[22px] border border-sky-200 bg-[#f2f9fd] p-3.5 shadow-sm sm:mt-6 sm:rounded-[28px] sm:p-7">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
@@ -1636,7 +1638,7 @@ export default function HouseholdPage() {
             </div>
             <Users
               size={20}
-              className="text-amber-600 sm:text-stone-400"
+              className="text-sky-700"
               aria-hidden="true"
             />
           </div>
@@ -1691,7 +1693,7 @@ export default function HouseholdPage() {
                   return (
                     <div
                       key={member.membershipId}
-                      className="rounded-2xl border border-amber-200 bg-white/80 p-3 sm:border-stone-200 sm:bg-stone-50 sm:p-4"
+                      className="rounded-2xl border border-sky-200 bg-white/85 p-3 sm:p-4"
                     >
                       <div className="flex flex-col gap-2 sm:gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
@@ -1802,7 +1804,7 @@ export default function HouseholdPage() {
           )}
 
           {isOwner ? (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 sm:mt-5 sm:items-start sm:gap-3 sm:rounded-2xl sm:border-stone-200 sm:bg-stone-50 sm:p-4">
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-violet-200 bg-[#f5f2ff] p-2.5 sm:mt-5 sm:items-start sm:gap-3 sm:rounded-2xl sm:p-4">
               <UserRoundCog
                 size={19}
                 className="mt-0.5 shrink-0 text-stone-500"
@@ -1818,7 +1820,7 @@ export default function HouseholdPage() {
         </div>
 
         {canSendInvites ? (
-          <section className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50/60 p-3.5 shadow-sm sm:mt-6 sm:rounded-[28px] sm:border-stone-200 sm:bg-white sm:p-7">
+          <section className="mt-4 rounded-[22px] border border-violet-200 bg-[#f5f2ff] p-3.5 shadow-sm sm:mt-6 sm:rounded-[28px] sm:p-7">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
@@ -1830,7 +1832,7 @@ export default function HouseholdPage() {
               </div>
               <MailPlus
                 size={20}
-                className="text-rose-500 sm:text-stone-400"
+                className="text-violet-600"
                 aria-hidden="true"
               />
             </div>
@@ -1877,7 +1879,7 @@ export default function HouseholdPage() {
                     return (
                       <div
                         key={invitation.id}
-                        className="rounded-2xl border border-rose-200 bg-white/80 p-2.5 sm:border-stone-200 sm:bg-stone-50 sm:p-4"
+                        className="rounded-2xl border border-violet-200 bg-white/85 p-2.5 sm:p-4"
                       >
                         <div className="flex flex-col gap-2 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
                           <div className="min-w-0">

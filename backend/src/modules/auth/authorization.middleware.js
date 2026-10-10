@@ -525,10 +525,38 @@ export function requireCustomerAccess(
   }
 }
 
-export const requireHostAccess =
-  requireAnyAccess(
-    'host',
-  )
+// Mode is a workspace boundary for notifications, not a new account capability.
+export function getNotificationAudienceFromUser(user) {
+  if (user?.superAdminEnabled === true) return 'super_admin'
+  if (
+    user?.hostEnabled === true &&
+    user?.hostAccessStatus === 'active' &&
+    (user?.activeMode === 'host' || user?.customerEnabled !== true)
+  ) return 'host'
+  if (user?.customerEnabled === true && user?.activeMode !== 'host') return 'customer'
+  return null
+}
+
+const requireHostCapability = requireAnyAccess('host')
+
+// A dual-mode account must explicitly switch to Host before using Host APIs.
+// Host-only identities retain their existing access. Capability remains mandatory.
+export function requireHostAccess(req, res, next) {
+  const user = req.currentUser
+
+  if (
+    user?.customerEnabled === true &&
+    user?.activeMode === 'customer'
+  ) {
+    return next(new ApiError(
+      403,
+      'Switch to Host mode to access this workspace.',
+      [{ code: 'AUTH_HOST_MODE_REQUIRED' }],
+    ))
+  }
+
+  return requireHostCapability(req, res, next)
+}
 
 export function requireChefRestaurantHostAccess(
   req,
@@ -563,6 +591,7 @@ export function requireChefRestaurantHostAccess(
         true &&
       user?.hostAccessStatus ===
         'active' &&
+      !(user?.customerEnabled === true && user?.activeMode === 'customer') &&
       workspaceType ===
         'chef_restaurant'
     ) {

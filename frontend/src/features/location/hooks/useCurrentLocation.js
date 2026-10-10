@@ -13,149 +13,112 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Geolocation Options
+| Fresh Browser Location
 |--------------------------------------------------------------------------
+|
+| A low-accuracy cached position can be many kilometres away. Request a
+| fresh, high-accuracy reading and keep the best fix received while the
+| device refines it. A desktop without GPS may still be coarse; do not
+| describe such a reading as precise.
+|
 */
+const POSITION_WAIT_MS = 11000
+const FIRST_FIX_REFINEMENT_MS = 1800
+const TARGET_ACCURACY_METERS = 150
+const PRECISE_ACCURACY_METERS = 250
 
-const FIRST_ATTEMPT_OPTIONS = {
+const LAST_RESORT_BROWSER_OPTIONS = {
   enableHighAccuracy: false,
-
-  timeout: 10000,
-
-  maximumAge:
-    5 * 60 * 1000,
-}
-
-const WATCH_ATTEMPT_OPTIONS = {
-  enableHighAccuracy: true,
-
-  timeout: 10000,
-
+  timeout: 5500,
   maximumAge: 0,
 }
 
-/*
-|--------------------------------------------------------------------------
-| One-Time Position
-|--------------------------------------------------------------------------
-*/
-
-function getPosition(
-  options,
-) {
-  return new Promise(
-    (
-      resolve,
-      reject,
-    ) => {
-      navigator.geolocation.getCurrentPosition(
-        resolve,
-        reject,
-        options,
-      )
-    },
-  )
+function getPosition(options) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options)
+  })
 }
 
-/*
-|--------------------------------------------------------------------------
-| Retry Through Watch Position
-|--------------------------------------------------------------------------
-|
-| Some devices temporarily report POSITION_UNAVAILABLE even though
-| permission has already been granted.
-|
-*/
+function positionAccuracy(position) {
+  const accuracy = Number(position?.coords?.accuracy)
+  return Number.isFinite(accuracy) && accuracy >= 0
+    ? accuracy
+    : Infinity
+}
 
-function watchForPosition(
-  options,
-) {
-  return new Promise(
-    (
-      resolve,
-      reject,
-    ) => {
-      let watchId = null
+function getBestPosition() {
+  return new Promise((resolve, reject) => {
+    let bestPosition = null
+    let watchId = null
+    let settled = false
+    let timeoutId = null
+    let refinementId = null
 
-      let settled = false
-
-      const finish = (
-        callback,
-        value,
-      ) => {
-        if (settled) {
-          return
-        }
-
-        settled = true
-
-        if (
-          watchId !== null
-        ) {
-          navigator.geolocation.clearWatch(
-            watchId,
-          )
-        }
-
-        window.clearTimeout(
-          timeoutId,
-        )
-
-        callback(value)
+    const finish = (callback, value) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeoutId)
+      window.clearTimeout(refinementId)
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
       }
+      callback(value)
+    }
 
-      const timeoutId =
-        window.setTimeout(
-          () => {
-            finish(
-              reject,
+    timeoutId = window.setTimeout(() => {
+      if (bestPosition) {
+        finish(resolve, bestPosition)
+      } else {
+        finish(reject, {
+          code: 3,
+          message: 'A fresh device location could not be obtained in time.',
+        })
+      }
+    }, POSITION_WAIT_MS)
 
-              {
-                code: 3,
-
-                message:
-                  'Location request timed out.',
-              },
-            )
-          },
-
-          12000,
-        )
-
-      watchId =
-        navigator.geolocation.watchPosition(
-          (position) => {
-            finish(
-              resolve,
-              position,
-            )
-          },
-
-          (error) => {
-            /*
-            |--------------------------------------------------------------------------
-            | Permission Denied
-            |--------------------------------------------------------------------------
-            |
-            | Do not keep retrying if the user/browser denied permission.
-            |
-            */
-
-            if (
-              error?.code ===
-              1
-            ) {
-              finish(
-                reject,
-                error,
-              )
-            }
-          },
-
-          options,
-        )
-    },
-  )
+    try {
+      const id = navigator.geolocation.watchPosition(
+        (position) => {
+          if (positionAccuracy(position) < positionAccuracy(bestPosition)) {
+            bestPosition = position
+          }
+          if (positionAccuracy(bestPosition) <= TARGET_ACCURACY_METERS) {
+            finish(resolve, bestPosition)
+          } else if (refinementId === null) {
+            // A desktop may never reach GPS accuracy. Return the first browser
+            // fix promptly after a short chance for a better reading.
+            refinementId = window.setTimeout(() => {
+              finish(resolve, bestPosition)
+            }, FIRST_FIX_REFINEMENT_MS)
+          }
+        },
+        (error) => {
+          // Permission denial cannot be repaired by retrying geolocation.
+          if (error?.code === 1) {
+            finish(reject, error)
+          } else if (bestPosition) {
+            finish(resolve, bestPosition)
+          } else {
+            finish(reject, error)
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: POSITION_WAIT_MS,
+          maximumAge: 0,
+        },
+      )
+      watchId = id
+      // Defensive cleanup if a test/browser synchronously invokes a callback.
+      if (settled) navigator.geolocation.clearWatch(id)
+    } catch (error) {
+      if (bestPosition) {
+        finish(resolve, bestPosition)
+      } else {
+        finish(reject, error)
+      }
+    }
+  })
 }
 
 /*
@@ -193,19 +156,19 @@ function getGeolocationErrorMessage(
   if (
     error?.code === 1
   ) {
-    return 'Location permission was denied. Allow location access in your browser settings and try again.'
+    return 'Device location is blocked. Allow Location for localhost in Chrome and enable Chrome under macOS Location Services, then try again.'
   }
 
   if (
     error?.code === 2
   ) {
-    return 'A precise location is temporarily unavailable on this device.'
+    return 'Your device could not provide a location. Check Wi-Fi and Location Services, then try again.'
   }
 
   if (
     error?.code === 3
   ) {
-    return 'The precise location request timed out.'
+    return 'Device location took too long. Check Wi-Fi and try again.'
   }
 
   return 'Your current location could not be determined.'
@@ -262,40 +225,32 @@ export function useCurrentLocation() {
 
   const resolveApproximateLocation =
     useCallback(
-      async (
-        reasonMessage = '',
-      ) => {
-        try {
-          setStatus(
-            'requesting',
-          )
-
-          const location =
-            await getApproximateNetworkLocation()
-
-          setLocation(
-            location,
-          )
-
-          return location
-        } catch (
-          networkError
-        ) {
+      async (reasonMessage = '') => {
+        // A failed refresh must not replace an existing location with the
+        // same IP guess or clear the reason why precise location failed.
+        if (currentLocation) {
           setError(
-            reasonMessage ||
-              networkError?.message ||
-              'Current location could not be loaded.',
+            reasonMessage || 'Device location could not be refreshed.',
+            'ready',
           )
+          return currentLocation
+        }
 
+        try {
+          const location = await getApproximateNetworkLocation()
+          setLocation(location)
+          if (reasonMessage) {
+            setError(reasonMessage, 'ready')
+          }
+          return location
+        } catch (networkError) {
+          setError(
+            reasonMessage || networkError?.message || 'Current location could not be loaded.',
+          )
           return null
         }
       },
-
-      [
-        setError,
-        setLocation,
-        setStatus,
-      ],
+      [currentLocation, setError, setLocation],
     )
 
   /*
@@ -307,6 +262,16 @@ export function useCurrentLocation() {
   const requestCurrentLocation =
     useCallback(
       async () => {
+        if (useLocationStore.getState().currentLocationStatus === 'requesting') {
+          return
+        }
+
+        setStatus('requesting')
+
+        const reportLocationFailure = (message, failureStatus = 'error') => {
+          setError(message, currentLocation ? 'ready' : failureStatus)
+        }
+
         /*
         |--------------------------------------------------------------------------
         | Browser Has No Geolocation API
@@ -343,128 +308,83 @@ export function useCurrentLocation() {
           return
         }
 
-        setStatus(
-          'requesting',
-        )
+        let position
 
         try {
-          let position
-
-          /*
-          |--------------------------------------------------------------------------
-          | Attempt 1
-          |--------------------------------------------------------------------------
-          |
-          | Lower accuracy is intentionally tried first because desktop
-          | devices often resolve it more reliably.
-          |
-          */
-
-          try {
-            position =
-              await getPosition(
-                FIRST_ATTEMPT_OPTIONS,
-              )
-          } catch (
-            firstError
-          ) {
-            /*
-            |--------------------------------------------------------------------------
-            | Permission Denied
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-              firstError?.code ===
-              1
-            ) {
-              setError(
-                getGeolocationErrorMessage(
-                  firstError,
-                ),
-
-                'denied',
-              )
-
-              return
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Attempt 2
-            |--------------------------------------------------------------------------
-            */
-
-            position =
-              await watchForPosition(
-                WATCH_ATTEMPT_OPTIONS,
-              )
-          }
-
-          /*
-          |--------------------------------------------------------------------------
-          | Reverse Geocode
-          |--------------------------------------------------------------------------
-          */
-
-          const location =
-            await reverseGeocodeLocation(
-              {
-                latitude:
-                  position.coords
-                    .latitude,
-
-                longitude:
-                  position.coords
-                    .longitude,
-              },
-            )
-
-          setLocation(
-            location,
-          )
-        } catch (
-          locationError
-        ) {
-          /*
-          |--------------------------------------------------------------------------
-          | Explicit Denial
-          |--------------------------------------------------------------------------
-          */
-
-          if (
-            locationError?.code ===
-            1
-          ) {
-            setError(
-              getGeolocationErrorMessage(
-                locationError,
-              ),
-
+          position = await getBestPosition()
+        } catch (highAccuracyError) {
+          if (highAccuracyError?.code === 1) {
+            reportLocationFailure(
+              getGeolocationErrorMessage(highAccuracyError),
               'denied',
             )
-
             return
           }
 
-          /*
-          |--------------------------------------------------------------------------
-          | GPS / CoreLocation Temporarily Unavailable
-          |--------------------------------------------------------------------------
-          |
-          | Fall back to approximate city-level network location.
-          |
-          */
+          // Some desktops can only supply a coarse browser position.
+          // Still prefer a fresh browser fix over a city guessed from the IP.
+          try {
+            position = await getPosition(LAST_RESORT_BROWSER_OPTIONS)
+          } catch (browserError) {
+            if (browserError?.code === 1) {
+              reportLocationFailure(
+                getGeolocationErrorMessage(browserError),
+                'denied',
+              )
+              return
+            }
+            await resolveApproximateLocation(
+              getGeolocationErrorMessage(browserError),
+            )
+            return
+          }
+        }
 
-          await resolveApproximateLocation(
-            getGeolocationErrorMessage(
-              locationError,
-            ),
+        // Location accuracy (metres) is supplied by the browser itself.
+        // The reverse-geocoder turns these coordinates into a readable name;
+        // its result alone is not proof of GPS-level precision.
+        const accuracyMeters = positionAccuracy(position)
+
+        try {
+          const location = await reverseGeocodeLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          })
+
+          setLocation({
+            ...location,
+            source: 'device',
+            accuracyMeters: Number.isFinite(accuracyMeters)
+              ? Math.round(accuracyMeters)
+              : null,
+            accuracyMode: accuracyMeters <= PRECISE_ACCURACY_METERS
+              ? 'precise'
+              : 'approximate',
+          })
+        } catch (geocodingError) {
+          // Never replace a valid device position with an unrelated city
+          // guessed from the public IP merely because reverse geocoding failed.
+          // Coordinates are intentionally not saved in session storage.
+          // The browser location was still obtained: report that accurately.
+          setLocation({
+            label: 'Device location detected (address unavailable)',
+            source: 'device',
+            accuracyMeters: Number.isFinite(accuracyMeters)
+              ? Math.round(accuracyMeters)
+              : null,
+            accuracyMode: accuracyMeters <= PRECISE_ACCURACY_METERS
+              ? 'precise'
+              : 'approximate',
+          })
+          setError(
+            'Device location was detected, but its address could not be loaded. Try Refresh again.',
+            'ready',
           )
         }
       },
 
       [
+        currentLocation,
         resolveApproximateLocation,
         setError,
         setLocation,

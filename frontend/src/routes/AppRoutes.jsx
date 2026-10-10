@@ -985,6 +985,7 @@ const APPLICATION_ACCESS_TYPES =
   })
 
 const LandingPage = lazy(() => import('../features/landing/pages/LandingPage'))
+const PromotionDetailPage = lazy(() => import('../features/retailMedia/pages/PromotionDetailPage'))
 const AboutPage = lazy(() => import('../features/about/pages/AboutPage'))
 const GroceryPage = lazy(() => import('../features/grocery/pages/GroceryPage'))
 const CategoryPage = lazy(() => import('../features/grocery/pages/CategoryPage'))
@@ -1057,6 +1058,8 @@ const HostAnalyticsPage = lazy(() => import('../features/analytics/pages/HostAna
 const HostListingHistoryPage = lazy(() => import('../features/listingHistory/pages/HostListingHistoryPage'))
 
 const AdminDashboardPage = lazy(() => import('../features/admin/pages/AdminDashboardPage'))
+const AdminEarningsPage = lazy(() => import('../features/admin/pages/AdminEarningsPage'))
+const AdminSearchDemandPage = lazy(() => import('../features/admin/pages/AdminSearchDemandPage'))
 const AdminCatalogPage = lazy(() => import('../features/admin/pages/AdminCatalogPage'))
 const AdminProductEditorPage = lazy(() => import('../features/admin/pages/AdminProductEditorPage'))
 const AdminIngredientsPage = lazy(() => import('../features/admin/pages/AdminIngredientsPage'))
@@ -1075,7 +1078,6 @@ const AdminRolesPage = lazy(() => import('../features/admin/pages/AdminRolesPage
 const AdminProMembershipPage = lazy(() => import('../features/admin/pages/AdminProMembershipPage'))
 const AdminAuditPage = lazy(() => import('../features/admin/pages/AdminAuditPage'))
 const AdminAnalyticsPage = lazy(() => import('../features/analytics/pages/AdminAnalyticsPage'))
-const AdminListingHistoryPage = lazy(() => import('../features/listingHistory/pages/AdminListingHistoryPage'))
 
 const SystemDebugPage = lazy(() => import('../features/system/pages/SystemDebugPage'))
 
@@ -1352,23 +1354,34 @@ function ApplicationAccessRoute({
     )
   }
 
+  const retailMediaHostPreview =
+    typeof window !== 'undefined' &&
+    window.self !== window.top &&
+    new URLSearchParams(location.search).get('retailMediaPreview') === '1' &&
+    hostEnabled === true &&
+    activeMode === 'host' &&
+    superAdminEnabled !== true
+
   let hasAccess =
     false
 
   switch (access) {
     case APPLICATION_ACCESS_TYPES.CUSTOMER:
       hasAccess =
-        superAdminEnabled !==
-          true &&
-        customerEnabled ===
-          true &&
-        activeMode !==
-          'host'
+        (
+          superAdminEnabled !==
+            true &&
+          customerEnabled ===
+            true &&
+          activeMode !==
+            'host'
+        ) ||
+        retailMediaHostPreview
       break
 
     case APPLICATION_ACCESS_TYPES.HOST:
       // prettier-ignore
-      hasAccess = superAdminEnabled !== true && hostEnabled === true && hostAccessStatus === 'active'
+      hasAccess = superAdminEnabled !== true && hostEnabled === true && hostAccessStatus === 'active' && activeMode !== 'customer'
       break
 
     case APPLICATION_ACCESS_TYPES.SUPER_ADMIN:
@@ -2187,6 +2200,14 @@ export default function AppRoutes() {
   const navigate =
     useNavigate()
 
+  const location =
+    useLocation()
+
+  const retailMediaPreview =
+    typeof window !== 'undefined' &&
+    window.self !== window.top &&
+    new URLSearchParams(location.search).get('retailMediaPreview') === '1'
+
   const [
     networkIssueActive,
     setNetworkIssueActive,
@@ -2338,6 +2359,10 @@ export default function AppRoutes() {
       function handleCustomerAccessRequired(
         event,
       ) {
+        if (retailMediaPreview) {
+          return
+        }
+
         const returnTo =
           String(
             event?.detail?.returnTo ||
@@ -2371,6 +2396,7 @@ export default function AppRoutes() {
     },
     [
       navigate,
+      retailMediaPreview,
     ],
   )
 
@@ -2383,7 +2409,7 @@ export default function AppRoutes() {
   return (
     <div className="app-frame text-stone-900">
       <ScrollToTop />
-      <Navbar />
+      {!retailMediaPreview ? <Navbar /> : null}
       <GlobalFloatingCartCompanion />
       <AvailabilityNotifyModal />
 
@@ -2395,6 +2421,7 @@ export default function AppRoutes() {
         >
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/promotions/:campaignId" element={<PromotionDetailPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/grocery" element={<GroceryPage />} />
             <Route path="/grocery/category/:slug" element={<CategoryPage />} />
@@ -3090,6 +3117,35 @@ export default function AppRoutes() {
             />
 
             <Route
+              path="/admin/earnings"
+              element={
+                <AdminPermissionRoute
+                  anyPermissions={[
+                    'finance.read',
+                    'admin.dashboard.read',
+                  ]}
+                >
+                  <AdminEarningsPage />
+                </AdminPermissionRoute>
+              }
+            />
+
+            <Route
+              path="/admin/search-demand"
+              element={
+                <AdminPermissionRoute
+                  anyPermissions={[
+                    'admin.dashboard.read',
+                    'marketplace.read',
+                    'catalog.read',
+                  ]}
+                >
+                  <AdminSearchDemandPage />
+                </AdminPermissionRoute>
+              }
+            />
+
+            <Route
               path="/admin/analytics"
               element={
                 <AdminPermissionRoute
@@ -3124,7 +3180,12 @@ export default function AppRoutes() {
             <Route
               path="/admin/catalog"
               element={
-                <AdminPermissionRoute permission="catalog.read">
+                <AdminPermissionRoute
+                  anyPermissions={[
+                    'catalog.read',
+                    'recipe.read',
+                  ]}
+                >
                   <AdminCatalogPage />
                 </AdminPermissionRoute>
               }
@@ -3194,7 +3255,7 @@ export default function AppRoutes() {
                     'recipe.read',
                   ]}
                 >
-                  <AdminListingHistoryPage />
+                  <Navigate to="/admin/catalog" replace />
                 </AdminPermissionRoute>
               }
             />

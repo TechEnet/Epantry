@@ -116,10 +116,9 @@ function requireCustomerNotificationAccess(
     )
 
   if (
-    user?.customerEnabled ===
-      true ||
-    user?.superAdminEnabled ===
-      true
+    user?.customerEnabled === true ||
+    user?.superAdminEnabled === true ||
+    (user?.hostEnabled === true && user?.hostAccessStatus === 'active')
   ) {
     return next()
   }
@@ -127,7 +126,7 @@ function requireCustomerNotificationAccess(
   return next(
     new ApiError(
       403,
-      'Customer or Super Admin access is required for notifications.',
+      'Customer, Host or Super Admin access is required for notifications.',
       [
         {
           code:

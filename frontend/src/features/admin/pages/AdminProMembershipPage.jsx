@@ -1,5 +1,4 @@
 import {
-  CalendarClock,
   CheckCircle2,
   CircleAlert,
   CreditCard,
@@ -29,8 +28,9 @@ import {
 
 function getErrorMessage(error) {
   return (
+    error?.response?.data?.message ||
     error?.message ||
-    'Unable to load EPANTRY Pro administration right now.'
+    'Unable to load EPANTRY Pro right now.'
   )
 }
 
@@ -56,20 +56,33 @@ function formatDate(value) {
   })
 }
 
+function readableStatus(value) {
+  const status = String(value || '').trim().toLowerCase()
+
+  if (status === 'active') return 'Active'
+  if (status === 'expired') return 'Expired'
+  if (status === 'suspended') return 'Suspended'
+  if (status === 'paid') return 'Paid'
+  if (status === 'initiated') return 'Started'
+  if (status === 'failed') return 'Failed'
+
+  return status || 'Unknown'
+}
+
 function statusClasses(status) {
   if (status === 'active' || status === 'paid') {
-    return 'bg-emerald-100 text-emerald-800'
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800'
   }
 
   if (status === 'suspended' || status === 'failed') {
-    return 'bg-red-100 text-red-800'
+    return 'border-red-200 bg-red-50 text-red-800'
   }
 
   if (status === 'initiated') {
-    return 'bg-blue-100 text-blue-800'
+    return 'border-blue-200 bg-blue-50 text-blue-800'
   }
 
-  return 'bg-amber-100 text-amber-800'
+  return 'border-stone-200 bg-stone-50 text-stone-600'
 }
 
 function normalizePlanDraft(plan) {
@@ -83,6 +96,14 @@ function normalizePlanDraft(plan) {
   }
 }
 
+function planDuration(plan) {
+  const months = Number(plan?.validityMonths || 0)
+
+  if (months === 1) return '1 month'
+  if (months === 12) return '12 months'
+  return `${months} months`
+}
+
 export default function AdminProMembershipPage() {
   const [overview, setOverview] = useState(null)
   const [memberships, setMemberships] = useState([])
@@ -94,6 +115,8 @@ export default function AdminProMembershipPage() {
   const [membershipPage, setMembershipPage] = useState(1)
   const [paymentPage, setPaymentPage] = useState(1)
   const [planDrafts, setPlanDrafts] = useState({})
+  const [selectedPlanCode, setSelectedPlanCode] = useState('')
+  const [activityView, setActivityView] = useState('memberships')
   const [busyPlanCode, setBusyPlanCode] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -117,6 +140,8 @@ export default function AdminProMembershipPage() {
 
       return next
     })
+
+    setSelectedPlanCode((current) => current || result?.plans?.[0]?.code || '')
   }, [])
 
   const loadMemberships = useCallback(async () => {
@@ -150,28 +175,28 @@ export default function AdminProMembershipPage() {
 
     setError('')
 
-    try {
-      await Promise.all([
-        loadOverview(),
-        loadMemberships(),
-        loadPayments(),
-      ])
-    } catch (requestError) {
-      setError(getErrorMessage(requestError))
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+    const results = await Promise.allSettled([
+      loadOverview(),
+      loadMemberships(),
+      loadPayments(),
+    ])
+
+    const failed = results.find((result) => result.status === 'rejected')
+
+    if (failed?.reason) {
+      setError(getErrorMessage(failed.reason))
     }
+
+    setLoading(false)
+    setRefreshing(false)
   }, [loadMemberships, loadOverview, loadPayments])
 
   useEffect(() => {
     loadAll()
-  }, [loadAll])
+  }, []) // initial load only; filters below refresh their own section
 
   useEffect(() => {
-    if (loading) {
-      return
-    }
+    if (loading) return
 
     loadMemberships().catch((requestError) => {
       setError(getErrorMessage(requestError))
@@ -179,16 +204,19 @@ export default function AdminProMembershipPage() {
   }, [membershipStatus, membershipPage])
 
   useEffect(() => {
-    if (loading) {
-      return
-    }
+    if (loading) return
 
     loadPayments().catch((requestError) => {
       setError(getErrorMessage(requestError))
     })
   }, [paymentStatus, paymentPage])
 
+  const plans = overview?.plans || []
   const summary = overview?.summary || {}
+  const selectedPlan = plans.find((plan) => plan.code === selectedPlanCode) || plans[0] || null
+  const selectedDraft = selectedPlan
+    ? planDrafts[selectedPlan.code] || normalizePlanDraft(selectedPlan)
+    : null
 
   const paidRevenue = useMemo(
     () => moneyFromMinor(summary?.payments?.paidRevenueMinor),
@@ -210,7 +238,7 @@ export default function AdminProMembershipPage() {
     const rupees = Number(draft.priceRupees)
 
     if (!Number.isFinite(rupees) || rupees <= 0) {
-      setError('Enter a valid positive price in rupees.')
+      setError('Enter a valid plan price.')
       return
     }
 
@@ -220,7 +248,7 @@ export default function AdminProMembershipPage() {
       .filter(Boolean)
 
     if (benefits.length < 1) {
-      setError('Keep at least one clear customer benefit for this plan.')
+      setError('Add at least one customer benefit.')
       return
     }
 
@@ -239,8 +267,8 @@ export default function AdminProMembershipPage() {
         },
       })
 
-      setMessage(`${plan.name} plan updated. New settings apply to future checkouts only.`)
-      await loadAll({ silent: true })
+      setMessage(`${plan.name} updated. The change applies to new purchases.`)
+      await loadOverview()
     } catch (requestError) {
       setError(getErrorMessage(requestError))
     } finally {
@@ -252,12 +280,12 @@ export default function AdminProMembershipPage() {
     return (
       <AdminShell
         title="EPANTRY Pro"
-        description="Plans, Customer memberships and Razorpay test payments."
+        description="Set plans, see customer access and review payments."
       >
-        <div className="grid min-h-[320px] place-items-center rounded-[28px] bg-violet-50">
-          <div className="flex items-center gap-3 text-sm font-bold text-violet-800">
-            <LoaderCircle size={20} className="animate-spin" aria-hidden="true" />
-            Loading Pro administration...
+        <div className="grid min-h-[42svh] place-items-center bg-[#f4f6f8]">
+          <div className="flex items-center gap-3 text-sm font-bold text-[#23445b]">
+            <LoaderCircle size={19} className="animate-spin" aria-hidden="true" />
+            Loading Pro workspace…
           </div>
         </div>
       </AdminShell>
@@ -267,339 +295,465 @@ export default function AdminProMembershipPage() {
   return (
     <AdminShell
       title="EPANTRY Pro"
-      description="Manage customer Pro plans and review membership/payment history. Existing paid access is preserved when a plan changes."
+      description="Set plans, see who has Pro access and review customer payments."
       actions={(
         <button
           type="button"
           disabled={refreshing}
           onClick={() => loadAll({ silent: true })}
-          className="focus-ring inline-flex items-center gap-2 rounded-2xl bg-stone-950 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50"
+          className="focus-ring inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700 shadow-sm disabled:opacity-50"
         >
-          <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
           Refresh
         </button>
       )}
     >
-      {error ? (
-        <div className="mb-4 flex items-start gap-3 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-800">
-          <CircleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-          {error}
-        </div>
-      ) : null}
-
-      {message ? (
-        <div className="mb-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-          <CheckCircle2 size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-          {message}
-        </div>
-      ) : null}
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-[24px] bg-violet-100 p-4">
-          <div className="flex items-center gap-2 text-violet-900">
-            <Users size={18} aria-hidden="true" />
-            <p className="text-[11px] font-black uppercase tracking-[0.12em]">Active members</p>
+      <div className="bg-[#f4f6f8] pb-8 sm:pb-10">
+        {error ? (
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-800 sm:px-7 sm:text-sm">
+            <div className="flex items-start gap-2">
+              <CircleAlert size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
           </div>
-          <p className="mt-3 text-3xl font-black text-stone-950">{summary?.memberships?.active || 0}</p>
-          <p className="mt-1 text-xs font-semibold text-stone-600">Customers with Pro access today.</p>
-        </article>
+        ) : null}
 
-        <article className="rounded-[24px] bg-amber-100 p-4">
-          <div className="flex items-center gap-2 text-amber-900">
-            <CalendarClock size={18} aria-hidden="true" />
-            <p className="text-[11px] font-black uppercase tracking-[0.12em]">Expired</p>
+        {message ? (
+          <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800 sm:px-7 sm:text-sm">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{message}</span>
+            </div>
           </div>
-          <p className="mt-3 text-3xl font-black text-stone-950">{summary?.memberships?.expired || 0}</p>
-          <p className="mt-1 text-xs font-semibold text-stone-600">Historical memberships whose paid time ended.</p>
-        </article>
+        ) : null}
 
-        <article className="rounded-[24px] bg-emerald-100 p-4">
-          <div className="flex items-center gap-2 text-emerald-900">
-            <IndianRupee size={18} aria-hidden="true" />
-            <p className="text-[11px] font-black uppercase tracking-[0.12em]">Verified test revenue</p>
+        <section className="bg-[#17334a] text-white">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_440px]">
+            <div className="px-4 py-5 sm:px-7 sm:py-7">
+              <h2 className="max-w-3xl text-[25px] font-black leading-[1.08] sm:text-[34px]">
+                Manage Pro plans, access and payments.
+              </h2>
+              <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-200 sm:text-sm">
+                Set plans, then review customer access and payment history.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 border-t border-white/15 lg:border-l lg:border-t-0">
+              {[
+                ['Active', summary?.memberships?.active || 0, Users],
+                ['Revenue', paidRevenue, IndianRupee],
+                ['Paid', summary?.payments?.paidCount || 0, CreditCard],
+              ].map(([label, value, Icon], index) => (
+                <div
+                  key={label}
+                  className={`px-3 py-4 sm:px-5 sm:py-5 ${index > 0 ? 'border-l border-white/15' : ''}`}
+                >
+                  <Icon size={16} className="text-sky-200" aria-hidden="true" />
+                  <p className="mt-2 text-xl font-black sm:text-2xl">{value}</p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-slate-300 sm:text-xs">{label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <p className="mt-3 text-3xl font-black text-stone-950">{paidRevenue}</p>
-          <p className="mt-1 text-xs font-semibold text-stone-600">Razorpay test payments captured for EPANTRY Pro.</p>
-        </article>
 
-        <article className="rounded-[24px] bg-blue-100 p-4">
-          <div className="flex items-center gap-2 text-blue-900">
-            <CreditCard size={18} aria-hidden="true" />
-            <p className="text-[11px] font-black uppercase tracking-[0.12em]">Paid transactions</p>
-          </div>
-          <p className="mt-3 text-3xl font-black text-stone-950">{summary?.payments?.paidCount || 0}</p>
-          <p className="mt-1 text-xs font-semibold text-stone-600">Verified Pro purchases in test mode.</p>
-        </article>
-      </section>
-
-      <section className="mt-5 rounded-[28px] bg-[#fffaf0] p-4 shadow-sm sm:p-5">
-        <div className="flex items-start gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-violet-600 text-white">
-            <Crown size={20} aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-violet-700">Plan configuration</p>
-            <h2 className="mt-1 text-xl font-black text-stone-950">What Customers can buy</h2>
-            <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-stone-600">
-              Price, availability and benefit copy below control future Customer checkouts. Disabling or editing a plan does not remove validity a Customer already paid for.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-4 xl:grid-cols-2">
-          {(overview?.plans || []).map((plan) => {
-            const draft = planDrafts[plan.code] || normalizePlanDraft(plan)
-            const busy = busyPlanCode === plan.code
-
-            return (
-              <article
-                key={plan.code}
-                className="rounded-[24px] border border-stone-200 bg-white p-4 sm:p-5"
+          <div className="grid grid-cols-2 border-t border-white/15 lg:grid-cols-4">
+            {[
+              ['01', 'Set plans', 'Price and availability'],
+              ['02', 'Customer buys', 'Checkout starts'],
+              ['03', 'Access starts', 'Payment verified'],
+              ['04', 'Review history', 'Access and payments'],
+            ].map(([number, title, copy], index) => (
+              <div
+                key={number}
+                className={`px-4 py-3 sm:px-6 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l lg:border-white/15' : ''}`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-base font-black text-stone-950">{plan.name}</p>
-                    <p className="mt-1 text-xs font-bold text-stone-500">
-                      Fixed validity: {plan.validityMonths} month{plan.validityMonths === 1 ? '' : 's'}
-                    </p>
-                  </div>
+                <p className="text-[10px] font-black text-sky-200">{number}</p>
+                <p className="mt-1 text-sm font-bold">{title}</p>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-300 sm:text-xs sm:leading-5">{copy}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-                  <label className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-2 text-xs font-black text-stone-700">
-                    <input
-                      type="checkbox"
-                      checked={draft.isEnabled === true}
-                      onChange={(event) => updatePlanDraft(plan.code, 'isEnabled', event.target.checked)}
-                      className="size-4 accent-emerald-700"
-                    />
-                    {draft.isEnabled ? 'Available' : 'Disabled'}
-                  </label>
-                </div>
+        <section className="mt-4 border-y border-stone-200 bg-white sm:mt-5">
+          <div className="border-b border-stone-200 px-4 py-3 sm:px-7 sm:py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-stone-950 sm:text-xl">Pro plans</h2>
+              </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                  <label className="text-xs font-black text-stone-700">
-                    Price (₹)
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={draft.priceRupees}
-                      onChange={(event) => updatePlanDraft(plan.code, 'priceRupees', event.target.value)}
-                      className="focus-ring mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-bold text-stone-950"
-                    />
-                  </label>
+            </div>
+          </div>
 
-                  <label className="text-xs font-black text-stone-700">
-                    Customer-facing description
-                    <input
-                      type="text"
-                      value={draft.shortDescription}
-                      onChange={(event) => updatePlanDraft(plan.code, 'shortDescription', event.target.value)}
-                      className="focus-ring mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-semibold text-stone-950"
-                    />
-                  </label>
-                </div>
-
-                <label className="mt-3 block text-xs font-black text-stone-700">
-                  Benefits shown with this plan
-                  <textarea
-                    rows={5}
-                    value={draft.benefitsText}
-                    onChange={(event) => updatePlanDraft(plan.code, 'benefitsText', event.target.value)}
-                    className="focus-ring mt-1.5 w-full resize-y rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-stone-950"
-                    placeholder="One benefit per line"
-                  />
+          {plans.length ? (
+            <div className="grid lg:grid-cols-[260px_minmax(0,1fr)]">
+              <div className="border-b border-stone-200 bg-[#f7f5fb] p-3 lg:border-b-0 lg:border-r lg:p-4">
+                <label className="block lg:hidden">
+                  <span className="text-xs font-bold text-stone-600">Choose a plan</span>
+                  <select
+                    value={selectedPlan?.code || ''}
+                    onChange={(event) => setSelectedPlanCode(event.target.value)}
+                    className="focus-ring mt-1.5 h-11 w-full rounded-xl border border-[#d8d0e7] bg-white px-3 text-sm font-bold text-stone-900"
+                  >
+                    {plans.map((plan) => (
+                      <option key={plan.code} value={plan.code}>
+                        {plan.name} · {moneyFromMinor(plan.priceMinor)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => savePlan(plan)}
-                  className="focus-ring mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                <div className="hidden space-y-1.5 lg:block">
+                  {plans.map((plan) => {
+                    const active = selectedPlan?.code === plan.code
+
+                    return (
+                      <button
+                        key={plan.code}
+                        type="button"
+                        onClick={() => setSelectedPlanCode(plan.code)}
+                        className={`focus-ring w-full rounded-xl px-3 py-3 text-left transition ${active ? 'bg-[#35254f] text-white shadow-sm' : 'text-stone-700 hover:bg-white'}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-black">{plan.name}</span>
+                          <span className={`text-xs font-bold ${active ? 'text-violet-200' : 'text-stone-500'}`}>
+                            {moneyFromMinor(plan.priceMinor)}
+                          </span>
+                        </div>
+                        <p className={`mt-1 text-xs ${active ? 'text-violet-100/80' : 'text-stone-500'}`}>
+                          {planDuration(plan)} · {plan.isEnabled ? 'Available' : 'Hidden'}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {selectedPlan && selectedDraft ? (
+                <div className="px-4 py-4 sm:px-7 sm:py-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-200 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Crown size={17} className="text-[#6b4f9c]" aria-hidden="true" />
+                        <h3 className="text-lg font-black text-stone-950">{selectedPlan.name}</h3>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-stone-500">Access for {planDuration(selectedPlan)}</p>
+                    </div>
+
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={selectedDraft.isEnabled === true}
+                        onChange={(event) => updatePlanDraft(selectedPlan.code, 'isEnabled', event.target.checked)}
+                        className="size-4 accent-[#6b4f9c]"
+                      />
+                      {selectedDraft.isEnabled ? 'Available' : 'Hidden'}
+                    </label>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+                    <label className="text-xs font-bold text-stone-700">
+                      Price
+                      <div className="relative mt-1.5">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-stone-500">₹</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={selectedDraft.priceRupees}
+                          onChange={(event) => updatePlanDraft(selectedPlan.code, 'priceRupees', event.target.value)}
+                          className="focus-ring h-11 w-full rounded-xl border border-stone-200 bg-white pl-8 pr-3 text-sm font-bold text-stone-950"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="text-xs font-bold text-stone-700">
+                      Short description
+                      <input
+                        type="text"
+                        value={selectedDraft.shortDescription}
+                        onChange={(event) => updatePlanDraft(selectedPlan.code, 'shortDescription', event.target.value)}
+                        className="focus-ring mt-1.5 h-11 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm font-semibold text-stone-950"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="mt-3 block text-xs font-bold text-stone-700">
+                    Benefits
+                    <textarea
+                      rows={4}
+                      value={selectedDraft.benefitsText}
+                      onChange={(event) => updatePlanDraft(selectedPlan.code, 'benefitsText', event.target.value)}
+                      className="focus-ring mt-1.5 w-full resize-y rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-semibold leading-5 text-stone-950"
+                      placeholder="One benefit per line"
+                    />
+                  </label>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      disabled={busyPlanCode === selectedPlan.code}
+                      onClick={() => savePlan(selectedPlan)}
+                      className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl bg-[#6b4f9c] px-4 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {busyPlanCode === selectedPlan.code ? (
+                        <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Save size={14} aria-hidden="true" />
+                      )}
+                      {busyPlanCode === selectedPlan.code ? 'Saving…' : 'Save plan'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="px-4 py-5 text-sm font-semibold text-stone-600 sm:px-7">
+              No Pro plans are available.
+            </div>
+          )}
+        </section>
+
+        <section className="mt-4 border-y border-stone-200 bg-white sm:mt-5">
+          <div className="flex flex-col gap-3 border-b border-stone-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div>
+              <h2 className="text-lg font-black text-stone-950 sm:text-xl">Customer activity</h2>
+            </div>
+
+            <div className="inline-flex self-start rounded-xl border border-stone-200 bg-stone-100 p-1">
+              <button
+                type="button"
+                onClick={() => setActivityView('memberships')}
+                className={`focus-ring rounded-lg px-3 py-2 text-xs font-black transition ${activityView === 'memberships' ? 'bg-[#17334a] text-white shadow-sm' : 'text-stone-600'}`}
+              >
+                Memberships ({membershipPagination?.total || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivityView('payments')}
+                className={`focus-ring rounded-lg px-3 py-2 text-xs font-black transition ${activityView === 'payments' ? 'bg-[#17334a] text-white shadow-sm' : 'text-stone-600'}`}
+              >
+                Payments ({paymentPagination?.total || 0})
+              </button>
+            </div>
+          </div>
+
+          {activityView === 'memberships' ? (
+            <div className="bg-white">
+              <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-4 py-3 sm:px-7">
+                <div>
+                  <p className="text-sm font-black text-stone-900">Pro access</p>
+                </div>
+                <select
+                  value={membershipStatus}
+                  onChange={(event) => {
+                    setMembershipStatus(event.target.value)
+                    setMembershipPage(1)
+                  }}
+                  className="focus-ring h-9 rounded-lg border border-stone-200 bg-white px-2.5 text-xs font-bold text-stone-700"
                 >
-                  {busy ? (
-                    <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Save size={14} aria-hidden="true" />
-                  )}
-                  {busy ? 'Saving...' : 'Save plan'}
-                </button>
-              </article>
-            )
-          })}
-        </div>
-      </section>
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="expired">Expired</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
 
-      <section className="mt-5 rounded-[28px] bg-emerald-50 p-4 shadow-sm sm:p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-emerald-800">Subscriptions</p>
-            <h2 className="mt-1 text-xl font-black text-stone-950">Customer Pro memberships</h2>
-            <p className="mt-1 text-xs font-semibold text-stone-600">View active, expired or suspended membership records. This module does not shorten paid validity.</p>
-          </div>
-
-          <select
-            value={membershipStatus}
-            onChange={(event) => {
-              setMembershipStatus(event.target.value)
-              setMembershipPage(1)
-            }}
-            className="focus-ring rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-stone-700"
-          >
-            <option value="all">All memberships</option>
-            <option value="active">Active</option>
-            <option value="expired">Expired</option>
-            <option value="suspended">Suspended</option>
-          </select>
-        </div>
-
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-emerald-100 bg-white">
-          <table className="min-w-full text-left text-xs">
-            <thead className="bg-emerald-100/70 text-[10px] font-black uppercase tracking-[0.1em] text-emerald-900">
-              <tr>
-                <th className="px-3 py-3">Customer</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Last plan</th>
-                <th className="px-3 py-3">Valid until</th>
-                <th className="px-3 py-3">Remaining</th>
-              </tr>
-            </thead>
-            <tbody>
               {memberships.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center font-semibold text-stone-500">No memberships found for this filter.</td>
-                </tr>
-              ) : memberships.map((membership) => (
-                <tr key={membership.id} className="border-t border-stone-100">
-                  <td className="px-3 py-3">
-                    <p className="font-black text-stone-900">{membership.user?.name || 'Customer'}</p>
-                    <p className="mt-0.5 text-[10px] font-semibold text-stone-500">{membership.user?.email || '—'}</p>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusClasses(membership.status)}`}>
-                      {membership.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 font-bold text-stone-700">{membership.lastPlan?.name || membership.lastPlanCode || '—'}</td>
-                  <td className="px-3 py-3 font-semibold text-stone-700">{formatDate(membership.validUntil)}</td>
-                  <td className="px-3 py-3 font-black text-stone-900">{membership.active ? `${membership.remainingDays} days` : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                <div className="px-4 py-6 sm:px-7">
+                  <p className="text-sm font-black text-stone-900">No Pro memberships yet.</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-stone-500">Paid Pro customers will appear here.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="sm:hidden">
+                    {memberships.map((membership, index) => (
+                      <div key={membership.id} className={`px-4 py-3 ${index ? 'border-t border-stone-100' : ''}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-stone-900">{membership.user?.name || 'Customer'}</p>
+                            <p className="mt-0.5 truncate text-xs text-stone-500">{membership.lastPlan?.name || membership.lastPlanCode || 'Pro access'}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-black ${statusClasses(membership.status)}`}>
+                            {readableStatus(membership.status)}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 text-xs text-stone-600">
+                          <span>Until {formatDate(membership.validUntil)}</span>
+                          <span className="font-bold text-stone-800">{membership.active ? `${membership.remainingDays} days` : '—'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold text-stone-500">
-            {membershipPagination?.total || 0} record{membershipPagination?.total === 1 ? '' : 's'}
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={membershipPage <= 1}
-              onClick={() => setMembershipPage((value) => Math.max(1, value - 1))}
-              className="focus-ring rounded-xl bg-white px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={!membershipPagination?.totalPages || membershipPage >= membershipPagination.totalPages}
-              onClick={() => setMembershipPage((value) => value + 1)}
-              className="focus-ring rounded-xl bg-stone-950 px-3 py-2 text-xs font-black text-white disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </section>
+                  <div className="hidden overflow-x-auto sm:block">
+                    <table className="min-w-full text-left text-xs">
+                      <thead className="border-b border-stone-200 bg-[#f7f8fa] text-[10px] font-black uppercase tracking-[0.08em] text-stone-500">
+                        <tr>
+                          <th className="px-7 py-3">Customer</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Plan</th>
+                          <th className="px-4 py-3">Valid until</th>
+                          <th className="px-7 py-3 text-right">Remaining</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {memberships.map((membership) => (
+                          <tr key={membership.id} className="border-b border-stone-100 last:border-b-0">
+                            <td className="px-7 py-3">
+                              <p className="font-black text-stone-900">{membership.user?.name || 'Customer'}</p>
+                              <p className="mt-0.5 text-[10px] text-stone-500">{membership.user?.email || '—'}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black ${statusClasses(membership.status)}`}>
+                                {readableStatus(membership.status)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-stone-700">{membership.lastPlan?.name || membership.lastPlanCode || '—'}</td>
+                            <td className="px-4 py-3 font-semibold text-stone-700">{formatDate(membership.validUntil)}</td>
+                            <td className="px-7 py-3 text-right font-black text-stone-900">{membership.active ? `${membership.remainingDays} days` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
 
-      <section className="mt-5 rounded-[28px] bg-blue-50 p-4 shadow-sm sm:p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-blue-800">Payments</p>
-            <h2 className="mt-1 text-xl font-black text-stone-950">Razorpay Pro transactions</h2>
-            <p className="mt-1 text-xs font-semibold text-stone-600">Payment history belongs to EPANTRY. Creator payout/revenue share is a separate future calculation.</p>
-          </div>
+              <div className="flex items-center justify-between border-t border-stone-200 px-4 py-3 sm:px-7">
+                <span className="text-xs font-semibold text-stone-500">{membershipPagination?.total || 0} records</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={membershipPage <= 1}
+                    onClick={() => setMembershipPage((value) => Math.max(1, value - 1))}
+                    className="focus-ring rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700 disabled:opacity-35"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!membershipPagination?.totalPages || membershipPage >= membershipPagination.totalPages}
+                    onClick={() => setMembershipPage((value) => value + 1)}
+                    className="focus-ring rounded-lg bg-[#17334a] px-3 py-2 text-xs font-bold text-white disabled:opacity-35"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white">
+              <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-4 py-3 sm:px-7">
+                <div>
+                  <p className="text-sm font-black text-stone-900">Pro payments</p>
+                </div>
+                <select
+                  value={paymentStatus}
+                  onChange={(event) => {
+                    setPaymentStatus(event.target.value)
+                    setPaymentPage(1)
+                  }}
+                  className="focus-ring h-9 rounded-lg border border-stone-200 bg-white px-2.5 text-xs font-bold text-stone-700"
+                >
+                  <option value="all">All</option>
+                  <option value="paid">Paid</option>
+                  <option value="initiated">Started</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
 
-          <select
-            value={paymentStatus}
-            onChange={(event) => {
-              setPaymentStatus(event.target.value)
-              setPaymentPage(1)
-            }}
-            className="focus-ring rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-black text-stone-700"
-          >
-            <option value="all">All payments</option>
-            <option value="paid">Paid</option>
-            <option value="initiated">Initiated</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
-
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-blue-100 bg-white">
-          <table className="min-w-full text-left text-xs">
-            <thead className="bg-blue-100/70 text-[10px] font-black uppercase tracking-[0.1em] text-blue-900">
-              <tr>
-                <th className="px-3 py-3">Customer</th>
-                <th className="px-3 py-3">Plan</th>
-                <th className="px-3 py-3">Amount</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Payment date</th>
-                <th className="px-3 py-3">Razorpay reference</th>
-              </tr>
-            </thead>
-            <tbody>
               {payments.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center font-semibold text-stone-500">No payments found for this filter.</td>
-                </tr>
-              ) : payments.map((payment) => (
-                <tr key={payment.id} className="border-t border-stone-100">
-                  <td className="px-3 py-3">
-                    <p className="font-black text-stone-900">{payment.user?.name || 'Customer'}</p>
-                    <p className="mt-0.5 text-[10px] font-semibold text-stone-500">{payment.user?.email || '—'}</p>
-                  </td>
-                  <td className="px-3 py-3 font-bold text-stone-700">{payment.plan?.name || payment.planCode}</td>
-                  <td className="px-3 py-3 font-black text-stone-900">{moneyFromMinor(payment.amountMinor)}</td>
-                  <td className="px-3 py-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusClasses(payment.status)}`}>
-                      {payment.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 font-semibold text-stone-700">{formatDate(payment.paidAt || payment.initiatedAt)}</td>
-                  <td className="max-w-[220px] px-3 py-3 font-mono text-[10px] text-stone-500">
-                    {payment.providerPaymentId || payment.providerOrderId || '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                <div className="px-4 py-6 sm:px-7">
+                  <p className="text-sm font-black text-stone-900">No Pro payments yet.</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-stone-500">Started Pro checkouts will appear here.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="sm:hidden">
+                    {payments.map((payment, index) => (
+                      <div key={payment.id} className={`px-4 py-3 ${index ? 'border-t border-stone-100' : ''}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-stone-900">{payment.user?.name || 'Customer'}</p>
+                            <p className="mt-0.5 truncate text-xs text-stone-500">{payment.plan?.name || payment.planCode || 'EPANTRY Pro'}</p>
+                          </div>
+                          <p className="shrink-0 text-sm font-black text-stone-950">{moneyFromMinor(payment.amountMinor)}</p>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${statusClasses(payment.status)}`}>
+                            {readableStatus(payment.status)}
+                          </span>
+                          <span className="text-xs text-stone-500">{formatDate(payment.paidAt || payment.initiatedAt)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold text-stone-500">
-            {paymentPagination?.total || 0} transaction{paymentPagination?.total === 1 ? '' : 's'}
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={paymentPage <= 1}
-              onClick={() => setPaymentPage((value) => Math.max(1, value - 1))}
-              className="focus-ring rounded-xl bg-white px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={!paymentPagination?.totalPages || paymentPage >= paymentPagination.totalPages}
-              onClick={() => setPaymentPage((value) => value + 1)}
-              className="focus-ring rounded-xl bg-stone-950 px-3 py-2 text-xs font-black text-white disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </section>
+                  <div className="hidden overflow-x-auto sm:block">
+                    <table className="min-w-full text-left text-xs">
+                      <thead className="border-b border-stone-200 bg-[#f7f8fa] text-[10px] font-black uppercase tracking-[0.08em] text-stone-500">
+                        <tr>
+                          <th className="px-7 py-3">Customer</th>
+                          <th className="px-4 py-3">Plan</th>
+                          <th className="px-4 py-3">Amount</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Date</th>
+                          <th className="px-7 py-3">Payment reference</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payments.map((payment) => (
+                          <tr key={payment.id} className="border-b border-stone-100 last:border-b-0">
+                            <td className="px-7 py-3">
+                              <p className="font-black text-stone-900">{payment.user?.name || 'Customer'}</p>
+                              <p className="mt-0.5 text-[10px] text-stone-500">{payment.user?.email || '—'}</p>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-stone-700">{payment.plan?.name || payment.planCode || 'EPANTRY Pro'}</td>
+                            <td className="px-4 py-3 font-black text-stone-950">{moneyFromMinor(payment.amountMinor)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black ${statusClasses(payment.status)}`}>
+                                {readableStatus(payment.status)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-stone-700">{formatDate(payment.paidAt || payment.initiatedAt)}</td>
+                            <td className="max-w-[240px] truncate px-7 py-3 font-mono text-[10px] text-stone-500">
+                              {payment.providerPaymentId || payment.providerOrderId || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-between border-t border-stone-200 px-4 py-3 sm:px-7">
+                <span className="text-xs font-semibold text-stone-500">{paymentPagination?.total || 0} transactions</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={paymentPage <= 1}
+                    onClick={() => setPaymentPage((value) => Math.max(1, value - 1))}
+                    className="focus-ring rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700 disabled:opacity-35"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!paymentPagination?.totalPages || paymentPage >= paymentPagination.totalPages}
+                    onClick={() => setPaymentPage((value) => value + 1)}
+                    className="focus-ring rounded-lg bg-[#17334a] px-3 py-2 text-xs font-bold text-white disabled:opacity-35"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+      </div>
     </AdminShell>
   )
 }

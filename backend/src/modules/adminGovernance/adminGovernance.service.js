@@ -33,6 +33,10 @@ import {
 } from '../commerce/commerce.transaction.models.js'
 
 import {
+  CommercePaymentIntent,
+} from '../commerce/commerce.final.models.js'
+
+import {
   RuleProfile,
 } from '../foodIntelligence/foodIntelligence.models.js'
 
@@ -44,6 +48,7 @@ import {
 
 import {
   HostSettlement,
+  HostSettlementLine,
 } from '../hostOperations/hostOperations.finance.models.js'
 
 import {
@@ -67,6 +72,24 @@ import {
 import {
   User,
 } from '../users/user.model.js'
+
+import {
+  ProMembershipPayment,
+} from '../learning/learning.models.js'
+
+import {
+  Campaign,
+} from '../retailMedia/retailMedia.models.js'
+
+import {
+  CreatorPaymentEvidence,
+  CreatorSession,
+  CreatorSessionBooking,
+} from '../expansionExecution/expansionExecution.models.js'
+
+import {
+  SearchDemandEvent,
+} from '../search/search.models.js'
 
 import {
   ADMIN_GOVERNANCE_DOMAINS,
@@ -938,6 +961,243 @@ async function requireAssignableAdminUser(
   }
 }
 
+export async function getAdminIntegrationOverview({
+  adminAuthorization,
+  limit = 250,
+}) {
+  const canRead =
+    adminAuthorizationHasAnyPermission(
+      adminAuthorization,
+      [
+        'marketplace.read',
+        'host.review.read',
+        'admin.dashboard.read',
+      ],
+    )
+
+  if (!canRead) {
+    throw new ApiError(
+      403,
+      'You do not have permission to review integration health.',
+      [
+        {
+          code:
+            'ADMIN_INTEGRATION_READ_FORBIDDEN',
+        },
+      ],
+    )
+  }
+
+  const safeLimit =
+    Math.min(
+      500,
+      Math.max(
+        1,
+        Number(limit) ||
+          250,
+      ),
+    )
+
+  const [
+    records,
+    total,
+  ] =
+    await Promise.all([
+      HostWebhookEndpoint.find({})
+        .select(
+          '_id organizationId name endpointUrl eventTypes status lastDeliveryAt lastDeliveryStatus createdAt updatedAt',
+        )
+        .sort({
+          lastDeliveryAt: -1,
+          updatedAt: -1,
+          createdAt: -1,
+        })
+        .limit(
+          safeLimit,
+        )
+        .lean(),
+
+      HostWebhookEndpoint.countDocuments({}),
+    ])
+
+  const organizationIds = [
+    ...new Set(
+      records
+        .map(
+          (item) =>
+            id(
+              item.organizationId,
+            ),
+        )
+        .filter(Boolean),
+    ),
+  ]
+
+  const organizations =
+    organizationIds.length
+      ? await MarketplaceOrganization.find({
+          _id: {
+            $in:
+              organizationIds,
+          },
+        })
+          .select(
+            '_id displayName organizationType status',
+          )
+          .lean()
+      : []
+
+  const organizationMap =
+    new Map(
+      organizations.map(
+        (organization) => [
+          id(
+            organization._id,
+          ),
+          organization,
+        ],
+      ),
+    )
+
+  const webhooks =
+    records.map(
+      (item) => {
+        const organization =
+          organizationMap.get(
+            id(
+              item.organizationId,
+            ),
+          ) ||
+          null
+
+        let endpointHost =
+          'Endpoint configured'
+
+        try {
+          endpointHost =
+            new URL(
+              item.endpointUrl,
+            ).host ||
+            endpointHost
+        } catch {
+          endpointHost =
+            'Endpoint configured'
+        }
+
+        return {
+          id:
+            id(
+              item._id,
+            ),
+          name:
+            item.name ||
+            'Webhook connection',
+          organizationId:
+            id(
+              item.organizationId,
+            ),
+          organizationName:
+            organization?.displayName ||
+            'Host organization',
+          organizationType:
+            organization?.organizationType ||
+            '',
+          organizationStatus:
+            organization?.status ||
+            '',
+          endpointHost,
+          eventTypes:
+            Array.isArray(
+              item.eventTypes,
+            )
+              ? item.eventTypes
+              : [],
+          status:
+            item.status ||
+            'active',
+          lastDeliveryStatus:
+            item.lastDeliveryStatus ||
+            'never',
+          lastDeliveryAt:
+            item.lastDeliveryAt ||
+            null,
+          updatedAt:
+            item.updatedAt ||
+            null,
+          createdAt:
+            item.createdAt ||
+            null,
+        }
+      },
+    )
+
+  const active =
+    webhooks.filter(
+      (item) =>
+        item.status ===
+        'active',
+    )
+
+  const failed =
+    active.filter(
+      (item) =>
+        item.lastDeliveryStatus ===
+        'failed',
+    )
+
+  const healthy =
+    active.filter(
+      (item) =>
+        item.lastDeliveryStatus ===
+        'success',
+    )
+
+  const neverUsed =
+    active.filter(
+      (item) =>
+        item.lastDeliveryStatus ===
+        'never',
+    )
+
+  return {
+    summary: {
+      total,
+      active:
+        active.length,
+      failed:
+        failed.length,
+      healthy:
+        healthy.length,
+      neverUsed:
+        neverUsed.length,
+      disabled:
+        webhooks.filter(
+          (item) =>
+            item.status ===
+            'disabled',
+        ).length,
+      organizations:
+        new Set(
+          webhooks
+            .map(
+              (item) =>
+                item.organizationId,
+            )
+            .filter(Boolean),
+        ).size,
+    },
+    webhooks,
+    pagination: {
+      total,
+      limit:
+        safeLimit,
+      hasMore:
+        total >
+        safeLimit,
+    },
+  }
+}
+
 export async function getAdminGovernanceCommandCenter({
   adminAuthorization,
 }) {
@@ -1050,6 +1310,7 @@ export async function getAdminGovernanceCommandCenter({
       hostActivationAwaitingReview,
       marketplaceIncidents,
       failedWebhooks,
+      pendingCampaignReviews,
     ] =
       await Promise.all([
         HostKybCase.countDocuments({
@@ -1084,6 +1345,13 @@ export async function getAdminGovernanceCommandCenter({
           lastDeliveryStatus:
             'failed',
         }),
+
+        Campaign.countDocuments({
+          status:
+            'pending_review',
+          'payment.status':
+            'paid',
+        }),
       ])
 
     metrics.marketplace = {
@@ -1092,6 +1360,7 @@ export async function getAdminGovernanceCommandCenter({
       orderExceptions:
         marketplaceIncidents,
       failedWebhooks,
+      pendingCampaignReviews,
     }
   }
 
@@ -1290,6 +1559,631 @@ function result(
   return {
     type,
     ...item,
+  }
+}
+
+
+function startOfCurrentMonth() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), 1)
+}
+
+async function sumMoney(Model, match, expression) {
+  const [row] = await Model.aggregate([
+    { $match: match },
+    { $group: { _id: null, amountMinor: { $sum: expression }, count: { $sum: 1 } } },
+  ])
+
+  return {
+    amountMinor: Number(row?.amountMinor || 0),
+    count: Number(row?.count || 0),
+  }
+}
+
+function serializeMoneyRow({ id, source, amountMinor, occurredAt, label, status = 'paid' }) {
+  return {
+    id: String(id || ''),
+    source,
+    label,
+    amountMinor: Number(amountMinor || 0),
+    currency: 'INR',
+    status,
+    occurredAt: occurredAt || null,
+  }
+}
+
+
+export async function listAdminMarketplaceOrderExceptions({
+  adminAuthorization,
+}) {
+  assertDomainRead(
+    adminAuthorization,
+    'marketplace',
+  )
+
+  const exceptionStatuses = [
+    'delivery_failed',
+    'return_requested',
+    'partial_unavailable',
+    'substitution_requested',
+  ]
+
+  const [orders, counts] =
+    await Promise.all([
+      SellerOrder
+        .find({
+          status: {
+            $in: exceptionStatuses,
+          },
+        })
+        .select(
+          '_id parentOrderId organizationId sellerName items commercialSnapshot fulfillment status createdAt updatedAt',
+        )
+        .sort({
+          updatedAt: -1,
+          createdAt: -1,
+          _id: -1,
+        })
+        .limit(100)
+        .lean(),
+
+      SellerOrder.aggregate([
+        {
+          $match: {
+            status: {
+              $in: exceptionStatuses,
+            },
+          },
+        },
+        {
+          $group: {
+            _id: '$status',
+            count: {
+              $sum: 1,
+            },
+          },
+        },
+      ]),
+    ])
+
+  const summary = {
+    total: 0,
+    deliveryFailed: 0,
+    returnsRequested: 0,
+    itemsUnavailable: 0,
+    substitutionsRequested: 0,
+  }
+
+  for (const row of counts) {
+    const count = Number(row?.count || 0)
+    summary.total += count
+
+    if (row?._id === 'delivery_failed') {
+      summary.deliveryFailed = count
+    } else if (row?._id === 'return_requested') {
+      summary.returnsRequested = count
+    } else if (row?._id === 'partial_unavailable') {
+      summary.itemsUnavailable = count
+    } else if (row?._id === 'substitution_requested') {
+      summary.substitutionsRequested = count
+    }
+  }
+
+  return {
+    orders: orders.map((order) => {
+      const itemNames = (order.items || [])
+        .map((item) => String(item?.displayName || '').trim())
+        .filter(Boolean)
+
+      const totalMinor =
+        order?.commercialSnapshot?.totalLandedCostMinor ??
+        order?.commercialSnapshot?.itemSubtotalMinor ??
+        null
+
+      return {
+        id: id(order._id),
+        parentOrderId: id(order.parentOrderId),
+        organizationId: id(order.organizationId),
+        sellerName: order.sellerName || 'Host',
+        status: order.status,
+        itemCount: itemNames.length || (order.items || []).length,
+        itemNames,
+        totalMinor,
+        currency: order?.commercialSnapshot?.currency || 'INR',
+        fulfillmentType: order?.fulfillment?.fulfillmentType || null,
+        createdAt: order.createdAt || null,
+        updatedAt: order.updatedAt || null,
+      }
+    }),
+    summary,
+    limitedTo: 100,
+  }
+}
+
+export async function getAdminEarningsOverview() {
+  const monthStart = startOfCurrentMonth()
+
+  const [
+    commerceAll,
+    commerceMonth,
+    proAll,
+    proMonth,
+    mediaAll,
+    mediaMonth,
+    creatorAll,
+    creatorMonth,
+    marketplaceFeeAll,
+    marketplaceFeeMonth,
+    hostPaidAll,
+    hostPaidMonth,
+    hostPendingAll,
+    recentCommerce,
+    recentPro,
+    recentMedia,
+    recentCreator,
+    recentMarketplaceFees,
+  ] = await Promise.all([
+    sumMoney(CommercePaymentIntent, { status: 'paid' }, '$amountMinor'),
+    sumMoney(CommercePaymentIntent, { status: 'paid', paidAt: { $gte: monthStart } }, '$amountMinor'),
+    sumMoney(ProMembershipPayment, { status: 'paid' }, '$amountMinor'),
+    sumMoney(ProMembershipPayment, { status: 'paid', paidAt: { $gte: monthStart } }, '$amountMinor'),
+    sumMoney(Campaign, { 'payment.status': 'paid' }, '$payment.requiredAmountMinor'),
+    sumMoney(Campaign, { 'payment.status': 'paid', 'payment.paidAt': { $gte: monthStart } }, '$payment.requiredAmountMinor'),
+    sumMoney(CreatorPaymentEvidence, {}, '$amountMinor'),
+    sumMoney(CreatorPaymentEvidence, { verifiedAt: { $gte: monthStart } }, '$amountMinor'),
+    sumMoney(HostSettlementLine, {}, '$platformFeeMinor'),
+    sumMoney(HostSettlementLine, { occurredAt: { $gte: monthStart } }, '$platformFeeMinor'),
+    sumMoney(HostSettlement, { status: 'paid' }, '$totals.netPayableMinor'),
+    sumMoney(HostSettlement, { status: 'paid', paidAt: { $gte: monthStart } }, '$totals.netPayableMinor'),
+    sumMoney(HostSettlement, { status: { $in: ['pending_approval', 'approved'] } }, '$totals.netPayableMinor'),
+    CommercePaymentIntent.find({ status: 'paid' })
+      .select('_id ownerUserId parentOrderId amountMinor currency paidAt createdAt updatedAt')
+      .sort({ paidAt: -1, createdAt: -1 })
+      .limit(30)
+      .lean(),
+    ProMembershipPayment.find({ status: 'paid' })
+      .select('_id userId planCode amountMinor validityMonths currency paidAt createdAt updatedAt')
+      .sort({ paidAt: -1, createdAt: -1 })
+      .limit(30)
+      .lean(),
+    Campaign.find({ 'payment.status': 'paid' })
+      .select('_id organizationId title objective payment createdAt updatedAt')
+      .sort({ 'payment.paidAt': -1, createdAt: -1 })
+      .limit(30)
+      .lean(),
+    CreatorPaymentEvidence.find({})
+      .select('_id bookingId customerUserId amountMinor currency verifiedAt createdAt')
+      .sort({ verifiedAt: -1, createdAt: -1 })
+      .limit(30)
+      .lean(),
+    HostSettlementLine.find({ platformFeeMinor: { $gt: 0 } })
+      .select('_id organizationId sellerOrderId grossMerchandiseMinor platformFeeMinor occurredAt createdAt')
+      .sort({ occurredAt: -1, createdAt: -1 })
+      .limit(30)
+      .lean(),
+  ])
+
+  const summarize = ({ commerce, pro, media, creator, marketplaceFee, hostPaid }) => ({
+    platformRevenueMinor:
+      Number(pro.amountMinor || 0) +
+      Number(media.amountMinor || 0) +
+      Number(marketplaceFee.amountMinor || 0),
+    grossCollectionsMinor:
+      Number(commerce.amountMinor || 0) +
+      Number(pro.amountMinor || 0) +
+      Number(media.amountMinor || 0) +
+      Number(creator.amountMinor || 0),
+    commerceCollectionsMinor: Number(commerce.amountMinor || 0),
+    proRevenueMinor: Number(pro.amountMinor || 0),
+    retailMediaRevenueMinor: Number(media.amountMinor || 0),
+    creatorCollectionsMinor: Number(creator.amountMinor || 0),
+    marketplaceFeeMinor: Number(marketplaceFee.amountMinor || 0),
+    hostPayoutsPaidMinor: Number(hostPaid.amountMinor || 0),
+    transactionCount:
+      Number(commerce.count || 0) +
+      Number(pro.count || 0) +
+      Number(media.count || 0) +
+      Number(creator.count || 0),
+  })
+
+  const parentOrderIds = recentCommerce
+    .map((row) => row.parentOrderId)
+    .filter(Boolean)
+
+  const feeSellerOrderIds = recentMarketplaceFees
+    .map((row) => row.sellerOrderId)
+    .filter(Boolean)
+
+  const bookingIds = recentCreator
+    .map((row) => row.bookingId)
+    .filter(Boolean)
+
+  const sellerOrderMatch = []
+  if (parentOrderIds.length) sellerOrderMatch.push({ parentOrderId: { $in: parentOrderIds } })
+  if (feeSellerOrderIds.length) sellerOrderMatch.push({ _id: { $in: feeSellerOrderIds } })
+
+  const [sellerOrders, creatorBookings] = await Promise.all([
+    sellerOrderMatch.length
+      ? SellerOrder.find({ $or: sellerOrderMatch })
+          .select('_id parentOrderId organizationId sellerName items commercialSnapshot fulfillment status createdAt updatedAt')
+          .lean()
+      : [],
+    bookingIds.length
+      ? CreatorSessionBooking.find({ _id: { $in: bookingIds } })
+          .select('_id sessionId customerUserId amountMinor currency status confirmedAt createdAt')
+          .lean()
+      : [],
+  ])
+
+  const sessionIds = creatorBookings
+    .map((row) => row.sessionId)
+    .filter(Boolean)
+
+  const creatorSessions = sessionIds.length
+    ? await CreatorSession.find({ _id: { $in: sessionIds } })
+        .select('_id ownerUserId title startsAt endsAt')
+        .lean()
+    : []
+
+  const userIds = new Set()
+  for (const row of recentCommerce) if (row.ownerUserId) userIds.add(String(row.ownerUserId))
+  for (const row of recentPro) if (row.userId) userIds.add(String(row.userId))
+  for (const row of recentCreator) if (row.customerUserId) userIds.add(String(row.customerUserId))
+  for (const row of creatorSessions) if (row.ownerUserId) userIds.add(String(row.ownerUserId))
+
+  const organizationIds = new Set()
+  for (const row of recentMedia) if (row.organizationId) organizationIds.add(String(row.organizationId))
+  for (const row of recentMarketplaceFees) if (row.organizationId) organizationIds.add(String(row.organizationId))
+  for (const row of sellerOrders) if (row.organizationId) organizationIds.add(String(row.organizationId))
+
+  const [users, organizations] = await Promise.all([
+    userIds.size
+      ? User.find({ _id: { $in: [...userIds] } }).select('_id name email').lean()
+      : [],
+    organizationIds.size
+      ? MarketplaceOrganization.find({ _id: { $in: [...organizationIds] } })
+          .select('_id displayName ownerUserId')
+          .lean()
+      : [],
+  ])
+
+  const userById = new Map(users.map((row) => [String(row._id), row]))
+  const organizationById = new Map(organizations.map((row) => [String(row._id), row]))
+  const bookingById = new Map(creatorBookings.map((row) => [String(row._id), row]))
+  const sessionById = new Map(creatorSessions.map((row) => [String(row._id), row]))
+  const sellerOrderById = new Map(sellerOrders.map((row) => [String(row._id), row]))
+
+  const sellerOrdersByParent = new Map()
+  for (const order of sellerOrders) {
+    const key = String(order.parentOrderId || '')
+    if (!key) continue
+    if (!sellerOrdersByParent.has(key)) sellerOrdersByParent.set(key, [])
+    sellerOrdersByParent.get(key).push(order)
+  }
+
+  const displayUser = (value, fallback = 'Customer') => {
+    const row = userById.get(String(value || ''))
+    return String(row?.name || row?.email || fallback).trim() || fallback
+  }
+
+  const displayOrganization = (value, fallback = 'Host') => {
+    const row = organizationById.get(String(value || ''))
+    return String(row?.displayName || fallback).trim() || fallback
+  }
+
+  const itemNamesFromOrder = (order) => (order?.items || [])
+    .map((item) => String(item?.displayName || '').trim())
+    .filter(Boolean)
+
+  const orderAmountMinor = (order) => Number(
+    order?.commercialSnapshot?.totalLandedCostMinor ??
+    order?.commercialSnapshot?.itemSubtotalMinor ??
+    0,
+  )
+
+  const shortItemReason = (items, fallback) => {
+    if (!items.length) return fallback
+    if (items.length === 1) return items[0]
+    return `${items[0]} + ${items.length - 1} more item${items.length - 1 === 1 ? '' : 's'}`
+  }
+
+  const platformPayments = [
+    ...recentPro.map((row) => {
+      const planLabel = String(row.planCode || 'Pro')
+        .replaceAll('_', ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase())
+
+      return {
+        ...serializeMoneyRow({
+          id: row._id,
+          source: 'pro_membership',
+          label: `${displayUser(row.userId)} paid EPANTRY`,
+          amountMinor: row.amountMinor,
+          occurredAt: row.paidAt || row.updatedAt || row.createdAt,
+        }),
+        payerName: displayUser(row.userId),
+        recipientName: 'EPANTRY',
+        reason: `${planLabel} membership`,
+        detail: {
+          type: 'Membership',
+          plan: planLabel,
+          validityMonths: Number(row.validityMonths || 0),
+        },
+      }
+    }),
+    ...recentMedia.map((row) => ({
+      ...serializeMoneyRow({
+        id: row._id,
+        source: 'retail_media',
+        label: `${displayOrganization(row.organizationId)} paid EPANTRY`,
+        amountMinor: row?.payment?.requiredAmountMinor,
+        occurredAt: row?.payment?.paidAt || row.updatedAt || row.createdAt,
+      }),
+      payerName: displayOrganization(row.organizationId, 'Advertiser'),
+      recipientName: 'EPANTRY',
+      reason: row.title || 'Advertising campaign',
+      detail: {
+        type: 'Ads & paid placements',
+        campaign: row.title || 'Advertising campaign',
+        objective: row.objective || '',
+      },
+    })),
+    ...recentMarketplaceFees.map((row) => {
+      const order = sellerOrderById.get(String(row.sellerOrderId || ''))
+      const items = itemNamesFromOrder(order)
+      const payerName = displayOrganization(row.organizationId, order?.sellerName || 'Host')
+
+      return {
+        ...serializeMoneyRow({
+          id: row._id,
+          source: 'marketplace_fee',
+          label: `EPANTRY earned a marketplace fee`,
+          amountMinor: row.platformFeeMinor,
+          occurredAt: row.occurredAt || row.createdAt,
+        }),
+        payerName,
+        recipientName: 'EPANTRY',
+        reason: shortItemReason(items, 'Marketplace order'),
+        detail: {
+          type: 'Marketplace fee',
+          items,
+          grossMerchandiseMinor: Number(row.grossMerchandiseMinor || 0),
+          platformFeeMinor: Number(row.platformFeeMinor || 0),
+          orderStatus: order?.status || '',
+        },
+      }
+    }),
+  ]
+    .filter((row) => Number(row.amountMinor || 0) > 0)
+    .sort((a, b) => new Date(b.occurredAt || 0) - new Date(a.occurredAt || 0))
+    .slice(0, 40)
+
+  const customerToHostPayments = []
+
+  for (const payment of recentCommerce) {
+    const customerName = displayUser(payment.ownerUserId)
+    const orders = sellerOrdersByParent.get(String(payment.parentOrderId || '')) || []
+
+    if (!orders.length) {
+      customerToHostPayments.push({
+        ...serializeMoneyRow({
+          id: payment._id,
+          source: 'customer_order',
+          label: `${customerName} paid for a marketplace order`,
+          amountMinor: payment.amountMinor,
+          occurredAt: payment.paidAt || payment.updatedAt || payment.createdAt,
+        }),
+        payerName: customerName,
+        recipientName: 'Marketplace Host',
+        reason: 'Marketplace order',
+        detail: {
+          type: 'Customer order',
+          items: [],
+        },
+      })
+      continue
+    }
+
+    for (const order of orders) {
+      const items = itemNamesFromOrder(order)
+      const amountMinor = orderAmountMinor(order)
+      const recipientName = order.sellerName ||
+        displayOrganization(order.organizationId, 'Host')
+
+      customerToHostPayments.push({
+        ...serializeMoneyRow({
+          id: `${payment._id}:${order._id}`,
+          source: 'customer_order',
+          label: `${customerName} paid ${recipientName}`,
+          amountMinor: amountMinor || payment.amountMinor,
+          occurredAt: payment.paidAt || payment.updatedAt || payment.createdAt,
+        }),
+        payerName: customerName,
+        recipientName,
+        reason: shortItemReason(items, 'Marketplace order'),
+        detail: {
+          type: 'Customer order',
+          items,
+          orderStatus: order.status || '',
+          fulfillmentType: order?.fulfillment?.fulfillmentType || '',
+          subtotalMinor: Number(order?.commercialSnapshot?.itemSubtotalMinor || 0),
+          feesMinor: Number(order?.commercialSnapshot?.knownFeesMinor || 0),
+          totalMinor: amountMinor || payment.amountMinor,
+        },
+      })
+    }
+  }
+
+  for (const payment of recentCreator) {
+    const booking = bookingById.get(String(payment.bookingId || ''))
+    const session = booking ? sessionById.get(String(booking.sessionId || '')) : null
+    const customerName = displayUser(payment.customerUserId)
+    const creatorName = session?.ownerUserId
+      ? displayUser(session.ownerUserId, 'Creator')
+      : 'Creator'
+
+    customerToHostPayments.push({
+      ...serializeMoneyRow({
+        id: payment._id,
+        source: 'creator_session',
+        label: `${customerName} paid ${creatorName}`,
+        amountMinor: payment.amountMinor,
+        occurredAt: payment.verifiedAt || payment.createdAt,
+      }),
+      payerName: customerName,
+      recipientName: creatorName,
+      reason: session?.title || 'Creator session',
+      detail: {
+        type: 'Creator session',
+        session: session?.title || 'Creator session',
+        startsAt: session?.startsAt || null,
+      },
+    })
+  }
+
+  customerToHostPayments.sort(
+    (a, b) => new Date(b.occurredAt || 0) - new Date(a.occurredAt || 0),
+  )
+
+  const recent = [...platformPayments, ...customerToHostPayments]
+    .sort((a, b) => new Date(b.occurredAt || 0) - new Date(a.occurredAt || 0))
+    .slice(0, 40)
+
+  return {
+    paymentDataVersion: 2,
+    currency: 'INR',
+    allTime: summarize({
+      commerce: commerceAll,
+      pro: proAll,
+      media: mediaAll,
+      creator: creatorAll,
+      marketplaceFee: marketplaceFeeAll,
+      hostPaid: hostPaidAll,
+    }),
+    currentMonth: summarize({
+      commerce: commerceMonth,
+      pro: proMonth,
+      media: mediaMonth,
+      creator: creatorMonth,
+      marketplaceFee: marketplaceFeeMonth,
+      hostPaid: hostPaidMonth,
+    }),
+    pendingHostPayoutMinor: Number(hostPendingAll.amountMinor || 0),
+    sources: [
+      { key: 'pro_membership', label: 'Pro memberships', amountMinor: proAll.amountMinor, kind: 'platform_revenue' },
+      { key: 'retail_media', label: 'Ads & paid placements', amountMinor: mediaAll.amountMinor, kind: 'platform_revenue' },
+      { key: 'marketplace_fee', label: 'Marketplace fees', amountMinor: marketplaceFeeAll.amountMinor, kind: 'platform_revenue' },
+      { key: 'customer_orders', label: 'Customer orders', amountMinor: commerceAll.amountMinor, kind: 'pass_through_collection' },
+      { key: 'creator_sessions', label: 'Creator sessions', amountMinor: creatorAll.amountMinor, kind: 'pass_through_collection' },
+    ],
+    platformPayments,
+    customerToHostPayments: customerToHostPayments.slice(0, 40),
+    recent,
+  }
+}
+
+export async function getAdminSearchDemand({ query }) {
+  const days = Math.max(1, Math.min(3650, Number(query?.days || 30)))
+  const limit = Math.max(5, Math.min(100, Number(query?.limit || 40)))
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+
+  const match = {
+    occurredAt: { $gte: since },
+  }
+
+  const q = String(query?.q || '').trim()
+  const area = String(query?.area || '').trim()
+
+  if (q) {
+    match.normalizedQuery = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' }
+  }
+
+  if (area) {
+    const escaped = area.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    match.$or = [
+      { 'area.city': { $regex: escaped, $options: 'i' } },
+      { 'area.state': { $regex: escaped, $options: 'i' } },
+      { 'area.postcode': { $regex: escaped, $options: 'i' } },
+    ]
+  }
+
+  const [
+    totalSearches,
+    uniqueCustomersRows,
+    topQueries,
+    topAreas,
+    queryByArea,
+    recent,
+  ] = await Promise.all([
+    SearchDemandEvent.countDocuments(match),
+    SearchDemandEvent.aggregate([
+      { $match: match },
+      { $group: { _id: '$ownerUserId' } },
+      { $count: 'count' },
+    ]),
+    SearchDemandEvent.aggregate([
+      { $match: match },
+      { $group: { _id: '$normalizedQuery', displayQuery: { $first: '$displayQuery' }, searches: { $sum: 1 }, customers: { $addToSet: '$ownerUserId' } } },
+      { $project: { _id: 0, query: '$displayQuery', searches: 1, uniqueCustomers: { $size: '$customers' } } },
+      { $sort: { searches: -1, query: 1 } },
+      { $limit: 15 },
+    ]),
+    SearchDemandEvent.aggregate([
+      { $match: match },
+      { $group: {
+          _id: {
+            city: { $ifNull: ['$area.city', ''] },
+            state: { $ifNull: ['$area.state', ''] },
+            postcode: { $ifNull: ['$area.postcode', ''] },
+          },
+          searches: { $sum: 1 },
+          customers: { $addToSet: '$ownerUserId' },
+        },
+      },
+      { $project: { _id: 0, city: '$_id.city', state: '$_id.state', postcode: '$_id.postcode', searches: 1, uniqueCustomers: { $size: '$customers' } } },
+      { $sort: { searches: -1 } },
+      { $limit: 15 },
+    ]),
+    SearchDemandEvent.aggregate([
+      { $match: match },
+      { $group: {
+          _id: {
+            query: '$normalizedQuery',
+            city: { $ifNull: ['$area.city', ''] },
+            state: { $ifNull: ['$area.state', ''] },
+            postcode: { $ifNull: ['$area.postcode', ''] },
+          },
+          displayQuery: { $first: '$displayQuery' },
+          searches: { $sum: 1 },
+        },
+      },
+      { $project: { _id: 0, query: '$displayQuery', city: '$_id.city', state: '$_id.state', postcode: '$_id.postcode', searches: 1 } },
+      { $sort: { searches: -1 } },
+      { $limit: 20 },
+    ]),
+    SearchDemandEvent.find(match)
+      .sort({ occurredAt: -1, _id: -1 })
+      .limit(limit)
+      .select('displayQuery surface area occurredAt')
+      .lean(),
+  ])
+
+  return {
+    windowDays: days,
+    totalSearches,
+    uniqueCustomers: Number(uniqueCustomersRows?.[0]?.count || 0),
+    topQuery: topQueries?.[0] || null,
+    topArea: topAreas?.[0] || null,
+    topQueries,
+    topAreas,
+    queryByArea,
+    recent: recent.map((row) => ({
+      id: String(row._id),
+      query: row.displayQuery,
+      surface: row.surface,
+      area: row.area || {},
+      occurredAt: row.occurredAt,
+    })),
   }
 }
 

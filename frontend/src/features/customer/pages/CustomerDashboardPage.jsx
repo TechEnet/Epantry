@@ -167,6 +167,41 @@ function formatMoney(
   ).format(Number(amountMinor) / 100)
 }
 
+function isPaidOrder(order) {
+  return [
+    'paid',
+    'captured',
+    'completed',
+    'success',
+    'succeeded',
+  ].includes(
+    String(order?.paymentStatus || '')
+      .trim()
+      .toLowerCase(),
+  )
+}
+
+function getOrderPaidAmountMinor(order) {
+  const candidates = [
+    order?.totals?.totalLandedCostMinor,
+    order?.totals?.itemSubtotalMinor,
+    order?.totalLandedCostMinor,
+    order?.payment?.amountMinor,
+    order?.paymentAmountMinor,
+    order?.amountMinor,
+  ]
+
+  for (const candidate of candidates) {
+    const value = Number(candidate)
+
+    if (Number.isFinite(value) && value > 0) {
+      return value
+    }
+  }
+
+  return 0
+}
+
 export default function CustomerDashboardPage() {
   const {
     currentUser,
@@ -243,13 +278,11 @@ export default function CustomerDashboardPage() {
       (order) => isSameMonth(order?.createdAt, now),
     )
 
-    const paidOrders = monthOrders.filter(
-      (order) => order?.paymentStatus === 'paid',
-    )
+    const paidOrders = orders.filter(isPaidOrder)
+    const monthPaidOrders = monthOrders.filter(isPaidOrder)
 
     const amountMinor = paidOrders.reduce(
-      (total, order) =>
-        total + Number(order?.totals?.totalLandedCostMinor || 0),
+      (total, order) => total + getOrderPaidAmountMinor(order),
       0,
     )
 
@@ -260,7 +293,8 @@ export default function CustomerDashboardPage() {
     return {
       amountMinor,
       currency,
-      paidOrderCount: paidOrders.length,
+      lifetimePaidOrderCount: paidOrders.length,
+      paidOrderCount: monthPaidOrders.length,
       monthOrderCount: monthOrders.length,
       monthLabel: now.toLocaleDateString(
         'en-IN',
@@ -340,7 +374,7 @@ export default function CustomerDashboardPage() {
                           )}
                   </p>
                   <p className="pb-0 text-[10px] font-bold text-white/60 sm:pb-1 sm:text-sm">
-                    in {monthSummary.monthLabel}
+                    total paid on EPANTRY
                   </p>
                 </div>
 
@@ -349,7 +383,7 @@ export default function CustomerDashboardPage() {
                     ? 'Getting your latest order activity…'
                     : paymentError
                       ? 'Your spending summary could not be loaded right now.'
-                      : `${monthSummary.paidOrderCount} paid ${monthSummary.paidOrderCount === 1 ? 'order' : 'orders'} this month.`}
+                      : `${monthSummary.lifetimePaidOrderCount} paid ${monthSummary.lifetimePaidOrderCount === 1 ? 'order' : 'orders'} overall · ${monthSummary.paidOrderCount} this month.`}
                 </p>
               </div>
             </div>

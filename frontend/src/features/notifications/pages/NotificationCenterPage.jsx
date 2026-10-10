@@ -15,9 +15,10 @@ import {
   X,
 } from "lucide-react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Link } from "react-router-dom";
+import { useAuth } from "../../auth/context/AuthContext";
 
 import {
   getAnalyticsErrorMessage,
@@ -383,6 +384,39 @@ function getNotificationCopy(notification) {
     };
   }
 
+  if (triggerType === "retail_media_campaign_review_requested") {
+    return {
+      title: "A sponsored campaign is ready for approval",
+      description:
+        explanation ||
+        "A Host has completed campaign payment. Review the sponsored placement before it can go live.",
+      why: "Host campaign payment completed",
+      openLabel: "Review campaign",
+    };
+  }
+
+  if (reasonCode === "retail_media_campaign_approved") {
+    return {
+      title: "Your campaign was approved",
+      description:
+        explanation ||
+        "Super Admin approved your sponsored campaign. Open it to activate the campaign.",
+      why: "Super Admin review completed",
+      openLabel: "Open campaign",
+    };
+  }
+
+  if (reasonCode === "retail_media_campaign_rejected") {
+    return {
+      title: "Your campaign needs changes",
+      description:
+        explanation ||
+        "Super Admin did not approve this sponsored campaign. Open it to review the decision.",
+      why: "Super Admin review completed",
+      openLabel: "Review campaign",
+    };
+  }
+
   if (triggerType === "household_invitation_received") {
     return {
       title: "You’ve been invited to a household",
@@ -661,6 +695,7 @@ function NotificationCard({ notification, busy, onAction, onMarkRead }) {
 }
 
 export default function NotificationCenterPage() {
+  const { activeMode, currentUser } = useAuth();
   const [preferences, setPreferences] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -669,10 +704,13 @@ export default function NotificationCenterPage() {
   const [notice, setNotice] = useState("");
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const generation = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++generation.current;
     setLoading(true);
     setError("");
+    setNotifications([]);
 
     try {
       const [preferenceData, notificationData] = await Promise.all([
@@ -682,19 +720,23 @@ export default function NotificationCenterPage() {
         }),
       ]);
 
-      setPreferences(preferenceData?.preferences || null);
-      setNotifications(notificationData?.notifications || []);
+      if (requestId === generation.current) {
+        setPreferences(preferenceData?.preferences || null);
+        setNotifications(notificationData?.notifications || []);
+      }
     } catch (requestError) {
+      if (requestId !== generation.current) return;
       setError(
         getAnalyticsErrorMessage(requestError, "Unable to load notifications.")
       );
     } finally {
-      setLoading(false);
+      if (requestId === generation.current) setLoading(false);
     }
-  }, []);
+  }, [activeMode, currentUser?.id]);
 
   useEffect(() => {
     load();
+    return () => { generation.current += 1; };
   }, [load]);
 
   async function markOneAsRead(notificationId) {

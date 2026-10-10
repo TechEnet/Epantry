@@ -24,6 +24,8 @@ import EmptyState from '../../../components/common/EmptyState'
 import { openAvailabilityNotifyModal } from '../../notifications/components/AvailabilityNotifyModal'
 import useGroceryCatalog from '../hooks/useGroceryCatalog'
 
+import { recordCustomerSearchDemand } from '../../search/services/search.service'
+
 const PREVIEW_PRODUCT_COUNT = 6
 const DEFAULT_PRODUCT_LIMIT = 24
 const CARD_TRAVEL = 1.72
@@ -1064,6 +1066,15 @@ export default function GroceryPage() {
 
   function handleSearchSubmit(event) {
     event.preventDefault()
+
+    const normalizedSearch = searchDraft.trim()
+
+    if (normalizedSearch.length >= 2) {
+      void recordCustomerSearchDemand({
+        query: normalizedSearch,
+        surface: 'grocery',
+      })
+    }
 
     if (limit !== DEFAULT_PRODUCT_LIMIT) setLimit(DEFAULT_PRODUCT_LIMIT)
     setSearch(searchDraft)

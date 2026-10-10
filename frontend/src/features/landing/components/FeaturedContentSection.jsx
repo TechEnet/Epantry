@@ -97,7 +97,11 @@ function initializeMobileRail(rail) {
   })
 }
 
-export default function FeaturedContentSection() {
+export default function FeaturedContentSection({
+  groceryEntranceEdgeOpacity,
+  groceryEntranceScale,
+  groceryEntranceLift,
+}) {
   const shouldReduceMotion =
     useReducedMotion()
 
@@ -214,6 +218,9 @@ export default function FeaturedContentSection() {
         products={grocery}
         onAddToCart={handleAddToCart}
         shouldReduceMotion={shouldReduceMotion}
+        entranceEdgeOpacity={groceryEntranceEdgeOpacity}
+        entranceScale={groceryEntranceScale}
+        entranceLift={groceryEntranceLift}
       />
 
       {/* =============================================================
@@ -279,9 +286,6 @@ function FeaturedBrandsMotionWall({
     return (
       <section className="flex h-[100svh] min-h-[100svh] items-center bg-[#f4f4f2] px-5 text-black sm:px-8">
         <div className="mx-auto w-full max-w-7xl">
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-black/55">
-            Know the brands behind the products.
-          </p>
           <h2 className="mt-4 text-[clamp(48px,7vw,104px)] font-normal leading-[0.92] tracking-[-0.055em]">
             Featured Brands
           </h2>
@@ -321,11 +325,19 @@ function FeaturedBrandsMotionWall({
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_48%_46%,rgba(255,255,255,0.9),rgba(244,244,242,0)_58%)]" />
 
+      <style>{`
+        @keyframes epantry-brand-scroll-left {
+          from { transform: translate3d(0, 0, 0); }
+          to { transform: translate3d(-50%, 0, 0); }
+        }
+        @keyframes epantry-brand-scroll-right {
+          from { transform: translate3d(-50%, 0, 0); }
+          to { transform: translate3d(0, 0, 0); }
+        }
+      `}</style>
+
       <div className="absolute left-5 right-5 top-[clamp(88px,10svh,118px)] z-20 sm:left-8 sm:right-8 lg:left-10 lg:right-10">
         <div className="max-w-[min(76rem,calc(100vw-8rem))]">
-          <p className="[font-family:Arial,Helvetica,sans-serif] text-[11px] font-normal tracking-[-0.01em] text-black/70 sm:text-[13px] lg:text-[15px]">
-            Know the brands behind the products.
-          </p>
 
           <h2
             id="featured-brands-title"
@@ -399,7 +411,7 @@ function FeaturedBrandsMotionWall({
 
       <Link
         to="/brands"
-        className="focus-ring group absolute bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:bottom-auto sm:right-0 sm:top-1/2 sm:-translate-y-1/2 sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
+        className="focus-ring group absolute right-5 top-[57svh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
       >
         <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
           Explore Brands
@@ -458,6 +470,8 @@ function BrandMotionRow({
   duration,
   shouldReduceMotion,
 }) {
+  const [isPaused, setIsPaused] = useState(false)
+
   const group = (
     <div className="flex shrink-0 items-center gap-[clamp(24px,4vw,74px)] pr-[clamp(24px,4vw,74px)]">
       {brands.map(
@@ -469,6 +483,7 @@ function BrandMotionRow({
             key={`${direction}-${brand.id || brand.slug || brand.name}-${index}`}
             brand={brand}
             index={index}
+            onHoverChange={setIsPaused}
           />
         ),
       )}
@@ -477,42 +492,20 @@ function BrandMotionRow({
 
   return (
     <div className="w-full overflow-hidden">
-      <motion.div
+      <div
         className="flex w-max items-center will-change-transform"
-        initial={false}
-        animate={
-          shouldReduceMotion
-            ? { x: '0%' }
-            : direction ===
-                'left'
-              ? {
-                  x: [
-                    '0%',
-                    '-50%',
-                  ],
-                }
-              : {
-                  x: [
-                    '-50%',
-                    '0%',
-                  ],
-                }
-        }
-        transition={
-          shouldReduceMotion
-            ? undefined
-            : {
-                duration,
-                ease: 'linear',
-                repeat: Infinity,
-              }
-        }
+        style={{
+          animation: shouldReduceMotion
+            ? 'none'
+            : `epantry-brand-scroll-${direction} ${duration}s linear infinite`,
+          animationPlayState: isPaused ? 'paused' : 'running',
+        }}
       >
         {group}
-        <div aria-hidden="true">
+        <div aria-hidden="true" className="shrink-0">
           {group}
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
@@ -520,6 +513,7 @@ function BrandMotionRow({
 function BrandMotionItem({
   brand,
   index,
+  onHoverChange,
 }) {
   const displayName =
     String(
@@ -541,6 +535,8 @@ function BrandMotionItem({
       )}
       className="focus-ring group relative flex h-[112px] w-[clamp(190px,18vw,330px)] shrink-0 items-center justify-center px-5 sm:h-[132px] lg:h-[148px]"
       aria-label={`Explore ${displayName}`}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
     >
       <span className="pointer-events-none absolute inset-y-3 left-0 w-px origin-center scale-y-0 bg-[#d76565]/55 transition-transform duration-300 ease-out group-hover:scale-y-100" />
       <span className="pointer-events-none absolute inset-y-3 right-0 w-px origin-center scale-y-0 bg-[#d76565]/55 transition-transform duration-300 ease-out group-hover:scale-y-100" />
@@ -548,7 +544,7 @@ function BrandMotionItem({
       <span className="flex max-w-full flex-col items-center text-center">
         <span
           className={[
-            '[font-family:Arial,Helvetica,sans-serif] text-[clamp(18px,1.65vw,31px)] leading-[0.96] tracking-[-0.045em] text-black transition-transform duration-300 ease-out group-hover:scale-[1.025]',
+            '[font-family:Arial,Helvetica,sans-serif] text-[clamp(18px,1.65vw,31px)] leading-[0.96] tracking-[-0.045em] text-black transition-[color,transform] duration-300 ease-out group-hover:scale-[1.025] group-hover:text-[#B4232B]',
             weightClass,
           ].join(' ')}
         >
@@ -653,6 +649,9 @@ function FeaturedGroceryScrollStory({
   products,
   onAddToCart,
   shouldReduceMotion,
+  entranceEdgeOpacity,
+  entranceScale,
+  entranceLift,
 }) {
   const productItems =
     Array.isArray(products)
@@ -903,7 +902,7 @@ function FeaturedGroceryScrollStory({
 
   if (productItems.length === 0) {
     return (
-      <section className="relative z-30 h-[100svh] overflow-hidden rounded-t-[30px] bg-[#26351E] shadow-[0_-22px_74px_rgba(17,24,39,0.16)] sm:rounded-t-[38px] lg:rounded-t-[46px]">
+      <section className="relative z-30 h-[100svh] overflow-hidden bg-[#26351E] shadow-[0_-22px_74px_rgba(17,24,39,0.16)]">
         <div className="page-shell flex h-full items-center justify-center">
           <EmptyState
             message="Featured grocery products will appear here once catalog data is available."
@@ -996,13 +995,35 @@ function FeaturedGroceryScrollStory({
   return (
     <section
       ref={sectionRef}
-      className="relative z-30 isolate rounded-t-[30px] shadow-[0_-22px_74px_rgba(17,24,39,0.16)] sm:rounded-t-[38px] lg:rounded-t-[46px]"
+      className="relative z-30 isolate shadow-[0_-22px_74px_rgba(17,24,39,0.16)]"
       style={{
         height:
           storyHeight,
       }}
     >
-      <div className="sticky top-0 h-[100svh] overflow-hidden rounded-t-[30px] bg-[#26351E] sm:rounded-t-[38px] lg:rounded-t-[46px]">
+      <div className="sticky top-0 h-[100svh] overflow-hidden [perspective:1800px]">
+        {/* The Grocery scene is one elevated surface. Scaling its inner plane
+            (not the sticky viewport) exposes the retreating Explore scene
+            along the sides and avoids sticky-position transform jitter. */}
+        <motion.div
+          className="relative h-full w-full overflow-hidden bg-[#26351E] shadow-[0_-40px_120px_-24px_rgba(0,0,0,0.75)] [backface-visibility:hidden]"
+          style={{
+            scale:
+              entranceScale,
+            y:
+              entranceLift,
+            transformOrigin:
+              '50% 0%',
+          }}
+        >
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 z-40 h-[16px] bg-[linear-gradient(180deg,rgba(255,255,255,0.22)_0%,rgba(255,255,255,0.06)_30%,transparent_100%)]"
+            style={{
+              opacity:
+                entranceEdgeOpacity,
+            }}
+          />
 
         {/* Product-driven colour field. */}
         <AnimatePresence
@@ -1056,12 +1077,12 @@ function FeaturedGroceryScrollStory({
 
           <div className="flex shrink-0 items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-              <p className="truncate text-[9px] font-black uppercase tracking-[0.24em] text-white/92 sm:text-[10px] lg:text-[11px]">
+              <p className="truncate text-[9px] font-black uppercase tracking-[0.24em] text-white/92 sm:text-[10px] lg:text-[15px]">
                 Featured Grocery
               </p>
 
 
-              <p className="shrink-0 text-[9px] font-black tabular-nums tracking-[0.15em] text-white/56 sm:text-[10px]">
+              <p className="shrink-0 text-[9px] font-black tabular-nums tracking-[0.15em] text-white/56 sm:text-[10px] lg:text-[13px]">
                 {String(resolvedActiveIndex + 1).padStart(2, '0')} / {String(items.length).padStart(2, '0')}
               </p>
             </div>
@@ -1081,7 +1102,7 @@ function FeaturedGroceryScrollStory({
           <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 py-3 sm:gap-3 sm:py-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(390px,1.2fr)_minmax(0,0.9fr)] lg:grid-rows-1 lg:items-center lg:gap-8 lg:py-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.18fr)_minmax(0,0.92fr)] xl:gap-11">
 
             {/* Left: current product identity. */}
-            <div className="min-w-0 lg:self-center lg:pb-9">
+            <div className="min-w-0 lg:self-center lg:pb-9 lg:pr-3">
               <AnimatePresence
                 mode="wait"
                 initial={false}
@@ -1125,28 +1146,35 @@ function FeaturedGroceryScrollStory({
                       1,
                     ],
                   }}
-                  className="flex items-end justify-between gap-4 lg:block"
+                  className="flex min-w-0 flex-col items-start justify-center text-left"
                 >
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-black uppercase tracking-[0.19em] text-white/56 sm:text-[9px] lg:text-[10px] lg:tracking-[0.22em]">
-                      {activeProduct?.subCategory || 'Grocery'}
-                    </p>
+                  <div className="min-w-0 w-full">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span aria-hidden="true" className="h-[2px] w-8 shrink-0 bg-white/85 sm:w-10" />
+                      <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 sm:text-xs lg:text-[13px]">
+                        {activeProduct?.subCategory || 'Grocery'}
+                      </p>
+                    </div>
 
-                    <h2 className="mt-1.5 max-w-[82vw] text-[clamp(27px,8vw,38px)] font-black leading-[0.94] tracking-[-0.05em] text-white drop-shadow-sm sm:max-w-[520px] sm:text-[clamp(34px,6vw,48px)] lg:mt-4 lg:max-w-[360px] lg:text-[clamp(34px,3.25vw,58px)]">
+                    <h2 className="mt-3 max-w-[92vw] break-words text-[clamp(27px,7.5vw,38px)] font-black leading-[1.03] tracking-[-0.047em] text-white [text-wrap:balance] sm:mt-4 sm:max-w-[520px] sm:text-[clamp(34px,6vw,48px)] lg:mt-5 lg:max-w-full lg:text-[clamp(34px,3.05vw,53px)] lg:leading-[1.04] xl:text-[clamp(38px,3.2vw,56px)]">
                       {activeProduct?.name || 'Grocery Product'}
                     </h2>
                   </div>
 
-                  {(activeProduct?.quantity || activeProduct?.unit) && (
-                    <p className="shrink-0 pb-1 text-[9px] font-bold text-white/55 sm:text-[10px] lg:mt-5 lg:pb-0 lg:text-sm">
-                      {activeProduct?.quantity}{activeProduct?.quantity && activeProduct?.unit ? ' ' : ''}{activeProduct?.unit || ''}
-                    </p>
-                  )}
+                  {(activeProduct?.quantity || activeProduct?.unit || activeProduct?.brand) && (
+                    <div className="mt-4 flex w-full max-w-[390px] flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-white/30 pt-3 sm:mt-5 sm:pt-4 lg:mt-7 lg:pt-5">
+                      {(activeProduct?.quantity || activeProduct?.unit) && (
+                        <p className="text-base font-bold tracking-[-0.025em] text-white sm:text-lg lg:text-[22px]">
+                          {activeProduct?.quantity}{activeProduct?.quantity && activeProduct?.unit ? ' ' : ''}{activeProduct?.unit || ''}
+                        </p>
+                      )}
 
-                  {activeProduct?.brand && (
-                    <p className="mt-2 hidden text-[10px] font-black uppercase tracking-[0.16em] text-white/42 lg:block">
-                      {activeProduct.brand}
-                    </p>
+                      {activeProduct?.brand && (
+                        <p className="min-w-0 text-xs font-semibold tracking-[0.02em] text-white/75 sm:text-sm lg:text-[15px]">
+                          {activeProduct.brand}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </motion.div>
               </AnimatePresence>
@@ -1234,7 +1262,7 @@ function FeaturedGroceryScrollStory({
                       1,
                     ],
                   }}
-                  className="relative flex min-h-0 w-full flex-1 items-center justify-center lg:absolute lg:inset-0"
+                  className="relative flex min-h-0 w-full flex-1 items-center justify-center lg:absolute lg:inset-0 lg:[perspective:1500px]"
                   style={{
                     willChange:
                       'transform, opacity',
@@ -1242,14 +1270,19 @@ function FeaturedGroceryScrollStory({
                 >
                   <Link
                     to={productPath}
-                    className="focus-ring group relative block h-[min(30svh,292px)] w-[min(78vw,380px)] overflow-hidden rounded-[22px] border border-white/38 bg-white/92 p-4 shadow-[0_24px_64px_rgba(0,0,0,0.24)] sm:h-[min(34svh,350px)] sm:w-[min(66vw,460px)] sm:rounded-[26px] sm:p-5 lg:h-auto lg:aspect-[1.12/1] lg:w-[min(34vw,520px)] lg:rounded-[28px] lg:p-6 xl:rounded-[30px] xl:p-7"
+                    className={`focus-ring group relative block h-[min(30svh,292px)] w-[min(78vw,380px)] overflow-hidden rounded-[22px] sm:h-[min(34svh,350px)] sm:w-[min(66vw,460px)] sm:rounded-[26px] lg:h-auto lg:aspect-[1.12/1] lg:w-[min(34vw,520px)] lg:rounded-[28px] xl:rounded-[30px] ${isViewAll
+                      ? 'border border-white/38 bg-white/92 p-4 shadow-[0_24px_64px_rgba(0,0,0,0.24)] sm:p-5 lg:p-6 xl:p-7'
+                      : 'border border-white/35 bg-white p-0 shadow-[12px_28px_70px_rgba(0,0,0,0.38),-5px_-5px_24px_rgba(255,255,255,0.08)] transition-[transform,box-shadow] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] lg:[transform:rotateY(-5deg)_rotateX(2deg)] lg:hover:[transform:rotateY(0deg)_rotateX(0deg)_translateY(-6px)] lg:hover:shadow-[0_38px_90px_rgba(0,0,0,0.42)] motion-reduce:transition-none'
+                    }`}
                     aria-label={
                       isViewAll
                         ? 'View all grocery products'
                         : undefined
                     }
                   >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,1),rgba(249,250,247,0.95)_58%,rgba(231,235,228,0.86)_100%)]" />
+                    {isViewAll ? (
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,1),rgba(249,250,247,0.95)_58%,rgba(231,235,228,0.86)_100%)]" />
+                    ) : null}
 
                     {isViewAll ? (
                       <div className="relative flex h-full flex-col items-center justify-center px-5 text-center text-[#153323]">
@@ -1292,12 +1325,12 @@ function FeaturedGroceryScrollStory({
                         </span>
                       </div>
                     ) : (
-                      <div className="relative flex h-full items-center justify-center">
+                      <div className="relative flex h-full w-full items-center justify-center">
                         {activeProduct?.image ? (
                           <img
                             src={activeProduct.image}
                             alt={activeProduct?.name || 'Grocery product'}
-                            className="max-h-full max-w-full object-contain drop-shadow-[0_20px_24px_rgba(17,24,39,0.16)] transition duration-700 ease-out group-hover:scale-[1.02]"
+                            className="block h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-[1.035] motion-reduce:transition-none"
                           />
                         ) : (
                           <div className="grid h-full w-full place-items-center text-[#166534]">
@@ -1309,6 +1342,12 @@ function FeaturedGroceryScrollStory({
                         )}
                       </div>
                     )}
+                    {!isViewAll ? (
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_2px_0_rgba(255,255,255,0.48),inset_-10px_0_18px_-15px_rgba(0,0,0,0.45)]"
+                      />
+                    ) : null}
                   </Link>
                 </motion.div>
               </AnimatePresence>
@@ -1487,17 +1526,17 @@ function FeaturedGroceryScrollStory({
                     </div>
                   ) : (
                     <>
-                  <div className="flex items-end justify-between gap-4 border-b border-white/18 pb-2.5 lg:pb-3">
+                  <div className="flex items-end justify-between gap-4 border-b border-white/18 pb-2.5 lg:max-w-[340px] lg:pb-3">
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/88 lg:text-[10px] lg:tracking-[0.24em]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/88 lg:text-[13px] lg:tracking-[0.24em]">
                         Nutrition
                       </p>
-                      <p className="mt-0.5 hidden text-xs font-semibold text-white/46 sm:block">
+                      <p className="mt-0.5 hidden text-xs font-semibold text-white/46 sm:block lg:text-sm">
                         Approved product information
                       </p>
                     </div>
 
-                    <span className="text-[9px] font-black tabular-nums text-white/38 lg:text-[10px]">
+                    <span className="text-[9px] font-black tabular-nums text-white/38 lg:text-xs">
                       {String(resolvedActiveIndex + 1).padStart(2, '0')}
                     </span>
                   </div>
@@ -1533,7 +1572,7 @@ function FeaturedGroceryScrollStory({
                         )}
                       </div>
 
-                      <div className="mt-4 hidden space-y-1 lg:block">
+                      <div className="mt-4 hidden space-y-1 lg:block lg:max-w-[340px]">
                         {activeNutrition.map(
                           (
                             nutrient,
@@ -1547,11 +1586,11 @@ function FeaturedGroceryScrollStory({
                               }
                               className="flex items-center justify-between gap-5 border-b border-white/[0.10] py-2.5"
                             >
-                              <span className="min-w-0 truncate text-[12px] font-bold text-white/52">
+                              <span className="min-w-0 truncate text-[14px] font-bold text-white/52">
                                 {nutrient.name || nutrient.key || 'Nutrient'}
                               </span>
 
-                              <span className="shrink-0 text-[12px] font-black text-white">
+                              <span className="shrink-0 text-[14px] font-black text-white">
                                 {formatNutritionValue(
                                   nutrient.amount,
                                   nutrient.unit,
@@ -1575,6 +1614,7 @@ function FeaturedGroceryScrollStory({
           </div>
 
         </div>
+        </motion.div>
       </div>
     </section>
   )
@@ -2596,10 +2636,10 @@ function FeaturedRecipesScrollStory({
         >
           <div className="relative h-full w-full">
             <div className="absolute left-4 top-0 z-20 sm:left-6 lg:left-8">
-              <p className="text-[8px] font-black uppercase tracking-[0.28em] text-white/54 sm:text-[9px] lg:text-[10px]">
+              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/54 sm:text-[10px] lg:text-[12px]">
                 Featured Recipes
               </p>
-              <p className="mt-1 text-[8px] font-bold tabular-nums tracking-[0.14em] text-red-400/70 sm:text-[9px]">
+              <p className="mt-1 text-[9px] font-bold tabular-nums tracking-[0.14em] text-red-400/70 sm:text-[10px] lg:text-[11px]">
                 {String(
                   activeSequenceIndex +
                     1,
@@ -2822,7 +2862,7 @@ function FeaturedRecipesScrollStory({
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex items-center justify-between px-5 text-[7px] font-black uppercase tracking-[0.22em] text-white/38 sm:bottom-4 sm:px-8 sm:text-[8px] lg:px-11">
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex items-center justify-between px-5 text-[8px] font-black uppercase tracking-[0.22em] text-white/38 sm:bottom-4 sm:px-8 sm:text-[9px] lg:px-11 lg:text-[10px]">
           <span>Discover</span>
           <span>Cook</span>
           <span>Connect</span>

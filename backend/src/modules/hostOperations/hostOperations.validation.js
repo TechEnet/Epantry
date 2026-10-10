@@ -161,6 +161,8 @@ export const createHostOrganizationSchema =
             'seller',
             'brand',
             'b2b',
+            'restaurant',
+            'chef',
             'hybrid',
           ])
           .default(
@@ -177,6 +179,8 @@ export const hostCommercialProfileRequestSchema =
           'seller',
           'brand',
           'b2b',
+          'restaurant',
+          'chef',
           'hybrid',
         ]),
 

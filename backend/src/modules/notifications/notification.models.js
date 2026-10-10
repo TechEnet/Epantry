@@ -58,6 +58,8 @@ export const NOTIFICATION_TRIGGER_TYPES = Object.freeze([
   'hospitality_approval_requested',
   'creator_approval_requested',
   'item_available',
+  'retail_media_campaign_review_requested',
+  'retail_media_campaign_review_result',
 ])
 
 export const NOTIFICATION_ACTIONS = Object.freeze([

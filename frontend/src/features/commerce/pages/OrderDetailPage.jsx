@@ -15,7 +15,7 @@ import {
   WalletCards,
 } from "lucide-react";
 
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { useAuth } from "../../auth/context/AuthContext";
 
@@ -25,6 +25,8 @@ import {
   getCommerceErrorMessage,
   getOrder,
 } from "../services/commerce.service";
+
+import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
 
 function formatMoney(amountMinor, currency = "INR") {
   if (!Number.isInteger(Number(amountMinor))) {
@@ -45,6 +47,81 @@ function label(value) {
     .split("_")
     .map((token) => `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
     .join(" ");
+}
+
+function buildRetailMediaPreviewOrderData() {
+  const createdAt = new Date(Date.now() - 35 * 60 * 1000).toISOString();
+  const updatedAt = new Date(Date.now() - 8 * 60 * 1000).toISOString();
+
+  return {
+    order: {
+      id: "retail-media-preview",
+      status: "confirmed",
+      paymentStatus: "paid",
+      paymentProvider: "razorpay",
+      createdAt,
+      updatedAt,
+      totals: {
+        itemSubtotalMinor: 124500,
+        knownFeesMinor: 4900,
+        totalLandedCostMinor: 129400,
+        currency: "INR",
+      },
+      deliveryAddressSnapshot: {
+        recipientName: "Customer",
+        addressLine1: "Delivery address preview",
+        area: "EPANTRY service area",
+        city: "New Delhi",
+        state: "Delhi",
+        postalCode: "110001",
+        country: "India",
+        deliveryInstructions: "Live customer data is hidden in placement preview.",
+      },
+    },
+    sellerOrders: [
+      {
+        id: "retail-media-preview-seller",
+        sellerName: "EPANTRY Host",
+        status: "seller_accepted",
+        updatedAt,
+        items: [
+          {
+            cartItemId: "retail-media-preview-item-1",
+            displayName: "Fresh grocery item",
+            packCount: 1,
+            packQuantity: 1,
+            packUnit: "pack",
+          },
+          {
+            cartItemId: "retail-media-preview-item-2",
+            displayName: "Kitchen essential",
+            packCount: 2,
+            packQuantity: 500,
+            packUnit: "g",
+          },
+        ],
+        promise: {
+          cancellationPolicySummary:
+            "Cancellation terms appear here exactly as they do on the live order page.",
+          returnPolicySummary:
+            "Return terms appear here exactly as they do on the live order page.",
+        },
+      },
+    ],
+    timeline: [
+      {
+        eventType: "payment_captured",
+        occurredAt: createdAt,
+      },
+      {
+        sellerOrderId: "retail-media-preview-seller",
+        status: "seller_accepted",
+        eventType: "seller_accepted",
+        occurredAt: updatedAt,
+      },
+    ],
+    deliveryEta: null,
+  };
 }
 
 const SELLER_PROGRESS_STEPS = [
@@ -595,7 +672,7 @@ function statusClass(value) {
   return "border-stone-200 bg-stone-100 text-stone-700";
 }
 
-function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
+function SellerJourneyTimeline({ order, timeline, sellerOrder, horizontal = false }) {
   const paymentEvent =
     timeline.find(
       (event) =>
@@ -657,7 +734,7 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
   ];
 
   return (
-    <div className="rounded-xl border border-indigo-100 bg-[#f8faff] p-3 sm:rounded-2xl sm:p-5">
+    <div className={`rounded-xl border border-indigo-100 bg-[#f8faff] p-3 sm:rounded-2xl sm:p-5 ${horizontal ? "lg:p-4" : ""}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2 sm:mb-4 sm:gap-3 sm:pb-4">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">
@@ -683,18 +760,27 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
         </span>
       </div>
 
-      <div className="space-y-0">
+      <div className={horizontal ? "space-y-0 lg:grid lg:grid-cols-8 lg:gap-1.5" : "space-y-0"}>
         {journeySteps.map((step, stepIndex) => {
           const isLast = stepIndex === journeySteps.length - 1;
 
           return (
             <div
               key={step.key}
-              className="relative flex gap-2.5 pb-3 last:pb-0 sm:gap-3 sm:pb-6"
+              className={`relative flex gap-2.5 pb-3 last:pb-0 sm:gap-3 sm:pb-6 ${horizontal ? "lg:min-w-0 lg:flex-col lg:items-center lg:gap-1 lg:pb-0 lg:text-center" : ""}`}
             >
               {!isLast && (
                 <span
-                  className={`absolute left-[13px] top-7 h-[calc(100%-0.65rem)] w-0.5 rounded-full ${
+                  className={`absolute left-[13px] top-7 h-[calc(100%-0.65rem)] w-0.5 rounded-full ${horizontal ? "lg:hidden" : ""} ${
+                    step.completed ? "bg-emerald-300" : "bg-stone-200"
+                  }`}
+                  aria-hidden="true"
+                />
+              )}
+
+              {horizontal && !isLast && (
+                <span
+                  className={`pointer-events-none absolute left-[calc(50%+18px)] top-[15px] hidden h-[2px] w-[calc(100%-24px)] rounded-full lg:block ${
                     step.completed ? "bg-emerald-300" : "bg-stone-200"
                   }`}
                   aria-hidden="true"
@@ -724,15 +810,15 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
               </div>
 
               <div
-                className={`min-w-0 flex-1 rounded-lg px-2.5 py-2 sm:rounded-xl sm:px-3 sm:py-2.5 ${
+                className={`min-w-0 flex-1 rounded-lg px-2.5 py-2 sm:rounded-xl sm:px-3 sm:py-2.5 ${horizontal ? "lg:w-full lg:px-1 lg:py-1.5" : ""} ${
                   step.current
                     ? "border border-indigo-200 bg-gradient-to-r from-indigo-50/95 via-sky-50/80 to-emerald-50/50 shadow-sm"
                     : "bg-transparent"
                 }`}
               >
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 ${horizontal ? "lg:flex-col lg:justify-center lg:gap-1" : ""}`}>
                   <p
-                    className={`text-sm font-black ${
+                    className={`text-sm font-black ${horizontal ? "lg:text-[11px] lg:leading-4" : ""} ${
                       step.current
                         ? "text-indigo-900"
                         : step.completed
@@ -751,7 +837,7 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
                 </div>
 
                 <p
-                  className={`mt-1 text-xs leading-5 ${
+                  className={`mt-1 text-xs leading-5 ${horizontal ? "lg:break-words lg:text-[10px] lg:leading-4" : ""} ${
                     step.completed ? "text-stone-500" : "text-stone-400"
                   }`}
                 >
@@ -761,7 +847,7 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
                 </p>
 
                 {step.current && step.key === "out_for_delivery" && (
-                  <div className="mt-3">
+                  <div className={`mt-3 ${horizontal ? "lg:hidden" : ""}`}>
                     <p className="mb-2 whitespace-nowrap text-[10px] font-semibold leading-4 text-stone-600 sm:mb-3 sm:whitespace-normal sm:text-xs sm:leading-5">
                       <span className="sm:hidden">
                         Your order is moving to your delivery address.
@@ -780,6 +866,14 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder }) {
           );
         })}
       </div>
+      {horizontal && journeySteps.some((step) => step.current && step.key === "out_for_delivery") && (
+        <div className="mt-3 hidden border-t border-indigo-100 pt-3 lg:flex lg:items-center lg:justify-center lg:gap-4">
+          <p className="max-w-xs text-xs font-semibold text-stone-600">
+            Your order has left the Host and is moving toward your delivery address.
+          </p>
+          <DeliveryTruckAnimation />
+        </div>
+      )}
     </div>
   );
 }
@@ -813,6 +907,13 @@ function formatEtaDistance(value) {
 
 export default function OrderDetailPage() {
   const { orderId } = useParams();
+
+  const location = useLocation();
+
+  const retailMediaPreview =
+    typeof window !== "undefined" &&
+    window.self !== window.top &&
+    new URLSearchParams(location.search).get("retailMediaPreview") === "1";
 
   const { currentUser } = useAuth();
 
@@ -849,7 +950,11 @@ export default function OrderDetailPage() {
       setError("");
 
       try {
-        setData(await getOrder(orderId));
+        if (retailMediaPreview) {
+          setData(buildRetailMediaPreviewOrderData());
+        } else {
+          setData(await getOrder(orderId));
+        }
       } catch (loadError) {
         setError(
           getCommerceErrorMessage(loadError, "Unable to load Order detail.")
@@ -860,7 +965,7 @@ export default function OrderDetailPage() {
         setRefreshing(false);
       }
     },
-    [orderId]
+    [orderId, retailMediaPreview]
   );
 
   useEffect(() => {
@@ -882,6 +987,10 @@ export default function OrderDetailPage() {
   }, [data?.deliveryEta?.available, data?.deliveryEta?.estimatedArrivalAt]);
 
   useEffect(() => {
+    if (retailMediaPreview) {
+      return;
+    }
+
     const eta = data?.deliveryEta;
 
     if (!eta?.available) {
@@ -904,7 +1013,12 @@ export default function OrderDetailPage() {
       targetPath: `/orders/${encodeURIComponent(String(orderId))}`,
       calculationMethod: eta.calculationMethod || "",
     });
-  }, [data?.deliveryEta, orderId, setDeliveryContext]);
+  }, [
+    data?.deliveryEta,
+    orderId,
+    retailMediaPreview,
+    setDeliveryContext,
+  ]);
 
   if (loading) {
     return (
@@ -934,6 +1048,8 @@ export default function OrderDetailPage() {
 
   const sellerOrders = data?.sellerOrders || [];
 
+  const isSingleHost = sellerOrders.length === 1;
+
   const timeline = data?.timeline || [];
 
   const deliveryEta = data?.deliveryEta || null;
@@ -943,8 +1059,8 @@ export default function OrderDetailPage() {
   const orderDisplayTitle = getOrderDisplayTitle(sellerOrders);
 
   return (
-    <main className="min-h-screen bg-[#f7f5ef]">
-      <div className="page-shell pb-3 pt-0 sm:pb-8 sm:pt-0">
+    <main className={`bg-[#f7f5ef] ${isSingleHost ? "min-h-[100svh]" : "min-h-screen"}`}>
+      <div className={`page-shell pb-3 pt-0 sm:pb-8 sm:pt-0 ${isSingleHost ? "lg:pb-3" : ""}`}>
         <Link
           to="/orders"
           className="focus-ring inline-flex items-center gap-1.5 rounded-full px-1 py-1.5 text-xs font-black text-stone-600 transition-colors hover:text-emerald-800 sm:gap-2 sm:px-2 sm:py-2 sm:text-sm"
@@ -956,7 +1072,7 @@ export default function OrderDetailPage() {
         <section className="relative mt-2 overflow-hidden rounded-[24px] border border-teal-200 bg-gradient-to-br from-[#DDF7EE] via-[#EAF4FF] to-[#F2ECFF] shadow-[0_14px_36px_rgba(37,99,235,0.09)] sm:mt-3 sm:rounded-[30px] sm:shadow-[0_18px_50px_rgba(37,99,235,0.10)]">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-teal-100/70 via-sky-100/60 to-violet-100/40" />
 
-          <div className="relative flex flex-col gap-2.5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className={`relative flex flex-col gap-2.5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between ${isSingleHost ? "lg:gap-4 lg:p-4" : ""}`}>
             <div className="min-w-0 flex-1">
               <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-emerald-800 backdrop-blur-sm sm:gap-2 sm:px-3 sm:py-1.5">
                 <PackageCheck
@@ -1094,7 +1210,7 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          <div className="relative grid grid-cols-[1fr_0.72fr_1.28fr] gap-2 border-t border-sky-200 bg-[#EEF4FF] p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-5">
+          <div className={`relative grid grid-cols-[1fr_0.72fr_1.28fr] gap-2 border-t border-sky-200 bg-[#EEF4FF] p-2.5 sm:grid-cols-3 sm:gap-3 sm:p-5 ${isSingleHost ? "lg:p-3" : ""}`}>
             <div className="min-h-[64px] min-w-0 overflow-hidden rounded-xl border border-sky-200 bg-sky-50/90 p-2 shadow-sm sm:min-h-0 sm:rounded-2xl sm:p-4">
               <div className="flex h-full items-center justify-between gap-1.5 sm:gap-3">
                 <div className="min-w-0">
@@ -1163,8 +1279,14 @@ export default function OrderDetailPage() {
           </div>
         </section>
 
+        <SponsoredCampaignSlot
+          placement="post_purchase"
+          slotKey="post_purchase_summary"
+          embedded
+        />
+
         {order.deliveryAddressSnapshot && (
-          <section className="mt-2 rounded-[18px] border border-emerald-200 bg-[#eaf9f3] p-2.5 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-6">
+          <section className={`mt-2 rounded-[18px] border border-emerald-200 bg-[#eaf9f3] p-2.5 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-6 ${isSingleHost ? "lg:mt-3 lg:p-3" : ""}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-700 text-white sm:h-10 sm:w-10 sm:rounded-2xl">
@@ -1231,13 +1353,19 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        <section className="mt-3 grid gap-3 sm:mt-5 sm:gap-5 lg:grid-cols-2">
+        <SponsoredCampaignSlot
+          placement="post_purchase"
+          slotKey="post_purchase_items"
+          embedded
+        />
+
+        <section className={`mt-3 grid gap-3 sm:mt-5 sm:gap-5 ${isSingleHost ? "lg:mt-3 lg:grid-cols-1 lg:gap-3" : "lg:grid-cols-2"}`}>
           {sellerOrders.map((sellerOrder) => (
             <article
               key={sellerOrder.id}
               className="flex flex-col overflow-hidden rounded-[22px] border border-violet-200 bg-white shadow-[0_12px_32px_rgba(76,29,149,0.08)] sm:rounded-[28px] sm:shadow-[0_16px_42px_rgba(76,29,149,0.09)]"
             >
-              <div className="flex shrink-0 items-center gap-2 border-b border-violet-200 bg-gradient-to-r from-violet-100 via-indigo-50 to-sky-50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-6">
+              <div className={`flex shrink-0 items-center gap-2 border-b border-violet-200 bg-gradient-to-r from-violet-100 via-indigo-50 to-sky-50 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-6 ${isSingleHost ? "lg:p-3" : ""}`}>
                 <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                   <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-700 text-white shadow-sm sm:h-11 sm:w-11 sm:rounded-2xl">
                     <Store
@@ -1277,9 +1405,9 @@ export default function OrderDetailPage() {
                 </span>
               </div>
 
-              <div className="min-h-0 flex-1">
+              <div className={isSingleHost ? "min-h-0 flex-1 lg:grid lg:grid-cols-4 lg:items-stretch lg:gap-2 lg:p-3" : "min-h-0 flex-1"}>
                 {sellerProblemCopy(sellerOrder.status) && (
-                  <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 sm:px-6 sm:py-4">
+                  <div className={`border-b border-rose-200 bg-rose-50 px-4 py-3 sm:px-6 sm:py-4 ${isSingleHost ? "lg:col-span-4" : ""}`}>
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-rose-700">
                       This delivery needs attention
                     </p>
@@ -1289,18 +1417,18 @@ export default function OrderDetailPage() {
                   </div>
                 )}
 
-                <div className="border-b border-violet-100 bg-white p-3 sm:p-6">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-700">
+                <div className={`border-b border-violet-100 bg-white p-3 sm:p-6 ${isSingleHost ? "lg:contents" : ""}`}>
+                  <p className={`text-[10px] font-black uppercase tracking-[0.14em] text-violet-700 ${isSingleHost ? "lg:col-span-4" : ""}`}>
                     Items in this Host delivery
                   </p>
 
-                  <p className="mt-1 text-xs font-semibold text-stone-500 sm:text-sm">
+                  <p className={`mt-1 text-xs font-semibold text-stone-500 sm:text-sm ${isSingleHost ? "lg:col-span-4 lg:mt-0" : ""}`}>
                     {(sellerOrder.items || []).length} item
                     {(sellerOrder.items || []).length === 1 ? "" : "s"} tied to{" "}
                     {sellerOrder.sellerName || "this Host"}.
                   </p>
 
-                  <div className="mt-2 grid gap-1 sm:mt-4 sm:grid-cols-2 sm:gap-2">
+                  <div className={`mt-2 grid gap-1 sm:mt-4 sm:grid-cols-2 sm:gap-2 ${isSingleHost ? "lg:contents" : ""}`}>
                     {(sellerOrder.items || []).map((item) => (
                       <div
                         key={
@@ -1322,7 +1450,7 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-1.5 border-b border-violet-100 bg-[#fffdfd] p-3 sm:grid-cols-2 sm:gap-3 sm:p-6">
+                <div className={`grid gap-1.5 border-b border-violet-100 bg-[#fffdfd] p-3 sm:grid-cols-2 sm:gap-3 sm:p-6 ${isSingleHost ? "lg:contents" : ""}`}>
                   <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-2 sm:rounded-2xl sm:p-4">
                     <div className="flex items-start gap-3">
                       <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-rose-100 text-rose-700 shadow-sm ring-1 ring-rose-200 sm:h-9 sm:w-9 sm:rounded-xl">
@@ -1372,17 +1500,24 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
 
-                <div className="p-3 sm:p-6">
+                <div className={`p-3 sm:p-6 ${isSingleHost ? "lg:col-span-4 lg:p-3" : ""}`}>
                   <SellerJourneyTimeline
                     order={order}
                     timeline={timeline}
                     sellerOrder={sellerOrder}
+                    horizontal={isSingleHost}
                   />
                 </div>
               </div>
             </article>
           ))}
         </section>
+
+        <SponsoredCampaignSlot
+          placement="post_purchase"
+          slotKey="post_purchase_follow_up"
+          embedded
+        />
       </div>
     </main>
   );

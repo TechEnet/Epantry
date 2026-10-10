@@ -379,7 +379,7 @@ function readCustomerCartNavigation() {
   }
 
   return {
-    href: '/grocery',
+    href: '/cart/recipe',
     count: 0,
   }
 }

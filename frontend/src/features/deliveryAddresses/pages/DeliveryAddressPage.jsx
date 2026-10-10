@@ -6,6 +6,7 @@ import {
   Home,
   LocateFixed,
   MapPin,
+  Pencil,
   Save,
   Tag,
   Truck,
@@ -16,6 +17,7 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -46,6 +48,7 @@ import {
   getDeliveryAddressErrorMessage,
   listDeliveryAddresses,
   setDefaultDeliveryAddress,
+  updateDeliveryAddress,
 } from '../services/deliveryAddress.service'
 
 const ADDRESS_LABELS = [
@@ -127,6 +130,26 @@ function createInitialForm(
       '',
     source:
       'manual',
+  }
+}
+
+function createFormFromSavedAddress(address) {
+  return {
+    recipientType: address.recipientType || 'self',
+    recipientName: address.recipientName || '',
+    phone: address.phone || '',
+    label: address.label || 'home',
+    customLabel: address.customLabel || '',
+    addressLine1: address.addressLine1 || '',
+    addressLine2: address.addressLine2 || '',
+    area: address.area || '',
+    landmark: address.landmark || '',
+    city: address.city || '',
+    state: address.state || '',
+    postalCode: address.postalCode || '',
+    country: address.country || 'India',
+    deliveryInstructions: address.deliveryInstructions || '',
+    source: address.source || 'manual',
   }
 }
 
@@ -304,6 +327,13 @@ export default function DeliveryAddressPage() {
           currentUser,
         ),
     )
+
+  const addressFormRef = useRef(null)
+
+  const [
+    editingAddressId,
+    setEditingAddressId,
+  ] = useState('')
 
   const [
     loading,
@@ -673,6 +703,33 @@ export default function DeliveryAddressPage() {
     )
   }
 
+  function handleEditSavedAddress(address) {
+    if (saving || selectingId) {
+      return
+    }
+
+    setEditingAddressId(address.id)
+    setLocationRequested(false)
+    setForm(createFormFromSavedAddress(address))
+    setError('')
+    setSuccess('')
+
+    window.requestAnimationFrame(() => {
+      addressFormRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }
+
+  function handleCancelEdit() {
+    setEditingAddressId('')
+    setLocationRequested(false)
+    setForm(createInitialForm(currentUser))
+    setError('')
+    setSuccess('')
+  }
+
   function returnAfterSelection() {
     navigate(
       returnTo,
@@ -745,49 +802,48 @@ export default function DeliveryAddressPage() {
     setSuccess('')
 
     try {
-      const result =
-        await createDeliveryAddress({
-          ...form,
-          postalCode:
-            String(
-              form.postalCode ||
-                '',
-            )
-              .replace(
-                /\D/g,
-                '',
-              )
-              .slice(
-                0,
-                6,
-              ),
-          isDefault:
-            true,
-        })
+      const existingAddress = editingAddressId
+        ? addresses.find((item) => item.id === editingAddressId)
+        : null
 
-      setSuccess(
-        returnTo.startsWith(
-          '/checkout/',
-        )
-          ? 'Delivery address saved. Returning to checkout.'
-          : 'Delivery address saved. Returning to your Recipe.',
-      )
+      if (editingAddressId && !existingAddress) {
+        throw new Error('The saved address is no longer available. Please reload and try again.')
+      }
 
-      setAddresses(
-        (current) => [
-          result.address,
-          ...current.filter(
-            (item) =>
-              item.id !==
-              result.address?.id,
+      const input = {
+        ...form,
+        postalCode: String(form.postalCode || '')
+          .replace(/\D/g, '')
+          .slice(0, 6),
+        isDefault: existingAddress ? existingAddress.isDefault === true : true,
+      }
+
+      if (existingAddress) {
+        const result = await updateDeliveryAddress(existingAddress.id, input)
+
+        setAddresses((current) =>
+          current.map((item) =>
+            item.id === existingAddress.id ? result.address : item,
           ),
-        ],
-      )
+        )
+        setForm(createFormFromSavedAddress(result.address))
+        setSuccess('Address updated successfully. You can select Deliver here when ready.')
+      } else {
+        const result = await createDeliveryAddress(input)
 
-      window.setTimeout(
-        returnAfterSelection,
-        450,
-      )
+        setSuccess(
+          returnTo.startsWith('/checkout/')
+            ? 'Delivery address saved. Returning to checkout.'
+            : 'Delivery address saved. Returning to your Recipe.',
+        )
+
+        setAddresses((current) => [
+          result.address,
+          ...current.filter((item) => item.id !== result.address?.id),
+        ])
+
+        window.setTimeout(returnAfterSelection, 450)
+      }
     } catch (
       saveError
     ) {
@@ -899,36 +955,23 @@ export default function DeliveryAddressPage() {
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {addresses.map(
                     (address) => (
-                      <button
-                        key={
-                          address.id
-                        }
-                        type="button"
-                        onClick={() =>
-                          handleUseSavedAddress(
-                            address,
-                          )
-                        }
-                        disabled={
-                          Boolean(
-                            selectingId,
-                          ) ||
-                          saving
-                        }
-                        className="focus-ring rounded-2xl border border-stone-200 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50/40 disabled:opacity-60"
+                      <div
+                        key={address.id}
+                        className={`rounded-2xl border p-4 transition ${
+                          editingAddressId === address.id
+                            ? 'border-emerald-400 bg-emerald-50/40'
+                            : 'border-stone-200 bg-white'
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="font-black text-stone-950">
-                              {getAddressTitle(
-                                address,
-                              )}
+                              {getAddressTitle(address)}
                             </p>
                             <p className="mt-1 text-sm font-semibold text-stone-700">
                               {address.recipientName}
                             </p>
                           </div>
-
                           {address.isDefault && (
                             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-emerald-800">
                               Default
@@ -944,19 +987,31 @@ export default function DeliveryAddressPage() {
                             address.state,
                             address.postalCode,
                           ]
-                            .filter(
-                              Boolean,
-                            )
+                            .filter(Boolean)
                             .join(', ')}
                         </p>
 
-                        <p className="mt-3 text-xs font-black text-emerald-700">
-                          {selectingId ===
-                          address.id
-                            ? 'Selecting...'
-                            : 'Deliver here →'}
-                        </p>
-                      </button>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleUseSavedAddress(address)}
+                            disabled={Boolean(selectingId) || saving}
+                            className="focus-ring rounded-lg py-1.5 text-xs font-black text-emerald-700 transition hover:text-emerald-900 disabled:opacity-60"
+                          >
+                            {selectingId === address.id ? 'Selecting...' : 'Deliver here →'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditSavedAddress(address)}
+                            disabled={Boolean(selectingId) || saving}
+                            aria-label={`Edit ${getAddressTitle(address)} address`}
+                            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700 transition hover:border-emerald-300 hover:text-emerald-800 disabled:opacity-60"
+                          >
+                            <Pencil size={13} aria-hidden="true" />
+                            Edit
+                          </button>
+                        </div>
+                      </div>
                     ),
                   )}
                 </div>
@@ -971,15 +1026,20 @@ export default function DeliveryAddressPage() {
               </section>
             )}
 
-            <section>
+            <section ref={addressFormRef} className="scroll-mt-24">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
                     Address details
                   </p>
                   <h2 className="mt-1 text-xl font-black text-stone-950">
-                    Add a delivery location
+                    {editingAddressId ? 'Edit delivery address' : 'Add a delivery location'}
                   </h2>
+                  {editingAddressId && (
+                    <p className="mt-1 text-xs font-medium text-stone-500">
+                      Update the details below and save your changes.
+                    </p>
+                  )}
                 </div>
 
                 <button
@@ -1439,14 +1499,16 @@ export default function DeliveryAddressPage() {
                 <div className="flex flex-wrap items-center justify-end gap-3 border-t border-stone-200 pt-5">
                   <button
                     type="button"
-                    onClick={() =>
-                      navigate(
-                        returnTo,
-                      )
-                    }
+                    onClick={() => {
+                      if (editingAddressId) {
+                        handleCancelEdit()
+                      } else {
+                        navigate(returnTo)
+                      }
+                    }}
                     className="focus-ring rounded-2xl border border-stone-200 px-5 py-3 text-sm font-black text-stone-700 hover:bg-stone-50"
                   >
-                    Cancel
+                    {editingAddressId ? 'Cancel editing' : 'Cancel'}
                   </button>
 
                   <button
@@ -1463,7 +1525,9 @@ export default function DeliveryAddressPage() {
                     />
                     {saving
                       ? 'Saving address...'
-                      : 'Save & deliver here'}
+                      : editingAddressId
+                        ? 'Save changes'
+                        : 'Save & deliver here'}
                   </button>
                 </div>
               </form>

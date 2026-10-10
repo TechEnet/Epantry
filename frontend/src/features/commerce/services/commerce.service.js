@@ -207,6 +207,20 @@ export async function optimizeBasket({
   })
 }
 
+export async function mergeRecipeMarketplaceCart({
+  cartId,
+  recipeCartId,
+}) {
+  return csrfRequest({
+    method: 'post',
+    url: '/cart/merge-recipe',
+    data: {
+      cartId: String(cartId || '').trim(),
+      recipeCartId: String(recipeCartId || '').trim(),
+    },
+  })
+}
+
 export async function getBasketQuote(
   quoteId,
 ) {

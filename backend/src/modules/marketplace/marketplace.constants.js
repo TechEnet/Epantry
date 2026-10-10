@@ -12,7 +12,7 @@
 | - inventory
 | - serviceability
 |
-| Seller / Brand / B2B are NOT top-level access types.
+| Seller / Brand / B2B / Restaurant / Chef are NOT top-level access types.
 | All of them are represented by the existing Host capability.
 |--------------------------------------------------------------------------
 */
@@ -30,6 +30,8 @@ export const MARKETPLACE_ORGANIZATION_TYPES =
     "seller",
     "brand",
     "b2b",
+    "restaurant",
+    "chef",
     "hybrid",
   ]);
 

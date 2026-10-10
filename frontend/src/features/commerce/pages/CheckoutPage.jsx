@@ -44,31 +44,44 @@ import {
 const RAZORPAY_CHECKOUT_URL =
   'https://checkout.razorpay.com/v1/checkout.js'
 
-function clearFloatingCartCompanion() {
+function clearFloatingCartCompanion(paidCartId) {
+  // A payment belongs to ONE validated Marketplace Cart. Never clear a
+  // different cart (or the user's other recipe/grocery selection).
   try {
-    window.sessionStorage.removeItem(
-      'epantry-floating-marketplace-cart',
-    )
-    window.sessionStorage.removeItem(
-      'epantry-pending-recipe-cart',
-    )
-    window.sessionStorage.removeItem(
-      'epantry-floating-cart-hidden',
-    )
-  } catch {
-    // Session persistence is best-effort UX state only.
-  }
+    const groceryKey = 'epantry-floating-marketplace-cart'
+    const recipeKey = 'epantry-pending-recipe-cart'
+    const recipeCheckoutKey = 'epantry-recipe-checkout-cart'
+    const floating = JSON.parse(window.sessionStorage.getItem(groceryKey) || 'null')
+    const recipeCheckout = JSON.parse(window.sessionStorage.getItem(recipeCheckoutKey) || 'null')
+    const paidId = String(paidCartId || '')
 
-  window.dispatchEvent(
-    new CustomEvent(
-      'epantry-cart-updated',
-      {
-        detail: {
-          show: false,
-        },
-      },
-    ),
-  )
+    if (paidId && String(floating?.cartId || '') === paidId) {
+      window.sessionStorage.removeItem(groceryKey)
+    }
+    if (paidId && String(recipeCheckout?.cartId || '') === paidId) {
+      // A newer recipe selection must survive payment for an older quote.
+      const currentRecipe = JSON.parse(window.sessionStorage.getItem(recipeKey) || 'null')
+      if (JSON.stringify(currentRecipe?.items || []) === JSON.stringify(recipeCheckout.items || [])) {
+        window.sessionStorage.removeItem(recipeKey)
+      }
+      window.sessionStorage.removeItem(recipeCheckoutKey)
+    }
+    const remainingGrocery = JSON.parse(window.sessionStorage.getItem(groceryKey) || 'null')
+    const remainingRecipe = JSON.parse(window.sessionStorage.getItem(recipeKey) || 'null')
+    const hasRemaining = (Array.isArray(remainingGrocery?.items) && remainingGrocery.items.length > 0)
+      || (Array.isArray(remainingRecipe?.items) && remainingRecipe.items.length > 0)
+    if (hasRemaining) {
+      window.sessionStorage.removeItem('epantry-floating-cart-hidden')
+    }
+    window.dispatchEvent(new CustomEvent('epantry-cart-updated', {
+      detail: { show: hasRemaining },
+    }))
+  } catch {
+    // Session persistence is best-effort. Do not affect verified payment.
+    window.dispatchEvent(new CustomEvent('epantry-cart-updated', {
+      detail: { show: true },
+    }))
+  }
 }
 
 function formatMoney(
@@ -700,7 +713,7 @@ export default function CheckoutPage() {
                   verified?.order?.id ||
                   order.id
 
-                clearFloatingCartCompanion()
+                clearFloatingCartCompanion(cartId)
 
                 navigate(
                   `/orders/${confirmedOrderId}`,

@@ -2,6 +2,10 @@ import crypto from 'crypto'
 
 import mongoose from 'mongoose'
 
+import { Dish, RecipeVersion } from '../recipes/recipe.models.js'
+import { ProductVersion } from '../catalog/catalog.models.js'
+import { Campaign } from '../retailMedia/retailMedia.models.js'
+
 import {
   ApiError,
 } from '../../utils/ApiError.js'
@@ -1273,6 +1277,76 @@ export function buildAdminAuditExplorerFilter({
 |--------------------------------------------------------------------------
 */
 
+// A display-only name, never written back to the immutable audit event.
+// Prefer the historical recorded snapshot; a current database name is used
+// only when an older event never stored a readable subject name.
+const AUDIT_SUBJECT_FIELDS = Object.freeze({
+  dish: ['name', 'title'],
+  recipe_version: ['title', 'name'],
+  product_version: ['displayName', 'name', 'title'],
+  retail_media_campaign: ['title', 'name', 'creative.headline'],
+  pro_plan: ['name', 'title'],
+  community_product_draft: ['productName', 'name', 'title', 'displayName'],
+  npi_catalog_handoff: ['productName', 'name', 'title', 'displayName'],
+})
+
+function auditSubjectFromSnapshot(event) {
+  const fields = AUDIT_SUBJECT_FIELDS[event?.entity?.type] || []
+  for (const snapshot of [event?.afterSnapshot, event?.beforeSnapshot]) {
+    for (const field of fields) {
+      const value = field.split('.').reduce((object, key) => object?.[key], snapshot)
+      if (typeof value === 'string' && value.trim() && value !== '[REDACTED]') {
+        return value.trim().slice(0, 180)
+      }
+    }
+  }
+  return null
+}
+
+const AUDIT_LOOKUP_MODELS = Object.freeze({
+  dish: { model: Dish, select: 'name' },
+  recipe_version: { model: RecipeVersion, select: 'title' },
+  product_version: { model: ProductVersion, select: 'displayName' },
+  retail_media_campaign: { model: Campaign, select: 'title' },
+})
+
+async function addAuditDisplaySubjects(events) {
+  const result = events.map((event) => ({
+    ...event,
+    subjectName: auditSubjectFromSnapshot(event),
+  }))
+  const pendingByType = new Map()
+  for (const event of result) {
+    const type = event.entity?.type
+    const id = String(event.entity?.id || '')
+    if (event.subjectName || !AUDIT_LOOKUP_MODELS[type] || !mongoose.isValidObjectId(id)) continue
+    const entries = pendingByType.get(type) || new Set()
+    entries.add(id)
+    pendingByType.set(type, entries)
+  }
+  const names = new Map()
+  // These are optional read-only lookups. They must never prevent an audit
+  // record from being returned, including when the original entity is gone.
+  await Promise.all([...pendingByType.entries()].map(async ([type, ids]) => {
+    const { model, select } = AUDIT_LOOKUP_MODELS[type]
+    try {
+      const documents = await model.find({ _id: { $in: [...ids] } }).select(select).lean()
+      for (const document of documents) {
+        const name = document.name || document.title || document.displayName
+        if (typeof name === 'string' && name.trim()) {
+          names.set(`${type}:${document._id}`, name.trim().slice(0, 180))
+        }
+      }
+    } catch {
+      // Historical audit access must remain available if a catalog lookup fails.
+    }
+  }))
+  return result.map((event) => ({
+    ...event,
+    subjectName: event.subjectName || names.get(`${event.entity?.type}:${event.entity?.id}`) || null,
+  }))
+}
+
 export async function listAdminAuditEvents({
   page =
     DEFAULT_AUDIT_PAGE,
@@ -1358,8 +1432,8 @@ export async function listAdminAuditEvents({
 
   return {
     events:
-      events.map(
-        serializeAdminAuditEvent,
+      await addAuditDisplaySubjects(
+        events.map(serializeAdminAuditEvent),
       ),
 
     pagination: {
@@ -1432,7 +1506,8 @@ export async function getAdminAuditEvent(
     )
   }
 
-  return serializeAdminAuditEvent(
-    event,
-  )
+  const [withDisplaySubject] = await addAuditDisplaySubjects([
+    serializeAdminAuditEvent(event),
+  ])
+  return withDisplaySubject
 }

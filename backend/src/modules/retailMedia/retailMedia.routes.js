@@ -44,20 +44,26 @@ import {
 } from '../auth/authorization.middleware.js'
 
 import {
+  RETAIL_MEDIA_DURATION_MINUTES,
   RETAIL_MEDIA_PLACEMENTS,
+  RETAIL_MEDIA_SLOT_KEYS,
   RETAIL_MEDIA_SPONSOR_LABELS,
 } from './retailMedia.models.js'
 
 import {
   createRetailMediaCampaignFromBrief,
+  createRetailMediaCampaignImageUploadIntent,
   createRetailMediaCampaignPaymentIntent,
   decideLowRiskSponsoredPlacement,
+  getHostRetailMediaPlacementAvailability,
   getHostRetailMediaPricing,
+  getPublicRetailMediaPromotion,
   listAdminAdDecisionLogs,
   listAdminRetailMediaCampaigns,
   listHostRetailMediaCampaigns,
   reviewAdminRetailMediaCampaign,
   transitionHostRetailMediaCampaign,
+  updateHostRetailMediaCampaign,
   verifyRetailMediaCampaignPayment,
 } from './retailMedia.service.js'
 
@@ -84,6 +90,32 @@ const createFromBriefSchema =
           )
           .min(1)
           .max(10),
+
+      placementSelections:
+        z
+          .array(
+            z
+              .object({
+                placement:
+                  z.enum(RETAIL_MEDIA_PLACEMENTS),
+                slotKey:
+                  z.enum(RETAIL_MEDIA_SLOT_KEYS),
+              })
+              .strict(),
+          )
+          .max(10)
+          .default([]),
+
+      durationMinutes:
+        z
+          .number()
+          .int()
+          .refine(
+            (value) =>
+              RETAIL_MEDIA_DURATION_MINUTES.includes(value),
+            'Choose a supported campaign duration.',
+          )
+          .default(1440),
 
       startsAt:
         z.coerce
@@ -175,6 +207,13 @@ const createFromBriefSchema =
             RETAIL_MEDIA_SPONSOR_LABELS,
           )
           .default('Sponsored'),
+
+      imageUrl:
+        z
+          .string()
+          .trim()
+          .max(1200)
+          .default(''),
     })
     .strict()
     .superRefine(
@@ -293,6 +332,12 @@ const decisionSchema =
           RETAIL_MEDIA_PLACEMENTS,
         ),
 
+      slotKey:
+        z
+          .enum(RETAIL_MEDIA_SLOT_KEYS)
+          .optional()
+          .default(undefined),
+
       marketCode:
         z
           .string()
@@ -312,6 +357,153 @@ const decisionSchema =
           )
           .max(30)
           .default([]),
+    })
+    .strict()
+
+const updateCampaignSchema =
+  z
+    .object({
+      placements:
+        z
+          .array(
+            z.enum(
+              RETAIL_MEDIA_PLACEMENTS,
+            ),
+          )
+          .min(1)
+          .max(10),
+
+      placementSelections:
+        z
+          .array(
+            z
+              .object({
+                placement:
+                  z.enum(RETAIL_MEDIA_PLACEMENTS),
+                slotKey:
+                  z.enum(RETAIL_MEDIA_SLOT_KEYS),
+              })
+              .strict(),
+          )
+          .max(10),
+
+      durationMinutes:
+        z
+          .number()
+          .int()
+          .refine(
+            (value) =>
+              RETAIL_MEDIA_DURATION_MINUTES.includes(value),
+            'Choose a supported campaign duration.',
+          ),
+
+      startsAt:
+        z.coerce
+          .date()
+          .nullable()
+          .optional()
+          .default(null),
+
+      contextualTags:
+        z
+          .array(
+            z
+              .string()
+              .trim()
+              .min(1)
+              .max(80),
+          )
+          .max(30)
+          .default([]),
+
+      frequencyCapPerContext:
+        z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .default(3),
+
+      headline:
+        z
+          .string()
+          .trim()
+          .min(2)
+          .max(180),
+
+      body:
+        z
+          .string()
+          .trim()
+          .max(500)
+          .default(''),
+
+      landingRef:
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(500),
+
+      sponsorLabel:
+        z
+          .enum(
+            RETAIL_MEDIA_SPONSOR_LABELS,
+          )
+          .default('Sponsored'),
+
+      imageUrl:
+        z
+          .string()
+          .trim()
+          .max(1200)
+          .default(''),
+    })
+    .strict()
+
+const placementAvailabilitySchema =
+  z
+    .object({
+      placement:
+        z.enum(RETAIL_MEDIA_PLACEMENTS),
+      slotKey:
+        z.enum(RETAIL_MEDIA_SLOT_KEYS),
+      durationMinutes:
+        z.coerce
+          .number()
+          .int()
+          .refine(
+            (value) => RETAIL_MEDIA_DURATION_MINUTES.includes(value),
+            'Choose a supported campaign duration.',
+          ),
+      requestedStartAt:
+        z.coerce
+          .date()
+          .optional(),
+    })
+    .strict()
+
+const publicPlacementSchema =
+  z
+    .object({
+      placement:
+        z.enum(RETAIL_MEDIA_PLACEMENTS),
+      slotKey:
+        z.enum(RETAIL_MEDIA_SLOT_KEYS),
+      marketCode:
+        z
+          .string()
+          .trim()
+          .min(2)
+          .max(10)
+          .default('IN'),
+      viewerKey:
+        z
+          .string()
+          .trim()
+          .min(8)
+          .max(160)
+          .optional(),
     })
     .strict()
 
@@ -463,6 +655,54 @@ router.get(
 )
 
 router.get(
+  '/host/retail-media/placement-availability',
+  ...hostSecurity,
+  wrap(
+    async (req, res) => {
+      const input =
+        parseOrThrow(
+          placementAvailabilitySchema,
+          req.query,
+          'M21_RETAIL_MEDIA_AVAILABILITY_INPUT_INVALID',
+          'Invalid advertising-position availability request.',
+        )
+
+      return send(
+        req,
+        res,
+        200,
+        await getHostRetailMediaPlacementAvailability({
+          ...input,
+          actorUser:
+            req.currentUser,
+        }),
+        'Advertising-position availability loaded.',
+      )
+    },
+  ),
+)
+
+router.post(
+  '/host/retail-media/image-upload-intent',
+  ...hostSecurity,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(
+    async (req, res) =>
+      send(
+        req,
+        res,
+        200,
+        await createRetailMediaCampaignImageUploadIntent({
+          actorUser:
+            req.currentUser,
+        }),
+        'Campaign image upload intent created.',
+      ),
+  ),
+)
+
+router.get(
   '/host/retail-media/campaigns',
   ...hostSecurity,
   wrap(
@@ -514,6 +754,45 @@ router.post(
             req.currentUser,
         }),
         'Retail Media campaign created from the governed Host Campaign Brief.',
+      )
+    },
+  ),
+)
+
+router.patch(
+  '/host/retail-media/campaigns/:campaignId',
+  ...hostSecurity,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(
+    async (req, res) => {
+      const campaignId =
+        parseOrThrow(
+          objectIdSchema,
+          req.params.campaignId,
+          'M21_RETAIL_MEDIA_CAMPAIGN_ID_INVALID',
+          'Invalid Retail Media Campaign ID.',
+        )
+
+      const input =
+        parseOrThrow(
+          updateCampaignSchema,
+          req.body,
+          'M21_RETAIL_MEDIA_CAMPAIGN_UPDATE_INVALID',
+          'Invalid Retail Media campaign update.',
+        )
+
+      return send(
+        req,
+        res,
+        200,
+        await updateHostRetailMediaCampaign({
+          campaignId,
+          input,
+          actorUser:
+            req.currentUser,
+        }),
+        'Retail Media campaign updated.',
       )
     },
   ),
@@ -623,6 +902,61 @@ router.post(
             req.currentUser,
         }),
         'Retail Media campaign state updated.',
+      )
+    },
+  ),
+)
+
+router.get(
+  '/retail-media/campaigns/:campaignId',
+  sensitiveResponseNoStoreMiddleware,
+  wrap(
+    async (req, res) => {
+      const campaignId =
+        parseOrThrow(
+          objectIdSchema,
+          req.params.campaignId,
+          'M21_RETAIL_MEDIA_CAMPAIGN_ID_INVALID',
+          'Invalid Retail Media Campaign ID.',
+        )
+
+      return send(
+        req,
+        res,
+        200,
+        await getPublicRetailMediaPromotion({
+          campaignId,
+        }),
+        'Promotion details loaded.',
+      )
+    },
+  ),
+)
+
+router.get(
+  '/retail-media/placement',
+  sensitiveResponseNoStoreMiddleware,
+  wrap(
+    async (req, res) => {
+      const input =
+        parseOrThrow(
+          publicPlacementSchema,
+          req.query,
+          'M21_RETAIL_MEDIA_PUBLIC_PLACEMENT_INVALID',
+          'Invalid sponsored placement request.',
+        )
+
+      return send(
+        req,
+        res,
+        200,
+        await decideLowRiskSponsoredPlacement({
+          input: {
+            ...input,
+            contextTags: [],
+          },
+        }),
+        'Sponsored placement loaded.',
       )
     },
   ),

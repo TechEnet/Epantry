@@ -1,6 +1,6 @@
 import { Bell } from "lucide-react";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Link, useLocation } from "react-router-dom";
 
@@ -15,13 +15,15 @@ const UNREAD_STATUSES = new Set([
 ]);
 
 export default function NotificationBell({ compact = false }) {
-  const { isAuthenticated, isBootstrapping } = useAuth();
+  const { isAuthenticated, isBootstrapping, activeMode, currentUser } = useAuth();
 
   const location = useLocation();
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const generation = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++generation.current;
     if (!isAuthenticated) {
       setUnreadCount(0);
       return;
@@ -34,24 +36,27 @@ export default function NotificationBell({ compact = false }) {
 
       const notifications = data?.notifications || [];
 
-      setUnreadCount(
-        notifications.filter(
-          (item) => !item.readAt && UNREAD_STATUSES.has(item.status)
-        ).length
-      );
+      if (requestId === generation.current) {
+        setUnreadCount(
+          notifications.filter(
+            (item) => !item.readAt && UNREAD_STATUSES.has(item.status)
+          ).length
+        );
+      }
     } catch {
       // The bell is progressive enhancement; the Notification Center surfaces errors.
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, activeMode, currentUser?.id]);
 
   useEffect(() => {
     if (isBootstrapping) {
       return undefined;
     }
 
+    setUnreadCount(0);
     load();
 
-    const intervalId = window.setInterval(load, 60000);
+    const intervalId = window.setInterval(load, 15000);
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -70,6 +75,7 @@ export default function NotificationBell({ compact = false }) {
     );
 
     return () => {
+      generation.current += 1;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener(

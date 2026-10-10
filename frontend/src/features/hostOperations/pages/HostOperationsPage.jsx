@@ -1459,9 +1459,13 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
                 <option value="brand">Brand</option>
 
-                <option value="hybrid">Hybrid</option>
+                <option value="restaurant">Restaurant</option>
 
-                <option value="b2b">Legacy B2B business profile</option>
+                <option value="chef">Chef</option>
+
+                <option value="b2b">B2B / Hospitality</option>
+
+                <option value="hybrid">Hybrid</option>
               </select>
             </Field>
 

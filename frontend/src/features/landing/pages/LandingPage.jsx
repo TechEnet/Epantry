@@ -31,6 +31,8 @@ import {
   landingCategories,
 } from '../content/landingContent'
 
+import SponsoredCampaignSlot from '../../retailMedia/components/SponsoredCampaignSlot'
+
 const EXPERIENCE_CARD_IMAGES = {
   grocery: '/exploar/Exploar_G.png',
   brands: '/exploar/Exploar_B.png',
@@ -140,6 +142,9 @@ export default function LandingPage() {
   const experienceSectionRef =
     useRef(null)
 
+  const featuredEntranceRef =
+    useRef(null)
+
   const shouldReduceMotion =
     useReducedMotion()
 
@@ -181,6 +186,105 @@ export default function LandingPage() {
       'end end',
     ],
   })
+
+  // Follow the scroll exactly, with a smooth easing curve and no lagging
+  // spring. Both planes share this progress so they cannot drift apart.
+  const {
+    scrollYProgress:
+      featuredEntranceProgress,
+  } = useScroll({
+    target:
+      featuredEntranceRef,
+    offset: [
+      'start end',
+      'start start',
+    ],
+  })
+
+  const featuredDepthProgress =
+    useTransform(
+      featuredEntranceProgress,
+      (progress) => {
+        const clamped =
+          Math.min(
+            Math.max(progress, 0),
+            1,
+          )
+
+        return (
+          clamped *
+          clamped *
+          (3 - 2 * clamped)
+        )
+      },
+    )
+
+  // The outgoing Explore scene retreats on a separate visual plane.
+  // Its sticky container and all existing interactive elements stay put.
+  const exploreSceneScale =
+    useTransform(
+      featuredDepthProgress,
+      [0, 0.5, 1],
+      shouldReduceMotion
+        ? [1, 1, 1]
+        : [1, 0.955, 0.91],
+    )
+
+  const exploreSceneRotateX =
+    useTransform(
+      featuredDepthProgress,
+      [0, 1],
+      shouldReduceMotion
+        ? [0, 0]
+        : [0, -3],
+    )
+
+  const exploreSceneY =
+    useTransform(
+      featuredDepthProgress,
+      [0, 1],
+      shouldReduceMotion
+        ? [0, 0]
+        : [0, -18],
+    )
+
+  const exploreDefocusOpacity =
+    useTransform(
+      featuredDepthProgress,
+      [0, 0.2, 0.7, 1],
+      shouldReduceMotion
+        ? [0, 0, 0, 0]
+        : [0, 0, 0.82, 1],
+    )
+
+  // The incoming Grocery sheet grows into the viewport instead of
+  // rotating the sticky element (which can cause scroll judder).
+  const groceryEntranceScale =
+    useTransform(
+      featuredDepthProgress,
+      [0, 0.55, 1],
+      shouldReduceMotion
+        ? [1, 1, 1]
+        : [0.90, 0.96, 1],
+    )
+
+  const groceryEntranceLift =
+    useTransform(
+      featuredDepthProgress,
+      [0, 1],
+      shouldReduceMotion
+        ? [0, 0]
+        : [16, 0],
+    )
+
+  const groceryEdgeOpacity =
+    useTransform(
+      featuredDepthProgress,
+      [0, 0.22, 0.7, 1],
+      shouldReduceMotion
+        ? [0, 0, 0, 0]
+        : [0.65, 0.85, 0.3, 0],
+    )
 
   const backdropVerticalY =
     useTransform(
@@ -408,7 +512,16 @@ export default function LandingPage() {
           HERO
       ============================================================= */}
 
-      <HeroSection />
+      <div className="relative">
+        <HeroSection />
+
+        <SponsoredCampaignSlot
+          placement="home"
+          slotKey="hero"
+          overlay
+          previewLabel="Hero section"
+        />
+      </div>
 
 
       {/* =============================================================
@@ -422,14 +535,36 @@ export default function LandingPage() {
           EXPLORE EPANTRY
       ============================================================= */}
 
-      <div
-        ref={experienceSectionRef}
-        className="relative z-10 h-[430svh] w-full bg-[#1A1A1A] sm:h-[450svh]"
-      >
+      <div className="relative z-10 h-[530svh] w-full bg-[#1A1A1A] sm:h-[550svh]">
+        <div
+          ref={experienceSectionRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[430svh] sm:h-[450svh]"
+        />
         <section
           className="sticky top-0 h-[100svh] w-full overflow-hidden bg-[#1A1A1A] text-white [perspective:1400px]"
         >
+          <SponsoredCampaignSlot
+            placement="home"
+            slotKey="explore_epantry"
+            overlay
+            previewLabel="Explore EPANTRY"
+          />
 
+
+          <motion.div
+            className="absolute inset-0 [transform-style:flat] [backface-visibility:hidden]"
+            style={{
+              scale:
+                exploreSceneScale,
+              rotateX:
+                exploreSceneRotateX,
+              y:
+                exploreSceneY,
+              transformOrigin:
+                '50% 45%',
+            }}
+          >
           {/* Dark gallery background */}
           <div
             aria-hidden="true"
@@ -496,7 +631,7 @@ export default function LandingPage() {
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-5 text-center sm:px-8"
           >
             <div className="max-w-[760px]">
-              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/50 sm:text-xs">
+              <p className="text-xs font-black uppercase tracking-[0.32em] text-white/50 sm:text-sm">
                 Explore EPANTRY
               </p>
 
@@ -654,17 +789,30 @@ export default function LandingPage() {
           {/* Minimal sequence cue */}
           <div className="pointer-events-none absolute right-3 top-1/2 z-40 hidden -translate-y-1/2 lg:block">
             <div className="flex flex-col items-center gap-3 text-white/35">
-              <span className="text-[9px] font-black tracking-[0.22em] [writing-mode:vertical-rl]">
+              <span className="text-[11px] font-black tracking-[0.22em] [writing-mode:vertical-rl] sm:text-xs">
                 EPANTRY EXPERIENCE
               </span>
               <span className="h-9 w-px bg-white/20" />
-              <span className="text-[10px] font-black tabular-nums">
+              <span className="text-xs font-black tabular-nums sm:text-sm">
                 {activeExperienceIndex >= 0
                   ? `0${activeExperienceIndex + 1} / 03`
                   : '00 / 03'}
               </span>
             </div>
           </div>
+
+          </motion.div>
+
+          {/* Static translucent glass behind the incoming Grocery surface.
+              Only its opacity changes; no expensive animated blur radius. */}
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-50 bg-[#080808]/30 backdrop-blur-[5px]"
+            style={{
+              opacity:
+                exploreDefocusOpacity,
+            }}
+          />
 
         </section>
       </div>
@@ -674,8 +822,22 @@ export default function LandingPage() {
           FEATURED SECTIONS
       ============================================================= */}
 
-      <div className="relative z-30 -mt-px">
-        <FeaturedContentSection />
+      <div
+        ref={featuredEntranceRef}
+        className="relative z-30 -mt-[100svh]"
+      >
+        <FeaturedContentSection
+          groceryEntranceEdgeOpacity={groceryEdgeOpacity}
+          groceryEntranceScale={groceryEntranceScale}
+          groceryEntranceLift={groceryEntranceLift}
+        />
+
+        <SponsoredCampaignSlot
+          placement="home"
+          slotKey="featured_content"
+          overlay
+          previewLabel="Featured content"
+        />
       </div>
 
 

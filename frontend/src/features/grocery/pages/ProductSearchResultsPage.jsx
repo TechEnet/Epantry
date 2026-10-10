@@ -35,6 +35,8 @@ import {
   openAvailabilityNotifyModal,
 } from '../../notifications/components/AvailabilityNotifyModal'
 
+import SponsoredCampaignSlot from '../../retailMedia/components/SponsoredCampaignSlot'
+
 function normalizeString(value) {
   return String(value || '').trim()
 }
@@ -675,6 +677,12 @@ export default function ProductSearchResultsPage() {
           </div>
         </section>
 
+        <SponsoredCampaignSlot
+          placement="search"
+          slotKey="search_top"
+          embedded
+        />
+
         <section className={`mt-3 overflow-hidden rounded-[22px] border ${primaryVisual.border} ${primaryVisual.surface} shadow-[0_12px_30px_rgba(23,60,45,0.055)] sm:mt-4 sm:rounded-[24px]`}>
           <div className="grid lg:grid-cols-[280px_1fr] xl:grid-cols-[320px_1fr]">
             <div className="grid min-h-[170px] place-items-center border-b border-white/75 bg-white/60 p-3 lg:min-h-[240px] lg:border-b-0 lg:border-r">
@@ -744,6 +752,18 @@ export default function ProductSearchResultsPage() {
             </div>
           </div>
         </section>
+
+        <SponsoredCampaignSlot
+          placement="search"
+          slotKey="search_best_match"
+          embedded
+        />
+
+        <SponsoredCampaignSlot
+          placement="search"
+          slotKey="search_more_options"
+          embedded
+        />
 
         <section className="mt-4 rounded-[22px] border border-[#dce3dc] bg-white/76 p-3 shadow-[0_10px_26px_rgba(35,43,38,0.04)] sm:rounded-[24px] sm:p-4 lg:p-5">
           <div className="mb-3 flex items-end justify-between gap-3 sm:mb-4">

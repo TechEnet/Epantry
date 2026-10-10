@@ -48,6 +48,7 @@ import {
 import {
   CandidateSet,
   RankingDecision,
+  SearchDemandEvent,
   SearchEvent,
   SearchSession,
 } from './search.models.js'
@@ -295,6 +296,56 @@ function getOwnerUserId(
     ? actorContext?.currentUser?._id ||
       null
     : null
+}
+
+function sanitizeSearchArea(area) {
+  const clean = (value, max) =>
+    String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, max)
+
+  return {
+    city: clean(area?.city, 120),
+    state: clean(area?.state, 120),
+    country: clean(area?.country, 120),
+    postcode: clean(area?.postcode, 24),
+  }
+}
+
+export async function recordCustomerSearchDemand({
+  query,
+  surface = 'global',
+  actorContext,
+  area = {},
+}) {
+  const ownerUserId = getOwnerUserId(actorContext)
+  const displayQuery = String(query || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 500)
+
+  if (!ownerUserId || displayQuery.length < 2) {
+    return { recorded: false }
+  }
+
+  const normalizedQuery = displayQuery.toLowerCase()
+
+  const event = await SearchDemandEvent.create({
+    ownerUserId,
+    normalizedQuery,
+    displayQuery,
+    surface: ['global', 'grocery', 'recipes'].includes(surface)
+      ? surface
+      : 'global',
+    area: sanitizeSearchArea(area),
+    occurredAt: new Date(),
+  })
+
+  return {
+    recorded: true,
+    id: stringifyId(event._id),
+  }
 }
 
 async function resolveHouseholdForSearch({
@@ -1905,6 +1956,9 @@ async function createDecisionArtifacts({
       normalizedQuery:
         intent.normalizedQuery,
 
+      area:
+        session.area || {},
+
       mode:
         intent.mode,
 
@@ -2035,6 +2089,9 @@ async function createDecisionArtifacts({
       normalizedQuery:
         intent.normalizedQuery,
 
+      area:
+        sanitizeSearchArea(area),
+
       mode:
         intent.mode,
 
@@ -2156,6 +2213,7 @@ export async function createSmartSearch({
   mode =
     'all',
   actorContext,
+  area = {},
 }) {
   const intent =
     parseDeterministicSearchIntent(
@@ -2165,6 +2223,17 @@ export async function createSmartSearch({
           mode,
       },
     )
+
+  try {
+    await recordCustomerSearchDemand({
+      query: intent.query,
+      surface: 'global',
+      actorContext,
+      area,
+    })
+  } catch {
+    // Demand analytics must never block a customer search.
+  }
 
   const execution =
     await executeSearchIntent({
@@ -2198,6 +2267,9 @@ export async function createSmartSearch({
 
       normalizedQuery:
         intent.normalizedQuery,
+
+      area:
+        sanitizeSearchArea(area),
 
       mode:
         intent.mode,
