@@ -841,7 +841,7 @@ function FeaturedGroceryScrollStory({
         )
 
   const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.26 : 0.58
+  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.42 : 0.58
 
   /*
    * Keep one viewport for the sticky surface, with a consistent 70svh
@@ -1220,7 +1220,7 @@ function FeaturedGroceryScrollStory({
               {/* Actions intentionally arrive from the right and sit under the active card. */}
               {!isViewAll && (
                 <AnimatePresence
-                  mode="wait"
+                  mode={isSmallScreen ? "sync" : "wait"}
                   initial={false}
                 >
                   <motion.div
@@ -1230,8 +1230,8 @@ function FeaturedGroceryScrollStory({
                       ? false
                       : {
                           opacity: 0,
-                          x: 90,
-                          y: 8,
+                          x: isSmallScreen ? 0 : 90,
+                          y: isSmallScreen ? 18 : 8,
                         }
                   }
                   animate={{
@@ -1244,18 +1244,18 @@ function FeaturedGroceryScrollStory({
                       ? undefined
                       : {
                           opacity: 0,
-                          x: -38,
-                          y: -4,
+                          x: isSmallScreen ? 0 : -38,
+                          y: isSmallScreen ? -18 : -4,
                         }
                   }
                   transition={{
                     duration:
                       shouldReduceMotion
                         ? 0
-                        : 0.68,
+                        : isSmallScreen ? motionDuration : 0.68,
 
                     delay:
-                      shouldReduceMotion
+                      shouldReduceMotion || isSmallScreen
                         ? 0
                         : 0.08,
 
@@ -1761,8 +1761,11 @@ function FeaturedRecipesScrollStory({
         if (!isMobile || !Number.isFinite(target)) return
         if (settledTimer !== null) window.clearTimeout(settledTimer)
         settledTimer = null
-        lastRendered = target
-        setStoryProgress(target)
+        // Update cards after the scroll movement begins, not before it.
+        window.setTimeout(() => {
+          lastRendered = target
+          setStoryProgress(target)
+        }, 135)
       }
 
       // Sync directly on mount, including browser scroll restoration.
@@ -2455,6 +2458,30 @@ function FeaturedRecipesScrollStory({
               </p>
             </div>
 
+            {isSmallScreen ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <AnimatePresence mode="sync" initial={false}>
+                  <motion.div
+                    key={activeItemKey}
+                    initial={shouldReduceMotion ? false : { opacity: 0, y: 16, scale: 0.985 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={shouldReduceMotion ? undefined : { opacity: 0, y: -12, scale: 0.985 }}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative flex items-center justify-center"
+                  >
+                    {activeItem?.type === 'view-all' ? (
+                      <RecipeStoryViewAllCard recipes={worldRecipes} />
+                    ) : activeItem?.recipe ? (
+                      <RecipeStoryBookCard
+                        recipe={activeItem.recipe}
+                        mobileOpen={mobileOpenKey === activeItem.key}
+                        shouldReduceMotion={shouldReduceMotion}
+                      />
+                    ) : null}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            ) : (
             <div className="absolute inset-0 overflow-hidden [perspective:1700px]">
               {(() => {
                 const viewportWidth =
@@ -2630,6 +2657,7 @@ function FeaturedRecipesScrollStory({
                 )
               })()}
             </div>
+            )}
           </div>
         </div>
 
@@ -2948,7 +2976,7 @@ function RecipeStoryViewAllCard({
   return (
     <Link
       to="/recipes"
-      className="focus-ring group relative flex h-[min(55dvh,470px)] max-h-[610px] min-h-0 w-[72vw] max-w-[420px] flex-col overflow-hidden rounded-[14px] border border-red-500/28 bg-[#130000] p-5 shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:h-[62svh] sm:min-h-[390px] sm:w-[48vw] sm:rounded-[16px] sm:p-6 md:w-[390px] lg:h-[64svh] lg:w-[410px] lg:p-7"
+      className="focus-ring group relative flex h-[min(52svh,440px)] max-h-[610px] min-h-0 w-[72vw] max-w-[420px] flex-col overflow-hidden rounded-[14px] border border-red-500/28 bg-[#130000] p-5 shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:h-[62svh] sm:min-h-[390px] sm:w-[48vw] sm:rounded-[16px] sm:p-6 md:w-[390px] lg:h-[64svh] lg:w-[410px] lg:p-7"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_24%,rgba(255,0,0,0.26),transparent_38%),linear-gradient(155deg,#160000_0%,#050202_62%,#000_100%)]" />
 

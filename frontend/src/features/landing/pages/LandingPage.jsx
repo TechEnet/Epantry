@@ -144,7 +144,7 @@ export default function LandingPage() {
   // Landing-only, one-gesture/one-stop navigation for pinned stories.
   // No global smooth scrolling or wheel changes outside these sections.
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return undefined
+    if (typeof window === 'undefined') return undefined
 
     let wheelTotal = 0
     let lastWheelAt = 0
@@ -152,6 +152,7 @@ export default function LandingPage() {
     let heldStop = null
     let touchStart = null
     let pendingTouchTimer = null
+    let lastDirection = 0
 
     const stories = () => Array.from(
       document.querySelectorAll('[data-landing-story]'),
@@ -170,7 +171,6 @@ export default function LandingPage() {
       .sort((a, b) => a.start - b.start)
 
     const currentStory = (y) => {
-      if (!window.matchMedia('(max-width: 767px)').matches) return null
       const all = stories()
       const active = all.find((item) =>
         y >= item.start - 12 && y < item.start + item.travel - 8,
@@ -201,7 +201,7 @@ export default function LandingPage() {
           if (pendingTouchTimer !== null) window.clearTimeout(pendingTouchTimer)
           pendingTouchTimer = window.setTimeout(() => {
             pendingTouchTimer = null
-            step(direction)
+            if (currentStory(window.scrollY)) step(direction)
           }, settlingUntil - now + 25)
         }
         return true
@@ -222,25 +222,26 @@ export default function LandingPage() {
 
       let target
       if (destination < 0) {
+        // Revisit the preceding pinned story without getting trapped at the boundary.
         const previous = [...all].reverse().find((story) => story.start < start - 10)
-        // Revisit the preceding card when the sections touch or overlap.
-        target = previous && previous.end >= start - 18
+        target = previous
           ? previous.start + previous.stops[previous.stops.length - 1] * previous.travel
-          : start - Math.min(window.innerHeight * 0.86, 680)
+          : start - Math.max(48, Math.min(window.innerHeight * 0.55, 320))
         heldStop = null
       } else if (destination >= stops.length) {
+        // Always leave the current pinned travel when the final stop is passed.
+        // Landing's overlapping panels otherwise trap the wheel on the same card.
         const next = all.find((story) => story.start > start + 10)
-        // Explore intentionally overlaps the incoming Grocery sheet.
-        const nextSectionStart = Math.min(end, next?.start ?? end)
-        target = next && next.start <= end - 10
+        target = next
           ? next.start + next.stops[0] * next.travel
-          : nextSectionStart
+          : start + travel + Math.max(48, Math.min(window.innerHeight * 0.2, 140))
         heldStop = null
       } else {
         target = positions[destination]
         heldStop = { node, y: target, index: destination }
       }
-      settlingUntil = now + 660
+      settlingUntil = now + (window.matchMedia('(max-width: 767px)').matches ? 530 : 570)
+      lastDirection = direction
       wheelTotal = 0
       // Mobile recipe transitions animate once at the target instead of
       // re-rendering the entire 3D gallery on every scroll frame.
@@ -260,16 +261,14 @@ export default function LandingPage() {
     const onWheel = (event) => {
       if (event.ctrlKey || event.metaKey || ignoreGesture(event.target)) return
       const story = currentStory(window.scrollY)
-      if (!story) { wheelTotal = 0; heldStop = null; return }
+      if (!story) { wheelTotal = 0; heldStop = null; lastDirection = 0; return }
       if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       event.preventDefault()
       const now = performance.now()
-      if (now < settlingUntil) {
-        settlingUntil = Math.max(settlingUntil, now + 140)
-        return
-      }
-      if (now - lastWheelAt > 220) wheelTotal = 0
+      const continuousWheel = now - lastWheelAt < 145
       lastWheelAt = now
+      if (now < settlingUntil || (continuousWheel && lastDirection !== 0 && wheelTotal === 0)) return
+      if (!continuousWheel) wheelTotal = 0
       wheelTotal += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
       // Small trackpad movements are accumulated, mouse-wheel ticks advance immediately.
       if (Math.abs(wheelTotal) >= 14) step(Math.sign(wheelTotal))
@@ -281,7 +280,7 @@ export default function LandingPage() {
         return
       }
       const story = currentStory(window.scrollY)
-      touchStart = story ? {
+      touchStart = story && window.matchMedia('(max-width: 767px)').matches ? {
         x: event.touches[0].clientX,
         y: event.touches[0].clientY,
       } : null
@@ -401,6 +400,8 @@ export default function LandingPage() {
     autoRevealExperienceId,
     setAutoRevealExperienceId,
   ] = useState(null)
+
+  const [mobileRevealExperienceId, setMobileRevealExperienceId] = useState(null)
 
   const experienceScrollProgress = useMotionValue(0)
 
@@ -730,6 +731,24 @@ export default function LandingPage() {
     shouldReduceMotion,
   ])
 
+  // Mobile: let the new card land, briefly reveal its information face,
+  // then return to the image. No large 3D rotations or background blur.
+  useEffect(() => {
+    if (!isSmallViewport || activeExperienceIndex < 0 || shouldReduceMotion) {
+      setMobileRevealExperienceId(null)
+      return undefined
+    }
+    const item = landingCategories[activeExperienceIndex]
+    if (!item) return undefined
+    setMobileRevealExperienceId(null)
+    const openId = window.setTimeout(() => setMobileRevealExperienceId(item.id), 530)
+    const closeId = window.setTimeout(() => setMobileRevealExperienceId(null), 1550)
+    return () => {
+      window.clearTimeout(openId)
+      window.clearTimeout(closeId)
+    }
+  }, [activeExperienceIndex, isSmallViewport, shouldReduceMotion])
+
   const handleExperienceCardEnter = (
     categoryId,
   ) => {
@@ -808,7 +827,7 @@ export default function LandingPage() {
           EXPLORE EPANTRY
       ============================================================= */}
 
-      <div data-landing-story="explore" data-landing-stops="0,0.267,0.56,0.853" className="relative z-10 h-[440svh] w-full bg-[#1A1A1A] sm:h-[460svh]">
+      <div data-landing-story="explore" data-landing-stops="0.015,0.28,0.555,0.83" className="relative z-10 h-[440svh] w-full bg-[#1A1A1A] sm:h-[460svh]">
         <div
           ref={experienceSectionRef}
           aria-hidden="true"
@@ -1001,6 +1020,21 @@ export default function LandingPage() {
                       />
                     </motion.div>
 
+                    {isSmallViewport && (
+                      <motion.div
+                        aria-hidden="true"
+                        initial={false}
+                        animate={{ opacity: mobileRevealExperienceId === activeExperience.id ? 1 : 0 }}
+                        transition={{ duration: 0.36, ease: 'easeInOut' }}
+                        className="pointer-events-none absolute inset-0 z-10 flex flex-col overflow-hidden rounded-[30px] bg-[#f3f7ee]/95 p-5"
+                      >
+                        <div className="mt-auto rounded-2xl bg-white/90 p-5 text-left shadow-sm">
+                          <p className="text-xs font-black uppercase tracking-[0.14em] text-[#166534]">{activeExperience.title}</p>
+                          <p className="mt-2 text-sm font-medium leading-6 text-[#25362D]">{EXPERIENCE_TRUST_COPY[activeExperience.id]}</p>
+                        </div>
+                      </motion.div>
+                    )}
+
                     {!isSmallViewport && <motion.div
                       aria-hidden="true"
                       className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-[30px] p-5 sm:rounded-[36px] sm:p-7 [backface-visibility:hidden] [transform-origin:bottom] [will-change:transform]"
@@ -1050,7 +1084,7 @@ export default function LandingPage() {
                   {/* Soft reflection like the reference */}
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute left-[6%] right-[6%] top-[calc(100%+10px)] h-[22%] overflow-hidden opacity-[0.12] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+                    className="pointer-events-none absolute left-[6%] right-[6%] top-[calc(100%+10px)] hidden h-[22%] overflow-hidden opacity-[0.12] [mask-image:linear-gradient(to_bottom,black,transparent)] md:block"
                   >
                     <img
                       src={EXPERIENCE_CARD_IMAGES[activeExperience.id]}
@@ -1101,7 +1135,7 @@ export default function LandingPage() {
 
       <div
         ref={featuredEntranceRef}
-        className="relative z-30 -mt-[100svh]"
+        className="relative z-30 mt-0 sm:-mt-[100svh]"
       >
         <FeaturedContentSection
           groceryEntranceEdgeOpacity={groceryEdgeOpacity}
@@ -1154,7 +1188,7 @@ function ExperienceBackdropRow({
     >
       <motion.div
         animate={
-          shouldReduceMotion
+          shouldReduceMotion || lowPower
             ? undefined
             : {
                 x: startsLeft
