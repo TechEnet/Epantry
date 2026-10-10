@@ -16,6 +16,7 @@ import {
   motion,
   useReducedMotion,
   useScroll,
+  useMotionValue,
   useTransform,
 } from 'motion/react'
 
@@ -160,6 +161,15 @@ export default function LandingPage() {
   )
 
   const [
+    isSmallViewport,
+    setIsSmallViewport,
+  ] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false,
+  )
+
+  const [
     activeExperienceIndex,
     setActiveExperienceIndex,
   ] = useState(-1)
@@ -174,18 +184,7 @@ export default function LandingPage() {
     setAutoRevealExperienceId,
   ] = useState(null)
 
-  const {
-    scrollYProgress:
-      experienceScrollProgress,
-  } = useScroll({
-    target:
-      experienceSectionRef,
-
-    offset: [
-      'start start',
-      'end end',
-    ],
-  })
+  const experienceScrollProgress = useMotionValue(0)
 
   // Follow the scroll exactly, with a smooth easing curve and no lagging
   // spring. Both planes share this progress so they cannot drift apart.
@@ -290,7 +289,7 @@ export default function LandingPage() {
     useTransform(
       experienceScrollProgress,
       [0, 1],
-      shouldReduceMotion
+      shouldReduceMotion || isSmallViewport
         ? ['0svh', '0svh']
         : ['0svh', '-56svh'],
     )
@@ -299,7 +298,7 @@ export default function LandingPage() {
     useTransform(
       experienceScrollProgress,
       [0, 0.5, 1],
-      shouldReduceMotion
+      shouldReduceMotion || isSmallViewport
         ? [1, 1, 1]
         : [1.025, 1, 1.035],
     )
@@ -308,10 +307,47 @@ export default function LandingPage() {
     useTransform(
       experienceScrollProgress,
       [0, 0.5, 1],
-      shouldReduceMotion
+      shouldReduceMotion || isSmallViewport
         ? [0, 0, 0]
         : [0.8, -0.65, 0.9],
     )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    let frame = null
+    const syncExperienceProgress = () => {
+      frame = null
+      const target = experienceSectionRef.current
+      if (!target) return
+
+      const rect = target.getBoundingClientRect()
+      const stickyHeight =
+        target.parentElement?.querySelector('section')
+          ?.getBoundingClientRect().height || rect.height
+      const travel = Math.max(rect.height - stickyHeight, 1)
+      const next = Math.min(Math.max(-rect.top / travel, 0), 1)
+      if (Math.abs(next - experienceScrollProgress.get()) > 0.0001) {
+        experienceScrollProgress.set(next)
+      }
+    }
+    const schedule = () => {
+      if (frame === null) {
+        frame = window.requestAnimationFrame(syncExperienceProgress)
+      }
+    }
+
+    syncExperienceProgress()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    window.addEventListener('pageshow', schedule)
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      window.removeEventListener('pageshow', schedule)
+    }
+  }, [experienceScrollProgress])
 
   useEffect(() => {
     if (
@@ -325,6 +361,20 @@ export default function LandingPage() {
       window.matchMedia(
         '(min-width: 1024px) and (hover: hover) and (pointer: fine)',
       )
+
+    const smallViewportMediaQuery = window.matchMedia(
+      '(max-width: 767px)',
+    )
+
+    const handleSmallViewportChange = (event) => {
+      setIsSmallViewport(event.matches)
+    }
+
+    setIsSmallViewport(smallViewportMediaQuery.matches)
+    smallViewportMediaQuery.addEventListener?.(
+      'change',
+      handleSmallViewportChange,
+    )
 
     const handleChange = (
       event,
@@ -354,6 +404,10 @@ export default function LandingPage() {
         'change',
         handleChange,
       )
+      smallViewportMediaQuery.removeEventListener?.(
+        'change',
+        handleSmallViewportChange,
+      )
     }
   }, [])
 
@@ -363,14 +417,13 @@ export default function LandingPage() {
     ) => {
       let nextIndex = -1
 
-      if (value >= 0.13 && value < 0.36) {
-        nextIndex = 0
-      } else if (value >= 0.36 && value < 0.59) {
-        nextIndex = 1
-      } else if (value >= 0.59 && value < 0.86) {
-        nextIndex = 2
-      } else if (value >= 0.86) {
-        nextIndex = 2
+      // The intro owns 12% of the available travel; each of the three
+      // experiences owns an equal share of the remaining travel.
+      if (value >= 0.12) {
+        nextIndex = Math.min(
+          2,
+          Math.floor((value - 0.12) / ((1 - 0.12) / 3)),
+        )
       }
 
       setActiveExperienceIndex(
@@ -602,7 +655,7 @@ export default function LandingPage() {
                   key={row.id}
                   row={row}
                   rowIndex={rowIndex}
-                  shouldReduceMotion={shouldReduceMotion}
+                  shouldReduceMotion={shouldReduceMotion || isSmallViewport}
                 />
               ),
             )}

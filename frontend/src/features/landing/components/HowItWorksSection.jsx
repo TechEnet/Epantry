@@ -1,12 +1,12 @@
 import {
+  useEffect,
   useRef,
 } from 'react'
 
 import {
   motion,
   useReducedMotion,
-  useScroll,
-  useSpring,
+  useMotionValue,
   useTransform,
 } from 'motion/react'
 
@@ -63,23 +63,61 @@ const WHY_IMAGE_BY_ID = {
 }
 
 const STORY_RANGES = [
-  [
-    0.18,
-    0.35,
-  ],
-  [
-    0.33,
-    0.50,
-  ],
-  [
-    0.48,
-    0.65,
-  ],
-  [
-    0.63,
-    0.98,
-  ],
+  [0.16, 0.38],
+  [0.36, 0.58],
+  [0.56, 0.78],
+  [0.76, 0.98],
 ]
+
+// All pinned stories follow the actual sticky travel rather than
+// the dynamically changing browser viewport height (notably on mobile).
+function useStableStickyProgress(sectionRef) {
+  const progress = useMotionValue(0)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    let frame = null
+
+    const update = () => {
+      frame = null
+      const section = sectionRef.current
+      if (!section) return
+
+      const rect = section.getBoundingClientRect()
+      const stickyHeight =
+        section.firstElementChild?.getBoundingClientRect().height ||
+        rect.height
+      const travel = Math.max(rect.height - stickyHeight, 1)
+      const next = Math.min(Math.max(-rect.top / travel, 0), 1)
+      if (Math.abs(next - progress.get()) > 0.0001) {
+        progress.set(next)
+      }
+    }
+
+    const schedule = () => {
+      if (frame === null) {
+        frame = window.requestAnimationFrame(update)
+      }
+    }
+
+    update()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    window.addEventListener('pageshow', schedule)
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      window.removeEventListener('pageshow', schedule)
+    }
+  }, [progress, sectionRef])
+
+  return progress
+}
 
 function clampIndex(
   index,
@@ -890,38 +928,7 @@ function WhyEpantrySection({
   const sectionRef =
     useRef(null)
 
-  const {
-    scrollYProgress,
-  } = useScroll({
-    target:
-      sectionRef,
-
-    offset: [
-      'start start',
-      'end end',
-    ],
-  })
-
-  const progress =
-    useSpring(
-      scrollYProgress,
-      {
-        stiffness:
-          shouldReduceMotion
-            ? 1000
-            : 135,
-
-        damping:
-          shouldReduceMotion
-            ? 100
-            : 24,
-
-        mass:
-          shouldReduceMotion
-            ? 0.01
-            : 0.42,
-      },
-    )
+  const progress = useStableStickyProgress(sectionRef)
 
   const titleY =
     useTransform(
@@ -979,7 +986,7 @@ function WhyEpantrySection({
   return (
     <section
       ref={sectionRef}
-      className="relative z-20 h-[560svh] w-full bg-[#080808]"
+      className="relative z-20 h-[450svh] w-full bg-[#080808]"
     >
       <div
         className="sticky top-0 h-[100svh] w-full overflow-hidden bg-[#080808] text-[#F3F1EB]"
@@ -1054,38 +1061,7 @@ export default function HowItWorksSection() {
   const shouldReduceMotion =
     useReducedMotion()
 
-  const {
-    scrollYProgress,
-  } = useScroll({
-    target:
-      sectionRef,
-
-    offset: [
-      'start start',
-      'end end',
-    ],
-  })
-
-  const progress =
-    useSpring(
-      scrollYProgress,
-      {
-        stiffness:
-          shouldReduceMotion
-            ? 1000
-            : 145,
-
-        damping:
-          shouldReduceMotion
-            ? 100
-            : 24,
-
-        mass:
-          shouldReduceMotion
-            ? 0.01
-            : 0.34,
-      },
-    )
+  const progress = useStableStickyProgress(sectionRef)
 
   const headerOpacity =
     useTransform(
@@ -1162,7 +1138,7 @@ export default function HowItWorksSection() {
     <>
       <section
         ref={sectionRef}
-        className="relative h-[500svh] w-full bg-[#B4485B]"
+        className="relative h-[400svh] w-full bg-[#B4485B]"
       >
       <div
         className="sticky top-0 h-[100svh] w-full overflow-hidden"

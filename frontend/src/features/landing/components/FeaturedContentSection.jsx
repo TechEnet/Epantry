@@ -672,17 +672,8 @@ function FeaturedGroceryScrollStory({
   const sectionRef =
     useRef(null)
 
-  const targetProgressRef =
-    useRef(0)
-
-  const displayProgressRef =
-    useRef(0)
-
   const animationFrameRef =
     useRef(null)
-
-  const progressInitializedRef =
-    useRef(false)
 
   const lastActiveIndexRef =
     useRef(0)
@@ -706,195 +697,63 @@ function FeaturedGroceryScrollStory({
         return undefined
       }
 
-      const resolveTargetProgress =
-        () => {
-          const section =
-            sectionRef.current
+      const resolveActiveIndex = () => {
+        const section = sectionRef.current
+        if (!section) {
+          return 0
+        }
 
-          if (!section) {
-            return 0
-          }
+        const sectionRect = section.getBoundingClientRect()
+        // 100svh does not change when mobile browser chrome expands or
+        // collapses. Use the real sticky panel's height, not innerHeight.
+        const stickyHeight =
+          section.firstElementChild?.getBoundingClientRect().height ||
+          sectionRect.height
+        const travel = Math.max(sectionRect.height - stickyHeight, 1)
+        const progress = Math.min(
+          Math.max(-sectionRect.top / travel, 0),
+          1,
+        )
 
-          const rect =
-            section.getBoundingClientRect()
+        return Math.min(
+          items.length - 1,
+          Math.floor(Math.min(progress * items.length, items.length - 0.0001)),
+        )
+      }
 
-          const scrollDistance =
-            Math.max(
-              section.offsetHeight -
-                window.innerHeight,
-              1,
-            )
+      const updateActiveCard = () => {
+        animationFrameRef.current = null
+        const nextIndex = resolveActiveIndex()
 
-          const consumed =
-            Math.min(
-              Math.max(
-                -rect.top,
-                0,
-              ),
-              scrollDistance,
-            )
+        if (nextIndex !== lastActiveIndexRef.current) {
+          setDirection(nextIndex > lastActiveIndexRef.current ? 1 : -1)
+          lastActiveIndexRef.current = nextIndex
+          setActiveIndex(nextIndex)
+        }
+      }
 
-          return (
-            consumed /
-            scrollDistance
+      const scheduleUpdate = () => {
+        if (animationFrameRef.current === null) {
+          animationFrameRef.current = window.requestAnimationFrame(
+            updateActiveCard,
           )
         }
+      }
 
-      const applyProgress =
-        (progress) => {
-          const nextIndex =
-            Math.min(
-              items.length - 1,
-              Math.max(
-                0,
-                Math.floor(
-                  Math.min(
-                    progress *
-                      items.length,
-                    items.length -
-                      0.0001,
-                  ),
-                ),
-              ),
-            )
-
-          if (
-            nextIndex !==
-            lastActiveIndexRef.current
-          ) {
-            setDirection(
-              nextIndex >
-                lastActiveIndexRef.current
-                ? 1
-                : -1,
-            )
-
-            lastActiveIndexRef.current =
-              nextIndex
-
-            setActiveIndex(
-              nextIndex,
-            )
-          }
-        }
-
-      const animateTowardsTarget =
-        () => {
-          animationFrameRef.current =
-            null
-
-          const target =
-            targetProgressRef.current
-
-          const current =
-            displayProgressRef.current
-
-          const difference =
-            target -
-            current
-
-          const next =
-            Math.abs(difference) <
-            0.00045
-              ? target
-              : current +
-                difference *
-                  0.25
-
-          displayProgressRef.current =
-            next
-
-          applyProgress(
-            next,
-          )
-
-          if (
-            Math.abs(
-              target -
-                next,
-            ) >
-            0.00045
-          ) {
-            animationFrameRef.current =
-              window.requestAnimationFrame(
-                animateTowardsTarget,
-              )
-          }
-        }
-
-      const scheduleUpdate =
-        () => {
-          const nextTarget =
-            resolveTargetProgress()
-
-          targetProgressRef.current =
-            nextTarget
-
-          if (
-            !progressInitializedRef.current
-          ) {
-            progressInitializedRef.current =
-              true
-
-            displayProgressRef.current =
-              nextTarget
-
-            applyProgress(
-              nextTarget,
-            )
-          }
-
-          if (
-            animationFrameRef.current ===
-            null
-          ) {
-            animationFrameRef.current =
-              window.requestAnimationFrame(
-                animateTowardsTarget,
-              )
-          }
-        }
-
-      scheduleUpdate()
-
-      window.addEventListener(
-        'scroll',
-        scheduleUpdate,
-        {
-          passive: true,
-        },
-      )
-
-      window.addEventListener(
-        'resize',
-        scheduleUpdate,
-      )
+      // Initial sync also handles browser back/forward scroll restoration.
+      updateActiveCard()
+      window.addEventListener('scroll', scheduleUpdate, { passive: true })
+      window.addEventListener('resize', scheduleUpdate)
+      window.addEventListener('pageshow', scheduleUpdate)
 
       return () => {
-        if (
-          animationFrameRef.current !==
-          null
-        ) {
-          window.cancelAnimationFrame(
-            animationFrameRef.current,
-          )
-
-          animationFrameRef.current =
-            null
+        if (animationFrameRef.current !== null) {
+          window.cancelAnimationFrame(animationFrameRef.current)
+          animationFrameRef.current = null
         }
-
-        progressInitializedRef.current =
-          false
-
-        window.removeEventListener(
-          'scroll',
-          scheduleUpdate,
-        )
-
-        window.removeEventListener(
-          'resize',
-          scheduleUpdate,
-        )
+        window.removeEventListener('scroll', scheduleUpdate)
+        window.removeEventListener('resize', scheduleUpdate)
+        window.removeEventListener('pageshow', scheduleUpdate)
       }
     },
     [items.length],
@@ -981,15 +840,15 @@ function FeaturedGroceryScrollStory({
   const motionDuration =
     shouldReduceMotion
       ? 0
-      : 0.9
+      : 0.58
 
   /*
-   * Keep one viewport for the sticky surface, with a shorter 85svh
+   * Keep one viewport for the sticky surface, with a consistent 70svh
    * scroll interval per card. All products and View all still get their
    * own stage, and the sticky surface releases without a blank spacer.
    */
   const storyHeight =
-    `${Math.max(items.length * 85 + 100, 200)}svh`
+    `${Math.max(items.length * 70 + 100, 200)}svh`
 
   return (
     <section
@@ -1045,7 +904,7 @@ function FeaturedGroceryScrollStory({
               duration:
                 shouldReduceMotion
                   ? 0
-                  : 0.95,
+                  : 0.6,
 
               ease: [
                 0.22,
@@ -1729,12 +1588,6 @@ function FeaturedRecipesScrollStory({
   const pointerFrameRef =
     useRef(null)
 
-  const targetProgressRef =
-    useRef(0)
-
-  const displayedProgressRef =
-    useRef(0)
-
   const pointerTargetRef =
     useRef({
       x: 0.5,
@@ -1841,164 +1694,79 @@ function FeaturedRecipesScrollStory({
    * never jump or swap positions.
    */
   const storyHeight =
-    '660svh'
+    '590svh'
 
   useEffect(
     () => {
-      if (
-        shouldReduceMotion ||
-        typeof window ===
-          'undefined'
-      ) {
+      if (typeof window === 'undefined') {
         return undefined
       }
 
-      const applyProgress =
-        (value) => {
-          displayedProgressRef.current =
-            value
+      const isMobile = window.matchMedia('(max-width: 767px)').matches
+      let lastRendered = -1
+      let lastFrameTime = -Infinity
 
-          setStoryProgress(
-            value,
-          )
+      const resolveProgress = () => {
+        const section = sectionRef.current
+        if (!section) {
+          return 0
         }
 
-      const resolveTargetProgress =
-        () => {
-          const section =
-            sectionRef.current
+        const sectionRect = section.getBoundingClientRect()
+        // Match the 100svh sticky stage, independent of mobile browser UI.
+        const stickyHeight =
+          stageRef.current?.getBoundingClientRect().height ||
+          sectionRect.height
+        const travel = Math.max(sectionRect.height - stickyHeight, 1)
 
-          if (!section) {
-            return 0
-          }
+        return clampRecipeStoryValue((-sectionRect.top / travel) * 7, 0, 7)
+      }
 
-          const rect =
-            section.getBoundingClientRect()
-
-          const viewportHeight =
-            Math.max(
-              window.innerHeight ||
-                1,
-              1,
-            )
-
-          const scrollDistance =
-            Math.max(
-              rect.height -
-                viewportHeight,
-              1,
-            )
-
-          return clampRecipeStoryValue(
-            (-rect.top /
-              scrollDistance) * 7,
-            0,
-            7,
-          )
+      const updateProgress = (frameTime) => {
+        animationFrameRef.current = null
+        const next = resolveProgress()
+        // Complex 3D recipe cards redraw in React; cap minor updates on
+        // mobile while keeping big flings responsive and final state exact.
+        if (
+          isMobile &&
+          frameTime - lastFrameTime < 32 &&
+          Math.abs(next - lastRendered) < 0.18
+        ) {
+          animationFrameRef.current = window.requestAnimationFrame(updateProgress)
+          return
         }
 
-      const animateProgress =
-        () => {
-          animationFrameRef.current =
-            null
-
-          const current =
-            displayedProgressRef.current
-
-          const target =
-            targetProgressRef.current
-
-          const difference =
-            target -
-            current
-
-          const next =
-            Math.abs(
-              difference,
-            ) < 0.002
-              ? target
-              : current +
-                difference *
-                  0.22
-
-          applyProgress(
-            next,
-          )
-
-          if (
-            Math.abs(
-              target -
-                next,
-            ) > 0.002
-          ) {
-            animationFrameRef.current =
-              window.requestAnimationFrame(
-                animateProgress,
-              )
-          }
+        if (Math.abs(next - lastRendered) > 0.001) {
+          lastRendered = next
+          lastFrameTime = frameTime
+          setStoryProgress(next)
         }
+      }
 
-      const scheduleProgress =
-        () => {
-          targetProgressRef.current =
-            resolveTargetProgress()
-
-          if (
-            animationFrameRef.current ===
-            null
-          ) {
-            animationFrameRef.current =
-              window.requestAnimationFrame(
-                animateProgress,
-              )
-          }
+      const scheduleProgress = () => {
+        if (animationFrameRef.current === null) {
+          animationFrameRef.current = window.requestAnimationFrame(updateProgress)
         }
+      }
 
-      targetProgressRef.current =
-        resolveTargetProgress()
-
-      displayedProgressRef.current =
-        targetProgressRef.current
-
-      applyProgress(
-        targetProgressRef.current,
-      )
-
-      window.addEventListener(
-        'scroll',
-        scheduleProgress,
-        {
-          passive: true,
-        },
-      )
-
-      window.addEventListener(
-        'resize',
-        scheduleProgress,
-      )
+      // Sync directly on mount, including browser scroll restoration.
+      lastRendered = resolveProgress()
+      setStoryProgress(lastRendered)
+      window.addEventListener('scroll', scheduleProgress, { passive: true })
+      window.addEventListener('resize', scheduleProgress)
+      window.addEventListener('pageshow', scheduleProgress)
 
       return () => {
-        if (
-          animationFrameRef.current !==
-          null
-        ) {
-          window.cancelAnimationFrame(
-            animationFrameRef.current,
-          )
+        if (animationFrameRef.current !== null) {
+          window.cancelAnimationFrame(animationFrameRef.current)
+          animationFrameRef.current = null
         }
-
-        window.removeEventListener(
-          'scroll',
-          scheduleProgress,
-        )
-
-        window.removeEventListener(
-          'resize',
-          scheduleProgress,
-        )
+        window.removeEventListener('scroll', scheduleProgress)
+        window.removeEventListener('resize', scheduleProgress)
+        window.removeEventListener('pageshow', scheduleProgress)
       }
     },
-    [shouldReduceMotion],
+    [],
   )
 
   useEffect(
