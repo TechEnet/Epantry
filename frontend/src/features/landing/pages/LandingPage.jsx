@@ -141,18 +141,17 @@ function getExperienceTone(categoryId) {
 
 export default function LandingPage() {
 
-  // Landing-only, one-gesture/one-stop navigation for pinned stories.
-  // No global smooth scrolling or wheel changes outside these sections.
+  // Only touch screens use the guided story navigation. Desktop/trackpad
+  // must keep native wheel, keyboard and momentum scrolling: intercepting
+  // those events previously made the page feel locked.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
+    const mobileQuery = window.matchMedia('(max-width: 767px)')
+    if (!mobileQuery.matches) return undefined
 
-    let wheelTotal = 0
-    let lastWheelAt = 0
-    let settlingUntil = 0
-    let heldStop = null
     let touchStart = null
-    let pendingTouchTimer = null
-    let lastDirection = 0
+    let heldStop = null
+    let busyUntil = 0
 
     const stories = () => Array.from(
       document.querySelectorAll('[data-landing-story]'),
@@ -160,23 +159,19 @@ export default function LandingPage() {
       const stops = (node.dataset.landingStops || '')
         .split(',').map(Number).filter(Number.isFinite)
       const rect = node.getBoundingClientRect()
-      const start = window.scrollY + rect.top
       const sticky = node.querySelector('[data-landing-sticky]')
-      const stickyHeight = sticky?.getBoundingClientRect().height || window.innerHeight
+      const start = window.scrollY + rect.top
+      const height = sticky?.getBoundingClientRect().height || window.innerHeight
       const travel = node.dataset.landingStatic === 'true'
         ? rect.height
-        : Math.max(rect.height - stickyHeight, 1)
-      return { node, start, end: start + rect.height, travel, stops }
+        : Math.max(rect.height - height, 1)
+      return { node, start, travel, stops }
     }).filter((item) => item.stops.length > 0)
-      .sort((a, b) => a.start - b.start)
+      .sort((left, right) => left.start - right.start)
 
-    const currentStory = (y) => {
-      const all = stories()
-      const active = all.find((item) =>
-        y >= item.start - 12 && y < item.start + item.travel - 8,
-      )
-      return active ? { ...active, all } : null
-    }
+    const currentStory = (y) => stories().find((item) =>
+      y >= item.start - 12 && y < item.start + item.travel - 8,
+    )
 
     const ignoreGesture = (target) => {
       if (!(target instanceof Element)) return false
@@ -190,64 +185,54 @@ export default function LandingPage() {
       return false
     }
 
-    const step = (direction, queueTouch = false) => {
-      const current = currentStory(window.scrollY)
-      if (!current) return false
-      const { all, start, travel, stops, node, end } = current
+    const advance = (direction) => {
+      if (!mobileQuery.matches) return
       const now = performance.now()
-      // Wheel inertia is absorbed. A separate mobile swipe is queued, not lost.
-      if (now < settlingUntil) {
-        if (queueTouch) {
-          if (pendingTouchTimer !== null) window.clearTimeout(pendingTouchTimer)
-          pendingTouchTimer = window.setTimeout(() => {
-            pendingTouchTimer = null
-            if (currentStory(window.scrollY)) step(direction)
-          }, settlingUntil - now + 25)
-        }
-        return true
-      }
+      // Do not queue another automatic jump during an unfinished transition.
+      if (now < busyUntil) return
+      const all = stories()
+      const story = all.find((item) =>
+        window.scrollY >= item.start - 12 &&
+        window.scrollY < item.start + item.travel - 8,
+      )
+      if (!story) return
 
+      const { node, start, travel, stops } = story
+      const positions = stops.map((stop) => start + stop * travel)
       const y = window.scrollY
-      const positions = stops.map((progress) => start + progress * travel)
-      const distanceToNearest = positions.map((pos) => Math.abs(pos - y))
-      const nearest = distanceToNearest.indexOf(Math.min(...distanceToNearest))
-      const atBeginning = direction > 0 && y < positions[0] - 16
-      const atEnd = direction < 0 && y > positions[positions.length - 1] + 16
-      let destination
-      if (heldStop && heldStop.node === node && Math.abs(heldStop.y - y) < 45) {
-        destination = heldStop.index + direction
-      } else {
-        destination = atBeginning ? 0 : atEnd ? positions.length - 1 : nearest + direction
+      const nearest = positions.reduce((best, pos, index) =>
+        Math.abs(pos - y) < Math.abs(positions[best] - y) ? index : best, 0)
+      let next = nearest + direction
+      if (heldStop?.node === node && Math.abs(heldStop.y - y) < 140) {
+        next = heldStop.index + direction
+      } else if (direction > 0 && y < positions[0] - 16) {
+        next = 0
+      } else if (direction < 0 && y > positions[positions.length - 1] + 16) {
+        next = positions.length - 1
       }
 
       let target
-      if (destination < 0) {
-        // Revisit the preceding pinned story without getting trapped at the boundary.
-        const previous = [...all].reverse().find((story) => story.start < start - 10)
+      if (next < 0) {
+        const previous = [...all].reverse().find((item) => item.start < start - 10)
         target = previous
           ? previous.start + previous.stops[previous.stops.length - 1] * previous.travel
-          : start - Math.max(48, Math.min(window.innerHeight * 0.55, 320))
+          : start - Math.min(window.innerHeight * 0.55, 320)
         heldStop = null
-      } else if (destination >= stops.length) {
-        // Always leave the current pinned travel when the final stop is passed.
-        // Landing's overlapping panels otherwise trap the wheel on the same card.
-        const next = all.find((story) => story.start > start + 10)
-        target = next
-          ? next.start + next.stops[0] * next.travel
-          : start + travel + Math.max(48, Math.min(window.innerHeight * 0.2, 140))
+      } else if (next >= positions.length) {
+        const following = all.find((item) => item.start > start + 10)
+        target = following
+          ? following.start + following.stops[0] * following.travel
+          : start + travel + Math.min(window.innerHeight * 0.2, 140)
         heldStop = null
       } else {
-        target = positions[destination]
-        heldStop = { node, y: target, index: destination }
+        target = positions[next]
+        heldStop = { node, y: target, index: next }
       }
-      settlingUntil = now + (window.matchMedia('(max-width: 767px)').matches ? 530 : 570)
-      lastDirection = direction
-      wheelTotal = 0
-      // Mobile recipe transitions animate once at the target instead of
-      // re-rendering the entire 3D gallery on every scroll frame.
-      if (node.dataset.landingStory === 'recipes' && destination >= 0 && destination < stops.length) {
+
+      busyUntil = now + 430
+      if (node.dataset.landingStory === 'recipes' && next >= 0 && next < stops.length) {
         window.dispatchEvent(new CustomEvent('epantry:recipe-stage', {
-          detail: { progress: stops[destination] * Number(node.dataset.landingRecipeScale || 7) },
+          detail: { progress: stops[next] * Number(node.dataset.landingRecipeScale || 7) },
         }))
       }
       window.scrollTo({
@@ -255,105 +240,46 @@ export default function LandingPage() {
         behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
           ? 'instant' : 'smooth',
       })
-      return true
-    }
-
-    const onWheel = (event) => {
-      if (event.ctrlKey || event.metaKey || ignoreGesture(event.target)) return
-      const story = currentStory(window.scrollY)
-      if (!story) { wheelTotal = 0; heldStop = null; lastDirection = 0; return }
-      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
-      event.preventDefault()
-      const now = performance.now()
-      const continuousWheel = now - lastWheelAt < 145
-      lastWheelAt = now
-      if (now < settlingUntil || (continuousWheel && lastDirection !== 0 && wheelTotal === 0)) return
-      if (!continuousWheel) wheelTotal = 0
-      wheelTotal += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
-      // Small trackpad movements are accumulated, mouse-wheel ticks advance immediately.
-      if (Math.abs(wheelTotal) >= 14) step(Math.sign(wheelTotal))
     }
 
     const onTouchStart = (event) => {
-      if (event.touches.length !== 1 || ignoreGesture(event.target)) {
+      if (!mobileQuery.matches || event.touches.length !== 1 || ignoreGesture(event.target)) {
         touchStart = null
         return
       }
-      const story = currentStory(window.scrollY)
-      touchStart = story && window.matchMedia('(max-width: 767px)').matches ? {
+      touchStart = currentStory(window.scrollY) ? {
         x: event.touches[0].clientX,
         y: event.touches[0].clientY,
       } : null
-      if (touchStart) window.addEventListener('touchmove', onTouchMove, { passive: false })
     }
     const onTouchMove = (event) => {
       if (!touchStart || event.touches.length !== 1) return
       const dx = event.touches[0].clientX - touchStart.x
       const dy = event.touches[0].clientY - touchStart.y
-      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5) {
-        // Prevent native fling from advancing two or three cards at once.
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 7 && event.cancelable) {
         event.preventDefault()
       }
     }
     const onTouchEnd = (event) => {
-      window.removeEventListener('touchmove', onTouchMove)
       if (!touchStart || !event.changedTouches.length) return
       const dx = event.changedTouches[0].clientX - touchStart.x
       const dy = event.changedTouches[0].clientY - touchStart.y
       touchStart = null
-      if (Math.abs(dy) > 15 && Math.abs(dy) > Math.abs(dx)) {
-        step(dy < 0 ? 1 : -1, true)
+      if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) {
+        advance(dy < 0 ? 1 : -1)
       }
     }
-    const onTouchCancel = () => {
-      touchStart = null
-      window.removeEventListener('touchmove', onTouchMove)
-    }
-    const onKeyDown = (event) => {
-      if (event.target instanceof Element && event.target.closest('a,button,[role="button"]')) return
-      if (event.defaultPrevented || ignoreGesture(event.target) || event.altKey || event.metaKey || event.ctrlKey) return
-      const direction = ['ArrowDown', 'PageDown', ' '].includes(event.key) ? 1
-        : ['ArrowUp', 'PageUp'].includes(event.key) ? -1 : 0
-      if (!direction || !currentStory(window.scrollY)) return
-      event.preventDefault()
-      step(direction)
-    }
+    const onTouchCancel = () => { touchStart = null }
 
-    // Activate wheel interception only while a pinned scene is on screen.
-    // This keeps ordinary page scrolling native and still works when the
-    // pointer is over the navbar instead of over a story card.
-    const supportsWheel = window.matchMedia('(pointer: fine)').matches
-    let wheelAttached = false
-    const syncWheel = () => {
-      if (!supportsWheel) return
-      const active = Boolean(currentStory(window.scrollY))
-      if (active && !wheelAttached) {
-        window.addEventListener('wheel', onWheel, { passive: false })
-        wheelAttached = true
-      } else if (!active && wheelAttached) {
-        window.removeEventListener('wheel', onWheel)
-        wheelAttached = false
-      }
-    }
-    const observer = new MutationObserver(syncWheel)
-    const root = document.querySelector('main')
-    if (root) observer.observe(root, { childList: true, subtree: true })
-    syncWheel()
-    window.addEventListener('scroll', syncWheel, { passive: true })
     window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchmove', onTouchMove, { passive: false })
     window.addEventListener('touchend', onTouchEnd, { passive: true })
     window.addEventListener('touchcancel', onTouchCancel, { passive: true })
-    window.addEventListener('keydown', onKeyDown)
     return () => {
-      observer.disconnect()
-      if (pendingTouchTimer !== null) window.clearTimeout(pendingTouchTimer)
-      window.removeEventListener('scroll', syncWheel)
-      if (wheelAttached) window.removeEventListener('wheel', onWheel)
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchmove', onTouchMove)
       window.removeEventListener('touchend', onTouchEnd)
       window.removeEventListener('touchcancel', onTouchCancel)
-      window.removeEventListener('keydown', onKeyDown)
     }
   }, [])
 
@@ -835,7 +761,7 @@ export default function LandingPage() {
         />
         <section
           data-landing-sticky
-          className="sticky top-0 h-[100dvh] sm:h-[100svh] w-full overflow-hidden bg-[#1A1A1A] text-white [perspective:1400px]"
+          className="sticky top-0 h-[100svh] sm:h-[100svh] w-full overflow-hidden bg-[#1A1A1A] text-white [perspective:1400px]"
         >
           <SponsoredCampaignSlot
             placement="home"
@@ -956,7 +882,7 @@ export default function LandingPage() {
                   shouldReduceMotion
                     ? false
                     : isSmallViewport
-                      ? { opacity: 0, scale: 0.98, y: 18 }
+                      ? { opacity: 0, y: 14 }
                       : {
                           opacity: 0,
                           rotateX: 8,
@@ -978,13 +904,13 @@ export default function LandingPage() {
                   duration:
                     shouldReduceMotion
                       ? 0
-                      : isSmallViewport ? 0.34 : 0.78,
+                      : isSmallViewport ? 0.30 : 0.78,
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                className="relative h-[56svh] min-h-[360px] max-h-[610px] w-[78vw] max-w-[350px] sm:h-[62svh] sm:w-[48vw] sm:max-w-[470px] lg:w-[31vw] lg:max-w-[500px] [transform-style:preserve-3d]"
+                className="relative h-[56svh] min-h-[360px] max-h-[610px] w-[78vw] max-w-[350px] sm:h-[62svh] sm:w-[48vw] sm:max-w-[470px] lg:w-[31vw] lg:max-w-[500px] [transform-style:flat] sm:[transform-style:preserve-3d]"
               >
                 <motion.div
-                  className="relative h-full w-full [transform-style:preserve-3d]"
+                  className="relative h-full w-full [transform-style:flat] sm:[transform-style:preserve-3d]"
                   onMouseEnter={() =>
                     handleExperienceCardEnter(
                       activeExperience.id,
@@ -1257,7 +1183,7 @@ function ExperienceBackdropTile({
 
   return (
     <div
-      className="relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] [transform-style:preserve-3d] sm:rounded-[11px]"
+      className="relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] [transform-style:flat] sm:[transform-style:preserve-3d] sm:rounded-[11px]"
       style={{
         width,
         transform: `translateZ(${depthOffset}px) rotateZ(${direction === 'left' ? alternatingTilt : -alternatingTilt}deg)`,
@@ -1339,7 +1265,7 @@ function ExperienceCardFront({
         className={`absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 px-5 md:px-7 ${labelAlignment}`}
       >
         <motion.h3
-          layout="position"
+          layout={typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches ? "position" : false}
           initial={false}
           transition={{
             layout: {

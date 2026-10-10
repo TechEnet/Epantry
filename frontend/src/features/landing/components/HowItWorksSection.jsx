@@ -1025,7 +1025,7 @@ function WhyEpantrySection({
     >
       <div
         data-landing-sticky
-        className="sticky top-0 h-[100dvh] sm:h-[100svh] w-full overflow-hidden bg-[#080808] text-[#F3F1EB]"
+        className="sticky top-0 h-[100svh] sm:h-[100svh] w-full overflow-hidden bg-[#080808] text-[#F3F1EB]"
       >
         <div
           aria-hidden="true"
@@ -1066,7 +1066,7 @@ function WhyEpantrySection({
           (
             benefit,
             index,
-          ) => (!mobile || Math.abs(index - active) <= 1) ? (
+          ) => (!mobile || index === active) ? (
             <WhyBenefitScene
               key={benefit.id}
               benefit={benefit}
@@ -1182,7 +1182,7 @@ export default function HowItWorksSection() {
       >
       <div
         data-landing-sticky
-        className="sticky top-0 h-[100dvh] sm:h-[100svh] w-full overflow-hidden"
+        className="sticky top-0 h-[100svh] sm:h-[100svh] w-full overflow-hidden"
         style={{
           backgroundColor:
             STORY_BACKGROUND,
@@ -1245,7 +1245,7 @@ export default function HowItWorksSection() {
           (
             item,
             index,
-          ) => (!mobile || Math.abs(index - (active - 1)) <= 1) ? (
+          ) => (!mobile || index === active - 1) ? (
             <JourneyScene
               key={item.id}
               item={item}

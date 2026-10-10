@@ -841,7 +841,7 @@ function FeaturedGroceryScrollStory({
         )
 
   const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.42 : 0.58
+  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.32 : 0.58
 
   /*
    * Keep one viewport for the sticky surface, with a consistent 70svh
@@ -866,7 +866,7 @@ function FeaturedGroceryScrollStory({
           : undefined,
       }}
     >
-      <div data-landing-sticky className="sticky top-0 h-[100dvh] sm:h-[100svh] overflow-hidden [perspective:1800px]">
+      <div data-landing-sticky className="sticky top-0 h-[100svh] sm:h-[100svh] overflow-hidden [perspective:1800px]">
         {/* The Grocery scene is one elevated surface. Scaling its inner plane
             (not the sticky viewport) exposes the retreating Explore scene
             along the sides and avoids sticky-position transform jitter. */}
@@ -896,17 +896,11 @@ function FeaturedGroceryScrollStory({
           initial={false}
         >
           <motion.div
-            key={`grocery-background-${productKey}`}
+            key={isSmallScreen ? "grocery-mobile-background" : `grocery-background-${productKey}`}
             aria-hidden="true"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            exit={{
-              opacity: 0,
-            }}
+            initial={isSmallScreen ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={isSmallScreen ? undefined : { opacity: 0 }}
             transition={{
               duration:
                 shouldReduceMotion
@@ -969,7 +963,7 @@ function FeaturedGroceryScrollStory({
             {/* Left: current product identity. */}
             <div className="min-w-0 lg:self-center lg:pb-9 lg:pr-3">
               <AnimatePresence
-                mode="wait"
+                mode={isSmallScreen ? "sync" : "wait"}
                 initial={false}
               >
                 <motion.div
@@ -1071,7 +1065,7 @@ function FeaturedGroceryScrollStory({
               )}
 
               <AnimatePresence
-                mode="popLayout"
+                mode={isSmallScreen ? "sync" : "popLayout"}
                 initial={false}
                 custom={direction}
               >
@@ -1087,7 +1081,7 @@ function FeaturedGroceryScrollStory({
                             direction > 0
                               ? (isSmallScreen ? 18 : 110)
                               : (isSmallScreen ? -18 : -110),
-                          scale: isSmallScreen ? 0.97 : 0.88,
+                          scale: isSmallScreen ? 1 : 0.88,
                           rotate:
                             direction > 0
                               ? (isSmallScreen ? 0 : 1.8)
@@ -1109,7 +1103,7 @@ function FeaturedGroceryScrollStory({
                             direction > 0
                               ? (isSmallScreen ? -18 : -110)
                               : (isSmallScreen ? 18 : 110),
-                          scale: isSmallScreen ? 0.98 : 0.91,
+                          scale: isSmallScreen ? 1 : 0.91,
                           rotate:
                             direction > 0
                               ? (isSmallScreen ? 0 : -1.4)
@@ -1323,7 +1317,7 @@ function FeaturedGroceryScrollStory({
             {/* Right: approved Nutrition. Mobile keeps the same content below the visual. */}
             <div className="min-w-0 lg:self-center lg:pb-9">
               <AnimatePresence
-                mode="wait"
+                mode={isSmallScreen ? "sync" : "wait"}
                 initial={false}
               >
                 <motion.div
@@ -1333,10 +1327,7 @@ function FeaturedGroceryScrollStory({
                       ? false
                       : {
                           opacity: 0,
-                          x:
-                            direction > 0
-                              ? 26
-                              : -12,
+                          x: isSmallScreen ? 0 : direction > 0 ? 26 : -12,
                         }
                   }
                   animate={{
@@ -1348,10 +1339,7 @@ function FeaturedGroceryScrollStory({
                       ? undefined
                       : {
                           opacity: 0,
-                          x:
-                            direction > 0
-                              ? -18
-                              : 18,
+                          x: isSmallScreen ? 0 : direction > 0 ? -18 : 18,
                         }
                   }
                   transition={{
@@ -1359,7 +1347,7 @@ function FeaturedGroceryScrollStory({
                       motionDuration,
 
                     delay:
-                      shouldReduceMotion
+                      shouldReduceMotion || isSmallScreen
                         ? 0
                         : 0.04,
 
@@ -2294,7 +2282,7 @@ function FeaturedRecipesScrollStory({
         ref={stageRef}
         data-landing-sticky
         initial={
-          shouldReduceMotion
+          shouldReduceMotion || isSmallScreen
             ? false
             : {
                 opacity: 0,
@@ -2327,7 +2315,7 @@ function FeaturedRecipesScrollStory({
         onPointerLeave={
           handlePointerLeave
         }
-        className="sticky top-0 h-[100dvh] sm:h-[100svh] overflow-hidden bg-[#020202] text-white"
+        className="sticky top-0 h-[100svh] sm:h-[100svh] overflow-hidden bg-[#020202] text-white"
         style={{
           '--recipe-pointer-x':
             '50%',
@@ -2351,7 +2339,7 @@ function FeaturedRecipesScrollStory({
 
         <div
           aria-hidden="true"
-          className="absolute inset-x-0 bottom-0 h-[46%] origin-bottom"
+          className="absolute inset-x-0 bottom-0 hidden h-[46%] origin-bottom sm:block"
           style={{
             perspective:
               '900px',
