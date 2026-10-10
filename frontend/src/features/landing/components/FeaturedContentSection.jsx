@@ -284,7 +284,7 @@ function FeaturedBrandsMotionWall({
 
   if (sourceBrands.length === 0) {
     return (
-      <section className="flex h-[100svh] min-h-[100svh] items-center bg-[#f4f4f2] px-5 text-black sm:px-8">
+      <section data-landing-story="brands" data-landing-stops="0" data-landing-static="true" className="flex h-[100svh] min-h-[100svh] items-center bg-[#f4f4f2] px-5 text-black sm:px-8">
         <div className="mx-auto w-full max-w-7xl">
           <h2 className="mt-4 text-[clamp(48px,7vw,104px)] font-normal leading-[0.92] tracking-[-0.055em]">
             Featured Brands
@@ -320,6 +320,9 @@ function FeaturedBrandsMotionWall({
 
   return (
     <section
+      data-landing-story="brands"
+      data-landing-stops="0"
+      data-landing-static="true"
       className="relative h-[100svh] min-h-[100svh] overflow-hidden bg-[#f4f4f2] text-[#111111]"
       aria-labelledby="featured-brands-title"
     >
@@ -411,7 +414,7 @@ function FeaturedBrandsMotionWall({
 
       <Link
         to="/brands"
-        className="focus-ring group absolute right-5 top-[57svh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
+        className="focus-ring group absolute right-3 top-[35svh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
       >
         <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
           Explore Brands
@@ -837,29 +840,33 @@ function FeaturedGroceryScrollStory({
           resolvedActiveIndex,
         )
 
-  const motionDuration =
-    shouldReduceMotion
-      ? 0
-      : 0.58
+  const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.26 : 0.58
 
   /*
    * Keep one viewport for the sticky surface, with a consistent 70svh
    * scroll interval per card. All products and View all still get their
    * own stage, and the sticky surface releases without a blank spacer.
    */
-  const storyHeight =
-    `${Math.max(items.length * 70 + 100, 200)}svh`
+  const storyHeight = isSmallScreen
+    ? `${Math.max(items.length * 54 + 100, 200)}svh`
+    : `${Math.max(items.length * 70 + 100, 200)}svh`
+  const groceryStops = items.map((_, index) => (index + 0.5) / items.length).join(',')
 
   return (
     <section
       ref={sectionRef}
-      className="relative z-30 isolate shadow-[0_-22px_74px_rgba(17,24,39,0.16)]"
+      data-landing-story="grocery"
+      data-landing-stops={groceryStops}
+      className="relative z-30 isolate bg-[#26351E] sm:bg-transparent shadow-[0_-22px_74px_rgba(17,24,39,0.16)]"
       style={{
-        height:
-          storyHeight,
+        height: storyHeight,
+        background: isSmallScreen
+          ? `radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`
+          : undefined,
       }}
     >
-      <div className="sticky top-0 h-[100svh] overflow-hidden [perspective:1800px]">
+      <div data-landing-sticky className="sticky top-0 h-[100dvh] sm:h-[100svh] overflow-hidden [perspective:1800px]">
         {/* The Grocery scene is one elevated surface. Scaling its inner plane
             (not the sticky viewport) exposes the retreating Explore scene
             along the sides and avoids sticky-position transform jitter. */}
@@ -922,7 +929,7 @@ function FeaturedGroceryScrollStory({
               <img
                 src={activeProduct.image}
                 alt=""
-                className="absolute left-1/2 top-1/2 h-[125%] w-[125%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.10] blur-[26px] saturate-110 sm:opacity-[0.11] lg:opacity-[0.13] lg:blur-[34px]"
+                className="absolute left-1/2 top-1/2 h-[125%] w-[125%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain opacity-0 blur-0 saturate-110 sm:opacity-[0.11] sm:blur-[26px] lg:opacity-[0.13] lg:blur-[34px]"
               />
             )}
 
@@ -931,7 +938,7 @@ function FeaturedGroceryScrollStory({
           </motion.div>
         </AnimatePresence>
 
-        <div className="page-shell relative z-10 flex h-full min-h-0 flex-col pb-3 pt-[76px] text-white sm:pb-4 sm:pt-[82px] md:pt-[138px] lg:pt-[138px] xl:pb-6 xl:pt-[86px]">
+        <div className="page-shell relative z-10 flex h-full min-h-0 flex-col pb-1 pt-[70px] text-white sm:pb-4 sm:pt-[82px] md:pt-[138px] lg:pt-[138px] xl:pb-6 xl:pt-[86px]">
 
           <div className="flex shrink-0 items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
@@ -957,7 +964,7 @@ function FeaturedGroceryScrollStory({
             </Link>
           </div>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 py-3 sm:gap-3 sm:py-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(390px,1.2fr)_minmax(0,0.9fr)] lg:grid-rows-1 lg:items-center lg:gap-8 lg:py-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.18fr)_minmax(0,0.92fr)] xl:gap-11">
+          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-1 py-1 sm:gap-3 sm:py-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(390px,1.2fr)_minmax(0,0.9fr)] lg:grid-rows-1 lg:items-center lg:gap-8 lg:py-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.18fr)_minmax(0,0.92fr)] xl:gap-11">
 
             {/* Left: current product identity. */}
             <div className="min-w-0 lg:self-center lg:pb-9 lg:pr-3">
@@ -1078,13 +1085,13 @@ function FeaturedGroceryScrollStory({
                           opacity: 0,
                           y:
                             direction > 0
-                              ? 110
-                              : -110,
-                          scale: 0.88,
+                              ? (isSmallScreen ? 18 : 110)
+                              : (isSmallScreen ? -18 : -110),
+                          scale: isSmallScreen ? 0.97 : 0.88,
                           rotate:
                             direction > 0
-                              ? 1.8
-                              : -1.8,
+                              ? (isSmallScreen ? 0 : 1.8)
+                              : (isSmallScreen ? 0 : -1.8),
                         }
                   }
                   animate={{
@@ -1100,13 +1107,13 @@ function FeaturedGroceryScrollStory({
                           opacity: 0,
                           y:
                             direction > 0
-                              ? -110
-                              : 110,
-                          scale: 0.91,
+                              ? (isSmallScreen ? -18 : -110)
+                              : (isSmallScreen ? 18 : 110),
+                          scale: isSmallScreen ? 0.98 : 0.91,
                           rotate:
                             direction > 0
-                              ? -1.4
-                              : 1.4,
+                              ? (isSmallScreen ? 0 : -1.4)
+                              : (isSmallScreen ? 0 : 1.4),
                         }
                   }
                   transition={{
@@ -1363,10 +1370,10 @@ function FeaturedGroceryScrollStory({
                       1,
                     ],
                   }}
-                  className="rounded-[18px] border border-white/14 bg-black/10 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none"
+                  className="rounded-[18px] border border-white/14 bg-black/10 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] sm:backdrop-blur-sm sm:p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none"
                 >
                   {isViewAll ? (
-                    <div className="flex min-h-[92px] items-center justify-between gap-4 lg:min-h-0 lg:block">
+                    <Link to="/grocery" className="focus-ring flex min-h-[92px] items-center justify-between gap-4 rounded-lg lg:min-h-0 lg:block" aria-label="Browse all grocery products">
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/88 lg:text-[10px] lg:tracking-[0.24em]">
                           All Grocery
@@ -1381,7 +1388,7 @@ function FeaturedGroceryScrollStory({
                         aria-hidden="true"
                         className="shrink-0 text-white/70 lg:mt-5"
                       />
-                    </div>
+                    </Link>
                   ) : (
                     <>
                   <div className="flex items-end justify-between gap-4 border-b border-white/18 pb-2.5 lg:max-w-[340px] lg:pb-3">
@@ -1576,6 +1583,7 @@ function FeaturedRecipesScrollStory({
   recipes,
   shouldReduceMotion,
 }) {
+  const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
   const sectionRef =
     useRef(null)
 
@@ -1693,8 +1701,11 @@ function FeaturedRecipesScrollStory({
    * sequence. Scroll moves the camera monotonically across that world; cards
    * never jump or swap positions.
    */
-  const storyHeight =
-    '590svh'
+  const mobileRecipeScale = 5.16
+  const storyHeight = isSmallScreen ? '395svh' : '590svh'
+  const recipeStops = isSmallScreen
+    ? [0.02, ...cameraItems.map((_, index) => Math.min(1.02 + index, 4.96) / mobileRecipeScale)].join(',')
+    : [0.02, ...cameraItems.map((_, index) => (1.04 + index) / 7), 6.68 / 7].join(',')
 
   useEffect(
     () => {
@@ -1704,7 +1715,7 @@ function FeaturedRecipesScrollStory({
 
       const isMobile = window.matchMedia('(max-width: 767px)').matches
       let lastRendered = -1
-      let lastFrameTime = -Infinity
+      let settledTimer = null
 
       const resolveProgress = () => {
         const section = sectionRef.current
@@ -1719,34 +1730,39 @@ function FeaturedRecipesScrollStory({
           sectionRect.height
         const travel = Math.max(sectionRect.height - stickyHeight, 1)
 
-        return clampRecipeStoryValue((-sectionRect.top / travel) * 7, 0, 7)
+        return clampRecipeStoryValue((-sectionRect.top / travel) * (isMobile ? 5.16 : 7), 0, 7)
       }
 
-      const updateProgress = (frameTime) => {
+      const updateProgress = () => {
         animationFrameRef.current = null
         const next = resolveProgress()
-        // Complex 3D recipe cards redraw in React; cap minor updates on
-        // mobile while keeping big flings responsive and final state exact.
-        if (
-          isMobile &&
-          frameTime - lastFrameTime < 32 &&
-          Math.abs(next - lastRendered) < 0.18
-        ) {
-          animationFrameRef.current = window.requestAnimationFrame(updateProgress)
-          return
-        }
-
         if (Math.abs(next - lastRendered) > 0.001) {
           lastRendered = next
-          lastFrameTime = frameTime
           setStoryProgress(next)
         }
       }
 
       const scheduleProgress = () => {
-        if (animationFrameRef.current === null) {
+        if (isMobile) {
+          // One React render after the native snap settles, not 30-60
+          // heavy 3D gallery re-renders per second during a touch swipe.
+          if (settledTimer !== null) window.clearTimeout(settledTimer)
+          settledTimer = window.setTimeout(() => {
+            settledTimer = null
+            updateProgress()
+          }, 95)
+        } else if (animationFrameRef.current === null) {
           animationFrameRef.current = window.requestAnimationFrame(updateProgress)
         }
+      }
+
+      const onRecipeStage = (event) => {
+        const target = event.detail?.progress
+        if (!isMobile || !Number.isFinite(target)) return
+        if (settledTimer !== null) window.clearTimeout(settledTimer)
+        settledTimer = null
+        lastRendered = target
+        setStoryProgress(target)
       }
 
       // Sync directly on mount, including browser scroll restoration.
@@ -1755,15 +1771,18 @@ function FeaturedRecipesScrollStory({
       window.addEventListener('scroll', scheduleProgress, { passive: true })
       window.addEventListener('resize', scheduleProgress)
       window.addEventListener('pageshow', scheduleProgress)
+      window.addEventListener('epantry:recipe-stage', onRecipeStage)
 
       return () => {
         if (animationFrameRef.current !== null) {
           window.cancelAnimationFrame(animationFrameRef.current)
           animationFrameRef.current = null
         }
+        if (settledTimer !== null) window.clearTimeout(settledTimer)
         window.removeEventListener('scroll', scheduleProgress)
         window.removeEventListener('resize', scheduleProgress)
         window.removeEventListener('pageshow', scheduleProgress)
+        window.removeEventListener('epantry:recipe-stage', onRecipeStage)
       }
     },
     [],
@@ -1774,7 +1793,8 @@ function FeaturedRecipesScrollStory({
       if (
         shouldReduceMotion ||
         typeof window ===
-          'undefined'
+          'undefined' ||
+        window.matchMedia('(max-width: 767px)').matches
       ) {
         return undefined
       }
@@ -2258,6 +2278,9 @@ function FeaturedRecipesScrollStory({
   return (
     <section
       ref={sectionRef}
+      data-landing-story="recipes"
+      data-landing-stops={recipeStops}
+      data-landing-recipe-scale={isSmallScreen ? mobileRecipeScale : 7}
       className="relative z-20 isolate bg-black"
       style={{
         height:
@@ -2266,6 +2289,7 @@ function FeaturedRecipesScrollStory({
     >
       <motion.div
         ref={stageRef}
+        data-landing-sticky
         initial={
           shouldReduceMotion
             ? false
@@ -2300,7 +2324,7 @@ function FeaturedRecipesScrollStory({
         onPointerLeave={
           handlePointerLeave
         }
-        className="sticky top-0 h-[100svh] overflow-hidden bg-[#020202] text-white"
+        className="sticky top-0 h-[100dvh] sm:h-[100svh] overflow-hidden bg-[#020202] text-white"
         style={{
           '--recipe-pointer-x':
             '50%',
@@ -2405,7 +2429,7 @@ function FeaturedRecipesScrollStory({
             transform:
               `translate3d(calc(var(--recipe-pointer-nx) * -5px), calc(var(--recipe-pointer-ny) * -3px), 0)`,
             transition:
-              'transform 170ms linear',
+              isSmallScreen ? 'opacity 360ms ease, transform 170ms linear' : 'transform 170ms linear',
           }}
         >
           <div className="relative h-full w-full">
@@ -2539,6 +2563,8 @@ function FeaturedRecipesScrollStory({
                                 0.18,
                           )
 
+                        if (isMobileViewport && distanceFromCamera > 1.35) return null
+
                         return (
                           <div
                             key={
@@ -2563,7 +2589,12 @@ function FeaturedRecipesScrollStory({
                               opacity:
                                 cardOpacity,
                               transform:
-                                `translate3d(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px), ${zOffset}px) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg) scale(${cardScale})`,
+                                isMobileViewport
+                                  ? `translate3d(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px), 0) scale(${cardScale})`
+                                  : `translate3d(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px), ${zOffset}px) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg) scale(${cardScale})`,
+                              transition: isMobileViewport
+                                ? 'transform 420ms cubic-bezier(0.22,1,0.36,1), opacity 360ms ease'
+                                : undefined,
                               transformOrigin:
                                 'center center',
                               willChange:
@@ -2612,7 +2643,7 @@ function FeaturedRecipesScrollStory({
             style={{
               transform:
                 `translate3d(${-curtainOpenAmount * 100}%, 0, 0)`,
-              transition: 'none',
+              transition: isSmallScreen ? 'transform 420ms cubic-bezier(0.22,1,0.36,1)' : 'none',
             }}
           >
             <span className="absolute inset-y-0 right-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
@@ -2623,7 +2654,7 @@ function FeaturedRecipesScrollStory({
             style={{
               transform:
                 `translate3d(${curtainOpenAmount * 100}%, 0, 0)`,
-              transition: 'none',
+              transition: isSmallScreen ? 'transform 420ms cubic-bezier(0.22,1,0.36,1)' : 'none',
             }}
           >
             <span className="absolute inset-y-0 left-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
@@ -2711,6 +2742,8 @@ function RecipeStoryBookCard({
     coverOpen
       ? 'translate3d(-7px, 0, 2px) rotateY(-84deg)'
       : 'translateZ(2px) rotateY(0deg)'
+
+  const mobileLightMotion = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
 
   return (
     <div
@@ -2854,22 +2887,18 @@ function RecipeStoryBookCard({
         }
         className="absolute inset-0 z-20 overflow-hidden rounded-[14px] border border-white/10 bg-[#190000] shadow-[0_30px_80px_rgba(0,0,0,0.56)] [transform-origin:left_center] [backface-visibility:hidden] sm:rounded-[16px]"
         style={{
-          transform:
-            openTransform,
-          WebkitTransform:
-            openTransform,
-          transformStyle:
-            'preserve-3d',
-          WebkitTransformStyle:
-            'preserve-3d',
-          WebkitTransformOrigin:
-            'left center',
-          transition:
-            shouldReduceMotion
-              ? 'none'
+          transform: mobileLightMotion ? 'none' : openTransform,
+          WebkitTransform: mobileLightMotion ? 'none' : openTransform,
+          opacity: mobileLightMotion && coverOpen ? 0 : 1,
+          transformStyle: mobileLightMotion ? 'flat' : 'preserve-3d',
+          WebkitTransformStyle: mobileLightMotion ? 'flat' : 'preserve-3d',
+          WebkitTransformOrigin: 'left center',
+          transition: shouldReduceMotion
+            ? 'none'
+            : mobileLightMotion
+              ? 'opacity 320ms ease-out'
               : 'transform 920ms cubic-bezier(0.20,0.84,0.22,1)',
-          willChange:
-            'transform',
+          willChange: mobileLightMotion ? 'opacity' : 'transform',
         }}
       >
         {recipe?.image ? (
@@ -2919,7 +2948,7 @@ function RecipeStoryViewAllCard({
   return (
     <Link
       to="/recipes"
-      className="focus-ring group relative flex h-[58svh] max-h-[610px] min-h-[390px] w-[72vw] max-w-[420px] flex-col overflow-hidden rounded-[14px] border border-red-500/28 bg-[#130000] p-5 shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:h-[62svh] sm:w-[48vw] sm:rounded-[16px] sm:p-6 md:w-[390px] lg:h-[64svh] lg:w-[410px] lg:p-7"
+      className="focus-ring group relative flex h-[min(55dvh,470px)] max-h-[610px] min-h-0 w-[72vw] max-w-[420px] flex-col overflow-hidden rounded-[14px] border border-red-500/28 bg-[#130000] p-5 shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:h-[62svh] sm:min-h-[390px] sm:w-[48vw] sm:rounded-[16px] sm:p-6 md:w-[390px] lg:h-[64svh] lg:w-[410px] lg:p-7"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_24%,rgba(255,0,0,0.26),transparent_38%),linear-gradient(155deg,#160000_0%,#050202_62%,#000_100%)]" />
 
@@ -2928,7 +2957,7 @@ function RecipeStoryViewAllCard({
           EPANTRY Recipes
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
+        <div className="mt-3 grid h-[min(22svh,150px)] min-h-0 grid-cols-2 grid-rows-2 gap-1.5 sm:mt-5 sm:h-auto sm:gap-3">
           {recipes.slice(
             0,
             4,
@@ -2939,7 +2968,7 @@ function RecipeStoryViewAllCard({
             ) => (
               <div
                 key={`recipe-story-view-all-${recipe?.id || recipe?.slug || index}`}
-                className="aspect-square overflow-hidden rounded-[10px] border border-white/10 bg-black/30"
+                className="min-h-0 overflow-hidden rounded-[10px] border border-white/10 bg-black/30 sm:aspect-square"
               >
                 {recipe?.image ? (
                   <img
@@ -2960,18 +2989,18 @@ function RecipeStoryViewAllCard({
           )}
         </div>
 
-        <div className="mt-auto pt-5 sm:pt-6">
+        <div className="mt-auto pt-2 sm:pt-6">
           <p className="text-[8px] font-black uppercase tracking-[0.16em] text-white/42 sm:text-[9px]">
             Full collection
           </p>
           <h3 className="mt-2 text-[38px] font-black uppercase leading-[0.82] tracking-[-0.065em] text-white sm:text-[46px]">
             View all
           </h3>
-          <p className="mt-3 max-w-[280px] text-[9px] font-semibold leading-4 text-white/48 sm:text-[10px] sm:leading-5">
+          <p className="mt-2 max-w-[280px] text-[9px] font-semibold leading-4 text-white/48 sm:mt-3 sm:text-[10px] sm:leading-5">
             Explore every published EPANTRY recipe and choose what to cook next.
           </p>
 
-          <span className="mt-4 inline-flex h-10 items-center gap-2 rounded-full border border-red-500/34 bg-red-600 px-4 text-[9px] font-black uppercase tracking-[0.10em] text-white shadow-[0_0_26px_rgba(220,0,0,0.22)] sm:h-11 sm:text-[10px]">
+          <span className="mt-2 inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-red-500/34 bg-red-600 px-4 text-[9px] font-black uppercase tracking-[0.10em] text-white shadow-[0_0_26px_rgba(220,0,0,0.22)] sm:h-11 sm:text-[10px]">
             Explore Recipes
             <ArrowRight
               size={14}
