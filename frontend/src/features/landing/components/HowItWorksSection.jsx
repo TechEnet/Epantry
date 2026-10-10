@@ -909,12 +909,12 @@ function WhyEpantrySection({
         stiffness:
           shouldReduceMotion
             ? 1000
-            : 72,
+            : 135,
 
         damping:
           shouldReduceMotion
             ? 100
-            : 25,
+            : 24,
 
         mass:
           shouldReduceMotion
@@ -979,7 +979,7 @@ function WhyEpantrySection({
   return (
     <section
       ref={sectionRef}
-      className="relative z-20 h-[700svh] w-full bg-[#080808]"
+      className="relative z-20 h-[560svh] w-full bg-[#080808]"
     >
       <div
         className="sticky top-0 h-[100svh] w-full overflow-hidden bg-[#080808] text-[#F3F1EB]"
@@ -1073,12 +1073,12 @@ export default function HowItWorksSection() {
         stiffness:
           shouldReduceMotion
             ? 1000
-            : 82,
+            : 145,
 
         damping:
           shouldReduceMotion
             ? 100
-            : 26,
+            : 24,
 
         mass:
           shouldReduceMotion
@@ -1162,7 +1162,7 @@ export default function HowItWorksSection() {
     <>
       <section
         ref={sectionRef}
-        className="relative h-[600svh] w-full bg-[#B4485B]"
+        className="relative h-[500svh] w-full bg-[#B4485B]"
       >
       <div
         className="sticky top-0 h-[100svh] w-full overflow-hidden"

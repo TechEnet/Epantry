@@ -535,11 +535,11 @@ export default function LandingPage() {
           EXPLORE EPANTRY
       ============================================================= */}
 
-      <div className="relative z-10 h-[530svh] w-full bg-[#1A1A1A] sm:h-[550svh]">
+      <div className="relative z-10 h-[440svh] w-full bg-[#1A1A1A] sm:h-[460svh]">
         <div
           ref={experienceSectionRef}
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-[430svh] sm:h-[450svh]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[340svh] sm:h-[360svh]"
         />
         <section
           className="sticky top-0 h-[100svh] w-full overflow-hidden bg-[#1A1A1A] text-white [perspective:1400px]"

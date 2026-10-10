@@ -799,7 +799,7 @@ function FeaturedGroceryScrollStory({
               ? target
               : current +
                 difference *
-                  0.16
+                  0.25
 
           displayProgressRef.current =
             next
@@ -984,13 +984,12 @@ function FeaturedGroceryScrollStory({
       : 0.9
 
   /*
-   * +1 viewport is intentional: the sticky surface itself consumes one
-   * viewport, while each story card receives one complete viewport
-   * of scroll travel. After the final View all card, the next pixel releases the
-   * scene into the next landing section instead of exposing a blank spacer.
+   * Keep one viewport for the sticky surface, with a shorter 85svh
+   * scroll interval per card. All products and View all still get their
+   * own stage, and the sticky surface releases without a blank spacer.
    */
   const storyHeight =
-    `${Math.max(items.length + 1, 2) * 100}svh`
+    `${Math.max(items.length * 85 + 100, 200)}svh`
 
   return (
     <section
@@ -1842,7 +1841,7 @@ function FeaturedRecipesScrollStory({
    * never jump or swap positions.
    */
   const storyHeight =
-    '800svh'
+    '660svh'
 
   useEffect(
     () => {
@@ -1883,9 +1882,16 @@ function FeaturedRecipesScrollStory({
               1,
             )
 
+          const scrollDistance =
+            Math.max(
+              rect.height -
+                viewportHeight,
+              1,
+            )
+
           return clampRecipeStoryValue(
-            -rect.top /
-              viewportHeight,
+            (-rect.top /
+              scrollDistance) * 7,
             0,
             7,
           )
@@ -1909,11 +1915,11 @@ function FeaturedRecipesScrollStory({
           const next =
             Math.abs(
               difference,
-            ) < 0.001
+            ) < 0.002
               ? target
               : current +
                 difference *
-                  0.11
+                  0.22
 
           applyProgress(
             next,
@@ -1923,7 +1929,7 @@ function FeaturedRecipesScrollStory({
             Math.abs(
               target -
                 next,
-            ) > 0.001
+            ) > 0.002
           ) {
             animationFrameRef.current =
               window.requestAnimationFrame(
@@ -2631,7 +2637,7 @@ function FeaturedRecipesScrollStory({
             transform:
               `translate3d(calc(var(--recipe-pointer-nx) * -5px), calc(var(--recipe-pointer-ny) * -3px), 0)`,
             transition:
-              'opacity 220ms linear, transform 170ms linear',
+              'transform 170ms linear',
           }}
         >
           <div className="relative h-full w-full">
@@ -2838,10 +2844,7 @@ function FeaturedRecipesScrollStory({
             style={{
               transform:
                 `translate3d(${-curtainOpenAmount * 100}%, 0, 0)`,
-              transition:
-                shouldReduceMotion
-                  ? 'none'
-                  : 'transform 80ms linear',
+              transition: 'none',
             }}
           >
             <span className="absolute inset-y-0 right-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
@@ -2852,10 +2855,7 @@ function FeaturedRecipesScrollStory({
             style={{
               transform:
                 `translate3d(${curtainOpenAmount * 100}%, 0, 0)`,
-              transition:
-                shouldReduceMotion
-                  ? 'none'
-                  : 'transform 80ms linear',
+              transition: 'none',
             }}
           >
             <span className="absolute inset-y-0 left-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
