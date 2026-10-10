@@ -691,6 +691,20 @@ function FeaturedGroceryScrollStory({
     setDirection,
   ] = useState(1)
 
+  // Prefetch just the next product on mobile, after the current scene lands.
+  // Desktop never starts this extra work.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return undefined
+    const nextImage = items[activeIndex + 1]?.image
+    if (!nextImage) return undefined
+    const timer = window.setTimeout(() => {
+      const image = new window.Image()
+      image.decoding = 'async'
+      image.src = nextImage
+    }, 240)
+    return () => window.clearTimeout(timer)
+  }, [activeIndex, items[activeIndex + 1]?.image])
+
   useEffect(
     () => {
       if (
@@ -841,7 +855,7 @@ function FeaturedGroceryScrollStory({
         )
 
   const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.32 : 0.58
+  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.62 : 0.58
 
   /*
    * Keep one viewport for the sticky surface, with a consistent 70svh
@@ -919,7 +933,7 @@ function FeaturedGroceryScrollStory({
               background: `radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`,
             }}
           >
-            {activeProduct?.image && (
+            {!isSmallScreen && activeProduct?.image && (
               <img
                 src={activeProduct.image}
                 alt=""
@@ -992,6 +1006,7 @@ function FeaturedGroceryScrollStory({
                             direction > 0
                               ? -18
                               : 18,
+                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
                         }
                   }
                   transition={{
@@ -1079,8 +1094,8 @@ function FeaturedGroceryScrollStory({
                           opacity: 0,
                           y:
                             direction > 0
-                              ? (isSmallScreen ? 18 : 110)
-                              : (isSmallScreen ? -18 : -110),
+                              ? (isSmallScreen ? 12 : 110)
+                              : (isSmallScreen ? -12 : -110),
                           scale: isSmallScreen ? 1 : 0.88,
                           rotate:
                             direction > 0
@@ -1101,13 +1116,14 @@ function FeaturedGroceryScrollStory({
                           opacity: 0,
                           y:
                             direction > 0
-                              ? (isSmallScreen ? -18 : -110)
-                              : (isSmallScreen ? 18 : 110),
+                              ? (isSmallScreen ? -12 : -110)
+                              : (isSmallScreen ? 12 : 110),
                           scale: isSmallScreen ? 1 : 0.91,
                           rotate:
                             direction > 0
                               ? (isSmallScreen ? 0 : -1.4)
                               : (isSmallScreen ? 0 : 1.4),
+                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
                         }
                   }
                   transition={{
@@ -1225,7 +1241,7 @@ function FeaturedGroceryScrollStory({
                       : {
                           opacity: 0,
                           x: isSmallScreen ? 0 : 90,
-                          y: isSmallScreen ? 18 : 8,
+                          y: isSmallScreen ? 12 : 8,
                         }
                   }
                   animate={{
@@ -1239,7 +1255,8 @@ function FeaturedGroceryScrollStory({
                       : {
                           opacity: 0,
                           x: isSmallScreen ? 0 : -38,
-                          y: isSmallScreen ? -18 : -4,
+                          y: isSmallScreen ? -12 : -4,
+                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
                         }
                   }
                   transition={{
@@ -1340,6 +1357,7 @@ function FeaturedGroceryScrollStory({
                       : {
                           opacity: 0,
                           x: isSmallScreen ? 0 : direction > 0 ? -18 : 18,
+                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
                         }
                   }
                   transition={{
@@ -1704,6 +1722,8 @@ function FeaturedRecipesScrollStory({
       const isMobile = window.matchMedia('(max-width: 767px)').matches
       let lastRendered = -1
       let settledTimer = null
+      let guidedUntil = 0
+      let guidedTimer = null
 
       const resolveProgress = () => {
         const section = sectionRef.current
@@ -1732,6 +1752,7 @@ function FeaturedRecipesScrollStory({
 
       const scheduleProgress = () => {
         if (isMobile) {
+          if (performance.now() < guidedUntil) return
           // One React render after the native snap settles, not 30-60
           // heavy 3D gallery re-renders per second during a touch swipe.
           if (settledTimer !== null) window.clearTimeout(settledTimer)
@@ -1748,12 +1769,15 @@ function FeaturedRecipesScrollStory({
         const target = event.detail?.progress
         if (!isMobile || !Number.isFinite(target)) return
         if (settledTimer !== null) window.clearTimeout(settledTimer)
+        if (guidedTimer !== null) window.clearTimeout(guidedTimer)
         settledTimer = null
-        // Update cards after the scroll movement begins, not before it.
-        window.setTimeout(() => {
+        // Hold one target card throughout the swipe. No in-between renders.
+        guidedUntil = performance.now() + 850
+        guidedTimer = window.setTimeout(() => {
+          guidedTimer = null
           lastRendered = target
           setStoryProgress(target)
-        }, 135)
+        }, 175)
       }
 
       // Sync directly on mount, including browser scroll restoration.
@@ -1770,6 +1794,7 @@ function FeaturedRecipesScrollStory({
           animationFrameRef.current = null
         }
         if (settledTimer !== null) window.clearTimeout(settledTimer)
+        if (guidedTimer !== null) window.clearTimeout(guidedTimer)
         window.removeEventListener('scroll', scheduleProgress)
         window.removeEventListener('resize', scheduleProgress)
         window.removeEventListener('pageshow', scheduleProgress)
@@ -2153,6 +2178,17 @@ function FeaturedRecipesScrollStory({
     activeItem?.key ||
     'recipe-story-empty'
 
+  const nextMobileRecipeImage = cameraItems[activeSequenceIndex + 1]?.recipe?.image
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches || !nextMobileRecipeImage) return undefined
+    const timer = window.setTimeout(() => {
+      const image = new window.Image()
+      image.decoding = 'async'
+      image.src = nextMobileRecipeImage
+    }, 240)
+    return () => window.clearTimeout(timer)
+  }, [nextMobileRecipeImage])
+
   const introOpacity =
     shouldReduceMotion
       ? 0
@@ -2217,7 +2253,7 @@ function FeaturedRecipesScrollStory({
           },
           shouldReduceMotion
             ? 0
-            : 280,
+            : 960,
         )
 
       const closeTimer =
@@ -2227,7 +2263,7 @@ function FeaturedRecipesScrollStory({
           },
           shouldReduceMotion
             ? 400
-            : 1550,
+            : 2550,
         )
 
       return () => {
@@ -2453,8 +2489,8 @@ function FeaturedRecipesScrollStory({
                     key={activeItemKey}
                     initial={shouldReduceMotion ? false : { opacity: 0, y: 16, scale: 0.985 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={shouldReduceMotion ? undefined : { opacity: 0, y: -12, scale: 0.985 }}
-                    transition={{ duration: shouldReduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }}
+                    exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.995, transition: { duration: 0.18 } }}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
                     className="relative flex items-center justify-center"
                   >
                     {activeItem?.type === 'view-all' ? (
@@ -2912,7 +2948,7 @@ function RecipeStoryBookCard({
           transition: shouldReduceMotion
             ? 'none'
             : mobileLightMotion
-              ? 'opacity 320ms ease-out'
+              ? 'opacity 520ms cubic-bezier(0.22,1,0.36,1)'
               : 'transform 920ms cubic-bezier(0.20,0.84,0.22,1)',
           willChange: mobileLightMotion ? 'opacity' : 'transform',
         }}

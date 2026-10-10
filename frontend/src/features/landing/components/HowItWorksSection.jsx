@@ -5,6 +5,7 @@ import {
 } from 'react'
 
 import {
+  AnimatePresence,
   motion,
   useReducedMotion,
   useMotionValue,
@@ -954,6 +955,87 @@ function WhyBenefitScene({
   )
 }
 
+
+// Mobile stages animate once on entry. Desktop retains the original
+// scroll-driven layered scenes and every existing measurement.
+function MobileHowScene({ active, shouldReduceMotion }) {
+  const nextImagePath = active < landingJourneySteps.length ? JOURNEY_IMAGE_BY_ID[landingJourneySteps[active]?.id] : null
+  useEffect(() => {
+    if (!nextImagePath || typeof window === 'undefined') return undefined
+    const timer = window.setTimeout(() => {
+      const image = new window.Image()
+      image.decoding = 'async'
+      image.src = nextImagePath
+    }, 240)
+    return () => window.clearTimeout(timer)
+  }, [nextImagePath])
+  const item = active > 0 ? landingJourneySteps[active - 1] : null
+  const imagePath = item ? JOURNEY_IMAGE_BY_ID[item.id] : INTRO_IMAGE
+  return (
+    <div className="absolute inset-x-0 bottom-[6svh] top-[23svh] z-20 flex items-center justify-center px-5">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={item?.id || 'journey-intro'}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 22, scale: 0.975 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.16 } }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.62, ease: [0.22, 1, 0.36, 1] }}
+          className="flex w-full max-w-[540px] flex-col items-center justify-center gap-5 text-center"
+        >
+          <div className="relative h-[min(42svh,390px)] w-full overflow-hidden rounded-[24px] border border-white/25 bg-[#F0E6D4] shadow-[0_24px_50px_rgba(57,12,24,0.22)]">
+            <img src={imagePath} alt="" aria-hidden="true" decoding="async" className="h-full w-full object-cover object-center" />
+          </div>
+          {item ? (
+            <div className="w-full">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[#F7EACB]/85">Step {item.step}</div>
+              <h3 className="mt-2 text-[clamp(32px,8vw,44px)] font-bold leading-[1.02] tracking-[-0.045em] text-[#F7EACB]">{item.title}</h3>
+            </div>
+          ) : (
+            <div className="max-w-[290px]">
+              <p className="font-serif text-[28px] italic text-[#F7EACB]">One food journey.</p>
+              <p className="mt-1 text-xl font-semibold uppercase leading-tight tracking-[-0.04em] text-[#F7EACB]">Everything stays connected.</p>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function MobileWhyScene({ benefit, shouldReduceMotion, nextImagePath }) {
+  useEffect(() => {
+    if (!nextImagePath || typeof window === 'undefined') return undefined
+    const timer = window.setTimeout(() => {
+      const image = new window.Image()
+      image.decoding = 'async'
+      image.src = nextImagePath
+    }, 240)
+    return () => window.clearTimeout(timer)
+  }, [nextImagePath])
+  return (
+    <div className="absolute inset-x-0 bottom-[7svh] top-[24svh] z-20 flex items-center justify-center px-5">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={benefit.id}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 24, scale: 0.975 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.16 } }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.66, ease: [0.22, 1, 0.36, 1] }}
+          className="flex w-full max-w-[500px] flex-col items-center justify-center gap-5 text-left"
+        >
+          <div className="h-[min(40svh,370px)] w-full max-w-[410px] overflow-hidden bg-[#111111]">
+            <img src={WHY_IMAGE_BY_ID[benefit.id]} alt="" aria-hidden="true" decoding="async" className="h-full w-full object-cover object-center" />
+          </div>
+          <div className="w-full max-w-[410px]">
+            <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-white/65">Why EPANTRY</p>
+            <h3 className="mt-3 text-[clamp(34px,8vw,48px)] font-medium leading-[0.98] tracking-[-0.045em] text-[#F3F1EB]">{benefit.title}</h3>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function WhyEpantrySection({
   shouldReduceMotion,
 }) {
@@ -1062,7 +1144,9 @@ function WhyEpantrySection({
           </div>
         </motion.header>
 
-        {WHY_CUSTOMER_BENEFITS.map(
+        {mobile ? (
+          <MobileWhyScene benefit={WHY_CUSTOMER_BENEFITS[active] || WHY_CUSTOMER_BENEFITS[0]} nextImagePath={WHY_IMAGE_BY_ID[WHY_CUSTOMER_BENEFITS[active + 1]?.id]} shouldReduceMotion={shouldReduceMotion} />
+        ) : WHY_CUSTOMER_BENEFITS.map(
           (
             benefit,
             index,
@@ -1235,13 +1319,16 @@ export default function HowItWorksSection() {
           </div>
         </motion.header>
 
-        {(!mobile || active < 2) && <IntroVisual
+        {mobile ? (
+          <MobileHowScene active={active} shouldReduceMotion={shouldReduceMotion} />
+        ) : null}
+        {!mobile && <IntroVisual
           progress={progress}
           shouldReduceMotion={shouldReduceMotion}
           mobile={mobile}
         />}
 
-        {landingJourneySteps.map(
+        {!mobile && landingJourneySteps.map(
           (
             item,
             index,
