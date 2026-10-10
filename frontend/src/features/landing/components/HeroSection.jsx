@@ -1315,45 +1315,6 @@ export default function HeroSection() {
 
         <div className="w-full max-w-3xl lg:w-[70%] lg:max-w-none">
 
-          {/* Eyebrow */}
-
-          <motion.div
-            initial={
-              shouldReduceMotion
-                ? false
-                : {
-                    opacity: 0,
-                    y: 14,
-                  }
-            }
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{
-              duration: 0.4,
-            }}
-            className="inline-flex items-center gap-2 rounded-full border border-[#166534]/10 bg-white/80 px-4 py-2 shadow-sm backdrop-blur"
-          >
-
-            <Sparkles
-              size={15}
-              className="text-[#166534]"
-              aria-hidden="true"
-            />
-
-
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#14532D]">
-
-              {
-                landingHero.eyebrow
-              }
-
-            </span>
-
-          </motion.div>
-
-
           {/* =========================================================
               ROTATING HERO MESSAGE
           ========================================================= */}
