@@ -855,7 +855,7 @@ function FeaturedGroceryScrollStory({
         )
 
   const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.4 : 0.58
+  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.27 : 0.58
 
   /*
    * Keep one viewport for the sticky surface, with a consistent 70svh
@@ -863,7 +863,7 @@ function FeaturedGroceryScrollStory({
    * own stage, and the sticky surface releases without a blank spacer.
    */
   const storyHeight = isSmallScreen
-    ? `${Math.max(items.length * 54 + 100, 200)}svh`
+    ? `${Math.max(items.length * 54 + 100, 200)}dvh`
     : `${Math.max(items.length * 70 + 100, 200)}svh`
   const groceryStops = items.map((_, index) => (index + 0.5) / items.length).join(',')
 
@@ -880,7 +880,11 @@ function FeaturedGroceryScrollStory({
           : undefined,
       }}
     >
-      <div data-landing-sticky className="sticky top-0 h-[100svh] sm:h-[100svh] overflow-hidden [perspective:1800px]">
+      <div
+        data-landing-sticky
+        className="sticky top-0 h-[100svh] sm:h-[100svh] overflow-hidden [perspective:1800px]"
+        style={isSmallScreen ? { height: '100dvh', minHeight: '100dvh' } : undefined}
+      >
         {/* The Grocery scene is one elevated surface. Scaling its inner plane
             (not the sticky viewport) exposes the retreating Explore scene
             along the sides and avoids sticky-position transform jitter. */}
@@ -912,14 +916,14 @@ function FeaturedGroceryScrollStory({
           <motion.div
             key={`grocery-background-${productKey}`}
             aria-hidden="true"
-            initial={isSmallScreen && shouldReduceMotion ? false : { opacity: 0 }}
+            initial={shouldReduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={isSmallScreen && shouldReduceMotion ? undefined : { opacity: 0 }}
+            exit={shouldReduceMotion ? undefined : { opacity: 0 }}
             transition={{
               duration:
                 shouldReduceMotion
                   ? 0
-                  : isSmallScreen ? 0.4 : 0.6,
+                  : isSmallScreen ? 0.27 : 0.6,
 
               ease: [
                 0.22,
@@ -930,6 +934,7 @@ function FeaturedGroceryScrollStory({
             }}
             className="absolute inset-0"
             style={{
+              willChange: isSmallScreen ? 'opacity' : undefined,
               background: `radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`,
             }}
           >
@@ -981,9 +986,9 @@ function FeaturedGroceryScrollStory({
                 initial={false}
               >
                 <motion.div
-                  key={`grocery-copy-${productKey}`}
+                  key={isSmallScreen ? 'grocery-mobile-copy' : `grocery-copy-${productKey}`}
                   initial={
-                    shouldReduceMotion
+                    shouldReduceMotion || isSmallScreen
                       ? false
                       : {
                           opacity: 0,
@@ -1087,11 +1092,11 @@ function FeaturedGroceryScrollStory({
                     shouldReduceMotion
                       ? false
                       : {
-                          opacity: 0,
+                          opacity: isSmallScreen ? 0.65 : 0,
                           y:
                             direction > 0
-                              ? (isSmallScreen ? 8 : 110)
-                              : (isSmallScreen ? -8 : -110),
+                              ? (isSmallScreen ? 7 : 110)
+                              : (isSmallScreen ? -7 : -110),
                           scale: isSmallScreen ? 1 : 0.88,
                           rotate:
                             direction > 0
@@ -1230,9 +1235,9 @@ function FeaturedGroceryScrollStory({
                   initial={false}
                 >
                   <motion.div
-                    key={`grocery-actions-${productKey}`}
+                    key={isSmallScreen ? 'grocery-mobile-actions' : `grocery-actions-${productKey}`}
                   initial={
-                    shouldReduceMotion
+                    shouldReduceMotion || isSmallScreen
                       ? false
                       : {
                           opacity: 0,
@@ -1334,9 +1339,9 @@ function FeaturedGroceryScrollStory({
                 initial={false}
               >
                 <motion.div
-                  key={`grocery-nutrition-${productKey}`}
+                  key={isSmallScreen ? 'grocery-mobile-nutrition' : `grocery-nutrition-${productKey}`}
                   initial={
-                    shouldReduceMotion
+                    shouldReduceMotion || isSmallScreen
                       ? false
                       : {
                           opacity: 0,

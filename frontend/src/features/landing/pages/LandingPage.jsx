@@ -115,31 +115,42 @@ export default function LandingPage() {
     let touchStart = null;
     let heldStop = null;
     let busyUntil = 0;
-    let exploreScrollFrame = null;
-    let restoreExploreScrollBehavior = null;
+    let groceryScrollingUntil = 0;
+    let guidedScrollFrame = null;
+    let restoreGuidedScrollBehavior = null;
 
-    // Explore alone gets a predictable, interruptible mobile scroll transition.
+    // Explore and Featured Grocery use one interruptible touch transition.
     // Other landing stories keep their existing navigation untouched.
-    const stopExploreScroll = () => {
-      if (exploreScrollFrame !== null) {
-        window.cancelAnimationFrame(exploreScrollFrame);
-        exploreScrollFrame = null;
+    const stopGuidedScroll = () => {
+      if (guidedScrollFrame !== null) {
+        window.cancelAnimationFrame(guidedScrollFrame);
+        guidedScrollFrame = null;
       }
-      if (restoreExploreScrollBehavior) {
-        restoreExploreScrollBehavior();
-        restoreExploreScrollBehavior = null;
+      if (restoreGuidedScrollBehavior) {
+        restoreGuidedScrollBehavior();
+        restoreGuidedScrollBehavior = null;
       }
     };
 
-    const scrollExploreTo = (target, stepCount) => {
-      stopExploreScroll();
+    const scrollGuidedTo = (target, stepCount, isGrocery = false) => {
+      stopGuidedScroll();
+      if (isGrocery) {
+        // Browser-native smooth scroll avoids a JS scrollTo call every frame.
+        // Explicitly requesting a new target also interrupts a previous flick.
+        window.scrollTo({
+          top: target,
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "instant" : "smooth",
+        });
+        return;
+      }
       // The global page CSS sets scroll-behavior: smooth. Override it only
       // during this gesture, so each individual frame moves immediately on
       // mobile Safari as well as Chromium without double-easing.
       const root = document.documentElement;
       const previousBehavior = root.style.scrollBehavior;
       root.style.scrollBehavior = "auto";
-      restoreExploreScrollBehavior = () => {
+      restoreGuidedScrollBehavior = () => {
         root.style.scrollBehavior = previousBehavior;
       };
 
@@ -150,12 +161,14 @@ export default function LandingPage() {
         window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ) {
         window.scrollTo(0, target);
-        restoreExploreScrollBehavior();
-        restoreExploreScrollBehavior = null;
+        restoreGuidedScrollBehavior();
+        restoreGuidedScrollBehavior = null;
         return;
       }
 
-      const duration = Math.min(620, 440 + (stepCount - 1) * 90);
+      const duration = isGrocery
+        ? Math.min(590, 370 + (stepCount - 1) * 70)
+        : Math.min(620, 440 + (stepCount - 1) * 90);
       let startTime = null;
       const tick = (time) => {
         if (startTime === null) startTime = time;
@@ -163,16 +176,16 @@ export default function LandingPage() {
         const eased = 1 - Math.pow(1 - progress, 3);
         window.scrollTo(0, Math.round(from + distance * eased));
         if (progress < 1) {
-          exploreScrollFrame = window.requestAnimationFrame(tick);
+          guidedScrollFrame = window.requestAnimationFrame(tick);
         } else {
-          exploreScrollFrame = null;
-          if (restoreExploreScrollBehavior) {
-            restoreExploreScrollBehavior();
-            restoreExploreScrollBehavior = null;
+          guidedScrollFrame = null;
+          if (restoreGuidedScrollBehavior) {
+            restoreGuidedScrollBehavior();
+            restoreGuidedScrollBehavior = null;
           }
         }
       };
-      exploreScrollFrame = window.requestAnimationFrame(tick);
+      guidedScrollFrame = window.requestAnimationFrame(tick);
     };
 
     const stories = () =>
@@ -218,7 +231,7 @@ export default function LandingPage() {
       return false;
     };
 
-    const advance = (direction, exploreSteps = 1) => {
+    const advance = (direction, storySteps = 1) => {
       if (!mobileQuery.matches) return;
       const now = performance.now();
       const all = stories();
@@ -231,8 +244,10 @@ export default function LandingPage() {
 
       const { node, start, travel, stops } = story;
       const isExplore = node.dataset.landingStory === "explore";
-      // Preserve the previous fixed cooldown for every OTHER section.
-      if (!isExplore && now < busyUntil) return;
+      const isGrocery = node.dataset.landingStory === "grocery";
+      const isGuided = isExplore || isGrocery;
+      // Keep existing cooldown for recipes/brands, not Grocery or Explore.
+      if (!isGuided && now < busyUntil) return;
       const positions = stops.map((stop) => start + stop * travel);
       const y = window.scrollY;
       const nearest = positions.reduce(
@@ -240,22 +255,24 @@ export default function LandingPage() {
           Math.abs(pos - y) < Math.abs(positions[best] - y) ? index : best,
         0
       );
-      const steps = isExplore ? exploreSteps : 1;
+      const steps = isGuided ? storySteps : 1;
       let next = nearest + direction * steps;
       if (
         heldStop?.node === node &&
         (Math.abs(heldStop.y - y) < 140 ||
-          (isExplore && exploreScrollFrame !== null))
+          (isGuided && guidedScrollFrame !== null) ||
+          (isGrocery && now < groceryScrollingUntil))
       ) {
         next = heldStop.index + direction * steps;
       } else if (direction > 0 && y < positions[0] - 16) {
+        // Grocery has no intro stage: enter at its first card.
         next = isExplore ? Math.min(positions.length - 1, steps) : 0;
       } else if (direction < 0 && y > positions[positions.length - 1] + 16) {
         next = positions.length - 1;
       }
-      // A strong flick can skip cards, but must not jump into a different
-      // landing section. Only a subsequent gesture may leave Explore.
-      if (isExplore && steps > 1) {
+      // Only a deliberately fast flick may skip cards, staying within the
+      // current section; the next gesture can leave the section normally.
+      if (isGuided && steps > 1) {
         next = Math.min(positions.length - 1, Math.max(0, next));
       }
 
@@ -280,7 +297,8 @@ export default function LandingPage() {
         heldStop = { node, y: target, index: next };
       }
 
-      if (!isExplore) busyUntil = now + 760;
+      if (!isGuided) busyUntil = now + 760;
+      if (isGrocery) groceryScrollingUntil = now + 750;
       if (
         node.dataset.landingStory === "recipes" &&
         next >= 0 &&
@@ -295,8 +313,8 @@ export default function LandingPage() {
           })
         );
       }
-      if (isExplore) {
-        scrollExploreTo(Math.max(0, Math.round(target)), steps);
+      if (isGuided) {
+        scrollGuidedTo(Math.max(0, Math.round(target)), steps, isGrocery);
       } else {
         window.scrollTo({
           top: Math.max(0, Math.round(target)),
@@ -323,6 +341,7 @@ export default function LandingPage() {
             y: event.touches[0].clientY,
             startedAt: performance.now(),
             isExplore: story.node.dataset.landingStory === "explore",
+            isGrocery: story.node.dataset.landingStory === "grocery",
           }
         : null;
     };
@@ -352,6 +371,17 @@ export default function LandingPage() {
                 ? 2
                 : 1;
           advance(dy < 0 ? 1 : -1, steps);
+        } else if (gesture.isGrocery) {
+          const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
+          // Ordinary swipes advance exactly one product. Only unusually fast,
+          // long flicks are allowed to cross three or four product stages.
+          const steps =
+            speed > 3.7 && Math.abs(dy) > 245
+              ? 4
+              : speed > 2.9 && Math.abs(dy) > 195
+                ? 3
+                : 1;
+          advance(dy < 0 ? 1 : -1, steps);
         } else {
           advance(dy < 0 ? 1 : -1);
         }
@@ -370,7 +400,7 @@ export default function LandingPage() {
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchCancel);
-      stopExploreScroll();
+      stopGuidedScroll();
     };
   }, []);
 
@@ -720,10 +750,10 @@ export default function LandingPage() {
               to { transform: translate3d(0, 0, 0); }
             }
             .epantry-mobile-gallery-left {
-              animation: epantry-mobile-gallery-left 22s linear infinite;
+              animation: epantry-mobile-gallery-left 9.8s linear infinite;
             }
             .epantry-mobile-gallery-right {
-              animation: epantry-mobile-gallery-right 25s linear infinite;
+              animation: epantry-mobile-gallery-right 11.2s linear infinite;
             }
             @media (prefers-reduced-motion: reduce) {
               .epantry-mobile-gallery-left, .epantry-mobile-gallery-right { animation: none; }
@@ -786,7 +816,9 @@ export default function LandingPage() {
                 rotateX: backdropDepthRotateX,
                 transformOrigin: "50% 50%",
               }}
-              className="absolute -inset-x-[8%] -inset-y-[14%] [transform-style:flat] sm:[transform-style:preserve-3d] sm:[will-change:transform]"
+              className={isSmallViewport
+                ? "absolute -inset-x-[8%] inset-y-0 [transform-style:flat]"
+                : "absolute -inset-x-[8%] -inset-y-[14%] [transform-style:flat] sm:[transform-style:preserve-3d] sm:[will-change:transform]"}
             >
               {EXPERIENCE_BACKDROP_ROWS.map((row, rowIndex) => (
                 <ExperienceBackdropRow
@@ -1070,7 +1102,8 @@ function ExperienceBackdropRow({
     <div
       className="absolute left-0 right-0 overflow-visible [transform-style:flat] sm:[transform-style:preserve-3d]"
       style={{
-        top: row.top,
+        // On phones, space all three image rows inside the visible screen.
+        top: lowPower ? ["9%", "40%", "71%"][rowIndex] : row.top,
         opacity: row.opacity,
       }}
     >
