@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -2221,6 +2222,8 @@ function FeaturedRecipesScrollStory({
         const image = new window.Image()
         image.decoding = 'async'
         image.src = src
+        // Decode before a card becomes active, not during its entry animation.
+        if (typeof image.decode === 'function') image.decode().catch(() => {})
         preloaded.push(image)
       })
     }
@@ -2230,7 +2233,7 @@ function FeaturedRecipesScrollStory({
         warmRecipeCovers()
         observer.disconnect()
       }
-    }, { threshold: 0 })
+    }, { threshold: 0, rootMargin: '120% 0px 120% 0px' })
     observer.observe(section)
     return () => observer.disconnect()
   }, [recipes, isSmallScreen])
@@ -2310,7 +2313,7 @@ function FeaturedRecipesScrollStory({
           },
           shouldReduceMotion
             ? 0
-            : 580,
+            : 490,
         )
 
       const closeTimer =
@@ -2542,27 +2545,43 @@ function FeaturedRecipesScrollStory({
 
             {isSmallScreen ? (
               <div className="absolute inset-0 flex items-center justify-center">
-                <AnimatePresence mode="sync" initial={false}>
-                  <motion.div
-                    key={activeItemKey}
-                    initial={shouldReduceMotion ? false : { opacity: 0, y: 72, scale: 0.94 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={shouldReduceMotion ? undefined : { opacity: 0, y: -20, scale: 0.985, transition: { duration: 0.16 } }}
-                    transition={{ duration: shouldReduceMotion ? 0 : 0.48, ease: [0.22, 1, 0.36, 1] }}
-                    className="relative flex items-center justify-center"
-                    style={{ willChange: shouldReduceMotion ? 'auto' : 'transform, opacity', backfaceVisibility: 'hidden' }}
-                  >
-                    {activeItem?.type === 'view-all' ? (
-                      <RecipeStoryViewAllCard recipes={worldRecipes} />
-                    ) : activeItem?.recipe ? (
-                      <RecipeStoryBookCard
-                        recipe={activeItem.recipe}
-                        mobileOpen={mobileOpenKey === activeItem.key}
-                        shouldReduceMotion={shouldReduceMotion}
-                      />
-                    ) : null}
-                  </motion.div>
-                </AnimatePresence>
+                {/* Keep the recipe books mounted: swapping an entire image-heavy
+                    book during a swipe caused main-thread image/layout jank. */}
+                {cameraItems.map((item, stageIndex) => {
+                  const isActive = stageIndex === activeSequenceIndex
+                  const isVisible = isActive && storyProgress >= 0.8 && storyProgress < 6
+                  const travelY = isVisible ? 0 : stageIndex < activeSequenceIndex ? -24 : 72
+                  return (
+                    <div
+                      key={item.key}
+                      aria-hidden={!isVisible}
+                      inert={!isVisible}
+                      className="absolute inset-0 flex items-center justify-center"
+                      style={{
+                        opacity: isVisible ? 1 : 0,
+                        transform: `translate3d(0, ${travelY}px, 0)`,
+                        transition: shouldReduceMotion
+                          ? 'none'
+                          : 'transform 490ms cubic-bezier(0.22, 1, 0.36, 1), opacity 370ms ease-out',
+                        pointerEvents: isVisible ? 'auto' : 'none',
+                        backfaceVisibility: 'hidden',
+                        willChange: !shouldReduceMotion && Math.abs(stageIndex - activeSequenceIndex) <= 1
+                          ? 'transform, opacity'
+                          : 'auto',
+                      }}
+                    >
+                      {item.type === 'view-all' ? (
+                        <RecipeStoryViewAllCard recipes={worldRecipes} />
+                      ) : item.recipe ? (
+                        <MemoRecipeStoryBookCard
+                          recipe={item.recipe}
+                          mobileOpen={mobileOpenKey === item.key}
+                          shouldReduceMotion={shouldReduceMotion}
+                        />
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             ) : (
             <div className="absolute inset-0 overflow-hidden [perspective:1700px]">
@@ -2867,9 +2886,9 @@ function RecipeStoryBookCard({
       }
       style={{
         perspective:
-          '1900px',
+          mobileLightMotion ? 'none' : '1900px',
         WebkitPerspective:
-          '1900px',
+          mobileLightMotion ? 'none' : '1900px',
         perspectiveOrigin:
           'left center',
         WebkitPerspectiveOrigin:
@@ -3007,7 +3026,7 @@ function RecipeStoryBookCard({
           transition: shouldReduceMotion
             ? 'none'
             : mobileLightMotion
-              ? 'opacity 430ms cubic-bezier(0.22,1,0.36,1)'
+              ? 'opacity 370ms cubic-bezier(0.22,1,0.36,1)'
               : 'transform 920ms cubic-bezier(0.20,0.84,0.22,1)',
           willChange: mobileLightMotion ? 'opacity' : 'transform',
         }}
@@ -3021,7 +3040,7 @@ function RecipeStoryBookCard({
               recipe.name ||
               'Recipe'
             }
-            loading={mobileLightMotion ? 'eager' : 'lazy'}
+            loading="lazy"
             decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
@@ -3053,6 +3072,8 @@ function RecipeStoryBookCard({
     </div>
   )
 }
+
+const MemoRecipeStoryBookCard = memo(RecipeStoryBookCard)
 
 function RecipeStoryViewAllCard({
   recipes,
