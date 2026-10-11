@@ -691,6 +691,35 @@ function FeaturedGroceryScrollStory({
     setDirection,
   ] = useState(1)
 
+  const mobileVisualZoneRef = useRef(null)
+  const [hasMobileCardEntered, setHasMobileCardEntered] = useState(false)
+
+  // Let the first mobile product card visibly rise into the screen when
+  // Grocery is reached; the section may have mounted several screens earlier.
+  // Observe only this stable visual zone, once, without running on scroll.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) {
+      return undefined
+    }
+
+    const visualZone = mobileVisualZoneRef.current
+    if (!visualZone) return undefined
+    if (typeof IntersectionObserver === 'undefined') {
+      setHasMobileCardEntered(true)
+      return undefined
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setHasMobileCardEntered(true)
+        observer.disconnect()
+      }
+    }, { threshold: 0.25 })
+
+    observer.observe(visualZone)
+    return () => observer.disconnect()
+  }, [productItems.length])
+
   // Prefetch just the next product on mobile, after the current scene lands.
   // Desktop never starts this extra work.
   useEffect(() => {
@@ -856,6 +885,7 @@ function FeaturedGroceryScrollStory({
 
   const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
   const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.27 : 0.58
+  const mobileCardReady = shouldReduceMotion || !isSmallScreen || hasMobileCardEntered
 
   /*
    * Keep one viewport for the sticky surface, with a consistent 70svh
@@ -1056,7 +1086,7 @@ function FeaturedGroceryScrollStory({
             </div>
 
             {/* Centre: active visual remains crisp while the scene scrolls. */}
-            <div className="relative flex min-h-0 flex-col items-center justify-center lg:h-full lg:py-[8svh]">
+            <div ref={mobileVisualZoneRef} className="relative flex min-h-0 flex-col items-center justify-center lg:h-full lg:py-[8svh]">
 
               {previousProduct?.image && (
                 <motion.div
@@ -1092,24 +1122,31 @@ function FeaturedGroceryScrollStory({
                     shouldReduceMotion
                       ? false
                       : {
-                          opacity: isSmallScreen ? 0.65 : 0,
+                          opacity: 0,
                           y:
                             direction > 0
-                              ? (isSmallScreen ? 7 : 110)
-                              : (isSmallScreen ? -7 : -110),
-                          scale: isSmallScreen ? 1 : 0.88,
+                              ? (isSmallScreen ? 76 : 110)
+                              : (isSmallScreen ? -76 : -110),
+                          scale: isSmallScreen ? 0.94 : 0.88,
                           rotate:
                             direction > 0
                               ? (isSmallScreen ? 0 : 1.8)
                               : (isSmallScreen ? 0 : -1.8),
                         }
                   }
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                    scale: 1,
-                    rotate: 0,
-                  }}
+                  animate={mobileCardReady
+                    ? {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        rotate: 0,
+                      }
+                    : {
+                        opacity: 0,
+                        y: direction > 0 ? 76 : -76,
+                        scale: 0.94,
+                        rotate: 0,
+                      }}
                   exit={
                     shouldReduceMotion || isSmallScreen
                       ? undefined
@@ -1128,9 +1165,7 @@ function FeaturedGroceryScrollStory({
                         }
                   }
                   transition={{
-                    duration:
-                      motionDuration,
-
+                    duration: shouldReduceMotion ? 0 : isSmallScreen ? 0.52 : motionDuration,
                     ease: [
                       0.2,
                       0.86,
