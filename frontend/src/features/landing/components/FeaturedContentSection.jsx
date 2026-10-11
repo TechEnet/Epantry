@@ -701,7 +701,7 @@ function FeaturedGroceryScrollStory({
       const image = new window.Image()
       image.decoding = 'async'
       image.src = nextImage
-    }, 240)
+    }, 80)
     return () => window.clearTimeout(timer)
   }, [activeIndex, items[activeIndex + 1]?.image])
 
@@ -855,7 +855,7 @@ function FeaturedGroceryScrollStory({
         )
 
   const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.62 : 0.58
+  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.4 : 0.58
 
   /*
    * Keep one viewport for the sticky surface, with a consistent 70svh
@@ -876,7 +876,7 @@ function FeaturedGroceryScrollStory({
       style={{
         height: storyHeight,
         background: isSmallScreen
-          ? `radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`
+          ? `radial-gradient(circle at 50% 48%, rgba(255,255,255,0.08), transparent 54%), linear-gradient(110deg, rgba(8,12,9,0.50) 0%, rgba(8,12,9,0.20) 44%, rgba(8,12,9,0.28) 66%, rgba(8,12,9,0.58) 100%), radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`
           : undefined,
       }}
     >
@@ -910,16 +910,16 @@ function FeaturedGroceryScrollStory({
           initial={false}
         >
           <motion.div
-            key={isSmallScreen ? "grocery-mobile-background" : `grocery-background-${productKey}`}
+            key={`grocery-background-${productKey}`}
             aria-hidden="true"
-            initial={isSmallScreen ? false : { opacity: 0 }}
+            initial={isSmallScreen && shouldReduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={isSmallScreen ? undefined : { opacity: 0 }}
+            exit={isSmallScreen && shouldReduceMotion ? undefined : { opacity: 0 }}
             transition={{
               duration:
                 shouldReduceMotion
                   ? 0
-                  : 0.6,
+                  : isSmallScreen ? 0.4 : 0.6,
 
               ease: [
                 0.22,
@@ -987,10 +987,7 @@ function FeaturedGroceryScrollStory({
                       ? false
                       : {
                           opacity: 0,
-                          y:
-                            direction > 0
-                              ? 26
-                              : -26,
+                          y: isSmallScreen ? (direction > 0 ? 12 : -12) : direction > 0 ? 26 : -26,
                         }
                   }
                   animate={{
@@ -998,7 +995,7 @@ function FeaturedGroceryScrollStory({
                     y: 0,
                   }}
                   exit={
-                    shouldReduceMotion
+                    shouldReduceMotion || isSmallScreen
                       ? undefined
                       : {
                           opacity: 0,
@@ -1006,7 +1003,6 @@ function FeaturedGroceryScrollStory({
                             direction > 0
                               ? -18
                               : 18,
-                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
                         }
                   }
                   transition={{
@@ -1094,8 +1090,8 @@ function FeaturedGroceryScrollStory({
                           opacity: 0,
                           y:
                             direction > 0
-                              ? (isSmallScreen ? 12 : 110)
-                              : (isSmallScreen ? -12 : -110),
+                              ? (isSmallScreen ? 8 : 110)
+                              : (isSmallScreen ? -8 : -110),
                           scale: isSmallScreen ? 1 : 0.88,
                           rotate:
                             direction > 0
@@ -1110,7 +1106,7 @@ function FeaturedGroceryScrollStory({
                     rotate: 0,
                   }}
                   exit={
-                    shouldReduceMotion
+                    shouldReduceMotion || isSmallScreen
                       ? undefined
                       : {
                           opacity: 0,
@@ -1250,7 +1246,7 @@ function FeaturedGroceryScrollStory({
                     y: 0,
                   }}
                   exit={
-                    shouldReduceMotion
+                    shouldReduceMotion || isSmallScreen
                       ? undefined
                       : {
                           opacity: 0,
@@ -1352,7 +1348,7 @@ function FeaturedGroceryScrollStory({
                     x: 0,
                   }}
                   exit={
-                    shouldReduceMotion
+                    shouldReduceMotion || isSmallScreen
                       ? undefined
                       : {
                           opacity: 0,
