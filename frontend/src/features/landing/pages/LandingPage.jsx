@@ -115,6 +115,65 @@ export default function LandingPage() {
     let touchStart = null;
     let heldStop = null;
     let busyUntil = 0;
+    let exploreScrollFrame = null;
+    let restoreExploreScrollBehavior = null;
+
+    // Explore alone gets a predictable, interruptible mobile scroll transition.
+    // Other landing stories keep their existing navigation untouched.
+    const stopExploreScroll = () => {
+      if (exploreScrollFrame !== null) {
+        window.cancelAnimationFrame(exploreScrollFrame);
+        exploreScrollFrame = null;
+      }
+      if (restoreExploreScrollBehavior) {
+        restoreExploreScrollBehavior();
+        restoreExploreScrollBehavior = null;
+      }
+    };
+
+    const scrollExploreTo = (target, stepCount) => {
+      stopExploreScroll();
+      // The global page CSS sets scroll-behavior: smooth. Override it only
+      // during this gesture, so each individual frame moves immediately on
+      // mobile Safari as well as Chromium without double-easing.
+      const root = document.documentElement;
+      const previousBehavior = root.style.scrollBehavior;
+      root.style.scrollBehavior = "auto";
+      restoreExploreScrollBehavior = () => {
+        root.style.scrollBehavior = previousBehavior;
+      };
+
+      const from = window.scrollY;
+      const distance = target - from;
+      if (
+        Math.abs(distance) < 2 ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
+        window.scrollTo(0, target);
+        restoreExploreScrollBehavior();
+        restoreExploreScrollBehavior = null;
+        return;
+      }
+
+      const duration = Math.min(620, 440 + (stepCount - 1) * 90);
+      let startTime = null;
+      const tick = (time) => {
+        if (startTime === null) startTime = time;
+        const progress = Math.min((time - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        window.scrollTo(0, Math.round(from + distance * eased));
+        if (progress < 1) {
+          exploreScrollFrame = window.requestAnimationFrame(tick);
+        } else {
+          exploreScrollFrame = null;
+          if (restoreExploreScrollBehavior) {
+            restoreExploreScrollBehavior();
+            restoreExploreScrollBehavior = null;
+          }
+        }
+      };
+      exploreScrollFrame = window.requestAnimationFrame(tick);
+    };
 
     const stories = () =>
       Array.from(document.querySelectorAll("[data-landing-story]"))
@@ -159,11 +218,9 @@ export default function LandingPage() {
       return false;
     };
 
-    const advance = (direction) => {
+    const advance = (direction, exploreSteps = 1) => {
       if (!mobileQuery.matches) return;
       const now = performance.now();
-      // Do not queue another automatic jump during an unfinished transition.
-      if (now < busyUntil) return;
       const all = stories();
       const story = all.find(
         (item) =>
@@ -173,6 +230,9 @@ export default function LandingPage() {
       if (!story) return;
 
       const { node, start, travel, stops } = story;
+      const isExplore = node.dataset.landingStory === "explore";
+      // Preserve the previous fixed cooldown for every OTHER section.
+      if (!isExplore && now < busyUntil) return;
       const positions = stops.map((stop) => start + stop * travel);
       const y = window.scrollY;
       const nearest = positions.reduce(
@@ -180,13 +240,23 @@ export default function LandingPage() {
           Math.abs(pos - y) < Math.abs(positions[best] - y) ? index : best,
         0
       );
-      let next = nearest + direction;
-      if (heldStop?.node === node && Math.abs(heldStop.y - y) < 140) {
-        next = heldStop.index + direction;
+      const steps = isExplore ? exploreSteps : 1;
+      let next = nearest + direction * steps;
+      if (
+        heldStop?.node === node &&
+        (Math.abs(heldStop.y - y) < 140 ||
+          (isExplore && exploreScrollFrame !== null))
+      ) {
+        next = heldStop.index + direction * steps;
       } else if (direction > 0 && y < positions[0] - 16) {
-        next = 0;
+        next = isExplore ? Math.min(positions.length - 1, steps) : 0;
       } else if (direction < 0 && y > positions[positions.length - 1] + 16) {
         next = positions.length - 1;
+      }
+      // A strong flick can skip cards, but must not jump into a different
+      // landing section. Only a subsequent gesture may leave Explore.
+      if (isExplore && steps > 1) {
+        next = Math.min(positions.length - 1, Math.max(0, next));
       }
 
       let target;
@@ -210,7 +280,7 @@ export default function LandingPage() {
         heldStop = { node, y: target, index: next };
       }
 
-      busyUntil = now + 760;
+      if (!isExplore) busyUntil = now + 760;
       if (
         node.dataset.landingStory === "recipes" &&
         next >= 0 &&
@@ -225,12 +295,16 @@ export default function LandingPage() {
           })
         );
       }
-      window.scrollTo({
-        top: Math.max(0, Math.round(target)),
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "instant"
-          : "smooth",
-      });
+      if (isExplore) {
+        scrollExploreTo(Math.max(0, Math.round(target)), steps);
+      } else {
+        window.scrollTo({
+          top: Math.max(0, Math.round(target)),
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "instant"
+            : "smooth",
+        });
+      }
     };
 
     const onTouchStart = (event) => {
@@ -242,10 +316,13 @@ export default function LandingPage() {
         touchStart = null;
         return;
       }
-      touchStart = currentStory(window.scrollY)
+      const story = currentStory(window.scrollY);
+      touchStart = story
         ? {
             x: event.touches[0].clientX,
             y: event.touches[0].clientY,
+            startedAt: performance.now(),
+            isExplore: story.node.dataset.landingStory === "explore",
           }
         : null;
     };
@@ -261,9 +338,23 @@ export default function LandingPage() {
       if (!touchStart || !event.changedTouches.length) return;
       const dx = event.changedTouches[0].clientX - touchStart.x;
       const dy = event.changedTouches[0].clientY - touchStart.y;
+      const gesture = touchStart;
       touchStart = null;
       if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) {
-        advance(dy < 0 ? 1 : -1);
+        if (gesture.isExplore) {
+          const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
+          // Ordinary swipes = exactly one stage. Only unusually fast,
+          // long flicks can move two or three stages in this 3-card story.
+          const steps =
+            speed > 3.3 && Math.abs(dy) > 210
+              ? 3
+              : speed > 2.25 && Math.abs(dy) > 155
+                ? 2
+                : 1;
+          advance(dy < 0 ? 1 : -1, steps);
+        } else {
+          advance(dy < 0 ? 1 : -1);
+        }
       }
     };
     const onTouchCancel = () => {
@@ -279,6 +370,7 @@ export default function LandingPage() {
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchCancel);
+      stopExploreScroll();
     };
   }, []);
 
@@ -548,11 +640,11 @@ export default function LandingPage() {
     setMobileRevealExperienceId(null);
     const openId = window.setTimeout(
       () => setMobileRevealExperienceId(item.id),
-      820
+      560
     );
     const closeId = window.setTimeout(
       () => setMobileRevealExperienceId(null),
-      2300
+      1850
     );
     return () => {
       window.clearTimeout(openId);
@@ -620,18 +712,18 @@ export default function LandingPage() {
         <style>{`
           @media (max-width: 767px) {
             @keyframes epantry-mobile-gallery-left {
-              from { transform: translate3d(0,0,0); }
-              to { transform: translate3d(-52px,0,0); }
+              from { transform: translate3d(0, 0, 0); }
+              to { transform: translate3d(-33.333333%, 0, 0); }
             }
             @keyframes epantry-mobile-gallery-right {
-              from { transform: translate3d(-52px,0,0); }
-              to { transform: translate3d(0,0,0); }
+              from { transform: translate3d(-33.333333%, 0, 0); }
+              to { transform: translate3d(0, 0, 0); }
             }
             .epantry-mobile-gallery-left {
-              animation: epantry-mobile-gallery-left 14s ease-in-out infinite alternate;
+              animation: epantry-mobile-gallery-left 22s linear infinite;
             }
             .epantry-mobile-gallery-right {
-              animation: epantry-mobile-gallery-right 17s ease-in-out infinite alternate;
+              animation: epantry-mobile-gallery-right 25s linear infinite;
             }
             @media (prefers-reduced-motion: reduce) {
               .epantry-mobile-gallery-left, .epantry-mobile-gallery-right { animation: none; }
@@ -752,7 +844,7 @@ export default function LandingPage() {
                     shouldReduceMotion
                       ? false
                       : isSmallViewport
-                      ? { opacity: 0, y: 14 }
+                      ? { opacity: 0, y: 36, scale: 0.96 }
                       : {
                           opacity: 0,
                           rotateX: 8,
@@ -762,19 +854,23 @@ export default function LandingPage() {
                           y: "58svh",
                         }
                   }
-                  animate={{
-                    opacity: 1,
-                    rotateX: 0,
-                    rotateY: 0,
-                    rotateZ: 0,
-                    scale: 1,
-                    y: isSmallViewport ? 0 : "0svh",
-                  }}
+                  animate={
+                    isSmallViewport
+                      ? { opacity: 1, y: 0, scale: 1 }
+                      : {
+                          opacity: 1,
+                          rotateX: 0,
+                          rotateY: 0,
+                          rotateZ: 0,
+                          scale: 1,
+                          y: "0svh",
+                        }
+                  }
                   transition={{
                     duration: shouldReduceMotion
                       ? 0
                       : isSmallViewport
-                      ? 0.62
+                      ? 0.44
                       : 0.78,
                     ease: [0.16, 1, 0.3, 1],
                   }}
@@ -821,7 +917,7 @@ export default function LandingPage() {
                                 : 0,
                           }}
                           transition={{
-                            duration: 0.5,
+                            duration: 0.32,
                             ease: [0.22, 1, 0.36, 1],
                           }}
                           className="pointer-events-none absolute inset-0 z-10 flex flex-col overflow-hidden rounded-[30px] bg-[#f3f7ee]/95 p-5"
@@ -963,7 +1059,10 @@ function ExperienceBackdropRow({
   shouldReduceMotion,
   lowPower = false,
 }) {
-  const repeatedGroups = lowPower ? ["copy-a"] : ["copy-a", "copy-b", "copy-c"];
+  // Three short, identical mobile groups keep the full viewport covered
+  // throughout the seamless -33.333% loop, including wider phones.
+  const repeatedGroups = ["copy-a", "copy-b", "copy-c"];
+  const sequence = lowPower ? row.sequence.slice(0, 3) : row.sequence;
 
   const startsLeft = row.direction === "left";
 
@@ -1005,7 +1104,7 @@ function ExperienceBackdropRow({
             key={`${row.id}-${groupId}`}
             className="flex shrink-0 items-center gap-[clamp(46px,7vw,112px)] pr-[clamp(46px,7vw,112px)]"
           >
-            {row.sequence.map((categoryId, itemIndex) => (
+            {sequence.map((categoryId, itemIndex) => (
               <ExperienceBackdropTile
                 key={`${row.id}-${groupId}-${categoryId}-${itemIndex}`}
                 categoryId={categoryId}
@@ -1013,6 +1112,7 @@ function ExperienceBackdropRow({
                 itemIndex={itemIndex}
                 width={row.cardWidth}
                 direction={row.direction}
+                lowPower={lowPower}
               />
             ))}
           </div>
@@ -1028,6 +1128,7 @@ function ExperienceBackdropTile({
   itemIndex,
   width,
   direction,
+  lowPower = false,
 }) {
   const imageSrc = EXPERIENCE_CARD_IMAGES[categoryId];
 
@@ -1049,10 +1150,14 @@ function ExperienceBackdropTile({
       <img
         src={imageSrc}
         alt=""
-        className="h-full w-full object-cover brightness-[0.50] saturate-[0.72] contrast-[1.04]"
+        className={
+          lowPower
+            ? "h-full w-full object-cover"
+            : "h-full w-full object-cover brightness-[0.50] saturate-[0.72] contrast-[1.04]"
+        }
       />
 
-      <div className="absolute inset-0 bg-black/10" />
+      <div className={`absolute inset-0 ${lowPower ? "bg-black/55" : "bg-black/10"}`} />
 
       <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/42 to-transparent" />
     </div>
