@@ -1744,7 +1744,7 @@ function FeaturedRecipesScrollStory({
    * never jump or swap positions.
    */
   const mobileRecipeScale = 5.16
-  const storyHeight = isSmallScreen ? '395svh' : '590svh'
+  const storyHeight = isSmallScreen ? '395dvh' : '590svh'
   const recipeStops = isSmallScreen
     ? [0.02, ...cameraItems.map((_, index) => Math.min(1.02 + index, 4.96) / mobileRecipeScale)].join(',')
     : [0.02, ...cameraItems.map((_, index) => (1.04 + index) / 7), 6.68 / 7].join(',')
@@ -1759,7 +1759,6 @@ function FeaturedRecipesScrollStory({
       let lastRendered = -1
       let settledTimer = null
       let guidedUntil = 0
-      let guidedTimer = null
 
       const resolveProgress = () => {
         const section = sectionRef.current
@@ -1789,8 +1788,8 @@ function FeaturedRecipesScrollStory({
       const scheduleProgress = () => {
         if (isMobile) {
           if (performance.now() < guidedUntil) return
-          // One React render after the native snap settles, not 30-60
-          // heavy 3D gallery re-renders per second during a touch swipe.
+          // Keep scroll feedback lightweight: sync after the browser-native
+          // movement settles instead of re-rendering during every frame.
           if (settledTimer !== null) window.clearTimeout(settledTimer)
           settledTimer = window.setTimeout(() => {
             settledTimer = null
@@ -1805,15 +1804,12 @@ function FeaturedRecipesScrollStory({
         const target = event.detail?.progress
         if (!isMobile || !Number.isFinite(target)) return
         if (settledTimer !== null) window.clearTimeout(settledTimer)
-        if (guidedTimer !== null) window.clearTimeout(guidedTimer)
         settledTimer = null
-        // Hold one target card throughout the swipe. No in-between renders.
-        guidedUntil = performance.now() + 850
-        guidedTimer = window.setTimeout(() => {
-          guidedTimer = null
-          lastRendered = target
-          setStoryProgress(target)
-        }, 175)
+        // Show the incoming card on gesture release, not 175ms later.
+        // Avoid rendering intermediate positions while native scroll settles.
+        guidedUntil = performance.now() + 650
+        lastRendered = target
+        setStoryProgress(target)
       }
 
       // Sync directly on mount, including browser scroll restoration.
@@ -1830,7 +1826,6 @@ function FeaturedRecipesScrollStory({
           animationFrameRef.current = null
         }
         if (settledTimer !== null) window.clearTimeout(settledTimer)
-        if (guidedTimer !== null) window.clearTimeout(guidedTimer)
         window.removeEventListener('scroll', scheduleProgress)
         window.removeEventListener('resize', scheduleProgress)
         window.removeEventListener('pageshow', scheduleProgress)
@@ -2214,6 +2209,32 @@ function FeaturedRecipesScrollStory({
     activeItem?.key ||
     'recipe-story-empty'
 
+  // Only preload in the Recipe section, never while the user is in Grocery.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isSmallScreen) return undefined
+    const section = sectionRef.current
+    if (!section) return undefined
+    const covers = [...new Set(worldRecipes.map((recipe) => recipe?.image).filter(Boolean))]
+    const preloaded = []
+    const warmRecipeCovers = () => {
+      covers.forEach((src) => {
+        const image = new window.Image()
+        image.decoding = 'async'
+        image.src = src
+        preloaded.push(image)
+      })
+    }
+    if (typeof window.IntersectionObserver !== 'function') return undefined
+    const observer = new window.IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        warmRecipeCovers()
+        observer.disconnect()
+      }
+    }, { threshold: 0 })
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [recipes, isSmallScreen])
+
   const nextMobileRecipeImage = cameraItems[activeSequenceIndex + 1]?.recipe?.image
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches || !nextMobileRecipeImage) return undefined
@@ -2289,7 +2310,7 @@ function FeaturedRecipesScrollStory({
           },
           shouldReduceMotion
             ? 0
-            : 960,
+            : 580,
         )
 
       const closeTimer =
@@ -2299,7 +2320,7 @@ function FeaturedRecipesScrollStory({
           },
           shouldReduceMotion
             ? 400
-            : 2550,
+            : 2250,
         )
 
       return () => {
@@ -2344,7 +2365,7 @@ function FeaturedRecipesScrollStory({
       data-landing-story="recipes"
       data-landing-stops={recipeStops}
       data-landing-recipe-scale={isSmallScreen ? mobileRecipeScale : 7}
-      className="relative z-20 isolate bg-black"
+      className="relative z-20 isolate bg-black max-[767px]:bg-[#020202]"
       style={{
         height:
           storyHeight,
@@ -2389,6 +2410,7 @@ function FeaturedRecipesScrollStory({
         }
         className="sticky top-0 h-[100svh] sm:h-[100svh] overflow-hidden bg-[#020202] text-white"
         style={{
+          height: isSmallScreen ? '100dvh' : undefined,
           '--recipe-pointer-x':
             '50%',
           '--recipe-pointer-y':
@@ -2523,11 +2545,12 @@ function FeaturedRecipesScrollStory({
                 <AnimatePresence mode="sync" initial={false}>
                   <motion.div
                     key={activeItemKey}
-                    initial={shouldReduceMotion ? false : { opacity: 0, y: 16, scale: 0.985 }}
+                    initial={shouldReduceMotion ? false : { opacity: 0, y: 72, scale: 0.94 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.995, transition: { duration: 0.18 } }}
-                    transition={{ duration: shouldReduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+                    exit={shouldReduceMotion ? undefined : { opacity: 0, y: -20, scale: 0.985, transition: { duration: 0.16 } }}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.48, ease: [0.22, 1, 0.36, 1] }}
                     className="relative flex items-center justify-center"
+                    style={{ willChange: shouldReduceMotion ? 'auto' : 'transform, opacity', backfaceVisibility: 'hidden' }}
                   >
                     {activeItem?.type === 'view-all' ? (
                       <RecipeStoryViewAllCard recipes={worldRecipes} />
@@ -2984,7 +3007,7 @@ function RecipeStoryBookCard({
           transition: shouldReduceMotion
             ? 'none'
             : mobileLightMotion
-              ? 'opacity 520ms cubic-bezier(0.22,1,0.36,1)'
+              ? 'opacity 430ms cubic-bezier(0.22,1,0.36,1)'
               : 'transform 920ms cubic-bezier(0.20,0.84,0.22,1)',
           willChange: mobileLightMotion ? 'opacity' : 'transform',
         }}
@@ -2998,7 +3021,8 @@ function RecipeStoryBookCard({
               recipe.name ||
               'Recipe'
             }
-            loading="lazy"
+            loading={mobileLightMotion ? 'eager' : 'lazy'}
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (

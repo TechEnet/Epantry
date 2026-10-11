@@ -116,6 +116,7 @@ export default function LandingPage() {
     let heldStop = null;
     let busyUntil = 0;
     let groceryScrollingUntil = 0;
+    let recipeScrollingUntil = 0;
     let guidedScrollFrame = null;
     let restoreGuidedScrollBehavior = null;
 
@@ -245,8 +246,10 @@ export default function LandingPage() {
       const { node, start, travel, stops } = story;
       const isExplore = node.dataset.landingStory === "explore";
       const isGrocery = node.dataset.landingStory === "grocery";
-      const isGuided = isExplore || isGrocery;
-      // Keep existing cooldown for recipes/brands, not Grocery or Explore.
+      const isRecipe = node.dataset.landingStory === "recipes";
+      const isGuided = isExplore || isGrocery || isRecipe;
+      // Keep the original cooldown for Brands; recipe gestures now behave
+      // like the already-approved mobile Grocery navigation.
       if (!isGuided && now < busyUntil) return;
       const positions = stops.map((stop) => start + stop * travel);
       const y = window.scrollY;
@@ -261,7 +264,8 @@ export default function LandingPage() {
         heldStop?.node === node &&
         (Math.abs(heldStop.y - y) < 140 ||
           (isGuided && guidedScrollFrame !== null) ||
-          (isGrocery && now < groceryScrollingUntil))
+          (isGrocery && now < groceryScrollingUntil) ||
+          (isRecipe && now < recipeScrollingUntil))
       ) {
         next = heldStop.index + direction * steps;
       } else if (direction > 0 && y < positions[0] - 16) {
@@ -299,6 +303,7 @@ export default function LandingPage() {
 
       if (!isGuided) busyUntil = now + 760;
       if (isGrocery) groceryScrollingUntil = now + 750;
+      if (isRecipe) recipeScrollingUntil = now + 650;
       if (
         node.dataset.landingStory === "recipes" &&
         next >= 0 &&
@@ -314,7 +319,9 @@ export default function LandingPage() {
         );
       }
       if (isGuided) {
-        scrollGuidedTo(Math.max(0, Math.round(target)), steps, isGrocery);
+        // Recipes use the same browser-native scroll as Grocery; Explore
+        // retains its approved timing/RAF behaviour without modification.
+        scrollGuidedTo(Math.max(0, Math.round(target)), steps, isGrocery || isRecipe);
       } else {
         window.scrollTo({
           top: Math.max(0, Math.round(target)),
@@ -342,6 +349,7 @@ export default function LandingPage() {
             startedAt: performance.now(),
             isExplore: story.node.dataset.landingStory === "explore",
             isGrocery: story.node.dataset.landingStory === "grocery",
+            isRecipe: story.node.dataset.landingStory === "recipes",
           }
         : null;
     };
@@ -375,6 +383,17 @@ export default function LandingPage() {
           const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
           // Ordinary swipes advance exactly one product. Only unusually fast,
           // long flicks are allowed to cross three or four product stages.
+          const steps =
+            speed > 3.7 && Math.abs(dy) > 245
+              ? 4
+              : speed > 2.9 && Math.abs(dy) > 195
+                ? 3
+                : 1;
+          advance(dy < 0 ? 1 : -1, steps);
+        } else if (gesture.isRecipe) {
+          const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
+          // Exactly one recipe per normal swipe. Only exceptionally quick,
+          // long flicks may pass 3-4 stages within the Recipe story.
           const steps =
             speed > 3.7 && Math.abs(dy) > 245
               ? 4
