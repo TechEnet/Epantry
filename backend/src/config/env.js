@@ -38,6 +38,24 @@ for (
 
 /*
 |--------------------------------------------------------------------------
+| Cookie SameSite Config Validation
+|--------------------------------------------------------------------------
+*/
+
+const authCookieSameSite =
+  process.env.AUTH_COOKIE_SAME_SITE?.trim().toLowerCase() ||
+  'lax'
+
+if (!['lax', 'strict', 'none'].includes(authCookieSameSite)) {
+  throw new Error('AUTH_COOKIE_SAME_SITE must be lax, strict or none')
+}
+
+if (authCookieSameSite === 'none' && (process.env.NODE_ENV || 'development') !== 'production') {
+  throw new Error('AUTH_COOKIE_SAME_SITE=none requires NODE_ENV=production for Secure cookies')
+}
+
+/*
+|--------------------------------------------------------------------------
 | Numeric Environment Helper
 |--------------------------------------------------------------------------
 */
@@ -141,6 +159,20 @@ export const env = {
   authCsrfCookieName:
     process.env.AUTH_CSRF_COOKIE_NAME?.trim() ||
     'epantry_csrf',
+
+  /*
+  |--------------------------------------------------------------------------
+  | Production Cookie Site Policy
+  |--------------------------------------------------------------------------
+  |
+  | Same-site frontend/API: keep SameSite=Lax (default).
+  | Cross-site frontend/API: set AUTH_COOKIE_SAME_SITE=none on the backend.
+  | The Secure flag stays mandatory for SameSite=None.
+  |
+  */
+
+  authCookieSameSite:
+    authCookieSameSite,
 
   authSessionDays:
     getPositiveNumber(

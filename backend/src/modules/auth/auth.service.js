@@ -52,7 +52,7 @@ export function getSessionCookieOptions() {
       'production',
 
     sameSite:
-      'lax',
+      env.authCookieSameSite,
 
     path:
       '/',
@@ -97,7 +97,7 @@ export function getCsrfCookieOptions() {
       'production',
 
     sameSite:
-      'lax',
+      env.authCookieSameSite,
 
     path:
       '/api/v1',
