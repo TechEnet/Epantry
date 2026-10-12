@@ -497,7 +497,7 @@ function FeaturedBrandsMotionWall({
 
       <Link
         to="/brands"
-        className="focus-ring group absolute right-4 top-[clamp(88px,14dvh,140px)] z-30 inline-flex items-center gap-2 rounded-full border border-[#DDEBCF]/65 bg-[#DDEBCF] px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-semibold text-[#123F32] transition hover:bg-white sm:bottom-auto sm:right-0 sm:top-[59svh] sm:-translate-y-1/2 sm:rounded-l-[4px] sm:rounded-r-none sm:border-black/15 sm:border-r-0 sm:bg-[#f4f4f2]/92 sm:px-4 sm:py-7 sm:font-medium sm:text-black sm:shadow-none sm:backdrop-blur-sm sm:hover:border-black/35 sm:hover:bg-[#f4f4f2]/92 lg:px-5"
+        className="focus-ring group absolute top-[clamp(82px,13dvh,136px)] right-4 z-30 inline-flex items-center gap-2 rounded-full border border-[#DDEBCF]/65 bg-[#DDEBCF] px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-semibold text-[#123F32] transition hover:bg-white sm:bottom-auto sm:right-0 sm:top-[59svh] sm:-translate-y-1/2 sm:rounded-l-[4px] sm:rounded-r-none sm:border-black/15 sm:border-r-0 sm:bg-[#f4f4f2]/92 sm:px-4 sm:py-7 sm:font-medium sm:text-black sm:shadow-none sm:backdrop-blur-sm sm:hover:border-black/35 sm:hover:bg-[#f4f4f2]/92 lg:px-5"
       >
         <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
           Explore Brands
