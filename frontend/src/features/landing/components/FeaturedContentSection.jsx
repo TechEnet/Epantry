@@ -343,6 +343,40 @@ function FeaturedBrandsMotionWall({
           from { transform: translate3d(-50%, 0, 0); }
           to { transform: translate3d(0, 0, 0); }
         }
+        @media (max-width: 639px) {
+          .epantry-brand-motion-item .epantry-brand-name {
+            color: #6b736e;
+            transition: color 440ms ease, transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+          }
+          .epantry-brand-motion-item .epantry-brand-count {
+            color: #919994;
+            transition: color 440ms ease;
+          }
+          .epantry-brand-motion-item .epantry-brand-name::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: -10px;
+            width: 40px;
+            height: 2px;
+            border-radius: 999px;
+            background: #1f7a55;
+            transform: translateX(-50%) scaleX(0);
+            opacity: 0;
+            transition: transform 440ms cubic-bezier(0.22, 1, 0.36, 1), opacity 440ms ease;
+          }
+          .epantry-brand-motion-item.is-center-brand .epantry-brand-name {
+            color: #0f5132;
+            transform: translate3d(0, -2px, 0) scale(1.09);
+          }
+          .epantry-brand-motion-item.is-center-brand .epantry-brand-name::after {
+            opacity: 1;
+            transform: translateX(-50%) scaleX(1);
+          }
+          .epantry-brand-motion-item.is-center-brand .epantry-brand-count {
+            color: #27714e;
+          }
+        }
       `}</style>
 
       <div className="absolute left-4 right-4 top-[clamp(36px,7dvh,76px)] z-20 sm:left-8 sm:right-8 sm:top-[clamp(88px,10svh,118px)] lg:left-10 lg:right-10">
@@ -478,6 +512,139 @@ function BrandMotionRow({
   shouldReduceMotion,
 }) {
   const [isPaused, setIsPaused] = useState(false)
+  const rowRef = useRef(null)
+
+  useEffect(() => {
+    const row = rowRef.current
+
+    if (!row || typeof window === 'undefined') {
+      return undefined
+    }
+
+    const mobileQuery = window.matchMedia('(max-width: 639px)')
+    const track = row.querySelector('[data-brand-motion-track]')
+    const items = Array.from(row.querySelectorAll('[data-brand-motion-item]'))
+
+    if (!mobileQuery.matches || !track || items.length === 0) {
+      return undefined
+    }
+
+    let positions = []
+    let activeItem = null
+    let intervalId = null
+    let isVisible = false
+
+    // Measure only on activation/resize. The marquee itself moves via CSS transform.
+    const measure = () => {
+      const trackLeft = track.getBoundingClientRect().left
+      positions = items.map((item) => {
+        const bounds = item.getBoundingClientRect()
+        return {
+          item,
+          center: bounds.left - trackLeft + bounds.width / 2,
+        }
+      })
+    }
+
+    const clearFocus = () => {
+      if (activeItem) {
+        activeItem.classList.remove('is-center-brand')
+        activeItem = null
+      }
+    }
+
+    const refreshFocus = () => {
+      if (!isVisible || document.hidden || !mobileQuery.matches) {
+        return
+      }
+
+      const rowBounds = row.getBoundingClientRect()
+      const targetCenter = rowBounds.left + rowBounds.width / 2 - track.getBoundingClientRect().left
+      let nearestItem = null
+      let nearestDistance = Number.POSITIVE_INFINITY
+
+      positions.forEach(({ item, center }) => {
+        const distance = Math.abs(center - targetCenter)
+        if (distance < nearestDistance) {
+          nearestDistance = distance
+          nearestItem = item
+        }
+      })
+
+      // Avoid highlighting an off-screen item while a wide gap crosses the center.
+      if (nearestDistance > rowBounds.width * 0.5) {
+        nearestItem = null
+      }
+
+      if (nearestItem === activeItem) {
+        return
+      }
+
+      clearFocus()
+      if (nearestItem) {
+        nearestItem.classList.add('is-center-brand')
+        activeItem = nearestItem
+      }
+    }
+
+    const stop = () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+        intervalId = null
+      }
+      clearFocus()
+    }
+
+    const start = () => {
+      if (intervalId !== null || !isVisible || document.hidden || !mobileQuery.matches) {
+        return
+      }
+      measure()
+      refreshFocus()
+      // The active brand changes infrequently; updating at 10Hz avoids per-frame layout work.
+      intervalId = window.setInterval(refreshFocus, 100)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stop()
+      } else {
+        start()
+      }
+    }
+
+    const handleResize = () => {
+      if (!mobileQuery.matches) {
+        stop()
+        return
+      }
+      measure()
+      if (isVisible) {
+        start()
+        refreshFocus()
+      }
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = Boolean(entry?.isIntersecting)
+      if (isVisible) {
+        start()
+      } else {
+        stop()
+      }
+    }, { threshold: 0.05 })
+
+    observer.observe(row)
+    window.addEventListener('resize', handleResize, { passive: true })
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', handleResize)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      stop()
+    }
+  }, [brands])
 
   const group = (
     <div className="flex shrink-0 items-center gap-[clamp(24px,4vw,74px)] pr-[clamp(24px,4vw,74px)]">
@@ -498,9 +665,11 @@ function BrandMotionRow({
   )
 
   return (
-    <div className="w-full overflow-hidden">
+    <div ref={rowRef} className="relative w-full overflow-hidden sm:static">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-[min(58vw,230px)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(221,243,231,0.78),rgba(221,243,231,0)_72%)] sm:hidden" />
       <div
-        className="flex w-max items-center will-change-transform"
+        data-brand-motion-track
+        className="relative z-10 flex w-max items-center will-change-transform sm:static sm:z-auto"
         style={{
           animation: shouldReduceMotion
             ? 'none'
@@ -540,7 +709,8 @@ function BrandMotionItem({
       to={getFeaturedBrandPath(
         brand,
       )}
-      className="focus-ring group relative flex h-[112px] w-[clamp(190px,18vw,330px)] shrink-0 items-center justify-center px-5 sm:h-[132px] lg:h-[148px]"
+      className="epantry-brand-motion-item focus-ring group relative flex h-[112px] w-[clamp(190px,18vw,330px)] shrink-0 items-center justify-center px-5 sm:h-[132px] lg:h-[148px]"
+      data-brand-motion-item
       aria-label={`Explore ${displayName}`}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
@@ -551,14 +721,14 @@ function BrandMotionItem({
       <span className="flex max-w-full flex-col items-center text-center">
         <span
           className={[
-            '[font-family:Arial,Helvetica,sans-serif] text-[clamp(18px,1.65vw,31px)] leading-[0.96] tracking-[-0.045em] text-black transition-[color,transform] duration-300 ease-out group-hover:scale-[1.025] group-hover:text-[#B4232B]',
+            'epantry-brand-name relative [font-family:Arial,Helvetica,sans-serif] text-[clamp(18px,1.65vw,31px)] leading-[0.96] tracking-[-0.045em] text-black transition-[color,transform] duration-300 ease-out group-hover:scale-[1.025] group-hover:text-[#B4232B]',
             weightClass,
           ].join(' ')}
         >
           {displayName}
         </span>
 
-        <span className="mt-2 [font-family:Arial,Helvetica,sans-serif] text-[9px] font-normal tracking-[0.04em] text-black/38 transition-colors duration-300 group-hover:text-black/62 sm:text-[10px]">
+        <span className="epantry-brand-count mt-2 [font-family:Arial,Helvetica,sans-serif] text-[9px] font-normal tracking-[0.04em] text-black/38 transition-colors duration-300 group-hover:text-black/62 sm:text-[10px]">
           {formatBrandProductCount(
             brand?.productCount,
           )}
