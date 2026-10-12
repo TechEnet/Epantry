@@ -956,48 +956,92 @@ function WhyBenefitScene({
 }
 
 
-// Mobile stages animate once on entry. Desktop retains the original
-// scroll-driven layered scenes and every existing measurement.
+// Mobile How scenes stay mounted to avoid expensive image/card remounts.
+// Keep the departing card above the arriving card until its slide/fade
+// finishes, so changing steps is visibly smooth rather than abrupt.
+// Desktop scenes and all card content/styles are left unchanged.
 function MobileHowScene({ active, shouldReduceMotion }) {
-  const nextImagePath = active < landingJourneySteps.length ? JOURNEY_IMAGE_BY_ID[landingJourneySteps[active]?.id] : null
+  const scenes = [null, ...landingJourneySteps]
+  const previousActiveRef = useRef(active)
+  const leavingIndex = previousActiveRef.current === active
+    ? -1
+    : previousActiveRef.current
+
   useEffect(() => {
-    if (!nextImagePath || typeof window === 'undefined') return undefined
-    const timer = window.setTimeout(() => {
-      const image = new window.Image()
-      image.decoding = 'async'
-      image.src = nextImagePath
-    }, 240)
-    return () => window.clearTimeout(timer)
-  }, [nextImagePath])
-  const item = active > 0 ? landingJourneySteps[active - 1] : null
-  const imagePath = item ? JOURNEY_IMAGE_BY_ID[item.id] : INTRO_IMAGE
+    previousActiveRef.current = active
+  }, [active])
+
   return (
     <div className="absolute inset-x-0 bottom-[6svh] top-[23svh] z-20 flex items-center justify-center px-5">
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={item?.id || 'journey-intro'}
-          initial={shouldReduceMotion ? false : { opacity: 0, y: 22, scale: 0.975 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.16 } }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.62, ease: [0.22, 1, 0.36, 1] }}
-          className="flex w-full max-w-[540px] flex-col items-center justify-center gap-5 text-center"
-        >
-          <div className="relative h-[min(42svh,390px)] w-full overflow-hidden rounded-[24px] border border-white/25 bg-[#F0E6D4] shadow-[0_24px_50px_rgba(57,12,24,0.22)]">
-            <img src={imagePath} alt="" aria-hidden="true" decoding="async" className="h-full w-full object-cover object-center" />
-          </div>
-          {item ? (
-            <div className="w-full">
-              <div className="text-xs font-bold uppercase tracking-[0.2em] text-[#F7EACB]/85">Step {item.step}</div>
-              <h3 className="mt-2 text-[clamp(32px,8vw,44px)] font-bold leading-[1.02] tracking-[-0.045em] text-[#F7EACB]">{item.title}</h3>
-            </div>
-          ) : (
-            <div className="max-w-[290px]">
-              <p className="font-serif text-[28px] italic text-[#F7EACB]">One food journey.</p>
-              <p className="mt-1 text-xl font-semibold uppercase leading-tight tracking-[-0.04em] text-[#F7EACB]">Everything stays connected.</p>
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+      <div className="relative h-full w-full max-w-[540px]">
+        {scenes.map((item, index) => {
+          const isActive = index === active
+          const isLeaving = index === leavingIndex
+          const imagePath = item ? JOURNEY_IMAGE_BY_ID[item.id] : INTRO_IMAGE
+
+          return (
+            <motion.div
+              key={item?.id || 'journey-intro'}
+              aria-hidden={!isActive}
+              initial={false}
+              animate={shouldReduceMotion
+                ? { opacity: isActive ? 1 : 0, y: 0, scale: 1 }
+                : {
+                    opacity: isActive ? 1 : 0,
+                    y: isActive ? 0 : index < active ? -34 : 30,
+                    scale: isActive ? 1 : 0.975,
+                  }}
+              transition={shouldReduceMotion
+                ? { duration: 0 }
+                : {
+                    opacity: {
+                      duration: isActive || isLeaving ? 0.58 : 0.22,
+                      ease: 'easeInOut',
+                      delay: isActive ? 0.06 : 0,
+                    },
+                    y: {
+                      duration: isActive || isLeaving ? 0.6 : 0.22,
+                      ease: [0.22, 1, 0.36, 1],
+                      delay: isActive ? 0.06 : 0,
+                    },
+                    scale: {
+                      duration: isActive || isLeaving ? 0.6 : 0.22,
+                      ease: [0.22, 1, 0.36, 1],
+                      delay: isActive ? 0.06 : 0,
+                    },
+                  }}
+              style={{
+                zIndex: isLeaving ? 2 : isActive ? 1 : 0,
+                pointerEvents: isActive ? 'auto' : 'none',
+                willChange: isActive || isLeaving ? 'transform, opacity' : 'auto',
+              }}
+              className="absolute inset-0 flex w-full flex-col items-center justify-center gap-5 text-center"
+            >
+              <div className="relative h-[min(42svh,390px)] w-full overflow-hidden rounded-[24px] border border-white/25 bg-[#F0E6D4] shadow-[0_24px_50px_rgba(57,12,24,0.22)]">
+                <img
+                  src={imagePath}
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  loading={index === 0 ? 'eager' : 'lazy'}
+                  className="h-full w-full object-cover object-center"
+                />
+              </div>
+              {item ? (
+                <div className="w-full">
+                  <div className="text-xs font-bold uppercase tracking-[0.2em] text-[#F7EACB]/85">Step {item.step}</div>
+                  <h3 className="mt-2 text-[clamp(32px,8vw,44px)] font-bold leading-[1.02] tracking-[-0.045em] text-[#F7EACB]">{item.title}</h3>
+                </div>
+              ) : (
+                <div className="max-w-[290px]">
+                  <p className="font-serif text-[28px] italic text-[#F7EACB]">One food journey.</p>
+                  <p className="mt-1 text-xl font-semibold uppercase leading-tight tracking-[-0.04em] text-[#F7EACB]">Everything stays connected.</p>
+                </div>
+              )}
+            </motion.div>
+          )
+        })}
+      </div>
     </div>
   )
 }
