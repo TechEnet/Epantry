@@ -285,9 +285,9 @@ function FeaturedBrandsMotionWall({
 
   if (sourceBrands.length === 0) {
     return (
-      <section data-landing-story="brands" data-landing-stops="0" data-landing-static="true" className="flex h-[100svh] min-h-[100svh] items-center bg-[#f4f4f2] px-5 text-black sm:px-8">
+      <section data-landing-story="brands" data-landing-stops="0" data-landing-static="true" className="flex h-[100dvh] min-h-[100dvh] items-center bg-[#f4f4f2] px-5 text-black sm:h-[100svh] sm:min-h-[100svh] sm:px-8">
         <div className="mx-auto w-full max-w-7xl">
-          <h2 className="mt-4 text-[clamp(48px,7vw,104px)] font-normal leading-[0.92] tracking-[-0.055em]">
+          <h2 className="mt-4 whitespace-nowrap text-[clamp(21px,6vw,30px)] font-normal leading-[0.92] tracking-[-0.055em] sm:whitespace-normal sm:text-[clamp(48px,7vw,104px)]">
             Featured Brands
           </h2>
           <div className="mt-12">
@@ -319,12 +319,17 @@ function FeaturedBrandsMotionWall({
     ),
   ]
 
+  const thirdRowBrands = [
+    ...sourceBrands.slice(1),
+    ...sourceBrands.slice(0, 1),
+  ]
+
   return (
     <section
       data-landing-story="brands"
       data-landing-stops="0"
       data-landing-static="true"
-      className="relative h-[100svh] min-h-[100svh] overflow-hidden bg-[#f4f4f2] text-[#111111]"
+      className="relative h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#f4f4f2] text-[#111111] sm:h-[100svh] sm:min-h-[100svh]"
       aria-labelledby="featured-brands-title"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_48%_46%,rgba(255,255,255,0.9),rgba(244,244,242,0)_58%)]" />
@@ -340,15 +345,45 @@ function FeaturedBrandsMotionWall({
         }
       `}</style>
 
-      <div className="absolute left-5 right-5 top-[clamp(88px,10svh,118px)] z-20 sm:left-8 sm:right-8 lg:left-10 lg:right-10">
-        <div className="max-w-[min(76rem,calc(100vw-8rem))]">
+      <div className="absolute left-4 right-4 top-[clamp(36px,7dvh,76px)] z-20 sm:left-8 sm:right-8 sm:top-[clamp(88px,10svh,118px)] lg:left-10 lg:right-10">
+        <div className="flex w-full items-center justify-between gap-2 sm:block sm:max-w-[min(76rem,calc(100vw-8rem))]">
 
           <h2
             id="featured-brands-title"
-            className="mt-3 [font-family:Arial,Helvetica,sans-serif] text-[clamp(46px,6.2vw,104px)] font-normal leading-[0.88] tracking-[-0.06em] text-black"
+            className="min-w-0 shrink-0 whitespace-nowrap [font-family:Arial,Helvetica,sans-serif] text-[clamp(20px,6vw,29px)] font-normal leading-[1] tracking-[-0.06em] text-black sm:mt-3 sm:whitespace-normal sm:text-[clamp(46px,6.2vw,104px)] sm:leading-[0.88]"
           >
             Featured Brands
           </h2>
+
+          <div className="flex min-w-0 max-w-[48vw] items-center justify-end gap-1 overflow-x-auto [scrollbar-width:none] sm:hidden">
+            <button
+              type="button"
+              onClick={() => onSelectBrandFilter('all')}
+              className={[
+                'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
+                selectedBrandFilter === 'all'
+                  ? 'bg-black text-white'
+                  : 'bg-black/5 text-black/55',
+              ].join(' ')}
+            >
+              All
+            </button>
+            {brandFilterGroups.slice(0, 2).map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => onSelectBrandFilter(group.id)}
+                className={[
+                  'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
+                  selectedBrandFilter === group.id
+                    ? 'bg-black text-white'
+                    : 'bg-black/5 text-black/55',
+                ].join(' ')}
+              >
+                {group.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -395,7 +430,7 @@ function FeaturedBrandsMotionWall({
         )}
       </div>
 
-      <div className="absolute inset-x-0 top-[34svh] z-10 sm:top-[35svh] lg:top-[34svh]">
+      <div className="absolute inset-x-0 top-[28dvh] z-10 sm:top-[35svh] lg:top-[34svh]">
         <BrandMotionRow
           brands={sourceBrands}
           direction="left"
@@ -404,7 +439,7 @@ function FeaturedBrandsMotionWall({
         />
       </div>
 
-      <div className="absolute inset-x-0 top-[66svh] z-10 sm:top-[67svh] lg:top-[68svh]">
+      <div className="absolute inset-x-0 top-[50dvh] z-10 sm:top-[67svh] lg:top-[68svh]">
         <BrandMotionRow
           brands={rotatedBrands}
           direction="right"
@@ -413,9 +448,18 @@ function FeaturedBrandsMotionWall({
         />
       </div>
 
+      <div className="absolute inset-x-0 top-[72dvh] z-10 sm:hidden">
+        <BrandMotionRow
+          brands={thirdRowBrands}
+          direction="left"
+          duration={26}
+          shouldReduceMotion={shouldReduceMotion}
+        />
+      </div>
+
       <Link
         to="/brands"
-        className="focus-ring group absolute right-3 top-[35svh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
+        className="focus-ring group absolute right-4 top-[19dvh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
       >
         <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
           Explore Brands
@@ -423,47 +467,6 @@ function FeaturedBrandsMotionWall({
         <ArrowRight className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5 sm:hidden" />
       </Link>
 
-      <div className="absolute bottom-5 left-5 z-20 flex gap-1.5 sm:hidden">
-        <button
-          type="button"
-          onClick={() =>
-            onSelectBrandFilter(
-              'all',
-            )
-          }
-          className={[
-            'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[10px]',
-            selectedBrandFilter ===
-            'all'
-              ? 'bg-black text-white'
-              : 'bg-black/5 text-black/55',
-          ].join(' ')}
-        >
-          All
-        </button>
-        {brandFilterGroups
-          .slice(0, 2)
-          .map((group) => (
-            <button
-              key={group.id}
-              type="button"
-              onClick={() =>
-                onSelectBrandFilter(
-                  group.id,
-                )
-              }
-              className={[
-                'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[10px]',
-                selectedBrandFilter ===
-                group.id
-                  ? 'bg-black text-white'
-                  : 'bg-black/5 text-black/55',
-              ].join(' ')}
-            >
-              {group.label}
-            </button>
-          ))}
-      </div>
     </section>
   )
 }
