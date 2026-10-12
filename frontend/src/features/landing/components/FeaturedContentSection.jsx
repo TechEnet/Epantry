@@ -329,10 +329,22 @@ function FeaturedBrandsMotionWall({
       data-landing-story="brands"
       data-landing-stops="0"
       data-landing-static="true"
-      className="relative h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#f4f4f2] text-[#111111] sm:h-[100svh] sm:min-h-[100svh]"
+      className="relative h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#F2F5F0] text-[#111111] sm:h-[100svh] sm:min-h-[100svh] sm:bg-[#f4f4f2]"
       aria-labelledby="featured-brands-title"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_48%_46%,rgba(255,255,255,0.9),rgba(244,244,242,0)_58%)]" />
+      <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_48%_46%,rgba(255,255,255,0.9),rgba(244,244,242,0)_58%)] sm:block" />
+
+      {/* One editorial focus window (not another row of cards). Moving brand
+          names pass over this stationary deep-green surface on mobile. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-[12dvh] left-1/2 top-[23dvh] z-0 w-[min(55vw,228px)] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/15 bg-[linear-gradient(155deg,#176247_0%,#104833_42%,#082D25_100%)] shadow-[0_18px_54px_rgba(16,72,51,0.20)] sm:hidden"
+      >
+        <div className="absolute inset-x-0 top-0 h-[28%] bg-[radial-gradient(ellipse_at_top,rgba(164,244,199,0.24),transparent_72%)]" />
+        <div className="absolute inset-x-0 top-1/3 h-px bg-white/10" />
+        <div className="absolute inset-x-0 top-2/3 h-px bg-white/10" />
+        <div className="absolute inset-0 rounded-[26px] ring-1 ring-inset ring-white/10" />
+      </div>
 
       <style>{`
         @keyframes epantry-brand-scroll-left {
@@ -345,36 +357,32 @@ function FeaturedBrandsMotionWall({
         }
         @media (max-width: 639px) {
           .epantry-brand-motion-item .epantry-brand-name {
-            color: #6b736e;
-            transition: color 440ms ease, transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+            color: #18392d;
+            font-weight: 600;
+            font-size: clamp(20px, 6.4vw, 26px);
+            letter-spacing: -0.052em;
+            line-height: 1.04;
+            transition: none;
           }
           .epantry-brand-motion-item .epantry-brand-count {
-            color: #919994;
-            transition: color 440ms ease;
+            color: #60766a;
+            font-size: 10px;
           }
-          .epantry-brand-motion-item .epantry-brand-name::after {
-            content: '';
-            position: absolute;
-            left: 50%;
-            bottom: -10px;
-            width: 40px;
-            height: 2px;
-            border-radius: 999px;
-            background: #1f7a55;
-            transform: translateX(-50%) scaleX(0);
-            opacity: 0;
-            transition: transform 440ms cubic-bezier(0.22, 1, 0.36, 1), opacity 440ms ease;
+          .epantry-brand-focus-copy .epantry-brand-name {
+            color: #f8fff9;
+            font-weight: 600;
+            font-size: clamp(20px, 6.4vw, 26px);
+            letter-spacing: -0.052em;
+            line-height: 1.04;
+            text-shadow: 0 1px 12px rgba(210,255,223,0.16);
           }
-          .epantry-brand-motion-item.is-center-brand .epantry-brand-name {
-            color: #0f5132;
-            transform: translate3d(0, -2px, 0) scale(1.09);
+          .epantry-brand-focus-copy .epantry-brand-count {
+            color: rgba(230,255,239,0.72);
+            font-size: 10px;
           }
-          .epantry-brand-motion-item.is-center-brand .epantry-brand-name::after {
-            opacity: 1;
-            transform: translateX(-50%) scaleX(1);
-          }
-          .epantry-brand-motion-item.is-center-brand .epantry-brand-count {
-            color: #27714e;
+          .epantry-brand-focus-overlay {
+            mask-image: linear-gradient(to right, transparent calc(50% - min(29vw, 120px)), #000 calc(50% - min(23vw, 93px)), #000 calc(50% + min(23vw, 93px)), transparent calc(50% + min(29vw, 120px)));
+            -webkit-mask-image: linear-gradient(to right, transparent calc(50% - min(29vw, 120px)), #000 calc(50% - min(23vw, 93px)), #000 calc(50% + min(23vw, 93px)), transparent calc(50% + min(29vw, 120px)));
           }
         }
       `}</style>
@@ -384,7 +392,7 @@ function FeaturedBrandsMotionWall({
 
           <h2
             id="featured-brands-title"
-            className="min-w-0 shrink-0 whitespace-nowrap [font-family:Arial,Helvetica,sans-serif] text-[clamp(20px,6vw,29px)] font-normal leading-[1] tracking-[-0.06em] text-black sm:mt-3 sm:whitespace-normal sm:text-[clamp(46px,6.2vw,104px)] sm:leading-[0.88]"
+            className="min-w-0 shrink-0 whitespace-nowrap [font-family:Arial,Helvetica,sans-serif] text-[clamp(19px,5.5vw,26px)] font-semibold leading-[1] tracking-[-0.065em] text-[#123F30] sm:mt-3 sm:whitespace-normal sm:text-[clamp(46px,6.2vw,104px)] sm:font-normal sm:leading-[0.88] sm:text-black"
           >
             Featured Brands
           </h2>
@@ -396,8 +404,8 @@ function FeaturedBrandsMotionWall({
               className={[
                 'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
                 selectedBrandFilter === 'all'
-                  ? 'bg-black text-white'
-                  : 'bg-black/5 text-black/55',
+                  ? 'bg-[#11553D] text-white sm:bg-black'
+                  : 'bg-[#E0EAE2] text-[#244B3A] sm:bg-black/5 sm:text-black/55',
               ].join(' ')}
             >
               All
@@ -410,8 +418,8 @@ function FeaturedBrandsMotionWall({
                 className={[
                   'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
                   selectedBrandFilter === group.id
-                    ? 'bg-black text-white'
-                    : 'bg-black/5 text-black/55',
+                    ? 'bg-[#11553D] text-white sm:bg-black'
+                    : 'bg-[#E0EAE2] text-[#244B3A] sm:bg-black/5 sm:text-black/55',
                 ].join(' ')}
               >
                 {group.label}
@@ -493,7 +501,7 @@ function FeaturedBrandsMotionWall({
 
       <Link
         to="/brands"
-        className="focus-ring group absolute right-4 top-[19dvh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-black/15 bg-[#f4f4f2]/92 px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-black backdrop-blur-sm transition hover:border-black/35 sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-r-0 sm:px-4 sm:py-7 lg:px-5"
+        className="focus-ring group absolute right-4 top-[19dvh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-[#11553D] bg-[#11553D] px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-white shadow-[0_8px_22px_rgba(15,81,50,0.16)] transition hover:bg-[#0D412F] sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-black/15 sm:border-r-0 sm:bg-[#f4f4f2]/92 sm:px-4 sm:py-7 sm:text-black sm:shadow-none sm:backdrop-blur-sm sm:hover:border-black/35 sm:hover:bg-[#f4f4f2]/92 lg:px-5"
       >
         <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
           Explore Brands
@@ -514,137 +522,9 @@ function BrandMotionRow({
   const [isPaused, setIsPaused] = useState(false)
   const rowRef = useRef(null)
 
-  useEffect(() => {
-    const row = rowRef.current
-
-    if (!row || typeof window === 'undefined') {
-      return undefined
-    }
-
-    const mobileQuery = window.matchMedia('(max-width: 639px)')
-    const track = row.querySelector('[data-brand-motion-track]')
-    const items = Array.from(row.querySelectorAll('[data-brand-motion-item]'))
-
-    if (!mobileQuery.matches || !track || items.length === 0) {
-      return undefined
-    }
-
-    let positions = []
-    let activeItem = null
-    let intervalId = null
-    let isVisible = false
-
-    // Measure only on activation/resize. The marquee itself moves via CSS transform.
-    const measure = () => {
-      const trackLeft = track.getBoundingClientRect().left
-      positions = items.map((item) => {
-        const bounds = item.getBoundingClientRect()
-        return {
-          item,
-          center: bounds.left - trackLeft + bounds.width / 2,
-        }
-      })
-    }
-
-    const clearFocus = () => {
-      if (activeItem) {
-        activeItem.classList.remove('is-center-brand')
-        activeItem = null
-      }
-    }
-
-    const refreshFocus = () => {
-      if (!isVisible || document.hidden || !mobileQuery.matches) {
-        return
-      }
-
-      const rowBounds = row.getBoundingClientRect()
-      const targetCenter = rowBounds.left + rowBounds.width / 2 - track.getBoundingClientRect().left
-      let nearestItem = null
-      let nearestDistance = Number.POSITIVE_INFINITY
-
-      positions.forEach(({ item, center }) => {
-        const distance = Math.abs(center - targetCenter)
-        if (distance < nearestDistance) {
-          nearestDistance = distance
-          nearestItem = item
-        }
-      })
-
-      // Avoid highlighting an off-screen item while a wide gap crosses the center.
-      if (nearestDistance > rowBounds.width * 0.5) {
-        nearestItem = null
-      }
-
-      if (nearestItem === activeItem) {
-        return
-      }
-
-      clearFocus()
-      if (nearestItem) {
-        nearestItem.classList.add('is-center-brand')
-        activeItem = nearestItem
-      }
-    }
-
-    const stop = () => {
-      if (intervalId !== null) {
-        window.clearInterval(intervalId)
-        intervalId = null
-      }
-      clearFocus()
-    }
-
-    const start = () => {
-      if (intervalId !== null || !isVisible || document.hidden || !mobileQuery.matches) {
-        return
-      }
-      measure()
-      refreshFocus()
-      // The active brand changes infrequently; updating at 10Hz avoids per-frame layout work.
-      intervalId = window.setInterval(refreshFocus, 100)
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        stop()
-      } else {
-        start()
-      }
-    }
-
-    const handleResize = () => {
-      if (!mobileQuery.matches) {
-        stop()
-        return
-      }
-      measure()
-      if (isVisible) {
-        start()
-        refreshFocus()
-      }
-    }
-
-    const observer = new IntersectionObserver(([entry]) => {
-      isVisible = Boolean(entry?.isIntersecting)
-      if (isVisible) {
-        start()
-      } else {
-        stop()
-      }
-    }, { threshold: 0.05 })
-
-    observer.observe(row)
-    window.addEventListener('resize', handleResize, { passive: true })
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', handleResize)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      stop()
-    }
-  }, [brands])
+  // The mobile center highlight is a stationary clipped overlay of an
+  // identically timed CSS marquee. It requires no layout reads, timers, or
+  // per-frame React state changes while the user scrolls.
 
   const group = (
     <div className="flex shrink-0 items-center gap-[clamp(24px,4vw,74px)] pr-[clamp(24px,4vw,74px)]">
@@ -664,9 +544,29 @@ function BrandMotionRow({
     </div>
   )
 
+  const mobileFocusGroup = (
+    <div className="flex shrink-0 items-center gap-[clamp(24px,4vw,74px)] pr-[clamp(24px,4vw,74px)]">
+      {brands.map((brand, index) => (
+        <div
+          key={`focus-${direction}-${brand.id || brand.slug || brand.name}-${index}`}
+          className="epantry-brand-focus-copy relative flex h-[112px] w-[clamp(190px,18vw,330px)] shrink-0 items-center justify-center px-5"
+        >
+          <span className="flex max-w-full flex-col items-center text-center">
+            <span className="epantry-brand-name [font-family:Arial,Helvetica,sans-serif]">
+              {String(brand?.name || 'Brand').trim()}
+            </span>
+            <span className="epantry-brand-count mt-2 [font-family:Arial,Helvetica,sans-serif] tracking-[0.04em]">
+              {formatBrandProductCount(brand?.productCount)}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div ref={rowRef} className="relative w-full overflow-hidden sm:static">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-[min(58vw,230px)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(221,243,231,0.78),rgba(221,243,231,0)_72%)] sm:hidden" />
+
       <div
         data-brand-motion-track
         className="relative z-10 flex w-max items-center will-change-transform sm:static sm:z-auto"
@@ -680,6 +580,25 @@ function BrandMotionRow({
         {group}
         <div aria-hidden="true" className="shrink-0">
           {group}
+        </div>
+      </div>
+      {/* The overlay stays fixed over the viewport, while its text track
+          matches the base marquee's travel exactly. */}
+      <div
+        aria-hidden="true"
+        className="epantry-brand-focus-overlay pointer-events-none absolute inset-0 z-20 overflow-hidden sm:hidden"
+      >
+        <div
+          className="flex w-max items-center will-change-transform"
+          style={{
+            animation: shouldReduceMotion
+              ? 'none'
+              : `epantry-brand-scroll-${direction} ${duration}s linear infinite`,
+            animationPlayState: isPaused ? 'paused' : 'running',
+          }}
+        >
+          {mobileFocusGroup}
+          {mobileFocusGroup}
         </div>
       </div>
     </div>
@@ -3061,9 +2980,9 @@ function RecipeStoryBookCard({
       }
       style={{
         perspective:
-          mobileLightMotion ? 'none' : '1900px',
+          mobileLightMotion ? '1180px' : '1900px',
         WebkitPerspective:
-          mobileLightMotion ? 'none' : '1900px',
+          mobileLightMotion ? '1180px' : '1900px',
         perspectiveOrigin:
           'left center',
         WebkitPerspectiveOrigin:
@@ -3192,18 +3111,21 @@ function RecipeStoryBookCard({
         }
         className="absolute inset-0 z-20 overflow-hidden rounded-[14px] border border-white/10 bg-[#190000] shadow-[0_30px_80px_rgba(0,0,0,0.56)] [transform-origin:left_center] [backface-visibility:hidden] sm:rounded-[16px]"
         style={{
-          transform: mobileLightMotion ? 'none' : openTransform,
-          WebkitTransform: mobileLightMotion ? 'none' : openTransform,
-          opacity: mobileLightMotion && coverOpen ? 0 : 1,
-          transformStyle: mobileLightMotion ? 'flat' : 'preserve-3d',
-          WebkitTransformStyle: mobileLightMotion ? 'flat' : 'preserve-3d',
+          // Mobile must open the book on its LEFT hinge like desktop.
+          // The previous mobile opacity fade removed the second animation.
+          transform: openTransform,
+          WebkitTransform: openTransform,
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d',
+          WebkitTransformStyle: 'preserve-3d',
           WebkitTransformOrigin: 'left center',
           transition: shouldReduceMotion
             ? 'none'
             : mobileLightMotion
-              ? 'opacity 370ms cubic-bezier(0.22,1,0.36,1)'
+              ? 'transform 720ms cubic-bezier(0.20,0.84,0.22,1)'
               : 'transform 920ms cubic-bezier(0.20,0.84,0.22,1)',
-          willChange: mobileLightMotion ? 'opacity' : 'transform',
+          willChange: 'transform',
         }}
       >
         {recipe?.image ? (
