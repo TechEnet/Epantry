@@ -329,22 +329,15 @@ function FeaturedBrandsMotionWall({
       data-landing-story="brands"
       data-landing-stops="0"
       data-landing-static="true"
-      className="relative h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#F2F5F0] text-[#111111] sm:h-[100svh] sm:min-h-[100svh] sm:bg-[#f4f4f2]"
+      className="relative h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#0D302B] text-[#F1F5EC] sm:h-[100svh] sm:min-h-[100svh] sm:bg-[#f4f4f2] sm:text-[#111111]"
       aria-labelledby="featured-brands-title"
     >
       <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_48%_46%,rgba(255,255,255,0.9),rgba(244,244,242,0)_58%)] sm:block" />
 
-      {/* One editorial focus window (not another row of cards). Moving brand
-          names pass over this stationary deep-green surface on mobile. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-[12dvh] left-1/2 top-[23dvh] z-0 w-[min(55vw,228px)] -translate-x-1/2 overflow-hidden rounded-[26px] border border-white/15 bg-[linear-gradient(155deg,#176247_0%,#104833_42%,#082D25_100%)] shadow-[0_18px_54px_rgba(16,72,51,0.20)] sm:hidden"
-      >
-        <div className="absolute inset-x-0 top-0 h-[28%] bg-[radial-gradient(ellipse_at_top,rgba(164,244,199,0.24),transparent_72%)]" />
-        <div className="absolute inset-x-0 top-1/3 h-px bg-white/10" />
-        <div className="absolute inset-x-0 top-2/3 h-px bg-white/10" />
-        <div className="absolute inset-0 rounded-[26px] ring-1 ring-inset ring-white/10" />
-      </div>
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,#0D302B_0%,#174D40_54%,#0B2E29_100%)] sm:hidden"
+      />
 
       <style>{`
         @keyframes epantry-brand-scroll-left {
@@ -356,33 +349,35 @@ function FeaturedBrandsMotionWall({
           to { transform: translate3d(0, 0, 0); }
         }
         @media (max-width: 639px) {
+          /* One moving text layer per row: no duplicate overlay, script or repaint loop. */
+          .epantry-brand-rail {
+            -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+          }
           .epantry-brand-motion-item .epantry-brand-name {
-            color: #18392d;
+            color: #F0F5ED;
             font-weight: 600;
-            font-size: clamp(20px, 6.4vw, 26px);
+            font-size: clamp(21px, 6.8vw, 29px);
+            line-height: 1.05;
             letter-spacing: -0.052em;
-            line-height: 1.04;
-            transition: none;
+            transition: color 180ms ease;
           }
           .epantry-brand-motion-item .epantry-brand-count {
-            color: #60766a;
-            font-size: 10px;
+            color: #B9D0C2;
+            font-size: 11px;
+            letter-spacing: 0.015em;
           }
-          .epantry-brand-focus-copy .epantry-brand-name {
-            color: #f8fff9;
-            font-weight: 600;
-            font-size: clamp(20px, 6.4vw, 26px);
-            letter-spacing: -0.052em;
-            line-height: 1.04;
-            text-shadow: 0 1px 12px rgba(210,255,223,0.16);
+          .epantry-brand-rail[data-brand-row-tone="light"] .epantry-brand-name {
+            color: #123F32;
+            font-weight: 700;
           }
-          .epantry-brand-focus-copy .epantry-brand-count {
-            color: rgba(230,255,239,0.72);
-            font-size: 10px;
+          .epantry-brand-rail[data-brand-row-tone="light"] .epantry-brand-count {
+            color: #4C7059;
           }
-          .epantry-brand-focus-overlay {
-            mask-image: linear-gradient(to right, transparent calc(50% - min(29vw, 120px)), #000 calc(50% - min(23vw, 93px)), #000 calc(50% + min(23vw, 93px)), transparent calc(50% + min(29vw, 120px)));
-            -webkit-mask-image: linear-gradient(to right, transparent calc(50% - min(29vw, 120px)), #000 calc(50% - min(23vw, 93px)), #000 calc(50% + min(23vw, 93px)), transparent calc(50% + min(29vw, 120px)));
+          .epantry-brand-motion-item:focus-visible {
+            outline: 2px solid #DDEBCF;
+            outline-offset: -3px;
+            border-radius: 8px;
           }
         }
       `}</style>
@@ -392,7 +387,7 @@ function FeaturedBrandsMotionWall({
 
           <h2
             id="featured-brands-title"
-            className="min-w-0 shrink-0 whitespace-nowrap [font-family:Arial,Helvetica,sans-serif] text-[clamp(19px,5.5vw,26px)] font-semibold leading-[1] tracking-[-0.065em] text-[#123F30] sm:mt-3 sm:whitespace-normal sm:text-[clamp(46px,6.2vw,104px)] sm:font-normal sm:leading-[0.88] sm:text-black"
+            className="min-w-0 shrink-0 whitespace-nowrap [font-family:Arial,Helvetica,sans-serif] text-[clamp(19px,5.5vw,26px)] font-semibold leading-[1] tracking-[-0.065em] text-[#F5F7EF] sm:mt-3 sm:whitespace-normal sm:text-[clamp(46px,6.2vw,104px)] sm:font-normal sm:leading-[0.88] sm:text-black"
           >
             Featured Brands
           </h2>
@@ -404,8 +399,8 @@ function FeaturedBrandsMotionWall({
               className={[
                 'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
                 selectedBrandFilter === 'all'
-                  ? 'bg-[#11553D] text-white sm:bg-black'
-                  : 'bg-[#E0EAE2] text-[#244B3A] sm:bg-black/5 sm:text-black/55',
+                  ? 'bg-[#DDEBCF] text-[#123E31] sm:bg-black sm:text-white'
+                  : 'border border-white/20 bg-white/10 text-[#E6F0E6] sm:border-0 sm:bg-black/5 sm:text-black/55',
               ].join(' ')}
             >
               All
@@ -418,8 +413,8 @@ function FeaturedBrandsMotionWall({
                 className={[
                   'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
                   selectedBrandFilter === group.id
-                    ? 'bg-[#11553D] text-white sm:bg-black'
-                    : 'bg-[#E0EAE2] text-[#244B3A] sm:bg-black/5 sm:text-black/55',
+                    ? 'bg-[#DDEBCF] text-[#123E31] sm:bg-black sm:text-white'
+                    : 'border border-white/20 bg-white/10 text-[#E6F0E6] sm:border-0 sm:bg-black/5 sm:text-black/55',
                 ].join(' ')}
               >
                 {group.label}
@@ -472,7 +467,7 @@ function FeaturedBrandsMotionWall({
         )}
       </div>
 
-      <div className="absolute inset-x-0 top-[28dvh] z-10 sm:top-[35svh] lg:top-[34svh]">
+      <div className="absolute inset-x-0 top-[25dvh] z-10 flex h-[18dvh] min-h-[100px] items-center border-y border-white/15 sm:top-[35svh] sm:block sm:h-auto sm:min-h-0 sm:border-0 lg:top-[34svh]">
         <BrandMotionRow
           brands={sourceBrands}
           direction="left"
@@ -481,16 +476,17 @@ function FeaturedBrandsMotionWall({
         />
       </div>
 
-      <div className="absolute inset-x-0 top-[50dvh] z-10 sm:top-[67svh] lg:top-[68svh]">
+      <div className="absolute inset-x-0 top-[47dvh] z-10 flex h-[19dvh] min-h-[100px] items-center bg-[#DCECCA] sm:top-[67svh] sm:block sm:h-auto sm:min-h-0 sm:bg-transparent lg:top-[68svh]">
         <BrandMotionRow
           brands={rotatedBrands}
           direction="right"
           duration={29}
+          tone="light"
           shouldReduceMotion={shouldReduceMotion}
         />
       </div>
 
-      <div className="absolute inset-x-0 top-[72dvh] z-10 sm:hidden">
+      <div className="absolute inset-x-0 top-[70dvh] z-10 flex h-[18dvh] min-h-[100px] items-center border-y border-white/15 sm:hidden">
         <BrandMotionRow
           brands={thirdRowBrands}
           direction="left"
@@ -501,7 +497,7 @@ function FeaturedBrandsMotionWall({
 
       <Link
         to="/brands"
-        className="focus-ring group absolute right-4 top-[19dvh] z-30 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-[#11553D] bg-[#11553D] px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-medium text-white shadow-[0_8px_22px_rgba(15,81,50,0.16)] transition hover:bg-[#0D412F] sm:right-0 sm:top-[59svh] sm:rounded-l-[4px] sm:rounded-r-none sm:border-black/15 sm:border-r-0 sm:bg-[#f4f4f2]/92 sm:px-4 sm:py-7 sm:text-black sm:shadow-none sm:backdrop-blur-sm sm:hover:border-black/35 sm:hover:bg-[#f4f4f2]/92 lg:px-5"
+        className="focus-ring group absolute right-4 top-[clamp(88px,14dvh,140px)] z-30 inline-flex items-center gap-2 rounded-full border border-[#DDEBCF]/65 bg-[#DDEBCF] px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-semibold text-[#123F32] transition hover:bg-white sm:bottom-auto sm:right-0 sm:top-[59svh] sm:-translate-y-1/2 sm:rounded-l-[4px] sm:rounded-r-none sm:border-black/15 sm:border-r-0 sm:bg-[#f4f4f2]/92 sm:px-4 sm:py-7 sm:font-medium sm:text-black sm:shadow-none sm:backdrop-blur-sm sm:hover:border-black/35 sm:hover:bg-[#f4f4f2]/92 lg:px-5"
       >
         <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
           Explore Brands
@@ -518,55 +514,30 @@ function BrandMotionRow({
   direction,
   duration,
   shouldReduceMotion,
+  tone = 'dark',
 }) {
   const [isPaused, setIsPaused] = useState(false)
   const rowRef = useRef(null)
 
-  // The mobile center highlight is a stationary clipped overlay of an
-  // identically timed CSS marquee. It requires no layout reads, timers, or
-  // per-frame React state changes while the user scrolls.
-
   const group = (
-    <div className="flex shrink-0 items-center gap-[clamp(24px,4vw,74px)] pr-[clamp(24px,4vw,74px)]">
-      {brands.map(
-        (
-          brand,
-          index,
-        ) => (
-          <BrandMotionItem
-            key={`${direction}-${brand.id || brand.slug || brand.name}-${index}`}
-            brand={brand}
-            index={index}
-            onHoverChange={setIsPaused}
-          />
-        ),
-      )}
-    </div>
-  )
-
-  const mobileFocusGroup = (
-    <div className="flex shrink-0 items-center gap-[clamp(24px,4vw,74px)] pr-[clamp(24px,4vw,74px)]">
+    <div className="flex shrink-0 items-center gap-4 pr-4 sm:gap-[clamp(24px,4vw,74px)] sm:pr-[clamp(24px,4vw,74px)]">
       {brands.map((brand, index) => (
-        <div
-          key={`focus-${direction}-${brand.id || brand.slug || brand.name}-${index}`}
-          className="epantry-brand-focus-copy relative flex h-[112px] w-[clamp(190px,18vw,330px)] shrink-0 items-center justify-center px-5"
-        >
-          <span className="flex max-w-full flex-col items-center text-center">
-            <span className="epantry-brand-name [font-family:Arial,Helvetica,sans-serif]">
-              {String(brand?.name || 'Brand').trim()}
-            </span>
-            <span className="epantry-brand-count mt-2 [font-family:Arial,Helvetica,sans-serif] tracking-[0.04em]">
-              {formatBrandProductCount(brand?.productCount)}
-            </span>
-          </span>
-        </div>
+        <BrandMotionItem
+          key={`${direction}-${brand.id || brand.slug || brand.name}-${index}`}
+          brand={brand}
+          index={index}
+          onHoverChange={setIsPaused}
+        />
       ))}
     </div>
   )
 
   return (
-    <div ref={rowRef} className="relative w-full overflow-hidden sm:static">
-
+    <div
+      ref={rowRef}
+      data-brand-row-tone={tone}
+      className="epantry-brand-rail relative w-full overflow-hidden sm:static"
+    >
       <div
         data-brand-motion-track
         className="relative z-10 flex w-max items-center will-change-transform sm:static sm:z-auto"
@@ -580,25 +551,6 @@ function BrandMotionRow({
         {group}
         <div aria-hidden="true" className="shrink-0">
           {group}
-        </div>
-      </div>
-      {/* The overlay stays fixed over the viewport, while its text track
-          matches the base marquee's travel exactly. */}
-      <div
-        aria-hidden="true"
-        className="epantry-brand-focus-overlay pointer-events-none absolute inset-0 z-20 overflow-hidden sm:hidden"
-      >
-        <div
-          className="flex w-max items-center will-change-transform"
-          style={{
-            animation: shouldReduceMotion
-              ? 'none'
-              : `epantry-brand-scroll-${direction} ${duration}s linear infinite`,
-            animationPlayState: isPaused ? 'paused' : 'running',
-          }}
-        >
-          {mobileFocusGroup}
-          {mobileFocusGroup}
         </div>
       </div>
     </div>
@@ -628,7 +580,7 @@ function BrandMotionItem({
       to={getFeaturedBrandPath(
         brand,
       )}
-      className="epantry-brand-motion-item focus-ring group relative flex h-[112px] w-[clamp(190px,18vw,330px)] shrink-0 items-center justify-center px-5 sm:h-[132px] lg:h-[148px]"
+      className="epantry-brand-motion-item focus-ring group relative flex h-[clamp(96px,17dvh,142px)] w-[min(64vw,270px)] shrink-0 items-center justify-center px-4 sm:h-[132px] sm:w-[clamp(190px,18vw,330px)] sm:px-5 lg:h-[148px]"
       data-brand-motion-item
       aria-label={`Explore ${displayName}`}
       onMouseEnter={() => onHoverChange(true)}
