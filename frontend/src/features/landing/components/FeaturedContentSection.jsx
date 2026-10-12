@@ -2550,7 +2550,9 @@ function FeaturedRecipesScrollStory({
                 {cameraItems.map((item, stageIndex) => {
                   const isActive = stageIndex === activeSequenceIndex
                   const isVisible = isActive && storyProgress >= 0.8 && storyProgress < 6
-                  const travelY = isVisible ? 0 : stageIndex < activeSequenceIndex ? -24 : 72
+                  // On mobile, the next book enters from the right and the
+                  // previous book exits left, matching the desktop direction.
+                  const travelX = isVisible ? '0px' : stageIndex < activeSequenceIndex ? '-82vw' : '82vw'
                   return (
                     <div
                       key={item.key}
@@ -2559,10 +2561,10 @@ function FeaturedRecipesScrollStory({
                       className="absolute inset-0 flex items-center justify-center"
                       style={{
                         opacity: isVisible ? 1 : 0,
-                        transform: `translate3d(0, ${travelY}px, 0)`,
+                        transform: `translate3d(${travelX}, 0, 0)`,
                         transition: shouldReduceMotion
                           ? 'none'
-                          : 'transform 490ms cubic-bezier(0.22, 1, 0.36, 1), opacity 370ms ease-out',
+                          : 'transform 540ms cubic-bezier(0.22, 1, 0.36, 1), opacity 370ms ease-out',
                         pointerEvents: isVisible ? 'auto' : 'none',
                         backfaceVisibility: 'hidden',
                         willChange: !shouldReduceMotion && Math.abs(stageIndex - activeSequenceIndex) <= 1
