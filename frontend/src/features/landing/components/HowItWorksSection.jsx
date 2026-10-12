@@ -697,7 +697,9 @@ function WhyBenefitScene({
 }) {
   const isActive = index === active
   const isLeaving = index === previous && previous !== active
-  const transition = shouldReduceMotion || (!isActive && !isLeaving)
+  // Even a rapidly skipped outgoing card must complete its exit.
+  // Hidden, inactive panels never paint, but their Motion state is retained.
+  const transition = shouldReduceMotion
     ? { duration: 0 }
     : WHY_DESKTOP_TRANSITION
   const imagePath = WHY_IMAGE_BY_ID[benefit.id]
@@ -946,7 +948,7 @@ function MobileWhyScene({ active, previous, shouldReduceMotion }) {
                     scale: isActive ? 1 : 0.985,
                     visibility: isActive ? 'visible' : 'hidden',
                   }}
-              transition={shouldReduceMotion || (!isActive && !isLeaving)
+              transition={shouldReduceMotion
                 ? { duration: 0 }
                 : WHY_MOBILE_TRANSITION}
               style={{
@@ -990,6 +992,7 @@ function useWhyTransitionState(progress) {
   const activeRef = useRef(0)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined
     const query = window.matchMedia('(max-width: 767px)')
     const onChange = () => setMobile(query.matches)
     query.addEventListener('change', onChange)
@@ -997,15 +1000,27 @@ function useWhyTransitionState(progress) {
   }, [])
 
   useEffect(() => {
-    const update = (value) => {
+    const update = (rawValue) => {
+      const value = Math.min(Math.max(rawValue, 0), 1)
+      const current = activeRef.current
       const next = WHY_STOPS.reduce((best, stop, index) =>
         Math.abs(stop - value) < Math.abs(WHY_STOPS[best] - value)
           ? index
           : best, 0)
-      if (next === activeRef.current) return
-      const previous = activeRef.current
+      if (next === current) return
+
+      // Wheel momentum / touch bounce can repeatedly cross a stop midpoint.
+      // A tiny hysteresis band prevents A-B-A-B flips and visible jolts,
+      // while long flicks still jump directly to the correct card.
+      if (Math.abs(next - current) === 1) {
+        const boundary = (WHY_STOPS[next] + WHY_STOPS[current]) / 2
+        const buffer = 0.012
+        if (next > current && value < boundary + buffer) return
+        if (next < current && value > boundary - buffer) return
+      }
+
       activeRef.current = next
-      setScene({ active: next, previous })
+      setScene({ active: next, previous: current })
     }
     update(progress.get())
     return progress.on('change', update)
@@ -1013,7 +1028,6 @@ function useWhyTransitionState(progress) {
 
   return { mobile, ...scene }
 }
-
 function WhyEpantrySection({
   shouldReduceMotion,
 }) {
