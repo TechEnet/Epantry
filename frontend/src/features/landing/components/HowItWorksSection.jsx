@@ -5,7 +5,6 @@ import {
 } from 'react'
 
 import {
-  AnimatePresence,
   motion,
   useReducedMotion,
   useMotionValue,
@@ -73,7 +72,7 @@ const STORY_RANGES = [
 
 // All pinned stories follow the actual sticky travel rather than
 // the dynamically changing browser viewport height (notably on mobile).
-function useStableStickyProgress(sectionRef) {
+function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
   const progress = useMotionValue(0)
 
   useEffect(() => {
@@ -82,18 +81,49 @@ function useStableStickyProgress(sectionRef) {
     }
 
     let frame = null
+    let desktopCache = null
+    let cacheEnabled = false
+    let observer = null
+
+    // Only Why EPANTRY on desktop uses cached geometry. Avoid synchronous
+    // getBoundingClientRect reads on every scroll frame; How and all mobile
+    // sections continue using the original calculation unchanged.
+    const measureDesktop = () => {
+      cacheEnabled = optimizeDesktop &&
+        window.matchMedia('(min-width: 768px)').matches
+      desktopCache = null
+      if (!cacheEnabled) return
+      const section = sectionRef.current
+      if (!section) return
+      const rect = section.getBoundingClientRect()
+      const stickyHeight =
+        section.firstElementChild?.getBoundingClientRect().height ||
+        rect.height
+      desktopCache = {
+        start: window.scrollY + rect.top,
+        travel: Math.max(rect.height - stickyHeight, 1),
+      }
+    }
 
     const update = () => {
       frame = null
       const section = sectionRef.current
       if (!section) return
 
-      const rect = section.getBoundingClientRect()
-      const stickyHeight =
-        section.firstElementChild?.getBoundingClientRect().height ||
-        rect.height
-      const travel = Math.max(rect.height - stickyHeight, 1)
-      const next = Math.min(Math.max(-rect.top / travel, 0), 1)
+      let next
+      if (cacheEnabled && desktopCache) {
+        next = (window.scrollY - desktopCache.start) /
+          desktopCache.travel
+      } else {
+        const rect = section.getBoundingClientRect()
+        const stickyHeight =
+          section.firstElementChild?.getBoundingClientRect().height ||
+          rect.height
+        const travel = Math.max(rect.height - stickyHeight, 1)
+        next = -rect.top / travel
+      }
+
+      next = Math.min(Math.max(next, 0), 1)
       if (Math.abs(next - progress.get()) > 0.0001) {
         progress.set(next)
       }
@@ -105,22 +135,39 @@ function useStableStickyProgress(sectionRef) {
       }
     }
 
+    const remeasure = () => {
+      if (optimizeDesktop) measureDesktop()
+      schedule()
+    }
+
+    if (optimizeDesktop) {
+      measureDesktop()
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(remeasure)
+        if (sectionRef.current) {
+          observer.observe(sectionRef.current)
+          if (sectionRef.current.firstElementChild) {
+            observer.observe(sectionRef.current.firstElementChild)
+          }
+        }
+      }
+    }
     update()
     window.addEventListener('scroll', schedule, { passive: true })
-    window.addEventListener('resize', schedule)
-    window.addEventListener('pageshow', schedule)
+    window.addEventListener('resize', remeasure)
+    window.addEventListener('pageshow', remeasure)
 
     return () => {
       if (frame !== null) window.cancelAnimationFrame(frame)
+      observer?.disconnect()
       window.removeEventListener('scroll', schedule)
-      window.removeEventListener('resize', schedule)
-      window.removeEventListener('pageshow', schedule)
+      window.removeEventListener('resize', remeasure)
+      window.removeEventListener('pageshow', remeasure)
     }
-  }, [progress, sectionRef])
+  }, [progress, sectionRef, optimizeDesktop])
 
   return progress
 }
-
 function useMobileStoryIndex(progress, stops) {
   const [mobile, setMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
@@ -631,241 +678,57 @@ const WHY_CUSTOMER_BENEFITS = [
   },
 ]
 
-const WHY_SCENE_RANGES = [
-  [
-    0.16,
-    0.35,
-  ],
-  [
-    0.31,
-    0.50,
-  ],
-  [
-    0.46,
-    0.65,
-  ],
-  [
-    0.61,
-    0.80,
-  ],
-  [
-    0.76,
-    1,
-  ],
-]
+// Scroll decides *which* benefit is visible. Motion handles the complete
+// transition independently of individual wheel/trackpad deltas. All five
+// scenes stay mounted, but inactive ones become visibility:hidden after their
+// exit animation, preventing mid-scroll image mount/decode hitches.
+const WHY_DESKTOP_TRANSITION = {
+  duration: 0.68,
+  ease: [0.22, 1, 0.36, 1],
+  opacity: { duration: 0.58, ease: 'easeInOut' },
+}
 
 function WhyBenefitScene({
   benefit,
   index,
-  progress,
-  range,
+  active,
+  previous,
   shouldReduceMotion,
-  mobile = false,
 }) {
-  const [
-    start,
-    end,
-  ] = range
-
-  const enter =
-    start +
-    (end - start) * 0.18
-
-  const exit =
-    end -
-    (end - start) * 0.2
-
-  const opacity =
-    useTransform(
-      progress,
-      [
-        start,
-        enter,
-        exit,
-        end,
-      ],
-      index === 0
-        ? [
-            1,
-            1,
-            1,
-            0,
-          ]
-        : index === WHY_CUSTOMER_BENEFITS.length - 1
-          ? [
-              0,
-              1,
-              1,
-              1,
-            ]
-          : [
-              0,
-              1,
-              1,
-              0,
-            ],
-    )
-
-  const sceneY =
-    useTransform(
-      progress,
-      [
-        start,
-        enter,
-        exit,
-        end,
-      ],
-      (shouldReduceMotion || mobile)
-        ? [
-            '0svh',
-            '0svh',
-            '0svh',
-            '0svh',
-          ]
-        : index === 0
-          ? [
-              '0svh',
-              '0svh',
-              '0svh',
-              '-26svh',
-            ]
-          : index === WHY_CUSTOMER_BENEFITS.length - 1
-            ? [
-                '28svh',
-                '0svh',
-                '0svh',
-                '0svh',
-              ]
-            : [
-                '28svh',
-                '0svh',
-                '0svh',
-                '-26svh',
-              ],
-    )
-
-  const visualX =
-    useTransform(
-      progress,
-      [
-        start,
-        index === 0
-          ? start + (end - start) * 0.4
-          : enter,
-        exit,
-        end,
-      ],
-      (shouldReduceMotion || mobile)
-        ? [
-            '0vw',
-            '0vw',
-            '0vw',
-            '0vw',
-          ]
-        : index === 0
-          ? [
-              '-58%',
-              '0%',
-              '0%',
-              '-7%',
-            ]
-          : index === WHY_CUSTOMER_BENEFITS.length - 1
-            ? [
-                '-7vw',
-                '0vw',
-                '0vw',
-                '0vw',
-              ]
-            : [
-                '-7vw',
-                '0vw',
-                '0vw',
-                '-3vw',
-              ],
-    )
-
-  const copyX =
-    useTransform(
-      progress,
-      [
-        start,
-        enter,
-        exit,
-        end,
-      ],
-      (shouldReduceMotion || mobile)
-        ? [
-            '0vw',
-            '0vw',
-            '0vw',
-            '0vw',
-          ]
-        : index === WHY_CUSTOMER_BENEFITS.length - 1
-          ? [
-              '6vw',
-              '0vw',
-              '0vw',
-              '0vw',
-            ]
-          : [
-              '6vw',
-              '0vw',
-              '0vw',
-              '3vw',
-            ],
-    )
-
-  const visualScale =
-    useTransform(
-      progress,
-      [
-        start,
-        enter,
-        exit,
-        end,
-      ],
-      (shouldReduceMotion || mobile)
-        ? [
-            1,
-            1,
-            1,
-            1,
-          ]
-        : index === WHY_CUSTOMER_BENEFITS.length - 1
-          ? [
-              0.92,
-              1,
-              1,
-              1,
-            ]
-          : [
-              0.92,
-              1,
-              1,
-              0.96,
-            ],
-    )
-
-  const imagePath =
-    WHY_IMAGE_BY_ID[benefit.id]
+  const isActive = index === active
+  const isLeaving = index === previous && previous !== active
+  const transition = shouldReduceMotion || (!isActive && !isLeaving)
+    ? { duration: 0 }
+    : WHY_DESKTOP_TRANSITION
+  const imagePath = WHY_IMAGE_BY_ID[benefit.id]
 
   return (
     <motion.article
-      style={{
-        opacity,
-        y:
-          sceneY,
-      }}
+      initial={false}
+      animate={shouldReduceMotion
+        ? {
+            opacity: isActive ? 1 : 0,
+            y: 0,
+            visibility: isActive ? 'visible' : 'hidden',
+          }
+        : {
+            opacity: isActive ? 1 : 0,
+            y: isActive ? '0svh' : index < active ? '-26svh' : '28svh',
+            visibility: isActive ? 'visible' : 'hidden',
+          }}
+      transition={transition}
+      style={{ zIndex: isLeaving ? 3 : isActive ? 2 : 1 }}
       className="pointer-events-none absolute inset-x-0 bottom-[7svh] top-[25svh] z-20 px-5 sm:px-8 lg:bottom-[6svh] lg:top-[23svh] lg:px-[5vw]"
     >
       <div className="mx-auto grid h-full max-w-[1540px] items-center gap-5 sm:gap-7 lg:grid-cols-[minmax(250px,0.72fr)_minmax(420px,1.3fr)_minmax(180px,0.42fr)] lg:gap-[5vw]">
         <motion.div
-          style={{
-            x:
-              visualX,
-            scale:
-              visualScale,
-          }}
+          animate={shouldReduceMotion
+            ? { x: 0, scale: 1 }
+            : {
+                x: isActive ? '0vw' : index < active ? '-3vw' : '-7vw',
+                scale: isActive ? 1 : index < active ? 0.96 : 0.92,
+              }}
+          transition={transition}
           className="relative mx-auto h-[31svh] w-full max-w-[410px] overflow-hidden bg-[#111111] sm:h-[36svh] lg:h-[52svh]"
         >
           {imagePath ? (
@@ -874,6 +737,8 @@ function WhyBenefitScene({
               alt=""
               aria-hidden="true"
               draggable="false"
+              decoding="async"
+              loading="eager"
               className="absolute inset-0 h-full w-full select-none object-cover object-center"
             />
           ) : null}
@@ -881,10 +746,10 @@ function WhyBenefitScene({
         </motion.div>
 
         <motion.div
-          style={{
-            x:
-              copyX,
-          }}
+          animate={shouldReduceMotion
+            ? { x: 0 }
+            : { x: isActive ? '0vw' : index < active ? '3vw' : '6vw' }}
+          transition={transition}
           className="mx-auto w-full max-w-[650px] lg:mx-0"
         >
           <div className="text-[13px] font-bold uppercase tracking-[0.18em] text-white/65 sm:text-sm">
@@ -1046,38 +911,107 @@ function MobileHowScene({ active, shouldReduceMotion }) {
   )
 }
 
-function MobileWhyScene({ benefit, shouldReduceMotion, nextImagePath }) {
-  useEffect(() => {
-    if (!nextImagePath || typeof window === 'undefined') return undefined
-    const timer = window.setTimeout(() => {
-      const image = new window.Image()
-      image.decoding = 'async'
-      image.src = nextImagePath
-    }, 240)
-    return () => window.clearTimeout(timer)
-  }, [nextImagePath])
+// Mobile Why cards stay mounted so a step change never waits for the old
+// image/card to unmount or the next image to create a new DOM tree.
+// Animate only opacity and transforms; keep the desktop story untouched.
+const WHY_MOBILE_TRANSITION = {
+  duration: 0.64,
+  ease: [0.22, 1, 0.36, 1],
+  opacity: { duration: 0.58, ease: 'easeInOut' },
+}
+
+function MobileWhyScene({ active, previous, shouldReduceMotion }) {
   return (
     <div className="absolute inset-x-0 bottom-[7svh] top-[24svh] z-20 flex items-center justify-center px-5">
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={benefit.id}
-          initial={shouldReduceMotion ? false : { opacity: 0, y: 24, scale: 0.975 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, transition: { duration: 0.16 } }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.66, ease: [0.22, 1, 0.36, 1] }}
-          className="flex w-full max-w-[500px] flex-col items-center justify-center gap-5 text-left"
-        >
-          <div className="h-[min(40svh,370px)] w-full max-w-[410px] overflow-hidden bg-[#111111]">
-            <img src={WHY_IMAGE_BY_ID[benefit.id]} alt="" aria-hidden="true" decoding="async" className="h-full w-full object-cover object-center" />
-          </div>
-          <div className="w-full max-w-[410px]">
-            <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-white/65">Why EPANTRY</p>
-            <h3 className="mt-3 text-[clamp(34px,8vw,48px)] font-medium leading-[0.98] tracking-[-0.045em] text-[#F3F1EB]">{benefit.title}</h3>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+      <div className="relative h-full w-full max-w-[500px]">
+        {WHY_CUSTOMER_BENEFITS.map((benefit, index) => {
+          const isActive = index === active
+          const isLeaving = index === previous && previous !== active
+
+          return (
+            <motion.div
+              key={benefit.id}
+              aria-hidden={!isActive}
+              initial={false}
+              animate={shouldReduceMotion
+                ? {
+                    opacity: isActive ? 1 : 0,
+                    y: 0,
+                    scale: 1,
+                    visibility: isActive ? 'visible' : 'hidden',
+                  }
+                : {
+                    opacity: isActive ? 1 : 0,
+                    y: isActive ? 0 : index < active ? -42 : 44,
+                    scale: isActive ? 1 : 0.985,
+                    visibility: isActive ? 'visible' : 'hidden',
+                  }}
+              transition={shouldReduceMotion || (!isActive && !isLeaving)
+                ? { duration: 0 }
+                : WHY_MOBILE_TRANSITION}
+              style={{
+                zIndex: isLeaving ? 3 : isActive ? 2 : 1,
+                pointerEvents: isActive ? 'auto' : 'none',
+                willChange: isLeaving || isActive ? 'transform, opacity' : 'auto',
+              }}
+              className="absolute inset-0 flex w-full flex-col items-center justify-center gap-5 text-left"
+            >
+              <div className="h-[min(40svh,370px)] w-full max-w-[410px] overflow-hidden bg-[#111111]">
+                <img
+                  src={WHY_IMAGE_BY_ID[benefit.id]}
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  className="h-full w-full object-cover object-center"
+                />
+              </div>
+              <div className="w-full max-w-[410px]">
+                <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-white/65">Why EPANTRY</p>
+                <h3 className="mt-3 text-[clamp(34px,8vw,48px)] font-medium leading-[0.98] tracking-[-0.045em] text-[#F3F1EB]">{benefit.title}</h3>
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
     </div>
   )
+}
+
+// Keep the selected benefit and the departing benefit together in React
+// state. A single update per crossed stop means quick forward/back gestures
+// cannot flip the exiting card's stacking order mid-transition.
+// This hook is local to Why EPANTRY; How EPANTRY's logic stays untouched.
+function useWhyTransitionState(progress) {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(max-width: 767px)').matches,
+  )
+  const [scene, setScene] = useState({ active: 0, previous: -1 })
+  const activeRef = useRef(0)
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)')
+    const onChange = () => setMobile(query.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    const update = (value) => {
+      const next = WHY_STOPS.reduce((best, stop, index) =>
+        Math.abs(stop - value) < Math.abs(WHY_STOPS[best] - value)
+          ? index
+          : best, 0)
+      if (next === activeRef.current) return
+      const previous = activeRef.current
+      activeRef.current = next
+      setScene({ active: next, previous })
+    }
+    update(progress.get())
+    return progress.on('change', update)
+  }, [progress])
+
+  return { mobile, ...scene }
 }
 
 function WhyEpantrySection({
@@ -1086,12 +1020,32 @@ function WhyEpantrySection({
   const sectionRef =
     useRef(null)
 
-  const progress = useStableStickyProgress(sectionRef)
-  const { mobile, active } = useMobileStoryIndex(progress, WHY_STOPS)
+  const progress = useStableStickyProgress(sectionRef, true)
+  const { mobile, active, previous } = useWhyTransitionState(progress)
+
+  // Preload/decode the existing five images once so neither desktop nor
+  // mobile waits for an image while a card transition is already playing.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const images = Object.values(WHY_IMAGE_BY_ID).map((src) => {
+      const image = new window.Image()
+      image.decoding = 'async'
+      image.src = src
+      if (typeof image.decode === 'function') {
+        image.decode().catch(() => {})
+      }
+      return image
+    })
+    return () => { images.length = 0 }
+  }, [])
+
+  // Why's heading still follows scroll; only the heavy cards are
+  // decoupled from raw scroll delta to prevent jerky card replacement.
+  const visualProgress = progress
 
   const titleY =
     useTransform(
-      progress,
+      visualProgress,
       [
         0.08,
         0.17,
@@ -1109,7 +1063,7 @@ function WhyEpantrySection({
 
   const titleOpacity =
     useTransform(
-      progress,
+      visualProgress,
       [
         0.06,
         0.16,
@@ -1126,7 +1080,7 @@ function WhyEpantrySection({
 
   const fieldY =
     useTransform(
-      progress,
+      visualProgress,
       [
         0,
         1,
@@ -1159,8 +1113,7 @@ function WhyEpantrySection({
         >
           <motion.div
             style={{
-              y:
-                fieldY,
+              y: mobile ? fieldY : 0,
             }}
             className="absolute -inset-[8%]"
           >
@@ -1189,30 +1142,17 @@ function WhyEpantrySection({
         </motion.header>
 
         {mobile ? (
-          <MobileWhyScene benefit={WHY_CUSTOMER_BENEFITS[active] || WHY_CUSTOMER_BENEFITS[0]} nextImagePath={WHY_IMAGE_BY_ID[WHY_CUSTOMER_BENEFITS[active + 1]?.id]} shouldReduceMotion={shouldReduceMotion} />
-        ) : WHY_CUSTOMER_BENEFITS.map(
-          (
-            benefit,
-            index,
-          ) => (!mobile || index === active) ? (
-            <WhyBenefitScene
-              key={benefit.id}
-              benefit={benefit}
-              index={index}
-              progress={progress}
-              range={
-                WHY_SCENE_RANGES[
-                  clampIndex(
-                    index,
-                    WHY_SCENE_RANGES.length,
-                  )
-                ]
-              }
-              shouldReduceMotion={shouldReduceMotion}
-              mobile={mobile}
-            />
-          ) : null,
-        )}
+          <MobileWhyScene active={active} previous={previous} shouldReduceMotion={shouldReduceMotion} />
+        ) : WHY_CUSTOMER_BENEFITS.map((benefit, index) => (
+          <WhyBenefitScene
+            key={benefit.id}
+            benefit={benefit}
+            index={index}
+            active={active}
+            previous={previous}
+            shouldReduceMotion={shouldReduceMotion}
+          />
+        ))}
 
       </div>
     </section>
