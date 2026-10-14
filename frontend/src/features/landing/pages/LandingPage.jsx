@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { Link } from "react-router-dom";
 
@@ -29,19 +29,6 @@ const EXPERIENCE_CARD_IMAGES = {
   brands: "/exploar/Exploar_B.png",
   recipes: "/exploar/Exploar_R.png",
 };
-
-const EXPERIENCE_TRUST_COPY = {
-  grocery:
-    "Fresh grocery choices with clear product information and trusted listings, so everyday essentials feel easier to choose with confidence.",
-
-  brands:
-    "Discover authentic brands and approved product listings with clearer identity, reliable context and trust built into the experience.",
-
-  recipes:
-    "Explore practical recipes built around real ingredients, then move naturally from food inspiration to the products you actually need.",
-};
-
-const CARD_FLIP_EASE = [0.175, 0.885, 0.32, 1.275];
 
 const EXPERIENCE_BACKDROP_ROWS = [
   {
@@ -72,36 +59,6 @@ const EXPERIENCE_BACKDROP_ROWS = [
     sequence: ["brands", "recipes", "grocery", "brands", "recipes", "grocery"],
   },
 ];
-
-function getExperienceTone(categoryId) {
-  if (categoryId === "brands") {
-    return {
-      glow: "bg-[#2563EB]/10",
-      icon: "bg-[#EFF6FF]/85 text-[#2563EB]",
-      action: "text-[#2563EB]",
-      frame: "bg-[#EFF6FF]",
-      glass: "bg-[#EFF6FF]/60",
-    };
-  }
-
-  if (categoryId === "recipes") {
-    return {
-      glow: "bg-[#F59E0B]/10",
-      icon: "bg-[#FFF7ED]/85 text-[#EA580C]",
-      action: "text-[#EA580C]",
-      frame: "bg-[#FFF7ED]",
-      glass: "bg-[#FFF7ED]/60",
-    };
-  }
-
-  return {
-    glow: "bg-[#16A34A]/10",
-    icon: "bg-[#F0FDF4]/85 text-[#166534]",
-    action: "text-[#166534]",
-    frame: "bg-[#F0FDF4]",
-    glass: "bg-[#F0FDF4]/60",
-  };
-}
 
 export default function LandingPage() {
   // Only touch screens use the guided story navigation. Desktop/trackpad
@@ -274,8 +231,7 @@ export default function LandingPage() {
       } else if (direction < 0 && y > positions[positions.length - 1] + 16) {
         next = positions.length - 1;
       }
-      // Only a deliberately fast flick may skip cards, staying within the
-      // current section; the next gesture can leave the section normally.
+      // Fast flicks in Grocery/Recipes remain contained within their stories.
       if (isGuided && steps > 1) {
         next = Math.min(positions.length - 1, Math.max(0, next));
       }
@@ -369,16 +325,8 @@ export default function LandingPage() {
       touchStart = null;
       if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) {
         if (gesture.isExplore) {
-          const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
-          // Ordinary swipes = exactly one stage. Only unusually fast,
-          // long flicks can move two or three stages in this 3-card story.
-          const steps =
-            speed > 3.3 && Math.abs(dy) > 210
-              ? 3
-              : speed > 2.25 && Math.abs(dy) > 155
-                ? 2
-                : 1;
-          advance(dy < 0 ? 1 : -1, steps);
+          // Intro -> entire gallery -> next section; never skip the gallery.
+          advance(dy < 0 ? 1 : -1);
         } else if (gesture.isGrocery) {
           const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
           // Ordinary swipes advance exactly one product. Only unusually fast,
@@ -429,13 +377,7 @@ export default function LandingPage() {
 
   const shouldReduceMotion = useReducedMotion();
 
-  const [isDesktopHoverDevice, setIsDesktopHoverDevice] = useState(() =>
-    typeof window !== "undefined"
-      ? window.matchMedia(
-          "(min-width: 1024px) and (hover: hover) and (pointer: fine)"
-        ).matches
-      : false
-  );
+  const experienceCarouselRef = useRef(null);
 
   const [isSmallViewport, setIsSmallViewport] = useState(() =>
     typeof window !== "undefined"
@@ -443,14 +385,9 @@ export default function LandingPage() {
       : false
   );
 
-  const [activeExperienceIndex, setActiveExperienceIndex] = useState(-1);
+  const [isExperienceGalleryVisible, setIsExperienceGalleryVisible] = useState(false);
 
-  const [hoveredExperienceId, setHoveredExperienceId] = useState(null);
-
-  const [autoRevealExperienceId, setAutoRevealExperienceId] = useState(null);
-
-  const [mobileRevealExperienceId, setMobileRevealExperienceId] =
-    useState(null);
+  const [mobileCardIndex, setMobileCardIndex] = useState(0);
 
   const experienceScrollProgress = useMotionValue(0);
 
@@ -516,24 +453,34 @@ export default function LandingPage() {
     shouldReduceMotion ? [0, 0, 0, 0] : [0.65, 0.85, 0.3, 0]
   );
 
+  // Finish the desktop backdrop lift before the gallery entrance.
+  // It stays stationary while the cards remain on screen, instead of
+  // moving upward on its own during the gallery's scroll hold.
   const backdropVerticalY = useTransform(
     experienceScrollProgress,
-    [0, 1],
+    [0, 0.24, 1],
     shouldReduceMotion || isSmallViewport
-      ? ["0svh", "0svh"]
-      : ["0svh", "-56svh"]
+      ? ["0svh", "0svh", "0svh"]
+      : ["0svh", "-18svh", "-18svh"]
+  );
+
+  // Mobile uses horizontal parallax rather than the desktop vertical drift.
+  const backdropHorizontalX = useTransform(
+    experienceScrollProgress,
+    [0, 1],
+    shouldReduceMotion || !isSmallViewport ? ["0vw", "0vw"] : ["0vw", "-22vw"]
   );
 
   const backdropDepthScale = useTransform(
     experienceScrollProgress,
     [0, 0.5, 1],
-    shouldReduceMotion || isSmallViewport ? [1, 1, 1] : [1.025, 1, 1.035]
+    shouldReduceMotion ? [1, 1, 1] : [1.025, 1, 1.035]
   );
 
   const backdropDepthRotateX = useTransform(
     experienceScrollProgress,
     [0, 0.5, 1],
-    shouldReduceMotion || isSmallViewport ? [0, 0, 0] : [0.8, -0.65, 0.9]
+    shouldReduceMotion ? [0, 0, 0] : [0.8, -0.65, 0.9]
   );
 
   useEffect(() => {
@@ -547,8 +494,8 @@ export default function LandingPage() {
 
       const rect = target.getBoundingClientRect();
       const stickyHeight =
-        target.parentElement?.querySelector("section")?.getBoundingClientRect()
-          .height || rect.height;
+        target.querySelector("[data-landing-sticky]")?.getBoundingClientRect()
+          .height || window.innerHeight;
       const travel = Math.max(rect.height - stickyHeight, 1);
       const next = Math.min(Math.max(-rect.top / travel, 0), 1);
       if (Math.abs(next - experienceScrollProgress.get()) > 0.0001) {
@@ -574,161 +521,49 @@ export default function LandingPage() {
   }, [experienceScrollProgress]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const mediaQuery = window.matchMedia(
-      "(min-width: 1024px) and (hover: hover) and (pointer: fine)"
-    );
-
-    const smallViewportMediaQuery = window.matchMedia("(max-width: 767px)");
-
-    const handleSmallViewportChange = (event) => {
-      setIsSmallViewport(event.matches);
-    };
-
-    setIsSmallViewport(smallViewportMediaQuery.matches);
-    smallViewportMediaQuery.addEventListener?.(
-      "change",
-      handleSmallViewportChange
-    );
-
-    const handleChange = (event) => {
-      setIsDesktopHoverDevice(event.matches);
-
-      if (!event.matches) {
-        setHoveredExperienceId(null);
-      }
-    };
-
-    setIsDesktopHoverDevice(mediaQuery.matches);
-
-    mediaQuery.addEventListener?.("change", handleChange);
-
-    return () => {
-      mediaQuery.removeEventListener?.("change", handleChange);
-      smallViewportMediaQuery.removeEventListener?.(
-        "change",
-        handleSmallViewportChange
-      );
-    };
+    if (typeof window === "undefined") return undefined;
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const onChange = (event) => setIsSmallViewport(event.matches);
+    setIsSmallViewport(mediaQuery.matches);
+    mediaQuery.addEventListener?.("change", onChange);
+    return () => mediaQuery.removeEventListener?.("change", onChange);
   }, []);
 
   useEffect(() => {
-    const updateStage = (value) => {
-      let nextIndex = -1;
-
-      // The intro owns 12% of the available travel; each of the three
-      // experiences owns an equal share of the remaining travel.
-      if (value >= 0.12) {
-        nextIndex = Math.min(2, Math.floor((value - 0.12) / ((1 - 0.12) / 3)));
-      }
-
-      setActiveExperienceIndex((currentIndex) =>
-        currentIndex === nextIndex ? currentIndex : nextIndex
-      );
+    const updateGallery = (progress) => {
+      const visible = progress >= 0.24;
+      setIsExperienceGalleryVisible((current) => current === visible ? current : visible);
     };
-
-    updateStage(experienceScrollProgress.get());
-
-    const unsubscribe = experienceScrollProgress.on("change", updateStage);
-
-    return unsubscribe;
+    updateGallery(experienceScrollProgress.get());
+    return experienceScrollProgress.on("change", updateGallery);
   }, [experienceScrollProgress]);
 
-  useEffect(() => {
-    if (
-      isDesktopHoverDevice ||
-      isSmallViewport ||
-      activeExperienceIndex < 0 ||
-      shouldReduceMotion
-    ) {
-      setAutoRevealExperienceId(null);
-
-      return undefined;
-    }
-
-    const category = landingCategories[activeExperienceIndex];
-
-    if (!category) {
-      return undefined;
-    }
-
-    setAutoRevealExperienceId(null);
-
-    const revealTimeoutId = window.setTimeout(() => {
-      setAutoRevealExperienceId(category.id);
-    }, 520);
-
-    const resetTimeoutId = window.setTimeout(() => {
-      setAutoRevealExperienceId(null);
-    }, 1420);
-
-    return () => {
-      window.clearTimeout(revealTimeoutId);
-
-      window.clearTimeout(resetTimeoutId);
-    };
-  }, [
-    activeExperienceIndex,
-    isDesktopHoverDevice,
-    isSmallViewport,
-    shouldReduceMotion,
-  ]);
-
-  // Mobile: let the new card land, briefly reveal its information face,
-  // then return to the image. No large 3D rotations or background blur.
-  useEffect(() => {
-    if (!isSmallViewport || activeExperienceIndex < 0 || shouldReduceMotion) {
-      setMobileRevealExperienceId(null);
-      return undefined;
-    }
-    const item = landingCategories[activeExperienceIndex];
-    if (!item) return undefined;
-    setMobileRevealExperienceId(null);
-    const openId = window.setTimeout(
-      () => setMobileRevealExperienceId(item.id),
-      560
-    );
-    const closeId = window.setTimeout(
-      () => setMobileRevealExperienceId(null),
-      1850
-    );
-    return () => {
-      window.clearTimeout(openId);
-      window.clearTimeout(closeId);
-    };
-  }, [activeExperienceIndex, isSmallViewport, shouldReduceMotion]);
-
-  const handleExperienceCardEnter = (categoryId) => {
-    if (!isDesktopHoverDevice || shouldReduceMotion) {
-      return;
-    }
-
-    setHoveredExperienceId(categoryId);
+  const getCardScrollStep = () => {
+    const track = experienceCarouselRef.current;
+    const card = track?.querySelector("[data-experience-card]");
+    if (!track || !card) return 0;
+    const gap = Number.parseFloat(window.getComputedStyle(track).columnGap) || 12;
+    return card.offsetWidth + gap;
   };
 
-  const handleExperienceCardLeave = (categoryId) => {
-    setHoveredExperienceId((currentId) =>
-      currentId === categoryId ? null : currentId
-    );
+  const onExperienceCarouselScroll = () => {
+    const track = experienceCarouselRef.current;
+    const step = getCardScrollStep();
+    if (!track || step <= 0) return;
+    const index = Math.max(0, Math.min(landingCategories.length - 1, Math.round(track.scrollLeft / step)));
+    setMobileCardIndex((current) => current === index ? current : index);
   };
 
-  const activeExperience =
-    activeExperienceIndex >= 0
-      ? landingCategories[activeExperienceIndex]
-      : null;
-
-  const activeExperienceTone = activeExperience
-    ? getExperienceTone(activeExperience.id)
-    : null;
-
-  const activeExperienceIsRevealed =
-    activeExperience && !isSmallViewport
-      ? hoveredExperienceId === activeExperience.id ||
-        autoRevealExperienceId === activeExperience.id
-      : false;
+  const scrollExperienceCard = (direction) => {
+    const track = experienceCarouselRef.current;
+    const step = getCardScrollStep();
+    if (!track || step <= 0) return;
+    const index = Math.max(0, Math.min(landingCategories.length - 1, Math.round(track.scrollLeft / step) + direction));
+    track.scrollTo({
+      left: Math.min(index * step, track.scrollWidth - track.clientWidth),
+      behavior: shouldReduceMotion ? "instant" : "smooth",
+    });
+  };
 
   return (
     <main className="overflow-x-clip">
@@ -782,14 +617,10 @@ export default function LandingPage() {
       )}
       <div
         data-landing-story="explore"
-        data-landing-stops="0.015,0.28,0.555,0.83"
-        className="relative z-10 h-[440svh] w-full bg-[#1A1A1A] sm:h-[460svh]"
+        data-landing-stops="0.015,0.78"
+        ref={experienceSectionRef}
+        className="relative z-10 h-[190svh] w-full bg-[#1A1A1A] sm:h-[190svh]"
       >
-        <div
-          ref={experienceSectionRef}
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-[440svh] sm:h-[360svh]"
-        />
         <section
           data-landing-sticky
           className="sticky top-0 h-[100svh] sm:h-[100svh] w-full overflow-hidden bg-[#1A1A1A] text-white [perspective:1400px]"
@@ -826,36 +657,55 @@ export default function LandingPage() {
               className="absolute inset-x-0 bottom-0 h-[32%] bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.018)_38%,rgba(0,0,0,0.72)_100%)]"
             />
 
-            {/* Continuous background rows: alternate directions + scroll-linked vertical drift */}
-            <motion.div
+            {/* Keep perspective local to the backdrop, not the foreground cards. */}
+            <div
               aria-hidden="true"
-              style={{
-                y: backdropVerticalY,
-                scale: backdropDepthScale,
-                rotateX: backdropDepthRotateX,
-                transformOrigin: "50% 50%",
-              }}
-              className={isSmallViewport
-                ? "absolute -inset-x-[8%] inset-y-0 [transform-style:flat]"
-                : "absolute -inset-x-[8%] -inset-y-[14%] [transform-style:flat] sm:[transform-style:preserve-3d] sm:[will-change:transform]"}
+              className="pointer-events-none absolute inset-0"
+              style={{ perspective: isSmallViewport && !shouldReduceMotion ? 780 : "none" }}
             >
-              {EXPERIENCE_BACKDROP_ROWS.map((row, rowIndex) => (
-                <ExperienceBackdropRow
-                  key={row.id}
-                  row={row}
-                  rowIndex={rowIndex}
-                  lowPower={isSmallViewport}
-                  shouldReduceMotion={shouldReduceMotion}
-                />
-              ))}
-            </motion.div>
+              {/* Continuous background rows: vertical depth on desktop, horizontal depth on mobile. */}
+              <motion.div
+                style={{
+                  y: backdropVerticalY,
+                  x: backdropHorizontalX,
+                  scale: backdropDepthScale,
+                  rotateX: backdropDepthRotateX,
+                  // Positive Y-rotation sends the right edge away from the viewer
+                  // and brings the left edge closer as tiles travel right-to-left.
+                  rotateY: isSmallViewport && !shouldReduceMotion ? 26 : 0,
+                  transformOrigin: "50% 50%",
+                }}
+                className={isSmallViewport
+                  ? "absolute -inset-x-[24%] inset-y-0 [transform-style:preserve-3d] [will-change:transform]"
+                  : "absolute -inset-x-[8%] -inset-y-[14%] [transform-style:flat] sm:[transform-style:preserve-3d] sm:[will-change:transform]"}
+              >
+                {EXPERIENCE_BACKDROP_ROWS.map((row, rowIndex) => (
+                  <ExperienceBackdropRow
+                    key={row.id}
+                    row={row}
+                    rowIndex={rowIndex}
+                    lowPower={isSmallViewport}
+                    shouldReduceMotion={shouldReduceMotion}
+                  />
+                ))}
+              </motion.div>
+            </div>
+
+            {/* On mobile, new tiles enter faint and distant on the right;
+                tiles travelling left remain clearer and nearer. */}
+            {isSmallViewport && !shouldReduceMotion && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#1A1A1A]/55"
+              />
+            )}
 
             {/* Intro stage */}
             <motion.div
               animate={{
-                opacity: activeExperienceIndex === -1 ? 1 : 0,
-                y: activeExperienceIndex === -1 ? 0 : -24,
-                scale: activeExperienceIndex === -1 ? 1 : 0.98,
+                opacity: isExperienceGalleryVisible ? 0 : 1,
+                y: isExperienceGalleryVisible ? -24 : 0,
+                scale: isExperienceGalleryVisible ? 0.98 : 1,
               }}
               transition={{
                 duration: 0.5,
@@ -876,7 +726,7 @@ export default function LandingPage() {
                 </h2>
 
                 <p className="mx-auto mt-5 max-w-xl text-sm font-medium leading-6 text-white/48 sm:text-base sm:leading-7">
-                  Scroll to move through Grocery, Brands and Recipes.
+                  Scroll to explore Grocery, Brands and Recipes together.
                 </p>
 
                 <div className="mx-auto mt-8 flex w-fit items-center gap-3 rounded-full border border-white/10 bg-white/[0.045] px-4 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-white/45 backdrop-blur-md sm:text-[10px]">
@@ -886,179 +736,91 @@ export default function LandingPage() {
               </div>
             </motion.div>
 
-            {/* Current experience card */}
-            <div className="absolute inset-0 z-30 flex items-center justify-center px-4 pt-8 sm:px-8 sm:pt-10">
-              {activeExperience && activeExperienceTone ? (
-                <motion.div
-                  key={`active-experience-${activeExperience.id}`}
-                  initial={
-                    shouldReduceMotion
-                      ? false
-                      : isSmallViewport
-                      ? { opacity: 0, y: 36, scale: 0.96 }
-                      : {
-                          opacity: 0,
-                          rotateX: 8,
-                          rotateY: -8,
-                          rotateZ: -2.5,
-                          scale: 0.84,
-                          y: "58svh",
-                        }
-                  }
-                  animate={
-                    isSmallViewport
-                      ? { opacity: 1, y: 0, scale: 1 }
-                      : {
-                          opacity: 1,
-                          rotateX: 0,
-                          rotateY: 0,
-                          rotateZ: 0,
-                          scale: 1,
-                          y: "0svh",
-                        }
-                  }
-                  transition={{
-                    duration: shouldReduceMotion
-                      ? 0
-                      : isSmallViewport
-                      ? 0.44
-                      : 0.78,
-                    ease: [0.16, 1, 0.3, 1],
-                  }}
-                  className="relative h-[56svh] min-h-[360px] max-h-[610px] w-[78vw] max-w-[350px] sm:h-[62svh] sm:w-[48vw] sm:max-w-[470px] lg:w-[31vw] lg:max-w-[500px] [transform-style:flat] sm:[transform-style:preserve-3d]"
-                >
+            {/* Reference motion: overlapping upward card entrances, without long stagger gaps. */}
+            <div className="absolute inset-0 z-30 flex items-center justify-center">
+              <div
+                ref={experienceCarouselRef}
+                onScroll={onExperienceCarouselScroll}
+                aria-label="Explore grocery, brands and recipes"
+                className="flex h-full w-full items-center gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain px-[7vw] py-5 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-center md:gap-4 md:overflow-x-visible md:overflow-y-visible md:px-8 md:py-8 md:snap-none lg:gap-5 lg:px-10"
+                style={{
+                  WebkitOverflowScrolling: "touch",
+                  pointerEvents: isExperienceGalleryVisible ? "auto" : "none",
+                }}
+              >
+                {landingCategories.map((category, index) => (
                   <motion.div
-                    className="relative h-full w-full [transform-style:flat] sm:[transform-style:preserve-3d]"
-                    onMouseEnter={() =>
-                      handleExperienceCardEnter(activeExperience.id)
-                    }
-                    onMouseLeave={() =>
-                      handleExperienceCardLeave(activeExperience.id)
-                    }
+                    key={category.id}
+                    data-experience-card
+                    aria-hidden={!isExperienceGalleryVisible}
+                    initial={false}
+                    animate={{
+                      opacity: isExperienceGalleryVisible ? 1 : 0,
+                      // Slide each card up from below the viewport at its original size.
+                      y: isExperienceGalleryVisible || shouldReduceMotion ? "0svh" : "85svh",
+                    }}
+                    transition={{
+                      // The video shows overlapping entrances: each starts while
+                      // the previous card is still rising; all settle in ~0.9s.
+                      y: {
+                        type: "tween",
+                        duration: shouldReduceMotion ? 0 : 0.52,
+                        delay: shouldReduceMotion || !isExperienceGalleryVisible ? 0 : index * 0.18,
+                        ease: [0.2, 0.8, 0.3, 1],
+                      },
+                      // A card is fully visible as soon as it rises onscreen.
+                      opacity: { duration: 0 },
+                    }}
+                    className="relative h-[min(55svh,460px)] min-h-[320px] w-[64vw] max-w-[270px] shrink-0 snap-start md:h-[min(67svh,600px)] md:min-h-[390px] md:w-[29vw] md:max-w-[370px] lg:h-[min(72svh,670px)] lg:w-[28vw] lg:max-w-[410px]"
                   >
                     <Link
-                      to={activeExperience.path}
-                      className="focus-ring relative block h-full w-full overflow-hidden rounded-[30px] border-0 bg-transparent outline-none ring-0 shadow-[0_44px_120px_rgba(0,0,0,0.48),0_10px_34px_rgba(0,0,0,0.22)] sm:rounded-[36px] [perspective:1200px]"
+                      to={category.path}
+                      tabIndex={isExperienceGalleryVisible ? 0 : -1}
+                      className="focus-ring group relative block h-full w-full overflow-hidden rounded-[14px] bg-[#111111] shadow-[0_34px_95px_rgba(0,0,0,0.44),0_8px_22px_rgba(0,0,0,0.20)] outline-none transition-transform duration-500 hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-white sm:rounded-[16px]"
                     >
-                      <motion.div
-                        className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-[30px] sm:rounded-[36px] [backface-visibility:hidden] [transform-origin:bottom] [will-change:transform]"
-                        animate={{
-                          rotateX: activeExperienceIsRevealed ? 90 : 0,
-                        }}
-                        transition={{
-                          duration: 0.6,
-                          ease: CARD_FLIP_EASE,
-                        }}
-                      >
-                        <ExperienceCardFront
-                          category={activeExperience}
-                          categoryTone={activeExperienceTone}
-                          isExpanded
-                        />
-                      </motion.div>
-
-                      {isSmallViewport && (
-                        <motion.div
-                          aria-hidden="true"
-                          initial={false}
-                          animate={{
-                            opacity:
-                              mobileRevealExperienceId === activeExperience.id
-                                ? 1
-                                : 0,
-                          }}
-                          transition={{
-                            duration: 0.32,
-                            ease: [0.22, 1, 0.36, 1],
-                          }}
-                          className="pointer-events-none absolute inset-0 z-10 flex flex-col overflow-hidden rounded-[30px] bg-[#f3f7ee]/95 p-5"
-                        >
-                          <div className="mt-auto rounded-2xl bg-white/90 p-5 text-left shadow-sm">
-                            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#166534]">
-                              {activeExperience.title}
-                            </p>
-                            <p className="mt-2 text-sm font-medium leading-6 text-[#25362D]">
-                              {EXPERIENCE_TRUST_COPY[activeExperience.id]}
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {!isSmallViewport && (
-                        <motion.div
-                          aria-hidden="true"
-                          className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-[30px] p-5 sm:rounded-[36px] sm:p-7 [backface-visibility:hidden] [transform-origin:bottom] [will-change:transform]"
-                          initial={false}
-                          animate={{
-                            rotateX: activeExperienceIsRevealed ? 0 : -90,
-                          }}
-                          transition={{
-                            duration: 0.6,
-                            ease: CARD_FLIP_EASE,
-                          }}
-                        >
-                          <ExperienceCardBack
-                            category={activeExperience}
-                            categoryTone={activeExperienceTone}
-                            Icon={activeExperience.icon}
-                          />
-                        </motion.div>
-                      )}
-
-                      {!shouldReduceMotion && !isSmallViewport ? (
-                        <motion.div
-                          key={`shine-${activeExperience.id}`}
-                          aria-hidden="true"
-                          initial={{
-                            x: "-230%",
-                            y: "150%",
-                            opacity: 0,
-                          }}
-                          animate={{
-                            x: "255%",
-                            y: "-145%",
-                            opacity: [0, 0.9, 0],
-                          }}
-                          transition={{
-                            duration: 1.05,
-                            delay: 0.22,
-                            ease: [0.16, 1, 0.3, 1],
-                          }}
-                          className="pointer-events-none absolute -bottom-[58%] -left-[34%] z-40 h-[180%] w-[32%] -rotate-[34deg] bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[7px]"
-                        />
-                      ) : null}
+                      <ExperienceCardFront category={category} />
                     </Link>
 
-                    {/* Soft reflection like the reference */}
+                    {/* Keep the existing subtle floor reflection on desktop. */}
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute left-[6%] right-[6%] top-[calc(100%+10px)] hidden h-[22%] overflow-hidden opacity-[0.12] [mask-image:linear-gradient(to_bottom,black,transparent)] md:block"
+                      className="pointer-events-none absolute left-[6%] right-[6%] top-[calc(100%+10px)] hidden h-[16%] overflow-hidden opacity-[0.10] [mask-image:linear-gradient(to_bottom,black,transparent)] md:block"
                     >
                       <img
-                        src={EXPERIENCE_CARD_IMAGES[activeExperience.id]}
+                        src={EXPERIENCE_CARD_IMAGES[category.id]}
                         alt=""
-                        className="h-full w-full origin-top scale-y-[-1] rounded-[30px] object-cover blur-[1px] sm:rounded-[36px]"
+                        className="h-full w-full origin-top scale-y-[-1] rounded-[16px] object-cover blur-[1px]"
                       />
                     </div>
                   </motion.div>
-                </motion.div>
-              ) : null}
+                ))}
+              </div>
+
+              {/* Mobile gallery uses horizontal swipe plus accessible arrow controls. */}
+              {isSmallViewport && isExperienceGalleryVisible && (
+                <div className="pointer-events-none absolute inset-x-2 top-1/2 z-40 flex -translate-y-1/2 justify-between">
+                  <button
+                    type="button"
+                    aria-label="Previous experience"
+                    disabled={mobileCardIndex === 0}
+                    onClick={() => scrollExperienceCard(-1)}
+                    className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full border border-white/30 bg-black/45 text-white backdrop-blur-md disabled:invisible"
+                  >
+                    <ArrowLeft size={19} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next experience"
+                    disabled={mobileCardIndex >= landingCategories.length - 1}
+                    onClick={() => scrollExperienceCard(1)}
+                    className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full border border-white/30 bg-black/45 text-white backdrop-blur-md disabled:invisible"
+                  >
+                    <ArrowRight size={19} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Minimal sequence cue */}
-            <div className="pointer-events-none absolute right-3 top-1/2 z-40 hidden -translate-y-1/2 lg:block">
-              <div className="flex flex-col items-center gap-3 text-white/35">
-                <span className="text-[11px] font-black tracking-[0.22em] [writing-mode:vertical-rl] sm:text-xs">
-                  EPANTRY EXPERIENCE
-                </span>
-                <span className="h-9 w-px bg-white/20" />
-                <span className="text-xs font-black tabular-nums sm:text-sm">
-                  {activeExperienceIndex >= 0
-                    ? `0${activeExperienceIndex + 1} / 03`
-                    : "00 / 03"}
-                </span>
-              </div>
-            </div>
           </motion.div>
 
           {/* Static translucent glass behind the incoming Grocery surface.
@@ -1079,7 +841,7 @@ export default function LandingPage() {
 
       <div
         ref={featuredEntranceRef}
-        className="relative z-30 mt-0 sm:-mt-[100svh]"
+        className="relative z-30 mt-0"
       >
         <FeaturedContentSection
           groceryEntranceEdgeOpacity={groceryEdgeOpacity}
@@ -1115,13 +877,13 @@ function ExperienceBackdropRow({
   const repeatedGroups = ["copy-a", "copy-b", "copy-c"];
   const sequence = lowPower ? row.sequence.slice(0, 3) : row.sequence;
 
-  const startsLeft = row.direction === "left";
+  const startsLeft = lowPower || row.direction === "left";
 
   return (
     <div
-      className="absolute left-0 right-0 overflow-visible [transform-style:flat] sm:[transform-style:preserve-3d]"
+      className="absolute left-0 right-0 overflow-visible [transform-style:preserve-3d]"
       style={{
-        // On phones, space all three image rows inside the visible screen.
+        // On phones, the image rows retain depth while moving horizontally.
         top: lowPower ? ["9%", "40%", "71%"][rowIndex] : row.top,
         opacity: row.opacity,
       }}
@@ -1191,7 +953,7 @@ function ExperienceBackdropTile({
 
   return (
     <div
-      className="relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] [transform-style:flat] sm:[transform-style:preserve-3d] sm:rounded-[11px]"
+      className="relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] [transform-style:preserve-3d] sm:rounded-[11px]"
       style={{
         width,
         transform: `translateZ(${depthOffset}px) rotateZ(${
@@ -1216,123 +978,31 @@ function ExperienceBackdropTile({
   );
 }
 
-function ExperienceCardFront({ category, categoryTone, isExpanded }) {
-  const collapsedLabelAlignment =
-    category.id === "grocery"
-      ? "justify-start"
-      : category.id === "recipes"
-      ? "justify-end"
-      : "justify-center";
-
-  const labelAlignment = isExpanded
-    ? "justify-center"
-    : collapsedLabelAlignment;
-
-  const imageSrc = EXPERIENCE_CARD_IMAGES[category.id];
-
+function ExperienceCardFront({ category }) {
   return (
-    <div className="relative h-full overflow-hidden rounded-[30px] bg-[#111111] sm:rounded-[36px]">
+    <div className="relative h-full w-full overflow-hidden bg-[#111111]">
       <img
-        src={imageSrc}
+        src={EXPERIENCE_CARD_IMAGES[category.id]}
         alt=""
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full scale-[1.015] object-cover transition-transform duration-700 ease-out lg:group-hover:scale-[1.035]"
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.045]"
       />
-
       <div
         aria-hidden="true"
-        className="absolute left-[8%] top-[3%] h-[22%] w-[48%] rounded-full bg-white/[0.055] blur-3xl"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.02)_30%,rgba(0,0,0,0.12)_55%,rgba(0,0,0,0.79)_100%)]"
       />
-
-      <div
-        aria-hidden="true"
-        className="absolute -left-[14%] top-[8%] h-[36%] w-[54%] rounded-full bg-white/[0.065] blur-3xl"
-      />
-
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04)_0%,rgba(0,0,0,0.02)_38%,rgba(0,0,0,0.16)_70%,rgba(0,0,0,0.52)_100%)]"
-      />
-
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-[8%] top-0 h-[28%] rounded-b-[50%] bg-white/[0.055] blur-2xl"
-      />
-
-      <div
-        aria-hidden="true"
-        className="absolute bottom-0 left-0 right-0 h-[38%] bg-[radial-gradient(circle_at_50%_110%,rgba(255,255,255,0.10),transparent_58%)]"
-      />
-
-      <div
-        className={`absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 px-5 md:px-7 ${labelAlignment}`}
-      >
-        <motion.h3
-          layout={
-            typeof window !== "undefined" &&
-            window.matchMedia("(min-width: 768px)").matches
-              ? "position"
-              : false
-          }
-          initial={false}
-          transition={{
-            layout: {
-              duration: 0.58,
-              ease: [0.22, 1, 0.36, 1],
-            },
-          }}
-          className="whitespace-nowrap text-2xl font-black tracking-[-0.03em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] [will-change:transform] md:text-4xl lg:rounded-[18px] lg:bg-black/[0.24] lg:px-5 lg:py-2.5 lg:shadow-[0_12px_34px_rgba(0,0,0,0.22)] lg:backdrop-blur-[7px] lg:drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
-        >
+      <div className="absolute inset-x-0 bottom-0 px-5 pb-7 text-center sm:px-6 sm:pb-9">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/80 sm:text-xs">
+          Explore EPANTRY
+        </p>
+        <h3 className="mt-2 text-[clamp(24px,3.3vw,40px)] font-bold leading-[1.06] tracking-[-0.035em] text-white drop-shadow-lg">
           {category.title}
-        </motion.h3>
+        </h3>
+        <span className="mt-3 inline-flex items-center justify-center gap-1 text-xs font-semibold text-white/85 opacity-90 sm:text-sm">
+          {category.buttonText}
+          <ArrowRight size={14} aria-hidden="true" />
+        </span>
       </div>
     </div>
   );
 }
 
-function ExperienceCardBack({ category, categoryTone, Icon }) {
-  const imageSrc = EXPERIENCE_CARD_IMAGES[category.id];
-
-  return (
-    <>
-      <img
-        src={imageSrc}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full scale-[1.03] object-cover"
-      />
-
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 ${categoryTone.glass} backdrop-blur-[9px]`}
-      />
-
-      <div aria-hidden="true" className="absolute inset-0 bg-white/10" />
-
-      <div
-        aria-hidden="true"
-        className={`absolute -right-16 -top-16 h-40 w-40 rounded-full ${categoryTone.glow} blur-3xl`}
-      />
-
-      <div
-        className={`relative z-10 grid h-13 w-13 place-items-center self-start rounded-2xl border border-white/[0.35] shadow-sm backdrop-blur-md ${categoryTone.icon}`}
-      >
-        <Icon size={24} aria-hidden="true" />
-      </div>
-
-      <div className="relative z-10 mt-auto max-w-md rounded-[22px] border border-white/[0.35] bg-white/[0.48] p-5 shadow-[0_18px_45px_rgba(17,24,39,0.10)] backdrop-blur-md">
-        <p className="text-base font-semibold leading-7 text-[#1F2937]">
-          {EXPERIENCE_TRUST_COPY[category.id]}
-        </p>
-
-        <div
-          className={`mt-5 inline-flex items-center gap-2 text-sm font-black ${categoryTone.action}`}
-        >
-          {category.buttonText}
-
-          <ArrowUpRight size={17} aria-hidden="true" />
-        </div>
-      </div>
-    </>
-  );
-}
