@@ -1,3 +1,4 @@
+import { optimizeUploadImage } from '../../../lib/optimizeUploadImage'
 import {
   apiClient,
 } from '../../../api/apiClient'
@@ -334,10 +335,16 @@ export async function uploadRecipeImage({
           .allowedMimeTypes
       : []
 
+  // Compress before checking Cloudinary's size limit, without changing its signed intent.
+  const uploadFile = await optimizeUploadImage(file, {
+    maxEdge: 2200,
+    targetBytes: 900 * 1024,
+  })
+
   if (
     maxBytes >
       0 &&
-    file.size >
+    uploadFile.size >
       maxBytes
   ) {
     throw new Error(
@@ -349,7 +356,7 @@ export async function uploadRecipeImage({
     allowedMimeTypes.length >
       0 &&
     !allowedMimeTypes.includes(
-      file.type,
+      uploadFile.type,
     )
   ) {
     throw new Error(
@@ -362,7 +369,7 @@ export async function uploadRecipeImage({
 
   formData.append(
     'file',
-    file,
+    uploadFile,
   )
 
   formData.append(

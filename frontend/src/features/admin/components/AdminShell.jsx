@@ -182,6 +182,8 @@ export default function AdminShell({
   children,
   actions = null,
   flushTop = false,
+  showWorkspaceBadge = true,
+  mobileStackHeader = false,
 }) {
   const location = useLocation();
 
@@ -248,22 +250,14 @@ export default function AdminShell({
       icon: BarChart3,
       items: [
         {
-          label: "Analytics Overview",
+          label: "Analytics & Customer Demand",
           to: "/admin/analytics",
           icon: BarChart3,
           visible:
             hasAdminPermission("admin.dashboard.read") ||
             hasAdminPermission("admin.audit.read") ||
             hasAdminPermission("marketplace.read") ||
-            hasAdminPermission("trust_safety.read"),
-        },
-        {
-          label: "Customer Search Demand",
-          to: "/admin/search-demand",
-          icon: Search,
-          visible:
-            hasAdminPermission("admin.dashboard.read") ||
-            hasAdminPermission("marketplace.read") ||
+            hasAdminPermission("trust_safety.read") ||
             hasAdminPermission("catalog.read"),
         },
       ],
@@ -682,14 +676,16 @@ export default function AdminShell({
                     <AdminGlobalSearch />
                   </div>
 
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:gap-4">
+                  <div className={mobileStackHeader ? "grid min-w-0 grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4" : "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:gap-4"}>
                     <div className="min-w-0">
-                      <div className="mb-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[7px] font-black uppercase tracking-[0.11em] text-emerald-800 sm:mb-1 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[9px] sm:tracking-[0.13em]">
-                        <ShieldCheck size={13} aria-hidden="true" />
-                        Secure admin workspace
-                      </div>
+                      {showWorkspaceBadge ? (
+                        <div className="mb-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[7px] font-black uppercase tracking-[0.11em] text-emerald-800 sm:mb-1 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[9px] sm:tracking-[0.13em]">
+                          <ShieldCheck size={13} aria-hidden="true" />
+                          Secure admin workspace
+                        </div>
+                      ) : null}
 
-                      <h1 className="text-[18px] font-black leading-5 tracking-tight text-stone-950 sm:text-2xl sm:leading-tight">
+                      <h1 className={mobileStackHeader ? "break-normal text-[22px] font-black leading-tight tracking-tight text-stone-950 sm:text-2xl" : "text-[18px] font-black leading-5 tracking-tight text-stone-950 sm:text-2xl sm:leading-tight"}>
                         {title}
                       </h1>
 
@@ -700,7 +696,7 @@ export default function AdminShell({
                       ) : null}
                     </div>
 
-                    {actions ? <div className="shrink-0">{actions}</div> : null}
+                    {actions ? <div className={mobileStackHeader ? "min-w-0 w-full sm:w-auto sm:shrink-0" : "shrink-0"}>{actions}</div> : null}
                   </div>
                 </header>
 

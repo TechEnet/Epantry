@@ -311,6 +311,16 @@ const creatorSessionSchema = new Schema(
       default: 'Asia/Kolkata',
     },
 
+    // Confidential provider-hosted meeting URL. Fetch only for the owner or
+    // confirmed attendee through the authenticated join endpoint.
+    meetingUrl: {
+      type: String,
+      trim: true,
+      maxlength: 2048,
+      default: '',
+      select: false,
+    },
+
     capacity: {
       type: Number,
       min: 1,
@@ -449,6 +459,24 @@ creatorSessionSchema.index({
   startsAt: 1,
   creatorProfileId: 1,
 })
+
+// A waitlist is an opt-in queue, not a reservation or payment promise.
+const creatorSessionWaitlistSchema = new Schema(
+  {
+    sessionId: { type: objectId, ref: 'CreatorSession', required: true, index: true, immutable: true },
+    customerUserId: { type: objectId, ref: 'User', required: true, index: true, immutable: true },
+    status: { type: String, enum: ['waiting', 'claimed', 'cancelled'], required: true, default: 'waiting' },
+    joinedAt: { type: Date, required: true, default: Date.now },
+    claimedAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
+  },
+  { ...baseOptions, collection: 'creatorSessionWaitlist' },
+)
+creatorSessionWaitlistSchema.index(
+  { sessionId: 1, customerUserId: 1 },
+  { unique: true, name: 'creator_session_waitlist_customer_unique' },
+)
+creatorSessionWaitlistSchema.index({ sessionId: 1, status: 1, joinedAt: 1 })
 
 const creatorSessionBookingSchema = new Schema(
   {
@@ -827,6 +855,10 @@ export const CreatorSessionBooking =
     'CreatorSessionBooking',
     creatorSessionBookingSchema,
   )
+
+export const CreatorSessionWaitlist =
+  mongoose.models.CreatorSessionWaitlist ||
+  mongoose.model('CreatorSessionWaitlist', creatorSessionWaitlistSchema)
 
 export const CreatorSessionEvent =
   mongoose.models.CreatorSessionEvent ||

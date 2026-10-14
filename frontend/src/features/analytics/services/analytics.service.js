@@ -174,6 +174,41 @@ export async function listNotifications({
   )
 }
 
+/*
+|--------------------------------------------------------------------------|
+| Navbar + Bell single-flight read
+|--------------------------------------------------------------------------|
+| The two navigation components can mount at the same time and request the
+| same notification list. Share only an in-flight request for the same user
+| and mode. Never retain a response or share one between separate accounts.
+*/
+const pendingHeaderNotifications = new Map()
+
+export function listHeaderNotifications({ userId, activeMode } = {}) {
+  // Do not coalesce across unknown identities (e.g. during session bootstrap).
+  if (!userId) return listNotifications({ limit: 100 })
+
+  const key = JSON.stringify([
+    String(userId || ''),
+    String(activeMode || ''),
+  ])
+
+  const existing = pendingHeaderNotifications.get(key)
+  if (existing) return existing
+
+  const promise = listNotifications({ limit: 100 })
+  pendingHeaderNotifications.set(key, promise)
+
+  const clear = () => {
+    if (pendingHeaderNotifications.get(key) === promise) {
+      pendingHeaderNotifications.delete(key)
+    }
+  }
+  promise.then(clear, clear)
+
+  return promise
+}
+
 export async function markNotificationRead(
   notificationId,
 ) {

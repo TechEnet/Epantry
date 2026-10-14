@@ -1,10 +1,6 @@
 import mongoose from 'mongoose'
 
-import brands from '../../../seed-data/brands.js'
-
-import {
-  env,
-} from '../../config/env.js'
+import { ApiError } from '../../utils/ApiError.js'
 
 import {
   getPublicProductBySlug,
@@ -25,113 +21,10 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| Temporary Development Preview Data
-|--------------------------------------------------------------------------
-|
-| Brand preview data remains available for development only.
-|
-| Grocery intentionally does NOT use the legacy prototype products
-| collection or product seed fallback anymore. The homepage Featured
-| Grocery section now reads from the same current canonical catalog used by
-| /grocery and requires an active Host listing.
-|
-| Recipes also continue to use the real published Recipes system.
-|
-*/
-
-const previewBrandIds = [
-  'brand_001',
-  'brand_002',
-  'brand_003',
-]
-
-/*
-|--------------------------------------------------------------------------
-| Select Preview Records
+| Featured content uses real public records only. No seed or preview brands
+| are returned, even if the live database is empty or unavailable.
 |--------------------------------------------------------------------------
 */
-
-function selectByIds(
-  items,
-  ids,
-) {
-  const itemMap =
-    new Map(
-      items.map(
-        (item) => [
-          item.id,
-          item,
-        ],
-      ),
-    )
-
-  return ids
-    .map(
-      (id) =>
-        itemMap.get(id),
-    )
-    .filter(Boolean)
-}
-
-/*
-|--------------------------------------------------------------------------
-| Development Fallback
-|--------------------------------------------------------------------------
-|
-| Kept only for the existing Featured Brands development behavior.
-|
-*/
-
-function fillWithDevelopmentPreview(
-  databaseItems,
-  previewItems,
-  limit,
-) {
-  const realItems =
-    Array.isArray(
-      databaseItems,
-    )
-      ? databaseItems
-      : []
-
-  if (
-    env.nodeEnv ===
-      'production' ||
-    realItems.length >=
-      limit
-  ) {
-    return realItems.slice(
-      0,
-      limit,
-    )
-  }
-
-  const existingIds =
-    new Set(
-      realItems
-        .map(
-          (item) =>
-            item?.id,
-        )
-        .filter(Boolean),
-    )
-
-  const fallbackItems =
-    previewItems.filter(
-      (item) =>
-        !existingIds.has(
-          item.id,
-        ),
-    )
-
-  return [
-    ...realItems,
-    ...fallbackItems,
-  ].slice(
-    0,
-    limit,
-  )
-}
 
 /*
 |--------------------------------------------------------------------------
@@ -479,35 +372,19 @@ async function buildFeaturedRecipeCard(
 export async function getLandingFeaturedContent() {
   /*
   |--------------------------------------------------------------------------
-  | Database Readiness Fallback
+  | Database Readiness
   |--------------------------------------------------------------------------
   |
-  | Landing is a public shell contract and must not wait for Mongoose query
-  | buffering when the database connection has not been established yet.
-  | Canonical Grocery and Recipe truth is never invented here: disconnected
-  | requests receive empty canonical arrays, while the existing development
-  | Brand preview remains available outside production.
+  | Fail explicitly when MongoDB is unavailable, rather than pretending that
+  | no approved Grocery, Brand, or Recipe records exist. The frontend already
+  | handles landing featured-content request failures.
   |
   */
 
-  if (
-    mongoose.connection.readyState !==
-    1
-  ) {
-    return {
-      grocery: [],
-
-      brands:
-        env.nodeEnv ===
-          'production'
-          ? []
-          : selectByIds(
-              brands,
-              previewBrandIds,
-            ),
-
-      recipes: [],
-    }
+  if (mongoose.connection.readyState !== 1) {
+    throw new ApiError(503, 'Featured content is temporarily unavailable because the database is not connected.', [
+      { code: 'LANDING_DATABASE_NOT_READY' },
+    ])
   }
 
   const [
@@ -560,18 +437,6 @@ export async function getLandingFeaturedContent() {
 
   /*
   |--------------------------------------------------------------------------
-  | Existing Brand Preview Selection
-  |--------------------------------------------------------------------------
-  */
-
-  const previewBrands =
-    selectByIds(
-      brands,
-      previewBrandIds,
-    )
-
-  /*
-  |--------------------------------------------------------------------------
   | Real Current Grocery + Approved Nutrition
   |--------------------------------------------------------------------------
   */
@@ -588,18 +453,7 @@ export async function getLandingFeaturedContent() {
       normalizePublicGroceryCard,
     )
 
-  /*
-  |--------------------------------------------------------------------------
-  | Existing Brand Behavior
-  |--------------------------------------------------------------------------
-  */
-
-  const featuredBrands =
-    fillWithDevelopmentPreview(
-      databaseBrands,
-      previewBrands,
-      databaseBrands.length,
-    )
+  const featuredBrands = databaseBrands
 
   /*
   |--------------------------------------------------------------------------

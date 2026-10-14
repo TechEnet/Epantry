@@ -51,6 +51,7 @@ const ROUTE_PREFIXES_BY_WORKSPACE = Object.freeze({
   [HOST_WORKSPACE_TYPES.B2B]: [
     ...COMMON_HOST_PATHS,
     ...COMMERCE_HOST_PATHS,
+    '/host/hospitality',
   ],
 
   [HOST_WORKSPACE_TYPES.BRAND_SELLER]: [

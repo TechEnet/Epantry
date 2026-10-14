@@ -113,7 +113,7 @@ function RunHistoryItem({ item }) {
   )
 }
 
-export default function AdminAiQualityPanel({ refreshSignal = 0 }) {
+export default function AdminAiQualityPanel({ refreshSignal = 0, condensed = false }) {
   const [data, setData] = useState(null)
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -149,60 +149,71 @@ export default function AdminAiQualityPanel({ refreshSignal = 0 }) {
   const items = Array.isArray(data?.items) ? data.items : []
 
   return (
-    <section id="ai-quality" className="min-w-0 space-y-4 sm:space-y-5">
-      <div className="overflow-hidden rounded-[20px] border border-[#c9e4da] bg-[#e4f3eb]">
+    <section
+      id="ai-quality"
+      className={condensed
+        ? 'min-w-0 overflow-hidden rounded-[20px] border border-[#d4e1d8] bg-white shadow-[0_10px_24px_rgba(18,55,39,0.04)]'
+        : 'min-w-0 space-y-4 sm:space-y-5'}
+    >
+      <div className={condensed ? 'border-b border-[#dbe8df] bg-[#edf5ef]' : 'overflow-hidden rounded-[20px] border border-[#c9e4da] bg-[#e4f3eb]'}>
         <div className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6 sm:p-6">
           <div className="min-w-0">
-            <p className="text-xs font-bold text-emerald-800">AI reliability</p>
-            <h2 className="mt-1 text-[24px] font-extrabold leading-tight text-[#124633] sm:text-[29px]">Check how the AI assistant is working</h2>
-            <p className="mt-1.5 max-w-2xl text-sm leading-5 text-[#416558] sm:text-base sm:leading-6">
-              <span className="sm:hidden">Review AI results, backups and errors.</span>
-              <span className="hidden sm:inline">See when Food Copilot answers normally, uses backup search or needs attention. Customer messages stay private.</span>
-            </p>
+            <p className="text-xs font-bold text-emerald-800">{condensed ? 'Food Copilot' : 'AI reliability'}</p>
+            <h2 className="mt-1 text-[24px] font-extrabold leading-tight text-[#124633] sm:text-[29px]">{condensed ? 'AI reliability & activity' : 'Check how the AI assistant is working'}</h2>
+            {!condensed ? (
+              <p className="mt-1.5 max-w-2xl text-sm leading-5 text-[#416558] sm:text-base sm:leading-6">
+                <span className="sm:hidden">Review AI results, backups and errors.</span>
+                <span className="hidden sm:inline">See when Food Copilot answers normally, uses backup search or needs attention. Customer messages stay private.</span>
+              </p>
+            ) : null}
           </div>
           <button type="button" onClick={load} disabled={loading} className="focus-ring inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-60">
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Refresh AI results
           </button>
         </div>
-        <div className="grid grid-cols-3 gap-px bg-[#cde7dd]">
-          {[
-            ['01', 'Check results'],
-            ['02', 'Find problems'],
-            ['03', 'Review details'],
-          ].map(([number, label]) => (
-            <div key={number} className="min-w-0 bg-[#f3faf6] px-2 py-2.5 text-center text-xs font-semibold text-[#225945] sm:py-3 sm:text-sm">
-              <strong className="mr-1 text-emerald-800">{number}</strong>{label}
-            </div>
-          ))}
-        </div>
+        {!condensed ? (
+          <div className="grid grid-cols-3 gap-px bg-[#cde7dd]">
+            {[
+              ['01', 'Check results'],
+              ['02', 'Find problems'],
+              ['03', 'Review details'],
+            ].map(([number, label]) => (
+              <div key={number} className="min-w-0 bg-[#f3faf6] px-2 py-2.5 text-center text-xs font-semibold text-[#225945] sm:py-3 sm:text-sm">
+                <strong className="mr-1 text-emerald-800">{number}</strong>{label}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-[18px] border border-[#d3e4ee] bg-[#edf5fa]">
-        <div className="flex items-center justify-between gap-3 border-b border-[#d5e3ed] px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2 text-[#2b5871]"><Bot size={17} aria-hidden="true" /><h3 className="text-base font-bold">Food Copilot results</h3></div>
-          <span className="text-xs font-semibold text-[#537186]">All recorded runs</span>
-        </div>
-        <div className="grid grid-cols-2 gap-px bg-[#d5e3ed] sm:grid-cols-4">
+      <div className={condensed ? 'border-b border-[#e0e8e2] bg-white' : 'overflow-hidden rounded-[18px] border border-[#d3e4ee] bg-[#edf5fa]'}>
+        {!condensed ? (
+          <div className="flex items-center justify-between gap-3 border-b border-[#d5e3ed] px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2 text-[#2b5871]"><Bot size={17} aria-hidden="true" /><h3 className="text-base font-bold">Food Copilot results</h3></div>
+            <span className="text-xs font-semibold text-[#537186]">All recorded runs</span>
+          </div>
+        ) : null}
+        <div className={condensed ? 'grid grid-cols-2 gap-px bg-[#e4ebe5] sm:grid-cols-4' : 'grid grid-cols-2 gap-px bg-[#d5e3ed] sm:grid-cols-4'}>
           {[
             ['Total runs', summary.total],
             ['Worked normally', summary.succeeded],
             ['Used backup', summary.fallback],
             ['Needs attention', summary.failed],
           ].map(([label, value]) => (
-            <div key={label} className="min-w-0 bg-white px-3 py-3.5 sm:px-5 sm:py-4">
-              <p className="text-2xl font-extrabold leading-none text-[#173f50] sm:text-3xl">{data ? (value ?? 0) : '—'}</p>
-              <p className="mt-1.5 text-xs font-semibold leading-4 text-[#526b79] sm:text-sm">{label}</p>
+            <div key={label} className={condensed ? 'min-w-0 bg-white px-3 py-4 sm:px-6 sm:py-5' : 'min-w-0 bg-white px-3 py-3.5 sm:px-5 sm:py-4'}>
+              <p className={condensed ? 'text-2xl font-extrabold leading-none text-[#164934] sm:text-3xl' : 'text-2xl font-extrabold leading-none text-[#173f50] sm:text-3xl'}>{data ? (value ?? 0) : '—'}</p>
+              <p className={condensed ? 'mt-1.5 text-xs font-semibold leading-4 text-[#52675b] sm:text-sm' : 'mt-1.5 text-xs font-semibold leading-4 text-[#526b79] sm:text-sm'}>{label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-[18px] border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-3.5 py-4 sm:px-6 sm:py-5">
+      <section className={condensed ? 'min-w-0 bg-white' : 'overflow-hidden rounded-[18px] border border-stone-200 bg-white'}>
+        <div className={condensed ? 'border-b border-stone-100 px-4 py-4 sm:px-6 sm:py-5' : 'border-b border-stone-200 px-3.5 py-4 sm:px-6 sm:py-5'}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-bold text-stone-950 sm:text-xl">Recent AI activity</h3>
-              <p className="mt-1 text-sm text-stone-600">Choose a result to check what happened.</p>
+              <h3 className="text-lg font-bold text-stone-950 sm:text-xl">{condensed ? 'Recent activity' : 'Recent AI activity'}</h3>
+              {!condensed ? <p className="mt-1 text-sm text-stone-600">Choose a result to check what happened.</p> : null}
             </div>
             {!error && data && <p className="text-sm font-bold text-emerald-800">{totalInFilter} {totalInFilter === 1 ? 'run' : 'runs'}</p>}
           </div>
@@ -245,10 +256,12 @@ export default function AdminAiQualityPanel({ refreshSignal = 0 }) {
         )}
       </section>
 
-      <div className="flex items-start gap-2.5 border-l-4 border-[#96c6b6] bg-[#f0f7f4] px-3.5 py-3.5 text-sm leading-5 text-[#305b4c] sm:px-5">
-        <ShieldCheck className="mt-0.5 shrink-0" size={18} aria-hidden="true" />
-        <p>This report tracks Food Copilot runs, not every AI process. AI suggestions do not approve products, recipes or food-safety decisions.</p>
-      </div>
+      {!condensed ? (
+        <div className="flex items-start gap-2.5 border-l-4 border-[#96c6b6] bg-[#f0f7f4] px-3.5 py-3.5 text-sm leading-5 text-[#305b4c] sm:px-5">
+          <ShieldCheck className="mt-0.5 shrink-0" size={18} aria-hidden="true" />
+          <p>This report tracks Food Copilot runs, not every AI process. AI suggestions do not approve products, recipes or food-safety decisions.</p>
+        </div>
+      ) : null}
     </section>
   )
 }

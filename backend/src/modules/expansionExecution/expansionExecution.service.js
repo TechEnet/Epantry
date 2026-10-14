@@ -59,6 +59,7 @@ import {
   CreatorPaymentEvidence,
   CreatorSession,
   CreatorSessionBooking,
+  CreatorSessionWaitlist,
   CreatorSessionEvent,
   SponsoredEligibilityEvidence,
 } from './expansionExecution.models.js'
@@ -216,6 +217,8 @@ function serializeSession(value) {
     timezone:
       item.timezone,
 
+    meetingConfigured: Boolean(item.meetingUrl),
+
     capacity:
       item.capacity,
 
@@ -275,6 +278,16 @@ function serializeSession(value) {
     updatedAt:
       item.updatedAt ||
       null,
+  }
+}
+
+function serializeWaitlist(value) {
+  const entry = typeof value?.toObject === 'function' ? value.toObject() : value
+  return {
+    id: id(entry._id),
+    sessionId: id(entry.sessionId),
+    status: entry.status,
+    createdAt: entry.createdAt || null,
   }
 }
 
@@ -1658,6 +1671,7 @@ export async function listMyCreatorSessions({
       ownerUserId:
         context.userId,
     })
+      .select('+meetingUrl')
       .sort({
         startsAt:
           -1,
@@ -1784,6 +1798,9 @@ export async function createCreatorSession({
       commercialDisclosure:
         input.commercialDisclosure,
 
+      meetingUrl:
+        input.meetingUrl || '',
+
       status:
         'draft',
 
@@ -1831,6 +1848,125 @@ export async function createCreatorSession({
         false,
     },
   }
+}
+
+export async function setCreatorSessionMeeting({ sessionId, meetingUrl, actorUser }) {
+  await requireM22SafeExpansionFeature()
+  const context = await ownedCreatorContext(actorUser)
+  if (!context.profile) {
+    throw new ApiError(404, 'Creator profile is required.')
+  }
+  const session = await CreatorSession.findOne({
+    _id: sessionId,
+    ownerUserId: context.userId,
+    creatorProfileId: context.profile._id,
+    status: { $in: ['draft', 'published'] },
+  }).select('+meetingUrl')
+  if (!session) {
+    throw new ApiError(404, 'Owned Creator session draft or published session was not found.')
+  }
+  session.meetingUrl = meetingUrl
+  await session.save()
+  await appendSessionEvent({
+    session, actorType: 'creator', actorUser,
+    eventType: 'meeting_link_configured',
+    reason: 'Owner configured the provider-hosted live meeting link.',
+    metadata: { linkValueLogged: false },
+  })
+  return { session: serializeSession(session) }
+}
+
+export async function getCreatorSessionJoinLink({ sessionId, actorUser }) {
+  await requireM22SafeExpansionFeature()
+  const userId = actorId(actorUser)
+  const session = await CreatorSession.findById(sessionId).select('+meetingUrl')
+  if (!session || session.status !== 'published') {
+    throw new ApiError(404, 'Published Creator session was not found.')
+  }
+  const now = Date.now()
+  if (
+    now < new Date(session.startsAt).getTime() - 15 * 60 * 1000 ||
+    now > new Date(session.endsAt).getTime()
+  ) {
+    throw new ApiError(409, 'The live meeting opens 15 minutes before class and closes when the class ends.')
+  }
+  if (!session.meetingUrl) {
+    throw new ApiError(409, 'The Creator has not configured a meeting link yet.')
+  }
+  const owner = String(session.ownerUserId) === String(userId)
+  if (owner && !(
+    actorUser?.hostEnabled === true &&
+    actorUser?.hostAccessStatus === 'active' &&
+    actorUser?.hostWorkspaceType === 'chef_restaurant' &&
+    actorUser?.activeMode !== 'customer'
+  )) {
+    throw new ApiError(403, 'Switch to an active Chef + Restaurant Host workspace to open your class.')
+  }
+  if (!owner) {
+    const booking = await CreatorSessionBooking.findOne({
+      sessionId: session._id,
+      customerUserId: userId,
+      status: { $in: ['confirmed', 'attended'] },
+    }).lean()
+    if (!booking) {
+      throw new ApiError(403, 'A confirmed booking is required to join this class.')
+    }
+  }
+  return { joinUrl: session.meetingUrl, startsAt: session.startsAt, endsAt: session.endsAt }
+}
+
+export async function joinCreatorSessionWaitlist({ sessionId, actorUser }) {
+  await requireM22SafeExpansionFeature()
+  const userId = actorId(actorUser)
+  const session = await CreatorSession.findOne({
+    _id: sessionId, status: 'published', startsAt: { $gt: new Date() },
+  }).lean()
+  if (!session) {
+    throw new ApiError(404, 'Published upcoming Creator session was not found.')
+  }
+  if (session.reservedSeats < session.capacity) {
+    throw new ApiError(409, 'A seat is available. Book the class directly instead.')
+  }
+  const booking = await CreatorSessionBooking.findOne({
+    sessionId: session._id, customerUserId: userId,
+    status: { $in: ['reserved', 'payment_required', 'confirmed', 'attended'] },
+  }).lean()
+  if (booking) {
+    throw new ApiError(409, 'You already have a booking for this class.')
+  }
+  // The existing session/customer booking index is unique. Never promise a
+  // new seat to an account whose earlier booking cannot be safely recreated.
+  const earlierBooking = await CreatorSessionBooking.exists({
+    sessionId: session._id, customerUserId: userId,
+  })
+  if (earlierBooking) {
+    throw new ApiError(409, 'An earlier booking exists for this class. Contact support before requesting a new seat.')
+  }
+  if (session.accessType === 'entitled') {
+    const entitlement = await activeCourseEntitlement({ userId, courseId: session.courseId })
+    if (!entitlement) {
+      throw new ApiError(403, 'An active Course Entitlement is required to join this class waitlist.')
+    }
+  }
+  const entry = await CreatorSessionWaitlist.findOneAndUpdate(
+    { sessionId: session._id, customerUserId: userId, status: { $ne: 'claimed' } },
+    { $set: { status: 'waiting', cancelledAt: null, claimedAt: null, joinedAt: new Date() }, $setOnInsert: { sessionId: session._id, customerUserId: userId } },
+    { upsert: true, new: true },
+  )
+  return { waitlist: serializeWaitlist(entry), reserved: false, paymentRequired: false }
+}
+
+export async function leaveCreatorSessionWaitlist({ sessionId, actorUser }) {
+  await requireM22SafeExpansionFeature()
+  const entry = await CreatorSessionWaitlist.findOneAndUpdate(
+    { sessionId, customerUserId: actorId(actorUser), status: 'waiting' },
+    { $set: { status: 'cancelled', cancelledAt: new Date() } },
+    { new: true },
+  )
+  if (!entry) {
+    throw new ApiError(404, 'Active class waitlist entry was not found.')
+  }
+  return { waitlist: serializeWaitlist(entry) }
 }
 
 export async function publishCreatorSession({
@@ -2198,6 +2334,30 @@ export async function bookCreatorSession({
     }
   }
 
+  // Reconcile rare failures after a durable booking: do not let stale
+  // waitlist records permanently block the next eligible customer.
+  let firstWaiting = await CreatorSessionWaitlist.findOne({
+    sessionId: session._id, status: 'waiting',
+  }).sort({ joinedAt: 1, _id: 1 }).lean()
+  for (let attempt = 0; firstWaiting && attempt < 100; attempt += 1) {
+    const alreadyBooked = await CreatorSessionBooking.exists({
+      sessionId: session._id, customerUserId: firstWaiting.customerUserId,
+    })
+    if (!alreadyBooked) break
+    await CreatorSessionWaitlist.updateOne(
+      { _id: firstWaiting._id, status: 'waiting' },
+      { $set: { status: 'claimed', claimedAt: new Date() } },
+    )
+    firstWaiting = await CreatorSessionWaitlist.findOne({
+      sessionId: session._id, status: 'waiting',
+    }).sort({ joinedAt: 1, _id: 1 }).lean()
+  }
+  if (firstWaiting && String(firstWaiting.customerUserId) !== String(userId)) {
+    throw new ApiError(409, 'A returned seat is being offered to the next waitlisted customer first.', [
+      { code: 'M22_CREATOR_WAITLIST_PRIORITY' },
+    ])
+  }
+
   const reserved =
     await CreatorSession.findOneAndUpdate(
       {
@@ -2409,6 +2569,15 @@ export async function bookCreatorSession({
         currency:
           booking.currency,
       }
+    }
+
+    // Booking is already durable. A failed queue update must not roll back
+    // the existing booking or its seat; the next read can reconcile it.
+    if (firstWaiting && String(firstWaiting.customerUserId) === String(userId)) {
+      await CreatorSessionWaitlist.updateOne(
+        { _id: firstWaiting._id, status: 'waiting' },
+        { $set: { status: 'claimed', claimedAt: new Date() } },
+      ).catch(() => {})
     }
 
     return {
@@ -3019,10 +3188,12 @@ export async function listMyCreatorBookings({
       )
       .lean()
 
+  const waitlist = await CreatorSessionWaitlist.find({
+    customerUserId: userId, status: 'waiting',
+  }).sort({ joinedAt: 1 }).limit(100).lean()
+
   return {
-    bookings:
-      bookings.map(
-        serializeBooking,
-      ),
+    bookings: bookings.map(serializeBooking),
+    waitlist: waitlist.map(serializeWaitlist),
   }
 }

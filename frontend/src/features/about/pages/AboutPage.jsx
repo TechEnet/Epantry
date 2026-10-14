@@ -443,149 +443,155 @@ export default function AboutPage() {
   }
 
   return (
-    <main className="relative overflow-hidden bg-[#F8FAF7] py-12 sm:py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_12%,rgba(22,101,52,0.10),transparent_25%),radial-gradient(circle_at_92%_44%,rgba(37,99,235,0.055),transparent_22%)]" />
-      <div className="page-shell relative z-10">
-      <div className="mx-auto max-w-7xl">
-        <section className="relative overflow-hidden rounded-[34px] border border-emerald-200/70 bg-[linear-gradient(135deg,#FFFFFF_0%,#F3FAF5_55%,#ECFDF5_100%)] p-7 shadow-[0_24px_70px_rgba(22,101,52,0.09)] sm:p-9 lg:p-12">
-          <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full border border-emerald-200/60 bg-emerald-100/45" />
-          <div className="pointer-events-none absolute -bottom-24 left-1/3 size-64 rounded-full bg-blue-100/30 blur-3xl" />
-          <div className="relative z-10 grid gap-10 lg:grid-cols-[1.28fr_0.72fr] lg:items-end">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                <Sparkles size={14} aria-hidden="true" />
-                About EPANTRY
+    <main className="min-w-0 overflow-x-clip bg-[#F8F9F6] pb-10 text-[#18372D] sm:pb-14">
+      <div className="page-shell">
+        <div className="mx-auto max-w-7xl px-1 sm:px-3 lg:px-5">
+          {/* Public About hero: a light introduction with four short steps. */}
+          <section
+            aria-labelledby="about-intro-title"
+            className="relative isolate mt-3 overflow-hidden rounded-[24px] border border-[#D6E5D9] bg-[#EAF3EC] sm:mt-5 sm:rounded-[30px]"
+          >
+            <div className="relative grid gap-8 px-5 py-8 sm:px-9 sm:py-12 lg:grid-cols-[minmax(0,1.14fr)_minmax(300px,0.86fr)] lg:items-center lg:gap-16 lg:px-12 lg:py-16">
+              <div className="min-w-0">
+                <p className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.12em] text-[#276B4B]">
+                  <span className="size-2 rounded-full bg-[#3A9267]" aria-hidden="true" />
+                  About EPANTRY
+                </p>
+                <h1 id="about-intro-title" className="mt-5 max-w-[720px] text-[clamp(2.4rem,5vw,5rem)] font-extrabold leading-[1.07] tracking-[-0.055em] text-[#133E2D]">
+                  Food made <span className="text-[#358560]">simple.</span>
+                  <span className="block">Life made easier.</span>
+                </h1>
+                <p className="mt-5 text-[16px] font-medium leading-6 text-[#406554] sm:text-[18px]">
+                  Shop, cook and plan. All in one place.
+                </p>
               </div>
 
-              <h1 className="mt-6 max-w-3xl text-4xl font-black tracking-[-0.045em] text-stone-950 sm:text-5xl lg:text-6xl">
-                Food discovery, shopping and everyday decisions — connected.
-              </h1>
-
-              <p className="mt-4 max-w-3xl text-sm font-medium leading-7 text-stone-600 sm:text-base">
-                EPANTRY is designed to help you move from finding food to understanding it, buying it, cooking it and planning what comes next without treating each step as a separate app experience.
-              </p>
-            </div>
-
-            <div className="rounded-[28px] border border-emerald-200 bg-white/90 p-6 shadow-[0_14px_40px_rgba(22,101,52,0.08)] backdrop-blur-sm">
-              <div className="flex items-center gap-3">
-                <div className="grid size-11 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
-                  <Layers3 size={20} aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-sm font-black text-stone-950">One connected food ecosystem</p>
-                  <p className="mt-1 text-xs leading-5 text-stone-500">Grocery · Brands · Recipes · Pantry · Planning · Marketplace</p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                {['Discover', 'Understand', 'Act'].map((label) => (
-                  <div
-                    key={label}
-                    className="rounded-2xl bg-emerald-50 px-2 py-3 text-[11px] font-black text-emerald-800"
-                  >
-                    {label}
+              <div className="min-w-0 border-t border-[#CBDDD0] pt-3 lg:border-l lg:border-t-0 lg:pl-9 lg:pt-0">
+                <p className="mb-3 text-[12px] font-bold uppercase tracking-[0.13em] text-[#397353]">How it connects</p>
+                {[
+                  { number: '01', label: 'Discover', icon: ShoppingBasket },
+                  { number: '02', label: 'Understand', icon: ScanLine },
+                  { number: '03', label: 'Cook', icon: BookOpenCheck },
+                  { number: '04', label: 'Plan', icon: Boxes },
+                ].map(({ number, label, icon: Icon }) => (
+                  <div key={number} className="flex items-center gap-4 border-b border-[#CBDDD0] py-3 last:border-b-0 sm:py-4">
+                    <span className="w-7 shrink-0 text-[12px] font-semibold tabular-nums text-[#6B9D7D]">{number}</span>
+                    <span className="min-w-0 flex-1 text-[19px] font-bold tracking-[-0.025em] text-[#183E2F] sm:text-[21px]">{label}</span>
+                    <Icon size={20} className="shrink-0 text-[#388461]" aria-hidden="true" />
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="mt-12">
-          <SectionHeading
-            eyebrow="For customers"
-            title="What you can do with EPANTRY"
-            description="The customer experience goes beyond placing an order. It connects shopping with the food context you already have and the meals you actually want to make."
-          />
-
-          <CapabilityGrid items={customerCapabilities} />
-        </section>
-
-        <section className="mt-12">
-          <SectionHeading
-            eyebrow="Privacy and trust"
-            title="Your data should make the product useful — not invisible to you"
-            description="EPANTRY keeps privacy, security and marketplace governance as explicit parts of the product so customers can understand where their personal context and marketplace trust come from."
-          />
-
-          <CapabilityGrid items={customerPrivacy} />
-        </section>
-
-        <section className="mt-12 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0C0A09_0%,#111827_100%)] p-7 text-white shadow-[0_20px_60px_rgba(17,24,39,0.14)] sm:p-9">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-400">
-              What makes EPANTRY different
-            </p>
-
-            <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">
-              It is not only about getting an item to your door.
-            </h2>
-
-            <p className="mt-4 text-sm leading-7 text-stone-400">
-              EPANTRY connects governed product discovery, trusted brand context, recipes, Pantry awareness, household planning and shopping. The goal is to help you make better food decisions before, during and after a purchase — not simply make checkout faster.
-            </p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          {/* Capability names are sufficient here: no repeated descriptions. */}
+          <section aria-labelledby="about-customer-title" className="py-11 sm:py-14 lg:py-16">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-7">
+              <div className="min-w-0">
+                <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#2E7F5A]">01 / Everyday EPANTRY</p>
+                <h2 id="about-customer-title" className="mt-2 text-[clamp(1.85rem,3.5vw,3.1rem)] font-extrabold leading-[1.12] tracking-[-0.045em] text-[#19382C]">
+                  Everything food, connected.
+                </h2>
+              </div>
+              <span className="hidden h-px flex-1 bg-[#D5DED6] sm:block" aria-hidden="true" />
+            </div>
+            <div className="mt-7 grid gap-x-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-x-6">
               {[
-                'Governed marketplace trust',
-                'Recipes connected to shopping',
-                'Pantry and planning context',
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-stone-800 bg-stone-900 p-4 text-xs font-black leading-5 text-stone-200"
-                >
-                  {item}
+                { title: 'Shop smarter', icon: ShoppingBasket },
+                { title: 'Find recipes', icon: BookOpenCheck },
+                { title: 'Know your Pantry', icon: Boxes },
+                { title: 'Understand products', icon: ScanLine },
+              ].map(({ title, icon: Icon }, index) => (
+                <div key={title} className="flex min-w-0 items-center gap-4 border-t border-[#D0DBD2] py-5 sm:items-start sm:gap-3 lg:flex-col lg:py-6">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-[13px] bg-[#E3EDE5] text-[#2E7552]">
+                    <Icon size={21} aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 flex-1 lg:mt-2">
+                    <span className="mb-1 hidden text-[12px] font-semibold tabular-nums text-[#92A49A] lg:block">0{index + 1}</span>
+                    <h3 className="text-[17px] font-bold leading-6 tracking-[-0.025em] text-[#203D31] sm:text-[18px]">{title}</h3>
+                  </div>
                 </div>
               ))}
             </div>
-          </article>
+          </section>
 
-          <article className="rounded-[32px] border border-stone-200 bg-white p-7 shadow-[0_16px_46px_rgba(17,24,39,0.06)] sm:p-9">
-            <ShieldCheck size={24} className="text-emerald-700" aria-hidden="true" />
-            <h2 className="mt-4 text-xl font-black text-stone-950">Your controls</h2>
-            <p className="mt-3 text-sm leading-6 text-stone-500">
-              Review your account settings, security options and privacy controls whenever you need them. EPANTRY keeps these controls separate from product recommendations and marketplace browsing.
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to="/account/settings"
-                    className="focus-ring inline-flex h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800"
-                  >
-                    Account Settings
-                  </Link>
-
-                  <Link
-                    to="/account/privacy"
-                    className="focus-ring inline-flex h-10 items-center justify-center rounded-full border border-stone-200 bg-white px-4 text-xs font-black text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Privacy Rights Center
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/register"
-                    className="focus-ring inline-flex h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800"
-                  >
-                    Create Account
-                  </Link>
-
-                  <Link
-                    to="/login"
-                    className="focus-ring inline-flex h-10 items-center justify-center rounded-full border border-stone-200 bg-white px-4 text-xs font-black text-stone-700 transition hover:bg-stone-50"
-                  >
-                    Login
-                  </Link>
-                </>
-              )}
+          {/* Trust is a quiet band, with short labels rather than explanatory cards. */}
+          <section aria-labelledby="about-trust-title" className="rounded-[24px] bg-[#EFF2EF] px-5 py-8 sm:rounded-[28px] sm:px-9 sm:py-11 lg:px-12">
+            <div className="grid gap-7 lg:grid-cols-[minmax(230px,0.78fr)_minmax(0,1.22fr)] lg:gap-12">
+              <div>
+                <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#487057]">02 / Privacy & trust</p>
+                <h2 id="about-trust-title" className="mt-3 text-[clamp(1.85rem,3.2vw,3rem)] font-extrabold leading-[1.14] tracking-[-0.04em] text-[#263D30]">
+                  Your data. Your choice.
+                </h2>
+              </div>
+              <div className="grid min-w-0 gap-x-6 sm:grid-cols-2">
+                {[
+                  { title: 'Clear privacy controls', icon: LockKeyhole },
+                  { title: 'Useful, optional context', icon: DatabaseZap },
+                  { title: 'Secure account access', icon: ShieldCheck },
+                  { title: 'Reviewed marketplace listings', icon: BadgeCheck },
+                ].map(({ title, icon: Icon }) => (
+                  <div key={title} className="flex min-w-0 items-center gap-3 border-t border-[#D4DED7] py-4.5 sm:py-5">
+                    <Icon size={21} className="shrink-0 text-[#3E795A]" aria-hidden="true" />
+                    <h3 className="text-[16px] font-semibold leading-6 text-[#263D30]">{title}</h3>
+                  </div>
+                ))}
+              </div>
             </div>
-          </article>
-        </section>
-      </div>
+          </section>
+
+          {/* A compact difference statement, then the same working account actions. */}
+          <section aria-label="Why EPANTRY and account options" className="grid gap-5 pt-10 sm:pt-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <article className="min-w-0 rounded-[24px] bg-[#F2F2EB] px-5 py-8 sm:rounded-[28px] sm:px-9 sm:py-10">
+              <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#5B745F]">03 / Why EPANTRY</p>
+              <h2 className="mt-3 max-w-[520px] text-[clamp(1.85rem,3vw,2.8rem)] font-extrabold leading-[1.14] tracking-[-0.045em] text-[#283C30]">
+                More than a shopping app.
+              </h2>
+              <div className="mt-7 grid gap-0 divide-y divide-[#E8D3B7] border-y border-[#D7DED3]">
+                {[
+                  'Trusted products & brands',
+                  'Recipes connected to shopping',
+                  'Pantry & meal planning',
+                ].map((item, index) => (
+                  <div key={item} className="flex items-center gap-4 py-3.5">
+                    <span className="w-6 shrink-0 text-[12px] font-bold text-[#7B9A81]">0{index + 1}</span>
+                    <p className="text-[15px] font-semibold leading-6 text-[#354A3A]">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="flex min-w-0 flex-col rounded-[24px] border border-[#D6E5DB] bg-white px-5 py-8 sm:rounded-[28px] sm:px-9 sm:py-10">
+              <div className="grid size-11 place-items-center rounded-[13px] bg-[#E6F3E9] text-[#287653]">
+                <ShieldCheck size={23} aria-hidden="true" />
+              </div>
+              <h2 className="mt-4 text-[clamp(1.85rem,2.6vw,2.6rem)] font-extrabold leading-[1.15] tracking-[-0.04em] text-[#203D31]">
+                {isAuthenticated ? 'Your account. Your control.' : 'Ready to join EPANTRY?'}
+              </h2>
+              <div className="mt-auto flex flex-col gap-3 pt-7 sm:flex-row sm:flex-wrap">
+                {isAuthenticated ? (
+                  <>
+                    <Link to="/account/settings" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full bg-[#215D42] px-6 text-[14px] font-bold text-white transition-colors hover:bg-[#164930]">
+                      Account Settings
+                    </Link>
+                    <Link to="/account/privacy" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full border border-[#BCD4C4] px-6 text-[14px] font-bold text-[#215D42] transition-colors hover:bg-[#F1F8F2]">
+                      Privacy Rights Center
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/register" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full bg-[#215D42] px-6 text-[14px] font-bold text-white transition-colors hover:bg-[#164930]">
+                      Create Account
+                    </Link>
+                    <Link to="/login" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full border border-[#BCD4C4] px-6 text-[14px] font-bold text-[#215D42] transition-colors hover:bg-[#F1F8F2]">
+                      Login
+                    </Link>
+                  </>
+                )}
+              </div>
+            </article>
+          </section>
+        </div>
       </div>
     </main>
   )

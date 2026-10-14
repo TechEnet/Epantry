@@ -64,7 +64,7 @@ import {
   } from '../../features/commerce/services/commerce.service';
 
   import {
-    listNotifications,
+    listHeaderNotifications,
   } from '../../features/analytics/services/analytics.service';
 
   import {
@@ -788,8 +788,18 @@ import {
                 return undefined;
             }
 
+            let inFlight = false;
+            let refreshQueued = false;
+
             const refreshContextualActions =
                 async () => {
+                    if (cancelled || document.visibilityState === 'hidden') return;
+                    if (inFlight) {
+                        refreshQueued = true;
+                        return;
+                    }
+                    inFlight = true;
+                    try {
                     const requests =
                         await Promise.allSettled([
                             showCustomerCart
@@ -800,8 +810,9 @@ import {
                                 : Promise.resolve({
                                       orders: [],
                                   }),
-                            listNotifications({
-                                limit: 100,
+                            listHeaderNotifications({
+                                userId: user?.id || user?._id,
+                                activeMode,
                             }),
                         ]);
 
@@ -949,6 +960,13 @@ import {
                             ).length,
                         );
                     }
+                    } finally {
+                        inFlight = false;
+                        if (refreshQueued && !cancelled) {
+                            refreshQueued = false;
+                            void refreshContextualActions();
+                        }
+                    }
                 };
 
             const handleVisibility =
@@ -1007,6 +1025,9 @@ import {
             isAuthenticated,
             isBootstrapping,
             showCustomerCart,
+            user?.id,
+            user?._id,
+            activeMode,
             location.pathname,
             setDeliveryContext,
             clearDeliveryContext,

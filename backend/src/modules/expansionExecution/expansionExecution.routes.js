@@ -40,6 +40,10 @@ import {
 
 import {
   bookCreatorSession,
+  getCreatorSessionJoinLink,
+  joinCreatorSessionWaitlist,
+  leaveCreatorSessionWaitlist,
+  setCreatorSessionMeeting,
   cancelCreatorBooking,
   createCreatorSession,
   decideSafeSponsoredPlacement,
@@ -127,6 +131,19 @@ const safeSponsoredDecisionSchema =
           .optional(),
     })
     .strict()
+
+const meetingUrlSchema = z.string().trim().max(2048).refine(
+  (value) => {
+    if (!value) return true
+    try {
+      const url = new URL(value)
+      return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password
+    } catch {
+      return false
+    }
+  },
+  'Meeting link must be a valid HTTPS URL without embedded credentials.',
+)
 
 const creatorSessionSchema =
   z
@@ -244,6 +261,8 @@ const creatorSessionSchema =
           .default(
             '',
           ),
+
+      meetingUrl: meetingUrlSchema.default(''),
     })
     .strict()
     .superRefine(
@@ -709,6 +728,72 @@ router.post(
       )
     },
   ),
+)
+
+// Live meeting link is private: public session lists do not contain the URL.
+// Only confirmed attendees or the owning Creator can request it in class time.
+router.get(
+  '/creator-sessions/:sessionId/join',
+  sensitiveResponseNoStoreMiddleware,
+  authenticateSession,
+  loadCurrentUser,
+  requireActiveAccount,
+  wrap(async (req, res) => send(
+    req, res, 200,
+    await getCreatorSessionJoinLink({
+      sessionId: parseOrThrow(objectIdSchema, req.params.sessionId, 'M22_CREATOR_SESSION_ID_INVALID', 'Invalid Creator session ID.'),
+      actorUser: req.currentUser,
+    }),
+    'Authorized live meeting access loaded.',
+  )),
+)
+
+router.put(
+  '/creator-sessions/:sessionId/meeting',
+  ...creatorHostSecurity,
+  requireCsrfToken,
+  wrap(async (req, res) => {
+    const input = parseOrThrow(
+      z.object({ meetingUrl: meetingUrlSchema.refine(Boolean, 'A meeting link is required.') }).strict(),
+      req.body, 'M22_CREATOR_MEETING_URL_INVALID', 'Invalid HTTPS meeting link.',
+    )
+    return send(req, res, 200,
+      await setCreatorSessionMeeting({
+        sessionId: parseOrThrow(objectIdSchema, req.params.sessionId, 'M22_CREATOR_SESSION_ID_INVALID', 'Invalid Creator session ID.'),
+        meetingUrl: input.meetingUrl,
+        actorUser: req.currentUser,
+      }),
+      'Creator live meeting link configured.',
+    )
+  }),
+)
+
+router.post(
+  '/creator-sessions/:sessionId/waitlist',
+  ...customerSecurity,
+  requireCsrfToken,
+  wrap(async (req, res) => send(
+    req, res, 201,
+    await joinCreatorSessionWaitlist({
+      sessionId: parseOrThrow(objectIdSchema, req.params.sessionId, 'M22_CREATOR_SESSION_ID_INVALID', 'Invalid Creator session ID.'),
+      actorUser: req.currentUser,
+    }),
+    'Added to the class waitlist without booking or payment.',
+  )),
+)
+
+router.post(
+  '/creator-sessions/:sessionId/waitlist/leave',
+  ...customerSecurity,
+  requireCsrfToken,
+  wrap(async (req, res) => send(
+    req, res, 200,
+    await leaveCreatorSessionWaitlist({
+      sessionId: parseOrThrow(objectIdSchema, req.params.sessionId, 'M22_CREATOR_SESSION_ID_INVALID', 'Invalid Creator session ID.'),
+      actorUser: req.currentUser,
+    }),
+    'Removed from class waitlist.',
+  )),
 )
 
 router.post(

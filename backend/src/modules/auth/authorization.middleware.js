@@ -624,6 +624,31 @@ export function requireChefRestaurantHostAccess(
   }
 }
 
+// Restaurant recipe listings are available to governed Hospitality B2B and
+// Chef + Restaurant Hosts. Other Host workspaces retain their existing boundary.
+// The Hospitality service still enforces organization grants and ownership.
+export function requireHospitalityRecipeHostAccess(req, res, next) {
+  try {
+    const user = requireLoadedUser(req)
+    const workspaceType = String(user?.hostWorkspaceType || '').trim().toLowerCase()
+    const allowed = workspaceType === 'b2b' || workspaceType === 'chef_restaurant'
+    if (
+      allowed &&
+      userHasAnyAccess(user, ['host']) &&
+      user?.hostEnabled === true &&
+      user?.hostAccessStatus === 'active' &&
+      !(user?.customerEnabled === true && user?.activeMode === 'customer')
+    ) {
+      return next()
+    }
+    return next(new ApiError(403, 'Hospitality B2B or Chef + Restaurant Host access is required.', [
+      { code: 'AUTH_HOSPITALITY_RECIPE_HOST_REQUIRED' },
+    ]))
+  } catch (error) {
+    return next(error)
+  }
+}
+
 export const requireSuperAdminAccess =
   requireAnyAccess(
     'super_admin',

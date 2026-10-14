@@ -1,3 +1,4 @@
+import { optimizeUploadImage } from '../../../lib/optimizeUploadImage'
 import { apiClient } from '../../../api/apiClient'
 
 function unwrapApiData(response) {
@@ -229,9 +230,18 @@ export async function uploadProductEvidence({
           .allowedMimeTypes
       : []
 
+  // Only Host and Super Admin listing uploads are in scope.
+  // Consumer scans keep their existing evidence format and behavior.
+  const uploadFile = ['host', 'admin'].includes(scope)
+    ? await optimizeUploadImage(file, {
+        maxEdge: 2400,
+        targetBytes: 1250 * 1024,
+      })
+    : file
+
   if (
     maxBytes > 0 &&
-    file.size > maxBytes
+    uploadFile.size > maxBytes
   ) {
     throw new Error(
       'This image is larger than the allowed upload size.',
@@ -242,7 +252,7 @@ export async function uploadProductEvidence({
     allowedMimeTypes.length >
       0 &&
     !allowedMimeTypes.includes(
-      file.type,
+      uploadFile.type,
     )
   ) {
     throw new Error(
@@ -255,7 +265,7 @@ export async function uploadProductEvidence({
 
   formData.append(
     'file',
-    file,
+    uploadFile,
   )
 
   formData.append(
@@ -350,12 +360,12 @@ export async function uploadProductEvidence({
         jpeg: 'image/jpeg',
         png: 'image/png',
         webp: 'image/webp',
-      }[String(payload.format || '').toLowerCase()] || file.type),
+      }[String(payload.format || '').toLowerCase()] || uploadFile.type),
 
     bytes:
       Number(
         payload.bytes ||
-        file.size,
+        uploadFile.size,
       ),
 
     width:

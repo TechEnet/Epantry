@@ -6,7 +6,7 @@ import { Link, useLocation } from "react-router-dom";
 
 import { useAuth } from "../../auth/context/AuthContext";
 
-import { listNotifications } from "../../analytics/services/analytics.service";
+import { listHeaderNotifications } from "../../analytics/services/analytics.service";
 
 const UNREAD_STATUSES = new Set([
   "pending",
@@ -23,15 +23,18 @@ export default function NotificationBell({ compact = false }) {
   const generation = useRef(0);
 
   const load = useCallback(async () => {
-    const requestId = ++generation.current;
     if (!isAuthenticated) {
+      generation.current += 1;
       setUnreadCount(0);
       return;
     }
+    if (document.visibilityState === "hidden") return;
 
+    const requestId = ++generation.current;
     try {
-      const data = await listNotifications({
-        limit: 100,
+      const data = await listHeaderNotifications({
+        userId: currentUser?.id || currentUser?._id,
+        activeMode,
       });
 
       const notifications = data?.notifications || [];
@@ -46,7 +49,7 @@ export default function NotificationBell({ compact = false }) {
     } catch {
       // The bell is progressive enhancement; the Notification Center surfaces errors.
     }
-  }, [isAuthenticated, activeMode, currentUser?.id]);
+  }, [isAuthenticated, activeMode, currentUser?.id, currentUser?._id]);
 
   useEffect(() => {
     if (isBootstrapping) {
@@ -56,7 +59,7 @@ export default function NotificationBell({ compact = false }) {
     setUnreadCount(0);
     load();
 
-    const intervalId = window.setInterval(load, 15000);
+    const intervalId = window.setInterval(load, 45000);
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {

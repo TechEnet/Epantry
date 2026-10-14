@@ -1059,7 +1059,6 @@ const HostListingHistoryPage = lazy(() => import('../features/listingHistory/pag
 
 const AdminDashboardPage = lazy(() => import('../features/admin/pages/AdminDashboardPage'))
 const AdminEarningsPage = lazy(() => import('../features/admin/pages/AdminEarningsPage'))
-const AdminSearchDemandPage = lazy(() => import('../features/admin/pages/AdminSearchDemandPage'))
 const AdminCatalogPage = lazy(() => import('../features/admin/pages/AdminCatalogPage'))
 const AdminProductEditorPage = lazy(() => import('../features/admin/pages/AdminProductEditorPage'))
 const AdminIngredientsPage = lazy(() => import('../features/admin/pages/AdminIngredientsPage'))
@@ -2337,7 +2336,7 @@ export default function AppRoutes() {
       const intervalId =
         window.setInterval(
           probeConnection,
-          3000,
+          10000,
         )
 
       return () => {
@@ -3140,7 +3139,7 @@ export default function AppRoutes() {
                     'catalog.read',
                   ]}
                 >
-                  <AdminSearchDemandPage />
+                  <Navigate to="/admin/analytics#customer-demand" replace />
                 </AdminPermissionRoute>
               }
             />
@@ -3154,6 +3153,7 @@ export default function AppRoutes() {
                     'admin.audit.read',
                     'marketplace.read',
                     'trust_safety.read',
+                    'catalog.read',
                   ]}
                 >
                   <AdminAnalyticsPage />

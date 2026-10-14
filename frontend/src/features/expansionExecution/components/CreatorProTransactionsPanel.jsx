@@ -20,6 +20,10 @@ import {
   bookCreatorSession,
   cancelCreatorBooking,
   createCreatorSession,
+  getCreatorSessionJoinLink,
+  joinCreatorSessionWaitlist,
+  leaveCreatorSessionWaitlist,
+  setCreatorSessionMeeting,
   getExpansionExecutionErrorMessage,
   listCreatorSessions,
   listMyCreatorBookings,
@@ -258,6 +262,8 @@ function newSessionForm() {
 
     commercialDisclosure:
       '',
+
+    meetingUrl: '',
   }
 }
 
@@ -281,6 +287,9 @@ export default function CreatorProTransactionsPanel({
     useState(
       [],
     )
+
+  const [waitlist, setWaitlist] = useState([])
+  const [meetingDrafts, setMeetingDrafts] = useState({})
 
   const [
     creatorState,
@@ -357,6 +366,7 @@ export default function CreatorProTransactionsPanel({
             setBookings(
               [],
             )
+            setWaitlist([])
 
             setCreatorState(
               creatorResult || {
@@ -387,6 +397,7 @@ export default function CreatorProTransactionsPanel({
               bookingResult?.bookings ||
               [],
             )
+            setWaitlist(bookingResult?.waitlist || [])
 
             setCreatorState({
               hasCreatorProfile:
@@ -442,6 +453,20 @@ export default function CreatorProTransactionsPanel({
         bookings,
       ],
     )
+
+  const waitlistBySession = useMemo(
+    () => new Map(waitlist.map((entry) => [entry.sessionId, entry])),
+    [waitlist],
+  )
+
+  async function openLiveMeeting(sessionId) {
+    await run(async () => {
+      const result = await getCreatorSessionJoinLink(sessionId)
+      // Do not expose a shared meeting link through a public page or prefetch.
+      window.location.assign(result.joinUrl)
+      return result
+    }, 'Opening your live class.')
+  }
 
   async function run(
     task,
@@ -648,6 +673,8 @@ export default function CreatorProTransactionsPanel({
 
           commercialDisclosure:
             form.commercialDisclosure,
+
+          meetingUrl: form.meetingUrl,
         })
 
         setForm(
@@ -760,6 +787,10 @@ export default function CreatorProTransactionsPanel({
                     session.id,
                   )
 
+                const queued = waitlistBySession.get(session.id)
+                const now = Date.now()
+                const canJoin = now >= new Date(session.startsAt).getTime() - 15 * 60 * 1000 && now <= new Date(session.endsAt).getTime()
+
                 return (
                   <article
                     key={
@@ -824,6 +855,14 @@ export default function CreatorProTransactionsPanel({
                           )}
                         </p>
 
+                        {booking.status === 'confirmed' && canJoin ? (
+                          <button type="button" disabled={busy}
+                            onClick={() => openLiveMeeting(session.id)}
+                            className={`${primaryButton} mt-3`}>
+                            Join live class
+                          </button>
+                        ) : null}
+
                         {[
                           'confirmed',
                           'payment_required',
@@ -855,14 +894,24 @@ export default function CreatorProTransactionsPanel({
                           </button>
                         ) : null}
                       </div>
+                    ) : session.seatsRemaining <= 0 ? (
+                      queued ? (
+                        <button type="button" disabled={busy}
+                          onClick={() => run(() => leaveCreatorSessionWaitlist(session.id), 'Removed from class waitlist.')}
+                          className="focus-ring mt-4 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black text-stone-700">
+                          Leave waitlist
+                        </button>
+                      ) : (
+                        <button type="button" disabled={busy}
+                          onClick={() => run(() => joinCreatorSessionWaitlist(session.id), 'You are on the waitlist. This is not a confirmed seat; check back for availability.')}
+                          className={`${primaryButton} mt-4`}>
+                          Join waitlist
+                        </button>
+                      )
                     ) : (
                       <button
                         type="button"
-                        disabled={
-                          busy ||
-                          session.seatsRemaining <=
-                            0
-                        }
+                        disabled={busy}
                         onClick={() =>
                           book(
                             session,
@@ -883,7 +932,7 @@ export default function CreatorProTransactionsPanel({
                           />
                         )}
 
-                        Book session
+                        {queued ? 'Claim available seat' : 'Book session'}
                       </button>
                     )}
                   </article>
@@ -1147,6 +1196,12 @@ export default function CreatorProTransactionsPanel({
               placeholder="Cancellation cutoff minutes"
             />
 
+            <input type="url" className={`${inputClass} sm:col-span-2`}
+              value={form.meetingUrl}
+              onChange={(event) => setForm((current) => ({ ...current, meetingUrl: event.target.value }))}
+              placeholder="HTTPS video meeting link (optional; only booked attendees can retrieve it)"
+            />
+
             <textarea
               rows={3}
               className={`${inputClass} sm:col-span-2`}
@@ -1236,6 +1291,31 @@ export default function CreatorProTransactionsPanel({
                       session.startsAt,
                     )}
                   </p>
+
+                  {['draft', 'published'].includes(session.status) ? (
+                    <div className="mt-3 flex flex-col gap-2">
+                      <p className="text-xs font-semibold text-stone-500">
+                        {session.meetingConfigured ? 'Meeting link configured' : 'Meeting link not configured'}
+                      </p>
+                      <input type="url" className={inputClass}
+                        value={meetingDrafts[session.id] || ''}
+                        onChange={(event) => setMeetingDrafts((current) => ({ ...current, [session.id]: event.target.value }))}
+                        placeholder="HTTPS meeting link"
+                      />
+                      <button type="button" disabled={busy || !meetingDrafts[session.id]?.trim()}
+                        onClick={() => run(() => setCreatorSessionMeeting({
+                          sessionId: session.id,
+                          meetingUrl: meetingDrafts[session.id].trim(),
+                        }), 'Meeting link saved for confirmed attendees.')}
+                        className="focus-ring rounded-xl border border-stone-200 px-3 py-2 text-xs font-black text-stone-700">
+                        Save meeting link
+                      </button>
+                      {session.status === 'published' && Date.now() >= new Date(session.startsAt).getTime() - 15 * 60 * 1000 && Date.now() <= new Date(session.endsAt).getTime() ? (
+                        <button type="button" disabled={busy} onClick={() => openLiveMeeting(session.id)}
+                          className={primaryButton}>Open my live class</button>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   {session.status ===
                   'draft' ? (

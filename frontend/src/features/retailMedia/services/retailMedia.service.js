@@ -1,3 +1,4 @@
+import { optimizeUploadImage } from '../../../lib/optimizeUploadImage'
 import {
   apiClient,
 } from '../../../api/apiClient'
@@ -141,7 +142,13 @@ export async function uploadRetailMediaImage({
       ? intent.constraints.allowedMimeTypes
       : []
 
-  if (maxBytes > 0 && file.size > maxBytes) {
+  // Optimize listing media client-side; Cloudinary upload/auth stay unchanged.
+  const uploadFile = await optimizeUploadImage(file, {
+    maxEdge: 2200,
+    targetBytes: 900 * 1024,
+  })
+
+  if (maxBytes > 0 && uploadFile.size > maxBytes) {
     throw new Error(
       'This campaign image is larger than the allowed upload size.',
     )
@@ -149,7 +156,7 @@ export async function uploadRetailMediaImage({
 
   if (
     allowedMimeTypes.length > 0 &&
-    !allowedMimeTypes.includes(file.type)
+    !allowedMimeTypes.includes(uploadFile.type)
   ) {
     throw new Error(
       'Use a JPEG, PNG, or WebP campaign image.',
@@ -161,7 +168,7 @@ export async function uploadRetailMediaImage({
 
   formData.append(
     'file',
-    file,
+    uploadFile,
   )
   formData.append(
     'api_key',

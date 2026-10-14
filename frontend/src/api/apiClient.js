@@ -64,9 +64,49 @@ export const apiClient =
   })
 
 /*
-|--------------------------------------------------------------------------
+|--------------------------------------------------------------------------|
+| Read timeout for a sleeping Render Free backend
+|--------------------------------------------------------------------------|
+| Render Free can take approximately one minute to cold start. Extend only
+| ordinary GET requests without an explicit timeout in production. POST,
+| PATCH, DELETE, payment and auth mutations keep their existing timeouts.
+| This changes waiting, not server throughput or rate-limit enforcement.
+*/
+const productionReadTimeoutMs =
+  Number.isFinite(Number(import.meta.env.VITE_API_READ_TIMEOUT_MS)) &&
+  Number(import.meta.env.VITE_API_READ_TIMEOUT_MS) >= 15000 &&
+  Number(import.meta.env.VITE_API_READ_TIMEOUT_MS) <= 90000
+    ? Number(import.meta.env.VITE_API_READ_TIMEOUT_MS)
+    : 65000
+
+apiClient.interceptors.request.use((config) => {
+  const method = String(config.method || 'get').toLowerCase()
+
+  if (method === 'get' && (config.data === undefined || config.data === null)) {
+    // Bodyless GETs do not need Content-Type: application/json. Omitting it
+    // avoids unnecessary CORS preflight traffic on cross-origin deployments.
+    if (typeof config.headers?.delete === 'function') {
+      config.headers.delete('Content-Type')
+    } else if (config.headers) {
+      delete config.headers['Content-Type']
+      delete config.headers['content-type']
+    }
+  }
+
+  if (
+    import.meta.env.PROD &&
+    method === 'get' &&
+    config.timeout === apiClient.defaults.timeout
+  ) {
+    config.timeout = productionReadTimeoutMs
+  }
+  return config
+})
+
+/*
+|--------------------------------------------------------------------------|
 | Request Metadata
-|--------------------------------------------------------------------------
+|--------------------------------------------------------------------------|
 */
 
 function getRequestUrl(

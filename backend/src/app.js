@@ -134,6 +134,25 @@ import healthRoutes from './routes/health.routes.js'
 const app =
   express()
 
+/*
+|--------------------------------------------------------------------------|
+| Client IP behind a trusted reverse proxy
+|--------------------------------------------------------------------------|
+| Render web services are reached through Render's proxy. Trust exactly one
+| hop there so rate limits group by the actual public client IP rather than
+| the shared proxy address. On other hosts the secure default is zero hops.
+| Set TRUST_PROXY_HOPS explicitly only after verifying your ingress chain.
+*/
+const proxyHopsValue = String(
+  process.env.TRUST_PROXY_HOPS ?? (process.env.RENDER === 'true' ? '1' : '0'),
+).trim()
+
+if (!/^[0-3]$/.test(proxyHopsValue)) {
+  throw new Error('TRUST_PROXY_HOPS must be a whole number from 0 to 3.')
+}
+
+app.set('trust proxy', Number(proxyHopsValue))
+
 app.disable(
   'x-powered-by',
 )

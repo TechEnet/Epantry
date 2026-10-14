@@ -76,13 +76,12 @@ const ADMIN_TOOL_PRIORITY = [
   'Orders & disputes',
   'Earnings & collections',
   'Payments & settlements',
-  'Customer search demand',
   'Catalog & listings',
   'Recipes',
   'Ingredient library',
   'Food Intelligence',
   'People & businesses',
-  'Analytics overview',
+  'Analytics & customer demand',
   'Trust & safety',
   'Bulk product review',
   'Integrations',
@@ -103,7 +102,7 @@ const TOOL_GROUPS = [
   {
     key: 'reviews',
     eyebrow: 'Reviews & decisions',
-    title: 'Work that needs a decision.',
+    title: 'Reviews & approvals',
     description: 'Approvals, disputes and review queues that can block Hosts, listings or marketplace activity.',
     mobileDescription: 'Approvals, disputes & reviews.',
     shell: 'border-[#e8c998] bg-[#fff4df]',
@@ -125,7 +124,7 @@ const TOOL_GROUPS = [
   {
     key: 'catalog',
     eyebrow: 'Catalog & food content',
-    title: 'What customers can discover.',
+    title: 'Catalog & content',
     description: 'Products, recipes and governed food data that shape the customer-facing EPANTRY experience.',
     mobileDescription: 'Products, recipes & food data.',
     shell: 'border-[#a9d1be] bg-[#e4f2eb]',
@@ -144,7 +143,7 @@ const TOOL_GROUPS = [
   {
     key: 'business',
     eyebrow: 'Business & operations',
-    title: 'How the platform is moving.',
+    title: 'Business operations',
     description: 'Demand, money, people and operational infrastructure that keep the marketplace running.',
     mobileDescription: 'Demand, money, people & ops.',
     shell: 'border-[#abcde5] bg-[#e5f1f9]',
@@ -153,8 +152,7 @@ const TOOL_GROUPS = [
     icon: 'text-[#1b587c]',
     meta: 'text-[#376b88]',
     titles: [
-      'Analytics overview',
-      'Customer search demand',
+      'Analytics & customer demand',
       'People & businesses',
       'Earnings & collections',
       'Payments & settlements',
@@ -165,7 +163,7 @@ const TOOL_GROUPS = [
   {
     key: 'governance',
     eyebrow: 'Governance & control',
-    title: 'Rules, access and platform oversight.',
+    title: 'Governance & access',
     description: 'Sensitive controls for permissions, policy, privacy, audit history and AI reliability.',
     mobileDescription: 'Access, policy, privacy, audit & AI.',
     shell: 'border-[#cbbbe2] bg-[#eee8f7]',
@@ -186,28 +184,28 @@ const TOOL_GROUPS = [
 const FLOW_STEPS = [
   {
     number: '01',
-    title: 'Check what needs attention',
+    title: 'Review alerts',
     copy: 'Start with reviews, Host approvals and operational exceptions that need a decision.',
     mobileCopy: 'Reviews and approvals first.',
     icon: FileWarning,
   },
   {
     number: '02',
-    title: 'See what customers want',
+    title: 'Check demand',
     copy: 'Use search demand to understand which products and recipes people are looking for by area.',
     mobileCopy: 'See customer demand by area.',
     icon: Search,
   },
   {
     number: '03',
-    title: 'Track money moving through EPANTRY',
+    title: 'Review finances',
     copy: 'Review platform earnings, subscriptions, paid placements and money collected through checkout.',
     mobileCopy: 'Check money and payouts.',
     icon: IndianRupee,
   },
   {
     number: '04',
-    title: 'Open the right control page',
+    title: 'Choose a tool',
     copy: 'Move into catalog, Hosts, safety, finance or permissions only when that area needs action.',
     mobileCopy: 'Open the right admin tool.',
     icon: ShieldCheck,
@@ -218,18 +216,18 @@ function CommandMetric({ label, mobileLabel, value, icon: Icon, to, index }) {
   const content = (
     <div className="flex min-h-[76px] flex-col justify-between px-4 py-3 sm:min-h-[92px] sm:px-5 sm:py-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[9.6px] font-black uppercase tracking-[0.14em] text-white/55 sm:hidden">{mobileLabel || label}</p>
-        <p className="hidden text-[10.8px] font-black uppercase tracking-[0.15em] text-white/55 sm:block">{label}</p>
+        <p className="text-[12px] font-black uppercase tracking-[0.14em] text-white/55 sm:hidden">{mobileLabel || label}</p>
+        <p className="hidden text-[12px] font-black uppercase tracking-[0.15em] text-white/55 sm:block">{label}</p>
         <Icon size={14} className="shrink-0 text-[#b7d9ca]" aria-hidden="true" />
       </div>
       <div className="mt-4 flex items-end justify-between gap-3">
         <p className="text-[33.6px] font-black leading-none tracking-[-0.055em] text-white sm:text-[43.2px]">{value}</p>
-        {to ? <ArrowRight size={14} className="mb-1 text-white/25" aria-hidden="true" /> : null}
+        {to ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/30 text-white/80 transition group-hover:translate-x-0.5 group-hover:bg-white/20" aria-hidden="true"><ArrowRight size={16} /></span> : null}
       </div>
     </div>
   )
 
-  const className = `focus-ring block min-w-0 transition hover:bg-white/[0.055] ${index % 2 ? 'border-l border-white/12' : ''} ${index > 1 ? 'border-t border-white/12 sm:border-t-0' : ''} ${index > 0 ? 'sm:border-l sm:border-white/12' : ''} ${index > 2 ? 'sm:border-t sm:border-white/12' : ''}`
+  const className = `focus-ring group block min-w-0 transition-colors duration-200 ${to ? 'hover:bg-white/15 focus-visible:bg-white/15 active:bg-white/20' : ''} ${index % 2 ? 'border-l border-white/12' : ''} ${index > 1 ? 'border-t border-white/12 sm:border-t-0' : ''} ${index > 0 ? 'sm:border-l sm:border-white/12' : ''} ${index > 2 ? 'sm:border-t sm:border-white/12' : ''}`
 
   if (to) {
     return <Link to={to} className={className}>{content}</Link>
@@ -242,73 +240,204 @@ function FlowStep({ item, index }) {
   const Icon = item.icon
 
   return (
-    <article className={`relative py-3 sm:py-4 lg:px-5 ${index ? 'border-t border-[#ddcfaf] lg:border-l lg:border-t-0' : ''}`}>
+    <article className={`relative py-3 sm:py-3 lg:px-4 ${index ? 'border-t border-[#ddcfaf] lg:border-l lg:border-t-0' : ''}`}>
       <div className="flex items-start gap-3.5">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#d2c39f] bg-[#fff8e8] text-[#174e40]">
           <Icon size={15} aria-hidden="true" />
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
-            <span className="text-[9.6px] font-black tracking-[0.16em] text-[#9a8861]">{item.number}</span>
-            <h3 className="text-[13.2px] font-black leading-4 text-stone-950 sm:text-[14.4px]">{item.title}</h3>
+            <span className="text-[12px] font-black tracking-[0.16em] text-[#9a8861]">{item.number}</span>
+            <h3 className="text-[14px] font-semibold leading-5 text-stone-950">{item.title}</h3>
           </div>
-          <p className="mt-1.5 text-[10.8px] font-semibold leading-4 text-stone-600 sm:hidden">{item.mobileCopy}</p>
-          <p className="mt-1.5 hidden max-w-[250px] text-[12px] font-semibold leading-[1.55] text-stone-600 sm:block">{item.copy}</p>
         </div>
       </div>
     </article>
   )
 }
 
-function ToolRow({ item, group }) {
+function WorkspaceToolLink({ item, group }) {
   const Icon = item.icon
 
   return (
     <Link
       to={item.to}
-      className={`focus-ring group grid min-w-0 grid-cols-[26px_minmax(0,1fr)_16px] items-start gap-3 border-t py-4 transition hover:bg-white/45 sm:grid-cols-[30px_minmax(0,1fr)_18px] sm:py-[18px] ${group.line}`}
+      className="focus-ring group flex min-h-[64px] min-w-0 items-center gap-3 rounded-[10px] border border-transparent border-b-[#e2e9e8] px-3 py-3.5 text-left transition-[background-color,border-color] duration-200 hover:border-[#c8d7d7] hover:bg-[#eff4f3] focus-visible:border-[#9ebaba] focus-visible:bg-[#eff4f3] sm:px-4 sm:py-4"
     >
-      <Icon size={16} className={`mt-0.5 ${group.icon}`} aria-hidden="true" />
-
-      <div className="min-w-0">
-        <h3 className="text-[13.2px] font-black leading-4 text-stone-950 sm:text-[14.4px] sm:leading-5">{item.title}</h3>
-        <p className="mt-1 text-[10.8px] font-semibold leading-4 text-stone-600 sm:hidden">{item.mobileDescription || item.description}</p>
-        <p className="mt-1 hidden max-w-[520px] text-[12px] font-semibold leading-[1.55] text-stone-600 sm:block">{item.description}</p>
-      </div>
-
-      <ArrowRight size={14} className="mt-1 text-stone-400 transition group-hover:translate-x-1 group-hover:text-stone-800" aria-hidden="true" />
+      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[11px] bg-[#e9f0f0] text-[#315563] ${group.icon}`} aria-hidden="true">
+        <Icon size={21} strokeWidth={1.85} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[17px] font-bold leading-[1.35] tracking-[-0.018em] text-[#20343a] sm:text-[18px]">
+          {item.title}
+        </span>
+      </span>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#d5e2e1] bg-white text-[#315c63] transition-[background-color,transform] duration-200 group-hover:translate-x-1 group-hover:bg-[#d8e8e7]" aria-hidden="true">
+        <ArrowRight size={18} strokeWidth={2} />
+      </span>
     </Link>
   )
 }
 
-function WorkspaceSection({ group, items }) {
-  if (!items.length) return null
+function WorkspaceDirectory({ groups, activeKey, onSelect }) {
+  if (!groups.length) return null
+
+  const activeGroup = groups.find((group) => group.key === activeKey) || groups[0]
+  const activeIndex = groups.findIndex((group) => group.key === activeGroup.key)
+  const categoryIcons = {
+    reviews: BadgeCheck,
+    catalog: Package,
+    business: BarChart3,
+    governance: ShieldCheck,
+  }
+  const ActiveIcon = categoryIcons[activeGroup.key] || Boxes
 
   return (
-    <section className={`overflow-hidden rounded-[24px] border ${group.shell}`}>
-      <div className="grid lg:grid-cols-[285px_minmax(0,1fr)]">
-        <header className={`${group.intro} p-4 sm:p-6 lg:min-h-full lg:p-7`}>
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-[9.6px] font-black uppercase tracking-[0.18em] text-white/70 sm:text-[10.8px]">{group.eyebrow}</p>
-            <span className="rounded-full border border-white/20 px-2.5 py-1 text-[9.6px] font-black uppercase tracking-[0.13em] text-white/65">
-              {items.length} tools
-            </span>
-          </div>
-          <h2 className="mt-3 max-w-[230px] text-[24px] font-black leading-[1.04] tracking-[-0.035em] text-white sm:mt-7 sm:text-[32.4px]">{group.title}</h2>
-          <p className="mt-2 whitespace-nowrap text-[10.2px] font-semibold leading-4 text-white/72 sm:hidden">{group.mobileDescription || group.description}</p>
-          <p className="mt-3 hidden max-w-[235px] text-[13.2px] font-semibold leading-5 text-white/72 sm:block">{group.description}</p>
-          <div className="mt-3 h-px w-14 bg-white/30 sm:mt-7" />
-        </header>
+    <>
+      {/* Mobile-only: clearly separated workspace selectors and nested tool links. */}
+      <div className="min-w-0 overflow-hidden rounded-[18px] border border-[#d5dfd9] bg-[#f5f5f1] lg:hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-[#d5dfd9] bg-[#e9eee9] px-4 py-3.5">
+          <p className="text-[14px] font-extrabold uppercase tracking-[0.07em] text-[#244a3c]">Work areas</p>
+          <p className="shrink-0 text-[13px] font-semibold text-[#547064]">{groups.length} sections</p>
+        </div>
 
-        <div className="px-4 sm:px-5 lg:px-6">
-          <div className="grid gap-x-7 md:grid-cols-2">
-            {items.map((item) => (
-              <ToolRow key={item.to} item={item} group={group} />
-            ))}
-          </div>
+        <div className="space-y-2.5 p-3">
+          {groups.map((group, index) => {
+            const isActive = activeGroup.key === group.key
+            const panelId = `admin-workspace-${group.key}-panel-mobile`
+            return (
+              <div key={group.key} className={`min-w-0 overflow-hidden rounded-[14px] border shadow-[0_2px_8px_rgba(22,62,48,0.035)] ${isActive ? 'border-[#2c6454]' : 'border-[#d8e1d9]'}`}>
+                <button
+                  type="button"
+                  aria-expanded={isActive}
+                  aria-controls={panelId}
+                  onClick={() => onSelect(group.key)}
+                  className={`focus-ring group flex min-h-[65px] w-full min-w-0 items-center gap-3 px-3.5 py-3.5 text-left transition-colors duration-200 ${isActive
+                    ? 'bg-[#184b3d] text-white'
+                    : 'bg-white text-[#213e34] hover:bg-[#edf4ed] focus-visible:bg-[#edf4ed]'
+                  }`}
+                >
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[9px] text-[17px] font-extrabold tabular-nums ${isActive ? 'bg-white/15 text-white' : 'bg-[#e4efe7] text-[#255742]'}`} aria-hidden="true">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[16px] font-extrabold leading-[1.3] tracking-[-0.02em]">
+                      {group.eyebrow}
+                    </span>
+                    <span className={`mt-1 block text-[13px] font-medium ${isActive ? 'text-[#d6e8df]' : 'text-[#64796c]'}`}>{group.items.length} tools</span>
+                  </span>
+                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border ${isActive ? 'border-white/30 bg-white/10 text-white' : 'border-[#d4e0d7] bg-[#f5f8f5] text-[#3f715b]'}`} aria-hidden="true">
+                    <ArrowRight size={18} className={`transition-transform duration-200 ${isActive ? 'rotate-90' : ''}`} />
+                  </span>
+                </button>
+
+                {isActive && (
+                  <section
+                    id={panelId}
+                    role="region"
+                    aria-label={group.eyebrow}
+                    className="min-w-0 border-t-[3px] border-[#6eaa8a] bg-[#eef2eb] px-3 py-3.5"
+                  >
+                    <div className="space-y-2 border-l-[3px] border-[#b2d0bd] pl-2.5">
+                      {group.items.map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            className="focus-ring group flex min-h-[60px] min-w-0 items-center gap-3 rounded-[11px] border border-[#d5e1d8] bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(25,65,48,0.035)] transition-[border-color,background-color] duration-200 hover:border-[#97b9a2] hover:bg-[#fbfefa] focus-visible:border-[#97b9a2] focus-visible:bg-[#fbfefa] active:bg-[#e5f1e7]"
+                          >
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#e9f2eb] text-[#246445]" aria-hidden="true">
+                              <Icon size={19} strokeWidth={1.9} />
+                            </span>
+                            <span className="min-w-0 flex-1 text-[16px] font-bold leading-[1.35] text-[#233a30]">{item.title}</span>
+                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#e6f0e8] text-[#256349]" aria-hidden="true">
+                              <ArrowRight size={17} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                            </span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
-    </section>
+
+      {/* Desktop layout is preserved exactly as in V4. */}
+      <div className="hidden lg:block">
+    <div className="overflow-hidden rounded-[22px] border border-[#d5dcda] bg-[#fcfdfc] shadow-[0_12px_30px_rgba(31,53,61,0.06)] lg:grid lg:grid-cols-[minmax(240px,29%)_minmax(0,1fr)]">
+      <div className="relative min-w-0 bg-[#e9eeec] px-3 py-4 sm:px-4 sm:py-5 lg:px-4 lg:py-6">
+        <div className="mb-3 flex items-center justify-between gap-3 px-1 lg:mb-5">
+          <p className="text-[14px] font-extrabold uppercase tracking-[0.09em] text-[#324b55]">Work areas</p>
+          <p className="text-[14px] font-semibold tabular-nums text-[#61767a]">{groups.length} sections</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-3">
+          {groups.map((group, index) => {
+            const isActive = activeGroup.key === group.key
+            return (
+              <button
+                key={group.key}
+                type="button"
+                aria-expanded={isActive}
+                aria-controls="admin-workspace-active-panel"
+                onClick={() => onSelect(group.key)}
+                onPointerEnter={(event) => {
+                  // Hover changes the open workspace only for an actual mouse.
+                  // Touch and pen users keep explicit tap/click navigation.
+                  if (event.pointerType === 'mouse' && !isActive) onSelect(group.key)
+                }}
+                className={`focus-ring group relative flex min-w-0 items-center gap-2.5 rounded-[13px] border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-200 sm:gap-3 sm:px-4 sm:py-3.5 ${isActive
+                  ? 'border-[#294b55] bg-[#294b55] text-white shadow-[3px_4px_0_#b6c8c6]'
+                  : 'border-[#d7e0de] bg-white/80 text-[#2a4149] hover:border-[#a3bab8] hover:bg-white focus-visible:bg-white'
+                }`}
+              >
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] text-[20px] font-extrabold tabular-nums sm:h-11 sm:w-11 sm:text-[22px] ${isActive ? 'bg-white/15 text-white' : 'bg-[#deebe8] text-[#32565c]'}`} aria-hidden="true">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-bold leading-[1.3] sm:text-[18px]">{group.eyebrow}</span>
+                  <span className={`mt-1 block text-[13px] font-medium sm:text-[14px] ${isActive ? 'text-[#d8e8e8]' : 'text-[#61767a]'}`}>{group.items.length} tools</span>
+                </span>
+                <ArrowRight size={18} className={`hidden shrink-0 transition-transform duration-200 lg:block ${isActive ? 'text-white' : 'text-[#537b7d] group-hover:translate-x-1'}`} aria-hidden="true" />
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <section
+        id="admin-workspace-active-panel"
+        role="region"
+        aria-label={activeGroup.eyebrow}
+        className="min-w-0 bg-[#fcfdfc] px-3 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6"
+      >
+        <div className="flex items-start gap-3 border-b border-[#e0e7e5] px-1 pb-4 sm:gap-4 sm:pb-5">
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[13px] border border-[#d5e3e0] bg-[#e9f0ee] ${activeGroup.icon}`} aria-hidden="true">
+            <ActiveIcon size={23} strokeWidth={1.85} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-bold tracking-[0.05em] text-[#536d73]">
+              SECTION {String(activeIndex + 1).padStart(2, '0')} / {String(groups.length).padStart(2, '0')}
+            </p>
+            <h3 className="mt-1 text-[24px] font-extrabold leading-[1.2] tracking-[-0.035em] text-[#233c42] sm:text-[28px]">
+              {activeGroup.title}
+            </h3>
+          </div>
+        </div>
+
+        <div className="mt-2 grid grid-cols-1 gap-0.5 md:grid-cols-2 md:gap-x-3 lg:mt-3">
+          {activeGroup.items.map((item) => (
+            <WorkspaceToolLink key={item.to} item={item} group={activeGroup} />
+          ))}
+        </div>
+      </section>
+    </div>
+      </div>
+    </>
   )
 }
 
@@ -327,6 +456,7 @@ export default function AdminDashboardPage() {
   const [demand, setDemand] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeWorkspaceKey, setActiveWorkspaceKey] = useState('reviews')
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -388,20 +518,11 @@ export default function AdminDashboardPage() {
   const accessibleModules = useMemo(() => [
     {
       icon: BarChart3,
-      title: 'Analytics overview',
-      description: 'See platform activity, operational signals and business performance in one place.',
-      mobileDescription: 'Platform activity and performance.',
+      title: 'Analytics & customer demand',
+      description: 'Customer activity, demand by area and controlled experiments in one place.',
+      mobileDescription: 'Activity, demand & experiments.',
       to: '/admin/analytics',
-      visible: hasAdminPermission('admin.dashboard.read') || canReadAiQuality,
-      tone: 'sky',
-    },
-    {
-      icon: Search,
-      title: 'Customer search demand',
-      description: 'See what customers search for and which areas are asking for those items most.',
-      mobileDescription: 'Search demand by area.',
-      to: '/admin/search-demand',
-      visible: hasAdminPermission('admin.dashboard.read') || hasAdminPermission('marketplace.read') || hasAdminPermission('catalog.read'),
+      visible: hasAdminPermission('admin.dashboard.read') || hasAdminPermission('admin.audit.read') || hasAdminPermission('marketplace.read') || hasAdminPermission('trust_safety.read') || hasAdminPermission('catalog.read'),
       tone: 'sky',
     },
     {
@@ -628,22 +749,21 @@ export default function AdminDashboardPage() {
     }))
     .filter((group) => group.items.length > 0)
 
+  const openWorkspaceKey = moduleGroups.some((group) => group.key === activeWorkspaceKey)
+    ? activeWorkspaceKey
+    : moduleGroups[0]?.key
+
   return (
     <AdminShell
       flushTop
-      title={<span className="text-[1.2em]">Super Admin Overview</span>}
-      description={
-        <span className="text-[1.2em]">
-          <span className="sm:hidden">Reviews, demand, money and controls.</span>
-          <span className="hidden sm:inline">See what needs attention, what customers are asking for, where money is moving, and which control area to open next.</span>
-        </span>
-      }
+      title={<span className="text-[24px] leading-tight sm:text-[30px]">Super Admin Overview</span>}
+      showWorkspaceBadge={false}
       actions={
         <button
           type="button"
           onClick={loadDashboard}
           disabled={loading}
-          className="focus-ring inline-flex items-center gap-2 rounded-full border border-stone-300 bg-[#f8f5ed] px-3.5 py-2 text-[14.4px] font-black text-stone-700 transition hover:border-stone-400 hover:bg-white disabled:opacity-50"
+          className="focus-ring inline-flex items-center gap-2 rounded-full border border-stone-300 bg-[#f8f5ed] px-3.5 py-2 text-[15px] font-black text-stone-700 transition hover:border-stone-400 hover:bg-white disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
           Refresh
@@ -660,28 +780,24 @@ export default function AdminDashboardPage() {
 
                 <div className="relative">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex min-w-0 items-center gap-1.5 text-[8.8px] font-black uppercase tracking-[0.15em] text-[#c3dfd3]">
+                    <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-black uppercase tracking-[0.15em] text-[#c3dfd3]">
                       <CheckCircle2 size={11} className="shrink-0" aria-hidden="true" />
-                      <span>Super Admin control room</span>
+                      <span>Admin overview</span>
                     </span>
-                    <span className="shrink-0 text-[8px] font-black uppercase tracking-[0.11em] text-white/40">
+                    <span className="shrink-0 text-[12px] font-black uppercase tracking-[0.11em] text-white/40">
                       {adminSource === 'super_admin' ? 'Super Admin' : 'Assigned Admin'}
                     </span>
                   </div>
 
-                  <h2 className="mt-3 text-[25px] font-black leading-[0.98] tracking-[-0.045em] text-white">
-                    What needs attention now.
+                  <h2 className="mt-3 text-[27px] font-extrabold leading-[1.05] tracking-[-0.035em] text-white">
+                    Today’s priorities
                   </h2>
-
-                  <p className="mt-2 whitespace-nowrap text-[9.8px] font-semibold leading-4 text-white/68">
-                    Reviews, approvals, money & alerts in one view.
-                  </p>
                 </div>
               </div>
 
               <details className="group border-t border-[#d8c694] bg-[#efe1bd]">
-                <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-[11px] font-black text-[#4f421f] [&::-webkit-details-marker]:hidden">
-                  <span>Open admin signals</span>
+                <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-[13px] font-black text-[#4f421f] [&::-webkit-details-marker]:hidden">
+                  <span>View admin signals</span>
                   <span className="text-[15px] leading-none transition-transform group-open:rotate-45" aria-hidden="true">+</span>
                 </summary>
 
@@ -689,11 +805,11 @@ export default function AdminDashboardPage() {
                   <div className="grid grid-cols-2 border-b border-white/12 px-4 py-3">
                     <div>
                       <p className="text-[20px] font-black leading-none tracking-[-0.04em] text-[#f0d18c]">{adminPermissionKeys.length}</p>
-                      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">Permissions</p>
+                      <p className="mt-1 text-[12px] font-black uppercase tracking-[0.12em] text-white/45">Permissions</p>
                     </div>
                     <div className="border-l border-white/12 pl-4">
                       <p className="text-[20px] font-black leading-none tracking-[-0.04em] text-[#f0d18c]">{accessibleModules.length}</p>
-                      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">Tools available</p>
+                      <p className="mt-1 text-[12px] font-black uppercase tracking-[0.12em] text-white/45">Tools available</p>
                     </div>
                   </div>
 
@@ -713,7 +829,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="border-t border-[#d8c694] px-3.5 py-2.5">
-                  <p className="text-[8.8px] font-black uppercase tracking-[0.16em] text-[#6f5828]">Quick dashboard flow</p>
+                  <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#6f5828]">Start here</p>
                   <div className="mt-1.5">
                     {FLOW_STEPS.map((item, index) => (
                       <FlowStep key={item.number} item={item} index={index} />
@@ -732,31 +848,27 @@ export default function AdminDashboardPage() {
 
                 <div className="relative">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="inline-flex items-center gap-2 text-[9.6px] font-black uppercase tracking-[0.18em] text-[#c3dfd3] sm:text-[10.8px]">
+                    <span className="inline-flex items-center gap-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#c3dfd3] sm:text-[12px]">
                       <CheckCircle2 size={13} aria-hidden="true" />
-                      Super Admin control room
+                      Admin overview
                     </span>
-                    <span className="text-[9.6px] font-black uppercase tracking-[0.13em] text-white/40">
+                    <span className="text-[12px] font-black uppercase tracking-[0.13em] text-white/40">
                       {adminSource === 'super_admin' ? 'Super Admin' : 'Assigned Admin'}
                     </span>
                   </div>
 
-                  <h2 className="mt-5 max-w-[430px] text-[34.8px] font-black leading-[0.98] tracking-[-0.05em] text-white sm:text-[48px] lg:text-[55.2px]">
-                    What needs attention right now.
+                  <h2 className="mt-5 max-w-[430px] text-[32px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white sm:text-[38px] lg:text-[42px]">
+                    Today’s priorities
                   </h2>
-
-                  <p className="mt-3 max-w-[500px] text-[12px] font-semibold leading-5 text-white/65 sm:text-[14.4px] sm:leading-6">
-                    Reviews, approvals, marketplace issues and finance signals are grouped here before you move into the detailed admin sections below.
-                  </p>
 
                   <div className="mt-5 grid grid-cols-2 gap-y-3 border-t border-white/12 pt-4">
                     <div>
                       <p className="text-[24px] font-black leading-none tracking-[-0.04em] text-[#f0d18c] sm:text-[28.8px]">{adminPermissionKeys.length}</p>
-                      <p className="mt-1.5 text-[9.6px] font-black uppercase tracking-[0.14em] text-white/45">Permissions</p>
+                      <p className="mt-1.5 text-[12px] font-black uppercase tracking-[0.14em] text-white/45">Permissions</p>
                     </div>
                     <div className="border-l border-white/12 pl-5">
                       <p className="text-[24px] font-black leading-none tracking-[-0.04em] text-[#f0d18c] sm:text-[28.8px]">{accessibleModules.length}</p>
-                      <p className="mt-1.5 text-[9.6px] font-black uppercase tracking-[0.14em] text-white/45">Tools available</p>
+                      <p className="mt-1.5 text-[12px] font-black uppercase tracking-[0.14em] text-white/45">Tools available</p>
                     </div>
                   </div>
                 </div>
@@ -780,8 +892,8 @@ export default function AdminDashboardPage() {
             <div className="border-t border-[#d8c694] bg-[#efe1bd] px-4 sm:px-5 lg:px-6">
               <div className="grid lg:grid-cols-[210px_minmax(0,1fr)]">
                 <div className="border-b border-[#d8c694] py-3 lg:border-b-0 lg:border-r lg:py-4 lg:pr-5">
-                  <p className="text-[9.6px] font-black uppercase tracking-[0.18em] text-[#6f5828]">Quick dashboard flow</p>
-                  <p className="mt-1.5 text-[15.6px] font-black leading-4 text-stone-950">Read the page in this order.</p>
+                  <p className="text-[12px] font-black uppercase tracking-[0.18em] text-[#6f5828]">Start here</p>
+                  <p className="mt-1.5 text-[17px] font-black leading-4 text-stone-950">Four quick steps</p>
                 </div>
                 <div className="grid lg:grid-cols-4 lg:pl-5">
                   {FLOW_STEPS.map((item, index) => (
@@ -793,7 +905,7 @@ export default function AdminDashboardPage() {
           </section>
 
           {error ? (
-            <div className="rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-[14.4px] font-semibold text-red-700 sm:px-5">{error}</div>
+            <div className="rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-[15px] font-semibold text-red-700 sm:px-5">{error}</div>
           ) : null}
 
           {(commandCenter?.incidentBanners || []).length ? (
@@ -803,7 +915,7 @@ export default function AdminDashboardPage() {
                   <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
                   <div>
                     <p className="text-[16.8px] font-black text-amber-950">{incident.title}</p>
-                    <p className="mt-1 text-[14.4px] font-semibold leading-5 text-amber-800">{incident.banner?.message || incident.summary}</p>
+                    <p className="mt-1 text-[15px] font-semibold leading-5 text-amber-800">{incident.banner?.message || incident.summary}</p>
                   </div>
                 </div>
               ))}
@@ -814,51 +926,47 @@ export default function AdminDashboardPage() {
             <header className="bg-[#d8e9df] px-4 py-2.5">
               <div className="flex items-end justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[8.8px] font-black uppercase tracking-[0.16em] text-[#1b5a49]">Business pulse</p>
-                  <h2 className="mt-0.5 text-[17px] font-black leading-5 tracking-[-0.03em] text-stone-950">Money + customer demand</h2>
+                  <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#1b5a49]">Business pulse</p>
+                  <h2 className="mt-0.5 text-[17px] font-black leading-5 tracking-[-0.03em] text-stone-950">Money & demand</h2>
                 </div>
-                <p className="shrink-0 whitespace-nowrap text-[8.4px] font-bold text-stone-600">At a glance</p>
               </div>
-              <p className="mt-1 whitespace-nowrap text-[9.4px] font-semibold leading-4 text-stone-600">
-                Money and demand signals in one place.
-              </p>
             </header>
 
             <div className="grid grid-cols-2">
               <Link
                 to="/admin/earnings"
-                className="focus-ring min-w-0 border-r border-[#bed4ca] bg-[#cce7da] px-3 py-3"
+                className="focus-ring group min-w-0 border-r border-[#bed4ca] bg-[#cce7da] px-3 py-3 transition-colors hover:bg-[#c1dece] focus-visible:bg-[#c1dece]"
               >
                 <div className="flex items-center justify-between gap-2 text-[#145846]">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <IndianRupee size={13} className="shrink-0" aria-hidden="true" />
-                    <p className="text-[8.4px] font-black uppercase tracking-[0.1em]">Money</p>
+                    <p className="text-[12px] font-black uppercase tracking-[0.1em]">Money</p>
                   </div>
                   <ArrowRight size={12} className="shrink-0 text-[#5f8f82]" aria-hidden="true" />
                 </div>
                 <p className="mt-2 break-words text-[22px] font-black leading-none tracking-[-0.05em] text-stone-950">{formatMoney(earnings?.currentMonth?.grossCollectionsMinor)}</p>
-                <p className="mt-1.5 break-words text-[8.8px] font-semibold leading-[1.35] text-stone-600">
+                <p className="mt-1.5 break-words text-[12px] font-semibold leading-[1.35] text-stone-600">
                   This month · platform {formatMoney(earnings?.currentMonth?.platformRevenueMinor)}
                 </p>
               </Link>
 
               <Link
-                to="/admin/search-demand"
-                className="focus-ring min-w-0 bg-[#d5e8f4] px-3 py-3"
+                to="/admin/analytics#customer-demand"
+                className="focus-ring group min-w-0 bg-[#d5e8f4] px-3 py-3 transition-colors hover:bg-[#c6e0f0] focus-visible:bg-[#c6e0f0]"
               >
                 <div className="flex items-center justify-between gap-2 text-[#15527a]">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <Search size={13} className="shrink-0" aria-hidden="true" />
-                    <p className="text-[8.4px] font-black uppercase tracking-[0.1em]">Demand</p>
+                    <p className="text-[12px] font-black uppercase tracking-[0.1em]">Demand</p>
                   </div>
                   <ArrowRight size={12} className="shrink-0 text-[#668da7]" aria-hidden="true" />
                 </div>
                 <p className="mt-2 break-words text-[22px] font-black leading-none tracking-[-0.05em] text-stone-950">{demand?.totalSearches ?? 0}</p>
-                <p className="mt-1.5 break-words text-[8.8px] font-semibold leading-[1.3] text-stone-600">
+                <p className="mt-1.5 break-words text-[12px] font-semibold leading-[1.3] text-stone-600">
                   30 days{demand?.topQuery?.query ? ` · top: “${demand.topQuery.query}”` : ' · no top search yet'}
                 </p>
                 {demand?.topArea ? (
-                  <p className="mt-1 break-words text-[8.4px] font-bold leading-[1.25] text-stone-500">
+                  <p className="mt-1 break-words text-[12px] font-bold leading-[1.25] text-stone-500">
                     {[demand.topArea.city, demand.topArea.state, demand.topArea.postcode].filter(Boolean).join(', ') || 'Area not available'}
                   </p>
                 ) : null}
@@ -869,51 +977,48 @@ export default function AdminDashboardPage() {
           <section className="hidden overflow-hidden rounded-[26px] border border-[#bed4ca] bg-[#f7f4ec] sm:block">
             <div className="grid lg:grid-cols-[250px_minmax(0,1fr)]">
               <header className="bg-[#d8e9df] p-5 sm:p-6 lg:p-7">
-                <p className="text-[9.6px] font-black uppercase tracking-[0.18em] text-[#1b5a49] sm:text-[10.8px]">Business pulse</p>
-                <h2 className="mt-5 max-w-[210px] text-[27.6px] font-black leading-[1.02] tracking-[-0.04em] text-stone-950 sm:text-[33.6px]">Money and customer demand.</h2>
-                <p className="mt-3 max-w-[220px] text-[12px] font-semibold leading-5 text-stone-600 sm:text-[13.2px]">
-                  Two signals that tell you how EPANTRY is being used and where business activity is moving.
-                </p>
+                <p className="text-[12px] font-black uppercase tracking-[0.18em] text-[#1b5a49] sm:text-[12px]">Business pulse</p>
+                <h2 className="mt-4 max-w-[210px] text-[25px] font-extrabold leading-tight tracking-[-0.035em] text-stone-950 sm:text-[28px]">Money & demand</h2>
               </header>
 
               <div className="grid lg:grid-cols-2">
                 <Link
                   to="/admin/earnings"
-                  className="focus-ring group flex min-h-[190px] flex-col justify-between border-t border-[#bed4ca] bg-[#cce7da] p-5 transition hover:bg-[#c3e1d3] sm:min-h-[220px] sm:p-6 lg:border-l lg:border-t-0 lg:p-7"
+                  className="focus-ring group flex min-h-[174px] flex-col justify-between border-t border-[#bed4ca] bg-[#cce7da] p-5 transition hover:bg-[#c3e1d3] sm:min-h-[196px] sm:p-6 lg:border-l lg:border-t-0 lg:p-7"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-2.5 text-[#145846]">
                       <IndianRupee size={17} aria-hidden="true" />
-                      <p className="text-[9.6px] font-black uppercase tracking-[0.16em]">Money through EPANTRY</p>
+                      <p className="text-[12px] font-black uppercase tracking-[0.16em]">Collections</p>
                     </div>
                     <ArrowRight size={16} className="text-[#5f8f82] transition group-hover:translate-x-1 group-hover:text-[#145846]" aria-hidden="true" />
                   </div>
                   <div>
                     <p className="text-[45.6px] font-black leading-none tracking-[-0.06em] text-stone-950 sm:text-[60px]">{formatMoney(earnings?.currentMonth?.grossCollectionsMinor)}</p>
-                    <p className="mt-3 max-w-[420px] text-[12px] font-semibold leading-5 text-stone-600 sm:text-[13.2px]">
+                    <p className="mt-3 max-w-[420px] text-[13px] font-semibold leading-5 text-stone-600 sm:text-[14px]">
                       This month · platform earnings inside this: {formatMoney(earnings?.currentMonth?.platformRevenueMinor)}
                     </p>
                   </div>
                 </Link>
 
                 <Link
-                  to="/admin/search-demand"
-                  className="focus-ring group flex min-h-[190px] flex-col justify-between border-t border-[#bdd2e2] bg-[#d5e8f4] p-5 transition hover:bg-[#cce3f1] sm:min-h-[220px] sm:p-6 lg:border-l lg:border-t-0 lg:p-7"
+                  to="/admin/analytics#customer-demand"
+                  className="focus-ring group flex min-h-[174px] flex-col justify-between border-t border-[#bdd2e2] bg-[#d5e8f4] p-5 transition hover:bg-[#cce3f1] sm:min-h-[196px] sm:p-6 lg:border-l lg:border-t-0 lg:p-7"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-2.5 text-[#15527a]">
                       <Search size={17} aria-hidden="true" />
-                      <p className="text-[9.6px] font-black uppercase tracking-[0.16em]">Customer search demand</p>
+                      <p className="text-[12px] font-black uppercase tracking-[0.16em]">Customer search demand</p>
                     </div>
                     <ArrowRight size={16} className="text-[#668da7] transition group-hover:translate-x-1 group-hover:text-[#15527a]" aria-hidden="true" />
                   </div>
                   <div>
                     <p className="text-[45.6px] font-black leading-none tracking-[-0.06em] text-stone-950 sm:text-[60px]">{demand?.totalSearches ?? 0} searches</p>
-                    <p className="mt-3 max-w-[420px] text-[12px] font-semibold leading-5 text-stone-600 sm:text-[13.2px]">
+                    <p className="mt-3 max-w-[420px] text-[13px] font-semibold leading-5 text-stone-600 sm:text-[14px]">
                       Last 30 days · {demand?.topQuery?.query ? `top search: “${demand.topQuery.query}”` : 'search demand will appear as customers use EPANTRY search'}
                     </p>
                     {demand?.topArea ? (
-                      <p className="mt-1 text-[10.8px] font-bold text-stone-500 sm:text-[12px]">Top area: {[demand.topArea.city, demand.topArea.state, demand.topArea.postcode].filter(Boolean).join(', ') || 'Area not available'}</p>
+                      <p className="mt-1 text-[12px] font-bold text-stone-500 sm:text-[13px]">Top area: {[demand.topArea.city, demand.topArea.state, demand.topArea.postcode].filter(Boolean).join(', ') || 'Area not available'}</p>
                     ) : null}
                   </div>
                 </Link>
@@ -924,47 +1029,19 @@ export default function AdminDashboardPage() {
           <section className="pt-1">
             <div className="mb-3 grid gap-2 border-y border-[#d7d0c5] py-3 sm:mb-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-3 sm:py-5">
               <div>
-                <p className="text-[9.6px] font-black uppercase tracking-[0.18em] text-[#185442] sm:text-[10.8px]">Admin workspaces</p>
-                <h2 className="mt-1.5 text-[25.2px] font-black leading-[1.02] tracking-[-0.04em] text-stone-950 sm:mt-2 sm:text-[37.2px] sm:leading-none">Open the right area. Keep every job separate.</h2>
-              </div>
-              <p className="max-w-[420px] text-[12px] font-semibold leading-5 text-stone-600 sm:text-right sm:text-[13.2px]">
-                Reviews, catalog, business operations and governance are separated so each kind of work has a clear home.
-              </p>
-            </div>
-
-            <div className="space-y-3 sm:space-y-5">
-              {moduleGroups.map((group) => (
-                <WorkspaceSection key={group.key} group={group} items={group.items} />
-              ))}
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-[20px] border border-[#2d3632] bg-[#232a27] text-white">
-            <div className="grid sm:grid-cols-[220px_minmax(0,1fr)]">
-              <header className="border-b border-white/10 p-4 sm:border-b-0 sm:border-r sm:p-5">
-                <p className="text-[9.6px] font-black uppercase tracking-[0.16em] text-[#a9cabd]">Admin safeguards</p>
-                <h2 className="mt-2 text-[19.2px] font-black leading-5 text-white">Built into every control.</h2>
-              </header>
-
-              <div className="grid sm:grid-cols-3">
-                {[
-                  ['Secure sign-in', 'MFA protects sensitive admin actions.'],
-                  ['Scoped access', 'Only approved admin controls are available.'],
-                  ['Audit trail', 'Important admin decisions are recorded.'],
-                ].map(([title, copy], index) => (
-                  <article key={title} className={`flex items-start gap-3 p-4 sm:p-5 ${index ? 'border-t border-white/10 sm:border-l sm:border-t-0' : ''}`}>
-                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#9ac8b5]" aria-hidden="true" />
-                    <div>
-                      <h3 className="text-[12px] font-black leading-4 text-white sm:text-[13.2px]">{title}</h3>
-                      <p className="mt-1 text-[10.8px] font-semibold leading-4 text-white/55 sm:text-[12px]">{copy}</p>
-                    </div>
-                  </article>
-                ))}
+                <p className="text-[12px] font-black uppercase tracking-[0.18em] text-[#185442] sm:text-[12px]">Admin workspaces</p>
+                <h2 className="mt-1 text-[24px] font-bold leading-tight tracking-[-0.035em] text-stone-950 sm:text-[30px]">Choose a workspace</h2>
               </div>
             </div>
+
+            <WorkspaceDirectory
+              groups={moduleGroups}
+              activeKey={openWorkspaceKey}
+              onSelect={setActiveWorkspaceKey}
+            />
           </section>
 
-          {canReadAiQuality ? <AdminAiQualityPanel /> : null}
+          {canReadAiQuality ? <AdminAiQualityPanel condensed /> : null}
         </div>
       </div>
     </AdminShell>

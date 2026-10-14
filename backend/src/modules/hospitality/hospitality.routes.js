@@ -24,7 +24,7 @@ import {
 } from '../auth/auth.middleware.js'
 
 import {
-  requireChefRestaurantHostAccess,
+  requireHospitalityRecipeHostAccess,
   requireHostAccess,
 } from '../auth/authorization.middleware.js'
 
@@ -879,7 +879,7 @@ router.patch(
 
 router.get(
   '/restaurant-recipes',
-  requireChefRestaurantHostAccess,
+  requireHospitalityRecipeHostAccess,
   wrap(
     async (req, res) =>
       send(
@@ -897,7 +897,7 @@ router.get(
 
 router.get(
   '/restaurant-recipes/:id',
-  requireChefRestaurantHostAccess,
+  requireHospitalityRecipeHostAccess,
   wrap(
     async (req, res) => {
       const params = parseOrThrow(
@@ -923,7 +923,7 @@ router.get(
 
 router.post(
   '/restaurant-recipes',
-  requireChefRestaurantHostAccess,
+  requireHospitalityRecipeHostAccess,
   requireCsrfToken,
   requireRecentMfaAuthentication,
   wrap(
@@ -951,7 +951,7 @@ router.post(
 
 router.put(
   '/restaurant-recipes/:id',
-  requireChefRestaurantHostAccess,
+  requireHospitalityRecipeHostAccess,
   requireCsrfToken,
   requireRecentMfaAuthentication,
   wrap(

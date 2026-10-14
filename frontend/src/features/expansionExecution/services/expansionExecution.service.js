@@ -236,3 +236,23 @@ export async function recordCreatorAttendance({
     },
   })
 }
+// The provider URL is returned only after server-side owner/booking checks.
+export async function getCreatorSessionJoinLink(sessionId) {
+  return unwrap(await apiClient.get(`/creator-sessions/${path(sessionId)}/join`))
+}
+
+export async function setCreatorSessionMeeting({ sessionId, meetingUrl }) {
+  return mutate({
+    url: `/creator-sessions/${path(sessionId)}/meeting`,
+    method: 'put',
+    data: { meetingUrl },
+  })
+}
+
+export async function joinCreatorSessionWaitlist(sessionId) {
+  return mutate({ url: `/creator-sessions/${path(sessionId)}/waitlist` })
+}
+
+export async function leaveCreatorSessionWaitlist(sessionId) {
+  return mutate({ url: `/creator-sessions/${path(sessionId)}/waitlist/leave` })
+}

@@ -100,17 +100,25 @@ function createRateLimitHandler({
 |--------------------------------------------------------------------------
 | General API Rate Limit
 |--------------------------------------------------------------------------
+|
+| This is a shared-IP abuse ceiling, not a measure of server concurrency.
+| Users on the same office/home connection may share one public IP. Keep
+| authentication and OTP restrictions below independent of this ceiling.
+|
 */
+
+function positiveInteger(value, fallback) {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
+}
 
 export const apiRateLimiter =
   rateLimit({
     windowMs:
-      15 *
-      60 *
-      1000,
+      positiveInteger(process.env.API_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
 
     limit:
-      300,
+      positiveInteger(process.env.API_RATE_LIMIT_MAX, 1800),
 
     standardHeaders:
       'draft-8',

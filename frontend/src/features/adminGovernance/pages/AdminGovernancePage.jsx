@@ -175,47 +175,28 @@ import {
     'Enabled feature flags': 'Active controls',
   });
   
-  const USER_METRIC_STYLES = [
-    'bg-[#dff0f3] text-[#0b5f68]',
-    'bg-[#e5e8f8] text-[#40508d]',
-    'bg-[#dff1e7] text-[#176647]',
-    'bg-[#ece7f7] text-[#5b4588]',
-    'bg-[#f4e6ea] text-[#8a4053]',
-    'bg-[#dff2f0] text-[#176a67]',
-    'bg-[#e5ebf5] text-[#365681]',
-    'bg-[#e8eee7] text-[#466347]',
-  ];
-  
   function UsersMetricCard({
     label,
     value,
     icon: Icon,
-    index,
   }) {
     return (
-        <div className="bg-[#f5faf9] p-3 sm:p-5">
-            <div className="flex items-start justify-between gap-2 sm:gap-3">
-                <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase leading-3.5 tracking-[0.08em] text-stone-500 sm:text-xs sm:leading-4 sm:tracking-[0.09em]">
-                        {USER_METRIC_LABELS[label] || label}
-                    </p>
-  
-                    <p className="mt-1.5 text-xl font-black leading-none text-stone-950 sm:mt-3 sm:text-[30px]">
-                        {value ?? 0}
-                    </p>
-                </div>
-  
-                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl ${USER_METRIC_STYLES[index % USER_METRIC_STYLES.length]}`}>
-                    <Icon
-                        size={16}
-                        aria-hidden="true"
-                    />
-                </span>
-            </div>
+      <div className="flex min-w-0 items-center justify-between gap-3 bg-white px-4 py-4 sm:px-5 sm:py-5">
+        <div className="min-w-0">
+          <p className="text-[14px] font-semibold leading-snug text-[#476258] sm:text-[15px]">
+            {USER_METRIC_LABELS[label] || label}
+          </p>
+          <p className="mt-1.5 text-[28px] font-extrabold leading-none tabular-nums text-[#183e31] sm:text-[32px]">
+            {value ?? 0}
+          </p>
         </div>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#edf5f0] text-[#236149]">
+          <Icon size={19} aria-hidden="true" />
+        </span>
+      </div>
     );
   }
-  
+
   function UsersStepCard({
     number,
     title,
@@ -223,70 +204,36 @@ import {
     mobileTitle,
     mobileBody,
     icon: Icon,
-    tone,
     to,
   }) {
-    const tones = {
-        amber:
-            'bg-[#dceff2] text-[#0d6070]',
-        sky:
-            'bg-[#dfe8f8] text-[#31598d]',
-        emerald:
-            'bg-[#dff1e7] text-[#176647]',
-        violet:
-            'bg-[#ebe5f7] text-[#5c4388]',
-    };
-  
-    const borderClasses = {
-        1: 'border-b border-r border-white/15 lg:border-b-0',
-        2: 'border-b border-white/15 lg:border-b-0 lg:border-r',
-        3: 'border-r border-white/15',
-        4: '',
-    };
-  
     const content = (
-        <div
-            className={`h-full min-h-[104px] p-3 sm:min-h-[150px] sm:p-5 ${borderClasses[number] || ''}`}
-        >
-            <div className="flex items-center justify-between gap-2 sm:gap-3">
-                <span className={`grid h-8 w-8 place-items-center rounded-lg sm:h-9 sm:w-9 sm:rounded-xl ${tones[tone]}`}>
-                    <Icon
-                        size={16}
-                        aria-hidden="true"
-                    />
-                </span>
-  
-                <span className="text-[9px] font-black tracking-[0.12em] text-white/45 sm:text-xs sm:tracking-[0.14em]">
-                    0{number}
-                </span>
-            </div>
-  
-            <h3 className="mt-2.5 text-[12px] font-black leading-4 text-white sm:mt-4 sm:text-[15px] sm:leading-5">
-                <span className="sm:hidden">{mobileTitle || title}</span>
-                <span className="hidden sm:inline">{title}</span>
-            </h3>
-  
-            <p className="mt-1 text-[10px] font-semibold leading-4 text-white/65 sm:mt-1.5 sm:text-[13px] sm:leading-5">
-                <span className="sm:hidden">{mobileBody || body}</span>
-                <span className="hidden sm:inline">{body}</span>
-            </p>
+      <div className="flex h-full min-w-0 items-start gap-3 bg-white px-4 py-4 sm:px-5 sm:py-5">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e3efe7] text-[#1c6145]">
+          <Icon size={21} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-bold text-[#4a7761]">Step {String(number).padStart(2, '0')}</p>
+          <h3 className="mt-0.5 break-words text-[16px] font-extrabold leading-snug text-[#193e30] sm:text-[17px]">
+            {title}
+          </h3>
+          <p className="mt-1 text-[14px] leading-5 text-stone-600">
+            {mobileBody || body}
+          </p>
         </div>
+        {to ? <span aria-hidden="true" className="shrink-0 self-center text-[19px] text-[#267251]">↗</span> : null}
+      </div>
     );
-  
-    if (!to) {
-        return content;
-    }
-  
-    return (
-        <Link
-            to={to}
-            className="focus-ring block h-full transition hover:bg-white/[0.04]"
-        >
-            {content}
-        </Link>
-    );
+
+    return to ? (
+      <Link
+        to={to}
+        className="focus-ring block h-full min-w-0 transition-colors hover:[&>div]:bg-[#f0f8f3] focus-visible:[&>div]:bg-[#f0f8f3]"
+      >
+        {content}
+      </Link>
+    ) : content;
   }
-  
+
   function QueueList({
     title,
     items,
@@ -4786,11 +4733,12 @@ import {
                 section === 'trustSafety'
                     ? 'Review safety reports, handle incidents and follow up on claims.'
                     : section === 'users'
-                    ? 'Find customer and Host accounts, review business access, and move to the right admin tool without editing records blindly.'
+                    ? null
                     : section === 'recipeReview'
                         ? 'Review recipes waiting for a decision, check food readiness, and move each recipe to the right next step.'
                         : section === 'policy' ? <><span className="text-[13px] leading-[1.3] sm:hidden">Manage rules and features.</span><span className="hidden sm:inline">Create and review food safety rules, manage feature access, and track related admin work.</span></> : config.description
             }
+            showWorkspaceBadge={section !== 'users'}
             flushTop={section === 'users'}
             actions={
                 <button
@@ -4828,7 +4776,7 @@ import {
                 </button>
             }
         >
-            {section !== 'dataQuality' && section !== 'recipeReview' ? (
+            {section !== 'dataQuality' && section !== 'recipeReview' && section !== 'users' ? (
                 <div className="flex items-center gap-2 text-emerald-700">
                     <Icon
                         size={18}
@@ -4862,72 +4810,49 @@ import {
             ) : null}
   
             {section === 'users' ? (
-                <section className="mt-3 overflow-hidden rounded-[22px] bg-[#123f4b] shadow-[0_18px_50px_rgba(18,63,75,0.14)] sm:mt-5 sm:rounded-[28px]">
-                    <div className="grid gap-2.5 px-3.5 py-4 sm:gap-4 sm:px-6 sm:py-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-end lg:gap-8 lg:px-8 lg:py-7">
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9fe2df] sm:text-xs">
-                                People & business workflow
-                            </p>
-  
-                            <h2 className="mt-1.5 max-w-xl text-[18px] font-black leading-[1.12] text-white sm:mt-2 sm:text-2xl sm:leading-tight lg:text-[28px]">
-                                <span className="sm:hidden">Find. Check access. Act safely.</span>
-                                <span className="hidden sm:inline">Find the record. Verify access. Make the right change.</span>
-                            </h2>
-                        </div>
-  
-                        <p className="max-w-2xl text-[11px] font-semibold leading-4 text-white/65 sm:text-sm sm:leading-6 lg:justify-self-end">
-                            <span className="sm:hidden">One guided path for people, Hosts and business access.</span>
-                            <span className="hidden sm:inline">Use one guided path for Customer, Host and business access work so sensitive changes stay deliberate and traceable.</span>
-                        </p>
+                <section className="mt-4 overflow-hidden rounded-[22px] border border-[#d4e2d8] bg-[#f6f8f4] sm:mt-5 sm:rounded-[26px]">
+                    <div className="flex flex-col gap-2 bg-[#174b38] px-4 py-5 text-white sm:px-7 sm:py-6">
+                        <p className="text-[13px] font-bold text-[#c6e7d2]">People & Business Access</p>
+                        <h2 className="max-w-3xl text-[24px] font-extrabold leading-tight sm:text-[29px]">
+                            Find an account. Review access. Take action.
+                        </h2>
                     </div>
-  
-                    <div className="grid grid-cols-2 border-t border-white/15 lg:grid-cols-4">
+                    <div className="grid gap-px bg-[#dce6df] sm:grid-cols-2 xl:grid-cols-4">
                         <UsersStepCard
                             number={1}
                             title="Find the account"
-                            body="Use Admin search to find a Customer, Host or business."
-                            mobileTitle="Find account"
-                            mobileBody="Search Customer, Host or business."
+                            body="Search for a Customer, Host or business."
+                            mobileBody="Use the admin search above."
                             icon={SearchCheck}
-                            tone="amber"
                         />
-  
                         <UsersStepCard
                             number={2}
-                            title="Review business access"
-                            body="Check Host approval and business access before changing anything."
-                            mobileTitle="Check access"
-                            mobileBody="Review Host and business access."
+                            title="Review Host access"
+                            body="Check pending Host or business requests."
+                            mobileBody="Open Host approvals."
                             icon={Building2}
-                            tone="sky"
                             to="/admin/host-operations"
                         />
-  
                         <UsersStepCard
                             number={3}
-                            title="Manage admin access"
-                            body="Open roles and permissions when internal admin access needs a change."
-                            mobileTitle="Admin access"
-                            mobileBody="Open roles only when needed."
+                            title="Manage permissions"
+                            body="Review internal Admin access."
+                            mobileBody="Open access controls."
                             icon={ShieldCheck}
-                            tone="emerald"
                             to={isRootSuperAdmin ? '/admin/roles' : '/admin/host-operations'}
                         />
-  
                         <UsersStepCard
                             number={4}
-                            title="Confirm the history"
-                            body="Check the audit trail after sensitive access or business changes."
-                            mobileTitle="Confirm history"
-                            mobileBody="Verify sensitive changes in audit."
+                            title="Check history"
+                            body="See records of Admin actions."
+                            mobileBody="View the audit history."
                             icon={Database}
-                            tone="violet"
                             to="/admin/audit"
                         />
                     </div>
                 </section>
             ) : null}
-  
+
             {section !== 'recipeReview' && loading ? (
                 <div
                     className={`grid place-items-center rounded-[22px] border border-stone-200 bg-white ${
@@ -4944,41 +4869,22 @@ import {
                     section !== 'dataQuality' &&
                     section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'aiQuality' ? (
                         section === 'users' ? (
-                            <section className="mt-3 overflow-hidden rounded-[22px] border border-[#c7dcdf] bg-[#c7dcdf] shadow-sm sm:mt-5 sm:rounded-[28px]">
-                                <div className="bg-[#e8f3f3] px-3.5 py-3 sm:px-6 sm:py-5">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#17666b] sm:text-xs">
-                                        Access & operational snapshot
-                                    </p>
-  
-                                    <div className="mt-0.5 flex flex-col gap-0.5 sm:mt-1 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-                                        <h2 className="text-[16px] font-black leading-5 text-stone-950 sm:text-xl">
-                                            <span className="sm:hidden">Review what needs attention</span>
-                                            <span className="hidden sm:inline">What needs review before access changes move forward</span>
-                                        </h2>
-  
-                                        <p className="max-w-xl text-[10px] font-semibold leading-4 text-stone-600 sm:text-sm sm:leading-5">
-                                            <span className="sm:hidden">Queues, approvals, payouts and active controls.</span>
-                                            <span className="hidden sm:inline">Review queues, Host approvals, payouts and active controls in one place.</span>
-                                        </p>
-                                    </div>
+                            <section className="mt-5 overflow-hidden rounded-[22px] border border-[#d8e2d9] bg-white sm:mt-6 sm:rounded-[26px]">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#dde6de] bg-[#e7f0e9] px-4 py-4 sm:px-6 sm:py-5">
+                                    <h2 className="text-[22px] font-extrabold text-[#1b4b38] sm:text-[26px]">
+                                        Needs attention
+                                    </h2>
+                                    <span className="text-[14px] font-semibold text-[#4e6b5b]">Platform overview</span>
                                 </div>
-  
-                                <div className="grid grid-cols-2 gap-px bg-[#c7dcdf] lg:grid-cols-4">
-                                    {metricEntries.map(
-                                        ([
-                                            label,
-                                            value,
-                                            MetricIcon,
-                                        ], index) => (
-                                            <UsersMetricCard
-                                                key={label}
-                                                label={label}
-                                                value={value}
-                                                icon={MetricIcon}
-                                                index={index}
-                                            />
-                                        ),
-                                    )}
+                                <div className="grid grid-cols-2 gap-px bg-[#e1e9e2] lg:grid-cols-4">
+                                    {metricEntries.map(([label, value, MetricIcon]) => (
+                                        <UsersMetricCard
+                                            key={label}
+                                            label={label}
+                                            value={value}
+                                            icon={MetricIcon}
+                                        />
+                                    ))}
                                 </div>
                             </section>
                         ) : (
@@ -5002,89 +4908,50 @@ import {
                     ) : null}
   
                     {section === 'users' ? (
-                        <section className="mt-3 overflow-hidden rounded-[22px] border border-[#d8dde5] bg-[#f3f5f7] shadow-sm sm:mt-5 sm:rounded-[28px]">
-                            <div className="grid lg:grid-cols-[0.92fr_1.08fr]">
-                                <div className="bg-[#193b63] p-4 text-white sm:p-6 lg:p-7">
-                                    <div className="flex items-center gap-2.5 sm:block">
-                                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/12 text-[#bfe8e0] sm:h-11 sm:w-11 sm:rounded-xl">
-                                        <UsersRound
-                                            size={19}
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-  
-                                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#add7e7] sm:mt-5 sm:text-xs sm:tracking-[0.14em]">
-                                        Account discovery
-                                    </p>
+                        <section className="mt-5 overflow-hidden rounded-[22px] border border-[#d7e3da] bg-white sm:mt-6 sm:rounded-[26px]">
+                            <div className="border-b border-[#e0e8e1] px-4 py-4 sm:px-6 sm:py-5">
+                                <h2 className="text-[22px] font-extrabold text-[#193f30] sm:text-[26px]">Open the right tool</h2>
+                            </div>
+                            <div className="grid min-w-0 md:grid-cols-2">
+                                <div className="min-w-0 bg-[#f5f7f3] px-4 py-5 sm:px-6 sm:py-6">
+                                    <div className="mb-3 flex items-center gap-3">
+                                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e2ece6] text-[#1d6047]">
+                                            <UsersRound size={22} aria-hidden="true" />
+                                        </span>
+                                        <h3 className="text-[19px] font-bold text-[#1c4133] sm:text-[21px]">Find a Customer or Host</h3>
                                     </div>
-  
-                                    <h2 className="mt-2 text-[18px] font-black leading-5 sm:mt-1.5 sm:text-2xl sm:leading-tight">
-                                        Find a person or business
-                                    </h2>
-  
-                                    <p className="mt-1.5 max-w-xl text-[10.5px] font-semibold leading-4 text-white/68 sm:mt-3 sm:text-sm sm:leading-6">
-                                        <span className="sm:hidden">Search Customers, Hosts or businesses. Results follow your admin access.</span>
-                                        <span className="hidden sm:inline">Use the Admin search above to find Customers, Hosts and businesses. Sensitive contact details stay protected and results follow your admin access.</span>
+                                    <p className="text-[15px] leading-6 text-stone-600">
+                                        Use the admin search at the top to find accounts and businesses.
                                     </p>
                                 </div>
-  
-                                <div className="bg-[#e4f1ec] p-4 sm:p-6 lg:p-7">
-                                    <div className="flex items-center gap-2.5 sm:block">
-                                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-[#176647] shadow-sm sm:h-11 sm:w-11 sm:rounded-xl">
-                                        <Building2
-                                            size={19}
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-  
-                                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#1d6a50] sm:mt-5 sm:text-xs sm:tracking-[0.14em]">
-                                        Governed access
-                                    </p>
+                                <div className="min-w-0 border-t border-[#d7e3da] bg-[#e7f3eb] px-4 py-5 sm:px-6 sm:py-6 md:border-l md:border-t-0">
+                                    <div className="mb-3 flex items-center gap-3">
+                                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#1d6047]">
+                                            <Building2 size={22} aria-hidden="true" />
+                                        </span>
+                                        <h3 className="text-[19px] font-bold text-[#1c4133] sm:text-[21px]">Manage business access</h3>
                                     </div>
-  
-                                    <h2 className="mt-2 text-[18px] font-black leading-5 text-stone-950 sm:mt-1.5 sm:text-2xl sm:leading-tight">
-                                        Open the right access tool
-                                    </h2>
-  
-                                    <p className="mt-1.5 max-w-2xl text-[10.5px] font-semibold leading-4 text-stone-600 sm:mt-3 sm:text-sm sm:leading-6">
-                                        <span className="sm:hidden">Use Host Operations or Roles & Permissions for controlled access changes.</span>
-                                        <span className="hidden sm:inline">Business approval, Host access and internal Admin permissions stay in their dedicated review pages so every change remains traceable.</span>
-                                    </p>
-  
-                                    <div className="mt-3 flex flex-wrap gap-2 sm:mt-5 sm:gap-2.5">
+                                    <div className="flex flex-wrap gap-3">
                                         <Link
                                             to="/admin/host-operations"
-                                            className="focus-ring inline-flex items-center justify-center rounded-lg bg-[#126444] px-3 py-2 text-[11px] font-black text-white transition hover:bg-[#0d5338] sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
+                                            className="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#15583e] px-4 py-2.5 text-[15px] font-bold text-white transition hover:bg-[#0e4933]"
                                         >
-                                            Review Hosts
+                                            Review Hosts ↗
                                         </Link>
-  
                                         {isRootSuperAdmin ? (
                                             <Link
                                                 to="/admin/roles"
-                                                className="focus-ring inline-flex items-center justify-center rounded-lg border border-[#b8d4ca] bg-white px-3 py-2 text-[11px] font-black text-stone-900 transition hover:border-[#82b7a4] sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
+                                                className="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#b5d2c0] bg-white px-4 py-2.5 text-[15px] font-bold text-[#204d39] transition hover:border-[#7fac90]"
                                             >
-                                                Roles & permissions
+                                                Roles & permissions ↗
                                             </Link>
                                         ) : null}
                                     </div>
                                 </div>
                             </div>
-  
-                            <div className="border-t border-[#d8dde5] bg-white px-5 py-4 sm:px-6 sm:py-5 lg:px-7">
-                                <div className="grid gap-1.5 sm:grid-cols-[auto_1fr] sm:items-start sm:gap-4">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.13em] text-[#3e5d78] sm:text-xs">
-                                        Where changes happen
-                                    </span>
-  
-                                    <p className="text-[11px] font-semibold leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                                        Profile details stay with the account owner, Host approval stays in Host operations, and roles stay in Access & Permissions. This page helps you find the record and open the correct tool.
-                                    </p>
-                                </div>
-                            </div>
                         </section>
                     ) : null}
-  
+
                     {section === 'aiQuality' ? (
                         <div className="mt-3 space-y-4 sm:mt-5 sm:space-y-5">
                             {hasAdminPermission('admin.audit.read') ? (
@@ -6630,7 +6497,7 @@ import {
                     ) : null}
   
   
-                    {section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' ? (
+                    {section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'users' ? (
                     <section
                         className={`shadow-sm ${
                             section === 'users'
