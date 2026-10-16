@@ -330,10 +330,13 @@ export default function NavbarLocationStatus({
         : `~${remainingDeliveryMinutes} min`
       : 'ETA unavailable'
 
+  // The universal palette maps some legacy light backgrounds to Forest.
+  // Use approved, explicit light surfaces here so the existing dark location
+  // and ETA labels remain readable in both states.
   const buttonSurface =
     activeView === 'delivery'
-      ? 'border-emerald-200 bg-[#f2fbf6] hover:border-emerald-300 hover:bg-[#eaf8f0]'
-      : 'border-stone-200 bg-white hover:border-emerald-200 hover:bg-[#fafcfb]'
+      ? 'border-[#DCE0CF] bg-[#DCE0CF] hover:border-[#173F35] hover:bg-[#F7F6F2]'
+      : 'border-[#DCE0CF] bg-[#F7F6F2] hover:border-[#173F35] hover:bg-[#DCE0CF]'
 
   if (mobileStripOnly) {
     if (
@@ -443,8 +446,8 @@ export default function NavbarLocationStatus({
         <div
           className={`grid size-8 shrink-0 place-items-center rounded-[11px] md:size-8 md:rounded-xl ${
             activeView === 'delivery'
-              ? 'bg-emerald-700 text-white shadow-[0_5px_14px_rgba(4,120,87,0.18)]'
-              : 'bg-emerald-50 text-emerald-700'
+              ? 'bg-[#173F35] text-[#F7F6F2] shadow-[0_5px_14px_rgba(4,120,87,0.18)]'
+              : 'bg-[#DCE0CF] text-[#173F35]'
           }`}
         >
           {activeView === 'delivery' ? (
@@ -536,7 +539,7 @@ export default function NavbarLocationStatus({
         {currentLocation && (
           <ChevronDown
             size={14}
-            className="shrink-0 text-stone-400"
+            className="shrink-0 text-[#173F35]"
             aria-hidden="true"
           />
         )}
@@ -557,7 +560,7 @@ export default function NavbarLocationStatus({
               }}
               className="overflow-hidden rounded-[20px] border border-emerald-100 bg-white shadow-[0_22px_55px_rgba(28,25,23,0.14)]"
             >
-              <div className="border-b border-emerald-100 bg-[#f2fbf6] px-4 py-3.5">
+              <div className="border-b border-[#DCE0CF] bg-[#DCE0CF] px-4 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="grid size-10 shrink-0 place-items-center rounded-[13px] bg-emerald-700 text-white">
                     <Truck size={17} aria-hidden="true" />
@@ -714,7 +717,7 @@ export default function NavbarLocationStatus({
                 </div>
 
                 {hasDeliveryContext && (
-                  <div className="mt-3 rounded-[15px] border border-emerald-100 bg-[#f2fbf6] p-3">
+                  <div className="mt-3 rounded-[15px] border border-[#DCE0CF] bg-[#DCE0CF] p-3">
                     <div className="flex items-start gap-2.5">
                       <Navigation
                         size={16}
