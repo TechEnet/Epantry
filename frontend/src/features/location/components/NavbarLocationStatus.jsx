@@ -433,7 +433,7 @@ export default function NavbarLocationStatus({
       <button
         type="button"
         onClick={handleMainClick}
-        className={`focus-ring flex min-h-[68px] w-full min-w-0 items-center gap-2 rounded-[17px] border px-2.5 py-2 text-left shadow-[0_6px_18px_rgba(28,25,23,0.07)] transition md:min-h-[68px] md:px-3 ${buttonSurface}`}
+        className={`focus-ring flex h-[48px] min-h-0 w-full min-w-0 items-center gap-2 rounded-[14px] border px-2.5 py-1 text-left shadow-[0_4px_12px_rgba(28,25,23,0.05)] transition md:h-[48px] md:px-2.5 ${buttonSurface}`}
         aria-expanded={panelOpen}
         aria-label={
           activeView === 'delivery'
@@ -444,7 +444,7 @@ export default function NavbarLocationStatus({
         }
       >
         <div
-          className={`grid size-8 shrink-0 place-items-center rounded-[11px] md:size-8 md:rounded-xl ${
+          className={`grid size-7 shrink-0 place-items-center rounded-[10px] md:size-7 md:rounded-[10px] ${
             activeView === 'delivery'
               ? 'bg-[#173F35] text-[#F7F6F2] shadow-[0_5px_14px_rgba(4,120,87,0.18)]'
               : 'bg-[#DCE0CF] text-[#173F35]'
@@ -466,10 +466,10 @@ export default function NavbarLocationStatus({
         <div className="min-w-0 flex-1 overflow-hidden">
           {activeView === 'current' && !currentLocation ? (
             <>
-              <p className="break-words text-[14px] font-semibold leading-[18px] tracking-normal text-[#202421]">
+              <p className="truncate text-[14px] font-semibold leading-[16px] tracking-normal text-[#202421]">
                 Delivery location
               </p>
-              <p className="mt-0.5 line-clamp-2 break-words text-[14px] font-semibold leading-[18px] text-[#173F35]">
+              <p className="mt-0.5 truncate text-[14px] font-semibold leading-[16px] text-[#173F35]">
                 {requesting
                   ? 'Finding your location…'
                   : 'Use current location'}
@@ -509,24 +509,24 @@ export default function NavbarLocationStatus({
               >
                 {activeView === 'delivery' ? (
                   <>
-                    <p className="break-words text-[14px] font-semibold leading-[18px] tracking-normal text-[#202421]">
+                    <p className="truncate text-[14px] font-semibold leading-[16px] tracking-normal text-[#202421]">
                       Deliver in
                     </p>
-                    <p className="mt-0.5 line-clamp-2 break-words text-[14px] font-semibold leading-[18px] text-[#173F35]">
+                    <p className="mt-0.5 truncate text-[14px] font-semibold leading-[16px] text-[#173F35]">
                       {deliveryHeadline}
                     </p>
                   </>
                 ) : (
                   <>
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <p className="break-words text-[14px] font-semibold leading-[18px] tracking-normal text-[#202421]">
+                      <p className="truncate text-[14px] font-semibold leading-[16px] tracking-normal text-[#202421]">
                         Current location
                       </p>
                       {approximate && (
                         <span className="sr-only">(approximate)</span>
                       )}
                     </div>
-                    <p className="mt-0.5 line-clamp-2 break-words text-[14px] font-semibold leading-[18px] text-[#173F35]">
+                    <p className="mt-0.5 truncate text-[14px] font-semibold leading-[16px] text-[#173F35]">
                       {currentLabel}
                     </p>
                   </>

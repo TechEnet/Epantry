@@ -47,8 +47,8 @@ const workflowStages = [
     to: '/host/operations-center',
     action: 'Open Operations Center',
     icon: Building2,
-    className: 'border-amber-200 bg-[#fff2c9]',
-    iconClassName: 'bg-amber-500 text-stone-950',
+    className: 'border-[#DCE0CF] bg-[#F7F6F2]',
+    iconClassName: 'bg-[#C86C42] text-[#F7F6F2]',
   },
   {
     step: 'Step 2',
@@ -57,8 +57,8 @@ const workflowStages = [
     to: '/host/catalog',
     action: 'Open Catalog',
     icon: Boxes,
-    className: 'border-sky-200 bg-[#e5f4ff]',
-    iconClassName: 'bg-sky-600 text-white',
+    className: 'border-[#DCE0CF] bg-[#DCE0CF]',
+    iconClassName: 'bg-[#173F35] text-[#F7F6F2]',
   },
   {
     step: 'Step 3',
@@ -67,8 +67,8 @@ const workflowStages = [
     to: '/host/marketplace',
     action: 'Open Pricing & Inventory',
     icon: ShoppingBag,
-    className: 'border-emerald-200 bg-[#dcf7e8]',
-    iconClassName: 'bg-emerald-700 text-white',
+    className: 'border-[#DCE0CF] bg-[#DCE0CF]',
+    iconClassName: 'bg-[#173F35] text-[#F7F6F2]',
   },
   {
     step: 'Step 4',
@@ -77,8 +77,8 @@ const workflowStages = [
     to: '/host/campaigns',
     action: 'Open Campaigns',
     icon: BarChart3,
-    className: 'border-violet-200 bg-[#eee8ff]',
-    iconClassName: 'bg-violet-600 text-white',
+    className: 'border-[#DCE0CF] bg-[#F7F6F2]',
+    iconClassName: 'bg-[#C86C42] text-[#F7F6F2]',
   },
 ]
 
@@ -301,23 +301,23 @@ export default function HostDashboardPage() {
       : 'Host workspace'
 
   return (
-    <main className="min-h-screen bg-[#f7f5ef] p-3 sm:p-7">
-      <section className="relative overflow-hidden rounded-[24px] border border-[#24594c] bg-[#173f35] px-4 py-5 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:rounded-[30px] sm:px-8 sm:py-10">
+    <main className="min-h-screen bg-[#F7F6F2] p-3 sm:p-7">
+      <section className="relative overflow-hidden rounded-[24px] border border-[#173F35] bg-[#173F35] px-4 py-5 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:rounded-[30px] sm:px-8 sm:py-10">
         <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-amber-300/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/4 size-64 rounded-full bg-emerald-300/10 blur-3xl" />
 
         <div className="relative flex flex-col gap-4 sm:gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#f0dfb8] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em]">
+              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#F7F6F2] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em]">
                 Host Dashboard
               </span>
-              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-100 sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.14em]">
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#F7F6F2] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.14em]">
                 {accessLabel}
               </span>
             </div>
 
-            <p className="mt-3 text-[11px] font-bold text-white/55 sm:mt-6 sm:text-sm">
+            <p className="mt-3 text-[11px] font-bold text-[#F7F6F2]/75 sm:mt-6 sm:text-sm">
               Welcome back
             </p>
 
@@ -325,7 +325,7 @@ export default function HostDashboardPage() {
               {name}
             </h1>
 
-            <p className="mt-2 max-w-2xl text-[11px] font-medium leading-[18px] text-white/70 sm:mt-4 sm:text-base sm:leading-7">
+            <p className="mt-2 max-w-2xl text-[11px] font-medium leading-[18px] text-[#F7F6F2]/90 sm:mt-4 sm:text-base sm:leading-7">
               <span className="sm:hidden">Run your Host workflow or jump straight to the tool you need.</span>
               <span className="hidden sm:inline">Follow the Host workflow in order, or jump straight into the business area you need from this dashboard.</span>
             </p>
@@ -345,24 +345,24 @@ export default function HostDashboardPage() {
         <section className="mt-3 sm:mt-6">
         <Link
           to="/host/earnings"
-          className="focus-ring group relative block overflow-hidden rounded-[24px] border border-sky-800 bg-[#123f63] p-4 text-white shadow-[0_24px_60px_-42px_rgba(14,60,95,0.9)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-40px_rgba(14,60,95,0.9)] sm:rounded-[28px] sm:p-6"
+          className="focus-ring group relative block overflow-hidden rounded-[24px] border border-[#173F35] bg-[#173F35] p-4 text-white shadow-[0_24px_60px_-42px_rgba(14,60,95,0.9)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-40px_rgba(14,60,95,0.9)] sm:rounded-[28px] sm:p-6"
         >
-          <div className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-cyan-300/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 left-1/3 size-52 rounded-full bg-violet-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-[#DCE0CF]/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-1/3 size-52 rounded-full bg-[#DCE0CF]/10 blur-3xl" />
 
           <div className="relative flex flex-col gap-3 sm:gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-300 text-[#102f49] shadow-sm sm:size-12 sm:rounded-2xl">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#DCE0CF] text-[#173F35] shadow-sm sm:size-12 sm:rounded-2xl">
                 <Banknote size={22} aria-hidden="true" />
               </span>
 
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#F7F6F2]">
                     Earnings
                   </p>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-200/20 bg-cyan-200/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-50">
-                    <span className="size-1.5 rounded-full bg-cyan-300" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DCE0CF]/20 bg-[#DCE0CF]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#F7F6F2]">
+                    <span className="size-1.5 rounded-full bg-[#C86C42]" />
                     Live refresh
                   </span>
                 </div>
@@ -376,7 +376,7 @@ export default function HostDashboardPage() {
                       )}
                 </p>
 
-                <p className="mt-0.5 text-[10px] font-semibold leading-4 text-white/65 sm:mt-1 sm:text-sm sm:leading-normal">
+                <p className="mt-0.5 text-[10px] font-semibold leading-4 text-[#F7F6F2]/85 sm:mt-1 sm:text-sm sm:leading-normal">
                   <span className="sm:hidden">Revenue captured from successful customer payments.</span>
                   <span className="hidden sm:inline">Captured revenue from successful customer payments. Settlement still follows delivery and finance review.</span>
                 </p>
@@ -423,12 +423,12 @@ export default function HostDashboardPage() {
           </div>
 
           <div className="relative mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3 sm:mt-4 sm:gap-4 sm:pt-4">
-            <p className="text-[9px] font-semibold text-white/55 sm:text-xs">
+            <p className="text-[9px] font-semibold text-[#F7F6F2]/75 sm:text-xs">
               {earningsError ||
                 `${earnings?.capturedOrders || 0} paid orders · ${earnings?.deliveredOrders || 0} delivered · auto-refreshes every 15 seconds`}
             </p>
 
-            <span className="inline-flex shrink-0 items-center gap-1 text-[9px] font-black text-cyan-100 sm:gap-2 sm:text-xs">
+            <span className="inline-flex shrink-0 items-center gap-1 text-[9px] font-black text-[#F7F6F2] sm:gap-2 sm:text-xs">
               Open earnings
               <ArrowRight
                 size={15}

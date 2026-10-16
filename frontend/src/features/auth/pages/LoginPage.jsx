@@ -103,11 +103,11 @@ function InputShell({
         rounded-xl
         border
         border-stone-100
-        bg-[#f8f8f8]
+        bg-[#F7F6F2]
         shadow-[inset_3px_3px_6px_#dedede,inset_-3px_-3px_6px_#ffffff]
         transition
         duration-200
-        focus-within:border-emerald-200
+        focus-within:border-[#173F35]
         focus-within:bg-white
         focus-within:shadow-[inset_2px_2px_5px_#dedede,inset_-2px_-2px_5px_#ffffff,0_0_0_3px_rgba(16,185,129,0.08)]
       "
@@ -125,7 +125,7 @@ function LoginShell({
       className="
         relative
         overflow-hidden
-        bg-[#f7f5ef]
+        bg-[#F7F6F2]
         py-4
         lg:py-5
       "
@@ -139,7 +139,7 @@ function LoginShell({
           top-10
           size-72
           rounded-full
-          bg-emerald-100/50
+          bg-[#DCE0CF]/50
           blur-3xl
         "
         aria-hidden="true"
@@ -153,7 +153,7 @@ function LoginShell({
           bottom-12
           size-80
           rounded-full
-          bg-amber-100/50
+          bg-[#DCE0CF]/40
           blur-3xl
         "
         aria-hidden="true"
@@ -182,7 +182,7 @@ function LoginShell({
               hidden
               min-h-[610px]
               overflow-hidden
-              bg-stone-950
+              bg-[#173F35]
               p-8
               text-white
               lg:flex
@@ -196,37 +196,22 @@ function LoginShell({
                 pointer-events-none
                 absolute
                 inset-0
-                bg-[radial-gradient(circle_at_20%_15%,rgba(16,185,129,0.18),transparent_34%),radial-gradient(circle_at_80%_85%,rgba(245,158,11,0.10),transparent_32%)]
+                bg-[radial-gradient(circle_at_20%_15%,rgba(220,224,207,0.15),transparent_34%)]
               "
               aria-hidden="true"
             />
 
             <Link
               to="/"
-              className="
-                focus-ring
-                relative
-                z-10
-                inline-flex
-                w-fit
-                items-center
-                gap-3
-                rounded-xl
-              "
+              aria-label="EPANTRY home"
+              className="focus-ring relative z-10 inline-flex w-fit items-center rounded-md bg-transparent p-0 transition hover:opacity-90"
             >
-              <span className="grid size-10 place-items-center rounded-xl bg-emerald-600 text-sm font-black text-white">
-                E
-              </span>
-
-              <span>
-                <span className="block text-lg font-black tracking-tight">
-                  EPANTRY
-                </span>
-
-                <span className="mt-0.5 block text-[7px] font-bold uppercase tracking-[0.22em] text-stone-400">
-                  Food Intelligence
-                </span>
-              </span>
+              <img
+                src="/branding/epantry-wordmark.webp"
+                alt="EPANTRY.in — Food Intelligence"
+                className="block h-auto w-[190px] max-w-full object-contain"
+                decoding="async"
+              />
             </Link>
 
             <div className="relative z-10 flex flex-1 items-center justify-center py-5">
@@ -627,8 +612,8 @@ export default function LoginPage() {
             shrink-0
             rounded-[22px]
             border
-            border-stone-200/80
-            bg-white
+            border-[#DCE0CF]
+            bg-[#F7F6F2]
             px-8
             py-8
             shadow-[0_24px_70px_rgba(41,37,36,0.13),0_4px_18px_rgba(41,37,36,0.06)]
@@ -643,7 +628,7 @@ export default function LoginPage() {
             disabled={
               isCompletingMfa
             }
-            className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500 transition hover:text-stone-950 disabled:opacity-50"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-[#202421]/75 transition hover:text-[#202421] disabled:opacity-50"
           >
             <ArrowLeft
               size={15}
@@ -651,7 +636,16 @@ export default function LoginPage() {
             Back to password
           </button>
 
-          <div className="mx-auto mt-7 grid size-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 shadow-[4px_4px_10px_#dedede,-4px_-4px_10px_#ffffff]">
+          <div className="mx-auto mt-5 flex justify-center" aria-label="EPANTRY branding">
+            <img
+              src="/branding/epantry-wordmark.webp"
+              alt="EPANTRY.in"
+              className="h-auto w-[194px] max-w-full object-contain"
+              draggable="false"
+            />
+          </div>
+
+          <div className="mx-auto mt-5 grid size-14 place-items-center rounded-2xl bg-[#DCE0CF] text-[#173F35]">
             <ShieldCheck
               size={27}
             />
@@ -659,29 +653,29 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center">
 
-            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-700">
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#173F35]">
               Two-step verification
             </p>
 
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-stone-950">
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#202421]">
               Security check
             </h1>
 
-            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-stone-500">
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#202421]/75">
               Enter the current 6-digit code from your authenticator app.
             </p>
 
           </div>
 
-          <div className="mt-6 flex items-center gap-3 rounded-xl border border-stone-100 bg-stone-50 px-4 py-3.5">
+          <div className="mt-6 flex items-center gap-3 rounded-xl border border-stone-100 bg-[#DCE0CF]/35 px-4 py-3.5">
 
             <Mail
               size={17}
-              className="shrink-0 text-stone-400"
+              className="shrink-0 text-[#202421]/60"
             />
 
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#202421]/60">
                 Signing in as
               </p>
 
@@ -730,7 +724,7 @@ export default function LoginPage() {
 
                   <Smartphone
                     size={16}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#202421]/60"
                   />
 
                   <select
@@ -778,11 +772,11 @@ export default function LoginPage() {
             )}
 
             {factors.length === 1 && (
-              <div className="mb-6 flex items-center gap-3 rounded-xl border border-stone-100 bg-stone-50 px-4 py-3">
+              <div className="mb-6 flex items-center gap-3 rounded-xl border border-stone-100 bg-[#DCE0CF]/35 px-4 py-3">
 
                 <Smartphone
                   size={17}
-                  className="text-emerald-700"
+                  className="text-[#173F35]"
                 />
 
                 <div>
@@ -793,7 +787,7 @@ export default function LoginPage() {
                     )}
                   </p>
 
-                  <p className="mt-0.5 text-[10px] text-stone-400">
+                  <p className="mt-0.5 text-[10px] text-[#202421]/60">
                     TOTP authenticator
                   </p>
                 </div>
@@ -825,7 +819,7 @@ export default function LoginPage() {
                   handleVerificationCodeChange
                 }
                 autoFocus
-                className="h-16 w-full bg-transparent px-4 text-center font-mono text-2xl font-bold tracking-[0.42em] text-stone-950 outline-none placeholder:text-stone-300"
+                className="h-16 w-full bg-transparent px-4 text-center font-mono text-2xl font-bold tracking-[0.42em] text-[#202421] outline-none placeholder:text-[#202421]/50"
                 placeholder="000000"
               />
 
@@ -839,7 +833,7 @@ export default function LoginPage() {
                   MFA_CODE_LENGTH ||
                 !selectedFactorUid
               }
-              className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-stone-950 text-xs font-bold text-white transition hover:bg-emerald-800 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
+              className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] text-xs font-bold text-white transition hover:bg-emerald-800 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isCompletingMfa ? (
                 <>
@@ -872,19 +866,28 @@ export default function LoginPage() {
 
       <div className="text-center">
 
-        <div className="mx-auto grid size-12 place-items-center rounded-xl bg-white text-lg font-black text-emerald-700 shadow-[4px_4px_9px_#dddddd,-4px_-4px_9px_#ffffff]">
-          E
-        </div>
+        <Link
+          to="/"
+          aria-label="Go to EPANTRY home"
+          className="focus-ring mx-auto inline-flex items-center justify-center rounded-md bg-transparent p-0 transition hover:opacity-90"
+        >
+          <img
+            src="/branding/epantry-wordmark.webp"
+            alt="EPANTRY.in"
+            className="block h-auto w-[142px] object-contain"
+            decoding="async"
+          />
+        </Link>
 
-        <p className="mt-6 text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-700">
+        <p className="mt-6 text-[10px] font-bold uppercase tracking-[0.28em] text-[#173F35]">
           Welcome back
         </p>
 
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-stone-950">
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#202421]">
           Login
         </h1>
 
-        <p className="mt-2 text-xs leading-5 text-stone-500">
+        <p className="mt-2 text-xs leading-5 text-[#202421]/75">
           Sign in to continue to EPANTRY.
         </p>
 
@@ -949,7 +952,7 @@ export default function LoginPage() {
 
             <Mail
               size={16}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#202421]/60"
             />
 
             <input
@@ -968,7 +971,7 @@ export default function LoginPage() {
                   event.target.value,
                 )
               }
-              className="peer h-14 w-full bg-transparent pb-2 pl-11 pr-4 pt-5 text-sm font-medium text-stone-950 outline-none placeholder:text-transparent"
+              className="peer h-14 w-full bg-transparent pb-2 pl-11 pr-4 pt-5 text-sm font-medium text-[#202421] outline-none placeholder:text-transparent"
               aria-invalid={
                 Boolean(
                   fieldErrors.email,
@@ -978,7 +981,7 @@ export default function LoginPage() {
 
             <label
               htmlFor="login-email"
-              className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 text-xs font-medium text-stone-400 transition-all duration-200 peer-focus:top-3 peer-focus:text-[9px] peer-focus:text-emerald-700 peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-[9px]"
+              className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 text-xs font-medium text-[#202421]/60 transition-all duration-200 peer-focus:top-3 peer-focus:text-[9px] peer-focus:text-[#173F35] peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-[9px]"
             >
               Email address
             </label>
@@ -999,7 +1002,7 @@ export default function LoginPage() {
 
             <LockKeyhole
               size={16}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#202421]/60"
             />
 
             <input
@@ -1022,7 +1025,7 @@ export default function LoginPage() {
                   event.target.value,
                 )
               }
-              className="peer h-14 w-full bg-transparent pb-2 pl-11 pr-12 pt-5 text-sm font-medium text-stone-950 outline-none placeholder:text-transparent"
+              className="peer h-14 w-full bg-transparent pb-2 pl-11 pr-12 pt-5 text-sm font-medium text-[#202421] outline-none placeholder:text-transparent"
               aria-invalid={
                 Boolean(
                   fieldErrors.password,
@@ -1032,7 +1035,7 @@ export default function LoginPage() {
 
             <label
               htmlFor="login-password"
-              className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 text-xs font-medium text-stone-400 transition-all duration-200 peer-focus:top-3 peer-focus:text-[9px] peer-focus:text-emerald-700 peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-[9px]"
+              className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 text-xs font-medium text-[#202421]/60 transition-all duration-200 peer-focus:top-3 peer-focus:text-[9px] peer-focus:text-[#173F35] peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-[9px]"
             >
               Password
             </label>
@@ -1045,7 +1048,7 @@ export default function LoginPage() {
                     !current,
                 )
               }
-              className="absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-800"
+              className="absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-[#202421]/60 transition hover:bg-stone-100 hover:text-stone-800"
               aria-label={
                 showPassword
                   ? 'Hide password'
@@ -1077,7 +1080,7 @@ export default function LoginPage() {
               to={
                 forgotPasswordPath
               }
-              className="ml-auto shrink-0 text-[11px] font-semibold text-stone-500 transition hover:text-emerald-700"
+              className="ml-auto shrink-0 text-[11px] font-semibold text-[#202421]/75 transition hover:text-[#173F35]"
             >
               Forgot password?
             </Link>
@@ -1099,7 +1102,7 @@ export default function LoginPage() {
             justify-center
             gap-2
             rounded-xl
-            bg-stone-950
+            bg-[#173F35]
             text-xs
             font-bold
             tracking-wide
@@ -1143,12 +1146,12 @@ export default function LoginPage() {
         <div className="h-px flex-1 bg-stone-200" />
       </div>
 
-      <p className="text-center text-[11px] text-stone-500">
+      <p className="text-center text-[11px] text-[#202421]/75">
         Don&apos;t have an account?{' '}
 
         <Link
           to={registerHref}
-          className="font-bold text-stone-950 transition hover:text-emerald-700"
+          className="font-bold text-[#202421] transition hover:text-[#173F35]"
         >
           Sign Up
         </Link>

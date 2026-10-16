@@ -79,18 +79,11 @@ export default function Footer() {
             className="focus-ring inline-flex w-fit items-start gap-2.5 rounded-xl"
             aria-label="EPANTRY home"
           >
-            <div className="grid h-8 w-8 place-items-center rounded-full border border-white/25 text-[14px] font-semibold tracking-[-0.03em] text-[#F7F6F2]">
-              E
-            </div>
-
-            <div>
-              <p className="text-[14px] font-semibold uppercase tracking-[0.15em] text-[#F7F6F2]">
-                EPANTRY
-              </p>
-              <p className="mt-0.5 text-[14px] font-semibold uppercase tracking-[0.2em] text-[#F7F6F2]/65">
-                Food Intelligence
-              </p>
-            </div>
+            <img
+              src="/branding/epantry-wordmark.webp"
+              alt="EPANTRY.in"
+              className="block h-auto w-[205px] max-w-full object-contain"
+            />
           </Link>
         </div>
 
@@ -118,7 +111,7 @@ export default function Footer() {
 
         <div
           aria-hidden="true"
-          className="mt-5 w-full select-none overflow-hidden  text-center text-[clamp(54px,17vw,76px)] font-light leading-[0.82] tracking-[-0.075em] text-[#F7F6F2]/90"
+          className="mt-5 w-full select-none overflow-hidden  text-center text-[clamp(54px,17vw,76px)] font-light leading-[0.82] tracking-[-0.075em] text-[#E67275]"
         >
           EPANTRY
         </div>
@@ -147,18 +140,11 @@ export default function Footer() {
                 className="focus-ring inline-flex w-fit shrink-0 items-center gap-3 rounded-xl"
                 aria-label="EPANTRY home"
               >
-                <div className="grid h-10 w-10 place-items-center rounded-full border border-white/25 text-[15px] font-semibold tracking-[-0.03em] text-[#F7F6F2]">
-                  E
-                </div>
-
-                <div>
-                  <p className="text-[15px] font-semibold uppercase tracking-[0.16em] text-[#F7F6F2]">
-                    EPANTRY
-                  </p>
-                  <p className="mt-1 text-[14px] font-semibold uppercase tracking-[0.22em] text-[#F7F6F2]/65">
-                    Food Intelligence
-                  </p>
-                </div>
+                <img
+                  src="/branding/epantry-wordmark.webp"
+                  alt="EPANTRY.in"
+                  className="block h-auto w-[250px] max-w-full object-contain"
+                />
               </Link>
 
             </div>
@@ -206,7 +192,7 @@ export default function Footer() {
               {'EPANTRY'.split('').map((letter, index) => (
                 <motion.span
                   key={`${letter}-${index}`}
-                  className="inline-flex min-w-0 flex-1 cursor-default origin-bottom justify-center  font-light leading-[0.86] tracking-[-0.075em] text-[#F7F6F2]/90"
+                  className="inline-flex min-w-0 flex-1 cursor-default origin-bottom justify-center  font-light leading-[0.86] tracking-[-0.075em] text-[#E67275]"
                   style={{
                     fontSize: 'clamp(72px, 16.2vw, 292px)',
                   }}

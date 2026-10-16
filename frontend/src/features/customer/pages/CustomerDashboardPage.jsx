@@ -40,8 +40,8 @@ const customerFlowStages = [
     to: '/pantry',
     action: 'Open My Pantry',
     icon: PackageSearch,
-    className: 'border-amber-200 bg-[#fff2c9]',
-    iconClassName: 'bg-amber-500 text-stone-950',
+    className: 'border-[#DCE0CF] bg-[#F7F6F2]',
+    iconClassName: 'bg-[#C86C42] text-[#F7F6F2]',
   },
   {
     step: 'Step 2',
@@ -50,8 +50,8 @@ const customerFlowStages = [
     to: '/meal-plan',
     action: 'Open Meal Planner',
     icon: ListChecks,
-    className: 'border-sky-200 bg-[#e5f4ff]',
-    iconClassName: 'bg-sky-600 text-white',
+    className: 'border-[#DCE0CF] bg-[#DCE0CF]',
+    iconClassName: 'bg-[#173F35] text-[#F7F6F2]',
   },
   {
     step: 'Step 3',
@@ -60,8 +60,8 @@ const customerFlowStages = [
     to: '/next-basket',
     action: 'Open Next Basket',
     icon: ShoppingBasket,
-    className: 'border-emerald-200 bg-[#dcf7e8]',
-    iconClassName: 'bg-emerald-700 text-white',
+    className: 'border-[#DCE0CF] bg-[#DCE0CF]',
+    iconClassName: 'bg-[#173F35] text-[#F7F6F2]',
   },
   {
     step: 'Step 4',
@@ -70,8 +70,8 @@ const customerFlowStages = [
     to: '/waste-reduction',
     action: 'Reduce Waste',
     icon: Sparkles,
-    className: 'border-violet-200 bg-[#eee8ff]',
-    iconClassName: 'bg-violet-600 text-white',
+    className: 'border-[#DCE0CF] bg-[#F7F6F2]',
+    iconClassName: 'bg-[#C86C42] text-[#F7F6F2]',
   },
 ]
 
@@ -307,23 +307,23 @@ export default function CustomerDashboardPage() {
   }, [orders])
 
   return (
-    <main className="min-h-screen bg-[#eef4f0] p-3 sm:bg-[#f7f5ef] sm:p-7">
-      <section className="relative overflow-hidden rounded-[22px] border border-[#24594c] bg-[#173f35] px-4 py-5 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:rounded-[30px] sm:px-8 sm:py-10">
+    <main className="min-h-screen bg-[#F7F6F2] p-3 sm:bg-[#F7F6F2] sm:p-7">
+      <section className="relative overflow-hidden rounded-[22px] border border-[#173F35] bg-[#173F35] px-4 py-5 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:rounded-[30px] sm:px-8 sm:py-10">
         <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-amber-300/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/4 size-64 rounded-full bg-emerald-300/10 blur-3xl" />
 
         <div className="relative flex flex-col gap-5 sm:gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#f0dfb8] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em]">
+              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#F7F6F2] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em]">
                 Customer Dashboard
               </span>
-              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-100 sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.14em]">
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#F7F6F2] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.14em]">
                 Customer mode
               </span>
             </div>
 
-            <p className="mt-4 text-xs font-bold text-white/55 sm:mt-6 sm:text-sm">
+            <p className="mt-4 text-xs font-bold text-[#F7F6F2]/75 sm:mt-6 sm:text-sm">
               Welcome back
             </p>
 
@@ -331,7 +331,7 @@ export default function CustomerDashboardPage() {
               {name}
             </h1>
 
-            <p className="mt-2 max-w-2xl text-xs font-medium leading-5 text-white/70 sm:mt-4 sm:text-base sm:leading-7">
+            <p className="mt-2 max-w-2xl text-xs font-medium leading-5 text-[#F7F6F2]/90 sm:mt-4 sm:text-base sm:leading-7">
               Manage your pantry, meals, shopping and orders from one place.
             </p>
           </div>
@@ -347,18 +347,18 @@ export default function CustomerDashboardPage() {
       </section>
 
       <section className="mt-2.5 sm:mt-6">
-        <div className="relative overflow-hidden rounded-[22px] border border-[#24594c] bg-[linear-gradient(135deg,#153f35_0%,#1e5a49_58%,#286854_100%)] p-2.5 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:rounded-[28px] sm:border-[#1f594a] sm:p-6 sm:shadow-[0_24px_60px_-42px_rgba(21,63,53,0.85)]">
+        <div className="relative overflow-hidden rounded-[22px] border border-[#173F35] bg-[#173F35] p-2.5 text-white shadow-[0_28px_70px_-48px_rgba(16,55,45,0.75)] sm:rounded-[28px] sm:border-[#1f594a] sm:p-6 sm:shadow-[0_24px_60px_-42px_rgba(21,63,53,0.85)]">
           <div className="pointer-events-none absolute -right-20 -top-24 size-60 rounded-full bg-[#f0c978]/12 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 left-1/3 size-56 rounded-full bg-emerald-200/10 blur-3xl" />
 
           <div className="relative grid gap-2 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-[#f2dcad]/40 bg-[#f0d39a] text-[#173f35] shadow-[0_3px_0_#b99659] sm:size-12 sm:rounded-2xl sm:shadow-[0_5px_0_#b99659]">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-[#f2dcad]/40 bg-[#DCE0CF] text-[#173F35] shadow-[0_3px_0_#b99659] sm:size-12 sm:rounded-2xl sm:shadow-[0_5px_0_#b99659]">
                 <ReceiptIndianRupee size={22} aria-hidden="true" />
               </span>
 
               <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#eed9ac] sm:text-[10px] sm:tracking-[0.18em]">
+                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#F7F6F2] sm:text-[10px] sm:tracking-[0.18em]">
                   Your spending
                 </p>
 
@@ -378,7 +378,7 @@ export default function CustomerDashboardPage() {
                   </p>
                 </div>
 
-                <p className="mt-0.5 text-[10px] font-semibold leading-4 text-white/70 sm:mt-2 sm:text-sm">
+                <p className="mt-0.5 text-[10px] font-semibold leading-4 text-[#F7F6F2]/90 sm:mt-2 sm:text-sm">
                   {paymentLoading
                     ? 'Getting your latest order activity…'
                     : paymentError

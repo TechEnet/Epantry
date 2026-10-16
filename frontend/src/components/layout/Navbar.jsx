@@ -1622,9 +1622,9 @@ import {
         ) : null;
 
     const brandCluster = (
-        <div className="flex min-w-0 items-center gap-2">
-            {universalBackButton}
+        <div className="flex min-w-0 shrink-0 items-center gap-2">
             {brand}
+            {universalBackButton}
         </div>
     );
 
@@ -1880,13 +1880,13 @@ import {
                                     duration:
                                         0.15,
                                 }}
-                                className="absolute right-0 top-[calc(100%+10px)] z-[70] w-[300px] overflow-hidden rounded-[24px] border border-stone-200 bg-white shadow-2xl"
+                                className="absolute right-0 top-[calc(100%+10px)] z-[70] w-[min(300px,calc(100vw-24px))] overflow-hidden rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] text-[#202421] shadow-2xl"
                                 role="menu"
                                 aria-label="Account navigation"
                             >
-                                <div className="border-b border-stone-100 bg-[#F8FAF7] p-4">
+                                <div className="border-b border-[#DCE0CF] bg-[#F7F6F2] p-4 text-[#202421]">
                                     <div className="flex items-center gap-3">
-                                        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-emerald-700 text-sm font-black text-white">
+                                        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#173F35] text-sm font-black text-[#F7F6F2]">
                                             {accountInitials}
                                         </span>
 
@@ -1901,7 +1901,7 @@ import {
                                         </div>
                                     </div>
 
-                                    <div className="mt-3 inline-flex rounded-full bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-emerald-800 ring-1 ring-emerald-100">
+                                    <div className="mt-3 inline-flex rounded-full bg-[#DCE0CF] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#173F35] ring-1 ring-[#173F35]/15">
                                         {accountRoleLabel}
                                     </div>
                                 </div>
@@ -2335,20 +2335,20 @@ import {
                     : '',
   
                 isHeroGlassPage
-                    ? 'fixed left-0 right-0 w-full border-white/80 bg-[#f7f5ef]/94 shadow-[0_10px_32px_rgba(17,24,39,0.10)] backdrop-blur-2xl saturate-150'
-                    : 'sticky bg-[#f7f5ef]/95',
+                    ? 'fixed left-0 right-0 w-full border-white/80 bg-[#F7F6F2]/94 shadow-[0_10px_32px_rgba(17,24,39,0.10)] backdrop-blur-2xl saturate-150'
+                    : 'sticky bg-[#F7F6F2]/95',
             ].join(
                 ' ',
             )}
         >
             <div className="page-shell">
                 <div className="hidden xl:block">
-                    <div className="flex min-h-[72px] items-center gap-3 py-1.5">
+                    <div className="flex h-[60px] w-full min-w-0 items-center gap-2 py-0">
                         <div className="shrink-0">
                             {brandCluster}
                         </div>
   
-                        <div className="relative min-w-[220px] flex-1">
+                        <div className="relative min-w-[140px] max-w-[340px] flex-[1_1_250px]">
                             <SearchBar
                                 value={
                                     currentQuery
@@ -2362,12 +2362,12 @@ import {
                             {renderNavbarSearchResults()}
                         </div>
   
-                        <div className="w-[205px] shrink-0">
+                        <div className="w-[188px] shrink-0">
                             <NavbarLocationStatus />
                         </div>
 
                         <nav
-                            className="flex shrink-0 items-center gap-1"
+                            className="ml-auto flex min-w-0 flex-[0_1_auto] items-center justify-end gap-0.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                             aria-label="Primary navigation"
                         >
                             {widePrimaryNavItems
@@ -2397,14 +2397,14 @@ import {
   
                         </nav>
   
-                        <div className="shrink-0">
+                        <div className="ml-1 shrink-0">
                             {wideDesktopAuth}
                         </div>
                     </div>
                 </div>
   
-                <div className="hidden py-2 md:block xl:hidden">
-                    <div className="flex min-h-[52px] items-center justify-between gap-4">
+                <div className="hidden py-1.5 md:block xl:hidden">
+                    <div className="flex min-h-[48px] items-center justify-between gap-3">
                         {brandCluster}
   
                         <nav
@@ -2474,7 +2474,7 @@ import {
                         </button>
                     </div>
   
-                    <div className="mt-2 grid grid-cols-2 gap-3">
+                    <div className="mt-1.5 grid grid-cols-2 gap-2">
                         <div className="relative">
                             <SearchBar
                                 value={

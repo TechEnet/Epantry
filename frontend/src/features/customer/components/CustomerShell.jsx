@@ -197,8 +197,8 @@ function CustomerNavigationItem({
           ? ''
           : '',
         isActive
-          ? 'border-[#d6ad78] bg-[linear-gradient(145deg,#f5ddb9_0%,#e8c48f_100%)] text-[#3f3124] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_5px_12px_rgba(118,83,47,0.14)]'
-          : 'border-[#dfd0bb] bg-[linear-gradient(145deg,rgba(255,254,250,0.96)_0%,rgba(248,239,226,0.96)_100%)] text-[#5a4938] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_8px_rgba(92,65,37,0.07)] hover:-translate-y-px hover:border-[#ccb590] hover:bg-[#fffdf8] hover:text-[#17483b] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_5px_12px_rgba(92,65,37,0.10)]',
+          ? 'border-[#C86C42] bg-[linear-gradient(145deg,#DCE0CF_0%,#DCE0CF_100%)] text-[#202421] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_5px_12px_rgba(118,83,47,0.14)]'
+          : 'border-[#DCE0CF] bg-[linear-gradient(145deg,rgba(255,254,250,0.96)_0%,rgba(248,239,226,0.96)_100%)] text-[#202421] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_8px_rgba(92,65,37,0.07)] hover:-translate-y-px hover:border-[#C86C42] hover:bg-[#F7F6F2] hover:text-[#173F35] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_5px_12px_rgba(92,65,37,0.10)]',
       ].join(' ')}
     >
       <Icon
@@ -219,7 +219,7 @@ function CustomerNavigationItem({
       </span>
 
       {Number(item.badge || 0) > 0 && !collapsed ? (
-        <span className="grid min-w-5 place-items-center rounded-full bg-[#17483b] px-1.5 py-0.5 text-[10px] font-black text-white">
+        <span className="grid min-w-5 place-items-center rounded-full bg-[#173F35] px-1.5 py-0.5 text-[10px] font-black text-white">
           {item.badge}
         </span>
       ) : null}
@@ -246,8 +246,8 @@ function CustomerNavigationGroup({
         className={[
           'focus-ring mx-auto flex h-11 w-11 items-center justify-center rounded-[18px] border transition duration-200',
           active
-            ? 'border-[#d6ad78] bg-[linear-gradient(145deg,#f5ddb9_0%,#e8c48f_100%)] text-[#3f3124] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_5px_12px_rgba(118,83,47,0.14)]'
-            : 'border-[#dfd0bb] bg-[linear-gradient(145deg,#fffdf8_0%,#f3e8d7_100%)] text-[#5a4938] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_3px_8px_rgba(92,65,37,0.08)] hover:-translate-y-px hover:text-[#17483b]',
+            ? 'border-[#C86C42] bg-[linear-gradient(145deg,#DCE0CF_0%,#DCE0CF_100%)] text-[#202421] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_5px_12px_rgba(118,83,47,0.14)]'
+            : 'border-[#DCE0CF] bg-[linear-gradient(145deg,#F7F6F2_0%,#F7F6F2_100%)] text-[#202421] shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_3px_8px_rgba(92,65,37,0.08)] hover:-translate-y-px hover:text-[#173F35]',
         ].join(' ')}
       >
         <Icon
@@ -262,21 +262,21 @@ function CustomerNavigationGroup({
     <div className="group/customer-section relative shrink-0 pb-3.5 pr-3.5 pt-2">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-4 right-0 top-0 h-4 rounded-t-[24px] border border-[#dac7aa]/75 bg-[linear-gradient(180deg,#f2e7d6_0%,#dfc9aa_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] [clip-path:polygon(5%_100%,92%_100%,100%_28%,12%_28%)]"
+        className="pointer-events-none absolute left-4 right-0 top-0 h-4 rounded-t-[24px] border border-[#DCE0CF]/75 bg-[linear-gradient(180deg,#DCE0CF_0%,#DCE0CF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] [clip-path:polygon(5%_100%,92%_100%,100%_28%,12%_28%)]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-1.5 right-0 top-5 w-4 rounded-r-[24px] border-y border-r border-[#cdb38e]/80 bg-[linear-gradient(90deg,#e3cfb2_0%,#c9aa80_100%)] shadow-[inset_1px_0_0_rgba(255,255,255,0.34),5px_4px_12px_rgba(92,65,37,0.09)]"
+        className="pointer-events-none absolute bottom-1.5 right-0 top-5 w-4 rounded-r-[24px] border-y border-r border-[#DCE0CF]/80 bg-[linear-gradient(90deg,#DCE0CF_0%,#DCE0CF_100%)] shadow-[inset_1px_0_0_rgba(255,255,255,0.34),5px_4px_12px_rgba(92,65,37,0.09)]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-5 right-2 h-4 rounded-b-[22px] border-x border-b border-[#c6a77b]/75 bg-[linear-gradient(180deg,#d8bd96_0%,#c4a072_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_5px_10px_rgba(92,65,37,0.08)]"
+        className="pointer-events-none absolute bottom-0 left-5 right-2 h-4 rounded-b-[22px] border-x border-b border-[#DCE0CF]/75 bg-[linear-gradient(180deg,#DCE0CF_0%,#DCE0CF_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_5px_10px_rgba(92,65,37,0.08)]"
       />
 
-      <div className="relative z-10 rounded-[24px] border border-[#decfb9] bg-[linear-gradient(145deg,#fffdf9_0%,#f5ecdf_100%)] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_8px_16px_rgba(92,65,37,0.08)]">
+      <div className="relative z-10 rounded-[24px] border border-[#DCE0CF] bg-[linear-gradient(145deg,#F7F6F2_0%,#F7F6F2_100%)] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),0_8px_16px_rgba(92,65,37,0.08)]">
         <div
           className={[
-            'flex min-h-[36px] items-center gap-2 rounded-[15px] border border-[#315f50]/80 bg-[linear-gradient(145deg,#1c4b3f_0%,#153d33_100%)] px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#f5ead8] shadow-[inset_0_1px_0_rgba(255,255,255,0.13),0_4px_10px_rgba(35,52,44,0.10)]',
+            'flex min-h-[36px] items-center gap-2 rounded-[15px] border border-[#173F35]/80 bg-[linear-gradient(145deg,#173F35_0%,#173F35_100%)] px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#F7F6F2] shadow-[inset_0_1px_0_rgba(255,255,255,0.13),0_4px_10px_rgba(35,52,44,0.10)]',
             active
               ? 'ring-1 ring-[#d9b36f]/60'
               : '',
@@ -527,8 +527,8 @@ export default function CustomerShell({
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f5ef] pb-0 lg:min-h-[calc(100vh-72px)]">
-      <div className="sticky top-0 z-[105] flex h-14 items-center border-b border-stone-200/70 bg-[#f7f5ef]/92 px-3 backdrop-blur-xl lg:hidden">
+    <main className="min-h-screen bg-[#F7F6F2] pb-0 lg:min-h-[calc(100vh-72px)]">
+      <div className="sticky top-0 z-[105] flex h-14 items-center border-b border-stone-200/70 bg-[#F7F6F2]/92 px-3 backdrop-blur-xl lg:hidden">
         <button
           type="button"
           onClick={() => setMobileSidebarOpen(true)}
@@ -565,7 +565,7 @@ export default function CustomerShell({
           >
             <aside
               className={[
-                'fixed inset-y-0 left-0 z-[130] w-[min(88vw,330px)] overflow-y-auto border-r border-stone-200 bg-[#faf8f4] shadow-[18px_0_50px_rgba(28,25,23,0.18)] transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-visible lg:border-r lg:border-stone-200 lg:bg-[#faf8f4] lg:shadow-none',
+                'fixed inset-y-0 left-0 z-[130] w-[min(88vw,330px)] overflow-y-auto border-r border-stone-200 bg-[#F7F6F2] shadow-[18px_0_50px_rgba(28,25,23,0.18)] transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-visible lg:border-r lg:border-stone-200 lg:bg-[#F7F6F2] lg:shadow-none',
                 mobileSidebarOpen
                   ? 'translate-x-0'
                   : '-translate-x-full',
@@ -589,8 +589,8 @@ export default function CustomerShell({
                   'flex min-h-full flex-col p-4 sm:p-5',
                   'lg:absolute lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:h-full lg:flex-col lg:overflow-visible lg:transform-gpu lg:will-change-[width,padding] lg:transition-[width,padding] lg:duration-[560ms] lg:ease-[cubic-bezier(0.22,1,0.36,1)]',
                   sidebarOpen
-                    ? 'lg:w-[248px] lg:bg-[#faf8f4] lg:px-4 lg:py-5 lg:shadow-none'
-                    : 'lg:w-[70px] lg:rounded-r-[26px] lg:border-r lg:border-stone-200 lg:bg-[#faf8f4] lg:px-3 lg:py-4 lg:shadow-[5px_0_16px_rgba(83,58,33,0.06)]',
+                    ? 'lg:w-[248px] lg:bg-[#F7F6F2] lg:px-4 lg:py-5 lg:shadow-none'
+                    : 'lg:w-[70px] lg:rounded-r-[26px] lg:border-r lg:border-stone-200 lg:bg-[#F7F6F2] lg:px-3 lg:py-4 lg:shadow-[5px_0_16px_rgba(83,58,33,0.06)]',
                 ].join(' ')}
               >
                 <div className="mb-3 flex items-center justify-between lg:hidden">
@@ -622,19 +622,27 @@ export default function CustomerShell({
 
                 <div
                   className={[
-                    'shrink-0 rounded-[22px] border border-[#315f50] bg-[linear-gradient(145deg,#17483b_0%,#11382f_100%)] px-3.5 py-3.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_7px_16px_rgba(31,63,53,0.16)] transition-[opacity,transform] duration-200 ease-out lg:relative lg:z-10 lg:w-full lg:max-w-[220px] lg:self-start',
+                    'shrink-0 rounded-[22px] border border-[#173F35] bg-[#173F35] px-3.5 py-3.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_7px_16px_rgba(31,63,53,0.16)] transition-[opacity,transform] duration-200 ease-out lg:relative lg:z-10 lg:w-full lg:max-w-[220px] lg:self-start',
                     !sidebarOpen
                       ? 'lg:hidden'
                       : '',
                   ].join(' ')}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] bg-emerald-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_3px_8px_rgba(4,120,87,0.22)]">
-                      <Home
-                        size={17}
-                        aria-hidden="true"
+                  <div className="flex min-w-0 flex-col items-start gap-2">
+                    <NavLink
+                      to="/"
+                      onClick={() => setMobileSidebarOpen(false)}
+                      aria-label="EPANTRY home"
+                      title="Go to EPANTRY home"
+                      className="focus-ring inline-flex w-[168px] max-w-full shrink-0 items-center rounded-md bg-transparent p-0 transition hover:opacity-90"
+                    >
+                      <img
+                        src="/branding/epantry-wordmark.webp"
+                        alt="EPANTRY.in"
+                        className="block h-auto w-full object-contain"
+                        decoding="async"
                       />
-                    </div>
+                    </NavLink>
 
                     <div
                       className={[
@@ -644,11 +652,11 @@ export default function CustomerShell({
                           : 'lg:max-w-[190px] lg:translate-x-0 lg:opacity-100',
                       ].join(' ')}
                     >
-                      <p className="text-[13px] font-black leading-4 text-[#fff7e8]">
-                        EPANTRY Customer
+                      <p className="text-[13px] font-black leading-4 text-[#F7F6F2]">
+                        Customer workspace
                       </p>
 
-                      <p className="mt-1 whitespace-normal text-[10px] font-semibold leading-4 text-[#d7c7aa]">
+                      <p className="mt-1 whitespace-normal text-[10px] font-semibold leading-4 text-[#F7F6F2]/85">
                         {activeMode === 'customer' ? 'Customer mode' : 'Customer access'} · {identityLabel}
                       </p>
                     </div>
@@ -704,7 +712,7 @@ export default function CustomerShell({
             <section
               className={[
                 'min-w-0 lg:transition-[padding-left] lg:duration-[460ms] lg:ease-[cubic-bezier(0.22,1,0.36,1)]',
-                'bg-[#f7f5ef]',
+                'bg-[#F7F6F2]',
                 'lg:pl-0',
               ].join(' ')}
             >

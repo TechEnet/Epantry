@@ -212,7 +212,7 @@ function InputShell({
         'w-full',
         'rounded-lg',
         'border',
-        'bg-[#f8f8f8]',
+        'bg-[#F7F6F2]',
         'shadow-[inset_2px_2px_5px_#e2e2e2,inset_-2px_-2px_5px_#ffffff]',
         'transition',
         'duration-200',
@@ -281,7 +281,7 @@ function AccountTypeCard({
         'focus-visible:ring-emerald-500',
         selected
           ? 'border-emerald-500 bg-emerald-50'
-          : 'border-stone-100 bg-[#fafafa] hover:border-stone-200 hover:bg-white',
+          : 'border-stone-100 bg-[#F7F6F2] hover:border-stone-200 hover:bg-white',
       ].join(' ')}
       aria-pressed={
         selected
@@ -308,7 +308,7 @@ function AccountTypeCard({
         </div>
 
         <div className="min-w-0 pr-3">
-          <p className="text-[10px] font-black text-stone-950">
+          <p className="text-[10px] font-black text-[#202421]">
             {item.label}
           </p>
 
@@ -408,7 +408,7 @@ function HostWorkspaceTypeCard({
         'focus-visible:ring-emerald-500',
         selected
           ? 'border-emerald-500 bg-emerald-50 shadow-[0_10px_28px_rgba(5,150,105,0.10)]'
-          : 'border-stone-100 bg-[#fafafa] hover:border-stone-200 hover:bg-white',
+          : 'border-stone-100 bg-[#F7F6F2] hover:border-stone-200 hover:bg-white',
       ].join(' ')}
       aria-pressed={selected}
     >
@@ -430,7 +430,7 @@ function HostWorkspaceTypeCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-black text-stone-950">
+            <p className="text-[11px] font-black text-[#202421]">
               {item.label}
             </p>
 
@@ -464,7 +464,7 @@ function AuthShell({
       className="
         relative
         overflow-hidden
-        bg-[#f7f5ef]
+        bg-[#F7F6F2]
         py-4
         lg:py-5
       "
@@ -521,7 +521,7 @@ function AuthShell({
               hidden
               min-h-[610px]
               overflow-hidden
-              bg-stone-950
+              bg-[#173F35]
               p-8
               text-white
               lg:flex
@@ -535,58 +535,22 @@ function AuthShell({
                 pointer-events-none
                 absolute
                 inset-0
-                bg-[radial-gradient(circle_at_20%_15%,rgba(16,185,129,0.18),transparent_34%),radial-gradient(circle_at_80%_85%,rgba(245,158,11,0.10),transparent_32%)]
+                bg-[radial-gradient(circle_at_20%_15%,rgba(220,224,207,0.15),transparent_34%)]
               "
               aria-hidden="true"
             />
 
             <Link
               to="/"
-              className="
-                focus-ring
-                relative
-                z-10
-                inline-flex
-                w-fit
-                items-center
-                gap-3
-                rounded-xl
-              "
+              aria-label="EPANTRY home"
+              className="focus-ring relative z-10 inline-flex w-fit items-center rounded-md bg-transparent p-0 transition hover:opacity-90"
             >
-              <span
-                className="
-                  grid
-                  size-10
-                  place-items-center
-                  rounded-xl
-                  bg-emerald-600
-                  text-sm
-                  font-black
-                  text-white
-                "
-              >
-                E
-              </span>
-
-              <span>
-                <span className="block text-lg font-black tracking-tight">
-                  EPANTRY
-                </span>
-
-                <span
-                  className="
-                    mt-0.5
-                    block
-                    text-[7px]
-                    font-bold
-                    uppercase
-                    tracking-[0.22em]
-                    text-stone-400
-                  "
-                >
-                  Food Intelligence
-                </span>
-              </span>
+              <img
+                src="/branding/epantry-wordmark.webp"
+                alt="EPANTRY.in — Food Intelligence"
+                className="block h-auto w-[190px] max-w-full object-contain"
+                decoding="async"
+              />
             </Link>
 
             <div
@@ -668,7 +632,7 @@ function AuthShell({
                   text-2xl
                   font-black
                   tracking-tight
-                  text-stone-950
+                  text-[#202421]
                 "
               >
                 {title}
@@ -1411,7 +1375,7 @@ export default function RegisterPage() {
               !selectedHostWorkspaceType ||
               isSubmitting
             }
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-stone-950 text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#173F35] text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? (
               <LoaderCircle size={14} className="animate-spin" />
@@ -1441,18 +1405,18 @@ export default function RegisterPage() {
           registrationVideoLabel
         }
       >
-        <div className="rounded-xl border border-stone-100 bg-[#fafafa] p-5">
+        <div className="rounded-xl border border-stone-100 bg-[#F7F6F2] p-5">
 
           <div className="flex flex-col items-center py-5 text-center">
 
-            <div className="grid size-12 place-items-center rounded-xl bg-stone-950 text-white">
+            <div className="grid size-12 place-items-center rounded-xl bg-[#173F35] text-white">
               <LoaderCircle
                 size={24}
                 className="animate-spin"
               />
             </div>
 
-            <p className="mt-4 text-base font-black text-stone-950">
+            <p className="mt-4 text-base font-black text-[#202421]">
               Finalizing secure registration
             </p>
 
@@ -1533,7 +1497,7 @@ export default function RegisterPage() {
               justify-center
               gap-2
               rounded-lg
-              bg-stone-950
+              bg-[#173F35]
               text-[10px]
               font-black
               text-white
@@ -1629,7 +1593,7 @@ export default function RegisterPage() {
               justify-center
               gap-2
               rounded-lg
-              bg-stone-950
+              bg-[#173F35]
               text-[10px]
               font-black
               text-white
@@ -1712,7 +1676,7 @@ export default function RegisterPage() {
               justify-center
               gap-2
               rounded-lg
-              bg-stone-950
+              bg-[#173F35]
               text-[10px]
               font-black
               text-white
@@ -1763,7 +1727,7 @@ export default function RegisterPage() {
             }
           />
 
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-stone-100 bg-[#fafafa] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-stone-100 bg-[#F7F6F2] px-3 py-2.5">
 
             <div className="flex min-w-0 items-center gap-2.5">
 
@@ -1845,7 +1809,7 @@ export default function RegisterPage() {
                   text-xl
                   font-black
                   tracking-[0.4em]
-                  text-stone-950
+                  text-[#202421]
                   outline-none
                   placeholder:text-stone-300
                 "
@@ -1909,7 +1873,7 @@ export default function RegisterPage() {
               justify-center
               gap-2
               rounded-lg
-              bg-stone-950
+              bg-[#173F35]
               text-[10px]
               font-black
               text-white
@@ -2050,7 +2014,7 @@ export default function RegisterPage() {
                   event.target.value,
                 )
               }
-              className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-stone-950 outline-none placeholder:text-stone-400"
+              className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none placeholder:text-stone-400"
               placeholder="Your full name"
             />
           </InputShell>
@@ -2106,7 +2070,7 @@ export default function RegisterPage() {
                     event.target.value,
                   )
                 }
-                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-stone-950 outline-none placeholder:text-stone-400"
+                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none placeholder:text-stone-400"
                 placeholder="you@example.com"
               />
             </InputShell>
@@ -2158,7 +2122,7 @@ export default function RegisterPage() {
                     ),
                   )
                 }
-                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-stone-950 outline-none"
+                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none"
                 placeholder="+919876543210"
               />
             </InputShell>
@@ -2215,7 +2179,7 @@ export default function RegisterPage() {
                     event.target.value,
                   )
                 }
-                className="h-10 w-full bg-transparent pl-9 pr-9 text-[10px] font-semibold text-stone-950 outline-none"
+                className="h-10 w-full bg-transparent pl-9 pr-9 text-[10px] font-semibold text-[#202421] outline-none"
                 placeholder="Create a password"
               />
 
@@ -2295,7 +2259,7 @@ export default function RegisterPage() {
                     event.target.value,
                   )
                 }
-                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-stone-950 outline-none"
+                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none"
                 placeholder="Repeat your password"
               />
             </InputShell>
@@ -2362,7 +2326,7 @@ export default function RegisterPage() {
 
         </fieldset>
 
-        <div className="rounded-lg border border-stone-100 bg-[#fafafa] px-3 py-2">
+        <div className="rounded-lg border border-stone-100 bg-[#F7F6F2] px-3 py-2">
 
           <div className="flex items-start gap-2">
 
@@ -2401,7 +2365,7 @@ export default function RegisterPage() {
             justify-center
             gap-2
             rounded-lg
-            bg-stone-950
+            bg-[#173F35]
             text-[10px]
             font-black
             text-white
@@ -2450,7 +2414,7 @@ export default function RegisterPage() {
 
           <Link
             to="/login"
-            className="font-black text-stone-950 transition hover:text-emerald-700"
+            className="font-black text-[#202421] transition hover:text-emerald-700"
           >
             Login
           </Link>
