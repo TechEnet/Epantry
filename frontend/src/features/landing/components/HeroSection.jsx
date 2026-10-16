@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useRef,
   useState,
 } from 'react'
 
@@ -44,28 +43,6 @@ const MESSAGE_HOLD_MS =
 
 const INTERACTIVE_MESSAGE_HOLD_MS =
   9000
-
-const WATER_TEXT_RADIUS_PX =
-  250
-
-const WATER_TEXT_DISPLACEMENT_PX =
-  15
-
-
-const WATER_POINTER_FOLLOW =
-  0.24
-
-const WATER_POINTER_RETURN =
-  0.12
-
-const WATER_MOVING_ENERGY =
-  1
-
-const WATER_RESTING_ENERGY =
-  0.14
-
-const WATER_MOVE_WINDOW_MS =
-  105
 
 const LANDING_COOK_QUERY_KEY =
   'epantry-cook-today-landing-input'
@@ -233,19 +210,7 @@ function WordSequence({
                   : '',
               ].join(' ')}
             >
-              <span className="inline-block whitespace-nowrap">
-                {[...word].map(
-                  (character, characterIndex) => (
-                    <span
-                      key={`${wordIndex}-${characterIndex}-${character}`}
-                      data-hero-water-char="true"
-                      className="inline-block will-change-transform [transform:translate3d(0,0,0)]"
-                    >
-                      {character}
-                    </span>
-                  ),
-                )}
-              </span>
+              <span className="inline-block whitespace-nowrap">{word}</span>
             </motion.span>
           )
         },
@@ -260,41 +225,6 @@ export default function HeroSection() {
 
   const navigate =
     useNavigate()
-
-  const heroSectionRef =
-    useRef(null)
-
-  const heroMessageRef =
-    useRef(null)
-
-  const heroImageStageRef =
-    useRef(null)
-
-
-  const pointerFrameRef =
-    useRef(null)
-
-  const characterOriginsRef =
-    useRef(new WeakMap())
-
-  const pointerStateRef =
-    useRef({
-      active: false,
-      initialized: false,
-      targetX: 0,
-      targetY: 0,
-      currentX: 0,
-      currentY: 0,
-      previousX: 0,
-      previousY: 0,
-      velocityX: 0,
-      velocityY: 0,
-      targetVelocityX: 0,
-      targetVelocityY: 0,
-      energy: 0,
-      phase: 0,
-      lastMoveAt: 0,
-    })
 
   const [
     activeSlide,
@@ -586,14 +516,6 @@ export default function HeroSection() {
     revealedWordCount >=
     totalCurrentMessageWords
 
-  useEffect(() => {
-    characterOriginsRef.current =
-      new WeakMap()
-  }, [
-    activeMessage,
-    isMobileView,
-  ])
-
   function handleCookTodaySubmit(
     event,
   ) {
@@ -633,614 +555,32 @@ export default function HeroSection() {
 
 
 
-  function resetHeroInteractionStyles() {
-    const characters =
-      heroMessageRef.current
-        ?.querySelectorAll(
-          '[data-hero-water-char="true"]',
-        ) || []
-
-    characters.forEach(
-      (character) => {
-        character.style.transform =
-          'translate3d(0px, 0px, 0px) rotate(0deg) scale3d(1, 1, 1)'
-      },
-    )
-
-    if (
-      heroImageStageRef.current
-    ) {
-      heroImageStageRef.current.style.transform =
-        'translate3d(0px, 0px, 0px) scale(1.018) rotate(0deg)'
-    }
-  }
-
-  function runHeroInteractionFrame(
-    timestamp,
-  ) {
-    const section =
-      heroSectionRef.current
-
-    if (!section) {
-      pointerFrameRef.current =
-        null
-      return
-    }
-
-    const state =
-      pointerStateRef.current
-
-    const rect =
-      section.getBoundingClientRect()
-
-    const restingX =
-      rect.width / 2
-    const restingY =
-      rect.height / 2
-
-    if (!state.initialized) {
-      state.currentX =
-        restingX
-      state.currentY =
-        restingY
-      state.previousX =
-        restingX
-      state.previousY =
-        restingY
-      state.targetX =
-        restingX
-      state.targetY =
-        restingY
-      state.initialized =
-        true
-    }
-
-    const targetX =
-      state.active
-        ? state.targetX
-        : restingX
-    const targetY =
-      state.active
-        ? state.targetY
-        : restingY
-
-    const follow =
-      state.active
-        ? WATER_POINTER_FOLLOW
-        : WATER_POINTER_RETURN
-
-    state.previousX =
-      state.currentX
-    state.previousY =
-      state.currentY
-
-    state.currentX +=
-      (
-        targetX -
-        state.currentX
-      ) *
-      follow
-
-    state.currentY +=
-      (
-        targetY -
-        state.currentY
-      ) *
-      follow
-
-    const frameVelocityX =
-      state.currentX -
-      state.previousX
-    const frameVelocityY =
-      state.currentY -
-      state.previousY
-
-    state.velocityX +=
-      (
-        frameVelocityX -
-        state.velocityX
-      ) *
-      0.28
-
-    state.velocityY +=
-      (
-        frameVelocityY -
-        state.velocityY
-      ) *
-      0.28
-
-    const now =
-      Number.isFinite(
-        timestamp,
-      )
-        ? timestamp
-        : performance.now()
-
-    const pointerIsMoving =
-      state.active &&
-      now -
-        state.lastMoveAt <
-        WATER_MOVE_WINDOW_MS
-
-    const speed =
-      Math.min(
-        24,
-        Math.hypot(
-          state.targetVelocityX,
-          state.targetVelocityY,
-        ),
-      )
-
-    const movingEnergy =
-      WATER_MOVING_ENERGY *
-      Math.min(
-        1,
-        0.42 +
-          speed /
-            12,
-      )
-
-    const targetEnergy =
-      state.active
-        ? pointerIsMoving
-          ? movingEnergy
-          : WATER_RESTING_ENERGY
-        : 0
-
-    const energyFollow =
-      targetEnergy >
-      state.energy
-        ? 0.22
-        : state.active
-          ? 0.055
-          : 0.075
-
-    state.energy +=
-      (
-        targetEnergy -
-        state.energy
-      ) *
-      energyFollow
-
-    state.targetVelocityX *=
-      pointerIsMoving
-        ? 0.82
-        : 0.68
-    state.targetVelocityY *=
-      pointerIsMoving
-        ? 0.82
-        : 0.68
-
-    state.phase +=
-      pointerIsMoving
-        ? 0.24 +
-          speed *
-            0.009
-        : state.active
-          ? 0.075
-          : 0.045
-
-    const phaseWave =
-      Math.sin(
-        state.phase,
-      )
-
-    const pointerClientX =
-      rect.left +
-      state.currentX
-    const pointerClientY =
-      rect.top +
-      state.currentY
-
-    const normalizedX =
-      Math.max(
-        -1,
-        Math.min(
-          1,
-          (
-            state.currentX -
-            restingX
-          ) /
-            Math.max(
-              restingX,
-              1,
-            ),
-        ),
-      )
-
-    const normalizedY =
-      Math.max(
-        -1,
-        Math.min(
-          1,
-          (
-            state.currentY -
-            restingY
-          ) /
-            Math.max(
-              restingY,
-              1,
-            ),
-        ),
-      )
-
-    if (
-      heroImageStageRef.current
-    ) {
-      const motionStrength =
-        state.energy
-
-      const surfaceShiftX =
-        -normalizedX *
-          8.5 *
-          motionStrength -
-        state.velocityX *
-          0.2
-
-      const surfaceShiftY =
-        -normalizedY *
-          5.5 *
-          motionStrength -
-        state.velocityY *
-          0.2
-
-      const settleWaveX =
-        Math.sin(
-          state.phase *
-            0.72,
-        ) *
-        1.15 *
-        motionStrength
-
-      const settleWaveY =
-        Math.cos(
-          state.phase *
-            0.64,
-        ) *
-        0.8 *
-        motionStrength
-
-      const surfaceRotation =
-        (
-          normalizedX *
-            0.12 +
-          state.velocityX *
-            0.012
-        ) *
-        motionStrength
-
-      const surfaceScale =
-        1.018 +
-        0.004 *
-          motionStrength +
-        Math.sin(
-          state.phase *
-            0.52,
-        ) *
-          0.0007 *
-          motionStrength
-
-      heroImageStageRef.current.style.transform =
-        `translate3d(${(surfaceShiftX + settleWaveX).toFixed(2)}px, ${(surfaceShiftY + settleWaveY).toFixed(2)}px, 0px) scale(${surfaceScale.toFixed(4)}) rotate(${surfaceRotation.toFixed(3)}deg)`
-    }
-
-    const characters =
-      heroMessageRef.current
-        ?.querySelectorAll(
-          '[data-hero-water-char="true"]',
-        ) || []
-
-    characters.forEach(
-      (character) => {
-        let origin =
-          characterOriginsRef.current.get(
-            character,
-          )
-
-        if (!origin) {
-          const characterRect =
-            character.getBoundingClientRect()
-
-          origin = {
-            centerX:
-              characterRect.left +
-              characterRect.width / 2,
-            centerY:
-              characterRect.top +
-              characterRect.height / 2,
-          }
-
-          characterOriginsRef.current.set(
-            character,
-            origin,
-          )
-        }
-
-        const deltaX =
-          origin.centerX -
-          pointerClientX
-        const deltaY =
-          origin.centerY -
-          pointerClientY
-
-        const distance =
-          Math.hypot(
-            deltaX,
-            deltaY,
-          )
-
-        if (
-          distance >=
-            WATER_TEXT_RADIUS_PX ||
-          state.energy <
-            0.008
-        ) {
-          character.style.transform =
-            'translate3d(0px, 0px, 0px) rotate(0deg) scale3d(1, 1, 1)'
-          return
-        }
-
-        const safeDistance =
-          Math.max(
-            distance,
-            1,
-          )
-
-        const directionX =
-          deltaX /
-          safeDistance
-        const directionY =
-          deltaY /
-          safeDistance
-
-        const tangentX =
-          -directionY
-        const tangentY =
-          directionX
-
-        const falloff =
-          Math.pow(
-            1 -
-              distance /
-                WATER_TEXT_RADIUS_PX,
-            1.7,
-          )
-
-        const ripple =
-          Math.sin(
-            distance *
-              0.057 -
-              state.phase *
-                1.72,
-          )
-
-        const secondaryRipple =
-          Math.cos(
-            distance *
-              0.031 -
-              state.phase *
-                1.08,
-          )
-
-        const radialAmount =
-          ripple *
-          WATER_TEXT_DISPLACEMENT_PX *
-          falloff *
-          state.energy
-
-        const tangentAmount =
-          secondaryRipple *
-          5.4 *
-          falloff *
-          state.energy
-
-        const dragX =
-          state.velocityX *
-          0.36 *
-          falloff
-        const dragY =
-          state.velocityY *
-          0.36 *
-          falloff
-
-        const translateX =
-          directionX *
-            radialAmount +
-          tangentX *
-            tangentAmount +
-          dragX
-
-        const translateY =
-          directionY *
-            radialAmount +
-          tangentY *
-            tangentAmount +
-          dragY
-
-        const rotate =
-          (
-            ripple *
-              4.2 +
-            state.velocityX *
-              0.14
-          ) *
-          falloff *
-          state.energy
-
-        const stretch =
-          ripple *
-          0.055 *
-          falloff *
-          state.energy
-
-        const squash =
-          secondaryRipple *
-          0.032 *
-          falloff *
-          state.energy
-
-        character.style.transform =
-          `translate3d(${translateX.toFixed(2)}px, ${translateY.toFixed(2)}px, 0px) rotate(${rotate.toFixed(2)}deg) scale3d(${(1 + stretch).toFixed(4)}, ${(1 - squash).toFixed(4)}, 1)`
-      },
-    )
-
-    const pointerDelta =
-      Math.abs(
-        targetX -
-        state.currentX,
-      ) +
-      Math.abs(
-        targetY -
-        state.currentY,
-      )
-
-    const shouldContinue =
-      state.active ||
-      state.energy >
-        0.006 ||
-      pointerDelta >
-        0.2
-
-    if (shouldContinue) {
-      pointerFrameRef.current =
-        window.requestAnimationFrame(
-          runHeroInteractionFrame,
-        )
-    } else {
-      resetHeroInteractionStyles()
-      pointerFrameRef.current =
-        null
-    }
-  }
-
-  function ensureHeroInteractionFrame() {
-    if (
-      pointerFrameRef.current
-    ) {
-      return
-    }
-
-    pointerFrameRef.current =
-      window.requestAnimationFrame(
-        runHeroInteractionFrame,
-      )
-  }
-
-  function handleHeroPointerMove(
-    event,
-  ) {
-    if (
-      shouldReduceMotion ||
-      event.pointerType ===
-        'touch'
-    ) {
-      return
-    }
-
-    const section =
-      heroSectionRef.current
-
-    if (!section) {
-      return
-    }
-
-    const rect =
-      section.getBoundingClientRect()
-
-    const state =
-      pointerStateRef.current
-
-    const nextX =
-      Math.max(
-        0,
-        Math.min(
-          rect.width,
-          event.clientX -
-            rect.left,
-        ),
-      )
-
-    const nextY =
-      Math.max(
-        0,
-        Math.min(
-          rect.height,
-          event.clientY -
-            rect.top,
-        ),
-      )
-
-    if (
-      state.initialized
-    ) {
-      state.targetVelocityX =
-        nextX -
-        state.targetX
-      state.targetVelocityY =
-        nextY -
-        state.targetY
-    } else {
-      state.currentX =
-        nextX
-      state.currentY =
-        nextY
-      state.previousX =
-        nextX
-      state.previousY =
-        nextY
-      state.initialized =
-        true
-    }
-
-    state.targetX =
-      nextX
-    state.targetY =
-      nextY
-    state.lastMoveAt =
-      performance.now()
-    state.active =
-      true
-
-    ensureHeroInteractionFrame()
-  }
-
-  function handleHeroPointerLeave() {
-    const state =
-      pointerStateRef.current
-
-    state.active =
-      false
-    state.lastMoveAt =
-      performance.now()
-
-    ensureHeroInteractionFrame()
-  }
-
-  useEffect(
-    () =>
-      () => {
-        if (
-          pointerFrameRef.current
-        ) {
-          window.cancelAnimationFrame(
-            pointerFrameRef.current,
-          )
-        }
-      },
-    [],
-  )
-
   return (
     <section
-      ref={heroSectionRef}
       className="hero-section-stable relative isolate m-0 flex min-h-[100svh] w-full items-center overflow-hidden p-0"
-      onPointerMove={
-        handleHeroPointerMove
-      }
-      onPointerLeave={
-        handleHeroPointerLeave
-      }
     >
+
+      {/* Keep the Hero title slightly larger than the shared type ramp.
+          Scoped !important rules are necessary because the approved
+          universal stylesheet sets h1 sizes with !important. */}
+      <style>{`
+        .hero-section-stable .epantry-hero-headline {
+          font-size: 40px !important;
+          line-height: 1.1 !important;
+        }
+        @media (min-width: 640px) {
+          .hero-section-stable .epantry-hero-headline {
+            font-size: 48px !important;
+            line-height: 1.1 !important;
+          }
+        }
+        @media (min-width: 1024px) {
+          .hero-section-stable .epantry-hero-headline {
+            font-size: 68px !important;
+            line-height: 1.08 !important;
+          }
+        }
+      `}</style>
 
       {/* =============================================================
           HERO BACKGROUND
@@ -1252,12 +592,7 @@ export default function HeroSection() {
       >
 
         <div
-          ref={heroImageStageRef}
-          className="absolute inset-0 will-change-transform"
-          style={{
-            transform:
-              'translate3d(0px, 0px, 0px) scale(1.018) rotate(0deg)',
-          }}
+          className="absolute inset-0"
         >
 
           <AnimatePresence
@@ -1320,8 +655,7 @@ export default function HeroSection() {
           ========================================================= */}
 
           <div
-            ref={heroMessageRef}
-            className="relative mt-7 min-h-[265px] max-w-3xl overflow-hidden rounded-[24px] border border-white/20 bg-white/10 p-4 shadow-md shadow-[#111827]/5 backdrop-blur-[2px] sm:min-h-[255px] md:min-h-[235px] md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none lg:min-h-[285px] lg:max-w-none">
+            className="relative mt-7 max-w-3xl overflow-hidden rounded-[24px] border border-white/20 bg-white/10 p-4 shadow-md shadow-[#111827]/5 backdrop-blur-[2px] md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none lg:max-w-none">
 
             <div
               aria-hidden="true"
@@ -1356,12 +690,10 @@ export default function HeroSection() {
                 ]
                   .filter(Boolean)
                   .join(' ')}
-                className="max-w-3xl text-[2.2rem] font-semibold uppercase leading-[1.08] tracking-[0.045em] text-[#111827] drop-shadow-[0_1px_1px_rgba(255,255,255,0.72)] sm:text-[2.9rem] md:drop-shadow-none lg:max-w-none lg:text-[3.95rem]"
+                className="epantry-hero-headline max-w-3xl font-semibold uppercase tracking-[0.045em] text-[#202421] lg:max-w-none"
                 style={{
-                  fontFamily:
-                    '"Avenir Next", "Helvetica Neue", Arial, sans-serif',
-                  textRendering:
-                    'geometricPrecision',
+                  color: '#202421',
+                  textShadow: '0 1px 3px #F7F6F2',
                 }}
               >
                 <WordSequence
@@ -1378,7 +710,7 @@ export default function HeroSection() {
                 />
 
                 {currentMessage.accent ? (
-                  <span className="text-[#166534]">
+                  <span className="text-[#173F35]" style={{ color: '#173F35' }}>
                     {' '}
                     <WordSequence
                       text={
@@ -1451,11 +783,11 @@ export default function HeroSection() {
                     What do you want to cook today?
                   </label>
 
-                  <div className="flex flex-col gap-2 rounded-[22px] border border-emerald-200/80 bg-white/90 p-2.5 shadow-[0_14px_35px_rgba(20,83,45,0.12)] backdrop-blur sm:flex-row sm:items-center">
+                  <div className="flex flex-col gap-2 rounded-[22px] border border-[#173F35] bg-[#F7F6F2] p-2.5 shadow-[0_14px_35px_rgba(32,36,33,0.12)] backdrop-blur sm:flex-row sm:items-center">
                     <div className="flex min-w-0 flex-1 items-center gap-3 px-2.5">
                       <ChefHat
                         size={19}
-                        className="shrink-0 text-[#166534]"
+                        className="shrink-0 text-[#173F35]"
                         aria-hidden="true"
                       />
 
@@ -1489,13 +821,14 @@ export default function HeroSection() {
                         }}
                         placeholder="Paneer, tomato, rice... or a dish idea"
                         autoComplete="off"
-                        className="min-h-11 w-full min-w-0 bg-transparent text-sm font-bold text-[#17352C] outline-none placeholder:font-semibold placeholder:text-[#7A8E86] sm:text-base"
+                        className="min-h-11 w-full min-w-0 bg-transparent text-sm font-bold text-[#202421] outline-none placeholder:font-semibold placeholder:text-[#202421]/75 sm:text-base"
+                        style={{ backgroundColor: '#F7F6F2', color: '#202421' }}
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[#166534] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#14532D]"
+                      className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[#173F35] px-5 text-sm font-black text-[#F7F6F2] shadow-sm transition hover:bg-[#202421]"
                     >
                       <Search
                         size={16}
@@ -1549,7 +882,7 @@ export default function HeroSection() {
               duration: 0.5,
               delay: 0.22,
             }}
-            className="mt-7 flex flex-wrap gap-3"
+            className="mt-10 flex flex-wrap gap-3 sm:mt-12"
           >
 
             <Link
@@ -1558,7 +891,7 @@ export default function HeroSection() {
                   .primaryAction
                   .path
               }
-              className="focus-ring inline-flex items-center gap-2 rounded-full bg-[#166534] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-[#14532D]/15 transition hover:bg-[#14532D]"
+              className="focus-ring inline-flex items-center gap-2 rounded-full bg-[#173F35] px-6 py-3.5 text-sm font-bold text-[#F7F6F2] shadow-lg shadow-[#202421]/15 transition hover:bg-[#202421]"
             >
 
               <ShoppingBasket
@@ -1588,7 +921,7 @@ export default function HeroSection() {
                   .secondaryAction
                   .path
               }
-              className="focus-ring inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-6 py-3.5 text-sm font-bold text-[#1F2937] shadow-sm transition hover:border-[#D1D5DB] hover:bg-[#F8FAF7]"
+              className="focus-ring inline-flex items-center gap-2 rounded-full border border-[#202421] bg-[#F7F6F2] px-6 py-3.5 text-sm font-bold text-[#202421] shadow-sm transition hover:border-[#173F35] hover:bg-[#DCE0CF]"
             >
 
               <CookingPot
@@ -1608,7 +941,7 @@ export default function HeroSection() {
 
             <Link
               to="/cook-today"
-              className="focus-ring inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/85 px-6 py-3.5 text-sm font-bold text-[#14532D] shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-white"
+              className="focus-ring inline-flex items-center gap-2 rounded-full border border-[#173F35] bg-[#DCE0CF] px-6 py-3.5 text-sm font-bold text-[#173F35] shadow-sm backdrop-blur transition hover:border-[#202421] hover:bg-[#F7F6F2]"
             >
 
               <ChefHat

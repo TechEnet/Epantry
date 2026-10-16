@@ -32,9 +32,9 @@ import {
 |--------------------------------------------------------------------------
 |
 | The canonical Grocery browse projection intentionally stays compact.
-| Featured Grocery now needs approved nutrition for the desktop two-phase
-| hover card, so getLandingFeaturedContent enriches only the five featured
-| records through the existing public Product detail service.
+| The landing grid displays up to eight real catalog products. To preserve
+| the existing featured endpoint contract, detail enrichment still resolves
+| approved nutrition through the existing public Product detail service.
 |
 | No new Product truth is created here. Nutrition is passed through exactly
 | from the current published ProductVersion / approved NPI fallback.
@@ -197,7 +197,7 @@ async function loadFeaturedGroceryDetails(
     )
       ? products.slice(
           0,
-          5,
+          8,
         )
       : []
 
@@ -397,7 +397,7 @@ export async function getLandingFeaturedContent() {
         1,
 
       limit:
-        5,
+        8,
 
       search:
         '',
@@ -408,8 +408,11 @@ export async function getLandingFeaturedContent() {
       brandSlug:
         '',
 
+      // Match the published public catalog used by the Grocery page.
+      // Requiring an active Host offer can leave the landing at five
+      // items even when more approved products exist in the catalog.
       listedOnly:
-        true,
+        false,
     }),
 
     findFeaturedBrands(),
@@ -418,8 +421,10 @@ export async function getLandingFeaturedContent() {
       page:
         1,
 
+      // Scan ahead so image-less records do not consume the eight
+      // landing gallery slots. The full Recipes page is unchanged.
       limit:
-        5,
+        40,
 
       search:
         '',
@@ -468,27 +473,16 @@ export async function getLandingFeaturedContent() {
       ? publicRecipeResult.recipes
       : []
 
-  /*
-  |--------------------------------------------------------------------------
-  | Mobile Fourth Recipe Selection
-  |--------------------------------------------------------------------------
-  |
-  | Desktop keeps the original first three featured recipes. The recipe that
-  | was fourth in the public result does not currently have the intended
-  | image, so the mobile-only fourth card intentionally uses the fifth public
-  | recipe instead. If fewer than five published recipes exist, fall back to
-  | the fourth record rather than inventing any content.
-  |
-  */
-
-  const featuredRecipeItems = [
-    ...publicRecipes.slice(
-      0,
-      3,
-    ),
-    publicRecipes[4] ||
-      publicRecipes[3],
-  ].filter(Boolean)
+  // Select image-backed published recipes only. Remove the explicitly
+  // requested image-less Test Jeera Rice item; fill from the next
+  // eligible real recipe instead of inventing a placeholder.
+  const featuredRecipeItems = publicRecipes
+    .filter((item) => {
+      const card = normalizePublicRecipeCard(item)
+      return Boolean(String(card.image || '').trim()) &&
+        String(card.slug || '').trim().toLowerCase() !== 'epantry-test-jeera-rice'
+    })
+    .slice(0, 8)
 
   const featuredRecipes =
     await Promise.all(

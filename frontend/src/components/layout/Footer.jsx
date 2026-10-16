@@ -67,7 +67,7 @@ export default function Footer() {
   return (
     <footer
       ref={footerRef}
-      className="relative w-full overflow-x-hidden bg-[#273B32] text-[#F2F6F0] sm:h-[100svh]"
+      className="relative w-full overflow-x-hidden bg-[#202421] text-[#F7F6F2] sm:h-[100svh]"
     >
       {/* =========================================================
           MOBILE FOOTER — NORMAL FLOW, NO STICKY/ABSOLUTE OVERLAP
@@ -79,15 +79,15 @@ export default function Footer() {
             className="focus-ring inline-flex w-fit items-start gap-2.5 rounded-xl"
             aria-label="EPANTRY home"
           >
-            <div className="grid h-8 w-8 place-items-center rounded-full border border-white/25 text-[10px] font-black tracking-[-0.03em] text-white">
+            <div className="grid h-8 w-8 place-items-center rounded-full border border-white/25 text-[14px] font-semibold tracking-[-0.03em] text-[#F7F6F2]">
               E
             </div>
 
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white">
+              <p className="text-[14px] font-semibold uppercase tracking-[0.15em] text-[#F7F6F2]">
                 EPANTRY
               </p>
-              <p className="mt-0.5 text-[7px] font-semibold uppercase tracking-[0.2em] text-white/65">
+              <p className="mt-0.5 text-[14px] font-semibold uppercase tracking-[0.2em] text-[#F7F6F2]/65">
                 Food Intelligence
               </p>
             </div>
@@ -100,14 +100,14 @@ export default function Footer() {
             <Link
               key={item.path}
               to={item.path}
-              className="focus-ring group flex min-w-0 items-center justify-between gap-2 border-b border-white/20 py-2 text-[13px] font-medium uppercase tracking-[-0.02em] text-white/85 transition-colors duration-300 hover:text-[#A4F0C5] last:col-span-2 last:w-1/2 last:justify-self-center"
+              className="focus-ring group flex min-w-0 items-center justify-between gap-2 border-b border-white/20 py-2 text-[15px] font-medium tracking-[-0.02em] text-[#F7F6F2]/85 transition-colors duration-300 hover:text-[#DCE0CF] last:col-span-2 last:w-1/2 last:justify-self-center"
             >
               <span className="truncate">
                 {item.label}
               </span>
               <span
                 aria-hidden="true"
-                className="shrink-0 text-[10px] text-white/45 transition-colors duration-300 group-hover:text-[#A4F0C5]"
+                className="shrink-0 text-[14px] text-[#F7F6F2]/45 transition-colors duration-300 group-hover:text-[#DCE0CF]"
               >
                 ↗
               </span>
@@ -118,12 +118,12 @@ export default function Footer() {
 
         <div
           aria-hidden="true"
-          className="mt-5 w-full select-none overflow-hidden bg-[linear-gradient(110deg,#67D6A1_0%,#B7E7C7_40%,#6AC89B_64%,#DCF6E2_100%)] bg-clip-text text-center text-[clamp(54px,17vw,76px)] font-light leading-[0.82] tracking-[-0.075em] text-transparent"
+          className="mt-5 w-full select-none overflow-hidden  text-center text-[clamp(54px,17vw,76px)] font-light leading-[0.82] tracking-[-0.075em] text-[#F7F6F2]/90"
         >
           EPANTRY
         </div>
 
-        <div className="mt-3 flex flex-col gap-1 border-t border-white/20 pt-2.5 text-[7px] uppercase tracking-[0.1em] text-white/65">
+        <div className="mt-3 flex flex-col gap-1 border-t border-white/20 pt-2.5 text-[14px] uppercase tracking-[0.1em] text-[#F7F6F2]/65">
           <p>
             © {currentYear} EPANTRY. All rights reserved.
           </p>
@@ -147,15 +147,15 @@ export default function Footer() {
                 className="focus-ring inline-flex w-fit shrink-0 items-center gap-3 rounded-xl"
                 aria-label="EPANTRY home"
               >
-                <div className="grid h-10 w-10 place-items-center rounded-full border border-white/25 text-[11px] font-black tracking-[-0.03em] text-white">
+                <div className="grid h-10 w-10 place-items-center rounded-full border border-white/25 text-[15px] font-semibold tracking-[-0.03em] text-[#F7F6F2]">
                   E
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white">
+                  <p className="text-[15px] font-semibold uppercase tracking-[0.16em] text-[#F7F6F2]">
                     EPANTRY
                   </p>
-                  <p className="mt-1 text-[8px] font-semibold uppercase tracking-[0.22em] text-white/65">
+                  <p className="mt-1 text-[14px] font-semibold uppercase tracking-[0.22em] text-[#F7F6F2]/65">
                     Food Intelligence
                   </p>
                 </div>
@@ -177,14 +177,14 @@ export default function Footer() {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className="focus-ring group relative flex min-h-[76px] min-w-0 items-center justify-center gap-2 px-2 py-4 text-center text-[clamp(13px,1.12vw,18px)] font-semibold uppercase tracking-[-0.025em] text-white/90 transition-colors duration-300 hover:bg-white/[0.07] hover:text-[#A4F0C5] lg:border-r lg:border-white/20 lg:last:border-r-0"
+                    className="focus-ring group relative flex min-h-[76px] min-w-0 items-center justify-center gap-2 px-2 py-4 text-center text-[15px] font-semibold tracking-[-0.025em] text-[#F7F6F2]/90 transition-colors duration-300 hover:bg-white/[0.07] hover:text-[#DCE0CF] lg:border-r lg:border-white/20 lg:last:border-r-0"
                   >
                     <span>
                       {item.label}
                     </span>
                     <span
                       aria-hidden="true"
-                      className="shrink-0 text-[12px] font-medium text-white/55 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#A4F0C5]"
+                      className="shrink-0 text-[14px] font-medium text-[#F7F6F2]/55 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#DCE0CF]"
                     >
                       ↗
                     </span>
@@ -206,7 +206,7 @@ export default function Footer() {
               {'EPANTRY'.split('').map((letter, index) => (
                 <motion.span
                   key={`${letter}-${index}`}
-                  className="inline-flex min-w-0 flex-1 cursor-default origin-bottom justify-center bg-[linear-gradient(110deg,#67D6A1_0%,#B7E7C7_40%,#6AC89B_64%,#DCF6E2_100%)] bg-clip-text font-light leading-[0.86] tracking-[-0.075em] text-transparent"
+                  className="inline-flex min-w-0 flex-1 cursor-default origin-bottom justify-center  font-light leading-[0.86] tracking-[-0.075em] text-[#F7F6F2]/90"
                   style={{
                     fontSize: 'clamp(72px, 16.2vw, 292px)',
                   }}
@@ -234,7 +234,7 @@ export default function Footer() {
           </motion.div>
 
           <motion.div
-            className="absolute bottom-0 left-8 right-8 z-20 flex flex-row items-center justify-center gap-2 border-t border-white/20 py-3 text-[9px] uppercase tracking-[0.12em] text-white/65 lg:left-[4vw] lg:right-[4vw]"
+            className="absolute bottom-0 left-8 right-8 z-20 flex flex-row items-center justify-center gap-2 border-t border-white/20 py-3 text-[14px] uppercase tracking-[0.12em] text-[#F7F6F2]/65 lg:left-[4vw] lg:right-[4vw]"
           >
             <p>
               © {currentYear} EPANTRY. All rights reserved.

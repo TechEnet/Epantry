@@ -18,7 +18,7 @@ import FeaturedContentSection from "../components/FeaturedContentSection";
 
 import HeroSection from "../components/HeroSection";
 
-import HowItWorksSection from "../components/HowItWorksSection";
+import HowEpantryGuidePopup from "../components/HowEpantryGuidePopup";
 
 import { landingCategories } from "../content/landingContent";
 
@@ -159,9 +159,14 @@ export default function LandingPage() {
           const height =
             sticky?.getBoundingClientRect().height || window.innerHeight;
           const travel =
-            node.dataset.landingStatic === "true"
-              ? rect.height
-              : Math.max(rect.height - height, 1);
+            (node.dataset.landingStory === "grocery" ||
+              node.dataset.landingStory === "recipes")
+              // The final Grocery/Recipes viewport is covered by the next hero.
+              // Release touch gestures to the incoming story at its start.
+              ? Math.max(rect.height - height, 1)
+              : node.dataset.landingStatic === "true"
+                ? rect.height
+                : Math.max(rect.height - height, 1);
           return { node, start, travel, stops };
         })
         .filter((item) => item.stops.length > 0)
@@ -496,7 +501,9 @@ export default function LandingPage() {
       const stickyHeight =
         target.querySelector("[data-landing-sticky]")?.getBoundingClientRect()
           .height || window.innerHeight;
-      const travel = Math.max(rect.height - stickyHeight, 1);
+      // Keep the original 90svh Explore card-animation timeline. The extra
+      // 100svh holds the scene while the Grocery hero passes in front of it.
+      const travel = Math.max(rect.height - stickyHeight * 2, 1);
       const next = Math.min(Math.max(-rect.top / travel, 0), 1);
       if (Math.abs(next - experienceScrollProgress.get()) > 0.0001) {
         experienceScrollProgress.set(next);
@@ -617,9 +624,9 @@ export default function LandingPage() {
       )}
       <div
         data-landing-story="explore"
-        data-landing-stops="0.015,0.78"
+        data-landing-stops="0.007,0.37"
         ref={experienceSectionRef}
-        className="relative z-10 h-[190svh] w-full bg-[#1A1A1A] sm:h-[190svh]"
+        className="relative z-10 h-[290svh] w-full bg-[#1A1A1A] sm:h-[290svh]"
       >
         <section
           data-landing-sticky
@@ -839,9 +846,11 @@ export default function LandingPage() {
           FEATURED SECTIONS
       ============================================================= */}
 
+      {/* Grocery begins during Explore's final sticky viewport. Its hero
+          slides over Explore, while the product gallery follows normally. */}
       <div
         ref={featuredEntranceRef}
-        className="relative z-30 mt-0"
+        className="relative z-30 -mt-[100svh]"
       >
         <FeaturedContentSection
           groceryEntranceEdgeOpacity={groceryEdgeOpacity}
@@ -857,11 +866,8 @@ export default function LandingPage() {
         />
       </div>
 
-      {/* =============================================================
-          HOW EPANTRY WORKS + WHY EPANTRY
-      ============================================================= */}
-
-      <HowItWorksSection />
+      {/* Guided introduction opens in a popup; Brand names now lead directly to Footer. */}
+      <HowEpantryGuidePopup />
     </main>
   );
 }

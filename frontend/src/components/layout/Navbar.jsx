@@ -435,6 +435,36 @@ import {
     const location =
         useLocation();
   
+    // A two-pixel reading-progress line stays attached to the navbar.
+    // Ref-only DOM updates avoid rerendering the large navbar on every scroll.
+    const landingProgressRef = useRef(null);
+    useEffect(() => {
+        if (typeof window === 'undefined' || window.location.pathname !== '/') return undefined;
+        let scheduled = false;
+        const update = () => {
+            scheduled = false;
+            const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            const ratio = maxScroll ? Math.min(1, Math.max(0, window.scrollY / maxScroll)) : 0;
+            if (landingProgressRef.current) {
+                landingProgressRef.current.style.transform = `scaleX(${ratio})`;
+            }
+        };
+        const requestUpdate = () => {
+            if (scheduled) return;
+            scheduled = true;
+            window.requestAnimationFrame(update);
+        };
+        update();
+        window.addEventListener('scroll', requestUpdate, { passive: true });
+        window.addEventListener('resize', requestUpdate);
+        window.addEventListener('load', requestUpdate);
+        return () => {
+            window.removeEventListener('scroll', requestUpdate);
+            window.removeEventListener('resize', requestUpdate);
+            window.removeEventListener('load', requestUpdate);
+        };
+    }, [location.pathname]);
+
     const navigate =
         useNavigate();
   
@@ -1557,19 +1587,19 @@ import {
             className="focus-ring inline-flex min-w-0 items-center gap-3 rounded-xl"
             aria-label="EPANTRY home"
         >
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-sm font-black text-white shadow-sm">
-                E
-            </div>
-  
-            <div className="min-w-0">
-                <p className="truncate text-lg font-black leading-none tracking-tight text-stone-950">
-                    EPANTRY
-                </p>
-  
-                <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500">
+            <span className="flex min-w-0 flex-col justify-center">
+                <img
+                    src="/branding/epantry-wordmark.webp"
+                    alt="EPANTRY.in"
+                    width={1636}
+                    height={265}
+                    className="block h-auto w-[174px] max-w-full object-contain"
+                    decoding="async"
+                />
+                <span className="mt-0.5 text-[11px] font-semibold leading-[17px] tracking-[0.08em] text-[#202421]">
                     Food Intelligence
-                </p>
-            </div>
+                </span>
+            </span>
         </Link>
     );
   
@@ -2313,7 +2343,7 @@ import {
         >
             <div className="page-shell">
                 <div className="hidden xl:block">
-                    <div className="flex min-h-[72px] items-center gap-3 py-3">
+                    <div className="flex min-h-[72px] items-center gap-3 py-1.5">
                         <div className="shrink-0">
                             {brandCluster}
                         </div>
@@ -2332,7 +2362,7 @@ import {
                             {renderNavbarSearchResults()}
                         </div>
   
-                        <div className="w-[168px] shrink-0">
+                        <div className="w-[205px] shrink-0">
                             <NavbarLocationStatus />
                         </div>
 
@@ -2373,7 +2403,7 @@ import {
                     </div>
                 </div>
   
-                <div className="hidden py-3 md:block xl:hidden">
+                <div className="hidden py-2 md:block xl:hidden">
                     <div className="flex min-h-[52px] items-center justify-between gap-4">
                         {brandCluster}
   
@@ -2444,7 +2474,7 @@ import {
                         </button>
                     </div>
   
-                    <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="mt-2 grid grid-cols-2 gap-3">
                         <div className="relative">
                             <SearchBar
                                 value={
@@ -2472,8 +2502,8 @@ import {
                         animate={{
                             height:
                                 mobileCompact && isMobileCompactPage
-                                    ? 56
-                                    : 64,
+                                    ? 52
+                                    : 60,
                         }}
                         transition={{
                             duration: 0.28,
@@ -2491,13 +2521,14 @@ import {
                             className="focus-ring flex shrink-0 items-center gap-1.5 rounded-[15px]"
                             aria-label="EPANTRY home"
                         >
-                            <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-emerald-700 text-[13px] font-black text-white shadow-[0_8px_20px_rgba(4,120,87,0.24)] ring-1 ring-white/35">
-                                E
-                            </span>
-
-                            <span className="text-[10px] font-black tracking-[0.04em] text-stone-900">
-                                EPANTRY
-                            </span>
+                            <img
+                                src="/branding/epantry-wordmark.webp"
+                                alt="EPANTRY.in"
+                                width={1636}
+                                height={265}
+                                className="block h-auto w-[124px] max-w-full object-contain"
+                                decoding="async"
+                            />
                         </Link>
 
                         <div className="ml-auto flex items-center gap-1.5">
@@ -2853,6 +2884,19 @@ import {
                     </div>
                 )}
             </div>
+            {location.pathname === '/' && (
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute bottom-[-3px] left-0 right-0 z-[80] h-[3px] overflow-hidden"
+                    style={{ backgroundColor: '#DCE0CF' }}
+                >
+                    <span
+                        ref={landingProgressRef}
+                        className="absolute inset-0 origin-left"
+                        style={{ backgroundColor: '#C86C42', transform: 'scaleX(0)' }}
+                    />
+                </div>
+            )}
         </header>
     );
   }

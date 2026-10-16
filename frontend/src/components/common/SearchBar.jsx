@@ -20,9 +20,9 @@ export default function SearchBar({ value = '', onSubmit, placeholder = 'Search 
         onChange={(event) => setQuery(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={`focus-ring w-full rounded-2xl border border-stone-200 bg-white pr-24 text-stone-900 shadow-sm placeholder:text-stone-400 ${compact ? 'h-11 pl-11 text-sm' : 'h-13 pl-12 text-sm sm:text-base'}`}
+        className={`epantry-input focus-ring w-full pr-24 shadow-sm ${compact ? 'h-12 pl-11' : 'h-[52px] pl-12'}`}
       />
-      <button type="submit" className="focus-ring absolute right-1.5 top-1/2 min-h-9 -translate-y-1/2 rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white transition hover:bg-brand-800">
+      <button type="submit" className="epantry-primary-button focus-ring absolute right-1.5 top-1/2 -translate-y-1/2 px-4">
         Search
       </button>
     </form>

@@ -1,37 +1,256 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Shared Japandi foundation - screenshot S1, without changing status semantics. */
+  --font-sans: "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
-  --color-brand-50: #F0FDF4;
-  --color-brand-100: #DCFCE7;
-  --color-brand-500: #16A34A;
-  --color-brand-600: #166534;
-  --color-brand-700: #14532D;
-  --color-brand-800: #14532D;
+  --color-porcelain: #F7F6F2;
+  --color-forest: #173F35;
+  --color-charcoal: #202421;
+  --color-soft-sage: #DCE0CF;
+  --color-clay: #C86C42;
 
-  --color-epantry-primary: #166534;
-  --color-epantry-primary-hover: #14532D;
-  --color-epantry-charcoal: #1F2937;
-  --color-epantry-accent: #F59E0B;
-  --color-epantry-background: #F8FAF7;
+  --color-brand-50: #F7F6F2;
+  --color-brand-100: #DCE0CF;
+  --color-brand-500: #173F35;
+  --color-brand-600: #173F35;
+  --color-brand-700: #173F35;
+  --color-brand-800: #173F35;
+
+  --color-epantry-primary: #173F35;
+  --color-epantry-primary-hover: #173F35;
+  --color-epantry-charcoal: #202421;
+  --color-epantry-accent: #C86C42;
+  --color-epantry-background: #F7F6F2;
   --color-epantry-card: #FFFFFF;
-  --color-epantry-border: #E5E7EB;
-  --color-epantry-text: #111827;
-  --color-epantry-muted: #6B7280;
+  --color-epantry-border: #DCE0CF;
+  --color-epantry-text: #202421;
+  --color-epantry-muted: color-mix(in srgb, #202421 70%, #F7F6F2);
+
+  /* Safety/status colors are deliberately independent from the brand palette. */
   --color-epantry-success: #16A34A;
   --color-epantry-warning: #F59E0B;
   --color-epantry-error: #DC2626;
 
-  --color-role-customer: #166534;
-  --color-role-host: #F59E0B;
-  --color-role-admin: #334155;
+  --color-role-customer: #173F35;
+  --color-role-host: #C86C42;
+  --color-role-admin: #202421;
 
-  --color-category-grocery: #16A34A;
-  --color-category-brands: #2563EB;
-  --color-category-recipes: #EA580C;
+  --color-category-grocery: #173F35;
+  --color-category-brands: #202421;
+  --color-category-recipes: #C86C42;
 
-  --color-cream: #F8FAF7;
+  --color-cream: #F7F6F2;
+
+  /* Optional semantic Tailwind utilities for later page-by-page adoption. */
+  --text-hero: 56px;
+  --text-hero--line-height: 64px;
+  --text-section-title: 36px;
+  --text-section-title--line-height: 44px;
+  --text-item-title: 24px;
+  --text-item-title--line-height: 32px;
+  --text-supporting: 14px;
+  --text-supporting--line-height: 21px;
+  --text-action: 15px;
+  --text-action--line-height: 20px;
+
+  /* Screenshot S1: align common Tailwind classes with the five approved colors. */
+  --color-black: #202421;
+  --color-white: #F7F6F2;
+  --shadow-sm: 0 1px 3px rgb(32 36 33 / 0.05);
+  --shadow-md: 0 3px 12px rgb(32 36 33 / 0.06);
+  --shadow-lg: 0 6px 18px rgb(32 36 33 / 0.075);
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 16px;
+  --radius-3xl: 16px;
+  --color-stone-50: #F7F6F2;
+  --color-stone-100: #F7F6F2;
+  --color-stone-200: #DCE0CF;
+  --color-stone-300: #DCE0CF;
+  --color-stone-400: color-mix(in srgb, #202421 50%, #F7F6F2);
+  --color-stone-500: color-mix(in srgb, #202421 65%, #F7F6F2);
+  --color-stone-600: color-mix(in srgb, #202421 80%, #F7F6F2);
+  --color-stone-700: #202421;
+  --color-stone-800: #202421;
+  --color-stone-900: #202421;
+  --color-stone-950: #202421;
+  --color-slate-50: #F7F6F2;
+  --color-slate-100: #F7F6F2;
+  --color-slate-200: #DCE0CF;
+  --color-slate-300: #DCE0CF;
+  --color-slate-400: color-mix(in srgb, #202421 50%, #F7F6F2);
+  --color-slate-500: color-mix(in srgb, #202421 65%, #F7F6F2);
+  --color-slate-600: color-mix(in srgb, #202421 80%, #F7F6F2);
+  --color-slate-700: #202421;
+  --color-slate-800: #202421;
+  --color-slate-900: #202421;
+  --color-slate-950: #202421;
+  --color-gray-50: #F7F6F2;
+  --color-gray-100: #F7F6F2;
+  --color-gray-200: #DCE0CF;
+  --color-gray-300: #DCE0CF;
+  --color-gray-400: color-mix(in srgb, #202421 50%, #F7F6F2);
+  --color-gray-500: color-mix(in srgb, #202421 65%, #F7F6F2);
+  --color-gray-600: color-mix(in srgb, #202421 80%, #F7F6F2);
+  --color-gray-700: #202421;
+  --color-gray-800: #202421;
+  --color-gray-900: #202421;
+  --color-gray-950: #202421;
+  --color-zinc-50: #F7F6F2;
+  --color-zinc-100: #F7F6F2;
+  --color-zinc-200: #DCE0CF;
+  --color-zinc-300: #DCE0CF;
+  --color-zinc-400: color-mix(in srgb, #202421 50%, #F7F6F2);
+  --color-zinc-500: color-mix(in srgb, #202421 65%, #F7F6F2);
+  --color-zinc-600: color-mix(in srgb, #202421 80%, #F7F6F2);
+  --color-zinc-700: #202421;
+  --color-zinc-800: #202421;
+  --color-zinc-900: #202421;
+  --color-zinc-950: #202421;
+  --color-neutral-50: #F7F6F2;
+  --color-neutral-100: #F7F6F2;
+  --color-neutral-200: #DCE0CF;
+  --color-neutral-300: #DCE0CF;
+  --color-neutral-400: color-mix(in srgb, #202421 50%, #F7F6F2);
+  --color-neutral-500: color-mix(in srgb, #202421 65%, #F7F6F2);
+  --color-neutral-600: color-mix(in srgb, #202421 80%, #F7F6F2);
+  --color-neutral-700: #202421;
+  --color-neutral-800: #202421;
+  --color-neutral-900: #202421;
+  --color-neutral-950: #202421;
+  --color-emerald-50: #F7F6F2;
+  --color-emerald-100: #DCE0CF;
+  --color-emerald-200: #DCE0CF;
+  --color-emerald-300: #DCE0CF;
+  --color-emerald-400: #173F35;
+  --color-emerald-500: #173F35;
+  --color-emerald-600: #173F35;
+  --color-emerald-700: #173F35;
+  --color-emerald-800: #173F35;
+  --color-emerald-900: #202421;
+  --color-emerald-950: #202421;
+  --color-green-50: #F7F6F2;
+  --color-green-100: #DCE0CF;
+  --color-green-200: #DCE0CF;
+  --color-green-300: #DCE0CF;
+  --color-green-400: #173F35;
+  --color-green-500: #173F35;
+  --color-green-600: #173F35;
+  --color-green-700: #173F35;
+  --color-green-800: #173F35;
+  --color-green-900: #202421;
+  --color-green-950: #202421;
+  --color-teal-50: #F7F6F2;
+  --color-teal-100: #DCE0CF;
+  --color-teal-200: #DCE0CF;
+  --color-teal-300: #DCE0CF;
+  --color-teal-400: #173F35;
+  --color-teal-500: #173F35;
+  --color-teal-600: #173F35;
+  --color-teal-700: #173F35;
+  --color-teal-800: #173F35;
+  --color-teal-900: #202421;
+  --color-teal-950: #202421;
+  --color-orange-50: #F7F6F2;
+  --color-orange-100: #DCE0CF;
+  --color-orange-200: #DCE0CF;
+  --color-orange-300: #C86C42;
+  --color-orange-400: #C86C42;
+  --color-orange-500: #C86C42;
+  --color-orange-600: #C86C42;
+  --color-orange-700: #C86C42;
+  --color-orange-800: #202421;
+  --color-orange-900: #202421;
+  --text-xs: 14px;
+  --text-xs--line-height: 21px;
+  --text-sm: 14px;
+  --text-sm--line-height: 21px;
+  --text-base: 16px;
+  --text-base--line-height: 26px;
+  --text-lg: 18px;
+  --text-lg--line-height: 28px;
+  --text-xl: 22px;
+  --text-xl--line-height: 30px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 28px;
+  --text-3xl--line-height: 36px;
+  --text-4xl: 36px;
+  --text-4xl--line-height: 44px;
+}
+
+/* 8-point sizing system and shared responsive grid values. Do not override
+   Tailwind's 4px spacing unit: existing page layouts rely on it. */
+:root {
+  --ep-space-1: 8px;
+  --ep-space-2: 16px;
+  --ep-space-3: 24px;
+  --ep-space-4: 32px;
+  --ep-space-6: 48px;
+  --ep-space-8: 64px;
+  --ep-content-max: 1360px;
+  --ep-content-gutter: 16px;
+  --ep-grid-columns: 4;
+  --ep-card-radius: 16px;
+  --ep-input-height: 52px;
+  --ep-button-height: 44px;
+  --ep-type-h1: 36px;
+  --ep-leading-h1: 42px;
+  --ep-type-h2: 28px;
+  --ep-leading-h2: 36px;
+  --ep-type-h3: 22px;
+  --ep-leading-h3: 30px;
+  --ep-type-body: 16px;
+  --ep-leading-body: 25px;
+  --ep-type-supporting: 14px;
+  --ep-leading-supporting: 21px;
+  --ep-type-button: 15px;
+  --ep-leading-button: 20px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --ep-grid-columns: 8;
+    --ep-content-gutter: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --ep-grid-columns: 12;
+    --ep-type-h1: 56px;
+    --ep-leading-h1: 64px;
+    --ep-type-h2: 36px;
+    --ep-leading-h2: 44px;
+    --ep-type-h3: 24px;
+    --ep-leading-h3: 32px;
+    --ep-leading-body: 26px;
+  }
+}
+
+/* Defaults apply to unstyled semantic elements; explicit page-level Tailwind
+   heading sizes win, preventing unintended Hero / operational UI redesigns. */
+@layer base {
+  body {
+    font-size: var(--ep-type-body);
+    line-height: var(--ep-leading-body);
+    font-weight: 400;
+  }
+
+  h1, h2, h3 {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  h1 { font-size: var(--ep-type-h1); line-height: var(--ep-leading-h1); }
+  h2 { font-size: var(--ep-type-h2); line-height: var(--ep-leading-h2); }
+  h3 { font-size: var(--ep-type-h3); line-height: var(--ep-leading-h3); }
+
+  button { font-size: var(--ep-type-button); line-height: var(--ep-leading-button); font-weight: 600; }
+  small { font-size: var(--ep-type-supporting); line-height: var(--ep-leading-supporting); }
 }
 
 
@@ -44,9 +263,9 @@
 :root {
   font-family: var(--font-sans);
 
-  color: #111827;
+  color: var(--color-epantry-text);
 
-  background: #F8FAF7;
+  background: var(--color-epantry-background);
 
   font-synthesis: none;
 
@@ -84,7 +303,7 @@ html {
 
   overscroll-behavior: none;
 
-  background: #F8FAF7;
+  background: var(--color-epantry-background);
 }
 
 
@@ -103,7 +322,7 @@ body {
 
   overscroll-behavior: none;
 
-  background: #F8FAF7;
+  background: var(--color-epantry-background);
 }
 
 
@@ -120,7 +339,7 @@ body {
 
   isolation: isolate;
 
-  background: #F8FAF7;
+  background: var(--color-epantry-background);
 }
 
 
@@ -185,9 +404,9 @@ canvas {
 */
 
 ::selection {
-  background: #DCFCE7;
+  background: var(--color-soft-sage);
 
-  color: #14532D;
+  color: var(--color-forest);
 }
 
 
@@ -209,18 +428,75 @@ canvas {
 */
 
 .page-shell {
-  width: calc(100% - 16px);
-
-  max-width: none;
-
-  margin-left: 8px;
-
-  margin-right: 8px;
-
+  width: calc(100% - (var(--ep-content-gutter) * 2));
+  max-width: var(--ep-content-max);
+  margin-inline: auto;
   padding-inline: 0;
-
   min-width: 0;
 }
+
+/* Existing operational workspaces have approved full-width data layouts. */
+.epantry-workspace-canvas .page-shell {
+  width: calc(100% - 16px);
+  max-width: none;
+  margin-inline: 8px;
+}
+
+/* Opt-in semantic layout primitives for the upcoming page-specific phases. */
+.epantry-content-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--ep-grid-columns), minmax(0, 1fr));
+  gap: var(--ep-space-2);
+  min-width: 0;
+}
+
+.epantry-section-surface {
+  border: 1px solid var(--color-epantry-border);
+  border-radius: var(--ep-card-radius);
+  background: var(--color-soft-sage);
+}
+
+.epantry-input {
+  min-height: 48px;
+  border: 1px solid var(--color-epantry-border);
+  border-radius: 14px;
+  background: #FFFFFF;
+  color: var(--color-epantry-text);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.epantry-input::placeholder { color: var(--color-epantry-muted); opacity: 1; }
+
+.epantry-primary-button {
+  display: inline-flex;
+  min-height: var(--ep-button-height);
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-epantry-primary);
+  color: #FFFFFF;
+  font-size: var(--ep-type-button);
+  line-height: var(--ep-leading-button);
+  font-weight: 600;
+  transition: background-color 150ms ease;
+}
+
+.epantry-primary-button:hover:not(:disabled) {
+  background: var(--color-epantry-primary-hover);
+}
+
+.epantry-primary-button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/* Preserve existing custom focus-ring animations; provide native focus for
+   controls that do not already use that component class. */
+:where(button, a, input, select, textarea, summary, [tabindex]):not(.focus-ring):focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-forest); }
 
 
 /*
@@ -244,7 +520,8 @@ canvas {
 
   overflow-x: clip;
 
-  background: #F8FAF7;
+  background: var(--color-epantry-background);
+  color: var(--color-epantry-charcoal);
 }
 
 
@@ -257,7 +534,7 @@ canvas {
 
   overflow-x: clip;
 
-  background: #F8FAF7;
+  background: var(--color-epantry-background);
 }
 
 
@@ -318,7 +595,7 @@ canvas {
 
   contain: paint;
 
-  background: #F8FAF7;
+  background: var(--color-epantry-background);
 }
 
 
@@ -329,7 +606,9 @@ canvas {
 */
 
 .surface-card {
-  @apply rounded-2xl border border-[#E5E7EB] bg-white shadow-sm;
+  @apply rounded-2xl border bg-white;
+  border-color: var(--color-epantry-border);
+  box-shadow: 0 2px 14px rgb(32 36 33 / 0.055);
 }
 
 
@@ -433,4 +712,878 @@ span {
   html {
     scroll-behavior: auto;
   }
+
+  .epantry-primary-button { transition: none; }
 }
+
+/*
+ * Universal application of senior screenshot S1 tokens.
+ * No extra decorative green gradients or generated green HEX shades.
+ * Original success / error / warning / info colors remain semantic.
+ * Layout, hover, transforms, sticky regions, and existing motion are unchanged.
+ */
+:root { color-scheme: light; }
+html, body, #root { background-color: #F7F6F2; color: #202421; }
+html, body, #root { font-family: "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, sans-serif; }
+/* The typography reference applies to semantic text; not to logo/3D art letterforms. */
+h1 { font-size: 36px !important; line-height: 42px !important; font-weight: 600; }
+h2 { font-size: 28px !important; line-height: 36px !important; font-weight: 600; }
+h3 { font-size: 22px !important; line-height: 30px !important; font-weight: 600; }
+h1,h2,h3 { letter-spacing: -0.025em; }
+body { font-size: 16px; line-height: 1.56; }
+small { font-size: 14px !important; line-height: 21px !important; }
+button, input[type=submit], input[type=button] { font-size: 15px; font-weight: 600; }
+input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]), textarea, select { background-color: #FFFFFF; color: #202421; font-size: 16px; }
+input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]), select { min-height: 48px; }
+:where(button, a, input, select, textarea, summary, [role="button"]):focus-visible { outline: 2px solid #173F35; outline-offset: 2px; }
+input[type=checkbox],input[type=radio] { accent-color: #173F35; }
+.epantry-primary-button { background-color: #173F35; color: #F7F6F2; }
+.epantry-section-surface { background-color: #DCE0CF; border-color: #DCE0CF; }
+.surface-card { box-shadow: 0 2px 12px rgb(32 36 33 / 0.06); border-radius: 16px; }
+/* Explicit legacy hexadecimal utility normalization. No CSS hacks on footer. */
+[class~="active:bg-[#e5f1e7]"]:active,
+[class~="bg-[#103E36]"],
+[class~="bg-[#123E32]"],
+[class~="bg-[#123e32]"],
+[class~="bg-[#123f35]"],
+[class~="bg-[#153323]"],
+[class~="bg-[#154F42]"],
+[class~="bg-[#15583e]"],
+[class~="bg-[#15583f]"],
+[class~="bg-[#16563f]"],
+[class~="bg-[#165b48]"],
+[class~="bg-[#165d3c]"],
+[class~="bg-[#173f35]"],
+[class~="bg-[#173f38]"],
+[class~="bg-[#17483b]"],
+[class~="bg-[#174b38]"],
+[class~="bg-[#174d48]"],
+[class~="bg-[#174f3f]"],
+[class~="bg-[#175339]"],
+[class~="bg-[#175342]"],
+[class~="bg-[#175c49]"],
+[class~="bg-[#17613D]"],
+[class~="bg-[#17624f]"],
+[class~="bg-[#184b3d]"] { background-color: #173F35 !important; }
+[class~="bg-[#185a42]"],
+[class~="bg-[#194d38]"],
+[class~="bg-[#195640]"],
+[class~="bg-[#214D33]"],
+[class~="bg-[#215D42]"],
+[class~="bg-[#26351E]"],
+[class~="bg-[#273B32]"],
+[class~="bg-[#3A9267]"],
+[class~="bg-[#50875a]"],
+[class~="bg-[#CDEAD9]"],
+[class~="bg-[#CDEDDC]"],
+[class~="bg-[#D5DED6]"],
+[class~="bg-[#DCECCA]"],
+[class~="bg-[#DDEBCF]"],
+[class~="bg-[#DDF4E8]"],
+[class~="bg-[#DFF1E9]"],
+[class~="bg-[#E3EDE5]"],
+[class~="bg-[#E4F7F2]"],
+[class~="bg-[#E6F3E9]"],
+[class~="bg-[#E6F4ED]"],
+[class~="bg-[#E7F4ED]"],
+[class~="bg-[#E7F4EF]"],
+[class~="bg-[#E9F6F0]"],
+[class~="bg-[#EAF3EC]"] { background-color: #173F35 !important; }
+[class~="bg-[#EAF7EF]"],
+[class~="bg-[#ECF9F2]"],
+[class~="bg-[#EFF2EF]"],
+[class~="bg-[#F1F8F5]"],
+[class~="bg-[#F4F9F6]"],
+[class~="bg-[#F4FBF8]"],
+[class~="bg-[#F8F9F6]"],
+[class~="bg-[#F8FAF7]"],
+[class~="bg-[#bcebdc]"],
+[class~="bg-[#c6ded3]"],
+[class~="bg-[#cce7da]"],
+[class~="bg-[#cde7dd]"],
+[class~="bg-[#d2f2dc]"],
+[class~="bg-[#d4ead2]"],
+[class~="bg-[#d8e9df]"],
+[class~="bg-[#d9ece3]"],
+[class~="bg-[#d9eee3]"],
+[class~="bg-[#d9f5ec]"],
+[class~="bg-[#dce6df]"],
+[class~="bg-[#dcefe7]"],
+[class~="bg-[#deebe8]"],
+[class~="bg-[#dff1e8]"],
+[class~="bg-[#dff1e9]"],
+[class~="bg-[#dff2e9]"] { background-color: #173F35 !important; }
+[class~="bg-[#dff3ea]"],
+[class~="bg-[#dff3eb]"],
+[class~="bg-[#dff4e9]"],
+[class~="bg-[#dff6f1]"],
+[class~="bg-[#dff7ef]"],
+[class~="bg-[#e1e8e2]"],
+[class~="bg-[#e1e9e2]"],
+[class~="bg-[#e2ece6]"],
+[class~="bg-[#e2f5ed]"],
+[class~="bg-[#e3efe7]"],
+[class~="bg-[#e3f2ea]"],
+[class~="bg-[#e4ebe5]"],
+[class~="bg-[#e4efe7]"],
+[class~="bg-[#e4f2eb]"],
+[class~="bg-[#e4f3eb]"],
+[class~="bg-[#e4f3ed]"],
+[class~="bg-[#e4f4ef]"],
+[class~="bg-[#e4f6ed]"],
+[class~="bg-[#e5f1ec]"],
+[class~="bg-[#e5f2eb]"],
+[class~="bg-[#e5f3e9]"],
+[class~="bg-[#e5f7f0]"],
+[class~="bg-[#e6f0e8]"],
+[class~="bg-[#e6f3ec]"] { background-color: #173F35 !important; }
+[class~="bg-[#e6f4eb]"],
+[class~="bg-[#e6f4ed]"],
+[class~="bg-[#e6f7f0]"],
+[class~="bg-[#e6f8f1]"],
+[class~="bg-[#e7f0e9]"],
+[class~="bg-[#e7f2ee]"],
+[class~="bg-[#e7f3eb]"],
+[class~="bg-[#e7f3ed]"],
+[class~="bg-[#e7f3ee]"],
+[class~="bg-[#e7f4ef]"],
+[class~="bg-[#e7f5ed]"],
+[class~="bg-[#e7f7ef]"],
+[class~="bg-[#e7f8ef]"],
+[class~="bg-[#e8ebe7]"],
+[class~="bg-[#e8ede7]"],
+[class~="bg-[#e8f0ed]"],
+[class~="bg-[#e8f2e9]"],
+[class~="bg-[#e8f3eb]"],
+[class~="bg-[#e8f3ef]"],
+[class~="bg-[#e8f4e8]"],
+[class~="bg-[#e8f4ed]"],
+[class~="bg-[#e8f4ee]"],
+[class~="bg-[#e8f5ee]"],
+[class~="bg-[#e9eee9]"] { background-color: #173F35 !important; }
+[class~="bg-[#e9eeec]"],
+[class~="bg-[#e9f0ee]"],
+[class~="bg-[#e9f2eb]"],
+[class~="bg-[#e9f4ec]"],
+[class~="bg-[#e9f8f1]"],
+[class~="bg-[#eaf5ed]"],
+[class~="bg-[#eaf5ef]"],
+[class~="bg-[#eaf6f1]"],
+[class~="bg-[#eaf7ef]"],
+[class~="bg-[#eaf8f3]"],
+[class~="bg-[#eaf9f3]"],
+[class~="bg-[#ebf5ed]"],
+[class~="bg-[#eceeea]"],
+[class~="bg-[#ecf6ed]"],
+[class~="bg-[#ecf7f0]"],
+[class~="bg-[#edf0e9]"],
+[class~="bg-[#edf1ef]"],
+[class~="bg-[#edf2ec]"],
+[class~="bg-[#edf4f1]"],
+[class~="bg-[#edf5e9]"],
+[class~="bg-[#edf5ef]"],
+[class~="bg-[#edf5f0]"],
+[class~="bg-[#edf6ef]"],
+[class~="bg-[#edf7f0]"] { background-color: #173F35 !important; }
+[class~="bg-[#edf7f1]"],
+[class~="bg-[#edf7f2]"],
+[class~="bg-[#edf8f2]"],
+[class~="bg-[#edf8f3]"],
+[class~="bg-[#edf9f3]"],
+[class~="bg-[#edf9f4]"],
+[class~="bg-[#eef2eb]"],
+[class~="bg-[#eef3ef]"],
+[class~="bg-[#eef4e9]"],
+[class~="bg-[#eef4f0]"],
+[class~="bg-[#eef6f2]"],
+[class~="bg-[#eef6f4]"],
+[class~="bg-[#eef7ea]"],
+[class~="bg-[#eef7f5]"],
+[class~="bg-[#eef9f4]"],
+[class~="bg-[#eef9f5]"],
+[class~="bg-[#eefaf4]"],
+[class~="bg-[#f0f3ef]"],
+[class~="bg-[#f0f7ef]"],
+[class~="bg-[#f0f7f2]"],
+[class~="bg-[#f0f7f3]"],
+[class~="bg-[#f0f7f4]"],
+[class~="bg-[#f0f8f2]"],
+[class~="bg-[#f0f8f3]"] { background-color: #173F35 !important; }
+[class~="bg-[#f1f5ef]"],
+[class~="bg-[#f1f7f4]"],
+[class~="bg-[#f1f8f4]"],
+[class~="bg-[#f2f3ef]"],
+[class~="bg-[#f2f6f0]"],
+[class~="bg-[#f2f7f4]"],
+[class~="bg-[#f2faf6]"],
+[class~="bg-[#f2fbf6]"],
+[class~="bg-[#f3f6f1]"],
+[class~="bg-[#f3f7f5]"],
+[class~="bg-[#f3f8ef]"],
+[class~="bg-[#f3f8f4]"],
+[class~="bg-[#f3f8f6]"],
+[class~="bg-[#f3f9f5]"],
+[class~="bg-[#f3faf6]"],
+[class~="bg-[#f4f5f1]"],
+[class~="bg-[#f4f7f2]"],
+[class~="bg-[#f4f7f4]"],
+[class~="bg-[#f4f9f6]"],
+[class~="bg-[#f4faf7]"],
+[class~="bg-[#f5f7f3]"],
+[class~="bg-[#f5f8f5]"],
+[class~="bg-[#f5f8f7]"],
+[class~="bg-[#f6f7f3]"] { background-color: #173F35 !important; }
+[class~="bg-[#f6f8f4]"],
+[class~="bg-[#f6f8f7]"],
+[class~="bg-[#f7f8f3]"],
+[class~="bg-[#f7f8f5]"],
+[class~="bg-[#f7faf8]"],
+[class~="bg-[#f7fbf8]"],
+[class~="bg-[#f8faf7]"],
+[class~="bg-[#f8faf8]"],
+[class~="bg-[#f8fbfa]"],
+[class~="bg-[#fafbf8]"],
+[class~="bg-[#fbfcf7]"],
+[class~="bg-[#fbfcf8]"],
+[class~="bg-[#fbfcf9]"],
+[class~="bg-[#fbfcfa]"],
+[class~="bg-[#fbfcfb]"],
+[class~="bg-[#fcfdfc]"],
+[class~="focus-visible:bg-[#175339]"]:focus-visible,
+[class~="focus-visible:bg-[#c1dece]"]:focus-visible,
+[class~="focus-visible:bg-[#e0f0e6]"]:focus-visible,
+[class~="focus-visible:bg-[#edf4ed]"]:focus-visible,
+[class~="focus-visible:bg-[#eff4f3]"]:focus-visible,
+[class~="hover:bg-[#0f3f2b]"]:hover,
+[class~="hover:bg-[#103f32]"]:hover,
+[class~="hover:bg-[#123b2b]"]:hover { background-color: #173F35 !important; }
+[class~="hover:bg-[#14532D]"]:hover,
+[class~="hover:bg-[#164930]"]:hover,
+[class~="hover:bg-[#205545]"]:hover,
+[class~="hover:bg-[#D7F2EC]"]:hover,
+[class~="hover:bg-[#F1F8F2]"]:hover,
+[class~="hover:bg-[#F8FAF7]"]:hover,
+[class~="hover:bg-[#c1dece]"]:hover,
+[class~="hover:bg-[#c3e1d3]"]:hover,
+[class~="hover:bg-[#d2ecdf]"]:hover,
+[class~="hover:bg-[#e0f0e6]"]:hover,
+[class~="hover:bg-[#e6f6ef]"]:hover,
+[class~="hover:bg-[#e8f3ed]"]:hover,
+[class~="hover:bg-[#eaf8f0]"]:hover,
+[class~="hover:bg-[#edf4ed]"]:hover,
+[class~="hover:bg-[#edf6ef]"]:hover,
+[class~="hover:bg-[#edf7f1]"]:hover,
+[class~="hover:bg-[#edf8f3]"]:hover,
+[class~="hover:bg-[#eef5f2]"]:hover,
+[class~="hover:bg-[#eff4f3]"]:hover,
+[class~="hover:bg-[#f1f8f3]"]:hover,
+[class~="hover:bg-[#f2f8f4]"]:hover,
+[class~="hover:bg-[#f3f8f5]"]:hover,
+[class~="hover:bg-[#fafcfb]"]:hover { background-color: #173F35 !important; }
+[class~="bg-[#020202]"],
+[class~="bg-[#050505]"],
+[class~="bg-[#080808]"],
+[class~="bg-[#111111]"],
+[class~="bg-[#17100c]"],
+[class~="bg-[#1A1A1A]"] { background-color: #202421 !important; }
+[class~="bg-[#0B6A50]"],
+[class~="bg-[#0C4D3C]"],
+[class~="bg-[#0D5F4B]"],
+[class~="bg-[#0F5132]"],
+[class~="bg-[#0F513F]"],
+[class~="bg-[#0F5B45]"],
+[class~="bg-[#0b433d]"],
+[class~="bg-[#0c5f4c]"],
+[class~="bg-[#0d5946]"],
+[class~="bg-[#0f4539]"],
+[class~="bg-[#0f4d45]"],
+[class~="bg-[#0f5132]"],
+[class~="bg-[#0f5148]"],
+[class~="bg-[#0f5f49]"],
+[class~="bg-[#0f6b4f]"],
+[class~="bg-[#105338]"],
+[class~="bg-[#147554]"],
+[class~="bg-[#155f57]"],
+[class~="bg-[#166534]"],
+[class~="bg-[#167455]"],
+[class~="bg-[#16794a]"],
+[class~="bg-[#176B57]"],
+[class~="bg-[#176a55]"],
+[class~="bg-[#176b57]"] { background-color: #DCE0CF !important; }
+[class~="bg-[#18A36B]"],
+[class~="bg-[#EAFBF3]"],
+[class~="bg-[#F0FDF4]"],
+[class~="bg-[#c9f3df]"],
+[class~="bg-[#cef4df]"],
+[class~="bg-[#dcf7e8]"],
+[class~="bg-[#dcf7ef]"],
+[class~="focus-visible:bg-[#fbfefa]"]:focus-visible,
+[class~="hover:bg-[#094B3B]"]:hover,
+[class~="hover:bg-[#095640]"]:hover,
+[class~="hover:bg-[#0C4D3C]"]:hover,
+[class~="hover:bg-[#0a3f27]"]:hover,
+[class~="hover:bg-[#0e4334]"]:hover,
+[class~="hover:bg-[#0e4933]"]:hover,
+[class~="hover:bg-[#0f432d]"]:hover,
+[class~="hover:bg-[#0f5f49]"]:hover,
+[class~="hover:bg-[#104E31]"]:hover,
+[class~="hover:bg-[#104f48]"]:hover,
+[class~="hover:bg-[#106346]"]:hover,
+[class~="hover:bg-[#124E3A]"]:hover,
+[class~="hover:bg-[#124e3f]"]:hover,
+[class~="hover:bg-[#125846]"]:hover,
+[class~="hover:bg-[#fbfefa]"]:hover { background-color: #DCE0CF !important; }
+[class~="bg-[#007E68]"],
+[class~="bg-[#083E35]"],
+[class~="bg-[#090303]"],
+[class~="bg-[#0D302B]"],
+[class~="bg-[#102f2a]"],
+[class~="bg-[#102f35]"],
+[class~="bg-[#111827]"],
+[class~="bg-[#11332e]"],
+[class~="bg-[#130000]"],
+[class~="bg-[#190000]"],
+[class~="bg-[#1b100c]"],
+[class~="bg-[#35180d]"],
+[class~="bg-[#b45309]"],
+[class~="bg-[#c2410c]"],
+[class~="bg-[#d38b00]"],
+[class~="bg-[#f0fff6]"],
+[class~="hover:bg-[#006A59]"]:hover,
+[class~="hover:bg-[#0B302A]"]:hover,
+[class~="hover:bg-[#0f3028]"]:hover,
+[class~="hover:bg-[#F6FFF9]"]:hover { background-color: #F7F6F2 !important; }
+[class~="bg-[#dff6f1]/80"] { background-color: color-mix(in srgb, #173F35 80%, transparent) !important; }
+[class~="bg-[#dff3ea]/95"],
+[class~="bg-[#edf5e9]/95"],
+[class~="bg-[#f3f7ee]/95"] { background-color: color-mix(in srgb, #173F35 95%, transparent) !important; }
+[class~="bg-[#080808]/30"] { background-color: color-mix(in srgb, #202421 30%, transparent) !important; }
+[class~="bg-[#16A34A]/10"] { background-color: color-mix(in srgb, #DCE0CF 10%, transparent) !important; }
+[class~="bg-[#16A34A]/20"] { background-color: color-mix(in srgb, #DCE0CF 20%, transparent) !important; }
+[class~="bg-[#F0FDF4]/60"] { background-color: color-mix(in srgb, #DCE0CF 60%, transparent) !important; }
+[class~="bg-[#F0FDF4]/85"] { background-color: color-mix(in srgb, #DCE0CF 85%, transparent) !important; }
+[class~="bg-[#F59E0B]/10"] { background-color: color-mix(in srgb, #F7F6F2 10%, transparent) !important; }
+[class~="bg-[#F59E0B]/20"],
+[class~="bg-[#f59e0b]/20"] { background-color: color-mix(in srgb, #F7F6F2 20%, transparent) !important; }
+[class~="bg-[#140b07]/55"] { background-color: color-mix(in srgb, #F7F6F2 55%, transparent) !important; }
+[class~="bg-[#F6FFF9]/80"] { background-color: color-mix(in srgb, #F7F6F2 80%, transparent) !important; }
+[class~="border-[#0D5F4B]"],
+[class~="border-[#0d332b]"],
+[class~="border-[#0f6b4f]"],
+[class~="border-[#0f7654]"],
+[class~="border-[#102f35]"],
+[class~="border-[#123f35]"],
+[class~="border-[#165b48]"],
+[class~="border-[#17483b]"],
+[class~="border-[#175339]"],
+[class~="border-[#176b57]"],
+[class~="border-[#195640]"],
+[class~="border-[#24574c]"],
+[class~="border-[#24594c]"],
+[class~="border-[#2a8b62]"],
+[class~="border-[#2c6454]"],
+[class~="border-[#315f50]"],
+[class~="border-[#3fb98a]"],
+[class~="border-[#538769]"],
+[class~="border-[#64a785]"],
+[class~="border-[#67b89e]"],
+[class~="border-[#6eaa8a]"],
+[class~="border-[#75cdb3]"],
+[class~="border-[#86d8b1]"],
+[class~="border-[#8FBEA5]"] { border-color: #DCE0CF !important; }
+[class~="border-[#8bd7c2]"],
+[class~="border-[#8fd0b6]"],
+[class~="border-[#8fd1a6]"],
+[class~="border-[#91bba8]"],
+[class~="border-[#96c6b6]"],
+[class~="border-[#9BCBB2]"],
+[class~="border-[#9fdcc2]"],
+[class~="border-[#A9D4BE]"],
+[class~="border-[#AFCFC3]"],
+[class~="border-[#B8DECf]"],
+[class~="border-[#B9E2D0]"],
+[class~="border-[#BBDACF]"],
+[class~="border-[#BCD4C4]"],
+[class~="border-[#C6DED3]"],
+[class~="border-[#C6E0D7]"],
+[class~="border-[#C6E1D2]"],
+[class~="border-[#CBDDD0]"],
+[class~="border-[#CBE3DA]"],
+[class~="border-[#CFE6D9]"],
+[class~="border-[#CFE6DC]"],
+[class~="border-[#D0DBD2]"],
+[class~="border-[#D4DED7]"],
+[class~="border-[#D6E5D9]"],
+[class~="border-[#D6E5DB]"] { border-color: #DCE0CF !important; }
+[class~="border-[#D7DED3]"],
+[class~="border-[#a9d1be]"],
+[class~="border-[#a9dfc5]"],
+[class~="border-[#acdcca]"],
+[class~="border-[#b2d0bd]"],
+[class~="border-[#b5d2c0]"],
+[class~="border-[#b8cbbf]"],
+[class~="border-[#b8dccf]"],
+[class~="border-[#b9d9ca]"],
+[class~="border-[#b9d9cc]"],
+[class~="border-[#b9dbc8]"],
+[class~="border-[#b9dccc]"],
+[class~="border-[#b9dfd1]"],
+[class~="border-[#b9e9d8]"],
+[class~="border-[#badace]"],
+[class~="border-[#bcd8cb]"],
+[class~="border-[#bcdac7]"],
+[class~="border-[#bcdccc]"],
+[class~="border-[#bddfce]"],
+[class~="border-[#bed4ca]"],
+[class~="border-[#bfd4c3]"],
+[class~="border-[#c5ded2]"],
+[class~="border-[#c6ded3]"],
+[class~="border-[#c7ddd9]"] { border-color: #DCE0CF !important; }
+[class~="border-[#c7e1d1]"],
+[class~="border-[#c7e4d8]"],
+[class~="border-[#c8ddd4]"],
+[class~="border-[#c8e7da]"],
+[class~="border-[#c9ddcf]"],
+[class~="border-[#c9ded6]"],
+[class~="border-[#c9dfd4]"],
+[class~="border-[#c9dfdb]"],
+[class~="border-[#c9e0d5]"],
+[class~="border-[#c9e4da]"],
+[class~="border-[#cbded0]"],
+[class~="border-[#cbded7]"],
+[class~="border-[#cbdfd2]"],
+[class~="border-[#cce5d7]"],
+[class~="border-[#cce6db]"],
+[class~="border-[#cddfc9]"],
+[class~="border-[#cde2d4]"],
+[class~="border-[#ceded7]"],
+[class~="border-[#cedfd9]"],
+[class~="border-[#cfd9cb]"],
+[class~="border-[#cfdfd5]"],
+[class~="border-[#cfe0da]"],
+[class~="border-[#cfe2d8]"],
+[class~="border-[#cfe2db]"] { border-color: #DCE0CF !important; }
+[class~="border-[#cfe4d4]"],
+[class~="border-[#cfe4dc]"],
+[class~="border-[#cfe6dc]"],
+[class~="border-[#d1e3d7]"],
+[class~="border-[#d1e3dd]"],
+[class~="border-[#d3e6d8]"],
+[class~="border-[#d4e0d7]"],
+[class~="border-[#d4e1d8]"],
+[class~="border-[#d4e2d8]"],
+[class~="border-[#d4e7e0]"],
+[class~="border-[#d4eadf]"],
+[class~="border-[#d5dcda]"],
+[class~="border-[#d5dfd9]"],
+[class~="border-[#d5e1d8]"],
+[class~="border-[#d5e3e0]"],
+[class~="border-[#d6e3dc]"],
+[class~="border-[#d6e4da]"],
+[class~="border-[#d6e6e0]"],
+[class~="border-[#d6e7e1]"],
+[class~="border-[#d6e9df]"],
+[class~="border-[#d6ece2]"],
+[class~="border-[#d7e0de]"],
+[class~="border-[#d7e3da]"],
+[class~="border-[#d7e5df]"] { border-color: #DCE0CF !important; }
+[class~="border-[#d7e6df]"],
+[class~="border-[#d7e7e0]"],
+[class~="border-[#d8e1d9]"],
+[class~="border-[#d8e2d9]"],
+[class~="border-[#d8e3dc]"],
+[class~="border-[#d8e5df]"],
+[class~="border-[#d8e7df]"],
+[class~="border-[#d8e7e2]"],
+[class~="border-[#d8e8da]"],
+[class~="border-[#d9e2dd]"],
+[class~="border-[#d9e3d5]"],
+[class~="border-[#d9e3dd]"],
+[class~="border-[#d9e6d6]"],
+[class~="border-[#d9e6de]"],
+[class~="border-[#dae7dc]"],
+[class~="border-[#dbe5df]"],
+[class~="border-[#dbe6df]"],
+[class~="border-[#dbe7e2]"],
+[class~="border-[#dbe8df]"],
+[class~="border-[#dce3dc]"],
+[class~="border-[#dce5df]"],
+[class~="border-[#dce6d8]"],
+[class~="border-[#dce7e3]"],
+[class~="border-[#dce9df]"] { border-color: #DCE0CF !important; }
+[class~="border-[#dde6de]"],
+[class~="border-[#dde6e3]"],
+[class~="border-[#dfe5db]"],
+[class~="border-[#dfe5df]"],
+[class~="border-[#dfe7dc]"],
+[class~="border-[#dfe7df]"],
+[class~="border-[#dfe7e2]"],
+[class~="border-[#e0e7e5]"],
+[class~="border-[#e0e8df]"],
+[class~="border-[#e0e8e1]"],
+[class~="border-[#e0e8e2]"],
+[class~="border-[#e1e4db]"],
+[class~="border-[#e1e8e4]"],
+[class~="border-[#e1e9e3]"],
+[class~="border-[#e1ebe4]"],
+[class~="border-[#e2e7e2]"],
+[class~="border-[#e2e8e4]"],
+[class~="border-[#e4ebe6]"],
+[class~="border-[#e5ebe6]"],
+[class~="border-[#e6ebe6]"],
+[class~="border-[#e7ece8]"],
+[class~="border-[#e9ece3]"],
+[class~="border-[#e9ece8]"],
+[class~="border-[#edf0ea]"] { border-color: #DCE0CF !important; }
+[class~="border-[#eef1ec]"],
+[class~="focus-visible:border-[#175339]"]:focus-visible,
+[class~="focus-visible:border-[#1f7650]"]:focus-visible,
+[class~="focus-visible:border-[#97b9a2]"]:focus-visible,
+[class~="focus:border-[#176B57]"]:focus,
+[class~="focus:border-[#438d83]"]:focus,
+[class~="hover:border-[#1b7550]"]:hover,
+[class~="hover:border-[#79c9a7]"]:hover,
+[class~="hover:border-[#7fa18d]"]:hover,
+[class~="hover:border-[#7fac90]"]:hover,
+[class~="hover:border-[#97b9a2]"]:hover,
+[class~="hover:border-[#9bb6a0]"]:hover,
+[class~="hover:border-[#9cbaa4]"]:hover,
+[class~="hover:border-[#9ebcad]"]:hover,
+[class~="hover:border-[#9fbea8]"]:hover,
+[class~="hover:border-[#9fbea9]"]:hover,
+[class~="hover:border-[#a3bab8]"]:hover,
+[class~="hover:border-[#a7c3a8]"]:hover { border-color: #DCE0CF !important; }
+[class~="border-[#173f38]/20"] { border-color: color-mix(in srgb, #DCE0CF 20%, transparent) !important; }
+[class~="border-[#16A34A]/25"] { border-color: color-mix(in srgb, #DCE0CF 25%, transparent) !important; }
+[class~="border-[#2e6655]/30"],
+[class~="border-[#F59E0B]/30"],
+[class~="hover:border-[#16A34A]/30"]:hover { border-color: color-mix(in srgb, #DCE0CF 30%, transparent) !important; }
+[class~="hover:border-[#16A34A]/45"]:hover,
+[class~="hover:border-[#EA580C]/45"]:hover { border-color: color-mix(in srgb, #DCE0CF 45%, transparent) !important; }
+[class~="border-[#DDEBCF]/65"] { border-color: color-mix(in srgb, #DCE0CF 65%, transparent) !important; }
+[class~="border-[#315f50]/80"] { border-color: color-mix(in srgb, #DCE0CF 80%, transparent) !important; }
+[class~="hover:text-[#0f4f34]"]:hover,
+[class~="hover:text-[#14532D]"]:hover,
+[class~="hover:text-[#17483b]"]:hover,
+[class~="hover:text-[#175339]"]:hover,
+[class~="hover:text-[#184936]"]:hover,
+[class~="hover:text-[#A4F0C5]"]:hover,
+[class~="text-[#0B6A50]"],
+[class~="text-[#0F5132]"],
+[class~="text-[#0F5B45]"],
+[class~="text-[#0F6A50]"],
+[class~="text-[#0d735b]"],
+[class~="text-[#0e6b4c]"],
+[class~="text-[#0f5d42]"],
+[class~="text-[#103f30]"],
+[class~="text-[#103f32]"],
+[class~="text-[#104331]"],
+[class~="text-[#113f30]"],
+[class~="text-[#115139]"],
+[class~="text-[#123E31]"],
+[class~="text-[#123F32]"],
+[class~="text-[#123d30]"],
+[class~="text-[#123f30]"],
+[class~="text-[#123f35]"],
+[class~="text-[#124633]"] { color: #173F35 !important; }
+[class~="text-[#124E3A]"],
+[class~="text-[#124b36]"],
+[class~="text-[#125B4A]"],
+[class~="text-[#126a60]"],
+[class~="text-[#133E2D]"],
+[class~="text-[#13593f]"],
+[class~="text-[#14532D]"],
+[class~="text-[#145846]"],
+[class~="text-[#145C39]"],
+[class~="text-[#153323]"],
+[class~="text-[#153e32]"],
+[class~="text-[#155d43]"],
+[class~="text-[#163b2a]"],
+[class~="text-[#164838]"],
+[class~="text-[#164934]"],
+[class~="text-[#164936]"],
+[class~="text-[#164b34]"],
+[class~="text-[#164b38]"],
+[class~="text-[#165d3c]"],
+[class~="text-[#166534]"],
+[class~="text-[#16665c]"],
+[class~="text-[#16A34A]"],
+[class~="text-[#17352C]"],
+[class~="text-[#173b2e]"] { color: #173F35 !important; }
+[class~="text-[#173c2d]"],
+[class~="text-[#173d2a]"],
+[class~="text-[#173d30]"],
+[class~="text-[#173d33]"],
+[class~="text-[#173e2e]"],
+[class~="text-[#173f35]"],
+[class~="text-[#173f38]"],
+[class~="text-[#174632]"],
+[class~="text-[#174836]"],
+[class~="text-[#17483b]"],
+[class~="text-[#174c38]"],
+[class~="text-[#174d48]"],
+[class~="text-[#174e40]"],
+[class~="text-[#174f3f]"],
+[class~="text-[#175339]"],
+[class~="text-[#175342]"],
+[class~="text-[#175b3b]"],
+[class~="text-[#17613D]"],
+[class~="text-[#17624A]"],
+[class~="text-[#176344]"],
+[class~="text-[#176348]"],
+[class~="text-[#176447]"],
+[class~="text-[#176448]"],
+[class~="text-[#176647]"] { color: #173F35 !important; }
+[class~="text-[#17664d]"],
+[class~="text-[#176B57]"],
+[class~="text-[#176a55]"],
+[class~="text-[#176b57]"],
+[class~="text-[#176d62]"],
+[class~="text-[#18372D]"],
+[class~="text-[#18382e]"],
+[class~="text-[#183E2F]"],
+[class~="text-[#183b2e]"],
+[class~="text-[#183c30]"],
+[class~="text-[#183e2e]"],
+[class~="text-[#183e31]"],
+[class~="text-[#184333]"],
+[class~="text-[#185442]"],
+[class~="text-[#187050]"],
+[class~="text-[#19382C]"],
+[class~="text-[#193e30]"],
+[class~="text-[#193f30]"],
+[class~="text-[#193f33]"],
+[class~="text-[#195b3b]"],
+[class~="text-[#195b45]"],
+[class~="text-[#195c43]"],
+[class~="text-[#196344]"],
+[class~="text-[#197457]"] { color: #173F35 !important; }
+[class~="text-[#19805b]"],
+[class~="text-[#1a332b]"],
+[class~="text-[#1a5238]"],
+[class~="text-[#1a6b48]"],
+[class~="text-[#1b3225]"],
+[class~="text-[#1b3a2c]"],
+[class~="text-[#1b4b38]"],
+[class~="text-[#1b5a3d]"],
+[class~="text-[#1b5a49]"],
+[class~="text-[#1c4133]"],
+[class~="text-[#1c6145]"],
+[class~="text-[#1c6948]"],
+[class~="text-[#1d5f4d]"],
+[class~="text-[#1d6047]"],
+[class~="text-[#1d7157]"],
+[class~="text-[#1e6949]"],
+[class~="text-[#1f2924]"],
+[class~="text-[#1f3430]"],
+[class~="text-[#203D31]"],
+[class~="text-[#204d39]"],
+[class~="text-[#213e34]"],
+[class~="text-[#215D42]"],
+[class~="text-[#225945]"],
+[class~="text-[#225c45]"] { color: #173F35 !important; }
+[class~="text-[#226c4d]"],
+[class~="text-[#233a30]"],
+[class~="text-[#234a38]"],
+[class~="text-[#236149]"],
+[class~="text-[#23614f]"],
+[class~="text-[#236748]"],
+[class~="text-[#244a3c]"],
+[class~="text-[#245240]"],
+[class~="text-[#24543d]"],
+[class~="text-[#245847]"],
+[class~="text-[#245c43]"],
+[class~="text-[#245c4d]"],
+[class~="text-[#246445]"],
+[class~="text-[#25312b]"],
+[class~="text-[#25362D]"],
+[class~="text-[#254c3d]"],
+[class~="text-[#255542]"],
+[class~="text-[#255742]"],
+[class~="text-[#256349]"],
+[class~="text-[#263D30]"],
+[class~="text-[#267251]"],
+[class~="text-[#267553]"],
+[class~="text-[#27483c]"],
+[class~="text-[#276454]"] { color: #173F35 !important; }
+[class~="text-[#276B4B]"],
+[class~="text-[#283C30]"],
+[class~="text-[#28594b]"],
+[class~="text-[#286443]"],
+[class~="text-[#287653]"],
+[class~="text-[#296c4c]"],
+[class~="text-[#297356]"],
+[class~="text-[#2B6B4C]"],
+[class~="text-[#2E7552]"],
+[class~="text-[#2E7F5A]"],
+[class~="text-[#2c6658]"],
+[class~="text-[#2c7756]"],
+[class~="text-[#2f654f]"],
+[class~="text-[#305b4c]"],
+[class~="text-[#305c48]"],
+[class~="text-[#315b46]"],
+[class~="text-[#315d46]"],
+[class~="text-[#315d4d]"],
+[class~="text-[#317553]"],
+[class~="text-[#32724e]"],
+[class~="text-[#345f4c]"],
+[class~="text-[#354A3A]"],
+[class~="text-[#35564d]"],
+[class~="text-[#355d3e]"] { color: #173F35 !important; }
+[class~="text-[#356252]"],
+[class~="text-[#35675d]"],
+[class~="text-[#35695b]"],
+[class~="text-[#358560]"],
+[class~="text-[#365a4d]"],
+[class~="text-[#365b4e]"],
+[class~="text-[#388461]"],
+[class~="text-[#396c52]"],
+[class~="text-[#397353]"],
+[class~="text-[#3E795A]"],
+[class~="text-[#3b7058]"],
+[class~="text-[#3b735e]"],
+[class~="text-[#3d5e51]"],
+[class~="text-[#3f715b]"],
+[class~="text-[#406554]"],
+[class~="text-[#416558]"],
+[class~="text-[#416851]"],
+[class~="text-[#425d49]"],
+[class~="text-[#42725c]"],
+[class~="text-[#436451]"],
+[class~="text-[#447354]"],
+[class~="text-[#46635b]"],
+[class~="text-[#476258]"],
+[class~="text-[#476351]"] { color: #173F35 !important; }
+[class~="text-[#476B59]"],
+[class~="text-[#477252]"],
+[class~="text-[#486455]"],
+[class~="text-[#487057]"],
+[class~="text-[#496b58]"],
+[class~="text-[#4a7761]"],
+[class~="text-[#4b876d]"],
+[class~="text-[#4d6457]"],
+[class~="text-[#4e6b5b]"],
+[class~="text-[#52655a]"],
+[class~="text-[#52675b]"],
+[class~="text-[#536259]"],
+[class~="text-[#53735e]"],
+[class~="text-[#547064]"],
+[class~="text-[#557065]"],
+[class~="text-[#5B745F]"],
+[class~="text-[#5E6C63]"],
+[class~="text-[#5a6a65]"],
+[class~="text-[#5f6c5d]"],
+[class~="text-[#5f7769]"],
+[class~="text-[#5f8f82]"],
+[class~="text-[#64745e]"],
+[class~="text-[#64796c]"],
+[class~="text-[#65786a]"] { color: #173F35 !important; }
+[class~="text-[#6B9D7D]"],
+[class~="text-[#6c7e72]"],
+[class~="text-[#718074]"],
+[class~="text-[#73806f]"],
+[class~="text-[#738475]"],
+[class~="text-[#78a184]"],
+[class~="text-[#7A8E86]"],
+[class~="text-[#7B9A81]"],
+[class~="text-[#809c83]"],
+[class~="text-[#8CE2BF]"],
+[class~="text-[#8baa98]"],
+[class~="text-[#8caa92]"],
+[class~="text-[#8fa396]"],
+[class~="text-[#92A49A]"],
+[class~="text-[#9fd0be]"],
+[class~="text-[#A4F0C5]"],
+[class~="text-[#A7EBCF]"],
+[class~="text-[#CDEDDC]"],
+[class~="text-[#E6F0E6]"],
+[class~="text-[#F1F5EC]"],
+[class~="text-[#F2F6F0]"],
+[class~="text-[#F5F7EF]"],
+[class~="text-[#a8b6aa]"],
+[class~="text-[#a8b9a9]"] { color: #173F35 !important; }
+[class~="text-[#a8ddd3]"],
+[class~="text-[#a9d8c5]"],
+[class~="text-[#b7d8cf]"],
+[class~="text-[#b7d9ca]"],
+[class~="text-[#b9d9c8]"],
+[class~="text-[#c3dfd3]"],
+[class~="text-[#c4efdc]"],
+[class~="text-[#c6e7d2]"],
+[class~="text-[#ccd2d0]"],
+[class~="text-[#d6e8df]"],
+[class~="text-[#e1f2e8]"] { color: #173F35 !important; }
+[class~="text-[#132016]"],
+[class~="text-[#17211C]"],
+[class~="text-[#2F1F18]"],
+[class~="text-[#6c4a05]"],
+[class~="text-[#D30000]"],
+[class~="text-[#EA580C]"] { color: #202421 !important; }
+[class~="text-[#006B5A]"],
+[class~="text-[#0B7154]"] { color: #F7F6F2 !important; }
+[class~="text-[#16A34A]/35"] { color: color-mix(in srgb, #173F35 35%, transparent) !important; }
+[class~="text-[#315A42]/65"] { color: color-mix(in srgb, #173F35 65%, transparent) !important; }
+[class~="text-[#e7efe9]/75"] { color: color-mix(in srgb, #173F35 75%, transparent) !important; }
+[class~="text-[#e6eee9]/80"] { color: color-mix(in srgb, #173F35 80%, transparent) !important; }
+[class~="text-[#111827]"],
+[class~="text-[#21120b]"],
+[class~="text-[#35180d]"] { color: color-mix(in srgb, #202421 70%, #F7F6F2) !important; }
+@media (min-width: 640px) {
+[class~="sm:bg-[#eefaf4]"] { background-color: #173F35 !important; }
+}
+@media (min-width: 640px) {
+[class~="sm:border-[#1f594a]"],
+[class~="sm:border-[#a9cbc5]"],
+[class~="sm:border-[#cfe2d8]"],
+[class~="sm:border-[#d9e3dd]"] { border-color: #DCE0CF !important; }
+}
+@media (min-width: 640px) {
+[class~="sm:text-[#111111]"] { color: #202421 !important; }
+}
+@media (min-width: 640px) {
+[class~="sm:text-[#006B5A]"] { color: #F7F6F2 !important; }
+}
+@media (min-width: 1024px) {
+[class~="lg:border-[#e1e9e3]"] { border-color: #DCE0CF !important; }
+}
+@media (min-width: 1024px) {
+[class~="lg:text-[#35180d]"] { color: color-mix(in srgb, #202421 70%, #F7F6F2) !important; }
+}
+@media (min-width: 1024px) {
+  h1 { font-size: 56px !important; line-height: 64px !important; }
+  h2 { font-size: 36px !important; line-height: 44px !important; }
+  h3 { font-size: 24px !important; line-height: 32px !important; }
+  /* KEEP the user-approved 75-percent workspace zoom unchanged. */
+  .epantry-workspace-canvas { zoom: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) { .epantry-primary-button { transition-duration: 0.01ms; } }
+
+/* Universal readable type, while preserving monospaced code and data snippets. */
+#root :where(*):not(code):not(pre):not(kbd):not(samp) { font-family: "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, sans-serif !important; }
+/* Reference S1 minimum supporting-label size: 14px. */
+[class~="text-[6px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[7px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[7.5px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[8px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[8.5px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[9px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[9.5px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[10px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[10.5px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[11px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[11.5px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[12px]"] { font-size: 14px !important; line-height: 21px !important; }
+[class~="text-[13px]"] { font-size: 14px !important; line-height: 21px !important; }
+@media (min-width: 1024px) { [class~="lg:text-[10px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 1024px) { [class~="lg:text-[11px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 1024px) { [class~="lg:text-[12px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 1024px) { [class~="lg:text-[13px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 768px) { [class~="md:text-[12px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 768px) { [class~="md:text-[13px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 768px) { [class~="md:text-[8px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 640px) { [class~="sm:text-[10px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 640px) { [class~="sm:text-[11px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 640px) { [class~="sm:text-[12px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 640px) { [class~="sm:text-[13px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 640px) { [class~="sm:text-[8px]"] { font-size: 14px !important; line-height: 21px !important; } }
+@media (min-width: 640px) { [class~="sm:text-[9px]"] { font-size: 14px !important; line-height: 21px !important; } }

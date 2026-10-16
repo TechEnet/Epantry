@@ -251,6 +251,7 @@ export async function findFeaturedBrands(limit = null) {
         },
         name: 1,
         slug: 1,
+        logoUrl: 1,
         productCount: 1,
       },
     },

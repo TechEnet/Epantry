@@ -1,3724 +1,1158 @@
-import {
-  memo,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useLandingFeaturedQuery } from '../hooks/useLandingFeaturedQuery'
 
-import {
-  ArrowRight,
-  Clock3,
-  Eye,
-  Package,
-  ShoppingBasket,
-  Users,
-} from 'lucide-react'
+export default function FeaturedContentSection() {
+  const navigate = useNavigate()
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState('all')
+  const { data, isLoading, isError, error } = useLandingFeaturedQuery()
 
-import {
-  Link,
-  useNavigate,
-} from 'react-router-dom'
-
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-} from 'motion/react'
-
-import {
-  useLandingFeaturedQuery,
-} from '../hooks/useLandingFeaturedQuery'
-
-const mobileRailFrames = new WeakMap()
-
-function updateMobileRailFocus(rail) {
-  if (!rail?.children?.length) {
-    return
-  }
-
-  const railRect = rail.getBoundingClientRect()
-  const railCenter = railRect.left + railRect.width / 2
-  const focusDistance = Math.max(railRect.width * 0.72, 1)
-
-  Array.from(rail.children).forEach((child) => {
-    const card = child.firstElementChild
-
-    if (!card) {
-      return
-    }
-
-    const childRect = child.getBoundingClientRect()
-    const childCenter = childRect.left + childRect.width / 2
-    const distance = Math.min(
-      Math.abs(childCenter - railCenter) / focusDistance,
-      1,
-    )
-    const scale = 1.035 - distance * 0.115
-    const translateY = distance * 8
-    const opacity = 1 - distance * 0.045
-
-    card.style.transform = `translate3d(0, ${translateY.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`
-    card.style.opacity = opacity.toFixed(3)
-  })
-}
-
-function handleMobileRailScroll(event) {
-  const rail = event.currentTarget
-  const previousFrame = mobileRailFrames.get(rail)
-
-  if (previousFrame) {
-    cancelAnimationFrame(previousFrame)
-  }
-
-  const nextFrame = requestAnimationFrame(() => {
-    updateMobileRailFocus(rail)
-    mobileRailFrames.delete(rail)
-  })
-
-  mobileRailFrames.set(rail, nextFrame)
-}
-
-function initializeMobileRail(rail) {
-  if (!rail || typeof requestAnimationFrame === 'undefined') {
-    return
-  }
-
-  requestAnimationFrame(() => {
-    const startCard = rail.querySelector('[data-mobile-rail-start]')
-
-    if (startCard) {
-      const centeredScrollLeft =
-        startCard.offsetLeft -
-        (rail.clientWidth - startCard.offsetWidth) / 2
-
-      rail.scrollLeft = Math.max(centeredScrollLeft, 0)
-    }
-
-    updateMobileRailFocus(rail)
-  })
-}
-
-export default function FeaturedContentSection({
-  groceryEntranceEdgeOpacity,
-  groceryEntranceScale,
-  groceryEntranceLift,
-}) {
-  const shouldReduceMotion =
-    useReducedMotion()
-
-  const navigate =
-    useNavigate()
-
-  const [
-    selectedBrandFilter,
-    setSelectedBrandFilter,
-  ] = useState('all')
-
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useLandingFeaturedQuery()
-
-  if (isLoading) {
-    return <FeaturedLoading />
-  }
-
+  if (isLoading) return <FeaturedLoading />
   if (isError) {
     return (
-      <section className="flex min-h-[100svh] items-center bg-white">
-
+      <section className="flex min-h-[100svh] items-center bg-[#F7F6F2]">
         <div className="page-shell">
-
-          <div className="rounded-3xl border border-[#DC2626]/15 bg-[#FEF2F2] p-8 text-center">
-
-            <p className="font-bold text-[#991B1B]">
-              Featured content could not be loaded.
-            </p>
-
-            <p className="mt-2 text-sm text-[#DC2626]">
-
-              {error?.message ||
-                'Please try again later.'}
-
-            </p>
-
+          <div className="rounded-xl border border-[#C86C42] bg-[#F7F6F2] p-8 text-center">
+            <p className="font-semibold text-[#202421]">Featured content could not be loaded.</p>
+            <p className="mt-2 text-sm text-[#173F35]">{error?.message || 'Please try again later.'}</p>
           </div>
-
         </div>
-
       </section>
     )
   }
 
-  const grocery =
-    data?.grocery || []
+  const grocery = data?.grocery || []
+  const recipes = data?.recipes || []
+  const brands = data?.brands || []
+  const brandFilterGroups = buildBrandFilterGroups(brands)
+  const visibleBrands = getVisibleBrands({ brands, brandFilterGroups, selectedBrandFilter })
 
-  const brands =
-    data?.brands || []
-
-  const brandFilterGroups =
-    buildBrandFilterGroups(
-      brands,
-    )
-
-  const visibleBrands =
-    getVisibleBrands({
-      brands,
-      brandFilterGroups,
-      selectedBrandFilter,
-    })
-
-  const recipes =
-    data?.recipes || []
-
-  const mobileRecipeItems =
-    recipes.slice(0, 4)
-
-  const mobileRecipeCards =
-    mobileRecipeItems.map(
-      (recipe) => ({
-        recipe,
-      }),
-    )
-
-  /*
-  |--------------------------------------------------------------------------
-  | Temporary Featured Cart
-  |--------------------------------------------------------------------------
-  |
-  | The real basket module does not exist yet.
-  | This keeps the Featured Grocery button functional without creating
-  | another store/file. It can later be replaced by the real basket action.
-  |
-  */
-
-  const handleAddToCart = (
-    product,
-  ) => {
-    const productPath =
-      product?.path ||
-      (product?.slug
-        ? `/grocery/product/${product.slug}`
-        : '/grocery')
-
-    navigate(
-      productPath,
-    )
+  // Preserve the existing Featured Grocery action until cart checkout is entered
+  // from the full product page. Do not invent a cart state on the landing page.
+  const handleAddToCart = (product) => {
+    const path = product?.path || (product?.slug
+      ? `/grocery/product/${encodeURIComponent(product.slug)}` : '/grocery')
+    navigate(path)
   }
 
   return (
     <>
-
-      {/* =============================================================
-          FEATURED GROCERY
-      ============================================================= */}
-
-      <FeaturedGroceryScrollStory
-        products={grocery}
-        onAddToCart={handleAddToCart}
-        shouldReduceMotion={shouldReduceMotion}
-        entranceEdgeOpacity={groceryEntranceEdgeOpacity}
-        entranceScale={groceryEntranceScale}
-        entranceLift={groceryEntranceLift}
+      <FeaturedGroceryScrollStory products={grocery} onAddToCart={handleAddToCart} />
+      <FeaturedDiscoverySection kind="recipes" items={recipes} />
+      <FeaturedDiscoverySection
+        kind="brands"
+        items={visibleBrands}
+        groups={brandFilterGroups}
+        selectedFilter={selectedBrandFilter}
+        onSelectFilter={setSelectedBrandFilter}
       />
-
-      {/* =============================================================
-          FEATURED RECIPES
-      ============================================================= */}
-
-      <FeaturedRecipesScrollStory
-        recipes={recipes}
-        shouldReduceMotion={shouldReduceMotion}
-      />
-
-      {/* =============================================================
-          FEATURED BRANDS
-      ============================================================= */}
-
-      <FeaturedBrandsMotionWall
-        brands={visibleBrands}
-        allBrands={brands}
-        brandFilterGroups={brandFilterGroups}
-        selectedBrandFilter={selectedBrandFilter}
-        onSelectBrandFilter={setSelectedBrandFilter}
-        shouldReduceMotion={shouldReduceMotion}
-      />
-
     </>
   )
 }
 
 /*
 |--------------------------------------------------------------------------
-| Featured Brands Motion Wall
+| Featured Grocery - photography-led hero + editorial product gallery
 |--------------------------------------------------------------------------
-|
-| Reference behavior:
-| - one 100svh canvas
-| - fixed editorial heading
-| - two open typographic brand rows
-| - top row continuously travels left
-| - bottom row continuously travels right
-| - lightweight hover separators, no heavy card chrome
-|
-| Existing Brand deep links and range filters remain available.
+| Uses the Grocery page's existing hero and real published product records.
+| The 100svh hero covers Explore; the 100svh gallery follows in normal flow.
+| No sample products, new cart logic, or extra API calls.
 |
 */
 
-function FeaturedBrandsMotionWall({
-  brands,
-  allBrands,
-  brandFilterGroups,
-  selectedBrandFilter,
-  onSelectBrandFilter,
-  shouldReduceMotion,
-}) {
-  const sourceBrands =
-    Array.isArray(brands) &&
-    brands.length > 0
-      ? brands
-      : Array.isArray(allBrands)
-        ? allBrands
-        : []
+const GROCERY_COLORS = {
+  porcelain: '#F7F6F2',
+  forest: '#173F35',
+  charcoal: '#202421',
+  sage: '#DCE0CF',
+  clay: '#C86C42',
+}
 
-  if (sourceBrands.length === 0) {
-    return (
-      <section data-landing-story="brands" data-landing-stops="0" data-landing-static="true" className="flex h-[100dvh] min-h-[100dvh] items-center bg-[#f4f4f2] px-5 text-black sm:h-[100svh] sm:min-h-[100svh] sm:px-8">
-        <div className="mx-auto w-full max-w-7xl">
-          <h2 className="mt-4 whitespace-nowrap text-[clamp(21px,6vw,30px)] font-normal leading-[0.92] tracking-[-0.055em] sm:whitespace-normal sm:text-[clamp(48px,7vw,104px)]">
-            Featured Brands
-          </h2>
-          <div className="mt-12">
-            <EmptyState
-              message="Featured brands will appear here once brand data is available."
-            />
-          </div>
-        </div>
-      </section>
-    )
-  }
+function FeaturedGroceryScrollStory({ products, onAddToCart }) {
+  const items = Array.isArray(products) ? products.slice(0, 8) : []
+  const grocerySectionRef = useRef(null)
+  const groceryHeroRef = useRef(null)
 
-  const splitIndex =
-    Math.max(
-      1,
-      Math.ceil(
-        sourceBrands.length /
-          2,
-      ),
-    )
+  // Keep guided mobile scroll stops aligned to the fixed-height hero and gallery.
+  useEffect(() => {
+    const section = grocerySectionRef.current
+    const hero = groceryHeroRef.current
+    if (!section || !hero) return undefined
 
-  const rotatedBrands = [
-    ...sourceBrands.slice(
-      splitIndex,
-    ),
-    ...sourceBrands.slice(
-      0,
-      splitIndex,
-    ),
-  ]
-
-  const thirdRowBrands = [
-    ...sourceBrands.slice(1),
-    ...sourceBrands.slice(0, 1),
-  ]
+    const updateGalleryStop = () => {
+      const sectionHeight = section.getBoundingClientRect().height
+      const gallery = section.querySelector('.ep-landing-grocery-gallery')
+      const galleryTop = gallery ? gallery.getBoundingClientRect().top - section.getBoundingClientRect().top : hero.getBoundingClientRect().height
+      const storyTravel = Math.max(sectionHeight - hero.getBoundingClientRect().height, 1)
+      if (storyTravel > 0) {
+        // The extra covered viewport is not a Grocery mobile swipe stop.
+        section.dataset.landingStops = `0,${Math.max(0,Math.min(galleryTop / storyTravel, 1)).toFixed(5)}`
+      }
+    }
+    updateGalleryStop()
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateGalleryStop)
+      : null
+    resizeObserver?.observe(section)
+    resizeObserver?.observe(hero)
+    window.addEventListener('resize', updateGalleryStop)
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', updateGalleryStop)
+    }
+  }, [items.length])
 
   return (
     <section
-      data-landing-story="brands"
-      data-landing-stops="0"
+      ref={grocerySectionRef}
+      data-landing-story="grocery"
+      data-landing-stops="0,0.6"
       data-landing-static="true"
-      className="relative h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#0D302B] text-[#F1F5EC] sm:h-[100svh] sm:min-h-[100svh] sm:bg-[#f4f4f2] sm:text-[#111111]"
-      aria-labelledby="featured-brands-title"
+      aria-label="Featured grocery discovery"
+      className="relative"
     >
-      <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_48%_46%,rgba(255,255,255,0.9),rgba(244,244,242,0)_58%)] sm:block" />
-
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,#0D302B_0%,#174D40_54%,#0B2E29_100%)] sm:hidden"
-      />
-
       <style>{`
-        @keyframes epantry-brand-scroll-left {
-          from { transform: translate3d(0, 0, 0); }
-          to { transform: translate3d(-50%, 0, 0); }
+        .ep-landing-grocery-hero,
+        .ep-landing-grocery-gallery {
+          position: relative;
+          width: 100%;
+          isolation: isolate;
         }
-        @keyframes epantry-brand-scroll-right {
-          from { transform: translate3d(-50%, 0, 0); }
-          to { transform: translate3d(0, 0, 0); }
+        .ep-landing-grocery-hero {
+          position: relative;
+          z-index: 1;
+          height: 100svh;
+          min-height: 0;
+          overflow: hidden;
         }
-        @media (max-width: 639px) {
-          /* One moving text layer per row: no duplicate overlay, script or repaint loop. */
-          .epantry-brand-rail {
-            -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-            mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+        .ep-landing-grocery-hero {
+          display: flex;
+          align-items: center;
+          background: ${GROCERY_COLORS.porcelain} !important;
+          color: ${GROCERY_COLORS.charcoal} !important;
+        }
+        .ep-landing-grocery-hero__image {
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: 62% center;
+        }
+        .ep-landing-grocery-hero__content {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          width: 100%;
+          height: 100%;
+          align-items: center;
+          padding: clamp(22px,5vw,82px);
+        }
+        .ep-landing-grocery-hero__panel {
+          width: min(520px,49vw);
+          padding: clamp(24px,3.5vw,48px);
+          background: ${GROCERY_COLORS.porcelain} !important;
+          border-left: 5px solid ${GROCERY_COLORS.forest};
+          color: ${GROCERY_COLORS.charcoal} !important;
+          box-shadow: 0 14px 36px rgba(32,36,33,.15);
+        }
+        .ep-landing-grocery-hero__eyebrow {
+          margin: 0 0 16px;
+          color: ${GROCERY_COLORS.forest} !important;
+          font-size: 14px !important;
+          font-weight: 700;
+          letter-spacing: .07em;
+          line-height: 1.4;
+          text-transform: uppercase;
+        }
+        .ep-landing-grocery-hero__eyebrow span {
+          color: ${GROCERY_COLORS.forest} !important;
+          background: none !important;
+          -webkit-text-fill-color: ${GROCERY_COLORS.forest} !important;
+          filter: none;
+        }
+        .ep-landing-grocery-hero__title {
+          margin: 0;
+          color: ${GROCERY_COLORS.charcoal} !important;
+          font-size: clamp(44px,5.4vw,82px) !important;
+          font-weight: 700 !important;
+          line-height: 1.02 !important;
+          letter-spacing: -.055em;
+          overflow-wrap: normal;
+          background: none !important;
+          -webkit-text-fill-color: ${GROCERY_COLORS.charcoal} !important;
+          filter: none;
+        }
+        .ep-landing-grocery-hero__title span {
+          display: block;
+          color: ${GROCERY_COLORS.forest} !important;
+          background: none !important;
+          -webkit-text-fill-color: ${GROCERY_COLORS.forest} !important;
+          filter: none;
+        }
+        .ep-landing-grocery-hero__subline {
+          margin: 20px 0 0;
+          padding: 0;
+          border: 0;
+          color: ${GROCERY_COLORS.charcoal} !important;
+          font-size: 17px !important;
+          font-weight: 600;
+          line-height: 1.55;
+          background: none !important;
+          -webkit-text-fill-color: ${GROCERY_COLORS.charcoal} !important;
+          filter: none;
+        }
+        .ep-landing-grocery-hero__scroll {
+          position: absolute;
+          right: clamp(20px,5vw,82px);
+          bottom: clamp(28px,5vw,70px);
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          padding: 8px 9px 8px 18px;
+          border: 1px solid ${GROCERY_COLORS.forest};
+          border-radius: 100px;
+          background: ${GROCERY_COLORS.porcelain} !important;
+          color: ${GROCERY_COLORS.forest} !important;
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 20px;
+        }
+        .ep-landing-grocery-hero__scroll-icon {
+          display: grid;
+          width: 50px;
+          height: 50px;
+          flex-shrink: 0;
+          place-items: center;
+          border: 1px solid ${GROCERY_COLORS.forest};
+          border-radius: 50%;
+          background: ${GROCERY_COLORS.forest} !important;
+          color: ${GROCERY_COLORS.porcelain} !important;
+        }
+        .ep-landing-grocery-hero__scroll-icon svg {
+          transform: rotate(90deg);
+        }
+        .ep-landing-grocery-gallery {
+          position: sticky;
+          top: 0;
+          box-sizing: border-box;
+          display: grid;
+          height: 100svh;
+          min-height: 0;
+          overflow: hidden;
+          grid-template-rows: auto minmax(0,1fr);
+          gap: clamp(10px,1.4svh,16px);
+          padding: clamp(75px,9svh,94px) clamp(18px,4vw,72px) clamp(12px,2svh,22px);
+          z-index: 3;
+          margin-top: 0;
+          border-radius: 0;
+          box-shadow: none;
+          background: ${GROCERY_COLORS.sage} !important;
+          color: ${GROCERY_COLORS.charcoal} !important;
+        }
+        /* Hold the Grocery gallery for one viewport while the Recipes
+           hero advances over it; no nested scrolling or card resizing. */
+        .ep-landing-grocery-exit-hold {
+          position: relative;
+          height: 100svh;
+          pointer-events: none;
+        }
+        .ep-landing-grocery-gallery__header {
+          display: flex;
+          flex: 0 0 auto;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 18px;
+        }
+        .ep-landing-grocery-gallery__eyebrow {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          margin-bottom: 5px;
+          color: ${GROCERY_COLORS.forest} !important;
+          font-size: 14px;
+          font-weight: 600;
+          line-height: 20px;
+          letter-spacing: .09em;
+          text-transform: uppercase;
+        }
+        .ep-landing-grocery-gallery__eyebrow::before {
+          width: 19px;
+          height: 2px;
+          flex-shrink: 0;
+          background: ${GROCERY_COLORS.clay};
+          content: '';
+        }
+        .ep-landing-grocery-gallery__heading {
+          margin: 0;
+          color: ${GROCERY_COLORS.charcoal} !important;
+          font-size: clamp(30px,3.5vw,50px) !important;
+          font-weight: 600;
+          line-height: 1.12 !important;
+          letter-spacing: -.047em;
+          text-wrap: balance;
+        }
+        .ep-landing-grocery-gallery__link {
+          display: inline-flex;
+          min-height: 48px;
+          flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          padding: 10px 16px 10px 20px;
+          border: 1px solid ${GROCERY_COLORS.forest};
+          border-radius: 100px;
+          background: ${GROCERY_COLORS.forest} !important;
+          color: ${GROCERY_COLORS.porcelain} !important;
+          font-size: 15px;
+          font-weight: 600;
+          line-height: 20px;
+          text-decoration: none;
+          transition: transform 220ms ease, background-color 220ms ease;
+        }
+        .ep-landing-grocery-gallery__link svg { flex-shrink: 0; }
+        .ep-landing-grocery-gallery__link:hover { transform: translateY(-2px); }
+        .ep-landing-grocery-gallery__grid {
+          display: grid;
+          min-height: 0;
+          overflow: hidden;
+          grid-template-columns: repeat(4,minmax(0,1fr));
+          grid-template-rows: repeat(2,minmax(0,1fr));
+          align-items: stretch;
+          gap: clamp(10px,1.3svh,16px) clamp(12px,1.6vw,22px);
+        }
+        .ep-landing-grocery-card {
+          box-sizing: border-box;
+          display: flex;
+          min-width: 0;
+          min-height: 0;
+          overflow: hidden;
+          flex-direction: column;
+          border: 1px solid rgba(23,63,53,.16);
+          border-radius: 16px;
+          background: ${GROCERY_COLORS.porcelain} !important;
+          color: ${GROCERY_COLORS.charcoal} !important;
+          transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+        }
+        .ep-landing-grocery-card:hover {
+          transform: translateY(-4px);
+          border-color: ${GROCERY_COLORS.forest};
+          box-shadow: 0 12px 24px rgba(32,36,33,.10);
+        }
+        .ep-landing-grocery-card__main {
+          display: flex;
+          min-width: 0;
+          min-height: 0;
+          flex: 1 1 auto;
+          flex-direction: column;
+          color: ${GROCERY_COLORS.charcoal} !important;
+          text-decoration: none;
+        }
+        .ep-landing-grocery-card__image-wrap {
+          position: relative;
+          display: grid;
+          width: 100%;
+          height: auto;
+          min-height: 0;
+          flex: 1 1 auto;
+          place-items: center;
+          overflow: hidden;
+          border: 0;
+          border-bottom: 1px solid rgba(23,63,53,.12);
+          border-radius: 0;
+          background: ${GROCERY_COLORS.porcelain} !important;
+        }
+        .ep-landing-grocery-card__image {
+          display: block;
+          width: calc(100% - 32px);
+          height: calc(100% - 28px);
+          max-width: 100%;
+          max-height: 100%;
+          min-height: 0;
+          padding: 0;
+          object-fit: contain;
+          object-position: center;
+          transform: none !important;
+        }
+        .ep-landing-grocery-card__no-image {
+          display: grid;
+          width: 100%;
+          height: 100%;
+          place-items: center;
+          color: ${GROCERY_COLORS.forest} !important;
+          font-size: 16px;
+          font-weight: 600;
+        }
+        .ep-landing-grocery-card__text {
+          display: flex;
+          min-height: 0;
+          flex: 0 0 auto;
+          flex-direction: column;
+          gap: clamp(1px,.35svh,5px);
+          padding: clamp(7px,.75svh,12px) 14px clamp(3px,.5svh,7px);
+        }
+        .ep-landing-grocery-card__category {
+          display: block;
+          overflow: hidden;
+          color: ${GROCERY_COLORS.forest} !important;
+          font-size: 13px;
+          font-weight: 750;
+          line-height: 19px;
+          letter-spacing: .02em;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .ep-landing-grocery-card__name {
+          display: -webkit-box;
+          overflow: hidden;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          color: ${GROCERY_COLORS.charcoal} !important;
+          font-size: clamp(16px,1.35vw,19px);
+          font-weight: 750;
+          line-height: 1.3;
+          letter-spacing: -.02em;
+        }
+        .ep-landing-grocery-card__extra {
+          display: block;
+          overflow: hidden;
+          color: ${GROCERY_COLORS.forest} !important;
+          font-size: 13px;
+          line-height: 19px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .ep-landing-grocery-card__action {
+          display: flex;
+          min-height: 44px;
+          flex: 0 0 auto;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin: 0 14px clamp(3px,.5svh,7px);
+          padding: 3px 0 0;
+          border: 0;
+          border-top: 1px solid rgba(23,63,53,.23);
+          border-radius: 0;
+          background: transparent !important;
+          color: ${GROCERY_COLORS.forest} !important;
+          font-size: 15px;
+          font-weight: 750;
+          line-height: 20px;
+          text-align: left;
+          cursor: pointer;
+        }
+        .ep-landing-grocery-card__action-icon {
+          display: grid;
+          width: clamp(27px,3.6svh,36px);
+          height: clamp(27px,3.6svh,36px);
+          flex-shrink: 0;
+          place-items: center;
+          border-radius: 50%;
+          background: ${GROCERY_COLORS.forest} !important;
+          color: ${GROCERY_COLORS.porcelain} !important;
+          transition: transform 220ms ease;
+        }
+        .ep-landing-grocery-card__action:hover .ep-landing-grocery-card__action-icon {
+          transform: translateX(3px);
+        }
+        .ep-landing-grocery-gallery :is(a,button):focus-visible {
+          outline: 3px solid ${GROCERY_COLORS.clay};
+          outline-offset: 2px;
+        }
+        .ep-landing-grocery-gallery__empty {
+          display: flex;
+          min-width: 0;
+          min-height: 0;
+          grid-column: 1 / -1;
+          grid-row: 1 / -1;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          padding: 24px;
+          color: ${GROCERY_COLORS.charcoal};
+          text-align: center;
+        }
+        .ep-landing-grocery-gallery__empty a { color: ${GROCERY_COLORS.forest}; }
+        @media (max-width:767px) {
+          .ep-landing-grocery-hero__image { object-position: 68% center; }
+          .ep-landing-grocery-hero__content { align-items: flex-end; padding: 20px 18px 105px; }
+          .ep-landing-grocery-hero__panel { width: min(100%,470px); padding: 22px; }
+          .ep-landing-grocery-hero__eyebrow { margin-bottom: 10px; font-size: 12px !important; }
+          .ep-landing-grocery-hero__title { font-size: clamp(43px,11vw,60px) !important; }
+          .ep-landing-grocery-hero__subline { margin-top: 13px; font-size: 15px !important; }
+          .ep-landing-grocery-hero__scroll { right: 20px; bottom: 28px; font-size: 13px; }
+          .ep-landing-grocery-hero__scroll-icon { width: 40px; height: 40px; }
+          .ep-landing-grocery-gallery {
+            gap: clamp(7px,1svh,12px);
+            padding: clamp(62px,8.5svh,78px) 12px clamp(9px,1.5svh,17px);
+            border-radius: 0;
           }
-          .epantry-brand-motion-item .epantry-brand-name {
-            color: #F0F5ED;
-            font-weight: 600;
-            font-size: clamp(21px, 6.8vw, 29px);
-            line-height: 1.05;
-            letter-spacing: -0.052em;
-            transition: color 180ms ease;
+          .ep-landing-grocery-gallery__header { align-items: center; gap: 7px; }
+          .ep-landing-grocery-gallery__eyebrow { font-size: 12px; line-height: 16px; }
+          .ep-landing-grocery-gallery__heading { font-size: clamp(24px,6.4vw,32px) !important; }
+          .ep-landing-grocery-gallery__link {
+            min-height: 44px;
+            padding: 8px 10px;
+            gap: 5px;
+            font-size: 12px;
+            white-space: nowrap;
           }
-          .epantry-brand-motion-item .epantry-brand-count {
-            color: #B9D0C2;
-            font-size: 11px;
-            letter-spacing: 0.015em;
+          .ep-landing-grocery-gallery__link svg { width: 15px; }
+          .ep-landing-grocery-gallery__grid {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+            grid-template-rows: repeat(2,minmax(0,1fr));
+            gap: clamp(7px,1.1svh,11px) 9px;
           }
-          .epantry-brand-rail[data-brand-row-tone="light"] .epantry-brand-name {
-            color: #123F32;
-            font-weight: 700;
-          }
-          .epantry-brand-rail[data-brand-row-tone="light"] .epantry-brand-count {
-            color: #4C7059;
-          }
-          .epantry-brand-motion-item:focus-visible {
-            outline: 2px solid #DDEBCF;
-            outline-offset: -3px;
-            border-radius: 8px;
-          }
+          .ep-landing-grocery-card:nth-child(n+5) { display: none; }
+          .ep-landing-grocery-card { border-radius: 12px; }
+          .ep-landing-grocery-card__image-wrap { height: auto; min-height: 0; flex: 1 1 auto; }
+          .ep-landing-grocery-card__category { font-size: 12px; line-height: 17px; }
+          .ep-landing-grocery-card__text { padding: clamp(5px,.7svh,9px) 9px 2px; gap: 2px; }
+          .ep-landing-grocery-card__name { font-size: 14px; line-height: 18px; }
+          .ep-landing-grocery-card__extra { font-size: 12px; line-height: 16px; }
+          .ep-landing-grocery-card__action { min-height: 44px; margin: 0 9px 3px; font-size: 13px; }
+          .ep-landing-grocery-card__action-icon { width: 29px; height: 29px; }
+          .ep-landing-grocery-card__action-icon svg { width: 16px; }
+        }
+        @media (max-width:380px) {
+          .ep-landing-grocery-gallery { padding: clamp(61px,8.5svh,76px) 9px 8px; gap: 6px; }
+          .ep-landing-grocery-gallery__heading { font-size: 22px !important; }
+          .ep-landing-grocery-gallery__grid { gap: 8px; }
+          .ep-landing-grocery-card__text { padding-top: 8px; }
+        }
+        @media (max-height:760px) {
+          .ep-landing-grocery-gallery { gap: 7px; padding-top: 65px; padding-bottom: 8px; }
+          .ep-landing-grocery-gallery__heading { font-size: clamp(22px,2.7vw,35px) !important; }
+          .ep-landing-grocery-gallery__eyebrow { margin-bottom: 1px; }
+          .ep-landing-grocery-gallery__link { min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
+          .ep-landing-grocery-gallery__grid { gap: 7px 10px; }
+          .ep-landing-grocery-card__text { padding-top: 5px; padding-bottom: 1px; gap: 1px; }
+          .ep-landing-grocery-card__name { font-size: 14px; line-height: 1.2; }
+          .ep-landing-grocery-card__action { min-height: 44px; }
+        }
+        @media (max-width:767px) and (max-height:740px) {
+          .ep-landing-grocery-gallery { padding-top: 58px; }
+          .ep-landing-grocery-gallery__heading { font-size: 23px !important; }
+          .ep-landing-grocery-gallery__link { min-height: 38px; }
+          .ep-landing-grocery-card__category { line-height: 15px; }
+          .ep-landing-grocery-card__extra { line-height: 15px; }
+          .ep-landing-grocery-card__action { min-height: 44px; }
+        }
+        @media (prefers-reduced-motion:reduce) {
+          .ep-landing-grocery-card,
+          .ep-landing-grocery-card__image,
+          .ep-landing-grocery-card__action-icon,
+          .ep-landing-grocery-gallery__link { transition: none; }
         }
       `}</style>
 
-      <div className="absolute left-4 right-4 top-[clamp(36px,7dvh,76px)] z-20 sm:left-8 sm:right-8 sm:top-[clamp(88px,10svh,118px)] lg:left-10 lg:right-10">
-        <div className="flex w-full items-center justify-between gap-2 sm:block sm:max-w-[min(76rem,calc(100vw-8rem))]">
-
-          <h2
-            id="featured-brands-title"
-            className="min-w-0 shrink-0 whitespace-nowrap [font-family:Arial,Helvetica,sans-serif] text-[clamp(19px,5.5vw,26px)] font-semibold leading-[1] tracking-[-0.065em] text-[#F5F7EF] sm:mt-3 sm:whitespace-normal sm:text-[clamp(46px,6.2vw,104px)] sm:font-normal sm:leading-[0.88] sm:text-black"
-          >
-            Featured Brands
-          </h2>
-
-          <div className="flex min-w-0 max-w-[48vw] items-center justify-end gap-1 overflow-x-auto [scrollbar-width:none] sm:hidden">
-            <button
-              type="button"
-              onClick={() => onSelectBrandFilter('all')}
-              className={[
-                'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
-                selectedBrandFilter === 'all'
-                  ? 'bg-[#DDEBCF] text-[#123E31] sm:bg-black sm:text-white'
-                  : 'border border-white/20 bg-white/10 text-[#E6F0E6] sm:border-0 sm:bg-black/5 sm:text-black/55',
-              ].join(' ')}
-            >
-              All
-            </button>
-            {brandFilterGroups.slice(0, 2).map((group) => (
-              <button
-                key={group.id}
-                type="button"
-                onClick={() => onSelectBrandFilter(group.id)}
-                className={[
-                  'focus-ring shrink-0 rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px]',
-                  selectedBrandFilter === group.id
-                    ? 'bg-[#DDEBCF] text-[#123E31] sm:bg-black sm:text-white'
-                    : 'border border-white/20 bg-white/10 text-[#E6F0E6] sm:border-0 sm:bg-black/5 sm:text-black/55',
-                ].join(' ')}
-              >
-                {group.label}
-              </button>
-            ))}
+      <div ref={groceryHeroRef} className="ep-landing-grocery-hero">
+        <img
+          className="ep-landing-grocery-hero__image"
+          src="/hero/grocery.png"
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
+        <div className="ep-landing-grocery-hero__content">
+          <div className="ep-landing-grocery-hero__panel">
+            <p className="ep-landing-grocery-hero__eyebrow"><span>Good food starts here</span></p>
+            <h2 className="ep-landing-grocery-hero__title">Featured <span>Grocery</span></h2>
+            <p className="ep-landing-grocery-hero__subline">Fresh finds and everyday favourites, all in one place.</p>
           </div>
         </div>
-      </div>
-
-      <div className="absolute right-5 top-[clamp(96px,11svh,128px)] z-30 hidden items-center gap-2 sm:flex lg:right-10">
-        <button
-          type="button"
-          onClick={() =>
-            onSelectBrandFilter(
-              'all',
-            )
-          }
-          className={[
-            'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px] transition-colors duration-300',
-            selectedBrandFilter ===
-            'all'
-              ? 'bg-black text-white'
-              : 'text-black/55 hover:bg-black/5 hover:text-black',
-          ].join(' ')}
-        >
-          All
-        </button>
-
-        {brandFilterGroups.map(
-          (group) => (
-            <button
-              key={group.id}
-              type="button"
-              onClick={() =>
-                onSelectBrandFilter(
-                  group.id,
-                )
-              }
-              className={[
-                'focus-ring rounded-full px-3 py-1.5 [font-family:Arial,Helvetica,sans-serif] text-[11px] transition-colors duration-300',
-                selectedBrandFilter ===
-                group.id
-                  ? 'bg-black text-white'
-                  : 'text-black/55 hover:bg-black/5 hover:text-black',
-              ].join(' ')}
-            >
-              {group.label}
-            </button>
-          ),
-        )}
-      </div>
-
-      <div className="absolute inset-x-0 top-[25dvh] z-10 flex h-[18dvh] min-h-[100px] items-center border-y border-white/15 sm:top-[35svh] sm:block sm:h-auto sm:min-h-0 sm:border-0 lg:top-[34svh]">
-        <BrandMotionRow
-          brands={sourceBrands}
-          direction="left"
-          duration={26}
-          shouldReduceMotion={shouldReduceMotion}
-        />
-      </div>
-
-      <div className="absolute inset-x-0 top-[47dvh] z-10 flex h-[19dvh] min-h-[100px] items-center bg-[#DCECCA] sm:top-[67svh] sm:block sm:h-auto sm:min-h-0 sm:bg-transparent lg:top-[68svh]">
-        <BrandMotionRow
-          brands={rotatedBrands}
-          direction="right"
-          duration={29}
-          tone="light"
-          shouldReduceMotion={shouldReduceMotion}
-        />
-      </div>
-
-      <div className="absolute inset-x-0 top-[70dvh] z-10 flex h-[18dvh] min-h-[100px] items-center border-y border-white/15 sm:hidden">
-        <BrandMotionRow
-          brands={thirdRowBrands}
-          direction="left"
-          duration={26}
-          shouldReduceMotion={shouldReduceMotion}
-        />
-      </div>
-
-      <Link
-        to="/brands"
-        className="focus-ring group absolute top-[clamp(82px,13dvh,136px)] right-4 z-30 inline-flex items-center gap-2 rounded-full border border-[#DDEBCF]/65 bg-[#DDEBCF] px-4 py-2.5 [font-family:Arial,Helvetica,sans-serif] text-xs font-semibold text-[#123F32] transition hover:bg-white sm:bottom-auto sm:right-0 sm:top-[59svh] sm:-translate-y-1/2 sm:rounded-l-[4px] sm:rounded-r-none sm:border-black/15 sm:border-r-0 sm:bg-[#f4f4f2]/92 sm:px-4 sm:py-7 sm:font-medium sm:text-black sm:shadow-none sm:backdrop-blur-sm sm:hover:border-black/35 sm:hover:bg-[#f4f4f2]/92 lg:px-5"
-      >
-        <span className="sm:[writing-mode:vertical-rl] sm:rotate-180">
-          Explore Brands
-        </span>
-        <ArrowRight className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5 sm:hidden" />
-      </Link>
-
-    </section>
-  )
-}
-
-function BrandMotionRow({
-  brands,
-  direction,
-  duration,
-  shouldReduceMotion,
-  tone = 'dark',
-}) {
-  const [isPaused, setIsPaused] = useState(false)
-  const rowRef = useRef(null)
-
-  const group = (
-    <div className="flex shrink-0 items-center gap-4 pr-4 sm:gap-[clamp(24px,4vw,74px)] sm:pr-[clamp(24px,4vw,74px)]">
-      {brands.map((brand, index) => (
-        <BrandMotionItem
-          key={`${direction}-${brand.id || brand.slug || brand.name}-${index}`}
-          brand={brand}
-          index={index}
-          onHoverChange={setIsPaused}
-        />
-      ))}
-    </div>
-  )
-
-  return (
-    <div
-      ref={rowRef}
-      data-brand-row-tone={tone}
-      className="epantry-brand-rail relative w-full overflow-hidden sm:static"
-    >
-      <div
-        data-brand-motion-track
-        className="relative z-10 flex w-max items-center will-change-transform sm:static sm:z-auto"
-        style={{
-          animation: shouldReduceMotion
-            ? 'none'
-            : `epantry-brand-scroll-${direction} ${duration}s linear infinite`,
-          animationPlayState: isPaused ? 'paused' : 'running',
-        }}
-      >
-        {group}
-        <div aria-hidden="true" className="shrink-0">
-          {group}
+        <div className="ep-landing-grocery-hero__scroll" aria-hidden="true">
+          <span>Scroll to explore</span>
+          <span className="ep-landing-grocery-hero__scroll-icon"><ArrowRight size={19} /></span>
         </div>
       </div>
-    </div>
-  )
-}
 
-function BrandMotionItem({
-  brand,
-  index,
-  onHoverChange,
-}) {
-  const displayName =
-    String(
-      brand?.name ||
-        'Brand',
-    ).trim()
-
-  const weightClass =
-    index % 3 === 0
-      ? 'font-semibold'
-      : index % 3 === 1
-        ? 'font-normal'
-        : 'font-medium'
-
-  return (
-    <Link
-      to={getFeaturedBrandPath(
-        brand,
-      )}
-      className="epantry-brand-motion-item focus-ring group relative flex h-[clamp(96px,17dvh,142px)] w-[min(64vw,270px)] shrink-0 items-center justify-center px-4 sm:h-[132px] sm:w-[clamp(190px,18vw,330px)] sm:px-5 lg:h-[148px]"
-      data-brand-motion-item
-      aria-label={`Explore ${displayName}`}
-      onMouseEnter={() => onHoverChange(true)}
-      onMouseLeave={() => onHoverChange(false)}
-    >
-      <span className="pointer-events-none absolute inset-y-3 left-0 w-px origin-center scale-y-0 bg-[#d76565]/55 transition-transform duration-300 ease-out group-hover:scale-y-100" />
-      <span className="pointer-events-none absolute inset-y-3 right-0 w-px origin-center scale-y-0 bg-[#d76565]/55 transition-transform duration-300 ease-out group-hover:scale-y-100" />
-
-      <span className="flex max-w-full flex-col items-center text-center">
-        <span
-          className={[
-            'epantry-brand-name relative [font-family:Arial,Helvetica,sans-serif] text-[clamp(18px,1.65vw,31px)] leading-[0.96] tracking-[-0.045em] text-black transition-[color,transform] duration-300 ease-out group-hover:scale-[1.025] group-hover:text-[#B4232B]',
-            weightClass,
-          ].join(' ')}
-        >
-          {displayName}
-        </span>
-
-        <span className="epantry-brand-count mt-2 [font-family:Arial,Helvetica,sans-serif] text-[9px] font-normal tracking-[0.04em] text-black/38 transition-colors duration-300 group-hover:text-black/62 sm:text-[10px]">
-          {formatBrandProductCount(
-            brand?.productCount,
-          )}
-        </span>
-      </span>
-    </Link>
-  )
-}
-
-/*
-|--------------------------------------------------------------------------
-| Featured Grocery Scroll Story
-|--------------------------------------------------------------------------
-|
-| The visible scene is always exactly 100svh. The outer track is taller so
-| native page scroll can advance five products plus the final View all card while the scene remains pinned.
-| This is deliberately shared by desktop and mobile so the interaction model
-| does not change between breakpoints.
-|
-*/
-
-const FEATURED_GROCERY_PALETTES = [
-  {
-    base: '#C99A25',
-    deep: '#76500D',
-    glow: '#F4D472',
-  },
-  {
-    base: '#A83C46',
-    deep: '#541821',
-    glow: '#DF7A82',
-  },
-  {
-    base: '#7EA14E',
-    deep: '#3F5D25',
-    glow: '#BFD78A',
-  },
-  {
-    base: '#526D3D',
-    deep: '#26351E',
-    glow: '#8DAA6F',
-  },
-  {
-    base: '#8C6A50',
-    deep: '#493326',
-    glow: '#C8A68B',
-  },
-]
-
-function getFeaturedGroceryPalette(
-  product,
-  index,
-) {
-  const identity =
-    `${product?.name || ''} ${product?.subCategory || ''} ${product?.brand || ''}`
-      .toLowerCase()
-
-  if (
-    identity.includes('mango') ||
-    identity.includes('aam')
-  ) {
-    return FEATURED_GROCERY_PALETTES[0]
-  }
-
-  if (
-    identity.includes('pomegranate') ||
-    identity.includes('anar')
-  ) {
-    return FEATURED_GROCERY_PALETTES[1]
-  }
-
-  if (
-    identity.includes('bottle gourd') ||
-    identity.includes('lauki') ||
-    identity.includes('gourd')
-  ) {
-    return FEATURED_GROCERY_PALETTES[2]
-  }
-
-  if (
-    identity.includes('matcha') ||
-    identity.includes('green tea') ||
-    identity.includes('tea')
-  ) {
-    return FEATURED_GROCERY_PALETTES[3]
-  }
-
-  return FEATURED_GROCERY_PALETTES[
-    index %
-      FEATURED_GROCERY_PALETTES.length
-  ]
-}
-
-function FeaturedGroceryScrollStory({
-  products,
-  onAddToCart,
-  shouldReduceMotion,
-  entranceEdgeOpacity,
-  entranceScale,
-  entranceLift,
-}) {
-  const productItems =
-    Array.isArray(products)
-      ? products.slice(0, 5)
-      : []
-
-  const items = [
-    ...productItems,
-    {
-      id: 'featured-grocery-view-all',
-      name: 'View all',
-      subCategory: 'Grocery catalogue',
-      path: '/grocery',
-      isViewAll: true,
-    },
-  ]
-
-  const sectionRef =
-    useRef(null)
-
-  const animationFrameRef =
-    useRef(null)
-
-  const lastActiveIndexRef =
-    useRef(0)
-
-  const [
-    activeIndex,
-    setActiveIndex,
-  ] = useState(0)
-
-  const [
-    direction,
-    setDirection,
-  ] = useState(1)
-
-  const mobileVisualZoneRef = useRef(null)
-  const [hasMobileCardEntered, setHasMobileCardEntered] = useState(false)
-
-  // Let the first mobile product card visibly rise into the screen when
-  // Grocery is reached; the section may have mounted several screens earlier.
-  // Observe only this stable visual zone, once, without running on scroll.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) {
-      return undefined
-    }
-
-    const visualZone = mobileVisualZoneRef.current
-    if (!visualZone) return undefined
-    if (typeof IntersectionObserver === 'undefined') {
-      setHasMobileCardEntered(true)
-      return undefined
-    }
-
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setHasMobileCardEntered(true)
-        observer.disconnect()
-      }
-    }, { threshold: 0.25 })
-
-    observer.observe(visualZone)
-    return () => observer.disconnect()
-  }, [productItems.length])
-
-  // Prefetch just the next product on mobile, after the current scene lands.
-  // Desktop never starts this extra work.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return undefined
-    const nextImage = items[activeIndex + 1]?.image
-    if (!nextImage) return undefined
-    const timer = window.setTimeout(() => {
-      const image = new window.Image()
-      image.decoding = 'async'
-      image.src = nextImage
-    }, 80)
-    return () => window.clearTimeout(timer)
-  }, [activeIndex, items[activeIndex + 1]?.image])
-
-  useEffect(
-    () => {
-      if (
-        items.length <= 1 ||
-        typeof window === 'undefined'
-      ) {
-        return undefined
-      }
-
-      const resolveActiveIndex = () => {
-        const section = sectionRef.current
-        if (!section) {
-          return 0
-        }
-
-        const sectionRect = section.getBoundingClientRect()
-        // 100svh does not change when mobile browser chrome expands or
-        // collapses. Use the real sticky panel's height, not innerHeight.
-        const stickyHeight =
-          section.firstElementChild?.getBoundingClientRect().height ||
-          sectionRect.height
-        const travel = Math.max(sectionRect.height - stickyHeight, 1)
-        const progress = Math.min(
-          Math.max(-sectionRect.top / travel, 0),
-          1,
-        )
-
-        return Math.min(
-          items.length - 1,
-          Math.floor(Math.min(progress * items.length, items.length - 0.0001)),
-        )
-      }
-
-      const updateActiveCard = () => {
-        animationFrameRef.current = null
-        const nextIndex = resolveActiveIndex()
-
-        if (nextIndex !== lastActiveIndexRef.current) {
-          setDirection(nextIndex > lastActiveIndexRef.current ? 1 : -1)
-          lastActiveIndexRef.current = nextIndex
-          setActiveIndex(nextIndex)
-        }
-      }
-
-      const scheduleUpdate = () => {
-        if (animationFrameRef.current === null) {
-          animationFrameRef.current = window.requestAnimationFrame(
-            updateActiveCard,
-          )
-        }
-      }
-
-      // Initial sync also handles browser back/forward scroll restoration.
-      updateActiveCard()
-      window.addEventListener('scroll', scheduleUpdate, { passive: true })
-      window.addEventListener('resize', scheduleUpdate)
-      window.addEventListener('pageshow', scheduleUpdate)
-
-      return () => {
-        if (animationFrameRef.current !== null) {
-          window.cancelAnimationFrame(animationFrameRef.current)
-          animationFrameRef.current = null
-        }
-        window.removeEventListener('scroll', scheduleUpdate)
-        window.removeEventListener('resize', scheduleUpdate)
-        window.removeEventListener('pageshow', scheduleUpdate)
-      }
-    },
-    [items.length],
-  )
-
-  if (productItems.length === 0) {
-    return (
-      <section className="relative z-30 h-[100svh] overflow-hidden bg-[#26351E] shadow-[0_-22px_74px_rgba(17,24,39,0.16)]">
-        <div className="page-shell flex h-full items-center justify-center">
-          <EmptyState
-            message="Featured grocery products will appear here once catalog data is available."
-          />
-        </div>
-      </section>
-    )
-  }
-
-  const resolvedActiveIndex =
-    Math.min(
-      activeIndex,
-      items.length - 1,
-    )
-
-  const activeProduct =
-    items[
-      resolvedActiveIndex
-    ]
-
-  const isViewAll =
-    activeProduct?.isViewAll ===
-    true
-
-  const previousProduct =
-    resolvedActiveIndex > 0
-      ? items[
-          resolvedActiveIndex - 1
-        ]
-      : null
-
-  const nextProduct =
-    resolvedActiveIndex <
-    items.length - 1
-      ? items[
-          resolvedActiveIndex + 1
-        ]
-      : null
-
-  const activeNutrition =
-    isViewAll
-      ? []
-      : getProductNutrition(
-          activeProduct,
-        ).slice(
-          0,
-          6,
-        )
-
-  const mobileNutrition =
-    activeNutrition
-
-  const productPath =
-    activeProduct?.path ||
-    (activeProduct?.slug
-      ? `/grocery/product/${activeProduct.slug}`
-      : '/grocery')
-
-  const productKey =
-    activeProduct?.id ||
-    activeProduct?.slug ||
-    `featured-product-${resolvedActiveIndex}`
-
-  const palette =
-    isViewAll
-      ? {
-          base: '#315A42',
-          deep: '#153323',
-          glow: '#8CB795',
-        }
-      : getFeaturedGroceryPalette(
-          activeProduct,
-          resolvedActiveIndex,
-        )
-
-  const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const motionDuration = shouldReduceMotion ? 0 : isSmallScreen ? 0.27 : 0.58
-  const mobileCardReady = shouldReduceMotion || !isSmallScreen || hasMobileCardEntered
-
-  /*
-   * Keep one viewport for the sticky surface, with a consistent 70svh
-   * scroll interval per card. All products and View all still get their
-   * own stage, and the sticky surface releases without a blank spacer.
-   */
-  const storyHeight = isSmallScreen
-    ? `${Math.max(items.length * 54 + 100, 200)}dvh`
-    : `${Math.max(items.length * 70 + 100, 200)}svh`
-  const groceryStops = items.map((_, index) => (index + 0.5) / items.length).join(',')
-
-  return (
-    <section
-      ref={sectionRef}
-      data-landing-story="grocery"
-      data-landing-stops={groceryStops}
-      className="relative z-30 isolate bg-[#26351E] sm:bg-transparent shadow-[0_-22px_74px_rgba(17,24,39,0.16)]"
-      style={{
-        height: storyHeight,
-        background: isSmallScreen
-          ? `radial-gradient(circle at 50% 48%, rgba(255,255,255,0.08), transparent 54%), linear-gradient(110deg, rgba(8,12,9,0.50) 0%, rgba(8,12,9,0.20) 44%, rgba(8,12,9,0.28) 66%, rgba(8,12,9,0.58) 100%), radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`
-          : undefined,
-      }}
-    >
       <div
-        data-landing-sticky
-        className="sticky top-0 h-[100svh] sm:h-[100svh] overflow-hidden [perspective:1800px]"
-        style={isSmallScreen ? { height: '100dvh', minHeight: '100dvh' } : undefined}
+        id="ep-landing-grocery-gallery"
+        className="ep-landing-grocery-gallery"
+        aria-labelledby="ep-landing-grocery-title"
       >
-        {/* The Grocery scene is one elevated surface. Scaling its inner plane
-            (not the sticky viewport) exposes the retreating Explore scene
-            along the sides and avoids sticky-position transform jitter. */}
-        <motion.div
-          className="relative h-full w-full overflow-hidden bg-[#26351E] shadow-[0_-40px_120px_-24px_rgba(0,0,0,0.75)] [backface-visibility:hidden]"
-          style={{
-            scale:
-              entranceScale,
-            y:
-              entranceLift,
-            transformOrigin:
-              '50% 0%',
-          }}
-        >
-          <motion.div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 z-40 h-[16px] bg-[linear-gradient(180deg,rgba(255,255,255,0.22)_0%,rgba(255,255,255,0.06)_30%,transparent_100%)]"
-            style={{
-              opacity:
-                entranceEdgeOpacity,
-            }}
-          />
-
-        {/* Product-driven colour field. */}
-        <AnimatePresence
-          mode="sync"
-          initial={false}
-        >
-          <motion.div
-            key={`grocery-background-${productKey}`}
-            aria-hidden="true"
-            initial={shouldReduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={shouldReduceMotion ? undefined : { opacity: 0 }}
-            transition={{
-              duration:
-                shouldReduceMotion
-                  ? 0
-                  : isSmallScreen ? 0.27 : 0.6,
-
-              ease: [
-                0.22,
-                1,
-                0.36,
-                1,
-              ],
-            }}
-            className="absolute inset-0"
-            style={{
-              willChange: isSmallScreen ? 'opacity' : undefined,
-              background: `radial-gradient(circle at 52% 42%, ${palette.glow} 0%, ${palette.base} 38%, ${palette.deep} 100%)`,
-            }}
-          >
-            {!isSmallScreen && activeProduct?.image && (
-              <img
-                src={activeProduct.image}
-                alt=""
-                className="absolute left-1/2 top-1/2 h-[125%] w-[125%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain opacity-0 blur-0 saturate-110 sm:opacity-[0.11] sm:blur-[26px] lg:opacity-[0.13] lg:blur-[34px]"
-              />
-            )}
-
-            <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(8,12,9,0.50)_0%,rgba(8,12,9,0.20)_44%,rgba(8,12,9,0.28)_66%,rgba(8,12,9,0.58)_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(255,255,255,0.08),transparent_54%)]" />
-          </motion.div>
-        </AnimatePresence>
-
-        <div className="page-shell relative z-10 flex h-full min-h-0 flex-col pb-1 pt-[70px] text-white sm:pb-4 sm:pt-[82px] md:pt-[138px] lg:pt-[138px] xl:pb-6 xl:pt-[86px]">
-
-          <div className="flex shrink-0 items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-              <p className="truncate text-[9px] font-black uppercase tracking-[0.24em] text-white/92 sm:text-[10px] lg:text-[15px]">
-                Featured Grocery
-              </p>
-
-
-              <p className="shrink-0 text-[9px] font-black tabular-nums tracking-[0.15em] text-white/56 sm:text-[10px] lg:text-[13px]">
-                {String(resolvedActiveIndex + 1).padStart(2, '0')} / {String(items.length).padStart(2, '0')}
-              </p>
-            </div>
-
-            <Link
-              to="/grocery"
-              className="focus-ring inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-white/24 bg-black/15 px-3 text-[9px] font-black text-white shadow-sm backdrop-blur-md transition hover:bg-black/24 sm:h-9 sm:px-3.5 sm:text-[10px] lg:h-10 lg:px-4 lg:text-xs"
-            >
-              Explore Grocery
-              <ArrowRight
-                size={13}
-                aria-hidden="true"
-              />
-            </Link>
+        <div className="ep-landing-grocery-gallery__header">
+          <div>
+            <span className="ep-landing-grocery-gallery__eyebrow">Featured grocery</span>
+            <h2 id="ep-landing-grocery-title" className="ep-landing-grocery-gallery__heading">Find something good.</h2>
           </div>
+          <Link className="ep-landing-grocery-gallery__link" to="/grocery">
+            Explore Grocery <ArrowRight size={17} aria-hidden="true" />
+          </Link>
+        </div>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-1 py-1 sm:gap-3 sm:py-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(390px,1.2fr)_minmax(0,0.9fr)] lg:grid-rows-1 lg:items-center lg:gap-8 lg:py-0 xl:grid-cols-[minmax(0,0.9fr)_minmax(440px,1.18fr)_minmax(0,0.92fr)] xl:gap-11">
-
-            {/* Left: current product identity. */}
-            <div className="min-w-0 lg:self-center lg:pb-9 lg:pr-3">
-              <AnimatePresence
-                mode={isSmallScreen ? "sync" : "wait"}
-                initial={false}
-              >
-                <motion.div
-                  key={isSmallScreen ? 'grocery-mobile-copy' : `grocery-copy-${productKey}`}
-                  initial={
-                    shouldReduceMotion || isSmallScreen
-                      ? false
-                      : {
-                          opacity: 0,
-                          y: isSmallScreen ? (direction > 0 ? 12 : -12) : direction > 0 ? 26 : -26,
-                        }
-                  }
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={
-                    shouldReduceMotion || isSmallScreen
-                      ? undefined
-                      : {
-                          opacity: 0,
-                          y:
-                            direction > 0
-                              ? -18
-                              : 18,
-                        }
-                  }
-                  transition={{
-                    duration:
-                      motionDuration,
-
-                    ease: [
-                      0.22,
-                      1,
-                      0.36,
-                      1,
-                    ],
-                  }}
-                  className="flex min-w-0 flex-col items-start justify-center text-left"
-                >
-                  <div className="min-w-0 w-full">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span aria-hidden="true" className="h-[2px] w-8 shrink-0 bg-white/85 sm:w-10" />
-                      <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 sm:text-xs lg:text-[13px]">
-                        {activeProduct?.subCategory || 'Grocery'}
-                      </p>
-                    </div>
-
-                    <h2 className="mt-3 max-w-[92vw] break-words text-[clamp(27px,7.5vw,38px)] font-black leading-[1.03] tracking-[-0.047em] text-white [text-wrap:balance] sm:mt-4 sm:max-w-[520px] sm:text-[clamp(34px,6vw,48px)] lg:mt-5 lg:max-w-full lg:text-[clamp(34px,3.05vw,53px)] lg:leading-[1.04] xl:text-[clamp(38px,3.2vw,56px)]">
-                      {activeProduct?.name || 'Grocery Product'}
-                    </h2>
-                  </div>
-
-                  {(activeProduct?.quantity || activeProduct?.unit || activeProduct?.brand) && (
-                    <div className="mt-4 flex w-full max-w-[390px] flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-white/30 pt-3 sm:mt-5 sm:pt-4 lg:mt-7 lg:pt-5">
-                      {(activeProduct?.quantity || activeProduct?.unit) && (
-                        <p className="text-base font-bold tracking-[-0.025em] text-white sm:text-lg lg:text-[22px]">
-                          {activeProduct?.quantity}{activeProduct?.quantity && activeProduct?.unit ? ' ' : ''}{activeProduct?.unit || ''}
-                        </p>
-                      )}
-
-                      {activeProduct?.brand && (
-                        <p className="min-w-0 text-xs font-semibold tracking-[0.02em] text-white/75 sm:text-sm lg:text-[15px]">
-                          {activeProduct.brand}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
+        <div className="ep-landing-grocery-gallery__grid">
+          {items.length === 0 ? (
+            <div className="ep-landing-grocery-gallery__empty">
+              <p>Published grocery products will appear here when available.</p>
+              <Link to="/grocery">Browse Grocery <ArrowRight size={16} aria-hidden="true" /></Link>
             </div>
-
-            {/* Centre: active visual remains crisp while the scene scrolls. */}
-            <div ref={mobileVisualZoneRef} className="relative flex min-h-0 flex-col items-center justify-center lg:h-full lg:py-[8svh]">
-
-              {previousProduct?.image && (
-                <motion.div
-                  key={`grocery-previous-${previousProduct.id || previousProduct.slug || resolvedActiveIndex}`}
-                  aria-hidden="true"
-                  initial={false}
-                  animate={{
-                    opacity:
-                      shouldReduceMotion
-                        ? 0
-                        : 0.24,
-                    y: 0,
-                  }}
-                  className="pointer-events-none absolute left-1/2 top-0 hidden aspect-[1.25/1] w-[32%] -translate-x-1/2 overflow-hidden rounded-[16px] border border-white/18 bg-black/12 shadow-lg backdrop-blur-sm lg:block"
-                >
-                  <img
-                    src={previousProduct.image}
-                    alt=""
-                    className="h-full w-full object-contain opacity-80"
-                  />
-                </motion.div>
-              )}
-
-              <AnimatePresence
-                mode={isSmallScreen ? "sync" : "popLayout"}
-                initial={false}
-                custom={direction}
-              >
-                <motion.div
-                  key={`grocery-visual-${productKey}`}
-                  custom={direction}
-                  initial={
-                    shouldReduceMotion
-                      ? false
-                      : {
-                          opacity: 0,
-                          y:
-                            direction > 0
-                              ? (isSmallScreen ? 76 : 110)
-                              : (isSmallScreen ? -76 : -110),
-                          scale: isSmallScreen ? 0.94 : 0.88,
-                          rotate:
-                            direction > 0
-                              ? (isSmallScreen ? 0 : 1.8)
-                              : (isSmallScreen ? 0 : -1.8),
-                        }
-                  }
-                  animate={mobileCardReady
-                    ? {
-                        opacity: 1,
-                        y: 0,
-                        scale: 1,
-                        rotate: 0,
-                      }
-                    : {
-                        opacity: 0,
-                        y: direction > 0 ? 76 : -76,
-                        scale: 0.94,
-                        rotate: 0,
-                      }}
-                  exit={
-                    shouldReduceMotion || isSmallScreen
-                      ? undefined
-                      : {
-                          opacity: 0,
-                          y:
-                            direction > 0
-                              ? (isSmallScreen ? -12 : -110)
-                              : (isSmallScreen ? 12 : 110),
-                          scale: isSmallScreen ? 1 : 0.91,
-                          rotate:
-                            direction > 0
-                              ? (isSmallScreen ? 0 : -1.4)
-                              : (isSmallScreen ? 0 : 1.4),
-                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
-                        }
-                  }
-                  transition={{
-                    duration: shouldReduceMotion ? 0 : isSmallScreen ? 0.52 : motionDuration,
-                    ease: [
-                      0.2,
-                      0.86,
-                      0.24,
-                      1,
-                    ],
-                  }}
-                  className="relative flex min-h-0 w-full flex-1 items-center justify-center lg:absolute lg:inset-0 lg:[perspective:1500px]"
-                  style={{
-                    willChange:
-                      'transform, opacity',
-                  }}
+          ) : (
+            items.map((product, index) => {
+              const productPath = product?.path || (
+                product?.slug ? `/grocery/product/${encodeURIComponent(product.slug)}` : '/grocery'
+              )
+              const pack = [
+                product?.quantity != null ? String(product.quantity) : '',
+                product?.unit || '',
+              ].filter(Boolean).join(' ')
+              const detail = [product?.brand, pack].filter(Boolean).join(' / ')
+              return (
+                <article
+                  key={product?.id || product?.slug || `grocery-${index}`}
+                  className="ep-landing-grocery-card"
                 >
                   <Link
                     to={productPath}
-                    className={`focus-ring group relative block h-[min(30svh,292px)] w-[min(78vw,380px)] overflow-hidden rounded-[22px] sm:h-[min(34svh,350px)] sm:w-[min(66vw,460px)] sm:rounded-[26px] lg:h-auto lg:aspect-[1.12/1] lg:w-[min(34vw,520px)] lg:rounded-[28px] xl:rounded-[30px] ${isViewAll
-                      ? 'border border-white/38 bg-white/92 p-4 shadow-[0_24px_64px_rgba(0,0,0,0.24)] sm:p-5 lg:p-6 xl:p-7'
-                      : 'border border-white/35 bg-white p-0 shadow-[12px_28px_70px_rgba(0,0,0,0.38),-5px_-5px_24px_rgba(255,255,255,0.08)] transition-[transform,box-shadow] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] lg:[transform:rotateY(-5deg)_rotateX(2deg)] lg:hover:[transform:rotateY(0deg)_rotateX(0deg)_translateY(-6px)] lg:hover:shadow-[0_38px_90px_rgba(0,0,0,0.42)] motion-reduce:transition-none'
-                    }`}
-                    aria-label={
-                      isViewAll
-                        ? 'View all grocery products'
-                        : undefined
-                    }
+                    className="ep-landing-grocery-card__main"
+                    aria-label={`View ${product?.name || 'grocery product'}`}
                   >
-                    {isViewAll ? (
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(255,255,255,1),rgba(249,250,247,0.95)_58%,rgba(231,235,228,0.86)_100%)]" />
-                    ) : null}
-
-                    {isViewAll ? (
-                      <div className="relative flex h-full flex-col items-center justify-center px-5 text-center text-[#153323]">
-                        <div className="mb-5 flex -space-x-4 sm:mb-6">
-                          {productItems.slice(0, 3).map((item, previewIndex) => (
-                            <span
-                              key={`view-all-grocery-preview-${item.id || item.slug || previewIndex}`}
-                              className="grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border-2 border-white bg-[#F8FAF7] shadow-md sm:h-16 sm:w-16"
-                            >
-                              {item.image ? (
-                                <img
-                                  src={item.image}
-                                  alt=""
-                                  className="h-full w-full object-contain p-1.5"
-                                />
-                              ) : (
-                                <Package
-                                  size={24}
-                                  aria-hidden="true"
-                                />
-                              )}
-                            </span>
-                          ))}
-                        </div>
-
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#315A42]/65 sm:text-xs">
-                          Explore the full grocery catalogue
-                        </p>
-
-                        <h3 className="mt-2 text-[clamp(32px,9vw,52px)] font-black leading-none tracking-[-0.05em] sm:text-[54px]">
-                          View all
-                        </h3>
-
-                        <span className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[#153323] px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(21,51,35,0.22)] transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-[#214D33]">
-                          Explore Grocery
-                          <ArrowRight
-                            size={15}
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="relative flex h-full w-full items-center justify-center">
-                        {activeProduct?.image ? (
-                          <img
-                            src={activeProduct.image}
-                            alt={activeProduct?.name || 'Grocery product'}
-                            className="block h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-[1.035] motion-reduce:transition-none"
-                          />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-[#166534]">
-                            <Package
-                              size={54}
-                              aria-hidden="true"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {!isViewAll ? (
-                      <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_2px_0_rgba(255,255,255,0.48),inset_-10px_0_18px_-15px_rgba(0,0,0,0.45)]"
-                      />
-                    ) : null}
+                    <div className="ep-landing-grocery-card__image-wrap">
+                      {product?.image ? (
+                        <img
+                          className="ep-landing-grocery-card__image"
+                          src={product.image}
+                          alt={product?.name || 'Grocery product'}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <span className="ep-landing-grocery-card__no-image">EPANTRY</span>
+                      )}
+                    </div>
+                    <div className="ep-landing-grocery-card__text">
+                      <span className="ep-landing-grocery-card__category">
+                        {product?.subCategory || 'Grocery'}
+                      </span>
+                      <span className="ep-landing-grocery-card__name">{product?.name || 'Grocery product'}</span>
+                      {detail ? <span className="ep-landing-grocery-card__extra">{detail}</span> : null}
+                    </div>
                   </Link>
-                </motion.div>
-              </AnimatePresence>
-
-              {/* Actions intentionally arrive from the right and sit under the active card. */}
-              {!isViewAll && (
-                <AnimatePresence
-                  mode={isSmallScreen ? "sync" : "wait"}
-                  initial={false}
-                >
-                  <motion.div
-                    key={isSmallScreen ? 'grocery-mobile-actions' : `grocery-actions-${productKey}`}
-                  initial={
-                    shouldReduceMotion || isSmallScreen
-                      ? false
-                      : {
-                          opacity: 0,
-                          x: isSmallScreen ? 0 : 90,
-                          y: isSmallScreen ? 12 : 8,
-                        }
-                  }
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                    y: 0,
-                  }}
-                  exit={
-                    shouldReduceMotion || isSmallScreen
-                      ? undefined
-                      : {
-                          opacity: 0,
-                          x: isSmallScreen ? 0 : -38,
-                          y: isSmallScreen ? -12 : -4,
-                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
-                        }
-                  }
-                  transition={{
-                    duration:
-                      shouldReduceMotion
-                        ? 0
-                        : isSmallScreen ? motionDuration : 0.68,
-
-                    delay:
-                      shouldReduceMotion || isSmallScreen
-                        ? 0
-                        : 0.08,
-
-                    ease: [
-                      0.22,
-                      1,
-                      0.36,
-                      1,
-                    ],
-                  }}
-                  className="relative z-20 mt-2 grid w-[min(78vw,380px)] grid-cols-2 gap-2 sm:mt-3 sm:w-[min(66vw,460px)] lg:absolute lg:bottom-[2.4svh] lg:left-1/2 lg:w-[min(34vw,520px)] lg:-translate-x-1/2"
-                >
-                  <Link
-                    to={productPath}
-                    className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-white/28 bg-black/24 px-3 text-[10px] font-black text-white shadow-sm backdrop-blur-md transition hover:bg-black/34 sm:h-10 sm:text-[11px] lg:h-11 lg:text-xs"
-                  >
-                    <Eye
-                      size={14}
-                      aria-hidden="true"
-                    />
-                    View product
-                  </Link>
-
                   <button
                     type="button"
-                    onClick={() =>
-                      onAddToCart(
-                        activeProduct,
-                      )
-                    }
-                    className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[10px] font-black text-[#132016] shadow-[0_10px_26px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 hover:bg-white sm:h-10 sm:text-[11px] lg:h-11 lg:text-xs"
+                    className="ep-landing-grocery-card__action"
+                    onClick={() => onAddToCart(product)}
+                    aria-label={`Add ${product?.name || 'product'} to cart`}
                   >
-                    <ShoppingBasket
-                      size={14}
-                      aria-hidden="true"
-                    />
-                    Add to cart
-                  </button>
-                  </motion.div>
-                </AnimatePresence>
-              )}
-
-              {nextProduct?.image && (
-                <motion.div
-                  key={`grocery-next-${nextProduct.id || nextProduct.slug || resolvedActiveIndex}`}
-                  aria-hidden="true"
-                  initial={false}
-                  animate={{
-                    opacity:
-                      shouldReduceMotion
-                        ? 0
-                        : 0.16,
-                  }}
-                  className="pointer-events-none absolute bottom-0 left-1/2 hidden aspect-[1.25/1] w-[27%] -translate-x-1/2 translate-y-[36%] overflow-hidden rounded-[14px] border border-white/14 bg-black/10 shadow-lg backdrop-blur-sm lg:block"
-                >
-                  <img
-                    src={nextProduct.image}
-                    alt=""
-                    className="h-full w-full object-contain opacity-80"
-                  />
-                </motion.div>
-              )}
-            </div>
-
-            {/* Right: approved Nutrition. Mobile keeps the same content below the visual. */}
-            <div className="min-w-0 lg:self-center lg:pb-9">
-              <AnimatePresence
-                mode={isSmallScreen ? "sync" : "wait"}
-                initial={false}
-              >
-                <motion.div
-                  key={isSmallScreen ? 'grocery-mobile-nutrition' : `grocery-nutrition-${productKey}`}
-                  initial={
-                    shouldReduceMotion || isSmallScreen
-                      ? false
-                      : {
-                          opacity: 0,
-                          x: isSmallScreen ? 0 : direction > 0 ? 26 : -12,
-                        }
-                  }
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                  }}
-                  exit={
-                    shouldReduceMotion || isSmallScreen
-                      ? undefined
-                      : {
-                          opacity: 0,
-                          x: isSmallScreen ? 0 : direction > 0 ? -18 : 18,
-                          transition: isSmallScreen ? { duration: 0.16 } : undefined,
-                        }
-                  }
-                  transition={{
-                    duration:
-                      motionDuration,
-
-                    delay:
-                      shouldReduceMotion || isSmallScreen
-                        ? 0
-                        : 0.04,
-
-                    ease: [
-                      0.22,
-                      1,
-                      0.36,
-                      1,
-                    ],
-                  }}
-                  className="rounded-[18px] border border-white/14 bg-black/10 p-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] sm:backdrop-blur-sm sm:p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none"
-                >
-                  {isViewAll ? (
-                    <Link to="/grocery" className="focus-ring flex min-h-[92px] items-center justify-between gap-4 rounded-lg lg:min-h-0 lg:block" aria-label="Browse all grocery products">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/88 lg:text-[10px] lg:tracking-[0.24em]">
-                          All Grocery
-                        </p>
-                        <p className="mt-1 max-w-[280px] text-[10px] font-semibold leading-4 text-white/55 sm:text-xs lg:mt-3 lg:text-sm lg:leading-6">
-                          Continue to the full EPANTRY grocery catalogue.
-                        </p>
-                      </div>
-
-                      <ArrowRight
-                        size={20}
-                        aria-hidden="true"
-                        className="shrink-0 text-white/70 lg:mt-5"
-                      />
-                    </Link>
-                  ) : (
-                    <>
-                  <div className="flex items-end justify-between gap-4 border-b border-white/18 pb-2.5 lg:max-w-[340px] lg:pb-3">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/88 lg:text-[13px] lg:tracking-[0.24em]">
-                        Nutrition
-                      </p>
-                      <p className="mt-0.5 hidden text-xs font-semibold text-white/46 sm:block lg:text-sm">
-                        Approved product information
-                      </p>
-                    </div>
-
-                    <span className="text-[9px] font-black tabular-nums text-white/38 lg:text-xs">
-                      {String(resolvedActiveIndex + 1).padStart(2, '0')}
+                    <span>Add to cart</span>
+                    <span className="ep-landing-grocery-card__action-icon">
+                      <ArrowRight size={17} aria-hidden="true" />
                     </span>
-                  </div>
-
-                  {(activeNutrition.length > 0) ? (
-                    <>
-                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 lg:hidden">
-                        {mobileNutrition.map(
-                          (
-                            nutrient,
-                            nutrientIndex,
-                          ) => (
-                            <div
-                              key={
-                                nutrient.key ||
-                                nutrient.name ||
-                                `${productKey}-mobile-nutrition-${nutrientIndex}`
-                              }
-                              className="flex min-h-[26px] items-center justify-between gap-2 py-1"
-                            >
-                              <span className="min-w-0 pr-1 text-[8px] font-bold leading-3 text-white/58 sm:text-[10px] sm:leading-4">
-                                {nutrient.name || nutrient.key || 'Nutrient'}
-                              </span>
-
-                              <span className="shrink-0 text-[9px] font-black text-white sm:text-[10px]">
-                                {formatNutritionValue(
-                                  nutrient.amount,
-                                  nutrient.unit,
-                                )}
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-
-                      <div className="mt-4 hidden space-y-1 lg:block lg:max-w-[340px]">
-                        {activeNutrition.map(
-                          (
-                            nutrient,
-                            nutrientIndex,
-                          ) => (
-                            <div
-                              key={
-                                nutrient.key ||
-                                nutrient.name ||
-                                `${productKey}-nutrition-${nutrientIndex}`
-                              }
-                              className="flex items-center justify-between gap-5 border-b border-white/[0.10] py-2.5"
-                            >
-                              <span className="min-w-0 truncate text-[14px] font-bold text-white/52">
-                                {nutrient.name || nutrient.key || 'Nutrient'}
-                              </span>
-
-                              <span className="shrink-0 text-[14px] font-black text-white">
-                                {formatNutritionValue(
-                                  nutrient.amount,
-                                  nutrient.unit,
-                                )}
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="mt-3 text-[10px] font-semibold leading-4 text-white/48 sm:text-xs lg:mt-5 lg:max-w-[270px] lg:text-sm lg:leading-6">
-                      Approved nutrition is not available for this product yet.
-                    </p>
-                  )}
-                    </>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
-
+                  </button>
+                </article>
+              )
+            })
+          )}
         </div>
-        </motion.div>
       </div>
+      <div className="ep-landing-grocery-exit-hold" aria-hidden="true" />
     </section>
   )
 }
 
 /*
 |--------------------------------------------------------------------------
-| Featured Recipes Scroll Story
+| Featured Recipes and Featured Brands: same approved Grocery visual system.
+| Hero images come from their EXISTING pages, never fabricated.
+| Existing navigation, brand-range filters and real API data are preserved.
 |--------------------------------------------------------------------------
 */
 
-const FEATURED_RECIPE_CAMERA_SEQUENCE = [
-  2,
-  0,
-  3,
-  1,
-]
-
-const RECIPE_WORLD_GEOMETRY = {
-  mobile: {
-    centerScale: 0.88,
-    scaleDrop: 0.14,
-    minScale: 0.58,
-    xRatio: 0.72,
-    xCurve: 0.82,
-    maxXRatio: 0.98,
-    yStep: 18,
-    zStep: 140,
-    rotateY: 10,
-    rotateZ: 1.1,
+const FEATURED_DISCOVERY_CONFIG = {
+  recipes: {
+    hero: '/hero/recipe.png',
+    title: 'Recipes',
+    label: 'Made to be shared',
+    description: 'Find a dish you love and make it your own.',
+    eyebrow: 'Featured recipes',
+    galleryTitle: 'Something worth cooking.',
+    explore: 'Explore Recipes',
+    path: '/recipes',
+    empty: 'Published recipes will appear here when available.',
   },
-  desktop: {
-    centerScale: 1,
-    scaleDrop: 0.19,
-    minScale: 0.58,
-    xRatio: 0.34,
-    xCurve: 0.84,
-    maxXRatio: 0.58,
-    yStep: 24,
-    zStep: 210,
-    rotateY: 14,
-    rotateZ: 1.5,
+  brands: {
+    hero: '/hero/brand.png',
+    title: 'Brands',
+    label: 'Discover the makers',
+    description: 'Explore the food brands behind your favourites.',
+    eyebrow: 'Featured brands',
+    galleryTitle: 'Meet the makers.',
+    explore: 'Explore Brands',
+    path: '/brands',
+    empty: 'Active food brands will appear here when available.',
   },
 }
 
-const RECIPE_STAGE_SHARDS = [
-  { left: '3%', top: '79%', size: 48, rotate: -17, opacity: 0.42 },
-  { left: '10%', top: '72%', size: 34, rotate: 26, opacity: 0.32 },
-  { left: '18%', top: '84%', size: 64, rotate: -38, opacity: 0.48 },
-  { left: '27%', top: '75%', size: 40, rotate: 11, opacity: 0.36 },
-  { left: '37%', top: '87%', size: 58, rotate: 41, opacity: 0.44 },
-  { left: '48%', top: '73%', size: 42, rotate: -11, opacity: 0.34 },
-  { left: '56%', top: '86%', size: 72, rotate: 19, opacity: 0.46 },
-  { left: '66%', top: '77%', size: 44, rotate: -32, opacity: 0.38 },
-  { left: '76%', top: '88%', size: 58, rotate: 27, opacity: 0.42 },
-  { left: '86%', top: '74%', size: 38, rotate: -9, opacity: 0.30 },
-  { left: '93%', top: '85%', size: 66, rotate: 34, opacity: 0.40 },
-]
-
-function clampRecipeStoryValue(
-  value,
-  min = 0,
-  max = 1,
-) {
-  return Math.min(
-    Math.max(
-      value,
-      min,
-    ),
-    max,
-  )
-}
-
-function smoothRecipeStoryStep(
-  value,
-) {
-  const resolved =
-    clampRecipeStoryValue(
-      value,
-    )
-
-  return (
-    resolved *
-    resolved *
-    (3 - 2 * resolved)
-  )
-}
-
-function recipePath(
-  recipe,
-) {
-  return (
-    recipe?.path ||
-    (recipe?.slug
-      ? `/recipes/${recipe.slug}`
-      : '/recipes')
-  )
-}
-
-function FeaturedRecipesScrollStory({
-  recipes,
-  shouldReduceMotion,
+/*
+ * Two distinct landing experiences reuse the existing featured API.
+ * Recipes: full-height, image-led 8/4 grid; Brands: restored typographic
+ * left/right motion wall instead of cards. The Grocery section is unchanged.
+ */
+function FeaturedDiscoverySection({
+  kind,
+  items,
+  groups = [],
+  selectedFilter = 'all',
+  onSelectFilter,
 }) {
-  const isSmallScreen = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const sectionRef =
-    useRef(null)
+  const config = FEATURED_DISCOVERY_CONFIG[kind]
+  const sectionRef = useRef(null)
+  const heroRef = useRef(null)
+  const displayItems = Array.isArray(items) ? (kind === 'recipes' ? items.slice(0, 8) : items) : []
 
-  const stageRef =
-    useRef(null)
-
-  const animationFrameRef =
-    useRef(null)
-
-  const pointerFrameRef =
-    useRef(null)
-
-  const pointerTargetRef =
-    useRef({
-      x: 0.5,
-      y: 0.34,
-    })
-
-  const pointerCurrentRef =
-    useRef({
-      x: 0.5,
-      y: 0.34,
-    })
-
-  const [
-    storyProgress,
-    setStoryProgress,
-  ] = useState(0)
-
-  const [
-    mobileOpenKey,
-    setMobileOpenKey,
-  ] = useState('')
-
-  const worldRecipes =
-    (recipes || []).slice(
-      0,
-      4,
-    )
-
-  const storyItems = [
-    ...worldRecipes.map(
-      (recipe) => ({
-        type: 'recipe',
-        recipe,
-        key:
-          recipe.id ||
-          recipe.slug ||
-          recipe.name,
-      }),
-    ),
-    {
-      type: 'view-all',
-      key: 'view-all-recipes',
-    },
-  ]
-
-  const preferredFocusSequence = [
-    ...FEATURED_RECIPE_CAMERA_SEQUENCE,
-    storyItems.length - 1,
-  ]
-
-  const focusSequence =
-    preferredFocusSequence
-      .filter(
-        (itemIndex, index, all) =>
-          itemIndex >= 0 &&
-          itemIndex < storyItems.length &&
-          all.indexOf(
-            itemIndex,
-          ) === index,
-      )
-
-  for (
-    let itemIndex = 0;
-    itemIndex < storyItems.length;
-    itemIndex += 1
-  ) {
-    if (
-      !focusSequence.includes(
-        itemIndex,
-      )
-    ) {
-      focusSequence.push(
-        itemIndex,
-      )
-    }
-  }
-
-  /*
-   * The reference keeps every card planted in one physical row and moves the
-   * camera forward through that row. The requested focus order is therefore
-   * also the left-to-right stage order. This avoids the backwards camera jumps
-   * caused by keeping the original recipe array order in the world.
-   */
-  const cameraItems =
-    focusSequence
-      .map(
-        (itemIndex) =>
-          storyItems[
-            itemIndex
-          ],
-      )
-      .filter(Boolean)
-
-  /*
-   * Timeline (viewport scroll units):
-   * 0     = closed intro title
-   * 0-1   = curtain opens with the third recipe already framed
-   * 1-5   = camera travels 3rd -> 1st -> 4th -> 2nd -> View all
-   * 5-6   = curtain closes over the final camera position
-   * 6-7   = closed outro title hold
-   *
-   * The cards stay fixed in one horizontal world in the requested focus
-   * sequence. Scroll moves the camera monotonically across that world; cards
-   * never jump or swap positions.
-   */
-  const mobileRecipeScale = 5.16
-  const storyHeight = isSmallScreen ? '395dvh' : '590svh'
-  const recipeStops = isSmallScreen
-    ? [0.02, ...cameraItems.map((_, index) => Math.min(1.02 + index, 4.96) / mobileRecipeScale)].join(',')
-    : [0.02, ...cameraItems.map((_, index) => (1.04 + index) / 7), 6.68 / 7].join(',')
-
-  useEffect(
-    () => {
-      if (typeof window === 'undefined') {
-        return undefined
-      }
-
-      const isMobile = window.matchMedia('(max-width: 767px)').matches
-      let lastRendered = -1
-      let settledTimer = null
-      let guidedUntil = 0
-
-      const resolveProgress = () => {
-        const section = sectionRef.current
-        if (!section) {
-          return 0
-        }
-
-        const sectionRect = section.getBoundingClientRect()
-        // Match the 100svh sticky stage, independent of mobile browser UI.
-        const stickyHeight =
-          stageRef.current?.getBoundingClientRect().height ||
-          sectionRect.height
-        const travel = Math.max(sectionRect.height - stickyHeight, 1)
-
-        return clampRecipeStoryValue((-sectionRect.top / travel) * (isMobile ? 5.16 : 7), 0, 7)
-      }
-
-      const updateProgress = () => {
-        animationFrameRef.current = null
-        const next = resolveProgress()
-        if (Math.abs(next - lastRendered) > 0.001) {
-          lastRendered = next
-          setStoryProgress(next)
-        }
-      }
-
-      const scheduleProgress = () => {
-        if (isMobile) {
-          if (performance.now() < guidedUntil) return
-          // Keep scroll feedback lightweight: sync after the browser-native
-          // movement settles instead of re-rendering during every frame.
-          if (settledTimer !== null) window.clearTimeout(settledTimer)
-          settledTimer = window.setTimeout(() => {
-            settledTimer = null
-            updateProgress()
-          }, 95)
-        } else if (animationFrameRef.current === null) {
-          animationFrameRef.current = window.requestAnimationFrame(updateProgress)
-        }
-      }
-
-      const onRecipeStage = (event) => {
-        const target = event.detail?.progress
-        if (!isMobile || !Number.isFinite(target)) return
-        if (settledTimer !== null) window.clearTimeout(settledTimer)
-        settledTimer = null
-        // Show the incoming card on gesture release, not 175ms later.
-        // Avoid rendering intermediate positions while native scroll settles.
-        guidedUntil = performance.now() + 650
-        lastRendered = target
-        setStoryProgress(target)
-      }
-
-      // Sync directly on mount, including browser scroll restoration.
-      lastRendered = resolveProgress()
-      setStoryProgress(lastRendered)
-      window.addEventListener('scroll', scheduleProgress, { passive: true })
-      window.addEventListener('resize', scheduleProgress)
-      window.addEventListener('pageshow', scheduleProgress)
-      window.addEventListener('epantry:recipe-stage', onRecipeStage)
-
-      return () => {
-        if (animationFrameRef.current !== null) {
-          window.cancelAnimationFrame(animationFrameRef.current)
-          animationFrameRef.current = null
-        }
-        if (settledTimer !== null) window.clearTimeout(settledTimer)
-        window.removeEventListener('scroll', scheduleProgress)
-        window.removeEventListener('resize', scheduleProgress)
-        window.removeEventListener('pageshow', scheduleProgress)
-        window.removeEventListener('epantry:recipe-stage', onRecipeStage)
-      }
-    },
-    [],
-  )
-
-  useEffect(
-    () => {
-      if (
-        shouldReduceMotion ||
-        typeof window ===
-          'undefined' ||
-        window.matchMedia('(max-width: 767px)').matches
-      ) {
-        return undefined
-      }
-
-      const animatePointer =
-        () => {
-          pointerFrameRef.current =
-            null
-
-          const current =
-            pointerCurrentRef.current
-
-          const target =
-            pointerTargetRef.current
-
-          const nextX =
-            current.x +
-            (target.x - current.x) *
-              0.09
-
-          const nextY =
-            current.y +
-            (target.y - current.y) *
-              0.09
-
-          pointerCurrentRef.current = {
-            x: nextX,
-            y: nextY,
-          }
-
-          const stage =
-            stageRef.current
-
-          if (stage) {
-            stage.style.setProperty(
-              '--recipe-pointer-x',
-              `${(
-                nextX *
-                100
-              ).toFixed(2)}%`,
-            )
-
-            stage.style.setProperty(
-              '--recipe-pointer-y',
-              `${(
-                nextY *
-                100
-              ).toFixed(2)}%`,
-            )
-
-            stage.style.setProperty(
-              '--recipe-pointer-nx',
-              (
-                (nextX - 0.5) *
-                2
-              ).toFixed(4),
-            )
-
-            stage.style.setProperty(
-              '--recipe-pointer-ny',
-              (
-                (nextY - 0.5) *
-                2
-              ).toFixed(4),
-            )
-          }
-
-          if (
-            Math.abs(
-              target.x - nextX,
-            ) > 0.0005 ||
-            Math.abs(
-              target.y - nextY,
-            ) > 0.0005
-          ) {
-            pointerFrameRef.current =
-              window.requestAnimationFrame(
-                animatePointer,
-              )
-          }
-        }
-
-      const ensurePointerFrame =
-        () => {
-          if (
-            pointerFrameRef.current ===
-            null
-          ) {
-            pointerFrameRef.current =
-              window.requestAnimationFrame(
-                animatePointer,
-              )
-          }
-        }
-
-      ensurePointerFrame()
-
-      return () => {
-        if (
-          pointerFrameRef.current !==
-          null
-        ) {
-          window.cancelAnimationFrame(
-            pointerFrameRef.current,
-          )
-        }
-      }
-    },
-    [shouldReduceMotion],
-  )
-
-  const handlePointerMove =
-    (event) => {
-      if (
-        shouldReduceMotion ||
-        event.pointerType ===
-          'touch'
-      ) {
-        return
-      }
-
-      const stage =
-        stageRef.current
-
-      if (!stage) {
-        return
-      }
-
-      const rect =
-        stage.getBoundingClientRect()
-
-      pointerTargetRef.current = {
-        x:
-          clampRecipeStoryValue(
-            (
-              event.clientX -
-              rect.left
-            ) /
-              Math.max(
-                rect.width,
-                1,
-              ),
-          ),
-        y:
-          clampRecipeStoryValue(
-            (
-              event.clientY -
-              rect.top
-            ) /
-              Math.max(
-                rect.height,
-                1,
-              ),
-          ),
-      }
-
-      if (
-        pointerFrameRef.current ===
-        null &&
-        typeof window !==
-          'undefined'
-      ) {
-        pointerFrameRef.current =
-          window.requestAnimationFrame(
-            function movePointerFrame() {
-              pointerFrameRef.current =
-                null
-
-              const current =
-                pointerCurrentRef.current
-
-              const target =
-                pointerTargetRef.current
-
-              const nextX =
-                current.x +
-                (target.x - current.x) *
-                  0.12
-
-              const nextY =
-                current.y +
-                (target.y - current.y) *
-                  0.12
-
-              pointerCurrentRef.current = {
-                x: nextX,
-                y: nextY,
-              }
-
-              const currentStage =
-                stageRef.current
-
-              if (currentStage) {
-                currentStage.style.setProperty(
-                  '--recipe-pointer-x',
-                  `${(
-                    nextX *
-                    100
-                  ).toFixed(2)}%`,
-                )
-
-                currentStage.style.setProperty(
-                  '--recipe-pointer-y',
-                  `${(
-                    nextY *
-                    100
-                  ).toFixed(2)}%`,
-                )
-
-                currentStage.style.setProperty(
-                  '--recipe-pointer-nx',
-                  (
-                    (nextX - 0.5) *
-                    2
-                  ).toFixed(4),
-                )
-
-                currentStage.style.setProperty(
-                  '--recipe-pointer-ny',
-                  (
-                    (nextY - 0.5) *
-                    2
-                  ).toFixed(4),
-                )
-              }
-
-              if (
-                Math.abs(
-                  target.x - nextX,
-                ) > 0.0005 ||
-                Math.abs(
-                  target.y - nextY,
-                ) > 0.0005
-              ) {
-                pointerFrameRef.current =
-                  window.requestAnimationFrame(
-                    movePointerFrame,
-                  )
-              }
-            },
-          )
-      }
-    }
-
-  const handlePointerLeave =
-    () => {
-      pointerTargetRef.current = {
-        x: 0.5,
-        y: 0.34,
-      }
-    }
-
-  const openingProgress =
-    shouldReduceMotion
-      ? 1
-      : smoothRecipeStoryStep(
-          storyProgress,
-        )
-
-  const closingProgress =
-    shouldReduceMotion
-      ? 0
-      : smoothRecipeStoryStep(
-          storyProgress -
-            5,
-        )
-
-  const curtainOpenAmount =
-    shouldReduceMotion
-      ? 1
-      : clampRecipeStoryValue(
-          openingProgress -
-            closingProgress,
-        )
-
-  const focusTravelProgress =
-    clampRecipeStoryValue(
-      storyProgress -
-        1,
-      0,
-      Math.max(
-        cameraItems.length -
-          1,
-        0,
-      ),
-    )
-
-  const focusSegmentIndex =
-    Math.min(
-      Math.floor(
-        focusTravelProgress,
-      ),
-      Math.max(
-        cameraItems.length -
-          1,
-        0,
-      ),
-    )
-
-  const focusSegmentLocalProgress =
-    focusTravelProgress -
-    focusSegmentIndex
-
-  /*
-   * Keep each target card visually settled for a short beat, then move the
-   * camera through the fixed row. The cards themselves never translate.
-   */
-  const focusSegmentProgress =
-    smoothRecipeStoryStep(
-      clampRecipeStoryValue(
-        (
-          focusSegmentLocalProgress -
-          0.14
-        ) /
-          0.72,
-      ),
-    )
-
-  const cameraFromSlot =
-    focusSegmentIndex
-
-  const cameraToSlot =
-    Math.min(
-      focusSegmentIndex +
-        1,
-      Math.max(
-        cameraItems.length -
-          1,
-        0,
-      ),
-    )
-
-  const cameraWorldSlot =
-    storyProgress < 1
-      ? 0
-      : cameraFromSlot +
-        (
-          cameraToSlot -
-          cameraFromSlot
-        ) *
-          focusSegmentProgress
-
-  const activeSequenceIndex =
-    Math.min(
-      Math.max(
-        Math.round(
-          focusTravelProgress,
-        ),
-        0,
-      ),
-      Math.max(
-        cameraItems.length -
-          1,
-        0,
-      ),
-    )
-
-  const activeItem =
-    cameraItems[
-      activeSequenceIndex
-    ] ||
-    null
-
-  const activeItemKey =
-    activeItem?.key ||
-    'recipe-story-empty'
-
-  // Only preload in the Recipe section, never while the user is in Grocery.
   useEffect(() => {
-    if (typeof window === 'undefined' || !isSmallScreen) return undefined
     const section = sectionRef.current
-    if (!section) return undefined
-    const covers = [...new Set(worldRecipes.map((recipe) => recipe?.image).filter(Boolean))]
-    const preloaded = []
-    const warmRecipeCovers = () => {
-      covers.forEach((src) => {
-        const image = new window.Image()
-        image.decoding = 'async'
-        image.src = src
-        // Decode before a card becomes active, not during its entry animation.
-        if (typeof image.decode === 'function') image.decode().catch(() => {})
-        preloaded.push(image)
-      })
+    const hero = heroRef.current
+    if (!section || !hero) return undefined
+    const update = () => {
+      const total = section.getBoundingClientRect().height
+      const gallery = section.querySelector(kind === 'recipes' ? '.ep-recipe-showcase' : '.ep-brand-motion')
+      const first = gallery ? gallery.getBoundingClientRect().top - section.getBoundingClientRect().top : hero.getBoundingClientRect().height
+      if (total > 0) {
+        // Recipes' final viewport is only a visual hold while the Brands hero
+        // slides over it, not a separately navigable mobile story stop.
+        const travel = kind === 'recipes'
+          ? Math.max(total - hero.getBoundingClientRect().height, 1)
+          : total
+        section.dataset.landingStops = `0,${Math.max(0,Math.min(first / travel, 1)).toFixed(5)}`
+      }
     }
-    if (typeof window.IntersectionObserver !== 'function') return undefined
-    const observer = new window.IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        warmRecipeCovers()
-        observer.disconnect()
-      }
-    }, { threshold: 0, rootMargin: '120% 0px 120% 0px' })
-    observer.observe(section)
-    return () => observer.disconnect()
-  }, [recipes, isSmallScreen])
-
-  const nextMobileRecipeImage = cameraItems[activeSequenceIndex + 1]?.recipe?.image
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches || !nextMobileRecipeImage) return undefined
-    const timer = window.setTimeout(() => {
-      const image = new window.Image()
-      image.decoding = 'async'
-      image.src = nextMobileRecipeImage
-    }, 240)
-    return () => window.clearTimeout(timer)
-  }, [nextMobileRecipeImage])
-
-  const introOpacity =
-    shouldReduceMotion
-      ? 0
-      : clampRecipeStoryValue(
-          1 -
-            storyProgress /
-              0.72,
-        )
-
-  const outroOpacity =
-    shouldReduceMotion
-      ? 0
-      : clampRecipeStoryValue(
-          (
-            storyProgress -
-            5.82
-          ) /
-            0.34,
-        )
-
-  const cardOpacity =
-    shouldReduceMotion
-      ? 1
-      : clampRecipeStoryValue(
-          Math.min(
-            storyProgress,
-            6 -
-              storyProgress,
-          ) /
-            0.72,
-        )
-
-  const activeCardCentered =
-    Math.abs(
-      cameraWorldSlot -
-        activeSequenceIndex,
-    ) < 0.12
-
-  useEffect(
-    () => {
-      if (
-        typeof window ===
-          'undefined' ||
-        !activeItem ||
-        activeItem.type !==
-          'recipe' ||
-        !activeCardCentered ||
-        !window.matchMedia(
-          '(max-width: 767px)',
-        ).matches
-      ) {
-        setMobileOpenKey('')
-        return undefined
-      }
-
-      const openTimer =
-        window.setTimeout(
-          () => {
-            setMobileOpenKey(
-              activeItemKey,
-            )
-          },
-          shouldReduceMotion
-            ? 0
-            : 490,
-        )
-
-      const closeTimer =
-        window.setTimeout(
-          () => {
-            setMobileOpenKey('')
-          },
-          shouldReduceMotion
-            ? 400
-            : 2250,
-        )
-
-      return () => {
-        window.clearTimeout(
-          openTimer,
-        )
-
-        window.clearTimeout(
-          closeTimer,
-        )
-      }
-    },
-    [
-      activeItemKey,
-      activeItem?.type,
-      activeCardCentered,
-      shouldReduceMotion,
-    ],
-  )
-
-  if (
-    storyItems.length ===
-    1 &&
-    storyItems[0]?.type ===
-      'view-all'
-  ) {
-    return (
-      <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-black text-white">
-        <Link
-          to="/recipes"
-          className="focus-ring rounded-full border border-red-500/40 px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-red-400"
-        >
-          Explore Recipes
-        </Link>
-      </section>
-    )
-  }
+    update()
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    observer?.observe(section)
+    observer?.observe(hero)
+    window.addEventListener('resize', update)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [kind, displayItems.length, selectedFilter])
 
   return (
     <section
       ref={sectionRef}
-      data-landing-story="recipes"
-      data-landing-stops={recipeStops}
-      data-landing-recipe-scale={isSmallScreen ? mobileRecipeScale : 7}
-      className="relative z-20 isolate bg-black max-[767px]:bg-[#020202]"
-      style={{
-        height:
-          storyHeight,
-      }}
+      className={`ep-featured-story ep-featured-story--${kind}`}
+      data-landing-story={kind}
+      data-landing-stops="0,0.5"
+      data-landing-static="true"
+      aria-label={`Featured ${kind} discovery`}
     >
-      <motion.div
-        ref={stageRef}
-        data-landing-sticky
-        initial={
-          shouldReduceMotion || isSmallScreen
-            ? false
-            : {
-                opacity: 0,
-                y: 54,
-              }
+      <style>{`
+        .ep-featured-story { position:relative; isolation:isolate; }
+        /* Recipes hero is a full-screen sheet sliding over the pinned
+           Grocery gallery; its own gallery comes next in normal flow. */
+        .ep-featured-story--recipes { margin-top:-100svh; z-index:4; }
+        .ep-featured-story--recipes .ep-featured-photo { position:relative; }
+        .ep-featured-story--recipes .ep-recipe-showcase {
+          position:sticky; top:0;
+          margin-top:0; border-radius:0; box-shadow:none;
         }
-        whileInView={{
-          opacity: 1,
-          y: 0,
-        }}
-        viewport={{
-          once: true,
-          amount: 0.08,
-        }}
-        transition={{
-          duration:
-            shouldReduceMotion
-              ? 0
-              : 0.9,
-          ease: [
-            0.22,
-            1,
-            0.36,
-            1,
-          ],
-        }}
-        onPointerMove={
-          handlePointerMove
+        /* Hold Recipes in place for the single viewport in which the Brands
+           hero rises over the gallery; no nested gallery scroll is introduced. */
+        .ep-featured-story--recipes .ep-recipe-exit-hold {
+          position:relative; height:100svh; pointer-events:none;
         }
-        onPointerLeave={
-          handlePointerLeave
+        .ep-featured-story--brands { margin-top:-100svh; z-index:5; }
+        .ep-featured-story--brands .ep-featured-photo { position:relative; }
+        .ep-featured-story--brands .ep-brand-motion {
+          margin-top:0; border-radius:0; box-shadow:none;
         }
-        className="sticky top-0 h-[100svh] sm:h-[100svh] overflow-hidden bg-[#020202] text-white"
-        style={{
-          height: isSmallScreen ? '100dvh' : undefined,
-          '--recipe-pointer-x':
-            '50%',
-          '--recipe-pointer-y':
-            '34%',
-          '--recipe-pointer-nx':
-            0,
-          '--recipe-pointer-ny':
-            0,
-        }}
-      >
-        {/* Mouse-responsive red atmosphere from the supplied reference. */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(circle at var(--recipe-pointer-x) var(--recipe-pointer-y), rgba(235,0,0,0.42) 0%, rgba(155,0,0,0.24) 13%, rgba(45,0,0,0.10) 28%, transparent 48%), radial-gradient(circle at 50% 52%, rgba(95,0,0,0.22), transparent 48%), #020202',
-          }}
-        />
-
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 bottom-0 hidden h-[46%] origin-bottom sm:block"
-          style={{
-            perspective:
-              '900px',
-          }}
-        >
-          <div
-            className="absolute -inset-x-[16%] -bottom-[32%] h-[150%] opacity-75"
-            style={{
-              backgroundImage:
-                'linear-gradient(rgba(255,28,28,0.20) 1px, transparent 1px), linear-gradient(90deg, rgba(255,28,28,0.16) 1px, transparent 1px)',
-              backgroundSize:
-                '48px 48px',
-              transform:
-                'rotateX(66deg) translate3d(calc(var(--recipe-pointer-nx) * 8px), calc(var(--recipe-pointer-ny) * 5px), 0)',
-              transformOrigin:
-                'center bottom',
-              transition:
-                'transform 160ms linear',
-              maskImage:
-                'linear-gradient(to top, black 20%, rgba(0,0,0,0.92) 58%, transparent 100%)',
-              WebkitMaskImage:
-                'linear-gradient(to top, black 20%, rgba(0,0,0,0.92) 58%, transparent 100%)',
-            }}
-          />
-
-          {RECIPE_STAGE_SHARDS.map(
-            (
-              shard,
-              index,
-            ) => (
-              <span
-                key={`recipe-stage-shard-${index}`}
-                className="absolute bg-gradient-to-br from-[#F52323] via-[#780000] to-[#160000] shadow-[0_0_28px_rgba(255,0,0,0.12)]"
-                style={{
-                  left:
-                    shard.left,
-                  top:
-                    shard.top,
-                  width:
-                    shard.size,
-                  height:
-                    shard.size *
-                    0.66,
-                  opacity:
-                    shard.opacity,
-                  clipPath:
-                    'polygon(50% 0%, 100% 100%, 0% 78%)',
-                  transform:
-                    `rotate(${shard.rotate}deg) translate3d(calc(var(--recipe-pointer-nx) * ${index % 2 ? -4 : 4}px), calc(var(--recipe-pointer-ny) * ${index % 3 ? 3 : -3}px), 0)`,
-                  transition:
-                    'transform 180ms linear',
-                }}
-              />
-            ),
-          )}
+        .ep-featured-story * { box-sizing:border-box; }
+        .ep-featured-photo {
+          position:sticky; top:0; z-index:1; height:100svh; overflow:hidden;
+          background:#F7F6F2 !important;
+        }
+        .ep-featured-photo__img {
+          position:absolute; inset:0; width:100%; height:100%;
+          object-fit:cover; object-position:center; z-index:0;
+        }
+        .ep-featured-story--brands .ep-featured-photo__img { object-position:66% center; }
+        .ep-featured-photo__content {
+          position:relative; z-index:2; height:100%; display:flex; align-items:center;
+          padding:clamp(22px,5vw,82px);
+        }
+        .ep-featured-photo__panel {
+          width:min(520px,49vw); padding:clamp(24px,3.5vw,48px);
+          background:#F7F6F2 !important;
+          border-left:5px solid #173F35;
+          color:#202421 !important;
+          box-shadow:0 14px 36px rgba(32,36,33,.15);
+        }
+        .ep-featured-photo__eyebrow {
+          margin:0 0 16px; color:#173F35 !important;
+          font-size:14px !important; font-weight:700; letter-spacing:.07em;
+          line-height:1.4; text-transform:uppercase;
+        }
+        .ep-featured-photo__heading {
+          margin:0; color:#202421 !important;
+          font-size:clamp(44px,5.4vw,82px) !important;
+          font-weight:700 !important; line-height:1.02 !important;
+          letter-spacing:-.055em; overflow-wrap:normal;
+        }
+        .ep-featured-photo__heading span { display:block; color:#173F35 !important; }
+        .ep-featured-photo__description {
+          margin:20px 0 0; color:#202421 !important; font-size:17px !important;
+          font-weight:600; line-height:1.55;
+        }
+        .ep-featured-photo__cue {
+          position:absolute; right:clamp(20px,5vw,72px); bottom:32px; z-index:2;
+          display:flex; align-items:center; gap:10px;
+          border:1px solid #173F35; border-radius:999px;
+          padding:10px 16px; color:#173F35 !important; background:#F7F6F2 !important;
+          font-size:14px; font-weight:700;
+        }
+        .ep-featured-photo__cue svg { transform:rotate(90deg); }
+        .ep-recipe-showcase {
+          position:relative; z-index:3;
+          margin-top:0;
+          height:100svh; min-height:0; display:flex; flex-direction:column;
+          gap:clamp(14px,2svh,22px); padding:clamp(76px,9svh,94px) clamp(16px,4vw,70px) clamp(12px,2svh,22px);
+          border-radius:24px 24px 0 0;
+          box-shadow:0 -8px 28px rgba(32,36,33,.10);
+          background:#DCE0CF !important; color:#202421 !important;
+        }
+        .ep-recipe-showcase__head {
+          flex:0 0 auto; display:flex; align-items:end; justify-content:space-between;
+          gap:16px;
+        }
+        .ep-recipe-showcase__label {
+          margin:0 0 4px; color:#173F35 !important;
+          font-size:13px !important; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+        }
+        .ep-recipe-showcase__title {
+          margin:0; color:#202421 !important; font-size:clamp(26px,3vw,44px) !important;
+          font-weight:700 !important; line-height:1.1 !important;
+        }
+        .ep-recipe-showcase__explore {
+          flex-shrink:0; display:inline-flex; align-items:center; gap:8px;
+          background:#173F35 !important; color:#F7F6F2 !important;
+          padding:12px 17px; min-height:44px; border-radius:999px;
+          text-decoration:none; font-size:14px; font-weight:700;
+        }
+        .ep-recipe-showcase__grid {
+          min-height:0; flex:1 1 auto; display:grid;
+          grid-template-columns:repeat(4,minmax(0,1fr));
+          grid-template-rows:repeat(2,minmax(0,1fr)); gap:clamp(10px,1.45vw,20px);
+        }
+        .ep-recipe-tile {
+          position:relative; min-width:0; min-height:0; display:flex;
+          flex-direction:column; overflow:hidden; border-radius:14px;
+          background:#F7F6F2 !important; border:1px solid #173F35;
+          color:#202421 !important; text-decoration:none;
+          transition:transform .22s ease,box-shadow .22s ease;
+        }
+        .ep-recipe-tile:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(32,36,33,.13); }
+        .ep-recipe-tile__image {
+          display:block; flex:1 1 auto; min-height:0; overflow:hidden;
+          background:#F7F6F2 !important;
+        }
+        .ep-recipe-tile__image img {
+          display:block; width:100%; height:100%; object-fit:cover; object-position:center;
+        }
+        .ep-recipe-tile__fallback {
+          display:grid; place-items:center; height:100%; padding:12px; color:#173F35 !important;
+          font-size:14px; text-align:center;
+        }
+        .ep-recipe-tile__details {
+          min-width:0; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+          gap:7px; padding:10px 12px; background:#F7F6F2 !important;
+        }
+        .ep-recipe-tile__details > span:first-child { display:block; min-width:0; }
+        .ep-recipe-tile__type {
+          display:block; margin-bottom:3px; color:#173F35 !important;
+          font-size:12px; font-weight:700; line-height:1.2;
+          white-space:nowrap; text-overflow:ellipsis; overflow:hidden;
+        }
+        .ep-recipe-tile__name {
+          display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+          color:#202421 !important; font-size:15px; font-weight:700; line-height:1.25;
+        }
+        .ep-recipe-tile__arrow {
+          flex:0 0 auto; width:30px; height:30px; display:grid; place-items:center;
+          border-radius:100%; color:#F7F6F2 !important; background:#173F35 !important;
+        }
+        .ep-recipe-showcase__empty {
+          grid-column:1/-1; display:grid; place-content:center; gap:10px;
+          text-align:center; color:#202421 !important;
+        }
+        .ep-recipe-showcase__empty a { color:#173F35 !important; }
+        .ep-brand-motion {
+          position:relative; z-index:3; isolation:isolate;
+          margin-top:0;
+          height:100svh; min-height:0;
+          overflow:hidden; background:#F7F6F2 !important; color:#202421 !important;
+          border-radius:24px 24px 0 0;
+          box-shadow:0 -8px 28px rgba(32,36,33,.10);
+        }
+        .ep-brand-motion__mobile-row { display:none; }
+        .ep-brand-motion__head {
+          position:absolute; z-index:2; top:clamp(74px,10svh,118px);
+          left:0; right:0; display:flex; align-items:end; justify-content:space-between; gap:14px;
+          padding:0 clamp(18px,5vw,80px);
+        }
+        .ep-brand-motion__head h2 {
+          margin:0; color:#202421 !important;
+          font-size:clamp(30px,4.3vw,64px) !important; font-weight:700;
+          letter-spacing:-.045em; line-height:1.05 !important;
+        }
+        .ep-brand-motion__head p {
+          margin:0 0 7px; color:#173F35 !important; font-size:14px; font-weight:700;
+          letter-spacing:.06em; text-transform:uppercase;
+        }
+        .ep-brand-motion__actions {
+          flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; gap:10px;
+          min-width:0;
+        }
+        .ep-brand-motion__all {
+          display:inline-flex; flex:0 0 auto; align-items:center; gap:8px;
+          min-height:44px; border:1px solid #173F35; border-radius:99px;
+          padding:9px 15px; background:#173F35 !important; color:#F7F6F2 !important;
+          font-size:14px; font-weight:700; text-decoration:none;
+        }
+        .ep-brand-motion__filters {
+          display:flex; align-items:center; gap:8px; min-width:0;
+          overflow-x:auto; scrollbar-width:none;
+        }
+        .ep-brand-motion__filters::-webkit-scrollbar { display:none; }
+        .ep-brand-motion__filters button {
+          flex:0 0 auto; min-height:40px; border:1px solid #173F35;
+          border-radius:99px; padding:8px 16px;
+          background:#F7F6F2 !important; color:#173F35 !important;
+          font-size:13px; font-weight:700; cursor:pointer;
+        }
+        .ep-brand-motion__filters button[aria-pressed="true"] {
+          background:#173F35 !important; color:#F7F6F2 !important;
+        }
+        .ep-brand-motion__row {
+          position:absolute; left:0; right:0;
+          width:100%; min-height:0; overflow:hidden;
+          -webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);
+          mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent);
+        }
+        .ep-brand-motion__row--first { top:34svh; }
+        .ep-brand-motion__row--sage { top:68svh; }
+        .ep-brand-motion__mobile-row { position:absolute; top:70svh; left:0; right:0; }
+        .ep-brand-motion__mobile-row .ep-brand-motion__row { position:relative; top:auto; }
+        .ep-brand-motion__track { display:flex; width:max-content; will-change:transform; }
+        .ep-brand-motion__sequence { flex:0 0 auto; display:flex; align-items:center; gap:28px; padding-right:28px; }
+        .ep-brand-motion__name {
+          display:flex; flex:0 0 auto; width:clamp(195px,22vw,380px);
+          min-height:110px; align-items:center; justify-content:center;
+          gap:6px; flex-direction:column; text-decoration:none;
+          color:#202421 !important;
+        }
+        .ep-brand-motion__name strong {
+          color:#173F35 !important; font-size:clamp(24px,3vw,48px);
+          font-weight:700; line-height:1.07; letter-spacing:-.04em;
+          white-space:normal; text-align:center;
+        }
+        .ep-brand-motion__name small { color:#202421 !important; font-size:13px; }
+        .ep-brand-motion__name:hover strong { color:#C86C42 !important; }
+        .ep-brand-motion__row--sage {
+          padding:15px 0; background:transparent !important;
+        }
+        @keyframes ep-featured-brand-left {
+          from { transform:translate3d(0,0,0); } to { transform:translate3d(-50%,0,0); }
+        }
+        @keyframes ep-featured-brand-right {
+          from { transform:translate3d(-50%,0,0); } to { transform:translate3d(0,0,0); }
+        }
+        .ep-featured-story :is(a,button):focus-visible {
+          outline:3px solid #C86C42; outline-offset:3px;
+        }
+        @media (max-width:1023px) {
+          .ep-brand-motion__head { flex-direction:column; align-items:flex-start; gap:10px; }
+          .ep-brand-motion__actions { width:100%; justify-content:flex-end; }
+        }
+        @media (max-width:767px) {
+          .ep-featured-photo__content { align-items:flex-end; padding:20px 18px 105px; }
+          .ep-featured-photo__panel { width:min(100%,470px); padding:22px; }
+          .ep-featured-photo__eyebrow { font-size:12px !important; margin-bottom:10px; }
+          .ep-featured-photo__heading { font-size:clamp(43px,11vw,60px) !important; }
+          .ep-featured-photo__description { font-size:15px !important; margin-top:13px; }
+          .ep-featured-photo__cue { right:18px; bottom:20px; font-size:12px; padding:9px 12px; }
+          .ep-recipe-showcase { padding:clamp(66px,9svh,80px) 12px 15px; gap:12px; border-radius:18px 18px 0 0; }
+          .ep-recipe-showcase__title { font-size:25px !important; }
+          .ep-recipe-showcase__label { font-size:12px !important; }
+          .ep-recipe-showcase__explore { min-height:42px; padding:9px 10px; font-size:12px; gap:4px; }
+          .ep-recipe-showcase__grid {
+            grid-template-columns:repeat(2,minmax(0,1fr));
+            grid-template-rows:repeat(2,minmax(0,1fr)); gap:10px;
+          }
+          .ep-recipe-tile:nth-child(n+5) { display:none; }
+          .ep-recipe-tile__details { padding:7px 8px; }
+          .ep-recipe-tile__type { font-size:11px; }
+          .ep-recipe-tile__name { font-size:13px; }
+          .ep-recipe-tile__arrow { width:26px; height:26px; }
+          .ep-brand-motion__mobile-row { display:block; }
+          .ep-brand-motion { border-radius:18px 18px 0 0; }
+          .ep-brand-motion__head { top:clamp(30px,6svh,66px); }
+          .ep-brand-motion__actions { gap:7px; }
+          .ep-brand-motion__filters { gap:6px; }
+          .ep-brand-motion__filters button { min-height:38px; padding:7px 11px; font-size:12px; }
+          .ep-brand-motion__all { min-height:38px; padding:7px 11px; font-size:12px; }
+          .ep-brand-motion__row--first { top:25svh; }
+          .ep-brand-motion__row--sage { top:47svh; }
+          .ep-brand-motion__head h2 { font-size:32px !important; }
+          .ep-brand-motion__name { width:clamp(150px,52vw,240px); min-height:90px; }
+          .ep-brand-motion__name strong { font-size:clamp(22px,6.1vw,32px); }
+          .ep-brand-motion__row { padding:12px 0; }
+          .ep-brand-motion__name small { font-size:12px; }
+        }
+        /* Match the approved Grocery single-viewport gallery at all heights. */
+        @media (prefers-reduced-motion:reduce) {
+          .ep-recipe-tile { transition:none; }
+          .ep-brand-motion__track { animation:none !important; transform:none !important; }
+        }
+      `}</style>
+      <div className="ep-featured-photo" ref={heroRef}>
+        <img className="ep-featured-photo__img" src={config.hero} alt="" loading="lazy" decoding="async" />
+        <div className="ep-featured-photo__content">
+          <div className="ep-featured-photo__panel">
+            <p className="ep-featured-photo__eyebrow">{config.label}</p>
+            <h2 className="ep-featured-photo__heading">Featured <span>{config.title}</span></h2>
+            <p className="ep-featured-photo__description">{config.description}</p>
+          </div>
         </div>
-
-        {/* Intro / outro reference-style title. */}
-        <RecipeStoryTitle
-          opacity={
-            Math.max(
-              introOpacity,
-              outroOpacity,
-            )
-          }
-          closing={
-            outroOpacity >
-            introOpacity
-          }
-        />
-
-        {/* Cards live behind the curtains. */}
-        <div
-          className="absolute inset-0 z-20 flex items-center justify-center px-4 pb-9 pt-[78px] sm:px-8 sm:pb-10 sm:pt-[92px] lg:pb-12 lg:pt-[104px]"
-          style={{
-            opacity:
-              cardOpacity,
-            transform:
-              `translate3d(calc(var(--recipe-pointer-nx) * -5px), calc(var(--recipe-pointer-ny) * -3px), 0)`,
-            transition:
-              isSmallScreen ? 'opacity 360ms ease, transform 170ms linear' : 'transform 170ms linear',
-          }}
-        >
-          <div className="relative h-full w-full">
-            <div className="absolute left-4 top-0 z-20 sm:left-6 lg:left-8">
-              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/54 sm:text-[10px] lg:text-[12px]">
-                Featured Recipes
-              </p>
-              <p className="mt-1 text-[9px] font-bold tabular-nums tracking-[0.14em] text-red-400/70 sm:text-[10px] lg:text-[11px]">
-                {String(
-                  activeSequenceIndex +
-                    1,
-                ).padStart(
-                  2,
-                  '0',
-                )}{' '}
-                /{' '}
-                {String(
-                  cameraItems.length,
-                ).padStart(
-                  2,
-                  '0',
-                )}
-              </p>
+        <div className="ep-featured-photo__cue" aria-hidden="true">
+          <span>Scroll to explore</span><ArrowRight size={17} />
+        </div>
+      </div>
+      {kind === 'recipes' ? (
+        <>
+        <div className="ep-recipe-showcase" aria-labelledby="ep-featured-recipes-title">
+          <div className="ep-recipe-showcase__head">
+            <div>
+              <p className="ep-recipe-showcase__label">Featured recipes</p>
+              <h2 id="ep-featured-recipes-title" className="ep-recipe-showcase__title">Find your next favourite.</h2>
             </div>
-
-            {isSmallScreen ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                {/* Keep the recipe books mounted: swapping an entire image-heavy
-                    book during a swipe caused main-thread image/layout jank. */}
-                {cameraItems.map((item, stageIndex) => {
-                  const isActive = stageIndex === activeSequenceIndex
-                  const isVisible = isActive && storyProgress >= 0.8 && storyProgress < 6
-                  // On mobile, the next book enters from the right and the
-                  // previous book exits left, matching the desktop direction.
-                  const travelX = isVisible ? '0px' : stageIndex < activeSequenceIndex ? '-82vw' : '82vw'
-                  return (
-                    <div
-                      key={item.key}
-                      aria-hidden={!isVisible}
-                      inert={!isVisible}
-                      className="absolute inset-0 flex items-center justify-center"
-                      style={{
-                        opacity: isVisible ? 1 : 0,
-                        transform: `translate3d(${travelX}, 0, 0)`,
-                        transition: shouldReduceMotion
-                          ? 'none'
-                          : 'transform 540ms cubic-bezier(0.22, 1, 0.36, 1), opacity 370ms ease-out',
-                        pointerEvents: isVisible ? 'auto' : 'none',
-                        backfaceVisibility: 'hidden',
-                        willChange: !shouldReduceMotion && Math.abs(stageIndex - activeSequenceIndex) <= 1
-                          ? 'transform, opacity'
-                          : 'auto',
-                      }}
-                    >
-                      {item.type === 'view-all' ? (
-                        <RecipeStoryViewAllCard recipes={worldRecipes} />
-                      ) : item.recipe ? (
-                        <MemoRecipeStoryBookCard
-                          recipe={item.recipe}
-                          mobileOpen={mobileOpenKey === item.key}
-                          shouldReduceMotion={shouldReduceMotion}
-                        />
-                      ) : null}
-                    </div>
-                  )
-                })}
+            <Link className="ep-recipe-showcase__explore" to="/recipes">Explore Recipes <ArrowRight size={16} /></Link>
+          </div>
+          <div className="ep-recipe-showcase__grid">
+            {displayItems.length === 0 ? (
+              <div className="ep-recipe-showcase__empty">
+                <p>{config.empty}</p>
+                <Link to="/recipes">Browse recipes <ArrowRight size={16} /></Link>
               </div>
-            ) : (
-            <div className="absolute inset-0 overflow-hidden [perspective:1700px]">
-              {(() => {
-                const viewportWidth =
-                  typeof window !==
-                  'undefined'
-                    ? window.innerWidth
-                    : 1280
-
-                const isMobileViewport =
-                  viewportWidth <
-                  768
-
-                const geometry =
-                  isMobileViewport
-                    ? RECIPE_WORLD_GEOMETRY.mobile
-                    : RECIPE_WORLD_GEOMETRY.desktop
-
-                return (
-                  <div className="absolute inset-0 [transform-style:preserve-3d]">
-                    {cameraItems.map(
-                      (
-                        item,
-                        stageIndex,
-                      ) => {
-                        const relativePosition =
-                          stageIndex -
-                          cameraWorldSlot
-
-                        const distanceFromCamera =
-                          Math.abs(
-                            relativePosition,
-                          )
-
-                        const direction =
-                          relativePosition ===
-                          0
-                            ? 0
-                            : relativePosition >
-                                0
-                              ? 1
-                              : -1
-
-                        const isActive =
-                          stageIndex ===
-                          activeSequenceIndex
-
-                        const curvedDistance =
-                          Math.pow(
-                            distanceFromCamera,
-                            geometry.xCurve,
-                          )
-
-                        const xOffset =
-                          direction *
-                          Math.min(
-                            viewportWidth *
-                              geometry.xRatio *
-                              curvedDistance,
-                            viewportWidth *
-                              geometry.maxXRatio,
-                          )
-
-                        const yOffset =
-                          Math.min(
-                            distanceFromCamera,
-                            2.4,
-                          ) *
-                          geometry.yStep
-
-                        const zOffset =
-                          -Math.min(
-                            distanceFromCamera,
-                            2.6,
-                          ) *
-                          geometry.zStep
-
-                        const cardScale =
-                          Math.max(
-                            geometry.minScale,
-                            geometry.centerScale -
-                              distanceFromCamera *
-                                geometry.scaleDrop,
-                          )
-
-                        const rotateY =
-                          -direction *
-                          Math.min(
-                            distanceFromCamera,
-                            1.35,
-                          ) *
-                          geometry.rotateY
-
-                        const rotateZ =
-                          direction *
-                          Math.min(
-                            distanceFromCamera,
-                            1,
-                          ) *
-                          geometry.rotateZ
-
-                        const cardOpacity =
-                          Math.max(
-                            0.42,
-                            1 -
-                              distanceFromCamera *
-                                0.18,
-                          )
-
-                        if (isMobileViewport && distanceFromCamera > 1.35) return null
-
-                        return (
-                          <div
-                            key={
-                              item.key
-                            }
-                            className="absolute left-1/2 top-1/2 flex items-center justify-center [transform-style:preserve-3d]"
-                            style={{
-                              pointerEvents:
-                                isActive &&
-                                activeCardCentered
-                                  ? 'auto'
-                                  : 'none',
-                              zIndex:
-                                Math.round(
-                                  80 -
-                                    Math.min(
-                                      distanceFromCamera *
-                                        12,
-                                      60,
-                                    ),
-                                ),
-                              opacity:
-                                cardOpacity,
-                              transform:
-                                isMobileViewport
-                                  ? `translate3d(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px), 0) scale(${cardScale})`
-                                  : `translate3d(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px), ${zOffset}px) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg) scale(${cardScale})`,
-                              transition: isMobileViewport
-                                ? 'transform 420ms cubic-bezier(0.22,1,0.36,1), opacity 360ms ease'
-                                : undefined,
-                              transformOrigin:
-                                'center center',
-                              willChange:
-                                'transform, opacity',
-                            }}
-                          >
-                            {item.type ===
-                            'view-all' ? (
-                              <RecipeStoryViewAllCard
-                                recipes={
-                                  worldRecipes
-                                }
-                              />
-                            ) : (
-                              <RecipeStoryBookCard
-                                recipe={
-                                  item.recipe
-                                }
-                                mobileOpen={
-                                  mobileOpenKey ===
-                                  item.key
-                                }
-                                shouldReduceMotion={
-                                  shouldReduceMotion
-                                }
-                              />
-                            )}
-                          </div>
-                        )
-                      },
+            ) : displayItems.map((recipe, index) => {
+              const path = recipe?.path || (recipe?.slug ? `/recipes/${encodeURIComponent(recipe.slug)}` : '/recipes')
+              return (
+                <Link key={recipe?.id || recipe?.slug || index} className="ep-recipe-tile" to={path} aria-label={`View ${recipe?.name || 'recipe'}`}>
+                  <div className="ep-recipe-tile__image">
+                    {recipe?.image ? (
+                      <img src={recipe.image} alt={recipe?.name || 'Recipe'} loading="lazy" decoding="async" />
+                    ) : (
+                      <span className="ep-recipe-tile__fallback">Recipe photo coming soon</span>
                     )}
                   </div>
-                )
-              })()}
-            </div>
-            )}
-          </div>
-        </div>
-
-        {/* Two curtain leaves: closed on intro, open for cards, closed on outro. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-40"
-        >
-          <div
-            className="absolute inset-y-0 left-0 w-1/2 bg-[linear-gradient(90deg,#020202_0%,#050000_72%,#250000_100%)] shadow-[16px_0_42px_rgba(0,0,0,0.75)]"
-            style={{
-              transform:
-                `translate3d(${-curtainOpenAmount * 100}%, 0, 0)`,
-              transition: isSmallScreen ? 'transform 420ms cubic-bezier(0.22,1,0.36,1)' : 'none',
-            }}
-          >
-            <span className="absolute inset-y-0 right-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
-          </div>
-
-          <div
-            className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(270deg,#020202_0%,#050000_72%,#250000_100%)] shadow-[-16px_0_42px_rgba(0,0,0,0.75)]"
-            style={{
-              transform:
-                `translate3d(${curtainOpenAmount * 100}%, 0, 0)`,
-              transition: isSmallScreen ? 'transform 420ms cubic-bezier(0.22,1,0.36,1)' : 'none',
-            }}
-          >
-            <span className="absolute inset-y-0 left-0 w-px bg-red-600/45 shadow-[0_0_22px_rgba(255,0,0,0.62)]" />
-          </div>
-        </div>
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-50 flex items-center justify-between px-5 text-[8px] font-black uppercase tracking-[0.22em] text-white/38 sm:bottom-4 sm:px-8 sm:text-[9px] lg:px-11 lg:text-[10px]">
-          <span>Discover</span>
-          <span>Cook</span>
-          <span>Connect</span>
-          <span>Explore</span>
-        </div>
-      </motion.div>
-    </section>
-  )
-}
-
-function RecipeStoryTitle({
-  opacity,
-  closing,
-}) {
-  return (
-    <div
-      className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center px-5 text-center"
-      style={{
-        opacity,
-        transform:
-          `translate3d(0, ${closing ? 0 : 18 * (1 - opacity)}px, 0)`,
-        transition:
-          'opacity 120ms linear',
-      }}
-    >
-      <div className="relative -mt-[3svh]">
-        <p
-          className="relative z-10 -mb-[0.30em] text-[clamp(42px,10vw,112px)] font-normal leading-[0.72] text-[#D30000] sm:text-[clamp(58px,8vw,126px)] lg:text-[clamp(70px,7.4vw,138px)]"
-          style={{
-            fontFamily:
-              "'Brush Script MT', 'Segoe Script', cursive",
-            fontStyle:
-              'italic',
-            letterSpacing:
-              '-0.06em',
-          }}
-        >
-          Featured
-        </p>
-
-        <p className="text-[clamp(48px,13vw,108px)] font-black uppercase leading-[0.78] tracking-[-0.065em] text-[#D30000] sm:text-[clamp(66px,10vw,132px)] lg:text-[clamp(74px,9vw,152px)]">
-          Recipes
-        </p>
-
-        <p className="mx-auto mt-5 max-w-[470px] text-[8px] font-bold uppercase leading-4 tracking-[0.12em] text-red-400/58 sm:mt-7 sm:text-[9px] sm:leading-5">
-          Curated dishes, approved food intelligence and ingredients connected back to EPANTRY Grocery.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function RecipeStoryBookCard({
-  recipe,
-  mobileOpen,
-  shouldReduceMotion,
-}) {
-  const [
-    desktopOpen,
-    setDesktopOpen,
-  ] = useState(false)
-
-  const nutrition =
-    Array.isArray(
-      recipe?.nutrition,
-    )
-      ? recipe.nutrition.slice(
-          0,
-          5,
-        )
-      : []
-
-  const coverOpen =
-    mobileOpen ||
-    desktopOpen
-
-  const openTransform =
-    coverOpen
-      ? 'translate3d(-7px, 0, 2px) rotateY(-84deg)'
-      : 'translateZ(2px) rotateY(0deg)'
-
-  const mobileLightMotion = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-
-  return (
-    <div
-      className="group relative h-[58svh] max-h-[610px] min-h-[390px] w-[72vw] max-w-[420px] sm:h-[62svh] sm:w-[48vw] md:w-[390px] lg:h-[64svh] lg:w-[410px]"
-      onMouseEnter={() =>
-        setDesktopOpen(true)
-      }
-      onMouseLeave={() =>
-        setDesktopOpen(false)
-      }
-      style={{
-        perspective:
-          mobileLightMotion ? '1180px' : '1900px',
-        WebkitPerspective:
-          mobileLightMotion ? '1180px' : '1900px',
-        perspectiveOrigin:
-          'left center',
-        WebkitPerspectiveOrigin:
-          'left center',
-      }}
-    >
-      <Link
-        to={
-          recipePath(
-            recipe,
-          )
-        }
-        className="absolute inset-0 overflow-hidden rounded-[14px] border border-red-500/20 bg-[#090303] shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:rounded-[16px]"
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(225,0,0,0.24),transparent_44%)]" />
-
-        <div className="relative flex h-full flex-col p-5 sm:p-6 lg:p-7">
-          <p className="text-[8px] font-black uppercase tracking-[0.22em] text-red-400 sm:text-[9px]">
-            Recipe details
-          </p>
-
-          <h3 className="mt-2 line-clamp-2 text-[24px] font-black leading-[0.92] tracking-[-0.04em] text-white sm:text-[30px]">
-            {recipe?.name ||
-              'Recipe'}
-          </h3>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
-            <div className="rounded-[12px] border border-red-500/15 bg-white/[0.055] p-3 sm:p-4">
-              <div className="flex items-center gap-1.5 text-red-400">
-                <Users
-                  size={14}
-                  aria-hidden="true"
-                />
-                <span className="text-[7px] font-black uppercase tracking-[0.13em] sm:text-[8px]">
-                  Servings
-                </span>
-              </div>
-              <p className="mt-2 text-sm font-black text-white sm:text-base">
-                {recipe?.servings
-                  ? `${recipe.servings}`
-                  : '—'}
-              </p>
-            </div>
-
-            <div className="rounded-[12px] border border-red-500/15 bg-white/[0.055] p-3 sm:p-4">
-              <div className="flex items-center gap-1.5 text-red-400">
-                <Clock3
-                  size={14}
-                  aria-hidden="true"
-                />
-                <span className="text-[7px] font-black uppercase tracking-[0.13em] sm:text-[8px]">
-                  Total time
-                </span>
-              </div>
-              <p className="mt-2 text-sm font-black text-white sm:text-base">
-                {recipe?.totalTime >
-                0
-                  ? `${recipe.totalTime} min`
-                  : '—'}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-[12px] border border-red-500/15 bg-white/[0.05] p-3 sm:mt-4 sm:p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/80 sm:text-xs">
-                Nutrition
-              </p>
-              {nutrition.length >
-                0 && (
-                <span className="text-[7px] font-black uppercase tracking-[0.10em] text-red-400/80 sm:text-[8px]">
-                  Approved
-                </span>
-              )}
-            </div>
-
-            {nutrition.length >
-            0 ? (
-              <div className="mt-2.5 space-y-1.5 sm:mt-3 sm:space-y-2">
-                {nutrition.map(
-                  (
-                    nutrient,
-                    nutrientIndex,
-                  ) => (
-                    <div
-                      key={
-                        nutrient.key ||
-                        nutrient.nutrientId ||
-                        `${recipe?.id || recipe?.slug}-story-nutrient-${nutrientIndex}`
-                      }
-                      className="flex items-center justify-between gap-3 rounded-[9px] bg-black/24 px-2.5 py-2 text-[9px] sm:px-3 sm:text-[10px]"
-                    >
-                      <span className="min-w-0 truncate font-bold text-white/54">
-                        {nutrient.name ||
-                          nutrient.key ||
-                          'Nutrient'}
-                      </span>
-                      <span className="shrink-0 font-black text-white/90">
-                        {formatNutritionValue(
-                          nutrient.amount,
-                          nutrient.unit,
-                        )}
-                      </span>
-                    </div>
-                  ),
-                )}
-              </div>
-            ) : (
-              <p className="mt-3 text-[9px] font-semibold leading-4 text-white/44 sm:text-[10px] sm:leading-5">
-                Approved nutrition is not available for this recipe yet.
-              </p>
-            )}
-          </div>
-
-          <p className="mt-3 text-[8px] font-bold uppercase tracking-[0.12em] text-white/38 sm:text-[9px]">
-            Open full recipe
-          </p>
-        </div>
-      </Link>
-
-      <Link
-        to={
-          recipePath(
-            recipe,
-          )
-        }
-        className="absolute inset-0 z-20 overflow-hidden rounded-[14px] border border-white/10 bg-[#190000] shadow-[0_30px_80px_rgba(0,0,0,0.56)] [transform-origin:left_center] [backface-visibility:hidden] sm:rounded-[16px]"
-        style={{
-          // Mobile must open the book on its LEFT hinge like desktop.
-          // The previous mobile opacity fade removed the second animation.
-          transform: openTransform,
-          WebkitTransform: openTransform,
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          transformStyle: 'preserve-3d',
-          WebkitTransformStyle: 'preserve-3d',
-          WebkitTransformOrigin: 'left center',
-          transition: shouldReduceMotion
-            ? 'none'
-            : mobileLightMotion
-              ? 'transform 720ms cubic-bezier(0.20,0.84,0.22,1)'
-              : 'transform 920ms cubic-bezier(0.20,0.84,0.22,1)',
-          willChange: 'transform',
-        }}
-      >
-        {recipe?.image ? (
-          <img
-            src={
-              recipe.image
-            }
-            alt={
-              recipe.name ||
-              'Recipe'
-            }
-            loading="lazy"
-            decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 grid place-items-center bg-[#190000] text-5xl">
-            🍽️
-          </div>
-        )}
-
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04)_0%,rgba(0,0,0,0.16)_42%,rgba(0,0,0,0.88)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,35,35,0.20),transparent_36%)]" />
-
-        <div className="absolute left-4 top-4 text-[7px] font-black uppercase tracking-[0.18em] text-white/72 sm:left-5 sm:top-5 sm:text-[8px]">
-          EPANTRY Recipe
-        </div>
-
-        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
-          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-red-300/80 sm:text-[9px]">
-            {recipe?.cuisine ||
-              recipe?.dietaryType ||
-              'Featured'}
-          </p>
-          <h3 className="mt-2 text-[28px] font-black leading-[0.9] tracking-[-0.05em] text-white sm:text-[34px]">
-            {recipe?.name ||
-              'Recipe'}
-          </h3>
-        </div>
-      </Link>
-    </div>
-  )
-}
-
-const MemoRecipeStoryBookCard = memo(RecipeStoryBookCard)
-
-function RecipeStoryViewAllCard({
-  recipes,
-}) {
-  return (
-    <Link
-      to="/recipes"
-      className="focus-ring group relative flex h-[min(52svh,440px)] max-h-[610px] min-h-0 w-[72vw] max-w-[420px] flex-col overflow-hidden rounded-[14px] border border-red-500/28 bg-[#130000] p-5 shadow-[0_32px_90px_rgba(0,0,0,0.58)] sm:h-[62svh] sm:min-h-[390px] sm:w-[48vw] sm:rounded-[16px] sm:p-6 md:w-[390px] lg:h-[64svh] lg:w-[410px] lg:p-7"
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_24%,rgba(255,0,0,0.26),transparent_38%),linear-gradient(155deg,#160000_0%,#050202_62%,#000_100%)]" />
-
-      <div className="relative z-10 flex h-full flex-col">
-        <p className="text-[8px] font-black uppercase tracking-[0.22em] text-red-400 sm:text-[9px]">
-          EPANTRY Recipes
-        </p>
-
-        <div className="mt-3 grid h-[min(22svh,150px)] min-h-0 grid-cols-2 grid-rows-2 gap-1.5 sm:mt-5 sm:h-auto sm:gap-3">
-          {recipes.slice(
-            0,
-            4,
-          ).map(
-            (
-              recipe,
-              index,
-            ) => (
-              <div
-                key={`recipe-story-view-all-${recipe?.id || recipe?.slug || index}`}
-                className="min-h-0 overflow-hidden rounded-[10px] border border-white/10 bg-black/30 sm:aspect-square"
-              >
-                {recipe?.image ? (
-                  <img
-                    src={
-                      recipe.image
-                    }
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-                  />
-                ) : (
-                  <div className="grid h-full w-full place-items-center text-2xl">
-                    🍽️
+                  <div className="ep-recipe-tile__details">
+                    <span>
+                      <span className="ep-recipe-tile__type">{recipe?.cuisine || recipe?.dietaryType || 'Recipe'}</span>
+                      <span className="ep-recipe-tile__name">{recipe?.name || 'Recipe'}</span>
+                    </span>
+                    <span className="ep-recipe-tile__arrow"><ArrowRight size={16} /></span>
                   </div>
-                )}
-              </div>
-            ),
-          )}
+                </Link>
+              )
+            })}
+          </div>
         </div>
-
-        <div className="mt-auto pt-2 sm:pt-6">
-          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-white/42 sm:text-[9px]">
-            Full collection
-          </p>
-          <h3 className="mt-2 text-[38px] font-black uppercase leading-[0.82] tracking-[-0.065em] text-white sm:text-[46px]">
-            View all
-          </h3>
-          <p className="mt-2 max-w-[280px] text-[9px] font-semibold leading-4 text-white/48 sm:mt-3 sm:text-[10px] sm:leading-5">
-            Explore every published EPANTRY recipe and choose what to cook next.
-          </p>
-
-          <span className="mt-2 inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-red-500/34 bg-red-600 px-4 text-[9px] font-black uppercase tracking-[0.10em] text-white shadow-[0_0_26px_rgba(220,0,0,0.22)] sm:h-11 sm:text-[10px]">
-            Explore Recipes
-            <ArrowRight
-              size={14}
-              aria-hidden="true"
-            />
-          </span>
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-/*
-|--------------------------------------------------------------------------
-| Featured Section Layout
-|--------------------------------------------------------------------------
-*/
-
-function FeaturedSection({
-  children,
-  texture,
-  tone = 'grocery',
-  className = '',
-}) {
-  return (
-    <section
-      className={[
-        'relative min-h-[100svh] w-full overflow-hidden bg-[#F8FAF7]',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
-    >
-
-      <SectionTexture
-        variant={
-          texture
-        }
-        tone={
-          tone
-        }
-      />
-
-      <div className="page-shell relative z-10 flex min-h-[100svh] flex-col py-8 sm:py-10">
-
-        {children}
-
-      </div>
-
+        <div className="ep-recipe-exit-hold" aria-hidden="true" />
+        </>
+      ) : (
+        <FeaturedBrandNamesWall
+          brands={displayItems}
+          groups={groups}
+          selectedFilter={selectedFilter}
+          onSelectFilter={onSelectFilter}
+        />
+      )}
     </section>
   )
 }
 
-/*
-|--------------------------------------------------------------------------
-| Header
-|--------------------------------------------------------------------------
-*/
-
-function SectionHeader({
-  eyebrow,
-  title,
-  description,
-  path,
-  action,
-  tone = 'grocery',
-}) {
-  const toneClasses =
-    tone === 'brands'
-      ? {
-          eyebrow:
-            'text-[#2563EB]',
-
-          action:
-            'border-[#2563EB]/25 text-[#2563EB] hover:border-[#2563EB]/45',
-        }
-      : tone === 'recipes'
-        ? {
-            eyebrow:
-              'text-[#EA580C]',
-
-            action:
-              'border-[#F59E0B]/30 text-[#EA580C] hover:border-[#EA580C]/45',
-          }
-        : {
-            eyebrow:
-              'text-[#166534]',
-
-            action:
-              'border-[#16A34A]/25 text-[#166534] hover:border-[#16A34A]/45',
-          }
-
+function FeaturedBrandNamesWall({ brands, groups, selectedFilter, onSelectFilter }) {
+  const list = Array.isArray(brands) ? brands : []
+  const alternate = list.length > 1 ? [...list.slice(Math.ceil(list.length / 2)), ...list.slice(0, Math.ceil(list.length / 2))] : list
+  const third = list.length > 1 ? [...list.slice(1), list[0]] : list
   return (
-    <div className="flex shrink-0 flex-col justify-between gap-4 md:flex-row md:items-end">
-
-      <div className="max-w-2xl">
-
-        <p className={`text-sm font-black uppercase tracking-[0.2em] sm:text-base ${toneClasses.eyebrow}`}>
-          {eyebrow}
-        </p>
-
-        <h2 className="mt-4 text-4xl font-black leading-[1.02] tracking-[-0.04em] text-[#111827] sm:text-5xl lg:text-[56px]">
-          {title}
-        </h2>
-
-        <p className="mt-3 leading-7 text-[#6B7280]">
-          {description}
-        </p>
-
+    <div className="ep-brand-motion" aria-labelledby="ep-featured-brands-title">
+      <div className="ep-brand-motion__head">
+        <div>
+          <p>Featured brands</p>
+          <h2 id="ep-featured-brands-title">Meet the makers.</h2>
+        </div>
+        <div className="ep-brand-motion__actions">
+          {onSelectFilter && groups.length > 0 ? (
+            <div className="ep-brand-motion__filters" aria-label="Filter brands by name range">
+              <button type="button" aria-pressed={selectedFilter === 'all'} onClick={() => onSelectFilter('all')}>All</button>
+              {groups.map(group => (
+                <button key={group.id} type="button" aria-pressed={selectedFilter === group.id} onClick={() => onSelectFilter(group.id)}>{group.label}</button>
+              ))}
+            </div>
+          ) : null}
+          <Link className="ep-brand-motion__all" to="/brands">Explore Brands <ArrowRight size={17} /></Link>
+        </div>
       </div>
+      {list.length === 0 ? (
+        <p className="ep-recipe-showcase__empty">Active food brands will appear here when available.</p>
+      ) : (
+        <>
+          <FeaturedBrandMovingRow brands={list} direction="left" duration={26} rowClass="ep-brand-motion__row--first" />
+          <FeaturedBrandMovingRow brands={alternate} direction="right" duration={29} sage />
+          <div className="ep-brand-motion__mobile-row"><FeaturedBrandMovingRow brands={third} direction="left" duration={26} /></div>
+        </>
+      )}
+    </div>
+  )
+}
 
+function FeaturedBrandMovingRow({ brands, direction, duration, sage = false, rowClass = '' }) {
+  const [isPaused, setIsPaused] = useState(false)
+  // Exactly TWO identical copies, as in the original 26s/29s brand motion.
+  // Tripling the sequence made the same animation duration feel too fast.
+  const series = brands
+  // Repeated *identical* sequences keep the -50% seamless even with few brands.
+  const renderNames = (isDuplicate = false) => series.map((brand, index) => (
+    isDuplicate ? (
+      <span key={`duplicate-${direction}-${index}`} className="ep-brand-motion__name">
+        <strong>{brand?.name || 'Brand'}</strong>
+        <small>{formatBrandProductCount(brand?.productCount)}</small>
+      </span>
+    ) : (
       <Link
-        to={path}
-        className={`focus-ring inline-flex w-fit items-center gap-2 rounded-full border bg-white/80 px-4 py-2 text-sm font-bold transition ${toneClasses.action}`}
+        key={`${direction}-${brand?.id || brand?.slug || brand?.name}-${index}`}
+        className="ep-brand-motion__name"
+        to={getFeaturedBrandPath(brand)}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onFocus={() => setIsPaused(true)}
+        onBlur={() => setIsPaused(false)}
       >
-
-        {action}
-
-        <ArrowRight
-          size={16}
-          aria-hidden="true"
-        />
-
+        <strong>{brand?.name || 'Brand'}</strong>
+        <small>{formatBrandProductCount(brand?.productCount)}</small>
       </Link>
-
-    </div>
-  )
-}
-
-/*
-|--------------------------------------------------------------------------
-| Texture
-|--------------------------------------------------------------------------
-*/
-
-function SectionTexture({
-  variant,
-  tone = 'grocery',
-}) {
-  const shouldReduceMotion =
-    useReducedMotion()
-
-  const toneColor =
-    tone === 'brands'
-      ? '37, 99, 235'
-      : tone === 'recipes'
-        ? '234, 88, 12'
-        : '22, 101, 52'
-
-  const textureStyles = {
-    grid: {
-      backgroundImage:
-        `linear-gradient(rgba(${toneColor}, 0.14) 1px, transparent 1px), linear-gradient(90deg, rgba(${toneColor}, 0.14) 1px, transparent 1px)`,
-
-      backgroundSize:
-        '38px 38px',
-    },
-
-    dots: {
-      backgroundImage:
-        `radial-gradient(circle, rgba(${toneColor}, 0.30) 1.35px, transparent 1.35px)`,
-
-      backgroundSize:
-        '27px 27px',
-    },
-
-    diagonal: {
-      backgroundImage:
-        `repeating-linear-gradient(135deg, rgba(${toneColor}, 0.12) 0px, rgba(${toneColor}, 0.12) 1px, transparent 1px, transparent 25px)`,
-    },
-  }
-
+    )
+  ))
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0"
-    >
-
+    <div className={`ep-brand-motion__row${sage ? ' ep-brand-motion__row--sage' : ''}${rowClass ? ` ${rowClass}` : ''}`}>
       <div
-        className="absolute inset-0 opacity-65"
-        style={
-          textureStyles[
-            variant
-          ] ||
-          textureStyles.dots
-        }
-      />
-
-      <motion.div
-        animate={
-          shouldReduceMotion
-            ? undefined
-            : {
-                x: [
-                  0,
-                  35,
-                  0,
-                ],
-
-                y: [
-                  0,
-                  -25,
-                  0,
-                ],
-              }
-        }
-        transition={{
-          duration: 12,
-
-          repeat:
-            Infinity,
-
-          ease:
-            'easeInOut',
-        }}
-        className={[
-          'absolute',
-          '-right-24',
-          'top-[36%]',
-          'h-80',
-          'w-80',
-          'rounded-full',
-          'blur-3xl',
-          tone === 'brands'
-            ? 'bg-[#2563EB]/20'
-            : tone === 'recipes'
-              ? 'bg-[#F59E0B]/20'
-              : 'bg-[#16A34A]/20',
-        ].join(
-          ' ',
-        )}
-      />
-
-    </div>
-  )
-}
-
-/*
-|--------------------------------------------------------------------------
-| Media
-|--------------------------------------------------------------------------
-*/
-
-function MediaBox({
-  image,
-  alt,
-  type,
-}) {
-  if (!image) {
-    return (
-      <div className="grid aspect-[4/3] place-items-center bg-[#F8FAF7] text-[#16A34A]">
-
-        {type ===
-        'product' ? (
-          <Package
-            size={36}
-            aria-hidden="true"
-          />
-        ) : (
-          <span className="text-4xl">
-            🍽️
-          </span>
-        )}
-
+        className="ep-brand-motion__track"
+        style={{animation:`ep-featured-brand-${direction} ${duration}s linear infinite`, animationPlayState:isPaused?'paused':'running'}}
+      >
+        <div className="ep-brand-motion__sequence">{renderNames()}</div>
+        <div className="ep-brand-motion__sequence" aria-hidden="true">{renderNames(true)}</div>
       </div>
-    )
-  }
-
-  return (
-    <div className="aspect-[4/3] overflow-hidden bg-[#F8FAF7]">
-
-      <img
-        src={image}
-        alt={alt || ''}
-        loading="lazy"
-        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-      />
-
     </div>
   )
 }
-
-/*
-|--------------------------------------------------------------------------
-| Grocery Nutrition Helpers
-|--------------------------------------------------------------------------
-*/
-
-function getProductNutrition(
-  product,
-) {
-  const candidates = [
-    product?.nutrition,
-    product?.nutritionFacts,
-    product?.foodIntelligence?.nutrition,
-    product?.foodIntelligence?.nutritionFacts,
-  ]
-
-  const source =
-    candidates.find(
-      (candidate) =>
-        candidate &&
-        (
-          Array.isArray(
-            candidate,
-          )
-            ? candidate.length >
-              0
-            : typeof candidate ===
-              'object'
-        ),
-    )
-
-  if (!source) {
-    return []
-  }
-
-  if (
-    Array.isArray(
-      source,
-    )
-  ) {
-    return source
-      .map(
-        (
-          nutrient,
-          index,
-        ) => normalizeNutritionItem(
-          nutrient,
-          index,
-        ),
-      )
-      .filter(Boolean)
-  }
-
-  return Object.entries(
-    source,
-  )
-    .filter(
-      ([key]) =>
-        ![
-          'basis',
-          'nutritionBasis',
-          'servingSize',
-          'servingUnit',
-          'source',
-          'evidenceState',
-        ].includes(
-          key,
-        ),
-    )
-    .map(
-      (
-        [
-          key,
-          value,
-        ],
-        index,
-      ) =>
-        normalizeNutritionItem(
-          {
-            key,
-            name:
-              humanizeNutritionKey(
-                key,
-              ),
-            amount:
-              typeof value ===
-              'object'
-                ? value?.amount ??
-                  value?.value
-                : value,
-            unit:
-              typeof value ===
-              'object'
-                ? value?.unit
-                : inferNutritionUnit(
-                    key,
-                  ),
-          },
-          index,
-        ),
-    )
-    .filter(Boolean)
-}
-
-function normalizeNutritionItem(
-  nutrient,
-  index,
-) {
-  if (
-    nutrient == null
-  ) {
-    return null
-  }
-
-  if (
-    typeof nutrient ===
-      'number' ||
-    typeof nutrient ===
-      'string'
-  ) {
-    const amount =
-      Number(
-        nutrient,
-      )
-
-    if (
-      !Number.isFinite(
-        amount,
-      )
-    ) {
-      return null
-    }
-
-    return {
-      key:
-        `nutrient-${index}`,
-      name:
-        `Nutrient ${index + 1}`,
-      amount,
-      unit: '',
-    }
-  }
-
-  const key =
-    nutrient.key ||
-    nutrient.nutrientId ||
-    nutrient.name ||
-    `nutrient-${index}`
-
-  const amount =
-    Number(
-      nutrient.amount ??
-      nutrient.value,
-    )
-
-  if (
-    !Number.isFinite(
-      amount,
-    )
-  ) {
-    return null
-  }
-
-  return {
-    key,
-    name:
-      nutrient.name ||
-      humanizeNutritionKey(
-        key,
-      ),
-    amount,
-    unit:
-      nutrient.unit ||
-      inferNutritionUnit(
-        key,
-      ),
-  }
-}
-
-function humanizeNutritionKey(
-  value,
-) {
-  return String(
-    value || '',
-  )
-    .replace(
-      /[_-]+/g,
-      ' ',
-    )
-    .replace(
-      /\b\w/g,
-      (character) =>
-        character.toUpperCase(),
-    )
-}
-
-function inferNutritionUnit(
-  key,
-) {
-  const normalized =
-    String(
-      key || '',
-    ).toLowerCase()
-
-  if (
-    normalized.includes(
-      'energy',
-    ) ||
-    normalized.includes(
-      'calorie',
-    ) ||
-    normalized.includes(
-      'kcal',
-    )
-  ) {
-    return 'kcal'
-  }
-
-  if (
-    normalized.includes(
-      'sodium',
-    ) ||
-    normalized.includes(
-      'salt',
-    )
-  ) {
-    return 'mg'
-  }
-
-  return 'g'
-}
-
-/*
-|--------------------------------------------------------------------------
-| Cart Helpers
-|--------------------------------------------------------------------------
-*/
-
-function getProductId(
-  product,
-) {
-  return String(
-    product?.id ||
-      product?.slug ||
-      product?.name ||
-      '',
-  )
-}
-
-/*
-|--------------------------------------------------------------------------
-| Featured Brand Filters
-|--------------------------------------------------------------------------
-*/
 
 const FEATURED_BRAND_LIMIT =
   15
@@ -4019,32 +1453,6 @@ function formatBrandProductCount(
   } listed`
 }
 
-/*
-|--------------------------------------------------------------------------
-| Empty State
-|--------------------------------------------------------------------------
-*/
-
-function EmptyState({
-  message,
-}) {
-  return (
-    <div className="w-full rounded-3xl border border-dashed border-[#E5E7EB] bg-white/80 p-10 text-center">
-
-      <p className="text-sm font-semibold text-[#6B7280]">
-        {message}
-      </p>
-
-    </div>
-  )
-}
-
-/*
-|--------------------------------------------------------------------------
-| Loading
-|--------------------------------------------------------------------------
-*/
-
 function FeaturedLoading() {
   return (
     <section className="min-h-[100svh] bg-white">
@@ -4078,73 +1486,3 @@ function FeaturedLoading() {
   )
 }
 
-/*
-|--------------------------------------------------------------------------
-| Nutrition
-|--------------------------------------------------------------------------
-*/
-
-function formatNutritionValue(
-  amount,
-  unit,
-) {
-  const numeric =
-    Number(
-      amount,
-    )
-
-  if (
-    !Number.isFinite(
-      numeric,
-    )
-  ) {
-    return '—'
-  }
-
-  const formatted =
-    new Intl.NumberFormat(
-      undefined,
-      {
-        maximumFractionDigits:
-          2,
-      },
-    ).format(
-      numeric,
-    )
-
-  return [
-    formatted,
-    unit || '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-}
-
-/*
-|--------------------------------------------------------------------------
-| Price
-|--------------------------------------------------------------------------
-*/
-
-function formatPrice(
-  value,
-  currency = 'INR',
-) {
-  return new Intl.NumberFormat(
-    'en-IN',
-    {
-      style:
-        'currency',
-
-      currency:
-        currency ||
-        'INR',
-
-      maximumFractionDigits:
-        0,
-    },
-  ).format(
-    Number(value) ||
-      0,
-  )
-}

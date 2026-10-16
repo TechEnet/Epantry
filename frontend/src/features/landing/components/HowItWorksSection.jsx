@@ -72,7 +72,7 @@ const STORY_RANGES = [
 
 // All pinned stories follow the actual sticky travel rather than
 // the dynamically changing browser viewport height (notably on mobile).
-function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
+function useStableStickyProgress(sectionRef, optimizeDesktop = false, scrollRootRef = null) {
   const progress = useMotionValue(0)
 
   useEffect(() => {
@@ -84,6 +84,24 @@ function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
     let desktopCache = null
     let cacheEnabled = false
     let observer = null
+    const root = scrollRootRef?.current || null
+    const scrollSource = root || window
+    const getOffset = (rect) => root
+      ? rect.top - root.getBoundingClientRect().top
+      : rect.top
+    const getPosition = () => root ? root.scrollTop : window.scrollY
+    let embeddedGeometry = null
+    const measureEmbedded = () => {
+      if (!root) return
+      const section = sectionRef.current
+      if (!section) return
+      const sectionRect = section.getBoundingClientRect()
+      const rootRect = root.getBoundingClientRect()
+      embeddedGeometry = {
+        start: root.scrollTop + sectionRect.top - rootRect.top,
+        travel: Math.max(sectionRect.height - root.clientHeight, 1),
+      }
+    }
 
     // Only Why EPANTRY on desktop uses cached geometry. Avoid synchronous
     // getBoundingClientRect reads on every scroll frame; How and all mobile
@@ -100,7 +118,7 @@ function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
         section.firstElementChild?.getBoundingClientRect().height ||
         rect.height
       desktopCache = {
-        start: window.scrollY + rect.top,
+        start: getPosition() + getOffset(rect),
         travel: Math.max(rect.height - stickyHeight, 1),
       }
     }
@@ -111,8 +129,11 @@ function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
       if (!section) return
 
       let next
-      if (cacheEnabled && desktopCache) {
-        next = (window.scrollY - desktopCache.start) /
+      if (root && embeddedGeometry) {
+        next = (root.scrollTop - embeddedGeometry.start) /
+          embeddedGeometry.travel
+      } else if (cacheEnabled && desktopCache) {
+        next = (getPosition() - desktopCache.start) /
           desktopCache.travel
       } else {
         const rect = section.getBoundingClientRect()
@@ -120,7 +141,7 @@ function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
           section.firstElementChild?.getBoundingClientRect().height ||
           rect.height
         const travel = Math.max(rect.height - stickyHeight, 1)
-        next = -rect.top / travel
+        next = -getOffset(rect) / travel
       }
 
       next = Math.min(Math.max(next, 0), 1)
@@ -136,11 +157,22 @@ function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
     }
 
     const remeasure = () => {
-      if (optimizeDesktop) measureDesktop()
+      if (root) measureEmbedded()
+      else if (optimizeDesktop) measureDesktop()
       schedule()
     }
 
-    if (optimizeDesktop) {
+    if (root) {
+      measureEmbedded()
+      // Modal CSS stage variables are set by the parent after mounting.
+      // Re-measure when those values change, and when the dialog resizes.
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(remeasure)
+        observer.observe(root)
+        if (sectionRef.current) observer.observe(sectionRef.current)
+      }
+    }
+    if (optimizeDesktop && !root) {
       measureDesktop()
       if (typeof ResizeObserver !== 'undefined') {
         observer = new ResizeObserver(remeasure)
@@ -149,22 +181,23 @@ function useStableStickyProgress(sectionRef, optimizeDesktop = false) {
           if (sectionRef.current.firstElementChild) {
             observer.observe(sectionRef.current.firstElementChild)
           }
+          if (root) observer.observe(root)
         }
       }
     }
     update()
-    window.addEventListener('scroll', schedule, { passive: true })
+    scrollSource.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('resize', remeasure)
     window.addEventListener('pageshow', remeasure)
 
     return () => {
       if (frame !== null) window.cancelAnimationFrame(frame)
       observer?.disconnect()
-      window.removeEventListener('scroll', schedule)
+      scrollSource.removeEventListener('scroll', schedule)
       window.removeEventListener('resize', remeasure)
       window.removeEventListener('pageshow', remeasure)
     }
-  }, [progress, sectionRef, optimizeDesktop])
+  }, [progress, sectionRef, optimizeDesktop, scrollRootRef])
 
   return progress
 }
@@ -680,8 +713,8 @@ const WHY_CUSTOMER_BENEFITS = [
 
 // Scroll decides *which* benefit is visible. Motion handles the complete
 // transition independently of individual wheel/trackpad deltas. All five
-// scenes stay mounted, but inactive ones become visibility:hidden after their
-// exit animation, preventing mid-scroll image mount/decode hitches.
+// scenes stay mounted and fade/slide both forward and backward; avoid
+// toggling visibility during the exit transition.
 const WHY_DESKTOP_TRANSITION = {
   duration: 0.68,
   ease: [0.22, 1, 0.36, 1],
@@ -698,7 +731,7 @@ function WhyBenefitScene({
   const isActive = index === active
   const isLeaving = index === previous && previous !== active
   // Even a rapidly skipped outgoing card must complete its exit.
-  // Hidden, inactive panels never paint, but their Motion state is retained.
+  // Keep panels mounted while they fade out, so reverse scrolling stays fluid.
   const transition = shouldReduceMotion
     ? { duration: 0 }
     : WHY_DESKTOP_TRANSITION
@@ -706,17 +739,16 @@ function WhyBenefitScene({
 
   return (
     <motion.article
+      aria-hidden={!isActive}
       initial={false}
       animate={shouldReduceMotion
         ? {
             opacity: isActive ? 1 : 0,
             y: 0,
-            visibility: isActive ? 'visible' : 'hidden',
           }
         : {
             opacity: isActive ? 1 : 0,
             y: isActive ? '0svh' : index < active ? '-26svh' : '28svh',
-            visibility: isActive ? 'visible' : 'hidden',
           }}
       transition={transition}
       style={{ zIndex: isLeaving ? 3 : isActive ? 2 : 1 }}
@@ -940,13 +972,11 @@ function MobileWhyScene({ active, previous, shouldReduceMotion }) {
                     opacity: isActive ? 1 : 0,
                     y: 0,
                     scale: 1,
-                    visibility: isActive ? 'visible' : 'hidden',
                   }
                 : {
                     opacity: isActive ? 1 : 0,
                     y: isActive ? 0 : index < active ? -42 : 44,
                     scale: isActive ? 1 : 0.985,
-                    visibility: isActive ? 'visible' : 'hidden',
                   }}
               transition={shouldReduceMotion
                 ? { duration: 0 }
@@ -979,11 +1009,82 @@ function MobileWhyScene({ active, previous, shouldReduceMotion }) {
   )
 }
 
+// In the embedded popup, the Why scenes follow scroll progress directly.
+// No discrete React scene swaps or long animation timers run on wheel events.
+// This eliminates forward/reverse snapping and uses the modal viewport rather
+// than full-window svh offsets for each image and title.
+function smoothStep(value) {
+  const clamped = Math.min(Math.max(value, 0), 1)
+  return clamped * clamped * (3 - 2 * clamped)
+}
+
+function EmbeddedWhyBenefitScene({ benefit, index, progress, shouldReduceMotion }) {
+  const previousBoundary = index > 0
+    ? (WHY_STOPS[index - 1] + WHY_STOPS[index]) / 2
+    : null
+  const nextBoundary = index < WHY_STOPS.length - 1
+    ? (WHY_STOPS[index] + WHY_STOPS[index + 1]) / 2
+    : null
+  const blend = 0.038
+
+  const opacity = useTransform(progress, (value) => {
+    const fadeIn = previousBoundary === null ? 1
+      : smoothStep((value - (previousBoundary - blend)) / (blend * 2))
+    const fadeOut = nextBoundary === null ? 1
+      : 1 - smoothStep((value - (nextBoundary - blend)) / (blend * 2))
+    return Math.min(fadeIn, fadeOut)
+  })
+  const y = useTransform(progress, (value) => {
+    if (shouldReduceMotion) return 0
+    if (previousBoundary !== null && value < previousBoundary + blend) {
+      return (1 - smoothStep((value - (previousBoundary - blend)) / (blend * 2))) * 22
+    }
+    if (nextBoundary !== null && value > nextBoundary - blend) {
+      return -22 * smoothStep((value - (nextBoundary - blend)) / (blend * 2))
+    }
+    return 0
+  })
+
+  return (
+    <motion.article
+      style={{ opacity, y, pointerEvents: 'none' }}
+      className="absolute inset-0 flex items-center justify-center overflow-hidden px-5 py-6 sm:px-10 sm:py-8"
+      role="group"
+      aria-label={benefit.title}
+    >
+      <div className="grid h-full w-full max-w-[1000px] min-h-0 items-center gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)] md:gap-9">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-[410px] items-center justify-center overflow-hidden">
+          <img
+            src={WHY_IMAGE_BY_ID[benefit.id]}
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            decoding="async"
+            draggable="false"
+            className="h-full max-h-[95%] w-full object-contain"
+          />
+        </div>
+        <div className="min-w-0 text-left">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#DCE0CF]">
+            Why EPANTRY <span className="ml-2 text-[#DCE0CF]/65">{String(index + 1).padStart(2, '0')} / 05</span>
+          </p>
+          <h3 className="mt-3 text-[clamp(26px,3.6vw,52px)] font-semibold leading-[1.08] tracking-[-0.035em] text-[#F7F6F2]">
+            {benefit.title}
+          </h3>
+          <p className="mt-4 max-w-[40ch] text-[14px] leading-6 text-[#DCE0CF] sm:text-[16px] sm:leading-7">
+            {benefit.description}
+          </p>
+        </div>
+      </div>
+    </motion.article>
+  )
+}
+
 // Keep the selected benefit and the departing benefit together in React
 // state. A single update per crossed stop means quick forward/back gestures
 // cannot flip the exiting card's stacking order mid-transition.
 // This hook is local to Why EPANTRY; How EPANTRY's logic stays untouched.
-function useWhyTransitionState(progress) {
+function useWhyTransitionState(progress, skipSceneTransitions = false) {
   const [mobile, setMobile] = useState(() =>
     typeof window !== 'undefined' &&
     window.matchMedia('(max-width: 767px)').matches,
@@ -1000,6 +1101,7 @@ function useWhyTransitionState(progress) {
   }, [])
 
   useEffect(() => {
+    if (skipSceneTransitions) return undefined
     const update = (rawValue) => {
       const value = Math.min(Math.max(rawValue, 0), 1)
       const current = activeRef.current
@@ -1024,18 +1126,20 @@ function useWhyTransitionState(progress) {
     }
     update(progress.get())
     return progress.on('change', update)
-  }, [progress])
+  }, [progress, skipSceneTransitions])
 
   return { mobile, ...scene }
 }
 function WhyEpantrySection({
   shouldReduceMotion,
+  embedded = false,
+  scrollRootRef = null,
 }) {
   const sectionRef =
     useRef(null)
 
-  const progress = useStableStickyProgress(sectionRef, true)
-  const { mobile, active, previous } = useWhyTransitionState(progress)
+  const progress = useStableStickyProgress(sectionRef, true, scrollRootRef)
+  const { mobile, active, previous } = useWhyTransitionState(progress, embedded)
 
   // Preload/decode the existing five images once so neither desktop nor
   // mobile waits for an image while a card transition is already playing.
@@ -1116,10 +1220,12 @@ function WhyEpantrySection({
       data-landing-story="why"
       data-landing-stops="0.24,0.39,0.54,0.69,0.9"
       className="relative z-20 h-[450svh] w-full bg-[#080808]"
+      style={embedded ? { height: 'var(--epantry-guide-why)' } : undefined}
     >
       <div
         data-landing-sticky
         className="sticky top-0 h-[100svh] sm:h-[100svh] w-full overflow-hidden bg-[#080808] text-[#F3F1EB]"
+        style={embedded ? { height: 'var(--epantry-guide-stage)' } : undefined}
       >
         <div
           aria-hidden="true"
@@ -1155,7 +1261,19 @@ function WhyEpantrySection({
           </div>
         </motion.header>
 
-        {mobile ? (
+        {embedded ? (
+          <div className="absolute inset-x-0 bottom-[5%] top-[12%] z-20 md:bottom-[8%] md:top-[15%]">
+            {WHY_CUSTOMER_BENEFITS.map((benefit, index) => (
+              <EmbeddedWhyBenefitScene
+                key={benefit.id}
+                benefit={benefit}
+                index={index}
+                progress={progress}
+                shouldReduceMotion={shouldReduceMotion}
+              />
+            ))}
+          </div>
+        ) : mobile ? (
           <MobileWhyScene active={active} previous={previous} shouldReduceMotion={shouldReduceMotion} />
         ) : WHY_CUSTOMER_BENEFITS.map((benefit, index) => (
           <WhyBenefitScene
@@ -1173,14 +1291,14 @@ function WhyEpantrySection({
   )
 }
 
-export default function HowItWorksSection() {
+export default function HowItWorksSection({ embedded = false, scrollRootRef = null }) {
   const sectionRef =
     useRef(null)
 
   const shouldReduceMotion =
     useReducedMotion()
 
-  const progress = useStableStickyProgress(sectionRef)
+  const progress = useStableStickyProgress(sectionRef, false, scrollRootRef)
   const { mobile, active } = useMobileStoryIndex(progress, HOW_STOPS)
 
   const headerOpacity =
@@ -1261,15 +1379,15 @@ export default function HowItWorksSection() {
         data-landing-story="how"
         data-landing-stops="0.04,0.27,0.47,0.67,0.87"
         className="relative h-[400svh] w-full bg-[#B4485B]"
+        style={embedded ? { height: 'var(--epantry-guide-how)' } : undefined}
       >
       <div
         data-landing-sticky
         className="sticky top-0 h-[100svh] sm:h-[100svh] w-full overflow-hidden"
         style={{
-          backgroundColor:
-            STORY_BACKGROUND,
-          color:
-            STORY_FOREGROUND,
+          backgroundColor: STORY_BACKGROUND,
+          color: STORY_FOREGROUND,
+          ...(embedded ? { height: 'var(--epantry-guide-stage)' } : {}),
         }}
       >
         <div
@@ -1365,6 +1483,8 @@ export default function HowItWorksSection() {
 
       <WhyEpantrySection
         shouldReduceMotion={shouldReduceMotion}
+        embedded={embedded}
+        scrollRootRef={scrollRootRef}
       />
     </>
   )
