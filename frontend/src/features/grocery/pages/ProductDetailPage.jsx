@@ -538,81 +538,26 @@ function DetailCard({
   accent = false,
   description = "",
   icon: Icon = null,
-  defaultOpen = false,
 }) {
-  if (!Icon && !description) {
-    return (
-      <details open={defaultOpen} className="group border-b border-stone-200 last:border-b-0">
-        <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-6 sm:py-4">
-          <div>
-            <h3
-              className={[
-                "text-sm font-black transition-colors duration-200",
-                accent ? "text-emerald-800" : "text-stone-950",
-                "group-open:text-emerald-900",
-              ].join(" ")}
-            >
-              {title}
-            </h3>
-
-            <p className="mt-0.5 text-[10px] text-stone-500 group-open:hidden sm:mt-1 sm:text-xs">
-              Click to view details
-            </p>
-          </div>
-
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white sm:h-9 sm:w-9">
-            <ChevronDown
-              size={17}
-              className="transition-transform duration-200 group-open:rotate-180"
-              aria-hidden="true"
-            />
-          </span>
-        </summary>
-
-        <div className="border-t border-emerald-100 bg-white px-4 py-4 sm:px-6 sm:py-5">
-          {children}
-        </div>
-      </details>
-    );
-  }
-
   return (
-    <details open={defaultOpen} className="group border-b border-stone-200 last:border-b-0">
-      <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:gap-4 sm:px-6 sm:py-4">
-        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-          {Icon && (
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm sm:h-10 sm:w-10">
-              <Icon size={17} aria-hidden="true" />
-            </span>
-          )}
-
-          <div className="min-w-0">
-            <h3
-              className={[
-                "text-sm font-black transition-colors duration-200",
-                accent ? "text-emerald-800" : "text-stone-950",
-                "group-open:text-emerald-900",
-              ].join(" ")}
-            >
+    <details className="group border-b border-[#C8D5D2] last:border-b-0">
+      <summary className="focus-ring flex min-h-[82px] cursor-pointer list-none items-center justify-between gap-4 py-4 text-left transition-colors hover:bg-[#F5F9F8] sm:py-5 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-[#C9D7D4] bg-[#E3F0ED] text-[#174E49]">
+            {Icon ? <Icon size={19} strokeWidth={1.8} aria-hidden="true" /> : <ShieldCheck size={19} strokeWidth={1.8} aria-hidden="true" />}
+          </span>
+          <span className="min-w-0">
+            <span className={`block text-[17px] font-semibold tracking-[-0.015em] sm:text-lg ${accent ? "text-[#173F35]" : "text-[#202421]"}`}>
               {title}
-            </h3>
-
-            <p className="mt-0.5 text-[10px] leading-4 text-stone-500 group-open:hidden sm:mt-1 sm:text-xs sm:leading-5">
-              {description || "Click to view details"}
-            </p>
-          </div>
-        </div>
-
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white sm:h-9 sm:w-9">
-          <ChevronDown
-            size={17}
-            className="transition-transform duration-200 group-open:rotate-180"
-            aria-hidden="true"
-          />
+            </span>
+            {description && <span className="mt-1 block text-sm leading-5 text-[#66736F]">{description}</span>}
+          </span>
+        </span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#C8D5D2] bg-white text-[#174E49] transition-colors group-open:bg-[#174E49] group-open:text-white">
+          <ChevronDown size={18} className="transition-transform group-open:rotate-180" aria-hidden="true" />
         </span>
       </summary>
-
-      <div className="border-t border-emerald-100 bg-white px-4 py-4 sm:px-6 sm:py-5">
+      <div className="min-w-0 pb-7 pl-0 pt-2 text-[15px] leading-7 text-[#343B36] sm:pb-8 sm:pl-[60px]">
         {children}
       </div>
     </details>
@@ -969,16 +914,16 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-white shadow-[0_12px_34px_rgba(4,120,87,0.08)]">
-      <div className="flex items-center gap-3 px-4 pb-2 pt-4">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm">
+    <section className="ep-product-offers min-w-0 border-t-[3px] border-[#214E4A] bg-[#E8F2F1] px-4 py-3 sm:px-5 sm:py-3">
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-[#C7DCD8] pb-2.5 sm:flex-nowrap">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#CFE4E1] text-[#174E49]">
           <Store size={19} aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-black text-stone-950">
+          <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">
             {pincode ? "Delivery availability" : "Check price by pincode"}
           </h2>
-          <p className="mt-0.5 text-xs leading-4 text-stone-600">
+          <p className="mt-0.5 text-[13px] leading-5 text-[#676E67]">
             {pincode
               ? `Delivery PIN ${pincode}${manualPincode === null ? (isLocationApproximate ? " · Estimated location" : " · Current location") : " · Selected address"}`
               : "Choose a delivery PIN to see prices and Add to Cart."}
@@ -988,7 +933,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
           <button
             type="button"
             onClick={openManualPinEditor}
-            className="focus-ring shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"
+            className="focus-ring ml-auto shrink-0 rounded-full border border-[#A9C8C4] bg-white px-3 py-2 text-sm font-semibold text-[#173F35] hover:border-[#173F35]"
           >
             Change PIN
           </button>
@@ -996,7 +941,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       </div>
 
       {pincode && !manualEditorOpen && (
-        <div className="px-4 pb-3">
+        <div className="py-1.5">
           {!packId ? (
             <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
               Delivery details are not available for this product yet.
@@ -1006,8 +951,8 @@ function MarketplaceOffers({ product, onOffersResolved }) {
               Checking delivery to {pincode}...
             </p>
           ) : !error && visibleOffers.length > 0 ? (
-            <p role="status" className="rounded-lg bg-emerald-100/70 px-3 py-2 text-xs font-bold text-emerald-800">
-              Delivery is available to PIN {pincode}. Choose a price and add to cart below.
+            <p role="status" className="border-l-[3px] border-[#2F856D] bg-white/65 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-[#285E50]">
+              {visibleOffers.length} seller option{visibleOffers.length === 1 ? "" : "s"} available for PIN {pincode}.
             </p>
           ) : !error ? (
             <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
@@ -1020,7 +965,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       {needsManualPin && (
         <form
           onSubmit={handleManualPinCheck}
-          className="space-y-2 px-4 pb-4 pt-2"
+          className="space-y-2 pb-2 pt-2.5"
         >
           <label htmlFor="product-delivery-pincode" className="block text-xs font-semibold text-stone-700">
             {pincode ? "Check delivery to another location" : "Enter your delivery PIN code"}
@@ -1050,13 +995,13 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                   setManualDraft(event.target.value.replace(/\D/g, "").slice(0, 6));
                   setPinEntryError("");
                 }}
-                className="focus-ring h-11 w-full rounded-xl border border-stone-300 bg-white pl-10 pr-3 text-sm font-bold text-stone-900 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="focus-ring h-12 w-full rounded-lg border border-[#A9C8C4] bg-white pl-10 pr-3 text-[15px] font-medium text-[#202421] outline-none transition focus:border-[#174E49] focus:ring-2 focus:ring-[#CFE4E1]"
                 placeholder="Enter 6-digit pincode"
               />
             </div>
             <button
               type="submit"
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2 text-sm font-black text-white transition hover:bg-emerald-800"
+              className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#174E49] px-5 py-2 text-[15px] font-semibold text-white transition hover:bg-[#286C62]"
             >
               <Search size={15} aria-hidden="true" />
               Check delivery
@@ -1095,14 +1040,14 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       )}
 
       {error && verifiedForCurrentPin && (
-        <p role="alert" className="mx-4 mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+        <p role="alert" className="mb-3 border-l-[3px] border-rose-500 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
           {error}
         </p>
       )}
 
-      {visibleOffers.length > 0 && (
+      {!manualEditorOpen && visibleOffers.length > 0 && (
         <div
-          className="max-h-[340px] space-y-3 overflow-y-auto overscroll-contain border-t border-emerald-100 px-4 py-4 sm:max-h-[400px]"
+          className="max-h-[300px] divide-y divide-[#C5D8D4] overflow-y-auto overscroll-y-auto border-t border-[#C5D8D4] [scrollbar-width:thin]"
           role="region"
           aria-label="Available delivery offers"
           tabIndex={0}
@@ -1110,107 +1055,98 @@ function MarketplaceOffers({ product, onOffersResolved }) {
           {visibleOffers.map((offer) => (
             <article
               key={offer.id}
-              className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_10px_28px_rgba(4,120,87,0.08)]"
+              className="grid min-w-0 gap-x-4 gap-y-3 bg-white/75 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-4"
             >
-              <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <p className="min-w-0 break-words text-[14px] font-semibold leading-5 text-[#173F35]">
                     {offer.seller?.name || "Marketplace Host"}
                   </p>
-                  <p className="mt-0.5 text-[10px] font-semibold capitalize text-stone-500">
-                    {offer.fulfillmentTypes?.join(" · ") || "Delivery"}
-                  </p>
+                  <span className="shrink-0 rounded-full border border-emerald-200 bg-[#E5F3E8] px-2 py-0.5 text-[12px] font-semibold text-emerald-900">
+                    In stock
+                  </span>
                 </div>
-                <span className="shrink-0 rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-800">
-                  In stock
-                </span>
+                <p className="mt-0.5 text-[13px] font-medium capitalize leading-5 text-[#66746D]">
+                  {offer.fulfillmentTypes?.join(" · ") || "Delivery"}
+                </p>
               </div>
 
-              <div className="p-4">
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-400">
-                      Your price
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                      <p className="text-3xl font-black tracking-tight text-stone-950">
+              <div className="min-w-0 sm:text-right">
+                <p className="text-[12px] font-semibold text-[#66746D]">Your price</p>
+                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:justify-end">
+                  <p className="whitespace-nowrap text-[23px] font-semibold leading-tight tracking-[-0.04em] text-[#202421] sm:text-[25px]">
+                    {formatMoney(
+                      offer.price?.effectiveAmountMinor,
+                      offer.price?.currency || "INR"
+                    )}
+                  </p>
+                  {offer.price?.saleAmountMinor !== null &&
+                    offer.price?.saleAmountMinor !== undefined &&
+                    offer.price?.listAmountMinor !==
+                      offer.price?.saleAmountMinor && (
+                      <p className="text-xs font-semibold text-stone-400 line-through">
                         {formatMoney(
-                          offer.price?.effectiveAmountMinor,
+                          offer.price?.listAmountMinor,
                           offer.price?.currency || "INR"
                         )}
                       </p>
+                    )}
+                </div>
+              </div>
 
-                      {offer.price?.saleAmountMinor !== null &&
-                        offer.price?.saleAmountMinor !== undefined &&
-                        offer.price?.listAmountMinor !==
-                          offer.price?.saleAmountMinor && (
-                          <p className="text-xs font-bold text-stone-400 line-through">
-                            {formatMoney(
-                              offer.price?.listAmountMinor,
-                              offer.price?.currency || "INR"
-                            )}
-                          </p>
-                        )}
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 text-right">
-                    <p className="mb-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">
-                      Quantity
-                    </p>
-                    <div className="inline-flex items-center overflow-hidden rounded-xl border border-stone-200 bg-stone-50 shadow-inner">
-                      <button
-                        type="button"
-                        aria-label="Decrease quantity"
-                        disabled={
-                          Boolean(addingOfferId) ||
-                          getOfferQuantity(offer) <=
-                            getOfferQuantityBounds(offer).minimum
-                        }
-                        onClick={() =>
-                          handleQuantityStep(offer, getOfferQuantity(offer) - 1)
-                        }
-                        className="focus-ring grid h-10 w-10 place-items-center text-stone-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Minus size={15} aria-hidden="true" />
-                      </button>
-
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        aria-label="Quantity"
-                        min={getOfferQuantityBounds(offer).minimum}
-                        max={getOfferQuantityBounds(offer).maximum}
-                        value={getOfferQuantity(offer)}
-                        disabled={Boolean(addingOfferId)}
-                        onChange={(event) =>
-                          setOfferQuantity(offer, event.target.value)
-                        }
-                        onBlur={() =>
-                          void syncExistingCartQuantity(
-                            offer,
-                            getOfferQuantity(offer)
-                          )
-                        }
-                        className="h-10 w-12 border-x border-stone-200 bg-white text-center text-sm font-black text-stone-950 outline-none disabled:opacity-50"
-                      />
-
-                      <button
-                        type="button"
-                        aria-label="Increase quantity"
-                        disabled={
-                          Boolean(addingOfferId) ||
-                          getOfferQuantity(offer) >=
-                            getOfferQuantityBounds(offer).maximum
-                        }
-                        onClick={() =>
-                          handleQuantityStep(offer, getOfferQuantity(offer) + 1)
-                        }
-                        className="focus-ring grid h-10 w-10 place-items-center text-stone-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Plus size={15} aria-hidden="true" />
-                      </button>
-                    </div>
+              <div className="flex min-w-0 flex-wrap items-end gap-3 border-t border-[#E1E9E5] pt-2.5 sm:col-span-2 sm:justify-end">
+                <div className="shrink-0">
+                  <p className="mb-1 text-[12px] font-semibold text-[#66746D]">Quantity</p>
+                  <div className="inline-flex items-center overflow-hidden border border-[#D4DAD2] bg-white">
+                    <button
+                      type="button"
+                      aria-label="Decrease quantity"
+                      disabled={
+                        Boolean(addingOfferId) ||
+                        getOfferQuantity(offer) <=
+                          getOfferQuantityBounds(offer).minimum
+                      }
+                      onClick={() =>
+                        handleQuantityStep(offer, getOfferQuantity(offer) - 1)
+                      }
+                      className="focus-ring grid h-9 w-9 place-items-center text-stone-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Minus size={15} aria-hidden="true" />
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      aria-label="Quantity"
+                      min={getOfferQuantityBounds(offer).minimum}
+                      max={getOfferQuantityBounds(offer).maximum}
+                      value={getOfferQuantity(offer)}
+                      disabled={Boolean(addingOfferId)}
+                      onChange={(event) =>
+                        setOfferQuantity(offer, event.target.value)
+                      }
+                      onBlur={() =>
+                        void syncExistingCartQuantity(
+                          offer,
+                          getOfferQuantity(offer)
+                        )
+                      }
+                      className="h-9 w-11 border-x border-stone-200 bg-white text-center text-sm font-semibold text-stone-950 outline-none disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      aria-label="Increase quantity"
+                      disabled={
+                        Boolean(addingOfferId) ||
+                        getOfferQuantity(offer) >=
+                          getOfferQuantityBounds(offer).maximum
+                      }
+                      onClick={() =>
+                        handleQuantityStep(offer, getOfferQuantity(offer) + 1)
+                      }
+                      className="focus-ring grid h-9 w-9 place-items-center text-stone-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Plus size={15} aria-hidden="true" />
+                    </button>
                   </div>
                 </div>
 
@@ -1220,9 +1156,9 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                   onClick={(event) =>
                     handleAddToCart(offer, event.currentTarget)
                   }
-                  className="focus-ring mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-700 px-5 text-sm font-black text-white shadow-[0_10px_22px_rgba(4,120,87,0.22)] transition hover:from-emerald-900 hover:to-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 bg-[#173F35] px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-[#265F49] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <ShoppingCart size={17} aria-hidden="true" />
+                  <ShoppingCart size={16} aria-hidden="true" />
                   {addingOfferId === offer.id
                     ? "Adding..."
                     : `Add ${getOfferQuantity(offer)} to Cart`}
@@ -1242,98 +1178,8 @@ function productDetailLabel(value) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function ProductDetailsSheet({ product, autoScroll = false }) {
+function ProductDetailsSheet({ product }) {
   const scrollAreaRef = useRef(null);
-
-  useEffect(() => {
-    if (!autoScroll || typeof window === "undefined") {
-      return undefined;
-    }
-
-    const scrollArea = scrollAreaRef.current;
-
-    if (!scrollArea) {
-      return undefined;
-    }
-
-    const mobileQuery = window.matchMedia("(max-width: 639px)");
-
-    const reducedMotionQuery = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    );
-
-    if (!mobileQuery.matches || reducedMotionQuery.matches) {
-      return undefined;
-    }
-
-    let animationFrameId = null;
-    let previousTime = null;
-    let pausedUntil = performance.now() + 1200;
-    let endHoldUntil = 0;
-
-    const pauseAutoScroll = () => {
-      pausedUntil = performance.now() + 2800;
-      endHoldUntil = 0;
-    };
-
-    const tick = (time) => {
-      if (previousTime === null) {
-        previousTime = time;
-      }
-
-      const elapsed = Math.min(40, time - previousTime);
-
-      previousTime = time;
-
-      if (time >= pausedUntil) {
-        const maxScroll = Math.max(
-          0,
-          scrollArea.scrollHeight - scrollArea.clientHeight
-        );
-
-        if (maxScroll > 6) {
-          if (scrollArea.scrollTop >= maxScroll - 2) {
-            if (!endHoldUntil) {
-              endHoldUntil = time + 1400;
-            } else if (time >= endHoldUntil) {
-              scrollArea.scrollTo({
-                top: 0,
-                behavior: "smooth",
-              });
-
-              pausedUntil = time + 1700;
-              endHoldUntil = 0;
-            }
-          } else {
-            scrollArea.scrollTop += elapsed * 0.04;
-            endHoldUntil = 0;
-          }
-        }
-      }
-
-      animationFrameId = window.requestAnimationFrame(tick);
-    };
-
-    scrollArea.addEventListener("touchstart", pauseAutoScroll, {
-      passive: true,
-    });
-    scrollArea.addEventListener("pointerdown", pauseAutoScroll, {
-      passive: true,
-    });
-    scrollArea.addEventListener("wheel", pauseAutoScroll, { passive: true });
-
-    animationFrameId = window.requestAnimationFrame(tick);
-
-    return () => {
-      if (animationFrameId) {
-        window.cancelAnimationFrame(animationFrameId);
-      }
-
-      scrollArea.removeEventListener("touchstart", pauseAutoScroll);
-      scrollArea.removeEventListener("pointerdown", pauseAutoScroll);
-      scrollArea.removeEventListener("wheel", pauseAutoScroll);
-    };
-  }, [autoScroll, product?.id, product?.slug, product?.displayName]);
 
   const nutrients = Array.isArray(product?.nutrition?.nutrients)
     ? product.nutrition.nutrients
@@ -1365,28 +1211,28 @@ function ProductDetailsSheet({ product, autoScroll = false }) {
   ];
 
   return (
-    <div className="flex h-full w-full items-stretch justify-center bg-[#f4f7f2] p-4 sm:p-6 xl:p-8">
-      <div className="flex h-full w-full max-w-[760px] flex-col overflow-hidden rounded-[24px] border border-emerald-200 bg-white shadow-[0_18px_42px_rgba(4,120,87,0.10)]">
-        <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-4 py-3 text-white sm:px-6 sm:py-5">
-          <p className="text-[8px] font-black uppercase tracking-[0.15em] text-emerald-200 sm:text-[10px] sm:tracking-[0.18em]">
+    <div className="flex h-full min-h-0 w-full items-stretch justify-center bg-[#E9EFF5] p-3 sm:p-4">
+      <div className="flex h-full min-h-0 w-full max-w-[760px] flex-col overflow-hidden border border-[#CEDCE5] bg-[#FFFCF8]">
+        <div className="shrink-0 border-b border-[#C9DDD7] bg-[#DDECE6] px-4 py-4 text-[#173F35] sm:px-6 sm:py-5">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#2D665B]">
             EPANTRY · Product details sheet
           </p>
           <h2 className="mt-1 text-[17px] font-black leading-[1.08] sm:mt-2 sm:text-3xl sm:leading-tight">
             {product?.displayName || "Product"}
           </h2>
-          <p className="mt-1 text-[9px] font-semibold leading-3 text-emerald-100/80 sm:text-xs sm:leading-normal">
+          <p className="mt-2 text-[13px] font-medium leading-5 text-[#536D65]">
             Published listing details · generated from governed product data
           </p>
         </div>
 
         <div
           ref={scrollAreaRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 [scrollbar-width:thin]"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto touch-pan-y p-5 sm:p-6 [scrollbar-width:thin]"
         >
           <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
             {detailRows.map(([label, value]) => (
               <div key={label} className="border-b border-stone-100 pb-2">
-                <dt className="text-[9px] font-black uppercase tracking-[0.1em] text-stone-400">
+                <dt className="text-[12px] font-black uppercase tracking-[0.1em] text-stone-400">
                   {label}
                 </dt>
                 <dd className="mt-1 min-w-0 break-words text-xs font-black text-stone-900">
@@ -1397,7 +1243,7 @@ function ProductDetailsSheet({ product, autoScroll = false }) {
           </dl>
 
           <div className="mt-5 border-t border-stone-200 pt-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+            <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
               Ingredients
             </p>
             <p className="mt-2 text-xs font-semibold leading-5 text-stone-700">
@@ -1412,7 +1258,7 @@ function ProductDetailsSheet({ product, autoScroll = false }) {
           </div>
 
           <div className="mt-4 border-t border-stone-200 pt-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+            <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
               Allergens
             </p>
             <p className="mt-2 text-xs font-semibold leading-5 text-stone-700">
@@ -1432,10 +1278,10 @@ function ProductDetailsSheet({ product, autoScroll = false }) {
 
           <div className="mt-4 border-t border-stone-200 pt-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
                 Nutrition
               </p>
-              <span className="text-[10px] font-black text-stone-500">
+              <span className="text-[12px] font-black text-stone-500">
                 {product?.nutrition?.basis
                   ? productDetailLabel(product.nutrition.basis)
                   : "Declared basis"}
@@ -1447,7 +1293,7 @@ function ProductDetailsSheet({ product, autoScroll = false }) {
                 {nutrients.map((nutrient, index) => (
                   <div
                     key={`${nutrient?.nutrientKey || "nutrient"}-${index}`}
-                    className="flex items-center justify-between gap-2 border-b border-stone-100 py-1.5 text-[11px]"
+                    className="flex items-center justify-between gap-2 border-b border-stone-100 py-1.5 text-[12px]"
                   >
                     <span className="font-bold text-stone-500">
                       {productDetailLabel(nutrient?.nutrientKey)}
@@ -1467,7 +1313,7 @@ function ProductDetailsSheet({ product, autoScroll = false }) {
 
           {product?.claims?.length || product?.certifications?.length ? (
             <div className="mt-4 border-t border-stone-200 pt-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
                 Claims & certifications
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -1477,7 +1323,7 @@ function ProductDetailsSheet({ product, autoScroll = false }) {
                 ].map((item, index) => (
                   <span
                     key={`${item?.key || item?.label || "detail"}-${index}`}
-                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-800"
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-black text-emerald-800"
                   >
                     {item?.label || productDetailLabel(item?.key)}
                   </span>
@@ -1576,17 +1422,17 @@ function RecommendationProductCard({ product }) {
       : "";
 
   return (
-    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#dfe7dc] bg-white shadow-[0_10px_30px_rgba(23,60,45,0.06)] transition duration-300 hover:-translate-y-1.5 hover:border-[#9fbea8] hover:shadow-[0_22px_44px_rgba(23,60,45,0.14)] motion-reduce:transform-none motion-reduce:transition-none">
+    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[17px] border border-[#CBDDD7] bg-[#FFFEFB] shadow-[0_5px_16px_rgba(22,57,46,0.05)] transition duration-300 hover:-translate-y-1 hover:border-[#709D91] hover:shadow-[0_14px_28px_rgba(22,57,46,0.12)] motion-reduce:transform-none motion-reduce:transition-none">
       <Link
         to={path}
-        className="focus-ring relative block aspect-[1.08/1] overflow-hidden bg-[linear-gradient(145deg,#f7f7f1,#eef4eb)]"
+        className="focus-ring relative block aspect-[1/1] overflow-hidden bg-[#F5F8F4]"
         aria-label={`View ${product?.displayName || "product"}`}
       >
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={product?.image?.alt || product?.displayName || "Product"}
-            className="h-full w-full object-contain p-5 transition duration-500 group-hover:scale-[1.04]"
+            className="h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.04]"
           />
         ) : (
           <div className="grid h-full place-items-center text-emerald-700/35">
@@ -1594,29 +1440,29 @@ function RecommendationProductCard({ product }) {
           </div>
         )}
 
-        <span className="absolute left-3 top-3 rounded-full border border-white/70 bg-white/90 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 shadow-sm backdrop-blur">
+        <span className="absolute left-3 top-3 rounded-full bg-[#FFFEFA]/95 px-2.5 py-1 text-[12px] font-semibold text-[#23564D] shadow-sm">
           {product?.category?.name || "EPANTRY pick"}
         </span>
       </Link>
 
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
         {product?.brand?.name ? (
-          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-700">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#346E60]">
             {product.brand.name}
           </p>
         ) : null}
 
-        <h3 className="mt-1.5 line-clamp-2 min-h-[2.7em] text-[16px] font-black leading-[1.35] tracking-[-0.02em] text-[#173c2d]">
+        <h3 className="mt-1.5 line-clamp-2 min-h-[2.7em] text-[17px] font-semibold leading-[1.35] tracking-[-0.02em] text-[#173F35]">
           {product?.displayName || "Grocery product"}
         </h3>
 
-        <div className="mt-2 min-h-5 text-[11px] font-semibold text-stone-500">
+        <div className="mt-2 min-h-5 text-[12px] font-semibold text-stone-500">
           {quantity || product?.pack?.name || "Published product"}
         </div>
 
         <Link
           to={path}
-          className="focus-ring mt-4 inline-flex items-center justify-between gap-3 rounded-xl bg-[#edf5e9] px-3.5 py-2.5 text-xs font-black text-[#1b5a3d] transition group-hover:bg-[#175339] group-hover:text-white"
+          className="focus-ring mt-auto inline-flex min-h-11 items-center justify-between gap-3 rounded-lg bg-[#174E49] px-3.5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#266D62]"
         >
           View product
           <ArrowRight size={15} aria-hidden="true" />
@@ -1670,10 +1516,10 @@ function CountryListingCard({ listing }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-800">
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[12px] font-black uppercase tracking-[0.12em] text-emerald-800">
             {isRecipe ? "Recipe" : "Grocery"}
           </span>
-          <span className="truncate text-[9px] font-bold text-stone-400">
+          <span className="truncate text-[12px] font-bold text-stone-400">
             {meta}
           </span>
         </div>
@@ -1708,20 +1554,22 @@ function ProductRecommendationShelf({
     <section>
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#346E60]">
             {eyebrow}
           </p>
-          <h2 className="mt-1.5 text-2xl font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
+          <h2 className="mt-1.5 text-[27px] font-semibold tracking-[-0.035em] text-[#173F35] sm:text-[34px]">
             {title}
           </h2>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-stone-500">
-            {description}
-          </p>
+          {description ? (
+            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-stone-500">
+              {description}
+            </p>
+          ) : null}
         </div>
 
         <Link
           to={viewAllTo}
-          className="focus-ring inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:border-emerald-700 hover:bg-emerald-700 hover:text-white"
+          className="focus-ring inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-[#B7CDC6] bg-[#FFFEFA] px-4 py-2.5 text-sm font-semibold text-[#174E49] transition hover:border-[#174E49] hover:bg-[#174E49] hover:text-white"
         >
           View all
           <ArrowRight size={16} aria-hidden="true" />
@@ -2115,8 +1963,6 @@ export default function ProductDetailPage() {
 
   const imageCount = productGalleryItems.length;
 
-  const visibleProductImages = productGalleryItems.slice(0, 4);
-
   const hasClaimsOrCertifications =
     product.claims?.length > 0 || product.certifications?.length > 0;
 
@@ -2125,324 +1971,129 @@ export default function ProductDetailPage() {
   const countryCopy = countryDescription(product.countryOfOrigin);
 
   return (
-    <main className="min-h-screen bg-[#f5f4ef]">
-      <div className="page-shell pb-10 pt-3 sm:pt-4">
-        <Link
-          to="/grocery"
-          className="focus-ring inline-flex items-center gap-2 text-sm font-black text-emerald-800 transition hover:text-emerald-950"
-        >
-          <ArrowLeft size={16} aria-hidden="true" />
-          Back to Grocery
-        </Link>
+    <main className="ep-product-page min-h-screen bg-[#FDFDFA] text-[#202421]">
+      <div className="mx-auto w-full max-w-[1480px] px-5 pb-14 pt-3 sm:px-9 lg:px-14">
+        <div className="flex items-center justify-between gap-4 border-b border-[#E7E9E4] pb-3 pt-1">
+          <Link to="/grocery" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42]">
+            <ArrowLeft size={17} aria-hidden="true" /> Back to Grocery
+          </Link>
+          <a href="#ep-product-facts" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42]">
+            Product information <ArrowRight size={16} aria-hidden="true" />
+          </a>
+        </div>
 
-        <section className="mt-3 rounded-[24px] border border-white/75 bg-white/[0.82] shadow-[0_18px_50px_rgba(28,25,23,0.08)] backdrop-blur-[10px] sm:border-stone-200 sm:bg-white sm:backdrop-blur-none">
-          <div className="grid items-start xl:grid-cols-[minmax(0,1.04fr)_minmax(430px,0.96fr)]">
-            <div className="overflow-hidden rounded-t-[24px] border-b border-white/70 bg-white/[0.58] xl:rounded-l-[24px] xl:rounded-tr-none xl:border-b-0 xl:border-r sm:border-stone-200 sm:bg-[#fafafa]">
-              <div className="sm:hidden">
-                <div className="bg-transparent">
-                  <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {productGalleryItems.map((item, index) => (
-                      <div
-                        key={
-                          item.type === "details"
-                            ? "mobile-product-details-sheet"
-                            : `mobile-${item.image?.url}-${index}`
-                        }
-                        className="relative h-[480px] w-[88%] shrink-0 snap-start overflow-hidden rounded-[22px] border border-stone-200 bg-white shadow-[0_12px_34px_rgba(28,25,23,0.07)]"
-                      >
-                        {item.type === "details" ? (
-                          <ProductDetailsSheet product={product} autoScroll />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center overflow-hidden bg-white">
-                            <img
-                              src={item.image.url}
-                              alt={item.image.alt || product.displayName}
-                              className="h-full w-full object-contain"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+        <section className="ep-product-hero grid min-w-0 gap-0 border-b border-[#E2E5DE] lg:grid-cols-[minmax(0,1.07fr)_minmax(0,0.93fr)] xl:min-h-[min(870px,96svh)]">
+          <div className="min-w-0 lg:pr-10 xl:pr-16">
+            <div className="relative flex min-h-[390px] flex-col justify-center bg-[#F6F6F2] sm:min-h-[540px] lg:min-h-[660px] xl:min-h-[min(735px,84svh)]">
+              <div className="absolute left-5 top-6 z-10 text-xs font-semibold tracking-[0.08em] text-[#5C6A60] sm:left-8 sm:top-8">
+                {product.category?.name || "EPANTRY grocery"}
               </div>
-
-              <div className="hidden sm:block">
-                {imageCount > 0 ? (
-                  <div className="bg-white">
-                    {visibleProductImages.map((item, index) => {
-                      if (item.type === "details") {
-                        return (
-                          <div
-                            key="product-details-sheet"
-                            className="relative h-[480px] overflow-hidden bg-white sm:h-[580px] lg:h-[660px] xl:h-[720px]"
-                          >
-                            <ProductDetailsSheet product={product} />
-
-                            {imageCount > 4 && index === 3 ? (
-                              <button
-                                type="button"
-                                onClick={() => setShowAllImages(true)}
-                                className="focus-ring absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white/95 px-4 py-2.5 text-xs font-black text-stone-900 shadow-lg backdrop-blur-md transition hover:border-emerald-300 hover:text-emerald-800"
-                              >
-                                <Images size={16} aria-hidden="true" />
-                                View all images ({imageCount})
-                              </button>
-                            ) : null}
-                          </div>
-                        );
-                      }
-
-                      const image = item.image;
-
-                      return (
-                        <div
-                          key={`${image.url}-${index}`}
-                          className="relative flex h-[480px] items-center justify-center overflow-hidden bg-white sm:h-[580px] lg:h-[660px] xl:h-[720px]"
-                          onMouseMove={(event) => {
-                            const bounds =
-                              event.currentTarget.getBoundingClientRect();
-
-                            const x = Math.max(
-                              0,
-                              Math.min(
-                                100,
-                                ((event.clientX - bounds.left) / bounds.width) *
-                                  100
-                              )
-                            );
-
-                            const y = Math.max(
-                              0,
-                              Math.min(
-                                100,
-                                ((event.clientY - bounds.top) / bounds.height) *
-                                  100
-                              )
-                            );
-
-                            setZoomPreview({
-                              url: image.url,
-                              alt: image.alt || product.displayName,
-                              x,
-                              y,
-                            });
-                          }}
-                          onMouseLeave={() => setZoomPreview(null)}
-                        >
-                          <img
-                            src={image.url}
-                            alt={image.alt || product.displayName}
-                            className="h-full w-full object-contain p-5 sm:p-8 xl:p-10"
-                          />
-
-                          {zoomPreview?.url === image.url && (
-                            <div
-                              className="pointer-events-none absolute hidden h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-emerald-600 bg-emerald-100/15 shadow-[0_10px_30px_rgba(5,150,105,0.2)] backdrop-blur-[1px] xl:block"
-                              style={{
-                                left: `${zoomPreview.x}%`,
-                                top: `${zoomPreview.y}%`,
-                              }}
-                              aria-hidden="true"
-                            />
-                          )}
-
-                          {imageCount > 4 && index === 3 && (
-                            <button
-                              type="button"
-                              onClick={() => setShowAllImages(true)}
-                              className="focus-ring absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white/95 px-4 py-2.5 text-xs font-black text-stone-900 shadow-lg backdrop-blur-md transition hover:border-emerald-300 hover:text-emerald-800"
-                            >
-                              <Images size={16} aria-hidden="true" />
-                              View all images ({imageCount})
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
+              <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-6 pt-16 [scrollbar-width:thin] lg:hidden" aria-label="Swipe product images and details">
+                {productGalleryItems.map((item, index) => (
+                  <div
+                    key={item.type === "details" ? "mobile-product-details-sheet" : `mobile-${item.image?.url}-${index}`}
+                    className="h-[340px] w-[88%] shrink-0 snap-center overflow-hidden border border-[#E4E8E0] bg-[#fffefa] sm:h-[470px]"
+                  >
+                    {item.type === "details" ? (
+                      <ProductDetailsSheet product={product} />
+                    ) : (
+                      <img src={item.image.url} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-5" />
+                    )}
                   </div>
+                ))}
+              </div>
+              <div
+                className="relative mx-auto hidden h-[575px] w-full items-center justify-center overflow-hidden px-7 pt-8 lg:flex xl:px-12"
+                onMouseMove={(event) => {
+                  if (!productImages[0]?.url) return;
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const x = Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100));
+                  const y = Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100));
+                  setZoomPreview({ url: productImages[0].url, alt: productImages[0].alt || product.displayName, x, y });
+                }}
+                onMouseLeave={() => setZoomPreview(null)}
+              >
+                {productImages[0]?.url ? (
+                  <img src={productImages[0].url} alt={productImages[0].alt || product.displayName} className="h-full w-full object-contain" />
                 ) : (
-                  <div className="grid h-[480px] place-items-center bg-white text-stone-300 sm:h-[580px] lg:h-[660px] xl:h-[720px]">
-                    <Package size={64} strokeWidth={1.4} aria-hidden="true" />
-                  </div>
+                  <span className="flex flex-col items-center gap-3 text-[#849187]"><Package size={72} strokeWidth={1.1} aria-hidden="true" /><span className="text-sm">Product image not available</span></span>
                 )}
               </div>
-            </div>
-
-            <div className="relative bg-white p-6 sm:p-8 xl:sticky xl:top-24 xl:min-h-[720px] xl:rounded-r-[24px] xl:p-8">
               {zoomPreview && (
-                <div
-                  className="pointer-events-none absolute inset-x-4 top-4 z-40 hidden h-[520px] overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_26px_70px_rgba(28,25,23,0.24)] xl:block"
-                  aria-label={`Zoomed preview of ${zoomPreview.alt}`}
-                >
-                  <div
-                    className="h-full w-full bg-white bg-no-repeat"
-                    style={{
-                      backgroundImage: `url(${zoomPreview.url})`,
-                      backgroundPosition: `${zoomPreview.x}% ${zoomPreview.y}%`,
-                      backgroundSize: "255%",
-                    }}
-                  />
-
-                  <div className="absolute left-3 top-3 rounded-full bg-stone-950/75 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-white backdrop-blur-sm">
-                    Zoom preview
-                  </div>
+                <div className="pointer-events-none absolute inset-4 z-20 hidden overflow-hidden border border-[#E0E4DA] bg-white shadow-lg lg:block" aria-label={`Zoomed preview of ${zoomPreview.alt}`}>
+                  <div className="h-full w-full bg-white bg-no-repeat" style={{ backgroundImage: `url(${zoomPreview.url})`, backgroundPosition: `${zoomPreview.x}% ${zoomPreview.y}%`, backgroundSize: "235%" }} />
                 </div>
               )}
-
-              <p className="text-sm font-black text-emerald-700">
-                {product.brand?.name}
-              </p>
-
-              <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] text-stone-950 sm:text-4xl xl:text-[42px] xl:leading-[1.02]">
-                {product.displayName}
-              </h1>
-
-              <div className="mt-4 grid grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-2 sm:hidden">
-                <div className="min-w-0 rounded-2xl border border-white/80 bg-white/72 px-3 py-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] backdrop-blur-md">
-                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-stone-500">
-                    Net quantity
-                  </p>
-                  <p className="mt-1 text-sm font-black text-stone-950">
-                    {formatQuantity(product.netQuantity)}
-                  </p>
-                </div>
-
-                <div className="min-w-0 rounded-2xl border border-white/80 bg-white/72 px-3 py-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] backdrop-blur-md">
-                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-stone-500">
-                    Country of origin
-                  </p>
-
-                  {product.countryOfOrigin ? (
-                    <button
-                      type="button"
-                      onClick={() => setCountryPanelOpen(true)}
-                      className="focus-ring group mt-1 inline-flex max-w-full items-center gap-1.5 text-left"
-                      aria-label={`Learn about ${product.countryOfOrigin}`}
-                    >
-                      <span
-                        className="text-[20px] leading-none"
-                        aria-hidden="true"
-                      >
-                        {countryMeta.flag}
-                      </span>
-                      <span className="min-w-0 truncate text-xs font-black text-stone-950">
-                        {product.countryOfOrigin}
-                      </span>
-                      <ArrowRight
-                        size={13}
-                        className="shrink-0 text-emerald-700 transition group-hover:translate-x-0.5"
-                        aria-hidden="true"
-                      />
-                    </button>
+              <button type="button" onClick={() => setShowAllImages(true)} className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8">
+                <ZoomIn size={17} aria-hidden="true" /> View gallery
+              </button>
+            </div>
+            <div className="flex items-center gap-3 overflow-x-auto py-4 sm:gap-4 sm:py-5" role="group" aria-label="Open product images and details">
+              {productGalleryItems.map((item, index) => (
+                <button
+                  key={item.type === "details" ? "product-facts-gallery-tile" : `product-tile-${item.image?.url}-${index}`}
+                  type="button"
+                  onClick={() => setShowAllImages(true)}
+                  className="focus-ring flex h-[75px] w-[75px] shrink-0 items-center justify-center border border-[#DBDFD7] bg-[#F9F9F5] text-[#173F35] transition hover:border-[#173F35] sm:h-[88px] sm:w-[88px]"
+                  aria-label={item.type === "details" ? "Open full product information sheet" : `View ${item.image?.alt || "product photograph"}`}
+                >
+                  {item.type === "details" ? (
+                    <div className="flex h-full w-full flex-col overflow-hidden bg-[#FFFCF7] text-left" aria-hidden="true">
+                      <div className="bg-[#DDECE6] px-2 py-1.5 text-[8px] font-semibold tracking-wide text-[#174E49]">EPANTRY</div>
+                      <div className="flex flex-1 flex-col justify-center gap-1 px-2.5">
+                        <span className="line-clamp-2 text-[9px] font-semibold leading-tight text-[#173F35]">{product.displayName}</span>
+                        <span className="h-px bg-[#D6DDD5]" />
+                        <span className="text-[8px] text-[#617269]">{product.brand?.name || "Product"}</span>
+                        <span className="h-px bg-[#D6DDD5]" />
+                        <span className="text-[8px] text-[#617269]">{formatQuantity(product.netQuantity)}</span>
+                      </div>
+                    </div>
                   ) : (
-                    <p className="mt-1 text-xs font-bold text-stone-400">
-                      Not declared
-                    </p>
+                    <img src={item.image.url} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-2" />
                   )}
-                </div>
-              </div>
-
-              <p className="mt-4 hidden text-sm font-bold text-stone-600 sm:block">
-                Net quantity{" "}
-                <span className="font-black text-stone-950">
-                  {formatQuantity(product.netQuantity)}
-                </span>
-              </p>
-
-              <div className="mt-4 hidden flex-wrap items-center gap-3 sm:flex">
-                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">
-                  Country of origin
-                </span>
-
-                {product.countryOfOrigin ? (
-                  <button
-                    type="button"
-                    onClick={() => setCountryPanelOpen(true)}
-                    className="focus-ring group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-left shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50"
-                    aria-label={`Learn about ${product.countryOfOrigin}`}
-                  >
-                    <span
-                      className="text-[28px] leading-none"
-                      aria-hidden="true"
-                    >
-                      {countryMeta.flag}
-                    </span>
-                    <span className="text-xs font-black text-emerald-950">
-                      {product.countryOfOrigin}
-                    </span>
-                    <ArrowRight
-                      size={14}
-                      className="text-emerald-700 transition group-hover:translate-x-0.5"
-                      aria-hidden="true"
-                    />
-                  </button>
-                ) : (
-                  <span className="text-xs font-bold text-stone-400">
-                    Not declared
-                  </span>
-                )}
-              </div>
-
-              <details className="group mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-                <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 bg-stone-50/80 px-4 py-4 text-sm font-black text-stone-950 transition hover:bg-stone-100">
-                  <span>Product details</span>
-
-                  <ChevronDown
-                    size={18}
-                    className="transition-transform duration-200 group-open:rotate-180"
-                    aria-hidden="true"
-                  />
-                </summary>
-
-                <dl className="divide-y divide-stone-200 border-t border-stone-200">
-                  <div className="grid grid-cols-[118px_minmax(0,1fr)] gap-4 px-4 py-3">
-                    <dt className="text-xs font-bold text-stone-500">
-                      Net quantity
-                    </dt>
-                    <dd className="text-sm font-black text-stone-950">
-                      {formatQuantity(product.netQuantity)}
-                    </dd>
-                  </div>
-
-                  <div className="grid grid-cols-[118px_minmax(0,1fr)] gap-4 px-4 py-3">
-                    <dt className="text-xs font-bold text-stone-500">Pack</dt>
-                    <dd className="overflow-x-auto whitespace-nowrap pb-0.5 text-sm font-black capitalize text-stone-950">
-                      {product.pack?.name ||
-                        product.pack?.type ||
-                        "Not declared"}
-                    </dd>
-                  </div>
-
-                  <div className="grid grid-cols-[118px_minmax(0,1fr)] gap-4 px-4 py-3">
-                    <dt className="text-xs font-bold text-stone-500">
-                      Category
-                    </dt>
-                    <dd className="text-sm font-black text-stone-950">
-                      {product.category?.name || "Not declared"}
-                    </dd>
-                  </div>
-
-                  <div className="grid grid-cols-[118px_minmax(0,1fr)] gap-4 px-4 py-3">
-                    <dt className="text-xs font-bold text-stone-500">
-                      Barcode
-                    </dt>
-                    <dd className="break-all text-sm font-black text-stone-950">
-                      {product.gtin || product.barcode || "Not declared"}
-                    </dd>
-                  </div>
-                </dl>
-              </details>
-
-              <div className="mt-5">
-                <MarketplaceOffers product={product} />
-              </div>
-
-
+                </button>
+              ))}
             </div>
           </div>
-        </section>
 
+          <div className="min-w-0 px-1 pb-10 pt-9 sm:px-4 sm:pt-14 lg:pb-14 lg:pl-8 xl:pl-14 xl:pt-20">
+            <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-[#173F35]">
+              <span className="h-[2px] w-7 bg-[#C86C42]" aria-hidden="true" />
+              {product.brand?.name || "EPANTRY grocery"}
+            </div>
+            <h1 className="mt-5 max-w-[650px] break-words text-[38px] font-medium leading-[1.09] tracking-[-0.055em] text-[#202421] sm:text-[50px] xl:text-[clamp(44px,4.4vw,66px)]">
+              {product.displayName}
+            </h1>
+            {product.variant?.name && product.variant.name !== product.displayName && (
+              <p className="mt-2 text-xl font-medium text-[#6E806B] sm:text-2xl">{product.variant.name}</p>
+            )}
+            <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-[#E0E6DF] py-4">
+              {product.category?.name && (
+                <span className="text-[14px] font-medium text-[#34685C]">{product.category.name}</span>
+              )}
+              {product.category?.name && <span className="h-1 w-1 rounded-full bg-[#9CAEA5]" aria-hidden="true" />}
+              <span className="text-[16px] font-semibold text-[#202421]">{formatQuantity(product.netQuantity)}</span>
+              {product.pack?.name && product.pack.name !== product.displayName && (
+                <span className="text-[14px] font-medium text-[#637267]">{product.pack.name}</span>
+              )}
+            </div>
+            {product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && <p className="mt-5 max-w-xl whitespace-pre-line text-[15px] leading-[1.75] text-[#495149] sm:text-base">{product.description}</p>}
+            {(!product.description || product.description.trim() === "Created through governed M14 NPI to M04 catalog handoff.") && product.ingredientDeclarationText && (
+              <p className="mt-5 max-w-xl text-[15px] leading-[1.75] text-[#495149] sm:text-base">{product.ingredientDeclarationText}</p>
+            )}
+            {product.countryOfOrigin && (
+              <button type="button" onClick={() => setCountryPanelOpen(true)} className="focus-ring mt-7 inline-flex items-center gap-2 border-b border-[#C2CDC2] pb-2 text-sm font-medium text-[#173F35] transition hover:border-[#173F35]">
+                <span aria-hidden="true">{countryMeta.flag}</span> Origin: {product.countryOfOrigin} <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            )}
+            <div className="mt-10 sm:mt-12">
+              <MarketplaceOffers product={product} />
+            </div>
+            <a href="#ep-product-facts" className="focus-ring mt-8 inline-flex min-h-11 items-center gap-3 border-b border-[#173F35] text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42]">
+              See complete product details <ArrowRight size={17} aria-hidden="true" />
+            </a>
+          </div>
+        </section>
         <SponsoredCampaignSlot
           placement="product_detail"
           slotKey="product_overview"
@@ -2458,12 +2109,12 @@ export default function ProductDetailPage() {
             onClick={() => setShowAllImages(false)}
           >
             <div
-              className="relative max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-white/20 bg-[#f7f7f5] shadow-2xl"
+              className="relative flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-[20px] border border-white/20 bg-[#F5F8F8] shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-stone-200 bg-white px-5 py-4 sm:px-6">
+              <div className="flex shrink-0 items-center justify-between border-b border-[#D7E3E5] bg-[#F8FBFA] px-5 py-4 sm:px-6">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                  <p className="text-[12px] font-black uppercase tracking-[0.14em] text-emerald-700">
                     Product gallery
                   </p>
                   <h2 className="mt-1 text-lg font-black text-stone-950">
@@ -2481,25 +2132,25 @@ export default function ProductDetailPage() {
                 </button>
               </div>
 
-              <div className="max-h-[calc(90vh-76px)] overflow-y-auto overscroll-contain p-4 sm:p-6">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto p-3 sm:p-5 [scrollbar-width:thin]">
+                <div className="grid auto-rows-auto items-stretch gap-4 sm:grid-cols-2">
                   {productGalleryItems.map((item, index) =>
                     item.type === "details" ? (
                       <div
                         key="all-product-details-sheet"
-                        className="min-h-[430px] overflow-hidden rounded-2xl border border-emerald-200 bg-white"
+                        className="h-[min(67dvh,560px)] min-h-[340px] overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white"
                       >
                         <ProductDetailsSheet product={product} />
                       </div>
                     ) : (
                       <div
                         key={`all-${item.image.url}-${index}`}
-                        className="flex min-h-[330px] items-center justify-center overflow-hidden rounded-2xl border border-stone-200 bg-white sm:min-h-[430px]"
+                        className="flex h-[min(67dvh,560px)] min-h-[340px] items-center justify-center overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white"
                       >
                         <img
                           src={item.image.url}
                           alt={item.image.alt || product.displayName}
-                          className="h-full max-h-[520px] w-full object-contain p-5"
+                          className="h-full w-full object-contain p-5 sm:p-8"
                         />
                       </div>
                     )
@@ -2521,16 +2172,16 @@ export default function ProductDetailPage() {
             }}
           >
             <aside
-              className="absolute right-4 top-[96px] flex max-h-[72vh] w-[min(380px,calc(100vw-32px))] flex-col overflow-hidden rounded-[28px] border border-emerald-100 bg-[#fbfcf8] shadow-[0_24px_70px_rgba(28,25,23,0.22)] sm:right-6 sm:top-[104px]"
+              className="absolute right-4 top-[96px] flex max-h-[min(78dvh,660px)] w-[min(400px,calc(100vw-32px))] flex-col overflow-hidden rounded-[20px] border border-[#D6D9E9] bg-[#FCFBFF] text-[#202421] shadow-[0_24px_70px_rgba(28,25,23,0.22)] sm:right-6 sm:top-[104px]"
               role="dialog"
               aria-modal="true"
               aria-label={`About ${product.countryOfOrigin}`}
             >
-              <div className="relative shrink-0 overflow-hidden border-b border-emerald-100 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.20),transparent_44%),linear-gradient(145deg,#0b3d2f,#145c43)] px-5 pb-4 pt-5 text-white">
+              <div className="relative shrink-0 overflow-hidden border-b border-[#D4D6E8] bg-[#E6DFF8] px-5 pb-5 pt-6 text-[#242638]">
                 <button
                   type="button"
                   onClick={() => setCountryPanelOpen(false)}
-                  className="focus-ring absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white hover:text-emerald-950"
+                  className="focus-ring absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-[#BDB5D4] bg-white/80 text-[#292C3E] transition hover:bg-white"
                   aria-label="Close country panel"
                 >
                   <X size={18} aria-hidden="true" />
@@ -2545,23 +2196,23 @@ export default function ProductDetailPage() {
                   </span>
 
                   <div className="min-w-0 pb-1">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-200">
+                    <p className="text-[13px] font-semibold uppercase tracking-[0.07em] text-[#5E567E]">
                       Country of origin
                     </p>
-                    <h2 className="mt-0.5 break-words text-2xl font-black tracking-[-0.035em]">
+                    <h2 className="mt-1 break-words text-[27px] font-semibold tracking-[-0.03em] text-[#242638]">
                       {product.countryOfOrigin}
                     </h2>
                   </div>
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto bg-[#FCFBFF] px-5 py-5 [scrollbar-width:thin]">
                 <section>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                  <p className="text-[12px] font-black uppercase tracking-[0.16em] text-emerald-700">
                     About the origin
                   </p>
 
-                  <div className="mt-2.5 space-y-2 text-[13px] font-semibold leading-5 text-stone-600">
+                  <div className="mt-3 space-y-3 text-[15px] font-normal leading-6 text-[#424351]">
                     {countryCopy.map((paragraph) => (
                       <p key={paragraph}>{paragraph}</p>
                     ))}
@@ -2570,10 +2221,10 @@ export default function ProductDetailPage() {
 
                 <section className="mt-5 border-t border-stone-200 pt-5">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                    <p className="text-[12px] font-black uppercase tracking-[0.16em] text-emerald-700">
                       More from {product.countryOfOrigin}
                     </p>
-                    <h3 className="mt-1 text-lg font-black tracking-[-0.025em] text-stone-950">
+                    <h3 className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[#242638]">
                       Grocery & recipes on EPANTRY
                     </h3>
                   </div>
@@ -2618,36 +2269,82 @@ export default function ProductDetailPage() {
           embedded
         />
 
-        <section className="mt-4 grid gap-3 sm:mt-6 sm:gap-5 xl:grid-cols-2 xl:items-stretch">
-          <section className="h-full overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_8px_24px_rgba(28,25,23,0.05)] sm:rounded-[24px] sm:shadow-[0_12px_34px_rgba(28,25,23,0.06)]">
-            <div className="border-b border-stone-200 bg-stone-50/70 px-4 py-3 sm:px-6 sm:py-5">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:tracking-[0.16em]">
-                Product information
-              </p>
-              <h2 className="mt-0.5 text-lg font-black tracking-tight text-stone-950 sm:mt-1 sm:text-2xl">
-                About this product
-              </h2>
+        <section id="ep-product-facts" className="scroll-mt-20 border-t border-[#D7DBD3] pt-10 sm:pt-14">
+          <div className="grid gap-0 border-b border-[#DDE0D9] lg:grid-cols-[minmax(260px,0.64fr)_minmax(0,1.36fr)]">
+            <div className="bg-[#E9E3F5] px-6 py-9 sm:px-9 sm:py-11">
+              <p className="text-sm font-semibold text-[#65567B]">01 / Product information</p>
+              <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#242638] sm:text-[42px]">Everything about<br />this product.</h2>
+              <p className="mt-5 max-w-sm text-[15px] leading-7 text-[#555268]">Published product facts, clearly presented. Information that has not been supplied is marked as not declared.</p>
             </div>
+            <div className="min-w-0 bg-[#FFFDF9] px-6 py-7 sm:px-9 sm:py-9">
+              {product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && (
+                <div className="border-b border-[#DDE0D9] pb-7">
+                  <h3 className="text-lg font-semibold text-[#173F35]">About this product</h3>
+                  <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#4C554D]">{product.description}</p>
+                </div>
+              )}
+              <dl className="grid gap-x-10 sm:grid-cols-2">
+                {[
+                  ["Brand", product.brand?.name || "Not declared"],
+                  ["Product family", product.family?.name || "Not declared"],
+                  ["Variant", product.variant?.name || "Not declared"],
+                  ["Category", product.category?.name || "Not declared"],
+                  ["Net quantity", formatQuantity(product.netQuantity)],
+                  ["Pack", product.pack?.name || product.pack?.type || "Not declared"],
+                  ["Pack type", product.pack?.type || "Not declared"],
+                  ["Units per pack", product.pack?.multipackCount != null ? String(product.pack.multipackCount) : "Not declared"],
+                  ["Manufacturer / packer", product.manufacturerName || "Not declared"],
+                  ["Serving size", product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : "Not declared"],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0 border-b border-[#DEE4DF] py-4">
+                    <dt className="text-[13px] font-medium text-[#737970]">{label}</dt>
+                    <dd className="mt-1 break-words text-base font-semibold text-[#202421]">{value}</dd>
+                  </div>
+                ))}
+                <div className="min-w-0 border-b border-[#DEE4DF] py-4">
+                  <dt className="text-[13px] font-medium text-[#737970]">Country of origin</dt>
+                  <dd className="mt-1">
+                    {product.countryOfOrigin ? (
+                      <button type="button" onClick={() => setCountryPanelOpen(true)} className="focus-ring inline-flex items-center gap-2 text-base font-semibold text-[#173F35] hover:underline">
+                        {countryMeta.flag} {product.countryOfOrigin} <ArrowRight size={16} aria-hidden="true" />
+                      </button>
+                    ) : <span className="font-semibold">Not declared</span>}
+                  </dd>
+                </div>
+                <div className="min-w-0 border-b border-[#DEE4DF] py-4">
+                  <dt className="text-[13px] font-medium text-[#737970]">Barcode / GTIN</dt>
+                  <dd className="mt-2 min-w-0"><ProductBarcode value={product.gtin || product.barcode} compact /></dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </section>
 
-            <div className="divide-y divide-stone-200">
+        <section className="grid min-w-0 items-stretch gap-6 pb-0 pt-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-8 sm:pt-10">
+          <div className="min-w-0 bg-[#EAF2F6] px-5 py-8 sm:px-8 sm:py-10">
+            <p className="text-sm font-semibold text-[#476B7C]">02 / Ingredients &amp; safety</p>
+            <h2 className="mb-2 mt-3 text-[29px] font-semibold tracking-[-0.045em] text-[#1C454D] sm:text-[36px]">Ingredients & safety</h2>
+            <p className="mb-5 max-w-lg text-sm leading-6 text-[#51666A]">
+              Open a section to read its published details, declarations and reviewed evidence.
+            </p>
+            <div className="min-w-0">
               <DetailCard
                 title="Ingredients"
-                defaultOpen
                 icon={Package}
                 description="Reviewed ingredient declaration and recognized ingredients"
               >
                 <div className="space-y-4">
                   {product.ingredientDeclarationText && (
-                    <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 p-4 shadow-[0_8px_20px_rgba(4,120,87,0.06)]">
+                    <div className="border-l-[3px] border-[#C86C42] bg-[#F8F1E8] px-5 py-4">
                       <div className="flex items-center gap-2">
                         <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-700 text-white">
                           <Package size={15} aria-hidden="true" />
                         </span>
                         <div>
-                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                          <p className="text-[13px] font-black uppercase tracking-[0.12em] text-emerald-700">
                             Reviewed ingredient declaration
                           </p>
-                          <p className="mt-0.5 text-[10px] text-stone-500">
+                          <p className="mt-0.5 text-[13px] text-stone-500">
                             Published from the approved product record
                           </p>
                         </div>
@@ -2662,10 +2359,10 @@ export default function ProductDetailPage() {
                   {product.ingredients?.length > 0 ? (
                     <div>
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-400">
+                        <p className="text-[13px] font-black uppercase tracking-[0.12em] text-stone-400">
                           Recognized ingredients
                         </p>
-                        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black text-emerald-700">
+                        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[13px] font-black text-emerald-700">
                           {product.ingredients.length} mapped
                         </span>
                       </div>
@@ -2676,16 +2373,18 @@ export default function ProductDetailPage() {
                             key={`${
                               ingredient.ingredientId || "ingredient"
                             }-${index}`}
-                            className="rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-xs font-bold text-stone-700 shadow-sm"
+                            className="rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-sm font-bold text-stone-700 shadow-sm"
                           >
                             {ingredient.displayName || "Canonical ingredient"}
+                            {ingredient.percentage !== null && ingredient.percentage !== undefined ? ` · ${ingredient.percentage}%` : ""}
+                            {ingredient.notes ? ` · ${ingredient.notes}` : ""}
                           </span>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
-                      <p className="text-xs leading-5 text-stone-500">
+                    <div className="border-l-2 border-[#d0d9cf] bg-[#F9F9F4] px-4 py-3">
+                      <p className="text-sm leading-5 text-stone-500">
                         {product.ingredientDeclarationText
                           ? "Canonical ingredient mapping is still pending. The reviewed package declaration is shown above."
                           : "Ingredient information has not been published for this product."}
@@ -2695,22 +2394,19 @@ export default function ProductDetailPage() {
                 </div>
               </DetailCard>
 
-              <div id="product-dietary-intelligence-slot" />
-
               <DetailCard
                 title="Product origin"
-                defaultOpen
                 icon={Globe2}
                 description="Where this product comes from and who made or packed it"
               >
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-[0_8px_20px_rgba(4,120,87,0.05)]">
+                  <div className="border-l-[3px] border-[#173F35] bg-[#EDF1EA] px-5 py-4">
                     <div className="flex items-start gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm">
                         <Globe2 size={18} aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
-                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                        <p className="text-[13px] font-black uppercase tracking-[0.12em] text-emerald-700">
                           Country of origin
                         </p>
                         <p className="mt-1.5 break-words text-sm font-black leading-5 text-stone-900">
@@ -2720,13 +2416,13 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
 
-                  <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-br from-stone-50 via-white to-white p-4 shadow-[0_8px_20px_rgba(28,25,23,0.04)]">
+                  <div className="border-l-[3px] border-[#C86C42] bg-[#F8F1E8] px-5 py-4">
                     <div className="flex items-start gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-stone-900 text-white shadow-sm">
                         <Factory size={18} aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
-                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-stone-500">
+                        <p className="text-[13px] font-black uppercase tracking-[0.12em] text-stone-500">
                           Manufacturer / packer
                         </p>
                         <p className="mt-1.5 break-words text-sm font-black leading-5 text-stone-900">
@@ -2738,13 +2434,13 @@ export default function ProductDetailPage() {
                 </div>
               </DetailCard>
 
-              {hasClaimsOrCertifications && (
-                <DetailCard title="Published claims & certifications">
+              <DetailCard title="Published claims & certifications" icon={BadgeCheck} description="Approved product claims and certification references">
+                {hasClaimsOrCertifications ? (
                   <div className="flex flex-wrap gap-2">
                     {product.claims?.map((claim, index) => (
                       <span
                         key={`${claim.key}-${index}`}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-800"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-black text-emerald-800"
                       >
                         <ShieldCheck size={13} aria-hidden="true" />
                         {claim.label || claim.key}
@@ -2754,7 +2450,7 @@ export default function ProductDetailPage() {
                     {product.certifications?.map((certification, index) => (
                       <span
                         key={`${certification.key}-${index}`}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-black text-stone-700"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-black text-stone-700"
                       >
                         <BadgeCheck
                           size={13}
@@ -2762,33 +2458,37 @@ export default function ProductDetailPage() {
                           aria-hidden="true"
                         />
                         {certification.label || certification.key}
+                        {certification.certificateReference ? ` · ${certification.certificateReference}` : ""}
                       </span>
                     ))}
                   </div>
-                </DetailCard>
-              )}
+                ) : (
+                  <p className="border-l-[3px] border-[#9DB9B0] bg-white/70 px-4 py-3 text-sm leading-6 text-[#566660]">
+                    No published claims or certifications are declared for this product.
+                  </p>
+                )}
+              </DetailCard>
 
               <DetailCard
                 title="Allergens"
-                defaultOpen
                 icon={ShieldCheck}
                 description="Reviewed allergen declaration and governed relationships"
               >
                 <div className="space-y-4">
                   {product.allergenStatement ? (
-                    <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-amber-50/40 p-4 shadow-[0_8px_20px_rgba(180,83,9,0.05)]">
+                    <div className="border-l-[3px] border-[#c77b42] bg-[#FFF1DF] px-5 py-4">
                       <div className="flex items-start gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-white shadow-sm">
                           <ShieldCheck size={16} aria-hidden="true" />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-amber-800">
+                          <p className="text-[13px] font-black uppercase tracking-[0.12em] text-amber-800">
                             Reviewed package declaration
                           </p>
                           <p className="mt-1.5 text-sm font-bold leading-5 text-stone-900">
                             {product.allergenStatement}
                           </p>
-                          <p className="mt-2 text-[10px] leading-4 text-stone-500">
+                          <p className="mt-2 text-[13px] leading-4 text-stone-500">
                             A missing positive allergen relationship is not
                             treated as an allergen-free claim.
                           </p>
@@ -2800,10 +2500,10 @@ export default function ProductDetailPage() {
                   {product.allergens?.length > 0 ? (
                     <div>
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-400">
+                        <p className="text-[13px] font-black uppercase tracking-[0.12em] text-stone-400">
                           Published allergen relationships
                         </p>
-                        <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[9px] font-black text-stone-600">
+                        <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[13px] font-black text-stone-600">
                           {product.allergens.length} recorded
                         </span>
                       </div>
@@ -2812,12 +2512,12 @@ export default function ProductDetailPage() {
                         {product.allergens.map((allergen, index) => (
                           <div
                             key={`${allergen.allergenKey}-${index}`}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-3"
+                            className="flex items-center justify-between gap-3 border-b border-[#d6ddd2] bg-[#F8FAF5] px-3 py-3"
                           >
-                            <span className="text-xs font-black capitalize text-stone-800">
+                            <span className="text-sm font-black capitalize text-stone-800">
                               {allergen.allergenKey}
                             </span>
-                            <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase tracking-wide text-stone-500 shadow-sm">
+                            <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[13px] font-black uppercase tracking-wide text-stone-500 shadow-sm">
                               {allergen.relationType}
                             </span>
                           </div>
@@ -2825,8 +2525,8 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
-                      <p className="text-xs leading-5 text-stone-500">
+                    <div className="border-l-2 border-[#d0d9cf] bg-[#F9F9F4] px-4 py-3">
+                      <p className="text-sm leading-5 text-stone-500">
                         {product.allergenStatement
                           ? "No positive governed allergen relationship is published beyond the reviewed package declaration above."
                           : "Allergen data is currently unknown or not published. EPANTRY does not infer missing safety facts."}
@@ -2838,26 +2538,21 @@ export default function ProductDetailPage() {
                 </div>
               </DetailCard>
 
+              <div id="product-dietary-intelligence-slot" />
+
               <div id="product-lineage-intelligence-slot" />
 
               <div id="product-food-intelligence-slot" />
             </div>
-          </section>
-
-          <section className="h-full overflow-hidden rounded-[18px] border border-emerald-200 bg-white shadow-[0_9px_26px_rgba(4,120,87,0.07)] ring-1 ring-emerald-100 sm:rounded-[24px] sm:shadow-[0_14px_38px_rgba(4,120,87,0.09)]">
-            <div className="border-b border-emerald-800 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-700 px-4 py-3 text-white sm:px-6 sm:py-5">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-200 sm:text-[10px] sm:tracking-[0.16em]">
-                Governed nutrition
-              </p>
-              <h2 className="mt-0.5 text-lg font-black tracking-tight sm:mt-1 sm:text-2xl">
-                Nutrition
-              </h2>
-              <p className="mt-0.5 text-[10px] leading-4 text-emerald-50/80 sm:mt-1 sm:text-xs sm:leading-5">
-                Published values from the current approved product record.
-              </p>
-            </div>
-
-            <div className="p-4 sm:p-6">
+          </div>
+          <div className="min-w-0 h-full border-t-[3px] border-[#66557B] bg-[#F0EAF7] px-5 pb-6 pt-7 sm:px-8 sm:pb-9 sm:pt-9">
+            <p className="text-sm font-semibold text-[#355F4C]">03 / Nutrition</p>
+            <h2 className="mt-3 text-[28px] font-medium tracking-[-0.045em] text-[#202421] sm:text-4xl">Nutrition facts</h2>
+            <dl className="mt-6 grid grid-cols-2 gap-4 border-b border-[#CDD8CD] pb-5">
+              <div><dt className="text-[13px] font-medium text-[#6B776C]">Basis</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : "Not declared"}</dd></div>
+              <div><dt className="text-[13px] font-medium text-[#6B776C]">Serving size</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : "Not declared"}</dd></div>
+            </dl>
+            <div className="mt-4">
               {product.nutrition?.nutrients?.length > 0 ? (
                 <div className="divide-y divide-stone-200">
                   {product.nutrition.nutrients.map((nutrient, index) => (
@@ -2882,36 +2577,31 @@ export default function ProductDetailPage() {
 
               <div id="product-nutrition-intelligence-slot" className="mt-5" />
             </div>
-          </section>
+          </div>
         </section>
-
         <SponsoredCampaignSlot
           placement="product_detail"
           slotKey="product_recommendations"
           embedded
         />
 
-        <div className="mt-12 space-y-12 border-t border-stone-200/80 pt-10 sm:mt-14 sm:pt-12">
+        <div className="space-y-6">
+          {(recommendationsLoading || frequentlyBought.length > 0) && (
+          <div className="bg-[#E6F0F4] px-5 py-8 sm:px-9 sm:py-10">
           <ProductRecommendationShelf
             eyebrow="More for your basket"
             title="Frequently bought"
-            description="Useful picks from the live EPANTRY grocery catalog that work well alongside everyday shopping."
             items={frequentlyBought}
             loading={recommendationsLoading}
             viewAllTo="/grocery"
           />
-
+          </div>
+          )}
+          {(recommendationsLoading || similarProducts.length > 0) && (
+          <div className="bg-[#FBEDD9] px-5 py-8 sm:px-9 sm:py-10">
           <ProductRecommendationShelf
             eyebrow="Same shelf"
             title="Similar products"
-            description={
-              similarCategorySlug
-                ? `More choices from the same ${similarCategorySlug.replace(
-                    /-/g,
-                    " "
-                  )} collection.`
-                : "More published products from the same grocery category."
-            }
             items={similarProducts}
             loading={recommendationsLoading}
             viewAllTo={
@@ -2920,6 +2610,8 @@ export default function ProductDetailPage() {
                 : "/grocery"
             }
           />
+          </div>
+          )}
         </div>
       </div>
     </main>

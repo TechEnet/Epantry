@@ -50,6 +50,10 @@ export function useGroceryCatalog({
 
   initialLimit =
     24,
+
+  // Opt-in only: the new Grocery collection accumulates real API pages.
+  // Existing consumers retain the original replace-on-page behavior.
+  appendPages = false,
 } = {}) {
   const [
     products,
@@ -245,9 +249,19 @@ export function useGroceryCatalog({
             return
           }
 
-          setProducts(
-            result.products,
-          )
+          setProducts((previous) => {
+            if (!appendPages || page <= 1) return result.products
+            const seen = new Set(previous.map((product) => String(
+              product?.productVersionId || product?.id || product?._id || product?.slug || '',
+            )))
+            const incoming = result.products.filter((product) => {
+              const id = String(product?.productVersionId || product?.id || product?._id || product?.slug || '')
+              if (seen.has(id)) return false
+              seen.add(id)
+              return true
+            })
+            return [...previous, ...incoming]
+          })
 
           setPagination(
             result.pagination,
@@ -288,6 +302,7 @@ export function useGroceryCatalog({
         search,
         categorySlug,
         brandSlug,
+        appendPages,
       ],
     )
 

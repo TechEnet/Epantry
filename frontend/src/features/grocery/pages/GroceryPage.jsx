@@ -1,976 +1,115 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowDown,
-  ArrowRight,
+  ArrowUpRight,
+  ChevronDown,
+  ChevronRight,
   CircleAlert,
   Grid3X3,
   Leaf,
   RotateCcw,
   Search,
+  SlidersHorizontal,
   X,
 } from 'lucide-react'
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-import {
-  Link,
-  useNavigate,
-  useSearchParams,
-} from 'react-router-dom'
 
 import EmptyState from '../../../components/common/EmptyState'
 import { openAvailabilityNotifyModal } from '../../notifications/components/AvailabilityNotifyModal'
+import { recordCustomerSearchDemand } from '../../search/services/search.service'
 import useGroceryCatalog from '../hooks/useGroceryCatalog'
 
-import { recordCustomerSearchDemand } from '../../search/services/search.service'
+const INITIAL_BATCH = 24
+const DESKTOP_REVEAL = 12
+const MOBILE_REVEAL = 4
 
-const PREVIEW_PRODUCT_COUNT = 6
-const DEFAULT_PRODUCT_LIMIT = 24
-const CARD_TRAVEL = 1.72
-const CARD_GAP = 0.92
-const FIRST_CARD_OFFSET = -0.24
-const ENDING_REVEAL_DISTANCE = 0.58
-const ENDING_HOLD_DISTANCE = 0.32
-const MOBILE_ENDING_HOLD_EXTRA = 0.92
-
-const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value))
-
-function getProductKey(product) {
+function productKey(product) {
   return String(product?.productVersionId || product?.id || product?._id || product?.slug || '')
 }
 
-function getProductName(product) {
+function productName(product) {
   return String(product?.displayName || 'Grocery product').trim()
 }
 
-function getProductImage(product) {
-  return product?.image?.url || ''
+function productImage(product) {
+  return product?.image?.url || product?.images?.[0]?.url || ''
 }
 
-function getProductPath(product) {
+function productPath(product) {
   return `/grocery/product/${encodeURIComponent(product?.slug || '')}`
 }
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(() => (
-    typeof window !== 'undefined'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ))
-
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReduced(query.matches)
-
-    update()
-    query.addEventListener('change', update)
-
-    return () => query.removeEventListener('change', update)
-  }, [])
-
-  return reduced
-}
-
-function useNavbarClearance(pageRef) {
-  useEffect(() => {
-    const header = document.querySelector('header')
-    const page = pageRef.current
-
-    if (!header || !page) return undefined
-
-    const update = () => {
-      const height = Math.ceil(header.getBoundingClientRect().height)
-      page.style.setProperty('--grocery-nav-height', `${height}px`)
-    }
-
-    const observer = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(update)
-      : null
-
-    observer?.observe(header)
-    update()
-    window.addEventListener('resize', update, { passive: true })
-
-    return () => {
-      observer?.disconnect()
-      window.removeEventListener('resize', update)
-    }
-  }, [pageRef])
-}
-
-function getSceneLength(count) {
-  if (!count) return 1
-  const lastStart = FIRST_CARD_OFFSET + (count - 1) * CARD_GAP
-  const lastExit = lastStart + CARD_TRAVEL
-
-  // One viewport is consumed by the sticky stage itself. Keep an additional
-  // distance after the ending has fully appeared so the final Grocery scene
-  // settles before normal page scrolling resumes.
-  return lastExit + ENDING_REVEAL_DISTANCE + ENDING_HOLD_DISTANCE + 1
-}
-
-function useGroceryScrollScene({
-  trackRef,
-  stageRef,
-  count,
-  signature,
-  reducedMotion,
-  paused,
-}) {
-  useEffect(() => {
-    const track = trackRef.current
-    const stage = stageRef.current
-
-    if (!track || !stage || !count || reducedMotion || paused) return undefined
-
-    const cards = Array.from(stage.querySelectorAll('[data-grocery-flight]'))
-    const names = Array.from(stage.querySelectorAll('[data-grocery-name]'))
-    const ending = stage.querySelector('[data-grocery-ending]')
-    const hint = stage.querySelector('[data-grocery-hint]')
-    const progressBar = stage.querySelector('[data-grocery-progress]')
-    const counter = stage.querySelector('[data-grocery-counter]')
-    const namePanel = stage.querySelector('.ep-grocery-stage__left')
-    const bottomPanel = stage.querySelector('.ep-grocery-stage__bottom')
-
-    const lastStart = FIRST_CARD_OFFSET + (count - 1) * CARD_GAP
-    const lastExit = lastStart + CARD_TRAVEL
-    let travelLength = getSceneLength(count)
-    let frame = null
-    let currentDistance = null
-    let targetDistance = 0
-    let lastTime = 0
-    let stageHeight = 1
-    let stageWidth = 1
-    let cardWidth = 1
-    let cardHeight = 1
-    let smallScreen = false
-    let cardX = 0
-    let mobileNameTop = 0
-    let mobileNameBottom = 0
-    let mobileBottomTop = 0
-
-    const smoothstep = (value) => {
-      const t = clamp(value)
-      return t * t * (3 - 2 * t)
-    }
-
-    const readLayout = () => {
-      stageHeight = stage.clientHeight || 1
-      stageWidth = stage.clientWidth || 1
-      cardWidth = cards[0]?.offsetWidth || 1
-      cardHeight = cards[0]?.offsetHeight || 1
-      smallScreen = stageWidth < 700
-      travelLength = getSceneLength(count) + (smallScreen ? MOBILE_ENDING_HOLD_EXTRA : 0)
-
-      const cardCenterX = smallScreen
-        ? stageWidth * 0.5
-        : stageWidth * 0.675
-
-      cardX = cardCenterX - cardWidth / 2
-
-      if (smallScreen) {
-        const stageRect = stage.getBoundingClientRect()
-        const nameRect = namePanel?.getBoundingClientRect()
-        const bottomRect = bottomPanel?.getBoundingClientRect()
-
-        mobileNameTop = nameRect
-          ? nameRect.top - stageRect.top - 4
-          : stageHeight * 0.15
-        mobileNameBottom = nameRect
-          ? nameRect.bottom - stageRect.top + 8
-          : stageHeight * 0.36
-        mobileBottomTop = bottomRect
-          ? bottomRect.top - stageRect.top - 12
-          : stageHeight - 88
-      }
-    }
-
-    const readTargetDistance = () => {
-      const rect = track.getBoundingClientRect()
-      targetDistance = clamp(-rect.top / stageHeight, 0, travelLength)
-
-      if (currentDistance === null) currentDistance = targetDistance
-    }
-
-    const render = (distance) => {
-      if (!stageHeight || !stageWidth) return
-
-      let activeIndex = 0
-      let activeStrength = -1
-
-      cards.forEach((card, index) => {
-        const start = FIRST_CARD_OFFSET + index * CARD_GAP
-        const raw = (distance - start) / CARD_TRAVEL
-        const t = clamp(raw)
-        const visible = raw > -0.035 && raw < 1.025
-
-        const entranceEnd = 0.34
-        const holdEnd = 0.61
-        let y
-        let scale
-
-        if (smallScreen) {
-          const safeTop = Math.max(mobileNameBottom + 18, stageHeight * 0.34)
-          const safeBottom = Math.max(safeTop + cardHeight, mobileBottomTop)
-          const restingY = Math.min(
-            Math.max(safeTop, stageHeight * 0.51 - cardHeight / 2),
-            safeBottom - cardHeight,
-          )
-          const entranceY = stageHeight + 18
-
-          if (t < entranceEnd) {
-            const p = smoothstep(t / entranceEnd)
-            y = entranceY + (restingY - entranceY) * p
-            scale = 0.82 + 0.18 * p
-          } else if (t < holdEnd) {
-            const p = smoothstep((t - entranceEnd) / (holdEnd - entranceEnd))
-            y = restingY - p * 5
-            scale = 1
-          } else {
-            const p = smoothstep((t - holdEnd) / (1 - holdEnd))
-            const namePanelCentre = mobileNameTop + (mobileNameBottom - mobileNameTop) * 0.56
-            const exitY = Math.max(
-              mobileNameTop - cardHeight * 0.18,
-              namePanelCentre - cardHeight * 0.5,
-            )
-            y = (restingY - 5) + (exitY - (restingY - 5)) * p
-            scale = 1 - 0.10 * p
-          }
-        } else if (t < entranceEnd) {
-          const p = smoothstep(t / entranceEnd)
-          y = stageHeight * 1.08 + (stageHeight * 0.50 - cardHeight / 2 - stageHeight * 1.08) * p
-          scale = 0.80 + 0.20 * p
-        } else if (t < holdEnd) {
-          const p = smoothstep((t - entranceEnd) / (holdEnd - entranceEnd))
-          y = stageHeight * 0.50 - cardHeight / 2 - p * 10
-          scale = 1
-        } else {
-          const p = smoothstep((t - holdEnd) / (1 - holdEnd))
-          const restingY = stageHeight * 0.50 - cardHeight / 2 - 10
-          const exitTravel = Math.min(stageHeight * 0.44, cardHeight * 0.72)
-          y = restingY - p * exitTravel
-          scale = 1 - 0.07 * p
-        }
-
-        const fadeIn = smoothstep(t / (smallScreen ? 0.16 : 0.12))
-        const fadeOut = smallScreen
-          ? 1 - smoothstep((t - 0.64) / 0.31)
-          : 1 - smoothstep((t - 0.68) / 0.25)
-        const opacity = visible ? Math.min(fadeIn, fadeOut) : 0
-        const centreStrength = visible ? 1 - Math.min(1, Math.abs(t - 0.47) / 0.47) : 0
-
-        if (centreStrength > activeStrength) {
-          activeStrength = centreStrength
-          activeIndex = index
-        }
-
-        card.style.transform = `translate3d(${cardX.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`
-        card.style.opacity = opacity.toFixed(3)
-        card.style.visibility = opacity > 0.004 ? 'visible' : 'hidden'
-        card.style.pointerEvents = opacity > 0.38 && centreStrength > 0.38 ? 'auto' : 'none'
-        card.style.zIndex = String(10 + index)
-        card.inert = !(opacity > 0.38 && centreStrength > 0.38)
-        card.setAttribute('aria-hidden', String(opacity <= 0.004))
-
-        const link = card.querySelector('a')
-        if (link) link.tabIndex = opacity > 0.38 && centreStrength > 0.38 ? 0 : -1
-
-        const name = names[index]
-        if (name && !smallScreen) {
-          const nameOpacity = smoothstep((centreStrength - 0.18) / 0.60)
-          const offset = 30 * (1 - nameOpacity)
-          name.style.opacity = nameOpacity.toFixed(3)
-          name.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`
-          name.style.visibility = nameOpacity > 0.02 ? 'visible' : 'hidden'
-        }
-      })
-
-      if (smallScreen) {
-        names.forEach((name, index) => {
-          const active = index === activeIndex
-          name.style.opacity = active ? '1' : '0'
-          name.style.transform = active ? 'translate3d(0, 0, 0)' : 'translate3d(0, 12px, 0)'
-          name.style.visibility = active ? 'visible' : 'hidden'
-        })
-      }
-
-      const endProgress = smoothstep((distance - lastExit + 0.06) / ENDING_REVEAL_DISTANCE)
-
-      // MOBILE ENDING HANDOFF:
-      // As the final directory scene arrives, retire the Published products/name
-      // panel so the ending CTA can reclaim that vertical space cleanly.
-      if (smallScreen && namePanel) {
-        const panelExit = smoothstep((endProgress - 0.04) / 0.46)
-        const panelOpacity = 1 - panelExit
-        namePanel.style.opacity = panelOpacity.toFixed(3)
-        namePanel.style.transform = `translate3d(0, ${(-14 * panelExit).toFixed(2)}px, 0) scale(${(1 - 0.015 * panelExit).toFixed(4)})`
-        namePanel.style.visibility = panelOpacity > 0.015 ? 'visible' : 'hidden'
-      } else if (namePanel) {
-        namePanel.style.opacity = '1'
-        namePanel.style.transform = ''
-        namePanel.style.visibility = 'visible'
-      }
-
-      if (ending) {
-        ending.style.opacity = endProgress.toFixed(3)
-        const endingOffsetY = smallScreen ? 0 : 26 * (1 - endProgress)
-        ending.style.transform = `translate3d(0, ${endingOffsetY.toFixed(2)}px, 0) scale(${(0.985 + endProgress * 0.015).toFixed(4)})`
-        ending.style.visibility = endProgress > 0.01 ? 'visible' : 'hidden'
-        ending.style.pointerEvents = endProgress > 0.06 ? 'auto' : 'none'
-        ending.inert = endProgress <= 0.06
-        ending.setAttribute('aria-hidden', String(endProgress <= 0.01))
-      }
-
-      if (hint) {
-        const hintOpacity = distance < lastExit
-          ? clamp(1 - distance / Math.max(lastExit, 1) * 0.42)
-          : 1 - endProgress
-        hint.style.opacity = hintOpacity.toFixed(3)
-      }
-
-      if (progressBar) {
-        progressBar.style.transform = `scaleX(${clamp(distance / Math.max(lastExit, 1)).toFixed(4)})`
-      }
-
-      if (counter) {
-        counter.textContent = `${String(Math.min(activeIndex + 1, count)).padStart(2, '0')} / ${String(count).padStart(2, '0')}`
-      }
-    }
-
-    const animate = (time) => {
-      frame = null
-
-      if (currentDistance === null) currentDistance = targetDistance
-      const deltaMs = lastTime ? Math.min(48, time - lastTime) : 16.7
-      lastTime = time
-
-      const smoothing = 1 - Math.exp(-20 * deltaMs / 1000)
-      currentDistance += (targetDistance - currentDistance) * smoothing
-
-      if (Math.abs(targetDistance - currentDistance) < 0.0002) {
-        currentDistance = targetDistance
-      }
-
-      render(currentDistance)
-
-      if (Math.abs(targetDistance - currentDistance) >= 0.0002) {
-        frame = window.requestAnimationFrame(animate)
-      }
-    }
-
-    const schedule = () => {
-      readTargetDistance()
-      if (frame === null) frame = window.requestAnimationFrame(animate)
-    }
-
-    const handleResize = () => {
-      readLayout()
-      schedule()
-    }
-
-    const observer = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(handleResize)
-      : null
-
-    observer?.observe(stage)
-    readLayout()
-    readTargetDistance()
-    render(currentDistance ?? targetDistance)
-    window.addEventListener('scroll', schedule, { passive: true })
-    window.addEventListener('resize', handleResize, { passive: true })
-    window.addEventListener('pageshow', schedule)
-
-    return () => {
-      if (frame !== null) window.cancelAnimationFrame(frame)
-      observer?.disconnect()
-      window.removeEventListener('scroll', schedule)
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('pageshow', schedule)
-    }
-  }, [trackRef, stageRef, count, signature, reducedMotion, paused])
-}
-
-function ProductImageCard({ product, compact = false, onNavigate }) {
-  const imageUrl = getProductImage(product)
-  const productName = getProductName(product)
+function GroceryTile({ product }) {
+  const title = productName(product)
+  const category = product?.category?.name || 'Grocery'
+  const brand = product?.brand?.name || ''
+  const quantity = product?.netQuantity?.display || product?.netQuantity?.label || product?.pack?.name || ''
+  const image = productImage(product)
 
   return (
     <Link
-      to={getProductPath(product)}
-      onClick={onNavigate}
-      aria-label={`View ${productName}`}
-      className={`ep-grocery-image-card ${compact ? 'ep-grocery-image-card--compact' : ''}`}
+      to={productPath(product)}
+      aria-label={`View grocery product: ${title}`}
+      className="focus-ring group flex h-full min-w-0 flex-col overflow-hidden rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] shadow-[0_8px_28px_rgba(32,36,33,0.07)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-[#173F35]/35 hover:shadow-[0_18px_44px_rgba(32,36,33,0.13)] focus-visible:ring-2 focus-visible:ring-[#173F35]"
     >
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={product?.image?.alt || productName}
-          loading={compact ? 'lazy' : 'eager'}
-        />
-      ) : (
-        <div className="ep-grocery-image-card__empty" aria-hidden="true">
-          <Grid3X3 size={38} strokeWidth={1.25} />
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#F7F6F2] lg:aspect-[3/2]">
+        {image ? (
+          <img
+            src={image}
+            alt={product?.image?.alt || title}
+            loading="lazy"
+            className="h-full w-full object-contain p-3 transition-transform duration-500 group-hover:scale-[1.035] motion-reduce:transform-none sm:p-4"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-[#DCE0CF]/50 text-[#173F35]">
+            <Grid3X3 size={38} aria-label="Product image unavailable" />
+          </div>
+        )}
+      </div>
+      <div className="flex min-h-[86px] flex-1 items-center justify-between gap-2.5 border-t border-[#DCE0CF] px-3.5 py-3 sm:px-4">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-medium text-[#173F35]">{category}</p>
+          <h3 className="mt-1 line-clamp-2 text-[18px] font-bold leading-tight tracking-[-0.025em] text-[#202421]">{title}</h3>
+          {(brand || quantity) && (
+            <p className="mt-1 truncate text-[14px] text-[#202421]/70">
+              {[brand, quantity].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </div>
-      )}
+        <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#173F35] text-[#F7F6F2] transition-transform duration-200 group-hover:translate-x-0.5">
+          <ArrowUpRight size={18} />
+        </span>
+      </div>
     </Link>
   )
 }
 
-function lockDialogViewport(dialog, closeRef) {
-  if (!dialog) return () => {}
-
-  const returnFocus = document.activeElement
-  const root = document.documentElement
-  const body = document.body
-  const scrollX = window.scrollX
-  const scrollY = window.scrollY
-  const savedRootOverflow = root.style.getPropertyValue('overflow')
-  const savedRootOverflowPriority = root.style.getPropertyPriority('overflow')
-  const savedScrollBehavior = root.style.getPropertyValue('scroll-behavior')
-  const savedScrollPriority = root.style.getPropertyPriority('scroll-behavior')
-  const savedBodyPadding = body.style.getPropertyValue('padding-right')
-  const savedBodyPaddingPriority = body.style.getPropertyPriority('padding-right')
-  const scrollbar = window.innerWidth - root.clientWidth
-  const currentPadding = parseFloat(window.getComputedStyle(body).paddingRight) || 0
-
-  if (scrollbar > 0) body.style.setProperty('padding-right', `${currentPadding + scrollbar}px`)
-  root.style.setProperty('overflow', 'hidden')
-  dialog.showModal()
-  closeRef.current?.focus({ preventScroll: true })
-
-  return () => {
-    if (dialog.open) dialog.close()
-
-    if (savedBodyPadding) body.style.setProperty('padding-right', savedBodyPadding, savedBodyPaddingPriority)
-    else body.style.removeProperty('padding-right')
-
-    if (savedRootOverflow) root.style.setProperty('overflow', savedRootOverflow, savedRootOverflowPriority)
-    else root.style.removeProperty('overflow')
-
-    root.style.setProperty('scroll-behavior', 'auto', 'important')
-    window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' })
-
-    if (savedScrollBehavior) root.style.setProperty('scroll-behavior', savedScrollBehavior, savedScrollPriority)
-    else root.style.removeProperty('scroll-behavior')
-
-    if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true })
-  }
-}
-
-function ProductDirectory({ products, categories, loading, onClose }) {
-  const dialogRef = useRef(null)
-  const closeRef = useRef(null)
-  const backdropPress = useRef(false)
-  const [directorySearch, setDirectorySearch] = useState('')
-
-  useEffect(() => lockDialogViewport(dialogRef.current, closeRef), [])
-
-  const filteredProducts = useMemo(() => {
-    const query = directorySearch.trim().toLowerCase()
-    if (!query) return products
-
-    return products.filter((product) => {
-      const searchable = [
-        getProductName(product),
-        product?.category?.name,
-        product?.category?.slug,
-        product?.brand?.name,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      return searchable.includes(query)
-    })
-  }, [directorySearch, products])
-
-  const categorySections = useMemo(() => {
-    const knownCategories = new Map(
-      categories.map((category) => [
-        String(category?.slug || category?.name || '').trim().toLowerCase(),
-        category,
-      ]),
-    )
-    const grouped = new Map()
-
-    filteredProducts.forEach((product) => {
-      const productCategory = product?.category || {}
-      const rawKey = String(productCategory.slug || productCategory.name || 'other-groceries')
-        .trim()
-        .toLowerCase()
-      const key = rawKey || 'other-groceries'
-      const knownCategory = knownCategories.get(key)
-      const label = String(
-        knownCategory?.name
-          || productCategory.name
-          || 'Other groceries',
-      ).trim()
-
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          key,
-          label,
-          products: [],
-        })
-      }
-
-      grouped.get(key).products.push(product)
-    })
-
-    const ordered = []
-    const added = new Set()
-
-    categories.forEach((category) => {
-      const key = String(category?.slug || category?.name || '').trim().toLowerCase()
-      const section = grouped.get(key)
-      if (!section) return
-      ordered.push(section)
-      added.add(key)
-    })
-
-    grouped.forEach((section, key) => {
-      if (!added.has(key)) ordered.push(section)
-    })
-
-    return ordered
-  }, [categories, filteredProducts])
-
-  function isOutside(event) {
-    const rect = dialogRef.current?.getBoundingClientRect()
-    return rect && (
-      event.clientX < rect.left
-      || event.clientX > rect.right
-      || event.clientY < rect.top
-      || event.clientY > rect.bottom
-    )
-  }
-
+// The native select remains keyboard-accessible. Its selected text is drawn
+// separately to prevent long category/brand names being clipped by Safari.
+function AdaptiveSelect({ label, value, options, onChange, disabled = false }) {
+  const selection = options.find((option) => option.value === value)
+  const shown = selection?.label || label
   return (
-    <dialog
-      ref={dialogRef}
-      className="ep-grocery-modal"
-      aria-labelledby="all-groceries-title"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onPointerDown={(event) => {
-        backdropPress.current = event.target === event.currentTarget && isOutside(event)
-      }}
-      onClick={(event) => {
-        if (backdropPress.current && event.target === event.currentTarget && isOutside(event)) onClose()
-        backdropPress.current = false
-      }}
-    >
-      <div className="ep-grocery-modal__body">
-        <header className="ep-grocery-modal__header">
-          <div>
-            <p>EPANTRY Grocery</p>
-            <h2 id="all-groceries-title">All groceries</h2>
-            <span>{products.length} products available in this view</span>
-          </div>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close all groceries">
-            <X size={21} aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className="ep-grocery-modal__directory-search">
-          <Search size={17} strokeWidth={1.8} aria-hidden="true" />
-          <input
-            type="search"
-            value={directorySearch}
-            onChange={(event) => setDirectorySearch(event.target.value)}
-            placeholder="Search groceries, brands or categories"
-            aria-label="Search groceries in this popup"
-          />
-          {directorySearch ? (
-            <button
-              type="button"
-              onClick={() => setDirectorySearch('')}
-              aria-label="Clear grocery search"
-            >
-              <X size={15} aria-hidden="true" />
-            </button>
-          ) : null}
-        </div>
-
-        <div className="ep-grocery-modal__scroll">
-          {loading ? (
-            <div className="ep-grocery-modal__loading" role="status">Loading groceries…</div>
-          ) : categorySections.length ? (
-            <div className="ep-grocery-modal__category-sections">
-              {categorySections.map((section) => (
-                <section
-                  key={section.key}
-                  className="ep-grocery-modal__category-section"
-                  aria-label={section.label}
-                >
-                  <div className="ep-grocery-modal__category-heading">
-                    <div>
-                      <span>Category</span>
-                      <h3>{section.label}</h3>
-                    </div>
-                    <p>{section.products.length} {section.products.length === 1 ? 'product' : 'products'}</p>
-                  </div>
-
-                  <div className="ep-grocery-modal__category-products">
-                    {section.products.map((product) => (
-                      <div
-                        key={getProductKey(product)}
-                        className="ep-grocery-modal__product-item"
-                      >
-                        <ProductImageCard
-                          product={product}
-                          compact
-                          onNavigate={onClose}
-                        />
-                        <div className="ep-grocery-modal__product-name">
-                          {getProductName(product)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          ) : (
-            <div className="ep-grocery-modal__empty-search">
-              <Search size={28} strokeWidth={1.35} aria-hidden="true" />
-              <strong>No groceries found</strong>
-              <span>Try another product, brand or category name.</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </dialog>
+    <label className={`focus-within:ring-2 focus-within:ring-[#173F35]/25 relative inline-flex min-h-11 w-max max-w-none shrink-0 items-center rounded-full border transition-colors duration-200 focus-within:border-[#173F35] ${value ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}>
+      <span aria-hidden="true" className="block whitespace-nowrap py-2.5 pl-3.5 pr-9 text-[14px] font-semibold leading-5">{shown}</span>
+      <select
+        aria-label={label}
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none rounded-full border-0 opacity-0 disabled:cursor-wait"
+      >
+        <option value="">{label}</option>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <ChevronDown size={15} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+    </label>
   )
 }
-
-function CategoryDirectory({ categories, onClose, onSelect }) {
-  const dialogRef = useRef(null)
-  const closeRef = useRef(null)
-  const backdropPress = useRef(false)
-
-  useEffect(() => lockDialogViewport(dialogRef.current, closeRef), [])
-
-  function isOutside(event) {
-    const rect = dialogRef.current?.getBoundingClientRect()
-    return rect && (
-      event.clientX < rect.left
-      || event.clientX > rect.right
-      || event.clientY < rect.top
-      || event.clientY > rect.bottom
-    )
-  }
-
-  return (
-    <dialog
-      ref={dialogRef}
-      className="ep-grocery-modal ep-grocery-modal--categories"
-      aria-labelledby="all-categories-title"
-      onCancel={(event) => {
-        event.preventDefault()
-        onClose()
-      }}
-      onPointerDown={(event) => {
-        backdropPress.current = event.target === event.currentTarget && isOutside(event)
-      }}
-      onClick={(event) => {
-        if (backdropPress.current && event.target === event.currentTarget && isOutside(event)) onClose()
-        backdropPress.current = false
-      }}
-    >
-      <div className="ep-grocery-modal__body">
-        <header className="ep-grocery-modal__header">
-          <div>
-            <p>Browse by category</p>
-            <h2 id="all-categories-title">All categories</h2>
-            <span>Choose a category to narrow the grocery collection.</span>
-          </div>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close categories">
-            <X size={21} aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className="ep-grocery-modal__scroll">
-          <div className="ep-grocery-modal__category-grid">
-            {categories.map((category, index) => (
-              <button
-                key={category.id || category.slug || category.name}
-                type="button"
-                onClick={() => onSelect(category.slug)}
-              >
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <strong>{category.name}</strong>
-                <ArrowRight size={17} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </dialog>
-  )
-}
-
-const PAGE_STYLES = `
-.ep-grocery-journey { --grocery-nav-height: 0px; background: #f5f4ef; color: #103b2e; }
-.ep-grocery-hero { height: 100vh; height: 100svh; min-height: 0; position: relative; display: flex; align-items: center; overflow: hidden; isolation: isolate; background: #0b3f30; }
-.ep-grocery-hero__photo,.ep-grocery-hero__shade { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
-.ep-grocery-hero__photo { background: #123e30 url('/hero/grocery.png') no-repeat 61% center / cover; transform: scale(1.002); }
-.ep-grocery-hero__shade { background: linear-gradient(90deg,rgba(5,45,34,.97) 0%,rgba(8,56,42,.94) 28%,rgba(10,55,41,.75) 40%,rgba(10,55,41,.26) 55%,rgba(8,35,27,.03) 72%); }
-.ep-grocery-hero__content { width: 100%; max-width: 1680px; margin: 0 auto; padding: calc(var(--grocery-nav-height) + 28px) clamp(24px,5vw,88px) 128px; }
-.ep-grocery-hero__eyebrow { display: inline-flex; align-items: center; gap: 10px; border: 1px solid #e2c98b80; border-radius: 999px; padding: 8px 13px; color: #f5e8c7; background: #0a3b2da8; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); font-size: 10px; line-height: 1; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
-.ep-grocery-hero h1 { max-width: 760px; margin: 22px 0 16px; font-family: Georgia,'Times New Roman',serif; font-size: clamp(62px,6.7vw,108px); line-height: .95; font-weight: 500; letter-spacing: -.055em; color: #fffaf0; }
-.ep-grocery-hero__copy { max-width: 390px; margin: 0; font-size: 15px; line-height: 1.75; color: #e0ece4; }
-.ep-grocery-hero__filters { width: min(100%,560px); margin-top: 30px; padding: 10px; border: 1px solid #ffffff80; border-radius: 18px; background: #f8fbf7ed; box-shadow: 0 18px 48px #021c151f; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-.ep-grocery-hero__search { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 7px 0 14px; border: 1px solid #d7e2d9; border-radius: 12px; background: white; color: #667c70; }
-.ep-grocery-hero__search:focus-within { outline: 2px solid #80a790; outline-offset: 2px; }
-.ep-grocery-hero__search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; font-size: 14px; color: #153f31; }
-.ep-grocery-hero__search button { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border: 0; border-radius: 9px; background: #155941; color: white; }
-.ep-grocery-hero__selects { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 8px; }
-.ep-grocery-hero__selects select { min-width: 0; height: 40px; appearance: none; border: 1px solid #dbe5dd; border-radius: 10px; background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23566f62' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat calc(100% - 11px) center; padding: 0 30px 0 12px; color: #365246; font-size: 12px; font-weight: 700; outline: 0; }
-.ep-grocery-hero__reset { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; border: 1px solid transparent; border-radius: 10px; background: transparent; padding: 0 10px; color: #52695d; font-size: 12px; font-weight: 700; }
-.ep-grocery-scroll-cue { position: absolute; z-index: 2; left: clamp(24px,5vw,88px); right: clamp(24px,5vw,88px); bottom: 27px; display: flex; align-items: end; justify-content: space-between; gap: 20px; color: #f4f8f3; }
-.ep-grocery-scroll-cue button { display: inline-flex; align-items: center; gap: 10px; border: 0; background: transparent; color: inherit; font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
-.ep-grocery-scroll-cue button span { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #ffffff66; border-radius: 50%; background: #ffffff14; backdrop-filter: blur(10px); animation: ep-grocery-cue 1.9s ease-in-out infinite; }
-.ep-grocery-scroll-cue p { margin: 0; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #dae7de; }
-@keyframes ep-grocery-cue { 0%,100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
-
-.ep-grocery-track { position: relative; height: var(--grocery-track-height); background: #081f19; }
-.ep-grocery-stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; isolation: isolate; background: linear-gradient(118deg,#061b16 0%,#0c3327 42%,#335847 66%,#d7e3d9 100%); }
-.ep-grocery-stage::before { content: ''; position: absolute; inset: 0; z-index: -2; background: radial-gradient(circle at 67% 48%,#ffffff2c 0%,#ffffff10 26%,transparent 47%),linear-gradient(90deg,rgba(3,19,15,.36),transparent 58%); }
-.ep-grocery-stage::after { content: ''; position: absolute; top: 0; bottom: 0; left: 31%; width: 1px; background: linear-gradient(180deg,transparent,#d5e6da55 15%,#d5e6da72 50%,#d5e6da55 85%,transparent); }
-.ep-grocery-stage__meta { position: absolute; top: calc(var(--grocery-nav-height) + 28px); left: clamp(24px,4.4vw,78px); right: clamp(24px,4.4vw,78px); display: flex; justify-content: space-between; gap: 18px; color: #f2f7f3; font-size: 10px; font-weight: 850; letter-spacing: .16em; text-transform: uppercase; text-shadow: 0 2px 14px rgba(0,0,0,.48); }
-.ep-grocery-stage__left { position: absolute; left: clamp(28px,5.2vw,92px); top: 50%; width: min(24vw,360px); transform: translateY(-50%); color: white; padding: 30px 18px 30px 0; text-shadow: 0 3px 26px rgba(0,0,0,.58); }
-.ep-grocery-stage__left::before { content: ''; position: absolute; z-index: -1; inset: -28px -24px -28px -34px; border: 1px solid rgba(231,241,234,.10); border-radius: 28px; background: linear-gradient(100deg,rgba(1,22,16,.94) 0%,rgba(3,31,23,.88) 62%,rgba(3,31,23,.50) 86%,transparent 100%); box-shadow: 0 24px 60px rgba(0,12,8,.24),inset 0 1px 0 rgba(255,255,255,.04); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); pointer-events: none; }
-.ep-grocery-stage__label { display: inline-flex; align-items: center; min-height: 48px; border: 1px solid rgba(238,213,151,.72); border-radius: 12px; padding: 0 18px; background: rgba(2,30,22,.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: #fff9e9; box-shadow: 0 12px 30px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.08); font-size: 13px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-.ep-grocery-stage__names { position: relative; width: 100%; min-height: 300px; margin-top: 24px; overflow: visible; }
-.ep-grocery-stage__name { position: absolute; inset: 0; width: 100%; max-width: 100%; visibility: hidden; will-change: transform,opacity; }
-.ep-grocery-stage__name span { display: block; margin-bottom: 12px; color: #f1e3bc; font-size: 12px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
-.ep-grocery-stage__name h2 { margin: 0; width: 100%; max-width: 100%; overflow-wrap: normal; word-break: normal; hyphens: none; font-family: Georgia,'Times New Roman',serif; font-size: clamp(34px,3.35vw,54px); line-height: .96; font-weight: 600; letter-spacing: -.042em; color: #fffdf4; text-wrap: balance; text-shadow: 0 3px 24px rgba(0,0,0,.72); }
-.ep-grocery-stage__name p { margin: 17px 0 0; color: #f0f6f1; font-size: 15px; line-height: 1.55; font-weight: 750; text-shadow: 0 2px 15px rgba(0,0,0,.56); }
-.ep-grocery-flight { position: absolute; top: 0; left: 0; width: min(42vw,570px); aspect-ratio: 1 / 1; opacity: 0; visibility: hidden; will-change: transform,opacity; backface-visibility: hidden; transform-style: preserve-3d; }
-.ep-grocery-image-card { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; border: 1px solid #ffffffb8; border-radius: 28px; background: rgba(250,252,248,.94); box-shadow: 0 34px 90px #00120d47,inset 0 1px 0 #ffffff; outline: none; }
-.ep-grocery-image-card::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: inherit; background: linear-gradient(135deg,#ffffff55,transparent 28%,transparent 72%,#0c3b2b12); }
-.ep-grocery-image-card img { width: 100%; height: 100%; object-fit: contain; padding: clamp(22px,3vw,54px); background: linear-gradient(145deg,#f8faf6,#eef3eb); transition: transform .35s ease; }
-.ep-grocery-image-card:hover img { transform: scale(1.035); }
-.ep-grocery-image-card:focus-visible { outline: 3px solid #f2ddb0; outline-offset: 5px; }
-.ep-grocery-image-card__empty { display: grid; place-items: center; width: 100%; height: 100%; color: #739181; background: linear-gradient(145deg,#f8faf6,#eef3eb); }
-.ep-grocery-stage__hint { position: absolute; left: clamp(24px,4.4vw,78px); bottom: 92px; display: inline-flex; align-items: center; gap: 8px; color: #edf5ef; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-shadow: 0 2px 14px rgba(0,0,0,.58); transition: opacity .15s linear; }
-.ep-grocery-stage__bottom { position: absolute; left: clamp(24px,4.4vw,78px); right: clamp(24px,4.4vw,78px); bottom: 26px; color: #e4eee7; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; text-shadow: 0 2px 12px rgba(0,0,0,.48); }
-.ep-grocery-stage__meter { height: 1px; overflow: hidden; background: #d9eadf2c; }
-.ep-grocery-stage__meter span { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left; background: #d7e6dc; }
-.ep-grocery-stage__bottom > div:last-child { display: flex; justify-content: space-between; gap: 16px; margin-top: 10px; }
-
-.ep-grocery-ending { position: absolute; inset: 0; opacity: 0; visibility: hidden; will-change: transform,opacity; }
-.ep-grocery-ending__view { position: absolute; left: 57%; top: 17%; width: min(31vw,420px); height: min(29vw,350px); max-height: 42svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px solid #ffffff96; border-radius: 24px; background: linear-gradient(145deg,#f8fcf6ed,#dce9dfed); color: #123c2e; box-shadow: 0 26px 70px #00150e35,inset 0 1px 0 #ffffffdf; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
-.ep-grocery-ending__view > span { font-size: 9px; font-weight: 900; letter-spacing: .17em; text-transform: uppercase; color: #587869; }
-.ep-grocery-ending__view h3 { max-width: 300px; margin: 0; text-align: center; font-family: Georgia,'Times New Roman',serif; font-size: clamp(30px,3.25vw,46px); line-height: 1; font-weight: 500; letter-spacing: -.045em; }
-.ep-grocery-ending__view button { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; border: 1px solid #164c39; border-radius: 999px; background: #123f30; padding: 0 20px; color: white; font-size: 12px; font-weight: 800; }
-.ep-grocery-ending__categories { position: absolute; left: calc(31% + 28px); right: clamp(24px,4.4vw,78px); bottom: 64px; min-height: 184px; padding: 20px 22px 22px; border: 1px solid rgba(255,255,255,.28); border-radius: 22px; background: linear-gradient(135deg,rgba(3,30,22,.82),rgba(25,73,54,.62)); box-shadow: 0 24px 64px rgba(0,18,12,.30),inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-.ep-grocery-ending__categories-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; color: #fffdf6; }
-.ep-grocery-ending__categories-head p { margin: 0; font-size: 12px; font-weight: 900; letter-spacing: .17em; text-transform: uppercase; }
-.ep-grocery-ending__categories-head button { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; background: rgba(255,255,255,.08); padding: 0 12px; color: #fffaf0; font-size: 11px; font-weight: 850; }
-.ep-grocery-ending__category-row { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 11px; }
-.ep-grocery-ending__category-row button { min-width: 0; min-height: 104px; border: 1px solid rgba(255,255,255,.42); border-radius: 16px; background: rgba(255,255,255,.17); padding: 16px; text-align: left; color: #fffdf7; box-shadow: inset 0 1px 0 rgba(255,255,255,.10); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: background .2s ease,border-color .2s ease,transform .2s ease; }
-.ep-grocery-ending__category-row button:hover { transform: translateY(-2px); border-color: #ffffff85; background: #ffffff22; }
-.ep-grocery-ending__category-row button span { display: block; margin-bottom: 12px; color: #d7e7dd; font-size: 9px; font-weight: 850; letter-spacing: .13em; }
-.ep-grocery-ending__category-row button strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 850; }
-
-.ep-grocery-static { padding: 60px 24px 90px; background: linear-gradient(135deg,#09251d,#456754); color: white; }
-.ep-grocery-static h2 { max-width: 1300px; margin: 0 auto 26px; font-family: Georgia,'Times New Roman',serif; font-size: 42px; }
-.ep-grocery-static__grid { max-width: 1300px; margin: 0 auto; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
-.ep-grocery-static__grid .ep-grocery-image-card { aspect-ratio: 1 / 1; }
-.ep-grocery-static__end { display: flex; justify-content: center; margin-top: 30px; }
-.ep-grocery-static__end button { min-height: 44px; border: 0; border-radius: 999px; background: white; padding: 0 20px; color: #123f30; font-weight: 800; }
-
-.ep-grocery-status { min-height: 56svh; display: grid; place-items: center; background: linear-gradient(135deg,#0a2d23,#345746); padding: 60px 24px; color: white; }
-.ep-grocery-status > div { width: min(620px,100%); text-align: center; }
-.ep-grocery-status h2 { margin: 12px 0 8px; font-family: Georgia,'Times New Roman',serif; font-size: 31px; font-weight: 500; }
-.ep-grocery-status p { margin: 0 auto 20px; max-width: 460px; color: #cbdad0; font-size: 13px; line-height: 1.7; }
-.ep-grocery-status button { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; border: 1px solid #ffffff60; border-radius: 999px; background: #ffffff14; padding: 0 17px; color: white; font-weight: 800; }
-
-.ep-grocery-modal { position: fixed; inset: 0; margin: auto; width: min(1180px,calc(100vw - 56px)); height: min(760px,calc(100svh - 58px)); max-width: none; max-height: none; padding: 0; overflow: hidden; border: 1px solid #ffffffc7; border-radius: 28px; background: rgba(229,239,232,.80); color: #123d2f; box-shadow: 0 40px 150px #00150f70,inset 0 1px 0 #ffffff; backdrop-filter: blur(32px) saturate(118%); -webkit-backdrop-filter: blur(32px) saturate(118%); }
-.ep-grocery-modal::backdrop { background: rgba(3,19,14,.48); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.ep-grocery-modal__body { height: 100%; display: flex; flex-direction: column; }
-.ep-grocery-modal__header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 26px 28px 17px; border-bottom: 1px solid #315b4930; }
-.ep-grocery-modal__header p { margin: 0; color: #57776a; font-size: 9px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-.ep-grocery-modal__header h2 { margin: 5px 0 5px; font-family: Georgia,'Times New Roman',serif; font-size: 38px; line-height: 1; font-weight: 500; letter-spacing: -.04em; }
-.ep-grocery-modal__header span { color: #577066; font-size: 11px; }
-.ep-grocery-modal__header > button { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid #ffffffc9; border-radius: 50%; background: #ffffff9e; color: #244f3e; }
-.ep-grocery-modal__directory-search { flex-shrink: 0; display: flex; align-items: center; gap: 10px; margin: 16px 28px 0; min-height: 48px; border: 1px solid #ffffffd4; border-radius: 15px; background: rgba(255,255,255,.74); padding: 0 12px 0 15px; color: #527064; box-shadow: inset 0 1px 0 #ffffff,0 8px 24px #113b2b0b; }
-.ep-grocery-modal__directory-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #173f31; font-size: 13px; font-weight: 700; }
-.ep-grocery-modal__directory-search input::placeholder { color: #718b80; font-weight: 650; }
-.ep-grocery-modal__directory-search button { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border: 1px solid #2b634c24; border-radius: 50%; background: #eef5ef; color: #315f4c; }
-.ep-grocery-modal__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 28px 28px; scrollbar-width: thin; scrollbar-color: #7f9c8d transparent; }
-.ep-grocery-modal__category-sections { display: flex; flex-direction: column; gap: 28px; }
-.ep-grocery-modal__category-section { min-width: 0; }
-.ep-grocery-modal__category-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 11px; padding: 0 2px; }
-.ep-grocery-modal__category-heading span { display: block; margin-bottom: 3px; color: #6f8c7f; font-size: 8px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-.ep-grocery-modal__category-heading h3 { margin: 0; color: #153d2f; font-family: Georgia,'Times New Roman',serif; font-size: 24px; line-height: 1; font-weight: 500; letter-spacing: -.025em; }
-.ep-grocery-modal__category-heading p { margin: 0; color: #718a7f; font-size: 10px; font-weight: 800; white-space: nowrap; }
-.ep-grocery-modal__category-products { display: flex; gap: 13px; width: 100%; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 10px; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: #88a596 transparent; -webkit-overflow-scrolling: touch; }
-.ep-grocery-modal__category-products::-webkit-scrollbar { height: 5px; }
-.ep-grocery-modal__category-products::-webkit-scrollbar-thumb { border-radius: 999px; background: #88a596; }
-.ep-grocery-modal__category-products::-webkit-scrollbar-track { background: transparent; }
-.ep-grocery-modal__product-item { min-width: 0; flex: 0 0 clamp(170px,18vw,212px); display: flex; flex-direction: column; scroll-snap-align: start; }
-.ep-grocery-image-card--compact { height: auto; flex: 0 0 auto; aspect-ratio: 1 / 1; border-radius: 18px; box-shadow: 0 8px 28px #0a2d2116,inset 0 1px 0 #ffffff; }
-.ep-grocery-image-card--compact img { padding: 24px; }
-.ep-grocery-modal__product-name { min-height: 44px; padding: 10px 4px 2px; overflow: visible; white-space: normal; color: #173f31; font-size: 13px; font-weight: 850; line-height: 1.35; overflow-wrap: anywhere; }
-.ep-grocery-modal__loading,.ep-grocery-modal__empty-search { display: grid; place-items: center; align-content: center; min-height: 300px; color: #557568; font-size: 13px; text-align: center; }
-.ep-grocery-modal__empty-search strong { margin-top: 12px; color: #234c3c; font-size: 15px; }
-.ep-grocery-modal__empty-search span { margin-top: 4px; color: #6d877b; font-size: 11px; }
-.ep-grocery-modal--categories { width: min(980px,calc(100vw - 56px)); height: min(650px,calc(100svh - 64px)); }
-.ep-grocery-modal__category-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
-.ep-grocery-modal__category-grid button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; min-height: 86px; border: 1px solid #ffffffb3; border-radius: 16px; background: #ffffff88; padding: 14px 16px; text-align: left; color: #173f31; box-shadow: 0 6px 22px #113b2b0d; }
-.ep-grocery-modal__category-grid button:hover { background: #ffffffc7; }
-.ep-grocery-modal__category-grid button span { font-size: 9px; font-weight: 900; color: #739184; letter-spacing: .1em; }
-.ep-grocery-modal__category-grid button strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-
-@media (max-width: 900px) {
-  .ep-grocery-stage::after { left: 34%; }
-  .ep-grocery-stage__left { width: min(27vw,340px); }
-  .ep-grocery-flight { width: min(48vw,470px); }
-  .ep-grocery-ending__view { left: 53%; width: min(36vw,410px); }
-  .ep-grocery-ending__categories { left: calc(34% + 18px); }
-}
-
-@media (max-width: 699px) {
-  .ep-grocery-hero__photo { background-position: 69% center; }
-  .ep-grocery-hero__shade { background: linear-gradient(90deg,rgba(5,45,34,.95),rgba(5,45,34,.74) 58%,rgba(5,45,34,.42)); }
-  .ep-grocery-hero__content { padding-left: 22px; padding-right: 22px; padding-bottom: 112px; }
-  .ep-grocery-hero h1 { max-width: 330px; font-size: clamp(50px,13vw,72px); }
-  .ep-grocery-hero__copy { max-width: 320px; font-size: 13px; }
-  .ep-grocery-hero__filters {
-    width: calc(100% + 20px);
-    max-width: none;
-    margin-top: 22px;
-    margin-left: -10px;
-    margin-right: -10px;
-    padding: 7px;
-    display: block;
-    overflow: hidden;
-  }
-  .ep-grocery-hero__search {
-    width: 100%;
-    min-width: 0;
-    min-height: 40px;
-    gap: 7px;
-    padding: 0 5px 0 10px;
-    border-radius: 10px;
-  }
-  .ep-grocery-hero__search > svg {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-  }
-  .ep-grocery-hero__search input {
-    min-width: 0;
-    font-size: 10px;
-  }
-  .ep-grocery-hero__search input::placeholder {
-    font-size: 10px;
-  }
-  .ep-grocery-hero__search button {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-  }
-  .ep-grocery-hero__selects {
-    display: grid;
-    grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
-    align-items: center;
-    gap: 6px;
-    margin-top: 7px;
-  }
-  .ep-grocery-hero__selects select {
-    width: 100%;
-    min-width: 0;
-    height: 38px;
-    padding: 0 25px 0 9px;
-    border-radius: 9px;
-    background-position: calc(100% - 8px) center;
-    font-size: 10px;
-  }
-  #grocery-category,
-  #grocery-brand { width: 100%; }
-  .ep-grocery-hero__reset {
-    width: auto;
-    min-width: 66px;
-    min-height: 38px;
-    padding: 0 9px;
-    gap: 5px;
-    font-size: 10px;
-  }
-  .ep-grocery-hero__reset svg {
-    width: 13px;
-    height: 13px;
-  }
-  .ep-grocery-scroll-cue { left: 22px; right: 22px; }
-  .ep-grocery-scroll-cue p { display: none; }
-  .ep-grocery-track { height: var(--grocery-track-height-mobile); }
-  .ep-grocery-stage::after { display: none; }
-  .ep-grocery-stage__meta { z-index: 70; top: calc(var(--grocery-nav-height) + 18px); left: 18px; right: 18px; }
-  .ep-grocery-stage__left { z-index: 70; top: calc(var(--grocery-nav-height) + 72px); left: 18px; width: calc(100% - 36px); transform: none; padding: 0; pointer-events: none; will-change: opacity, transform; transform-origin: top center; }
-  .ep-grocery-stage__left::before { inset: -12px -18px; }
-  .ep-grocery-stage__label { min-height: 34px; font-size: 8px; }
-  .ep-grocery-stage__names { min-height: 122px; margin-top: 10px; overflow: hidden; }
-  .ep-grocery-stage__name span { margin-bottom: 8px; font-size: 10px; }
-  .ep-grocery-stage__name h2 { max-width: 100%; font-size: clamp(30px,8.2vw,42px); line-height: .92; text-wrap: pretty; }
-  .ep-grocery-stage__name p { display: none; }
-  .ep-grocery-flight { width: min(76vw,430px); }
-  .ep-grocery-image-card { border-radius: 22px; }
-  .ep-grocery-stage__hint { z-index: 60; left: 18px; bottom: 70px; pointer-events: none; }
-  .ep-grocery-stage__bottom { z-index: 60; left: 18px; right: 18px; bottom: 20px; pointer-events: none; }
-  .ep-grocery-ending__view { left: 50%; top: calc(var(--grocery-nav-height) + 92px); width: min(72vw,360px); height: min(66vw,320px); transform: translateX(-50%); }
-  .ep-grocery-ending__categories { left: 18px; right: 18px; bottom: 60px; padding: 13px; border-color: rgba(255,255,255,.34); border-radius: 24px; background: linear-gradient(150deg,rgba(7,43,32,.80),rgba(52,92,73,.52)); box-shadow: 0 20px 50px rgba(0,18,12,.24),inset 0 1px 0 rgba(255,255,255,.08); }
-  .ep-grocery-ending__categories-head { margin-bottom: 11px; gap: 8px; }
-  .ep-grocery-ending__categories-head p { font-size: 10px; letter-spacing: .14em; }
-  .ep-grocery-ending__categories-head button { min-height: 31px; padding: 0 10px; font-size: 9px; }
-  .ep-grocery-ending__category-row { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
-  .ep-grocery-ending__category-row button:nth-child(n+4) { display: none; }
-  .ep-grocery-ending__category-row button { position: relative; min-height: 96px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; overflow: hidden; border-color: rgba(255,255,255,.50); border-radius: 17px; background: linear-gradient(145deg,rgba(255,255,255,.24),rgba(255,255,255,.10)); padding: 11px 10px 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,.14),0 8px 18px rgba(0,18,12,.10); }
-  .ep-grocery-ending__category-row button::before { content: ''; position: absolute; left: 10px; right: 10px; top: 0; height: 2px; border-radius: 999px; background: linear-gradient(90deg,#f1ddb0,rgba(241,221,176,0)); opacity: .9; }
-  .ep-grocery-ending__category-row button span { margin-bottom: 0; align-self: flex-start; border: 1px solid rgba(255,255,255,.20); border-radius: 999px; background: rgba(255,255,255,.10); padding: 4px 6px; color: #e6f1ea; font-size: 8px; line-height: 1; }
-  .ep-grocery-ending__category-row button strong { display: block; overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; word-break: normal; color: #fffdf7; font-size: 11px; line-height: 1.18; font-weight: 850; }
-  .ep-grocery-modal { width: calc(100vw - 22px); height: calc(100svh - 28px); border-radius: 20px; }
-  .ep-grocery-modal__header { padding: 18px 16px 13px; }
-  .ep-grocery-modal__header h2 { font-size: 29px; }
-  .ep-grocery-modal__directory-search { min-height: 44px; margin: 12px 16px 0; border-radius: 13px; padding-left: 12px; }
-  .ep-grocery-modal__directory-search input { font-size: 11px; }
-  .ep-grocery-modal__scroll { padding: 14px 16px 20px; }
-  .ep-grocery-modal__category-sections { gap: 23px; }
-  .ep-grocery-modal__category-heading { align-items: center; margin-bottom: 9px; }
-  .ep-grocery-modal__category-heading h3 { font-size: 21px; }
-  .ep-grocery-modal__category-heading p { font-size: 9px; }
-  .ep-grocery-modal__category-products { gap: 10px; padding-bottom: 8px; }
-  .ep-grocery-modal__product-item { flex-basis: min(42vw,156px); }
-  .ep-grocery-image-card--compact img { padding: 15px; }
-  .ep-grocery-modal__product-name { min-height: 40px; padding-top: 8px; font-size: 11px; }
-  .ep-grocery-modal__category-grid { grid-template-columns: 1fr; }
-  .ep-grocery-static__grid { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-height: 590px) and (min-width: 700px) {
-  .ep-grocery-hero__content { padding-top: calc(var(--grocery-nav-height) + 14px); padding-bottom: 72px; }
-  .ep-grocery-hero h1 { font-size: 50px; margin: 12px 0 10px; }
-  .ep-grocery-hero__copy { font-size: 12px; }
-  .ep-grocery-hero__filters { margin-top: 14px; }
-  .ep-grocery-scroll-cue { bottom: 14px; }
-  .ep-grocery-flight { width: min(36vw,390px); }
-  .ep-grocery-ending__view { top: 13%; height: min(29vw,300px); }
-  .ep-grocery-ending__categories { bottom: 48px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ep-grocery-journey *, .ep-grocery-modal * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-}
-`
 
 export default function GroceryPage() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const {
     products,
     categories,
@@ -978,7 +117,7 @@ export default function GroceryPage() {
     search,
     categorySlug,
     brandSlug,
-    limit,
+    page,
     pagination,
     loading,
     filtersLoading,
@@ -986,365 +125,262 @@ export default function GroceryPage() {
     setSearch,
     setCategorySlug,
     setBrandSlug,
-    setLimit,
+    setPage,
     resetFilters,
   } = useGroceryCatalog({
-    initialSearch: searchParams.get('q') || '',
+    initialSearch: initialQuery,
     initialCategorySlug: searchParams.get('category') || '',
     initialBrandSlug: searchParams.get('brand') || '',
+    initialLimit: INITIAL_BATCH,
+    appendPages: true,
   })
 
-  const [searchDraft, setSearchDraft] = useState(search)
-  const [productDirectoryOpen, setProductDirectoryOpen] = useState(false)
-  const [categoryDirectoryOpen, setCategoryDirectoryOpen] = useState(false)
-  const pageRef = useRef(null)
-  const trackRef = useRef(null)
-  const stageRef = useRef(null)
+  const collectionRef = useRef(null)
   const unavailableSearchRef = useRef('')
-  const reducedMotion = useReducedMotion()
+  const [heroSearch, setHeroSearch] = useState(initialQuery)
+  const [collectionQuery, setCollectionQuery] = useState(initialQuery)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(DESKTOP_REVEAL)
+  const [smallViewport, setSmallViewport] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  ))
+  const [hint, setHint] = useState('')
 
-  useNavbarClearance(pageRef)
-
-  const featuredProducts = useMemo(
-    () => products.slice(0, PREVIEW_PRODUCT_COUNT),
-    [products],
-  )
-  const featuredCategories = useMemo(
-    () => categories.slice(0, 5),
-    [categories],
-  )
-  const signature = featuredProducts.map(getProductKey).join('|')
-  const showScene = !loading && !error && featuredProducts.length > 0
-  const scenePaused = productDirectoryOpen || categoryDirectoryOpen
-
-  useGroceryScrollScene({
-    trackRef,
-    stageRef,
-    count: showScene ? featuredProducts.length : 0,
-    signature,
-    reducedMotion,
-    paused: scenePaused,
-  })
+  const revealSize = smallViewport ? MOBILE_REVEAL : DESKTOP_REVEAL
 
   useEffect(() => {
-    if (!productDirectoryOpen) return
+    const query = window.matchMedia('(max-width: 767px)')
+    const update = () => setSmallViewport(query.matches)
+    update()
+    query.addEventListener?.('change', update)
+    return () => query.removeEventListener?.('change', update)
+  }, [])
 
-    const total = Number(pagination?.total) || 0
-    if (total > limit) setLimit(total)
-  }, [productDirectoryOpen, pagination?.total, limit, setLimit])
+  // One card batch at a time; changing filters starts from the first batch.
+  const filterSignature = `${categorySlug}\u0001${brandSlug}`
+  useEffect(() => { setVisibleCount(revealSize) }, [filterSignature, revealSize])
 
+  // The collection input searches the server's real category/brand-filtered
+  // catalog; it never creates made-up products or client-only fake results.
+  useEffect(() => {
+    if (collectionQuery.trim() === search) return undefined
+    const timer = window.setTimeout(() => {
+      setSearch(collectionQuery.trim())
+      setVisibleCount(revealSize)
+    }, 360)
+    return () => window.clearTimeout(timer)
+  }, [collectionQuery, search, revealSize, setSearch])
+
+  const primaryCategories = categories.slice(0, 4)
+  const extraCategories = categories.slice(4).map((category) => ({
+    value: category.slug,
+    label: category.name,
+  }))
+  const brandOptions = brands.map((brand) => ({ value: brand.slug, label: brand.name }))
+  const extraSelected = extraCategories.some((item) => item.value === categorySlug) ? categorySlug : ''
+  const chosenCategory = categories.find((item) => item.slug === categorySlug)
+  const chosenBrand = brands.find((item) => item.slug === brandSlug)
+  const searchScope = chosenCategory?.name || (chosenBrand?.name ? `${chosenBrand.name} products` : 'groceries')
+
+  const suggestions = useMemo(() => {
+    if (chosenCategory?.name) return [
+      `Explore ${chosenCategory.name.toLowerCase()}...`,
+      `Find fresh ${chosenCategory.name.toLowerCase()}...`,
+      `Search ${chosenCategory.name.toLowerCase()} by name...`,
+    ]
+    if (chosenBrand?.name) return [
+      `Find ${chosenBrand.name} favourites...`,
+      `Search ${chosenBrand.name} products...`,
+      `Discover more from ${chosenBrand.name}...`,
+    ]
+    return ['Fresh fruit and vegetables...', 'Everyday pantry essentials...', 'Search groceries and brands...']
+  }, [chosenCategory?.name, chosenBrand?.name])
 
   useEffect(() => {
-    const normalizedSearch = String(search || '').trim()
+    if (collectionQuery || searchFocused) { setHint(''); return undefined }
+    let index = 0
+    let position = 0
+    let deleting = false
+    let timer
+    const tick = () => {
+      const word = suggestions[index]
+      position = deleting ? Math.max(0, position - 1) : Math.min(word.length, position + 1)
+      setHint(word.slice(0, position))
+      let delay = deleting ? 40 : 65
+      if (!deleting && position === word.length) { deleting = true; delay = 1600 }
+      if (deleting && position === 0) { deleting = false; index = (index + 1) % suggestions.length; delay = 240 }
+      timer = window.setTimeout(tick, delay)
+    }
+    timer = window.setTimeout(tick, 250)
+    return () => window.clearTimeout(timer)
+  }, [suggestions, collectionQuery, searchFocused])
 
-    if (
-      loading ||
-      error ||
-      normalizedSearch.length < 2 ||
-      products.length > 0
-    ) {
-      if (products.length > 0 || !normalizedSearch) {
-        unavailableSearchRef.current = ''
-      }
+  useEffect(() => {
+    const query = search.trim().toLowerCase()
+    if (loading || error || query.length < 2 || products.length || categorySlug || brandSlug) {
+      if (products.length || !query) unavailableSearchRef.current = ''
       return
     }
+    if (unavailableSearchRef.current === query) return
+    unavailableSearchRef.current = query
+    openAvailabilityNotifyModal({ query, displayName: search.trim(), source: 'search' })
+  }, [loading, error, search, products.length, categorySlug, brandSlug])
 
-    const watchKey = normalizedSearch.toLowerCase()
-
-    if (unavailableSearchRef.current === watchKey) {
-      return
-    }
-
-    unavailableSearchRef.current = watchKey
-
-    openAvailabilityNotifyModal({
-      query: normalizedSearch,
-      displayName: normalizedSearch,
-      source: 'search',
-    })
-  }, [loading, error, search, products.length])
-
-  function handleSearchSubmit(event) {
-    event.preventDefault()
-
-    const normalizedSearch = searchDraft.trim()
-
-    if (normalizedSearch.length >= 2) {
-      void recordCustomerSearchDemand({
-        query: normalizedSearch,
-        surface: 'grocery',
-      })
-    }
-
-    if (limit !== DEFAULT_PRODUCT_LIMIT) setLimit(DEFAULT_PRODUCT_LIMIT)
-    setSearch(searchDraft)
-  }
-
-  function handleReset() {
-    setSearchDraft('')
-    if (limit !== DEFAULT_PRODUCT_LIMIT) setLimit(DEFAULT_PRODUCT_LIMIT)
-    resetFilters()
-  }
-
-  function scrollToProducts() {
-    trackRef.current?.scrollIntoView({
-      behavior: reducedMotion ? 'instant' : 'smooth',
+  function scrollToCollection() {
+    collectionRef.current?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
       block: 'start',
     })
   }
 
-  function handleCategorySelect(slug) {
-    const normalizedSlug = String(slug || '').trim()
-    if (!normalizedSlug) return
+  function handleHeroSearch(event) {
+    event.preventDefault()
+    const value = heroSearch.trim()
+    if (value.length >= 2) void recordCustomerSearchDemand({ query: value, surface: 'grocery' })
+    setCollectionQuery(value)
+    setSearch(value)
+    setVisibleCount(revealSize)
+    scrollToCollection()
+  }
 
-    setCategoryDirectoryOpen(false)
-    navigate(`/grocery/category/${encodeURIComponent(normalizedSlug)}`)
+  function handleCollectionSearch(event) {
+    event.preventDefault()
+    const value = collectionQuery.trim()
+    if (value.length >= 2) void recordCustomerSearchDemand({ query: value, surface: 'grocery' })
+    setSearch(value)
+  }
+
+  function chooseCategory(value) {
+    setCategorySlug(value)
+    setVisibleCount(revealSize)
+  }
+
+  function chooseBrand(value) {
+    setBrandSlug(value)
+    setVisibleCount(revealSize)
+  }
+
+  function clearEverything() {
+    resetFilters()
+    setHeroSearch('')
+    setCollectionQuery('')
+    setVisibleCount(revealSize)
+  }
+
+  const total = Number(pagination?.total) || 0
+  const totalPages = Number(pagination?.pages) || 0
+  const visibleProducts = products.slice(0, visibleCount)
+  const canViewMore = visibleCount < products.length || (page < totalPages)
+
+  function handleViewMore() {
+    if (loading) return
+    const nextCount = visibleCount + revealSize
+    setVisibleCount(nextCount)
+    if (nextCount > products.length && page < totalPages) setPage(page + 1)
   }
 
   return (
-    <main ref={pageRef} className="ep-grocery-journey min-w-0">
-      <style>{PAGE_STYLES}</style>
-
-      <section className="ep-grocery-hero" aria-labelledby="grocery-page-title">
-        <div className="ep-grocery-hero__photo" aria-hidden="true" />
-        <div className="ep-grocery-hero__shade" aria-hidden="true" />
-
-        <div className="ep-grocery-hero__content">
-          <div className="ep-grocery-hero__eyebrow">
-            <Leaf size={13} strokeWidth={1.8} aria-hidden="true" />
-            EPANTRY Grocery
-          </div>
-
-          <h1 id="grocery-page-title">Groceries made easier to discover.</h1>
-          <p className="ep-grocery-hero__copy">Fresh groceries, easier to find.</p>
-
-          <div className="ep-grocery-hero__filters">
-            <form
-              role="search"
-              aria-label="Search groceries"
-              className="ep-grocery-hero__search"
-              onSubmit={handleSearchSubmit}
-            >
-              <Search size={18} strokeWidth={1.7} aria-hidden="true" />
-              <label htmlFor="grocery-search" className="sr-only">Search groceries, products or brands</label>
-              <input
-                id="grocery-search"
-                type="search"
-                value={searchDraft}
-                onChange={(event) => setSearchDraft(event.target.value)}
-                placeholder="Search groceries, products or brands"
-              />
-              <button type="submit" aria-label="Search groceries">
-                <ArrowRight size={17} aria-hidden="true" />
+    <main className="min-h-screen bg-[#F7F6F2] text-[#202421]">
+      {/* Match the approved Recipes 100svh hero and typography while keeping
+          the existing genuine Grocery hero photograph and Grocery copy. */}
+      <section
+        className="relative flex h-[100svh] min-h-0 items-center overflow-hidden bg-[#F7F6F2] bg-center bg-cover bg-no-repeat"
+        style={{ backgroundImage: "url('/hero/grocery.png')" }}
+        aria-labelledby="grocery-page-title"
+      >
+        <div className="page-shell relative z-10 w-full">
+          <div className="w-full max-w-[620px] border-l-[5px] border-[#173F35] bg-[#F7F6F2] px-5 py-6 text-[#202421] shadow-[0_14px_36px_rgba(32,36,33,0.15)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+            <p className="flex items-center gap-2 text-[14px] font-bold uppercase tracking-[0.14em] text-[#173F35]">
+              <Leaf size={16} aria-hidden="true" /> EPANTRY Grocery
+            </p>
+            <h1 id="grocery-page-title" className="mt-3 text-[36px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#202421] sm:text-[44px] lg:text-[56px]">
+              Groceries made easier to discover.
+            </h1>
+            <p className="mt-4 text-base leading-relaxed text-[#202421]">Fresh groceries, easier to find.</p>
+            <form role="search" aria-label="Search groceries" onSubmit={handleHeroSearch} className="mt-6 flex min-h-[52px] w-full items-center gap-2 rounded-[14px] border border-[#DCE0CF] bg-[#F7F6F2] p-1.5 focus-within:border-[#173F35]">
+              <Search size={19} className="ml-2 shrink-0 text-[#173F35]" aria-hidden="true" />
+              <label htmlFor="grocery-hero-search" className="sr-only">Search groceries or brands</label>
+              <input id="grocery-hero-search" type="search" value={heroSearch} onChange={(event) => setHeroSearch(event.target.value)} placeholder="Search groceries or brands" className="min-w-0 flex-1 bg-transparent px-1 text-base text-[#202421] outline-none placeholder:text-[#202421]/60" />
+              <button type="submit" className="focus-ring inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[11px] bg-[#173F35] px-4 text-[15px] font-semibold text-[#F7F6F2] transition hover:bg-[#202421]">
+                <span className="hidden sm:inline">Search groceries</span><ArrowUpRight size={18} aria-hidden="true" />
               </button>
             </form>
-
-            <div className="ep-grocery-hero__selects">
-              <label className="sr-only" htmlFor="grocery-category">Category</label>
-              <select
-                id="grocery-category"
-                value={categorySlug}
-                disabled={filtersLoading}
-                onChange={(event) => {
-                  if (limit !== DEFAULT_PRODUCT_LIMIT) setLimit(DEFAULT_PRODUCT_LIMIT)
-                  setCategorySlug(event.target.value)
-                }}
-              >
-                <option value="">All categories</option>
-                {categories.map((category) => (
-                  <option key={category.id || category.slug} value={category.slug}>{category.name}</option>
-                ))}
-              </select>
-
-              <label className="sr-only" htmlFor="grocery-brand">Brand</label>
-              <select
-                id="grocery-brand"
-                value={brandSlug}
-                disabled={filtersLoading}
-                onChange={(event) => {
-                  if (limit !== DEFAULT_PRODUCT_LIMIT) setLimit(DEFAULT_PRODUCT_LIMIT)
-                  setBrandSlug(event.target.value)
-                }}
-              >
-                <option value="">All brands</option>
-                {brands.map((brand) => (
-                  <option key={brand.id || brand.slug} value={brand.slug}>{brand.name}</option>
-                ))}
-              </select>
-
-              <button type="button" className="ep-grocery-hero__reset" onClick={handleReset}>
-                <RotateCcw size={13} aria-hidden="true" />
-                Reset
-              </button>
-            </div>
           </div>
         </div>
-
-        <div className="ep-grocery-scroll-cue">
-          <button type="button" onClick={scrollToProducts}>
-            <span><ArrowDown size={17} aria-hidden="true" /></span>
-            Scroll to discover
-          </button>
-          <p>{Number(pagination?.total) || 0} published products</p>
-        </div>
+        <button type="button" onClick={scrollToCollection} aria-label="Scroll down to explore groceries"
+          className="focus-ring absolute bottom-5 right-5 z-20 inline-flex min-h-11 items-center gap-2 rounded-full border border-transparent bg-[#F7F6F2] px-3.5 py-2.5 text-[14px] font-semibold text-[#173F35] shadow-[0_6px_22px_rgba(32,36,33,0.16)] transition-colors hover:border-[#173F35] focus-visible:border-[#173F35] sm:bottom-8 sm:right-8">
+          <span className="hidden sm:inline">Scroll to explore</span><ArrowDown size={17} aria-hidden="true" />
+        </button>
       </section>
 
-      {!showScene ? (
-        <section ref={trackRef} className="ep-grocery-status" aria-label="Grocery catalog status">
-          {loading ? (
-            <div role="status">
-              <Grid3X3 size={28} className="mx-auto" aria-hidden="true" />
-              <h2>Loading groceries</h2>
-              <p>Preparing the published grocery collection.</p>
+      <section ref={collectionRef} className="scroll-mt-[70px] border-t border-[#DCE0CF] bg-[#F7F6F2] py-10 sm:py-14" aria-labelledby="grocery-collection-heading">
+        <div className="page-shell">
+          <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#173F35]">EPANTRY Grocery Collection</p>
+          <h2 id="grocery-collection-heading" className="mt-2 text-[28px] font-bold leading-tight tracking-[-0.04em] text-[#202421] sm:text-[36px]">Find something good.</h2>
+
+          {/* Recipe-style category discovery, using real published catalog
+              categories instead of invented non-functional Grocery types. */}
+          <div className="mt-7 rounded-[16px] border border-[#DCE0CF] bg-[#DCE0CF]/45 p-3 sm:p-4">
+            <div className="mb-3 flex items-center gap-2 text-[#173F35]">
+              <SlidersHorizontal size={18} aria-hidden="true" />
+              <h3 className="text-[15px] font-bold uppercase tracking-[0.08em]">Explore by type</h3>
             </div>
-          ) : error ? (
-            <div role="alert">
-              <CircleAlert size={30} className="mx-auto" aria-hidden="true" />
-              <h2>We couldn't load groceries</h2>
-              <p>{error}</p>
+            <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-2">
+              <button type="button" aria-pressed={!categorySlug} onClick={() => chooseCategory('')}
+                className={`focus-ring inline-flex min-h-11 shrink-0 items-center rounded-full border px-3 py-2 text-[14px] font-semibold whitespace-nowrap transition-colors ${!categorySlug ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}>All Groceries</button>
+              {primaryCategories.map((category) => (
+                <button key={category.slug || category.id} type="button" aria-pressed={categorySlug === category.slug} onClick={() => chooseCategory(category.slug)}
+                  className={`focus-ring inline-flex min-h-11 shrink-0 items-center rounded-full border px-3 py-2 text-[14px] font-semibold whitespace-nowrap transition-colors ${categorySlug === category.slug ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}>{category.name}</button>
+              ))}
+              {extraCategories.length > 0 && <AdaptiveSelect label="More types…" value={extraSelected} options={extraCategories} onChange={chooseCategory} disabled={filtersLoading} />}
             </div>
-          ) : (
-            <div>
-              <EmptyState
-                title="No published products found"
-                description="Try changing the current search or catalog filters."
-              />
-              {(search || categorySlug || brandSlug) && (
-                <button type="button" onClick={handleReset}>
-                  <RotateCcw size={14} aria-hidden="true" />
-                  Reset filters
-                </button>
-              )}
+            <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 border-t border-[#173F35]/15 pt-3">
+              <span className="mr-1 text-[14px] font-semibold text-[#173F35]">Brand</span>
+              <AdaptiveSelect label="All brands" value={brandSlug} options={brandOptions} onChange={chooseBrand} disabled={filtersLoading} />
+              {(categorySlug || brandSlug) && <button type="button" onClick={() => { chooseCategory(''); chooseBrand('') }} className="focus-ring inline-flex min-h-10 items-center gap-1.5 rounded-full border border-transparent px-3 text-[14px] font-semibold text-[#173F35] hover:border-[#173F35]"><RotateCcw size={15} aria-hidden="true" /> Reset filters</button>}
+            </div>
+          </div>
+
+          <form role="search" aria-label="Search in grocery collection" onSubmit={handleCollectionSearch} className="mt-4">
+            <label className="flex min-h-[54px] items-center gap-3 rounded-[14px] border border-[#DCE0CF] bg-[#F7F6F2] px-4 transition-colors focus-within:border-[#173F35] focus-within:ring-2 focus-within:ring-[#173F35]/15">
+              <Search size={21} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+              <span className="sr-only">Search {searchScope}</span>
+              <input type="search" value={collectionQuery} maxLength={150}
+                onChange={(event) => { setCollectionQuery(event.target.value); setVisibleCount(revealSize) }}
+                onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)}
+                placeholder={hint || `Search ${searchScope.toLowerCase()}...`}
+                className="h-[52px] w-full min-w-0 flex-1 bg-transparent text-base text-[#202421] outline-none placeholder:text-[#202421]/60" />
+              {collectionQuery && <button type="button" onClick={() => { setCollectionQuery(''); setHeroSearch(''); setSearch(''); setVisibleCount(revealSize) }} aria-label="Clear grocery search" className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#DCE0CF] text-[#173F35] hover:bg-[#173F35] hover:text-[#F7F6F2]"><X size={17} aria-hidden="true" /></button>}
+            </label>
+          </form>
+
+          {error && <div role="alert" className="mt-5 rounded-[12px] border border-[#C86C42] bg-[#F7F6F2] p-4 text-sm text-[#202421]"><CircleAlert size={18} aria-hidden="true" className="mr-2 inline" />{error}</div>}
+          {loading && products.length === 0 ? (
+            <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-5" role="status" aria-label="Loading groceries">
+              {Array.from({ length: 8 }, (_, index) => <div key={index} className="aspect-[4/3] animate-pulse rounded-[16px] bg-[#DCE0CF] lg:aspect-[3/2]" />)}
+            </div>
+          ) : !error && visibleProducts.length > 0 ? (
+            <div className="mt-6 grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-5" aria-live="polite">
+              {visibleProducts.map((product) => <GroceryTile key={productKey(product)} product={product} />)}
+            </div>
+          ) : !error && !loading ? (
+            <div className="mt-8 rounded-[16px] border border-dashed border-[#173F35]/30 bg-[#DCE0CF]/45 px-6 py-12 text-center">
+              <EmptyState title="No matching groceries" description="Try another search, category or brand." />
+              {(search || categorySlug || brandSlug) && <button type="button" onClick={clearEverything} className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#173F35] px-5 text-[15px] font-semibold text-[#F7F6F2]"><RotateCcw size={16} /> Clear filters</button>}
+            </div>
+          ) : null}
+
+          {!error && canViewMore && (
+            <div className="mt-8 flex justify-center border-t border-[#DCE0CF] pt-7">
+              <button type="button" onClick={handleViewMore} disabled={loading} className="focus-ring inline-flex min-h-[48px] items-center gap-2 rounded-full bg-[#173F35] px-8 text-[15px] font-bold text-[#F7F6F2] transition hover:bg-[#202421] disabled:opacity-60">
+                {loading ? 'Loading groceries…' : 'View all · Show more groceries'}<ChevronRight size={19} aria-hidden="true" />
+              </button>
             </div>
           )}
-        </section>
-      ) : reducedMotion ? (
-        <section ref={trackRef} className="ep-grocery-static" aria-labelledby="published-products-static-title">
-          <h2 id="published-products-static-title">Published products</h2>
-          <div className="ep-grocery-static__grid">
-            {featuredProducts.map((product) => (
-              <ProductImageCard key={getProductKey(product)} product={product} />
-            ))}
-          </div>
-          <div className="ep-grocery-static__end">
-            <button type="button" onClick={() => setProductDirectoryOpen(true)}>View all Grocery</button>
-          </div>
-        </section>
-      ) : (
-        <section
-          ref={trackRef}
-          className="ep-grocery-track"
-          aria-labelledby="published-products-title"
-          style={{
-            '--grocery-track-height': `${getSceneLength(featuredProducts.length) * 100}svh`,
-            '--grocery-track-height-mobile': `${(getSceneLength(featuredProducts.length) + MOBILE_ENDING_HOLD_EXTRA) * 100}svh`,
-          }}
-        >
-          <div ref={stageRef} className="ep-grocery-stage">
-            <div className="ep-grocery-stage__meta">
-              <span>EPANTRY / Grocery collection</span>
-              <span>Scroll-controlled</span>
-            </div>
-
-            <div className="ep-grocery-stage__left">
-              <div className="ep-grocery-stage__label" id="published-products-title">Published products</div>
-              <div className="ep-grocery-stage__names" aria-live="polite">
-                {featuredProducts.map((product, index) => (
-                  <div key={getProductKey(product)} data-grocery-name={index} className="ep-grocery-stage__name">
-                    <span>Product {String(index + 1).padStart(2, '0')}</span>
-                    <h2>{getProductName(product)}</h2>
-                    <p>{product?.brand?.name || product?.category?.name || 'Published grocery'}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {featuredProducts.map((product, index) => (
-              <div
-                key={getProductKey(product)}
-                data-grocery-flight={index}
-                className="ep-grocery-flight"
-                aria-hidden="true"
-              >
-                <ProductImageCard product={product} />
-              </div>
-            ))}
-
-            <div data-grocery-hint className="ep-grocery-stage__hint">
-              <ArrowDown size={14} aria-hidden="true" />
-              Keep scrolling to explore the collection
-            </div>
-
-            <div data-grocery-ending className="ep-grocery-ending" aria-hidden="true">
-              <div className="ep-grocery-ending__view">
-                <span>Complete grocery collection</span>
-                <h3>See every published grocery.</h3>
-                <button
-                  type="button"
-                  onClick={() => setProductDirectoryOpen(true)}
-                  aria-haspopup="dialog"
-                >
-                  View all Grocery
-                  <ArrowRight size={16} aria-hidden="true" />
-                </button>
-              </div>
-
-              {featuredCategories.length > 0 && (
-                <div className="ep-grocery-ending__categories">
-                  <div className="ep-grocery-ending__categories-head">
-                    <p>Browse categories</p>
-                    <button
-                      type="button"
-                      onClick={() => setCategoryDirectoryOpen(true)}
-                      aria-haspopup="dialog"
-                    >
-                      View all categories
-                      <ArrowRight size={14} aria-hidden="true" />
-                    </button>
-                  </div>
-                  <div className="ep-grocery-ending__category-row">
-                    {featuredCategories.map((category, index) => (
-                      <button
-                        key={category.id || category.slug || category.name}
-                        type="button"
-                        onClick={() => handleCategorySelect(category.slug)}
-                      >
-                        <span>{String(index + 1).padStart(2, '0')}</span>
-                        <strong>{category.name}</strong>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="ep-grocery-stage__bottom" aria-hidden="true">
-              <div className="ep-grocery-stage__meter"><span data-grocery-progress /></div>
-              <div>
-                <span>Scroll down to explore. Scroll up to revisit.</span>
-                <span data-grocery-counter>01 / {String(featuredProducts.length).padStart(2, '0')}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {productDirectoryOpen && (
-        <ProductDirectory
-          products={products}
-          categories={categories}
-          loading={loading}
-          onClose={() => setProductDirectoryOpen(false)}
-        />
-      )}
-
-      {categoryDirectoryOpen && (
-        <CategoryDirectory
-          categories={categories}
-          onClose={() => setCategoryDirectoryOpen(false)}
-          onSelect={handleCategorySelect}
-        />
-      )}
+          {loading && products.length > 0 && <p role="status" className="mt-3 text-center text-[14px] text-[#173F35]">Updating groceries…</p>}
+          {total > 0 && visibleProducts.length > 0 && <p className="sr-only">Showing {visibleProducts.length} of {total} published grocery products.</p>}
+        </div>
+      </section>
     </main>
   )
 }

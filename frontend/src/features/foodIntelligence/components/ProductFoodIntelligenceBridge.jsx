@@ -45,6 +45,8 @@ export default function ProductFoodIntelligenceBridge() {
         setIsLoading(
           true,
         )
+        // Do not display a previous product's evidence while the next product loads.
+        setFoodIntelligence(null)
 
         try {
           const versionId =
@@ -106,17 +108,31 @@ export default function ProductFoodIntelligenceBridge() {
     return null
   }
 
-  if (
-    !foodIntelligence
-  ) {
-    return null
-  }
+  // The separate public intelligence API is optional. When its record is
+  // unavailable, render the disclosure rows with an explicit unverified state
+  // instead of leaving empty spaces in Ingredients & safety.
+  // Never substitute invented nutrient, allergen or dietary evidence.
+  const presentedFoodIntelligence = foodIntelligence
+    ? {
+        ...foodIntelligence,
+        subject: {
+          ...(foodIntelligence.subject || {}),
+          type: 'product_version',
+        },
+      }
+    : {
+        subject: { type: 'product_version' },
+        available: false,
+        verificationStatus: 'cannot_verify',
+        nutrition: [],
+        allergens: [],
+        dietary: [],
+        lineage: { sources: [], rules: [] },
+      }
 
   return (
     <FoodIntelligencePanel
-      foodIntelligence={
-        foodIntelligence
-      }
+      foodIntelligence={presentedFoodIntelligence}
       title="Product Food Intelligence"
     />
   )

@@ -422,86 +422,34 @@ function IntelligenceSection({
 function ProductAccordion({
   title,
   children,
-  description =
-    '',
-  icon: Icon =
-    null,
+  description = '',
+  icon: Icon = null,
 }) {
-  if (
-    !description
-  ) {
-    return (
-      <details className="group border-b border-stone-200 last:border-b-0">
-        <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            {Icon && (
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm">
-                <Icon
-                  size={17}
-                  aria-hidden="true"
-                />
+  // The product-only portals use the same row layout as the surrounding
+  // Ingredient, Origin, Claims and Allergen accordions in Product Detail.
+  return (
+    <details className="group border-b border-[#C8D5D2]">
+      <summary className="focus-ring flex min-h-[82px] cursor-pointer list-none items-center justify-between gap-4 py-4 text-left transition-colors hover:bg-[#F5F9F8] sm:py-5 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-[#C9D7D4] bg-[#E3F0ED] text-[#174E49]">
+            {Icon ? <Icon size={19} strokeWidth={1.8} aria-hidden="true" /> : <ShieldCheck size={19} strokeWidth={1.8} aria-hidden="true" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[17px] font-semibold tracking-[-0.015em] text-[#202421] sm:text-lg">
+              {title}
+            </span>
+            {description && (
+              <span className="mt-1 block text-sm leading-5 text-[#66736F]">
+                {description}
               </span>
             )}
-
-            <div className="min-w-0">
-              <h3 className="text-sm font-black text-stone-950 transition-colors duration-200 group-open:text-emerald-900">
-                {title}
-              </h3>
-              <p className="mt-1 text-xs leading-5 text-stone-500 group-open:hidden">
-                Click to view details
-              </p>
-            </div>
-          </div>
-
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white">
-            <ChevronDown
-              size={17}
-              className="transition-transform duration-200 group-open:rotate-180"
-              aria-hidden="true"
-            />
           </span>
-        </summary>
-
-        <div className="border-t border-emerald-100 bg-white px-5 py-5 sm:px-6">
-          {children}
-        </div>
-      </details>
-    )
-  }
-
-  return (
-    <details className="group border-b border-stone-200 last:border-b-0">
-      <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-emerald-50/70 group-open:bg-emerald-50 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          {Icon && (
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm">
-              <Icon
-                size={17}
-                aria-hidden="true"
-              />
-            </span>
-          )}
-
-          <div className="min-w-0">
-            <h3 className="text-sm font-black text-stone-950 transition-colors duration-200 group-open:text-emerald-900">
-              {title}
-            </h3>
-            <p className="mt-1 text-xs leading-5 text-stone-500 group-open:hidden">
-              {description}
-            </p>
-          </div>
-        </div>
-
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-600 transition duration-200 group-hover:border-emerald-200 group-hover:text-emerald-800 group-open:border-emerald-300 group-open:bg-emerald-700 group-open:text-white">
-          <ChevronDown
-            size={17}
-            className="transition-transform duration-200 group-open:rotate-180"
-            aria-hidden="true"
-          />
+        </span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#C8D5D2] bg-white text-[#174E49] transition-colors group-open:bg-[#174E49] group-open:text-white">
+          <ChevronDown size={18} className="transition-transform group-open:rotate-180" aria-hidden="true" />
         </span>
       </summary>
-
-      <div className="border-t border-emerald-100 bg-white px-5 py-5 sm:px-6">
+      <div className="min-w-0 pb-7 pl-0 pt-2 text-[15px] leading-7 text-[#343B36] sm:pb-8 sm:pl-[60px]">
         {children}
       </div>
     </details>
@@ -885,38 +833,31 @@ export default function FoodIntelligencePanel({
               description="Suitability based on the current approved product evidence"
               icon={BadgeCheck}
             >
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 p-4 shadow-[0_8px_20px_rgba(4,120,87,0.05)]">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              <div className="space-y-3">
+                <div className="border-l-[3px] border-[#84739B] bg-[#F1EEF8] px-4 py-4 sm:px-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[15px] font-semibold text-[#393449]">
                         Dietary suitability
                       </p>
-                      <p className="mt-1 text-xs leading-5 text-stone-500">
+                      <p className="mt-1 text-[14px] leading-6 text-[#565363]">
                         Each result is shown exactly to the confidence supported by the approved product record.
                       </p>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-[9px] font-black text-emerald-700 shadow-sm">
-                        {dietary.length} result{dietary.length === 1 ? '' : 's'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <label className="mt-3 block">
-                    <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">
-                      Show
+                    <span className="shrink-0 rounded-full bg-white px-3 py-1 text-[13px] font-semibold text-[#51466C]">
+                      {dietary.length} result{dietary.length === 1 ? '' : 's'}
                     </span>
-
+                  </div>
+                  <label className="mt-4 flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span className="text-[14px] font-semibold text-[#393449]">
+                      Show results
+                    </span>
                     <select
                       value={dietaryFilter}
                       onChange={(event) =>
-                        setDietaryFilter(
-                          event.target.value,
-                        )
+                        setDietaryFilter(event.target.value)
                       }
-                      className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold text-stone-700 shadow-sm outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                      className="focus-ring min-h-10 w-full min-w-0 border border-[#C6BFD6] bg-white px-3 text-[14px] font-medium text-[#343044] outline-none transition focus:border-[#84739B] focus:ring-2 focus:ring-[#E1DBEC] sm:ml-auto sm:w-auto sm:min-w-[170px]"
                     >
                       <option value="all">All results</option>
                       <option value="eligible">Eligible</option>
@@ -935,7 +876,7 @@ export default function FoodIntelligencePanel({
                       : 'No dietary result matches this filter.'}
                   </EmptyIntelligence>
                 ) : (
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="divide-y divide-[#DAD7E4] border-y border-[#DAD7E4] bg-[#FFFEFC]">
                     {filteredDietary.map((item, index) => {
                       const status = item?.status || 'cannot_verify'
                       const statusLabel =
@@ -946,33 +887,28 @@ export default function FoodIntelligencePanel({
                             : 'Cannot verify'
                       const statusClasses =
                         status === 'eligible'
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          ? 'border-[#B7D9C5] bg-[#E8F5ED] text-[#205B3E]'
                           : status === 'not_eligible'
-                            ? 'border-rose-200 bg-rose-50 text-rose-700'
-                            : 'border-amber-200 bg-amber-50 text-amber-800'
+                            ? 'border-[#EDC3C3] bg-[#FFF0EF] text-[#922F35]'
+                            : 'border-[#E8D2A6] bg-[#FFF4DE] text-[#76501B]'
 
                       return (
-                        <div
-                          key={item.key || index}
-                          className="rounded-2xl border border-stone-200 bg-white p-3.5 shadow-[0_6px_16px_rgba(28,25,23,0.04)]"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-xs font-black leading-5 text-stone-900">
+                        <div key={item.key || index} className="px-3 py-3.5 sm:px-4">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="min-w-0 flex-1 text-[15px] font-semibold leading-6 text-[#262D2A]">
                               {displayName(item, 'Dietary rule')}
                             </p>
-
                             <span
                               className={[
-                                'shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide',
+                                'shrink-0 rounded-full border px-3 py-1 text-[12px] font-semibold leading-5',
                                 statusClasses,
                               ].join(' ')}
                             >
                               {statusLabel}
                             </span>
                           </div>
-
                           {item.reason && (
-                            <p className="mt-2 border-t border-stone-100 pt-2 text-[10px] leading-4 text-stone-500">
+                            <p className="mt-2 text-[14px] leading-6 text-[#59635F]">
                               {item.reason}
                             </p>
                           )}

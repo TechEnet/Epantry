@@ -171,40 +171,214 @@ const adminCapabilities = [
   },
 ]
 
-function CapabilityGrid({
-  items,
-  accent = 'green',
-}) {
-  const accentClasses =
-    accent === 'orange'
-      ? 'bg-amber-50 text-amber-700'
-      : accent === 'slate'
-        ? 'bg-slate-100 text-slate-700'
-        : 'bg-emerald-50 text-emerald-700'
+// Component-scoped Japandi palette. Use only the five senior-approved colors.
+// Scoped styles protect this page from legacy universal color remaps.
+const ABOUT_COLORS = {
+  porcelain: '#F7F6F2',
+  forest: '#173F35',
+  charcoal: '#202421',
+  sage: '#DCE0CF',
+  clay: '#C86C42',
+}
 
+const ABOUT_STYLE = `
+/* About Page - editorial Japandi, scoped to this page only. */
+.ep-about {
+  --ep-porcelain: ${ABOUT_COLORS.porcelain};
+  --ep-forest: ${ABOUT_COLORS.forest};
+  --ep-charcoal: ${ABOUT_COLORS.charcoal};
+  --ep-sage: ${ABOUT_COLORS.sage};
+  --ep-clay: ${ABOUT_COLORS.clay};
+  background: var(--ep-porcelain) !important;
+  color: var(--ep-charcoal) !important;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+}
+.ep-about :is(h1,h2,h3) {
+  color: inherit !important;
+  font-weight: 600 !important;
+  letter-spacing: -.035em;
+}
+.ep-about h1 { font-size: 36px !important; line-height: 42px !important; }
+.ep-about h2 { font-size: 28px !important; line-height: 36px !important; }
+.ep-about h3 { font-size: 22px !important; line-height: 30px !important; }
+.ep-about p { line-height: 1.6; }
+.ep-about .ep-text { color: var(--ep-charcoal) !important; }
+.ep-about .ep-muted { color: var(--ep-charcoal) !important; opacity: .83; }
+.ep-about .ep-eyebrow {
+  color: var(--ep-forest) !important;
+  font-size: 14px !important;
+  line-height: 21px !important;
+  letter-spacing: .10em;
+  font-weight: 600 !important;
+}
+.ep-about .ep-surface { background: var(--ep-porcelain) !important; color: var(--ep-charcoal) !important; }
+.ep-about .ep-sage { background: var(--ep-sage) !important; color: var(--ep-charcoal) !important; }
+.ep-about .ep-dark { background: var(--ep-porcelain) !important; color: var(--ep-charcoal) !important; }
+.ep-about .ep-dark :is(h1,h2,h3,p,span) { color: var(--ep-charcoal) !important; }
+.ep-about .ep-border, .ep-about .ep-line { border-color: var(--ep-forest) !important; }
+.ep-about .ep-mark { color: var(--ep-forest) !important; }
+.ep-about .ep-clay-mark { color: var(--ep-clay) !important; }
+
+/* Buttons stay readable in light and tinted sections, without changing routes. */
+.ep-about .ep-cta {
+  background: var(--ep-forest) !important;
+  border: 1px solid var(--ep-forest) !important;
+  color: var(--ep-porcelain) !important;
+}
+.ep-about .ep-cta:hover { background: var(--ep-charcoal) !important; border-color: var(--ep-charcoal) !important; }
+.ep-about .ep-outline {
+  background: transparent !important;
+  color: var(--ep-forest) !important;
+  border: 1px solid var(--ep-forest) !important;
+}
+.ep-about .ep-outline:hover { background: var(--ep-sage) !important; }
+.ep-about .ep-cta:focus-visible, .ep-about .ep-outline:focus-visible {
+  outline: 3px solid var(--ep-clay);
+  outline-offset: 3px;
+}
+
+/* Third concept: open porcelain-led hero with a strong Forest sidebar.
+   Previous all-Forest hero and Sage-only panel are intentionally gone. */
+.ep-about :is(.ep-hero-customer,.ep-hero-host,.ep-hero-admin) {
+  background: var(--ep-porcelain) !important;
+  color: var(--ep-charcoal) !important;
+  border: 1px solid var(--ep-sage) !important;
+  border-left: 6px solid var(--ep-clay) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 14px 42px rgba(32,36,33,.055);
+}
+.ep-about :is(.ep-hero-customer,.ep-hero-host,.ep-hero-admin) :is(h1,h2,h3,p,span) {
+  color: var(--ep-charcoal) !important;
+}
+.ep-about :is(.ep-hero-customer,.ep-hero-host,.ep-hero-admin) .ep-eyebrow {
+  color: var(--ep-forest) !important;
+}
+.ep-about .ep-hero-customer .ep-hero-title span {
+  color: var(--ep-clay) !important;
+}
+.ep-about :is(.ep-hero-customer,.ep-hero-host) .ep-muted {
+  color: var(--ep-charcoal) !important;
+  opacity: .83;
+}
+.ep-about .ep-hero-host .ep-text { color: var(--ep-charcoal) !important; }
+.ep-about .ep-hero-steps {
+  position: relative;
+  align-self: stretch;
+  background: var(--ep-forest) !important;
+  color: var(--ep-porcelain) !important;
+  border: none !important;
+  border-radius: 16px;
+  padding: 24px 27px;
+  box-shadow: 0 16px 36px rgba(23,63,53,.15);
+}
+.ep-about .ep-hero-steps :is(h1,h2,h3,p,span) { color: var(--ep-porcelain) !important; }
+.ep-about .ep-hero-steps .ep-eyebrow { color: var(--ep-sage) !important; }
+.ep-about .ep-hero-steps .ep-mark { color: var(--ep-porcelain) !important; }
+.ep-about .ep-hero-steps .ep-step-index { color: var(--ep-sage) !important; }
+.ep-about .ep-hero-steps .ep-step-row { border-color: rgba(247,246,242,.24) !important; }
+
+/* The content is editorial: airy dividers, no repeated bright cards. */
+.ep-about .ep-capability-band {
+  background: var(--ep-porcelain) !important;
+  border-top: 2px solid var(--ep-clay) !important;
+  padding-top: 25px;
+}
+.ep-about .ep-capability-band .ep-mark { color: var(--ep-forest) !important; }
+.ep-about .ep-capability-row { border-color: rgba(23,63,53,.23) !important; }
+.ep-about .ep-capability-row:hover { border-color: var(--ep-clay) !important; }
+.ep-about .ep-feature-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--ep-sage) !important;
+  color: var(--ep-forest) !important;
+}
+
+/* Trust takes Sage instead of the previous heavy charcoal block. */
+.ep-about .ep-privacy {
+  background: var(--ep-sage) !important;
+  color: var(--ep-charcoal) !important;
+  border: none !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+.ep-about .ep-privacy :is(h1,h2,h3,p,span) { color: var(--ep-charcoal) !important; }
+.ep-about .ep-privacy .ep-eyebrow, .ep-about .ep-privacy .ep-mark { color: var(--ep-forest) !important; }
+.ep-about .ep-privacy .ep-privacy-row { border-color: rgba(23,63,53,.22) !important; }
+
+/* Reverse the closing composition: bold Forest "Why", calm porcelain account CTA. */
+.ep-about .ep-why {
+  background: var(--ep-forest) !important;
+  color: var(--ep-porcelain) !important;
+  border: none !important;
+  border-radius: 18px !important;
+}
+.ep-about .ep-why :is(h1,h2,h3,p,span) { color: var(--ep-porcelain) !important; opacity: 1 !important; }
+.ep-about .ep-why .ep-eyebrow { color: var(--ep-sage) !important; }
+.ep-about .ep-why .ep-text { color: var(--ep-porcelain) !important; }
+.ep-about .ep-why div.border-t { border-color: rgba(247,246,242,.24) !important; }
+.ep-about .ep-account-panel {
+  background: var(--ep-porcelain) !important;
+  color: var(--ep-charcoal) !important;
+  border: 1px solid var(--ep-sage) !important;
+  border-top: 4px solid var(--ep-clay) !important;
+  border-radius: 18px !important;
+}
+.ep-about .ep-account-panel :is(h1,h2,h3,p,span) { color: var(--ep-charcoal) !important; }
+.ep-about .ep-account-panel .ep-eyebrow { color: var(--ep-forest) !important; }
+.ep-about .ep-account-panel svg { color: var(--ep-forest) !important; }
+
+/* Host/Admin-specific shared layout stays intact, palette gets deliberate contrast. */
+.ep-about .ep-host-trust {
+  background: var(--ep-sage) !important;
+  border: none !important;
+  border-radius: 18px !important;
+}
+.ep-about .ep-host-trust .ep-mark { color: var(--ep-forest) !important; }
+.ep-about .ep-admin-principles {
+  background: var(--ep-sage) !important;
+  border: none !important;
+  border-left: 5px solid var(--ep-clay) !important;
+  border-radius: 18px !important;
+}
+.ep-about .ep-admin-principles .ep-mark { color: var(--ep-forest) !important; }
+
+@media (min-width: 1024px) {
+  .ep-about h1 { font-size: 56px !important; line-height: 64px !important; }
+  .ep-about h2 { font-size: 36px !important; line-height: 44px !important; }
+  .ep-about h3 { font-size: 24px !important; line-height: 32px !important; }
+  .ep-about .ep-hero-steps { padding: 31px 36px; }
+}
+@media (max-width: 639px) {
+  .ep-about .ep-hero-steps { padding: 20px 21px; }
+  .ep-about :is(.ep-hero-customer,.ep-hero-host,.ep-hero-admin) { border-left-width: 4px !important; }
+}
+`
+
+
+function AboutHeading({ eyebrow, title, description }) {
   return (
-    <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => {
+    <div className="max-w-3xl">
+      <p className="ep-eyebrow uppercase">{eyebrow}</p>
+      <h2 className="mt-2">{title}</h2>
+      {description ? <p className="ep-muted mt-3 max-w-3xl text-base">{description}</p> : null}
+    </div>
+  )
+}
+
+function AboutCapabilities({ items, numbered = false }) {
+  return (
+    <div className="mt-6 grid gap-x-7 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
+      {items.map((item, index) => {
         const Icon = item.icon
-
         return (
-          <article
-            key={item.title}
-            className="group relative overflow-hidden rounded-[28px] border border-stone-200/90 bg-white/95 p-6 shadow-[0_8px_30px_rgba(17,24,39,0.045)] transition-all duration-300 hover:-translate-y-1 hover:border-stone-300 hover:shadow-[0_18px_44px_rgba(17,24,39,0.09)]"
-          >
-            <div className="pointer-events-none absolute -right-10 -top-10 size-28 rounded-full bg-current opacity-[0.035]" />
-
-            <div className={`relative grid size-12 place-items-center rounded-2xl ring-1 ring-black/[0.03] transition-transform duration-300 group-hover:scale-105 ${accentClasses}`}>
-              <Icon size={20} aria-hidden="true" />
+          <article key={item.title} className="ep-text ep-capability-row min-w-0 border-t py-5" style={{ borderColor: 'rgba(23,63,53,.25)' }}>
+            <div className="mb-4 flex items-center justify-between">
+              <Icon className="ep-mark" size={25} aria-hidden="true" />
+              {numbered ? <span className="ep-eyebrow">{String(index + 1).padStart(2, '0')}</span> : null}
             </div>
-
-            <h3 className="relative mt-5 text-[17px] font-black tracking-[-0.015em] text-stone-950">
-              {item.title}
-            </h3>
-
-            <p className="relative mt-2.5 text-sm leading-6 text-stone-500">
-              {item.description}
-            </p>
+            <h3>{item.title}</h3>
+            <p className="ep-muted mt-2 text-base">{item.description}</p>
           </article>
         )
       })}
@@ -212,27 +386,20 @@ function CapabilityGrid({
   )
 }
 
-function SectionHeading({
-  eyebrow,
-  title,
-  description,
-}) {
+function AboutLink({ to, children, outline = false }) {
   return (
-    <div className="max-w-4xl">
-      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">
-        {eyebrow}
-      </p>
+    <Link to={to} className={`${outline ? 'ep-outline' : 'ep-cta'} focus-ring inline-flex min-h-12 w-fit items-center justify-center rounded-full px-6 py-3 text-[15px] font-semibold transition-colors`}>
+      {children}
+    </Link>
+  )
+}
 
-      <h2 className="mt-3 text-3xl font-black tracking-[-0.035em] text-stone-950 sm:text-4xl">
-        {title}
-      </h2>
-
-      {description ? (
-        <p className="mt-4 max-w-3xl text-sm font-medium leading-7 text-stone-600 sm:text-[15px]">
-          {description}
-        </p>
-      ) : null}
-    </div>
+function AboutPageBody({ children }) {
+  return (
+    <main className="ep-about min-w-0 overflow-x-clip py-6 sm:py-9 lg:py-12">
+      <style>{ABOUT_STYLE}</style>
+      <div className="page-shell"><div className="mx-auto max-w-7xl px-1 sm:px-3 lg:px-5">{children}</div></div>
+    </main>
   )
 }
 
@@ -246,353 +413,177 @@ export default function AboutPage() {
     superAdminEnabled,
   } = useAuth()
 
-  const isSuperAdmin =
-    superAdminEnabled === true
-
-  const isPendingHost =
-    hostAccessStatus === 'pending' &&
-    hostEnabled !== true
-
-  const isHostView =
-    !isSuperAdmin &&
-    (
-      activeMode === 'host' ||
-      isPendingHost
-    )
-
-  const displayName =
-    currentUser?.displayName ||
-    currentUser?.name ||
-    ''
-
-  const hostStatusKnown =
-    HOST_STATUSES.has(
-      hostAccessStatus,
-    )
+  const isSuperAdmin = superAdminEnabled === true
+  const isPendingHost = hostAccessStatus === 'pending' && hostEnabled !== true
+  const isHostView = !isSuperAdmin && (activeMode === 'host' || isPendingHost)
+  const displayName = currentUser?.displayName || currentUser?.name || ''
+  const hostStatusKnown = HOST_STATUSES.has(hostAccessStatus)
 
   if (isSuperAdmin) {
     return (
-      <main className="relative overflow-hidden bg-[#F8FAF7] py-12 sm:py-16">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(51,65,85,0.08),transparent_24%),radial-gradient(circle_at_88%_32%,rgba(51,65,85,0.06),transparent_22%)]" />
-        <div className="page-shell relative z-10">
-        <div className="mx-auto max-w-7xl">
-          <section className="relative overflow-hidden rounded-[34px] border border-slate-800 bg-[linear-gradient(135deg,#0F172A_0%,#111827_58%,#1E293B_100%)] p-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] sm:p-9 lg:p-12">
-            <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full border border-white/10 bg-white/[0.035]" />
-            <div className="pointer-events-none absolute -bottom-28 right-1/4 size-64 rounded-full bg-slate-500/10 blur-3xl" />
-            <div className="relative z-10 flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-4xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
-                  <ShieldCheck size={14} aria-hidden="true" />
-                  Super Admin
-                </div>
-
-                <h1 className="mt-6 text-4xl font-black tracking-[-0.045em] sm:text-5xl lg:text-6xl">
-                  EPANTRY governance control plane
-                </h1>
-
-                <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-slate-300 sm:text-base">
-                  {displayName ? `${displayName}, ` : ''}your About view focuses on administrative authority: what can be reviewed, governed, approved, audited and monitored across EPANTRY.
-                </p>
-              </div>
-
-              <Link
-                to="/admin"
-                className="focus-ring inline-flex h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-black text-slate-950 shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:bg-slate-100"
-              >
-                Open Admin Dashboard
-              </Link>
+      <AboutPageBody>
+        <section className="ep-dark ep-hero-admin relative overflow-hidden rounded-3xl px-6 py-10 sm:px-10 sm:py-12 lg:px-12 lg:py-14">
+          <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div>
+              <p className="ep-eyebrow flex items-center gap-2 uppercase"><ShieldCheck size={18} aria-hidden="true" /> Super Admin</p>
+              <h1 className="mt-4 max-w-4xl">EPANTRY governance control plane</h1>
+              <p className="mt-4 max-w-2xl text-base">{displayName ? `${displayName}, ` : ''}your About view focuses on administrative authority: what can be reviewed, governed, approved, audited and monitored across EPANTRY.</p>
             </div>
-          </section>
+            <AboutLink to="/admin">Open Admin Dashboard</AboutLink>
+          </div>
+        </section>
 
-          <section className="mt-12">
-            <SectionHeading
-              eyebrow="Administrative capabilities"
-              title="What Super Admin can control"
-              description="EPANTRY keeps governance responsibilities explicit so operational power is separated into reviewable administrative domains."
-            />
+        <section className="ep-capability-band mt-12 sm:mt-16">
+          <AboutHeading eyebrow="Administrative capabilities" title="What Super Admin can control" description="EPANTRY keeps governance responsibilities explicit so operational power is separated into reviewable administrative domains." />
+          <AboutCapabilities items={adminCapabilities} numbered />
+        </section>
 
-            <CapabilityGrid
-              items={adminCapabilities}
-              accent="slate"
-            />
-          </section>
-
-          <section className="mt-12 grid gap-5 lg:grid-cols-3">
-            <article className="rounded-[28px] border border-stone-200 bg-white p-7 shadow-[0_10px_34px_rgba(17,24,39,0.05)]">
-              <KeyRound className="text-slate-700" size={22} aria-hidden="true" />
-              <h2 className="mt-4 text-lg font-black text-stone-950">Permission-scoped authority</h2>
-              <p className="relative mt-2.5 text-sm leading-6 text-stone-500">
-                Administrative access is enforced by backend authority and permissions. A visible dashboard is not treated as the source of authorization.
-              </p>
+        <section className="ep-sage ep-admin-principles mt-9 grid gap-6 rounded-3xl px-6 py-7 sm:px-9 sm:py-10 lg:grid-cols-3">
+          {[
+            { icon: KeyRound, title: 'Permission-scoped authority', description: 'Administrative access is enforced by backend authority and permissions. A visible dashboard is not treated as the source of authorization.' },
+            { icon: LockKeyhole, title: 'Security before privileged actions', description: 'Administrative surfaces can require stronger authentication assurance so privileged workflows stay separate from ordinary account convenience.' },
+            { icon: FileClock, title: 'Traceable governance', description: 'Audit, history and governance records help preserve who changed what and where review is still required.' },
+          ].map(({ icon: Icon, title, description }) => (
+            <article className="min-w-0" key={title}>
+              <Icon className="ep-mark mb-4" size={25} aria-hidden="true" />
+              <h3>{title}</h3>
+              <p className="ep-muted mt-2 text-base">{description}</p>
             </article>
-
-            <article className="rounded-[28px] border border-stone-200 bg-white p-7 shadow-[0_10px_34px_rgba(17,24,39,0.05)]">
-              <LockKeyhole className="text-slate-700" size={22} aria-hidden="true" />
-              <h2 className="mt-4 text-lg font-black text-stone-950">Security before privileged actions</h2>
-              <p className="relative mt-2.5 text-sm leading-6 text-stone-500">
-                Administrative surfaces can require stronger authentication assurance so privileged workflows stay separate from ordinary account convenience.
-              </p>
-            </article>
-
-            <article className="rounded-[28px] border border-stone-200 bg-white p-7 shadow-[0_10px_34px_rgba(17,24,39,0.05)]">
-              <FileClock className="text-slate-700" size={22} aria-hidden="true" />
-              <h2 className="mt-4 text-lg font-black text-stone-950">Traceable governance</h2>
-              <p className="relative mt-2.5 text-sm leading-6 text-stone-500">
-                Audit, history and governance records help preserve who changed what and where review is still required.
-              </p>
-            </article>
-          </section>
-        </div>
-        </div>
-      </main>
+          ))}
+        </section>
+      </AboutPageBody>
     )
   }
 
   if (isHostView) {
     return (
-      <main className="relative overflow-hidden bg-[#F8FAF7] py-12 sm:py-16">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(245,158,11,0.10),transparent_24%),radial-gradient(circle_at_92%_36%,rgba(22,101,52,0.07),transparent_24%)]" />
-        <div className="page-shell relative z-10">
-        <div className="mx-auto max-w-7xl">
-          <section className="relative overflow-hidden rounded-[34px] border border-amber-200/80 bg-[linear-gradient(135deg,#FFFDF5_0%,#FFF7E3_56%,#F8FAF7_100%)] p-7 shadow-[0_24px_70px_rgba(120,53,15,0.09)] sm:p-9 lg:p-12">
-            <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full border border-amber-200/70 bg-amber-100/55" />
-            <div className="pointer-events-none absolute -bottom-24 right-1/4 size-64 rounded-full bg-emerald-200/25 blur-3xl" />
-            <div className="relative z-10 flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-4xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-amber-800">
-                  <Store size={14} aria-hidden="true" />
-                  Host / Seller / Brand / B2B
-                </div>
-
-                <h1 className="mt-6 text-4xl font-black tracking-[-0.045em] text-stone-950 sm:text-5xl lg:text-6xl">
-                  Build trust before you build volume
-                </h1>
-
-                <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-stone-600 sm:text-base">
-                  EPANTRY gives Hosts a governed operating workspace for listings, brand authority, marketplace operations and fulfillment while keeping the customer-facing experience connected to the same trusted ecosystem.
-                </p>
-
-                {hostStatusKnown ? (
-                  <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-2 text-xs font-black text-amber-900">
-                    <CheckCircle2 size={15} aria-hidden="true" />
-                    Host access status: {hostAccessStatus.replaceAll('_', ' ')}
-                  </div>
-                ) : null}
-              </div>
-
-              <Link
-                to={hostEnabled ? '/host/operations' : '/dashboard'}
-                className="focus-ring inline-flex h-12 items-center justify-center rounded-full bg-amber-500 px-6 text-sm font-black text-stone-950 shadow-lg shadow-amber-900/10 transition hover:-translate-y-0.5 hover:bg-amber-400"
-              >
-                {hostEnabled ? 'Open Host Dashboard' : 'Open Account Dashboard'}
-              </Link>
+      <AboutPageBody>
+        <section className="ep-dark ep-hero-host rounded-3xl px-6 py-10 sm:px-10 sm:py-12 lg:px-12 lg:py-14">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div>
+              <p className="ep-eyebrow flex items-center gap-2 uppercase"><Store size={18} aria-hidden="true" /> Host / Seller / Brand / B2B</p>
+              <h1 className="mt-4 max-w-4xl">Build trust before you build volume</h1>
+              <p className="ep-muted mt-4 max-w-2xl text-base">EPANTRY gives Hosts a governed operating workspace for listings, brand authority, marketplace operations and fulfillment while keeping the customer-facing experience connected to the same trusted ecosystem.</p>
+              {hostStatusKnown ? <p className="ep-text mt-4 inline-flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="ep-mark" size={18} aria-hidden="true" /> Host access status: {hostAccessStatus.replaceAll('_', ' ')}</p> : null}
             </div>
-          </section>
-
-          <section className="mt-12">
-            <SectionHeading
-              eyebrow="Host workspace"
-              title="What EPANTRY gives you as a Host"
-              description="The Host experience is designed around controlled marketplace participation, not just a form for uploading products."
-            />
-
-            <CapabilityGrid
-              items={hostCapabilities}
-              accent="orange"
-            />
-          </section>
-
-          <section className="mt-12">
-            <SectionHeading
-              eyebrow="Trust and responsibility"
-              title="How Host participation stays reliable"
-              description="The same marketplace that gives Hosts reach also carries review, history and authority checks so customer trust is not separated from seller operations."
-            />
-
-            <CapabilityGrid
-              items={hostPrinciples}
-              accent="orange"
-            />
-          </section>
-
-          <section className="relative mt-12 overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#0C0A09_0%,#111827_100%)] p-7 text-white shadow-[0_20px_60px_rgba(17,24,39,0.14)] sm:p-9">
-            <div className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full border border-amber-400/10 bg-amber-400/[0.04]" />
-            <div className="relative z-10 grid gap-7 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-400">
-                  One identity, controlled capabilities
-                </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight">Host access does not erase your Customer experience.</h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-400">
-                  Approved Hosts can switch between Customer and Host experiences where their account allows it. The switch changes presentation; backend access rules still decide what the account is authorized to do.
-                </p>
-              </div>
-
-              <Link
-                to="/account/settings"
-                className="focus-ring inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-black text-stone-950 transition hover:bg-stone-100"
-              >
-                Account Settings
-              </Link>
+            <AboutLink to={hostEnabled ? '/host/operations' : '/dashboard'}>{hostEnabled ? 'Open Host Dashboard' : 'Open Account Dashboard'}</AboutLink>
+          </div>
+        </section>
+        <section className="ep-capability-band mt-12 sm:mt-16">
+          <AboutHeading eyebrow="Host workspace" title="What EPANTRY gives you as a Host" description="The Host experience is designed around controlled marketplace participation, not just a form for uploading products." />
+          <AboutCapabilities items={hostCapabilities} numbered />
+        </section>
+        <section className="ep-sage ep-host-trust mt-12 rounded-3xl px-6 py-8 sm:px-9 sm:py-10">
+          <AboutHeading eyebrow="Trust and responsibility" title="How Host participation stays reliable" description="The same marketplace that gives Hosts reach also carries review, history and authority checks so customer trust is not separated from seller operations." />
+          <AboutCapabilities items={hostPrinciples} numbered />
+        </section>
+        <section className="ep-dark ep-account-panel mt-11 rounded-3xl px-6 py-9 sm:px-10">
+          <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div>
+              <p className="ep-eyebrow uppercase">One identity, controlled capabilities</p>
+              <h2 className="mt-2">Host access does not erase your Customer experience.</h2>
+              <p className="mt-3 max-w-3xl text-base">Approved Hosts can switch between Customer and Host experiences where their account allows it. The switch changes presentation; backend access rules still decide what the account is authorized to do.</p>
             </div>
-          </section>
-        </div>
-        </div>
-      </main>
+            <AboutLink to="/account/settings">Account Settings</AboutLink>
+          </div>
+        </section>
+      </AboutPageBody>
     )
   }
 
   return (
-    <main className="min-w-0 overflow-x-clip bg-[#F8F9F6] pb-10 text-[#18372D] sm:pb-14">
-      <div className="page-shell">
-        <div className="mx-auto max-w-7xl px-1 sm:px-3 lg:px-5">
-          {/* Public About hero: a light introduction with four short steps. */}
-          <section
-            aria-labelledby="about-intro-title"
-            className="relative isolate mt-3 overflow-hidden rounded-[24px] border border-[#D6E5D9] bg-[#EAF3EC] sm:mt-5 sm:rounded-[30px]"
-          >
-            <div className="relative grid gap-8 px-5 py-8 sm:px-9 sm:py-12 lg:grid-cols-[minmax(0,1.14fr)_minmax(300px,0.86fr)] lg:items-center lg:gap-16 lg:px-12 lg:py-16">
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.12em] text-[#276B4B]">
-                  <span className="size-2 rounded-full bg-[#3A9267]" aria-hidden="true" />
-                  About EPANTRY
-                </p>
-                <h1 id="about-intro-title" className="mt-5 max-w-[720px] text-[clamp(2.4rem,5vw,5rem)] font-extrabold leading-[1.07] tracking-[-0.055em] text-[#133E2D]">
-                  Food made <span className="text-[#358560]">simple.</span>
-                  <span className="block">Life made easier.</span>
-                </h1>
-                <p className="mt-5 text-[16px] font-medium leading-6 text-[#406554] sm:text-[18px]">
-                  Shop, cook and plan. All in one place.
-                </p>
+    <AboutPageBody>
+      <section aria-labelledby="about-intro-title" className="ep-dark ep-hero-customer relative overflow-hidden rounded-3xl px-6 py-10 sm:px-9 sm:py-12 lg:px-12 lg:py-14">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,.85fr)] lg:items-center lg:gap-12">
+          <div className="min-w-0">
+            <p className="ep-eyebrow uppercase">About EPANTRY</p>
+            <h1 id="about-intro-title" className="ep-hero-title mt-4 max-w-3xl">
+              Food made simple.<span className="block">Life made easier.</span>
+            </h1>
+            <p className="ep-muted mt-5 text-base">Shop, cook and plan. All in one place.</p>
+          </div>
+          <div className="ep-hero-steps min-w-0">
+            <p className="ep-eyebrow mb-2 uppercase">How it connects</p>
+            {[
+              { label: 'Discover', icon: ShoppingBasket },
+              { label: 'Understand', icon: ScanLine },
+              { label: 'Cook', icon: BookOpenCheck },
+              { label: 'Plan', icon: Boxes },
+            ].map(({ label, icon: Icon }, index) => (
+              <div key={label} className="ep-step-row flex items-center gap-4 border-b py-3 last:border-b-0">
+                <span className="ep-step-index ep-eyebrow w-7 shrink-0 tabular-nums">0{index + 1}</span>
+                <span className="ep-text min-w-0 flex-1 text-lg font-semibold">{label}</span>
+                <Icon className="ep-mark shrink-0" size={21} aria-hidden="true" />
               </div>
-
-              <div className="min-w-0 border-t border-[#CBDDD0] pt-3 lg:border-l lg:border-t-0 lg:pl-9 lg:pt-0">
-                <p className="mb-3 text-[12px] font-bold uppercase tracking-[0.13em] text-[#397353]">How it connects</p>
-                {[
-                  { number: '01', label: 'Discover', icon: ShoppingBasket },
-                  { number: '02', label: 'Understand', icon: ScanLine },
-                  { number: '03', label: 'Cook', icon: BookOpenCheck },
-                  { number: '04', label: 'Plan', icon: Boxes },
-                ].map(({ number, label, icon: Icon }) => (
-                  <div key={number} className="flex items-center gap-4 border-b border-[#CBDDD0] py-3 last:border-b-0 sm:py-4">
-                    <span className="w-7 shrink-0 text-[12px] font-semibold tabular-nums text-[#6B9D7D]">{number}</span>
-                    <span className="min-w-0 flex-1 text-[19px] font-bold tracking-[-0.025em] text-[#183E2F] sm:text-[21px]">{label}</span>
-                    <Icon size={20} className="shrink-0 text-[#388461]" aria-hidden="true" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Capability names are sufficient here: no repeated descriptions. */}
-          <section aria-labelledby="about-customer-title" className="py-11 sm:py-14 lg:py-16">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-7">
-              <div className="min-w-0">
-                <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#2E7F5A]">01 / Everyday EPANTRY</p>
-                <h2 id="about-customer-title" className="mt-2 text-[clamp(1.85rem,3.5vw,3.1rem)] font-extrabold leading-[1.12] tracking-[-0.045em] text-[#19382C]">
-                  Everything food, connected.
-                </h2>
-              </div>
-              <span className="hidden h-px flex-1 bg-[#D5DED6] sm:block" aria-hidden="true" />
-            </div>
-            <div className="mt-7 grid gap-x-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-x-6">
-              {[
-                { title: 'Shop smarter', icon: ShoppingBasket },
-                { title: 'Find recipes', icon: BookOpenCheck },
-                { title: 'Know your Pantry', icon: Boxes },
-                { title: 'Understand products', icon: ScanLine },
-              ].map(({ title, icon: Icon }, index) => (
-                <div key={title} className="flex min-w-0 items-center gap-4 border-t border-[#D0DBD2] py-5 sm:items-start sm:gap-3 lg:flex-col lg:py-6">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-[13px] bg-[#E3EDE5] text-[#2E7552]">
-                    <Icon size={21} aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0 flex-1 lg:mt-2">
-                    <span className="mb-1 hidden text-[12px] font-semibold tabular-nums text-[#92A49A] lg:block">0{index + 1}</span>
-                    <h3 className="text-[17px] font-bold leading-6 tracking-[-0.025em] text-[#203D31] sm:text-[18px]">{title}</h3>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Trust is a quiet band, with short labels rather than explanatory cards. */}
-          <section aria-labelledby="about-trust-title" className="rounded-[24px] bg-[#EFF2EF] px-5 py-8 sm:rounded-[28px] sm:px-9 sm:py-11 lg:px-12">
-            <div className="grid gap-7 lg:grid-cols-[minmax(230px,0.78fr)_minmax(0,1.22fr)] lg:gap-12">
-              <div>
-                <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#487057]">02 / Privacy & trust</p>
-                <h2 id="about-trust-title" className="mt-3 text-[clamp(1.85rem,3.2vw,3rem)] font-extrabold leading-[1.14] tracking-[-0.04em] text-[#263D30]">
-                  Your data. Your choice.
-                </h2>
-              </div>
-              <div className="grid min-w-0 gap-x-6 sm:grid-cols-2">
-                {[
-                  { title: 'Clear privacy controls', icon: LockKeyhole },
-                  { title: 'Useful, optional context', icon: DatabaseZap },
-                  { title: 'Secure account access', icon: ShieldCheck },
-                  { title: 'Reviewed marketplace listings', icon: BadgeCheck },
-                ].map(({ title, icon: Icon }) => (
-                  <div key={title} className="flex min-w-0 items-center gap-3 border-t border-[#D4DED7] py-4.5 sm:py-5">
-                    <Icon size={21} className="shrink-0 text-[#3E795A]" aria-hidden="true" />
-                    <h3 className="text-[16px] font-semibold leading-6 text-[#263D30]">{title}</h3>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* A compact difference statement, then the same working account actions. */}
-          <section aria-label="Why EPANTRY and account options" className="grid gap-5 pt-10 sm:pt-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-            <article className="min-w-0 rounded-[24px] bg-[#F2F2EB] px-5 py-8 sm:rounded-[28px] sm:px-9 sm:py-10">
-              <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#5B745F]">03 / Why EPANTRY</p>
-              <h2 className="mt-3 max-w-[520px] text-[clamp(1.85rem,3vw,2.8rem)] font-extrabold leading-[1.14] tracking-[-0.045em] text-[#283C30]">
-                More than a shopping app.
-              </h2>
-              <div className="mt-7 grid gap-0 divide-y divide-[#E8D3B7] border-y border-[#D7DED3]">
-                {[
-                  'Trusted products & brands',
-                  'Recipes connected to shopping',
-                  'Pantry & meal planning',
-                ].map((item, index) => (
-                  <div key={item} className="flex items-center gap-4 py-3.5">
-                    <span className="w-6 shrink-0 text-[12px] font-bold text-[#7B9A81]">0{index + 1}</span>
-                    <p className="text-[15px] font-semibold leading-6 text-[#354A3A]">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="flex min-w-0 flex-col rounded-[24px] border border-[#D6E5DB] bg-white px-5 py-8 sm:rounded-[28px] sm:px-9 sm:py-10">
-              <div className="grid size-11 place-items-center rounded-[13px] bg-[#E6F3E9] text-[#287653]">
-                <ShieldCheck size={23} aria-hidden="true" />
-              </div>
-              <h2 className="mt-4 text-[clamp(1.85rem,2.6vw,2.6rem)] font-extrabold leading-[1.15] tracking-[-0.04em] text-[#203D31]">
-                {isAuthenticated ? 'Your account. Your control.' : 'Ready to join EPANTRY?'}
-              </h2>
-              <div className="mt-auto flex flex-col gap-3 pt-7 sm:flex-row sm:flex-wrap">
-                {isAuthenticated ? (
-                  <>
-                    <Link to="/account/settings" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full bg-[#215D42] px-6 text-[14px] font-bold text-white transition-colors hover:bg-[#164930]">
-                      Account Settings
-                    </Link>
-                    <Link to="/account/privacy" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full border border-[#BCD4C4] px-6 text-[14px] font-bold text-[#215D42] transition-colors hover:bg-[#F1F8F2]">
-                      Privacy Rights Center
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <Link to="/register" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full bg-[#215D42] px-6 text-[14px] font-bold text-white transition-colors hover:bg-[#164930]">
-                      Create Account
-                    </Link>
-                    <Link to="/login" className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full border border-[#BCD4C4] px-6 text-[14px] font-bold text-[#215D42] transition-colors hover:bg-[#F1F8F2]">
-                      Login
-                    </Link>
-                  </>
-                )}
-              </div>
-            </article>
-          </section>
+            ))}
+          </div>
         </div>
-      </div>
-    </main>
+      </section>
+
+      <section className="ep-capability-band mt-12 sm:mt-16" aria-labelledby="about-customer-title">
+        <p className="ep-eyebrow uppercase">01 / Everyday EPANTRY</p>
+        <h2 id="about-customer-title" className="mt-2">Everything food, connected.</h2>
+        <div className="mt-7 grid gap-x-6 gap-y-0 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { title: 'Shop smarter', icon: ShoppingBasket },
+            { title: 'Find recipes', icon: BookOpenCheck },
+            { title: 'Know your Pantry', icon: Boxes },
+            { title: 'Understand products', icon: ScanLine },
+          ].map(({ title, icon: Icon }, index) => (
+            <div key={title} className="flex items-center gap-4 border-t py-5 lg:items-start lg:flex-col" style={{ borderColor: 'rgba(23,63,53,.25)' }}>
+              <span className="ep-feature-mark"><Icon className="ep-mark" size={24} aria-hidden="true" /></span>
+              <div><span className="ep-eyebrow">0{index + 1}</span><h3 className="mt-1">{title}</h3></div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="ep-privacy mt-12 rounded-3xl px-6 py-8 sm:px-9 sm:py-10 lg:px-12" aria-labelledby="about-trust-title">
+        <div className="grid gap-7 lg:grid-cols-[minmax(220px,.8fr)_minmax(0,1.2fr)] lg:gap-12">
+          <div>
+            <p className="ep-eyebrow uppercase">02 / Privacy & trust</p>
+            <h2 id="about-trust-title" className="mt-2">Your data. Your choice.</h2>
+          </div>
+          <div className="grid gap-x-6 sm:grid-cols-2">
+            {[
+              { title: 'Clear privacy controls', icon: LockKeyhole },
+              { title: 'Useful, optional context', icon: DatabaseZap },
+              { title: 'Secure account access', icon: ShieldCheck },
+              { title: 'Reviewed marketplace listings', icon: BadgeCheck },
+            ].map(({ title, icon: Icon }) => (
+              <div key={title} className="ep-privacy-row flex items-center gap-3 border-t py-5">
+                <Icon className="ep-mark shrink-0" size={23} aria-hidden="true" /><h3>{title}</h3>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-11 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,.9fr)]" aria-label="Why EPANTRY and account options">
+        <article className="ep-sage ep-why min-w-0 rounded-3xl px-6 py-9 sm:px-9">
+          <p className="ep-eyebrow uppercase">03 / Why EPANTRY</p>
+          <h2 className="mt-2">More than a shopping app.</h2>
+          <div className="mt-5">
+            {['Trusted products & brands', 'Recipes connected to shopping', 'Pantry & meal planning'].map((item, index) => (
+              <div key={item} className="flex items-center gap-4 border-t py-3" style={{ borderColor: 'rgba(23,63,53,.22)' }}>
+                <span className="ep-eyebrow w-7 shrink-0">0{index + 1}</span>
+                <p className="ep-text text-base font-semibold">{item}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="ep-dark ep-account-panel flex min-w-0 flex-col rounded-3xl px-6 py-9 sm:px-9">
+          <ShieldCheck size={26} aria-hidden="true" className="mb-4" />
+          <h2>{isAuthenticated ? 'Your account. Your control.' : 'Ready to join EPANTRY?'}</h2>
+          <div className="mt-auto flex flex-wrap gap-3 pt-7">
+            {isAuthenticated ? (
+              <><AboutLink to="/account/settings">Account Settings</AboutLink><AboutLink to="/account/privacy" outline>Privacy Rights Center</AboutLink></>
+            ) : (
+              <><AboutLink to="/register">Create Account</AboutLink><AboutLink to="/login" outline>Login</AboutLink></>
+            )}
+          </div>
+        </article>
+      </section>
+    </AboutPageBody>
   )
 }

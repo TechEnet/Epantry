@@ -1,13 +1,15 @@
 import {
   ChefHat,
-  ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ArrowDown,
+  ArrowUpRight,
+  SlidersHorizontal,
   Search,
   X,
 } from 'lucide-react'
 
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -30,20 +32,6 @@ import { recordCustomerSearchDemand } from '../../search/services/search.service
 
 import SponsoredCampaignSlot from '../../retailMedia/components/SponsoredCampaignSlot'
 
-const FEATURED_RECIPE_COUNT = 8
-const VISIBLE_CATEGORY_COUNT = 6
-const SCROLL_STEP_VH = 58
-const SHOWCASE_END_HOLD_VH = 58
-
-function clamp(value, min, max) {
-  return Math.min(
-    max,
-    Math.max(
-      min,
-      value,
-    ),
-  )
-}
 
 function recipeKey(item, index = 0) {
   return (
@@ -167,6 +155,91 @@ function recipeDietaryKind(item, foodIntelligence = null) {
   return recipeDietaryKindFromIntelligence(foodIntelligence)
 }
 
+// The main browsing categories remain visible even if a category has no
+// published recipes yet. Extra course labels from real backend records are
+// appended without duplicating these common groups.
+const PRIMARY_RECIPE_TABS = [
+  { id: 'all', label: 'All Recipes' },
+  { id: 'restaurant', label: 'Restaurant Picks' },
+  { id: 'course:breakfast', label: 'Breakfast' },
+  { id: 'course:brunch', label: 'Brunch' },
+  { id: 'course:lunch', label: 'Lunch' },
+  { id: 'course:dinner', label: 'Dinner' },
+  { id: 'course:snacks', label: 'Snacks' },
+  { id: 'course:starters', label: 'Starters' },
+  { id: 'course:mains', label: 'Main Course' },
+  { id: 'course:sides', label: 'Side Dishes' },
+  { id: 'course:soups', label: 'Soups' },
+  { id: 'course:salads', label: 'Salads' },
+  { id: 'course:street-food', label: 'Street Food' },
+  { id: 'course:bakery', label: 'Bakery' },
+  { id: 'drinks', label: 'Drinks' },
+  { id: 'desserts', label: 'Desserts & Sweets' },
+]
+
+// Match only genuine category metadata; don't guess a course just because
+// a dish title happens to include a word such as "lunch" or "tea".
+const COLLECTION_TERMS = {
+  'course:breakfast': ['breakfast', 'morning meal'],
+  'course:brunch': ['brunch'],
+  'course:lunch': ['lunch', 'midday meal'],
+  'course:dinner': ['dinner', 'supper', 'evening meal'],
+  'course:snacks': ['snack', 'snacks', 'quick bites', 'tiffin'],
+  'course:starters': ['starter', 'starters', 'appetizer', 'appetizers', 'appetiser', 'appetisers'],
+  'course:mains': ['main course', 'main dish', 'main dishes', 'mains', 'entree', 'entrees'],
+  'course:sides': ['side', 'sides', 'side dish', 'side dishes', 'accompaniment'],
+  'course:soups': ['soup', 'soups', 'broth'],
+  'course:salads': ['salad', 'salads'],
+  'course:street-food': ['street food', 'streetfood', 'chaat'],
+  'course:bakery': ['bakery', 'baking', 'bread', 'breads', 'pastry', 'pastries'],
+  drinks: ['drink', 'drinks', 'beverage', 'beverages', 'mocktail', 'mocktails', 'cocktail', 'cocktails', 'smoothie', 'smoothies', 'juice', 'juices', 'shake', 'shakes', 'tea', 'coffee'],
+  desserts: ['dessert', 'desserts', 'sweet', 'sweets', 'mithai', 'cake', 'cakes', 'pudding', 'puddings'],
+}
+
+function normalizeCollectionText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_\-/]+/g, ' ')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function recipeCategoryMetadata(item) {
+  const dish = item?.dish || {}
+  const recipe = item?.recipe || {}
+  return [
+    dish.course, recipe.course,
+    dish.mealType, recipe.mealType,
+    dish.category, recipe.category,
+    dish.categoryName, recipe.categoryName,
+    ...(Array.isArray(dish.categories) ? dish.categories : []),
+    ...(Array.isArray(recipe.categories) ? recipe.categories : []),
+    ...(Array.isArray(dish.tags) ? dish.tags : []),
+    ...(Array.isArray(recipe.tags) ? recipe.tags : []),
+  ]
+    .filter((value) => typeof value === 'string' || typeof value === 'number')
+    .map(normalizeCollectionText)
+    .filter(Boolean)
+}
+
+function matchesRecipeCollection(item, collection) {
+  if (collection === 'all' || collection === 'veg' || collection === 'nonveg' || collection === 'restaurant') return true
+  const metadata = recipeCategoryMetadata(item)
+  const terms = COLLECTION_TERMS[collection] || (
+    collection.startsWith('course:') ? [collection.slice('course:'.length)] : []
+  )
+  return terms.some((term) => {
+    const wanted = normalizeCollectionText(term)
+    if (!wanted) return false
+    // Word-boundary comparison lets "breakfast and brunch" match Breakfast,
+    // but avoids accidentally matching "tea" inside a word like "steak".
+    return metadata.some((value) => (` ${value} `).includes(` ${wanted} `))
+  })
+}
+
 function formatRestaurantPrice(
   price,
 ) {
@@ -202,1411 +275,612 @@ function formatRestaurantPrice(
   )
 }
 
-function RestaurantRecipeCard({
-  item,
-}) {
-  const dish =
-    item?.dish ||
-    {}
+function recipeImage(item) {
+  return item?.dish?.heroImageUrl || item?.recipe?.heroImageUrl || ''
+}
 
-  const restaurant =
-    item?.restaurant ||
-    {}
-
-  const priceLabel =
-    formatRestaurantPrice(
-      restaurant.pricePerServing,
-    )
+// A restrained image-first card: only the dish name, cuisine/restaurant and a
+// clear navigation affordance. Keep all existing recipe destinations intact.
+function RecipeTile({ item, restaurant = false }) {
+  const title = recipeName(item)
+  const cuisine = recipeCuisine(item)
+  const venue = item?.restaurant?.restaurantName || 'From Restaurants'
+  const price = restaurant ? formatRestaurantPrice(item?.restaurant?.pricePerServing) : ''
+  const subtitle = restaurant ? venue : (cuisine || recipeCourse(item))
 
   return (
     <Link
       to={recipePath(item)}
-      className="focus-ring group overflow-hidden rounded-[24px] border border-orange-950/10 bg-[#fff9ef] shadow-[0_14px_38px_rgba(105,50,17,0.10)] transition hover:-translate-y-1 hover:shadow-[0_22px_52px_rgba(105,50,17,0.15)]"
+      aria-label={`Explore recipe: ${title}`}
+      className="focus-ring group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] shadow-[0_8px_28px_rgba(32,36,33,0.07)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-[#173F35]/35 hover:shadow-[0_18px_44px_rgba(32,36,33,0.13)] focus-visible:ring-2 focus-visible:ring-[#173F35]"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-[#f2d8b6]">
-        {dish.heroImageUrl ? (
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#DCE0CF] lg:aspect-[3/2]">
+        {recipeImage(item) ? (
           <img
-            src={dish.heroImageUrl}
-            alt={recipeName(item)}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
+            src={recipeImage(item)}
+            alt={title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.035] motion-reduce:transform-none"
           />
         ) : (
-          <div className="grid h-full place-items-center bg-gradient-to-br from-orange-100 via-amber-50 to-rose-100 text-orange-800">
-            <ChefHat
-              size={38}
-              aria-hidden="true"
-            />
+          <div className="flex h-full w-full items-center justify-center bg-[#DCE0CF] text-[#173F35]">
+            <ChefHat size={40} aria-label="Image not available" />
           </div>
         )}
-
-        <span className="absolute left-3 top-3 rounded-full border border-white/65 bg-[#7c2d12]/88 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white shadow-sm backdrop-blur">
-          From restaurant
+        {restaurant ? (
+          <span className="absolute left-3 top-3 rounded-full bg-[#F7F6F2] px-3 py-1.5 text-[13px] font-semibold text-[#173F35] shadow-sm">
+            Restaurant Pick
+          </span>
+        ) : null}
+      </div>
+      <div className="flex min-h-[86px] flex-1 items-center justify-between gap-3 px-3.5 py-3 sm:px-4">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-[#173F35]">{subtitle}</p>
+          <h3 className="mt-1 line-clamp-2 text-[18px] font-bold leading-tight tracking-[-0.025em] text-[#202421]">{title}</h3>
+          {price ? <p className="mt-1 text-sm font-medium text-[#173F35]">{price} / serving</p> : null}
+        </div>
+        <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#173F35] text-[#F7F6F2] transition-transform duration-200 group-hover:translate-x-0.5">
+          <ArrowUpRight size={18} />
         </span>
       </div>
-
-      <div className="p-4">
-        <h3 className="line-clamp-2 font-serif text-xl font-semibold leading-tight tracking-[-0.02em] text-[#35180d]">
-          {recipeName(item)}
-        </h3>
-
-        <p className="mt-2 text-xs font-black text-[#9a3412]">
-          From {restaurant.restaurantName || 'Restaurant'}
-        </p>
-
-        <p className="mt-1 text-[11px] font-semibold text-stone-500">
-          {restaurant.outletName || 'Restaurant outlet'}
-        </p>
-
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-orange-950/10 pt-3">
-          <span className="text-xs font-black text-stone-800">
-            {priceLabel
-              ? `${priceLabel} / serving`
-              : 'View recipe'}
-          </span>
-
-          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.12em] text-orange-800">
-            Details
-            <ChevronRight
-              size={14}
-              aria-hidden="true"
-            />
-          </span>
-        </div>
-      </div>
     </Link>
   )
 }
 
-function ModalShell({
-  children,
-  onClose,
-  ariaLabel,
-  wide = false,
-}) {
+const STANDARD_PAGE_SIZE = 48
+const RESTAURANT_PAGE_SIZE = 24
+const DESKTOP_REVEAL_SIZE = 12
+const MOBILE_REVEAL_SIZE = 4
+
+const MORE_TYPE_GROUPS = [
+  { label: 'Meal times', ids: ['course:breakfast', 'course:brunch', 'course:lunch', 'course:dinner'] },
+  { label: 'Meal courses', ids: ['course:snacks', 'course:starters', 'course:mains', 'course:sides', 'course:soups', 'course:salads', 'course:street-food'] },
+  { label: 'Bakery, drinks & sweets', ids: ['course:bakery', 'drinks', 'desserts'] },
+]
+
+function groupMoreTypes(tabs) {
+  const mappedIds = new Set(MORE_TYPE_GROUPS.flatMap((group) => group.ids))
+  const groups = MORE_TYPE_GROUPS.map(({ label, ids }) => ({
+    label,
+    tabs: tabs.filter((tab) => ids.includes(tab.id)),
+  })).filter((group) => group.tabs.length > 0)
+  const extra = tabs.filter((tab) => !mappedIds.has(tab.id))
+  if (extra.length) groups.push({ label: 'More categories', tabs: extra })
+  return groups
+}
+
+// Keep the native, keyboard-accessible select, but render its chosen label as
+// normal text. Native select text is not measured consistently by every
+// browser, which previously clipped labels such as "Brunch".
+function AdaptiveRecipeTypeSelect({ groups, options, currentId, onSelect, mobile = false }) {
+  const selectedTab = options.find((tab) => tab.id === currentId)
+  const displayLabel = selectedTab?.label || 'More types…'
+
   return (
-    <div
-      className="fixed inset-0 z-[120] grid place-items-center bg-[#140b07]/55 p-4 backdrop-blur-xl sm:p-7"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose()
-        }
-      }}
+    <label
+      className={`relative inline-flex min-h-11 w-max max-w-none shrink-0 items-center rounded-full border transition-colors duration-200 focus-within:border-[#173F35] focus-within:ring-2 focus-within:ring-[#173F35]/25 ${mobile ? 'lg:hidden' : 'hidden lg:inline-flex'} ${selectedTab ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}
     >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        className={`relative flex max-h-[84svh] w-full flex-col overflow-hidden rounded-[30px] border border-white/45 bg-[#fffaf2]/88 shadow-[0_32px_100px_rgba(30,14,8,0.34)] backdrop-blur-2xl ${
-          wide
-            ? 'max-w-[1180px]'
-            : 'max-w-[980px]'
-        }`}
+      <span
+        aria-hidden="true"
+        className={`block whitespace-nowrap py-2.5 pl-3.5 pr-9 font-semibold leading-5 ${mobile ? 'text-[13px]' : 'text-[14px]'}`}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          className="focus-ring absolute right-5 top-5 z-20 grid h-10 w-10 place-items-center rounded-full border border-stone-900/10 bg-white/85 text-stone-700 shadow-sm backdrop-blur transition hover:bg-white hover:text-stone-950"
-          aria-label="Close"
-        >
-          <X
-            size={18}
-            aria-hidden="true"
-          />
-        </button>
-
-        {children}
-      </section>
-    </div>
+        {displayLabel}
+      </span>
+      <select
+        value={selectedTab ? currentId : ''}
+        onChange={(event) => { if (event.target.value) onSelect(event.target.value) }}
+        aria-label="More recipe types"
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none rounded-full border-0 opacity-0"
+      >
+        <option value="">More types…</option>
+        {groups.map((group) => (
+          <optgroup key={group.label} label={group.label}>
+            {group.tabs.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      <ChevronDown size={15} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+    </label>
   )
 }
 
-function RecipePreviewCard({
-  item,
-  index,
-}) {
-  const dish = item?.dish || {}
-  const cuisine = recipeCuisine(item)
-  const course = recipeCourse(item)
-
-  return (
-    <Link
-      to={recipePath(item)}
-      className="focus-ring group relative block h-full w-full overflow-hidden rounded-[28px] bg-[#17100c] shadow-[0_30px_90px_rgba(12,6,3,0.34)]"
-      aria-label={`Open ${recipeName(item)}`}
-    >
-      {dish.heroImageUrl ? (
-        <img
-          src={dish.heroImageUrl}
-          alt={dish.name || recipeName(item)}
-          className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.025]"
-        />
-      ) : (
-        <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#4d2112] via-[#24120d] to-[#120a07] text-orange-100">
-          <ChefHat
-            size={56}
-            aria-hidden="true"
-          />
-        </div>
-      )}
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/62 via-black/22 to-transparent px-5 pb-5 pt-16">
-        <div className="flex flex-wrap items-center gap-2">
-          {cuisine && (
-            <span className="rounded-full border border-white/35 bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-[0.17em] text-white backdrop-blur-md">
-              {cuisine}
-            </span>
-          )}
-
-          {course && (
-            <span className="rounded-full border border-orange-200/55 bg-[#f59e0b]/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.17em] text-orange-50 backdrop-blur-md">
-              {course}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <span className="pointer-events-none absolute left-5 top-5 rounded-full border border-white/25 bg-black/25 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-white/85 backdrop-blur-md">
-        {String(index + 1).padStart(2, '0')}
-      </span>
-    </Link>
-  )
+const SEARCH_SUGGESTIONS = {
+  all: ['Paneer tikka for tonight...', 'Easy recipes for a busy day...', 'What can I cook with rice?'],
+  veg: ['Paneer and tomato dinner...', 'Simple vegetable lunch...', 'Quick plant-based meals...'],
+  nonveg: ['Chicken curry ideas...', 'Easy fish dinner...', 'Weekend egg recipes...'],
+  restaurant: ['Signature restaurant dishes...', 'Chef-made favourites...', 'Explore restaurant recipes...'],
+  'course:breakfast': ['Start with a warm breakfast...', 'Oats, eggs or morning favourites...', 'Something quick before work...'],
+  'course:brunch': ['Lazy weekend brunch...', 'Make a savoury brunch...', 'Brunch ideas for friends...'],
+  'course:lunch': ['What is for lunch today?', 'Simple midday meals...', 'Lunchbox favourites...'],
+  'course:dinner': ['Dinner for tonight...', 'Comforting evening meals...', 'Make a special dinner...'],
+  'course:snacks': ['Something to snack on...', 'Easy afternoon bites...', 'Quick savoury snacks...'],
+  'course:starters': ['Start the meal beautifully...', 'Small plates to share...', 'Party starters...'],
+  'course:mains': ['A satisfying main course...', 'One memorable dish...', 'Family-style meals...'],
+  'course:sides': ['Sides for your favourite dish...', 'Complete your plate...', 'Simple vegetable sides...'],
+  'course:soups': ['A comforting bowl of soup...', 'Warming broths...', 'Fresh seasonal soups...'],
+  'course:salads': ['Fresh and colourful salads...', 'A lighter lunch...', 'Simple salad ideas...'],
+  'course:street-food': ['Favourite street food...', 'Make a chaat at home...', 'Something spicy and fun...'],
+  'course:bakery': ['Freshly baked favourites...', 'Bread from your kitchen...', 'Pastry ideas...'],
+  drinks: ['A refreshing mango shake...', 'Cooling summer mocktails...', 'Coffee and smoothie recipes...'],
+  desserts: ['Something sweet after dinner...', 'Easy homemade desserts...', 'Cakes and festive sweets...'],
 }
 
-function ViewAllSlide({
-  onOpen,
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="focus-ring group flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[28px] border border-orange-100/35 bg-[radial-gradient(circle_at_top_right,rgba(251,146,60,0.28),transparent_38%),linear-gradient(145deg,rgba(83,35,17,0.96),rgba(27,13,8,0.98))] px-8 text-center shadow-[0_30px_90px_rgba(12,6,3,0.35)] transition hover:border-orange-200/55"
-    >
-      <span className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-200/80">
-        Full recipe collection
-      </span>
+function searchableRecipeText(item) {
+  return [
+    recipeName(item),
+    recipeCuisine(item),
+    recipeCourse(item),
+    item?.dish?.description,
+    item?.recipe?.description,
+    ...(Array.isArray(item?.dish?.tags) ? item.dish.tags : []),
+    ...(Array.isArray(item?.recipe?.tags) ? item.recipe.tags : []),
+    item?.restaurant?.restaurantName,
+  ].filter(Boolean).join(' ').toLowerCase()
+}
 
-      <span className="mt-4 max-w-[9ch] font-serif text-5xl font-semibold leading-[0.95] tracking-[-0.04em] text-[#fff7ed] sm:text-6xl">
-        View all recipes.
-      </span>
+function hasNextPage(payload, rows, page, limit) {
+  const pages = Number(payload?.pagination?.pages)
+  if (Number.isFinite(pages)) return page < pages
+  return rows.length >= limit
+}
 
-      <span className="mt-7 inline-flex items-center gap-2 rounded-full border border-orange-100/25 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition group-hover:bg-white/15">
-        Explore collection
-        <ChevronRight
-          size={17}
-          aria-hidden="true"
-        />
-      </span>
-    </button>
-  )
+function mergedById(existing, incoming) {
+  const seen = new Set(existing.map((item, index) => recipeKey(item, index)))
+  return [...existing, ...incoming.filter((item, index) => {
+    const key = recipeKey(item, index)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })]
+}
+
+function RecipeGridCard({ item, restaurant = false }) {
+  return <RecipeTile item={item} restaurant={restaurant} />
 }
 
 export default function RecipesPage() {
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [collectionQuery, setCollectionQuery] = useState('')
+  const [serverSearch, setServerSearch] = useState('')
+  const [hint, setHint] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [selectedCollection, setSelectedCollection] = useState('all')
+  const [selectedDiet, setSelectedDiet] = useState('all')
   const [recipes, setRecipes] = useState([])
   const [restaurantRecipes, setRestaurantRecipes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [restaurantLoading, setRestaurantLoading] = useState(true)
   const [error, setError] = useState('')
   const [restaurantError, setRestaurantError] = useState('')
-  const [carouselPosition, setCarouselPosition] = useState(0)
-  const [recipeModalOpen, setRecipeModalOpen] = useState(false)
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
-  const [modalRecipeSearch, setModalRecipeSearch] = useState('')
-  const [modalRecipeDiet, setModalRecipeDiet] = useState('all')
+  const [standardPage, setStandardPage] = useState(1)
+  const [restaurantPage, setRestaurantPage] = useState(1)
+  const [standardHasMore, setStandardHasMore] = useState(false)
+  const [restaurantHasMore, setRestaurantHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [modalDietaryByRecipeId, setModalDietaryByRecipeId] = useState({})
-  const [modalDietaryLoading, setModalDietaryLoading] = useState(false)
-
-  const showcaseRef = useRef(null)
-  const animationFrameRef = useRef(null)
-  const positionRef = useRef(0)
-  const targetPositionRef = useRef(0)
-  const swipeStartRef = useRef(null)
-  const swipeHandledRef = useRef(false)
-
-  const loadRecipes = useCallback(
-    async () => {
-      setLoading(true)
-      setRestaurantLoading(true)
-      setError('')
-      setRestaurantError('')
-
-      const standardRequest =
-        listPublicRecipes({
-          page: 1,
-          limit: 48,
-          search,
-          sourceScope: 'standard',
-        })
-
-      const restaurantRequest =
-        listPublicRecipes({
-          page: 1,
-          limit: 24,
-          search,
-          sourceScope: 'restaurant',
-        })
-
-      try {
-        const data =
-          await standardRequest
-
-        setRecipes(
-          Array.isArray(data?.recipes)
-            ? data.recipes
-            : [],
-        )
-      } catch (loadError) {
-        setError(
-          loadError?.message ||
-            'Unable to load recipes.',
-        )
-      } finally {
-        setLoading(false)
-      }
-
-      try {
-        const restaurantData =
-          await restaurantRequest
-
-        setRestaurantRecipes(
-          Array.isArray(restaurantData?.recipes)
-            ? restaurantData.recipes
-            : [],
-        )
-      } catch (loadError) {
-        setRestaurantRecipes([])
-        setRestaurantError(
-          loadError?.message ||
-            'Unable to load Restaurant recipes.',
-        )
-      } finally {
-        setRestaurantLoading(false)
-      }
-    },
-    [search],
+  const [dietaryLoading, setDietaryLoading] = useState(false)
+  const [revealSize, setRevealSize] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+      ? MOBILE_REVEAL_SIZE : DESKTOP_REVEAL_SIZE,
   )
+  const [visibleCount, setVisibleCount] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+      ? MOBILE_REVEAL_SIZE : DESKTOP_REVEAL_SIZE,
+  )
+  const browseRef = useRef(null)
+  const requestGenerationRef = useRef(0)
+  const loadMoreInFlightRef = useRef(false)
 
   useEffect(() => {
-    loadRecipes()
-  }, [loadRecipes])
+    if (typeof window === 'undefined') return undefined
+    const query = window.matchMedia('(max-width: 767px)')
+    const apply = () => {
+      const step = query.matches ? MOBILE_REVEAL_SIZE : DESKTOP_REVEAL_SIZE
+      setRevealSize(step)
+      setVisibleCount((value) => value <= DESKTOP_REVEAL_SIZE ? step : value)
+    }
+    query.addEventListener?.('change', apply)
+    return () => query.removeEventListener?.('change', apply)
+  }, [])
 
-  const featuredRecipes = useMemo(
-    () => recipes.slice(0, FEATURED_RECIPE_COUNT),
-    [recipes],
-  )
+  // Search the selected category, not an unrelated set of recipes.
+  // A small debounce avoids an API request for every character typed.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setServerSearch(collectionQuery.trim()), 380)
+    return () => window.clearTimeout(timer)
+  }, [collectionQuery])
 
-  const slides = useMemo(
-    () => [
-      ...featuredRecipes.map((item) => ({
-        type: 'recipe',
-        item,
-      })),
-      {
-        type: 'view-all',
-        item: null,
-      },
-    ],
-    [featuredRecipes],
-  )
+  useEffect(() => {
+    const generation = ++requestGenerationRef.current
+    let cancelled = false
+    setLoading(true)
+    setLoadingMore(false)
+    loadMoreInFlightRef.current = false
+    setError('')
+    setRestaurantError('')
+    setVisibleCount(revealSize)
+
+    const standardRequest = listPublicRecipes({
+      page: 1, limit: STANDARD_PAGE_SIZE, search: serverSearch, sourceScope: 'standard',
+    })
+    const restaurantRequest = listPublicRecipes({
+      page: 1, limit: RESTAURANT_PAGE_SIZE, search: serverSearch, sourceScope: 'restaurant',
+    })
+
+    Promise.allSettled([standardRequest, restaurantRequest]).then(([standard, restaurant]) => {
+      if (cancelled || requestGenerationRef.current !== generation) return
+      if (standard.status === 'fulfilled') {
+        const rows = Array.isArray(standard.value?.recipes) ? standard.value.recipes : []
+        setRecipes(rows)
+        setStandardHasMore(hasNextPage(standard.value, rows, 1, STANDARD_PAGE_SIZE))
+      } else {
+        setRecipes([])
+        setStandardHasMore(false)
+        setError(standard.reason?.message || 'Unable to load recipes.')
+      }
+      if (restaurant.status === 'fulfilled') {
+        const rows = Array.isArray(restaurant.value?.recipes) ? restaurant.value.recipes : []
+        setRestaurantRecipes(rows)
+        setRestaurantHasMore(hasNextPage(restaurant.value, rows, 1, RESTAURANT_PAGE_SIZE))
+      } else {
+        setRestaurantRecipes([])
+        setRestaurantHasMore(false)
+        setRestaurantError(restaurant.reason?.message || 'Unable to load restaurant recipes.')
+      }
+      setStandardPage(1)
+      setRestaurantPage(1)
+      setLoading(false)
+    })
+
+    return () => { cancelled = true }
+  }, [serverSearch])
 
   const categories = useMemo(() => {
     const counts = new Map()
-
     recipes.forEach((item) => {
-      const category = recipeCourse(item)
-
-      if (!category) {
-        return
-      }
-
-      counts.set(
-        category,
-        (counts.get(category) || 0) + 1,
-      )
+      const course = recipeCourse(item)
+      if (!course || course.toLowerCase() === 'recipe') return
+      counts.set(course, (counts.get(course) || 0) + 1)
     })
-
-    return Array.from(counts.entries())
-      .map(([name, count]) => ({
-        name,
-        count,
-      }))
-      .sort((a, b) => {
-        if (b.count !== a.count) {
-          return b.count - a.count
-        }
-
-        return a.name.localeCompare(b.name)
-      })
+    return [...counts].map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }, [recipes])
 
-  const visibleCategories = categories.slice(
-    0,
-    VISIBLE_CATEGORY_COUNT,
-  )
+  const recipeTabs = useMemo(() => {
+    const known = new Set([
+      ...PRIMARY_RECIPE_TABS.map(({ label }) => normalizeCollectionText(label)),
+      ...Object.values(COLLECTION_TERMS).flat().map(normalizeCollectionText),
+      'dessert', 'drink', 'beverage', 'sweet', 'bakery',
+      'vegetarian', 'non vegetarian', 'non veg', 'veg',
+    ])
+    const additional = categories
+      .filter(({ name }) => !known.has(normalizeCollectionText(name)))
+      .map(({ name }) => ({ id: `course:${name}`, label: name }))
+    if (selectedCollection.startsWith('course:') &&
+      ![...PRIMARY_RECIPE_TABS, ...additional].some((tab) => tab.id === selectedCollection)) {
+      additional.push({ id: selectedCollection, label: selectedCollection.slice(7) })
+    }
+    return [...PRIMARY_RECIPE_TABS, ...additional]
+  }, [categories, selectedCollection])
 
+  const selectedLabel = recipeTabs.find((tab) => tab.id === selectedCollection)?.label || 'Recipes'
+
+  // Real dietary evidence only: a Lunch + Vegetarian selection must not
+  // silently classify recipes with unknown dietary information as vegetarian.
   useEffect(() => {
-    if (!recipeModalOpen || recipes.length === 0) {
+    if (selectedDiet === 'all') {
+      setDietaryLoading(false)
       return undefined
     }
-
-    const unresolved = recipes
-      .map((item) => ({
-        item,
-        recipeVersionId: String(item?.recipe?.id || '').trim(),
-      }))
-      .filter(({ item, recipeVersionId }) =>
-        recipeVersionId &&
-        recipeDietaryKind(item) === 'unknown' &&
-        !Object.hasOwn(modalDietaryByRecipeId, recipeVersionId),
-      )
-
-    if (unresolved.length === 0) {
-      return undefined
-    }
-
-    let cancelled = false
-
-    setModalDietaryLoading(true)
-
-    Promise.allSettled(
-      unresolved.map(async ({ recipeVersionId }) => [
-        recipeVersionId,
-        await getRecipeFoodIntelligence(recipeVersionId),
-      ]),
+    const eligible = selectedCollection === 'restaurant'
+      ? restaurantRecipes : selectedCollection === 'all'
+        ? [...recipes, ...restaurantRecipes] : recipes
+    const unresolved = eligible.map((item) => ({
+      item, id: String(item?.recipe?.id || '').trim(),
+    })).filter(({ item, id }) =>
+      id && recipeDietaryKind(item) === 'unknown' && !Object.hasOwn(modalDietaryByRecipeId, id),
     )
-      .then((results) => {
-        if (cancelled) {
-          return
-        }
-
-        setModalDietaryByRecipeId((current) => {
-          const next = { ...current }
-
-          results.forEach((result, index) => {
-            const recipeVersionId = unresolved[index]?.recipeVersionId
-
-            if (!recipeVersionId) {
-              return
-            }
-
-            next[recipeVersionId] =
-              result.status === 'fulfilled'
-                ? result.value?.[1] || null
-                : null
-          })
-
-          return next
+    if (!unresolved.length) { setDietaryLoading(false); return undefined }
+    let cancelled = false
+    setDietaryLoading(true)
+    const check = async () => {
+      const collected = {}
+      for (let index = 0; index < unresolved.length; index += 3) {
+        if (cancelled) break
+        const batch = unresolved.slice(index, index + 3)
+        const results = await Promise.allSettled(batch.map(async ({ id }) => [id, await getRecipeFoodIntelligence(id)]))
+        if (cancelled) break
+        results.forEach((result, offset) => {
+          const id = batch[offset]?.id
+          if (id) collected[id] = result.status === 'fulfilled' ? result.value[1] : null
         })
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setModalDietaryLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
+      }
+      if (!cancelled && Object.keys(collected).length) setModalDietaryByRecipeId((current) => ({ ...current, ...collected }))
     }
-  }, [
-    recipeModalOpen,
-    recipes,
-    modalDietaryByRecipeId,
-  ])
+    check().finally(() => { if (!cancelled) setDietaryLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedCollection, selectedDiet, recipes, restaurantRecipes, modalDietaryByRecipeId])
 
-  const filteredModalRecipes = useMemo(() => {
-    const query = modalRecipeSearch.trim().toLowerCase()
-
-    return recipes.filter((item) => {
-      const name = recipeName(item)
-      const searchable = [
-        name,
-        recipeCuisine(item),
-        recipeCourse(item),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      if (query && !searchable.includes(query)) {
-        return false
+  const matchedRecipes = useMemo(() => {
+    const query = collectionQuery.trim().toLowerCase()
+    const source = selectedCollection === 'restaurant'
+      ? restaurantRecipes.map((item) => ({ item, restaurant: true }))
+      : selectedCollection === 'all'
+        ? [...recipes.map((item) => ({ item, restaurant: false })),
+          // Don't reshuffle visible tiles: show Restaurant records only after
+          // all preceding standard catalogue pages have been loaded.
+          ...(standardHasMore ? [] : restaurantRecipes.map((item) => ({ item, restaurant: true })))]
+        : recipes.map((item) => ({ item, restaurant: false }))
+    return source.filter(({ item, restaurant }) => {
+      if (query && !searchableRecipeText(item).includes(query)) return false
+      if (selectedCollection !== 'all' && selectedCollection !== 'restaurant' && !matchesRecipeCollection(item, selectedCollection)) return false
+      if (selectedDiet !== 'all') {
+        const intel = modalDietaryByRecipeId[String(item?.recipe?.id || '')] || null
+        if (recipeDietaryKind(item, intel) !== selectedDiet) return false
       }
-
-      if (
-        modalRecipeDiet !== 'all' &&
-        recipeDietaryKind(
-          item,
-          modalDietaryByRecipeId[String(item?.recipe?.id || '')] || null,
-        ) !== modalRecipeDiet
-      ) {
-        return false
-      }
-
       return true
     })
-  }, [
-    recipes,
-    modalRecipeSearch,
-    modalRecipeDiet,
-    modalDietaryByRecipeId,
-  ])
+  }, [recipes, restaurantRecipes, collectionQuery, selectedCollection, selectedDiet, modalDietaryByRecipeId, standardHasMore])
 
-  const slideCount = Math.max(1, slides.length)
-  const scrollSteps = Math.max(1, slideCount - 1)
-  const showcaseEndHoldVh =
-    slideCount > 1
-      ? SHOWCASE_END_HOLD_VH
-      : 0
-  const showcaseHeight = `calc(100svh + ${(scrollSteps * SCROLL_STEP_VH) + showcaseEndHoldVh}vh)`
-  const activeIndex = clamp(
-    Math.round(carouselPosition),
-    0,
-    slideCount - 1,
-  )
-  const activeSlide = slides[activeIndex] || slides[0]
-  const activeRecipe =
-    activeSlide?.type === 'recipe'
-      ? activeSlide.item
-      : null
+  const visibleRecipes = matchedRecipes.slice(0, visibleCount)
+  const moreFromServer = selectedCollection === 'restaurant'
+    ? restaurantHasMore
+    : selectedCollection === 'all'
+      ? standardHasMore || restaurantHasMore
+      : standardHasMore
+  const canViewMore = visibleCount < matchedRecipes.length || moreFromServer
 
-  useEffect(() => {
-    function isMobileShowcase() {
-      return window.matchMedia('(max-width: 1023px)').matches
-    }
+  function chooseCollection(id) {
+    setSelectedCollection(id)
+    setVisibleCount(revealSize)
+  }
 
-    function updateTargetFromScroll() {
-      if (isMobileShowcase()) {
-        return
+  function chooseDiet(id) {
+    setSelectedDiet(id)
+    setVisibleCount(revealSize)
+  }
+
+  const desktopMainTabs = ['all', 'restaurant', 'course:breakfast', 'course:lunch', 'course:dinner', 'course:snacks']
+  const mobileMainTabs = ['all', 'restaurant']
+  const desktopExtraTabs = recipeTabs.filter((tab) => !desktopMainTabs.includes(tab.id))
+  const mobileExtraTabs = recipeTabs.filter((tab) => !mobileMainTabs.includes(tab.id))
+  const desktopMoreGroups = groupMoreTypes(desktopExtraTabs)
+  const mobileMoreGroups = groupMoreTypes(mobileExtraTabs)
+  const searchScope = selectedLabel + (selectedDiet === 'veg' ? ' · Vegetarian' : selectedDiet === 'nonveg' ? ' · Non-Vegetarian' : '')
+
+  async function handleViewMore() {
+    if (loadingMore || loading) return
+    const nextCount = visibleCount + revealSize
+    setVisibleCount(nextCount)
+    if (matchedRecipes.length >= nextCount || !moreFromServer) return
+    // Load only the next real API page on demand, never create placeholder duplicates.
+    const useRestaurant = selectedCollection === 'restaurant' ||
+      (selectedCollection === 'all' && !standardHasMore)
+    const nextPage = useRestaurant ? restaurantPage + 1 : standardPage + 1
+    const limit = useRestaurant ? RESTAURANT_PAGE_SIZE : STANDARD_PAGE_SIZE
+    const sourceScope = useRestaurant ? 'restaurant' : 'standard'
+    if (loadMoreInFlightRef.current) return
+    loadMoreInFlightRef.current = true
+    setLoadingMore(true)
+    const generation = requestGenerationRef.current
+    try {
+      const payload = await listPublicRecipes({ page: nextPage, limit, search: serverSearch, sourceScope })
+      if (generation !== requestGenerationRef.current) return
+      const rows = Array.isArray(payload?.recipes) ? payload.recipes : []
+      if (useRestaurant) {
+        setRestaurantRecipes((previous) => mergedById(previous, rows))
+        setRestaurantPage(nextPage)
+        setRestaurantHasMore(hasNextPage(payload, rows, nextPage, limit))
+      } else {
+        setRecipes((previous) => mergedById(previous, rows))
+        setStandardPage(nextPage)
+        setStandardHasMore(hasNextPage(payload, rows, nextPage, limit))
       }
-
-      const section = showcaseRef.current
-
-      if (!section || slideCount <= 1) {
-        targetPositionRef.current = 0
-        return
+    } catch (loadError) {
+      if (generation === requestGenerationRef.current) {
+        if (useRestaurant) setRestaurantError(loadError?.message || 'Unable to load more restaurant recipes.')
+        else setError(loadError?.message || 'Unable to load more recipes.')
       }
-
-      const rect = section.getBoundingClientRect()
-      const sectionScrollDistance = Math.max(
-        1,
-        section.offsetHeight - window.innerHeight,
-      )
-      const endHoldDistance =
-        window.innerHeight *
-        (SHOWCASE_END_HOLD_VH / 100)
-      const carouselScrollDistance = Math.max(
-        1,
-        sectionScrollDistance - endHoldDistance,
-      )
-      const travelled = clamp(
-        -rect.top,
-        0,
-        carouselScrollDistance,
-      )
-      const progress =
-        travelled / carouselScrollDistance
-
-      targetPositionRef.current =
-        progress * (slideCount - 1)
+    } finally {
+      if (generation === requestGenerationRef.current) setLoadingMore(false)
+      loadMoreInFlightRef.current = false
     }
-
-    function handleResize() {
-      if (isMobileShowcase()) {
-        const nearestIndex = clamp(
-          Math.round(positionRef.current),
-          0,
-          slideCount - 1,
-        )
-
-        targetPositionRef.current = nearestIndex
-        return
-      }
-
-      updateTargetFromScroll()
-    }
-
-    function animate() {
-      const current = positionRef.current
-      const target = targetPositionRef.current
-      const next = current + (target - current) * 0.095
-
-      positionRef.current =
-        Math.abs(target - next) < 0.001
-          ? target
-          : next
-
-      setCarouselPosition(positionRef.current)
-      animationFrameRef.current = requestAnimationFrame(animate)
-    }
-
-    updateTargetFromScroll()
-    window.addEventListener('scroll', updateTargetFromScroll, {
-      passive: true,
-    })
-    window.addEventListener('resize', handleResize)
-    animationFrameRef.current = requestAnimationFrame(animate)
-
-    return () => {
-      window.removeEventListener('scroll', updateTargetFromScroll)
-      window.removeEventListener('resize', handleResize)
-
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-      }
-    }
-  }, [slideCount])
-
-  useEffect(() => {
-    if (!recipeModalOpen && !categoryModalOpen) {
-      return undefined
-    }
-
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        setRecipeModalOpen(false)
-        setCategoryModalOpen(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [recipeModalOpen, categoryModalOpen])
+  }
 
   function handleSearch(event) {
     event.preventDefault()
-
-    const normalizedSearch = searchInput.trim()
-
-    if (normalizedSearch.length >= 2) {
-      void recordCustomerSearchDemand({
-        query: normalizedSearch,
-        surface: 'recipes',
-      })
-    }
-
-    setSearch(normalizedSearch)
+    const query = searchInput.trim()
+    if (query.length >= 2) void recordCustomerSearchDemand({ query, surface: 'recipes' })
+    setCollectionQuery(query)
+    browseRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  function scrollToSlide(nextIndex) {
-    const index = clamp(
-      nextIndex,
-      0,
-      slideCount - 1,
-    )
-
-    if (window.matchMedia('(max-width: 1023px)').matches) {
-      targetPositionRef.current = index
-      return
-    }
-
-    const section = showcaseRef.current
-
-    if (!section) {
-      return
-    }
-
-    const sectionScrollDistance = Math.max(
-      1,
-      section.offsetHeight - window.innerHeight,
-    )
-    const endHoldDistance =
-      slideCount > 1
-        ? window.innerHeight *
-          (SHOWCASE_END_HOLD_VH / 100)
-        : 0
-    const carouselScrollDistance = Math.max(
-      1,
-      sectionScrollDistance - endHoldDistance,
-    )
-    const sectionTop =
-      window.scrollY + section.getBoundingClientRect().top
-    const ratio =
-      slideCount <= 1
-        ? 0
-        : index / (slideCount - 1)
-
-    window.scrollTo({
-      top: sectionTop + carouselScrollDistance * ratio,
-      behavior: 'smooth',
-    })
+  function handleCollectionSearch(event) {
+    const query = event.target.value
+    setCollectionQuery(query)
+    setVisibleCount(revealSize)
   }
 
-  function handleShowcasePointerDown(event) {
-    if (!window.matchMedia('(max-width: 1023px)').matches) {
-      return
+  // Type short category-specific suggestions, one at a time, only when idle.
+  useEffect(() => {
+    if (collectionQuery || searchFocused) { setHint(''); return undefined }
+    const suggestions = selectedDiet !== 'all' ? [
+      `${selectedDiet === 'veg' ? 'Vegetarian' : 'Non-vegetarian'} ${selectedLabel.toLowerCase()} ideas...`,
+      `Find a ${selectedDiet === 'veg' ? 'vegetarian' : 'non-vegetarian'} favourite...`,
+      `Try something for ${selectedLabel.toLowerCase()}...`,
+    ] : SEARCH_SUGGESTIONS[selectedCollection] || [
+      `Explore ${selectedLabel.toLowerCase()} recipes...`,
+      `Find your next ${selectedLabel.toLowerCase()} favourite...`,
+      `Search ${selectedLabel.toLowerCase()} ideas...`,
+    ]
+    const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduced) { setHint(suggestions[0]); return undefined }
+    let current = 0
+    let characters = 0
+    let removing = false
+    let timeoutId
+    const tick = () => {
+      const phrase = suggestions[current % suggestions.length]
+      setHint(phrase.slice(0, characters))
+      if (!removing && characters < phrase.length) { characters += 1; timeoutId = window.setTimeout(tick, 65); return }
+      if (!removing) { removing = true; timeoutId = window.setTimeout(tick, 1700); return }
+      if (characters > 0) { characters -= 1; timeoutId = window.setTimeout(tick, 30); return }
+      current += 1
+      removing = false
+      timeoutId = window.setTimeout(tick, 320)
     }
-
-    swipeStartRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-    }
-    swipeHandledRef.current = false
-  }
-
-  function handleShowcasePointerUp(event) {
-    if (!window.matchMedia('(max-width: 1023px)').matches) {
-      return
-    }
-
-    const start = swipeStartRef.current
-    swipeStartRef.current = null
-
-    if (!start) {
-      return
-    }
-
-    const deltaX = event.clientX - start.x
-    const deltaY = event.clientY - start.y
-
-    if (
-      Math.abs(deltaX) < 38 ||
-      Math.abs(deltaX) <= Math.abs(deltaY)
-    ) {
-      return
-    }
-
-    swipeHandledRef.current = true
-
-    if (deltaX < 0) {
-      scrollToSlide(activeIndex + 1)
-    } else {
-      scrollToSlide(activeIndex - 1)
-    }
-  }
-
-  function handleShowcaseClickCapture(event) {
-    if (!swipeHandledRef.current) {
-      return
-    }
-
-    swipeHandledRef.current = false
-    event.preventDefault()
-    event.stopPropagation()
-  }
+    tick()
+    return () => window.clearTimeout(timeoutId)
+  }, [selectedCollection, selectedLabel, selectedDiet, collectionQuery, searchFocused])
 
   return (
-    <main className="min-h-screen bg-[#f7f1e8]">
+    <main className="min-h-screen bg-[#F7F6F2] text-[#202421]">
       <section
-        className="relative min-h-[100svh] overflow-hidden bg-[#f7d7b2] bg-center bg-no-repeat"
-        style={{
-          backgroundImage:
-            "linear-gradient(90deg, rgba(255,239,219,0.98) 0%, rgba(255,239,219,0.94) 22%, rgba(255,239,219,0.72) 36%, rgba(255,239,219,0.24) 48%, rgba(255,239,219,0) 58%, rgba(255,239,219,0) 100%), url('/hero/recipe.png')",
-          backgroundSize: 'cover',
-        }}
+        className="relative flex h-[100svh] min-h-0 items-center overflow-hidden bg-[#F7F6F2] bg-center bg-cover bg-no-repeat"
+        style={{ backgroundImage: "url('/hero/recipe.png')" }}
       >
-        <div className="page-shell flex min-h-[100svh] items-center pb-20 pt-[148px] md:pt-[156px] xl:pt-[92px]">
-          <div className="w-full max-w-3xl">
-            <span className="inline-flex rounded-full border border-orange-200/80 bg-[#fff8ef]/85 px-3 py-1 text-[11px] font-black uppercase tracking-[0.17em] text-[#9a3412] shadow-sm backdrop-blur">
-              Recipes
+        <div className="page-shell relative z-10 w-full">
+          {/* Featured Grocery-style SOLID Porcelain reading panel. The image is
+              untouched: no gradient, blur, tint or overlay on the photograph. */}
+          <div className="w-full max-w-[620px] border-l-[5px] border-[#173F35] bg-[#F7F6F2] px-5 py-6 text-[#202421] shadow-[0_14px_36px_rgba(32,36,33,0.15)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+            <span className="inline-flex items-center border-l-[3px] border-[#C86C42] pl-3 text-sm font-semibold uppercase tracking-[0.12em] text-[#173F35]">
+              EPANTRY Recipes
             </span>
-
-            <h1 className="mt-5 max-w-[13ch] font-serif text-5xl font-semibold leading-[0.94] tracking-[-0.045em] text-[#21120b] sm:text-6xl lg:text-[72px]">
-              Cook from real recipe requirements.
+            <h1 className="mt-5 max-w-[15ch] text-[36px] font-semibold leading-[1.08] tracking-[-0.05em] text-[#202421] sm:text-[48px] lg:text-[56px]">
+              Discover <span className="text-[#173F35]">something good</span> to cook.
             </h1>
-
-            <p className="mt-5 max-w-xl text-base font-semibold leading-7 text-[#5b4338] sm:text-lg">
-              Real recipes, clear cooking steps.
-            </p>
-
-            <form
-              onSubmit={handleSearch}
-              className="mt-7 flex max-w-2xl gap-2"
-            >
-              <label
-                htmlFor="recipe-search"
-                className="sr-only"
-              >
-                Search recipes
+            <p className="mt-4 max-w-lg text-base leading-7 text-[#202421]">Explore real recipes, find a favourite and make it your own.</p>
+            <form onSubmit={handleSearch} className="mt-6 flex max-w-[620px] flex-col gap-2 rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] p-2 shadow-[0_16px_40px_rgba(32,36,33,0.11)] sm:flex-row">
+              <label className="relative flex-1">
+                <span className="sr-only">Search recipes</span>
+                <Search size={19} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#173F35]" />
+                <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} maxLength={160} placeholder="Search recipes and cuisines" className="focus-ring h-[50px] w-full min-w-0 rounded-[12px] bg-[#F7F6F2] pl-12 pr-4 text-base text-[#202421] outline-none placeholder:text-[#202421]/65" />
               </label>
-
-              <div className="relative min-w-0 flex-1">
-                <Search
-                  size={19}
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-500"
-                  aria-hidden="true"
-                />
-
-                <input
-                  id="recipe-search"
-                  value={searchInput}
-                  onChange={(event) =>
-                    setSearchInput(event.target.value)
-                  }
-                  placeholder="Search Paneer Tikka, rice, breakfast..."
-                  className="focus-ring h-14 w-full rounded-[20px] border border-white/70 bg-white/88 pl-12 pr-4 text-sm font-semibold text-stone-900 shadow-[0_16px_42px_rgba(83,42,20,0.10)] outline-none backdrop-blur-xl"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="focus-ring rounded-[20px] bg-[#b45309] px-6 text-sm font-black text-white shadow-[0_12px_30px_rgba(180,83,9,0.22)] transition hover:bg-[#92400e]"
-              >
-                Search
-              </button>
+              <button type="submit" className="focus-ring min-h-[50px] rounded-[12px] bg-[#173F35] px-6 text-[15px] font-semibold text-[#F7F6F2] hover:bg-[#202421]">Search recipes</button>
             </form>
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Link
-                to="/recipes/what-should-we-cook"
-                className="focus-ring inline-flex items-center gap-2 rounded-full border border-orange-200/80 bg-[#fff8ef]/88 px-4 py-2 text-xs font-black text-[#8a3415] shadow-sm backdrop-blur transition hover:bg-white"
-              >
-                <ChefHat
-                  size={15}
-                  aria-hidden="true"
-                />
-                What Should We Cook?
-              </Link>
-            </div>
+            <Link to="/recipes/what-should-we-cook" className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#173F35] bg-[#DCE0CF] px-5 text-[15px] font-semibold text-[#173F35] transition hover:bg-[#F7F6F2]">
+              <ChefHat size={18} aria-hidden="true" /> What should we cook? <ChevronRight size={17} aria-hidden="true" />
+            </Link>
           </div>
         </div>
-
         <button
           type="button"
-          onClick={() => {
-            showcaseRef.current?.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start',
-            })
-          }}
-          className="focus-ring absolute bottom-7 left-1/2 inline-flex -translate-x-1/2 flex-col items-center gap-2 rounded-full px-5 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#6f351d] transition hover:text-[#3c1a0d]"
+          onClick={() => browseRef.current?.scrollIntoView({
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            block: 'start',
+          })}
+          aria-label="Scroll down to explore recipes"
+          className="focus-ring absolute bottom-5 right-5 z-20 inline-flex min-h-11 items-center gap-2 rounded-full border border-transparent bg-[#F7F6F2] px-3.5 py-2.5 text-[14px] font-semibold text-[#173F35] shadow-[0_6px_22px_rgba(32,36,33,0.16)] transition-colors hover:border-[#173F35] focus-visible:border-[#173F35] sm:bottom-8 sm:right-8"
         >
-          <span>Scroll to explore recipes</span>
-          <span className="h-8 w-px bg-gradient-to-b from-[#9a4b24] to-transparent" />
+          <span className="hidden sm:inline">Scroll to explore</span>
+          <ArrowDown size={17} aria-hidden="true" />
         </button>
       </section>
 
-      <SponsoredCampaignSlot
-        placement="recipe"
-        slotKey="recipe_hero"
-      />
+      <SponsoredCampaignSlot placement="recipe" slotKey="recipe_hero" />
 
-      <SponsoredCampaignSlot
-        placement="recipe"
-        slotKey="recipe_collection"
-      />
-
-      <section
-        ref={showcaseRef}
-        className="recipe-showcase-section relative isolate z-0 bg-[#1b100c]"
-        style={{
-          '--recipe-showcase-height': showcaseHeight,
-        }}
-      >
-        <div className="min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_35%,rgba(146,64,14,0.24),transparent_34%),radial-gradient(circle_at_100%_0%,rgba(245,158,11,0.11),transparent_31%),linear-gradient(135deg,#120a07_0%,#23120c_46%,#3a1d0f_100%)] text-white lg:sticky lg:top-0">
-          <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:72px_72px]" />
-
-          <div className="relative mx-auto flex min-h-[100svh] max-w-[1500px] flex-col px-5 pb-6 pt-[102px] sm:px-8 sm:pt-[118px] lg:px-12">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-200/70">
-                  EPANTRY / Recipe collection
-                </p>
-                <p className="mt-1 text-xs font-semibold text-white/45">
-                  <span className="lg:hidden">
-                    Swipe left or use the arrows to browse.
-                  </span>
-                  <span className="hidden lg:inline">
-                    Scroll or use the arrows to browse.
-                  </span>
-                </p>
-              </div>
-
-              <p className="hidden text-[10px] font-black uppercase tracking-[0.2em] text-white/45 lg:block">
-                Scroll-controlled
-              </p>
-            </div>
-
-            {error && (
-              <div
-                role="alert"
-                className="mx-auto mt-8 w-full max-w-3xl rounded-2xl border border-red-300/30 bg-red-950/45 px-5 py-4 text-sm font-semibold text-red-100 backdrop-blur"
-              >
-                {error}
-              </div>
-            )}
-
-            {loading ? (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="h-[390px] w-[300px] animate-pulse rounded-[28px] bg-white/8 sm:h-[470px] sm:w-[360px]" />
-              </div>
-            ) : recipes.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="max-w-lg rounded-[28px] border border-white/12 bg-white/6 p-8 text-center backdrop-blur-xl">
-                  <ChefHat
-                    size={42}
-                    className="mx-auto text-orange-200"
-                    aria-hidden="true"
-                  />
-                  <h2 className="mt-4 text-2xl font-black">
-                    No published recipes found
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-white/60">
-                    Try another search.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div
-                  className="relative mt-7 flex min-h-0 flex-1 touch-pan-y items-center justify-center overflow-hidden sm:mt-6 lg:mt-2"
-                  onPointerDown={handleShowcasePointerDown}
-                  onPointerUp={handleShowcasePointerUp}
-                  onPointerCancel={() => {
-                    swipeStartRef.current = null
-                    swipeHandledRef.current = false
-                  }}
-                  onClickCapture={handleShowcaseClickCapture}
-                >
-                  <div className="relative h-[360px] w-full sm:h-[430px] lg:h-[470px]">
-                    {slides.map((slide, index) => {
-                      const offset = index - carouselPosition
-                      const distance = Math.abs(offset)
-                      const visible = distance < 2.25
-
-                      if (!visible) {
-                        return null
-                      }
-
-                      const translateX = offset * 52
-                      const translateY = distance * 5
-                      const scale = Math.max(
-                        0.56,
-                        1 - distance * 0.25,
-                      )
-                      const rotateY = clamp(
-                        offset * -34,
-                        -58,
-                        58,
-                      )
-                      const opacity = clamp(
-                        1 - Math.max(0, distance - 1) * 0.7,
-                        0,
-                        1,
-                      )
-                      const blur =
-                        distance > 1.15
-                          ? Math.min(4, (distance - 1.15) * 4)
-                          : 0
-                      const endPairShift =
-                        slideCount <= 1
-                          ? 0.5
-                          : clamp(
-                              carouselPosition -
-                                (slideCount - 2),
-                              0,
-                              1,
-                            )
-                      const desktopTranslateX =
-                        (offset - 0.5 + endPairShift) * 30
-                      const desktopPairDistance = Math.max(
-                        0,
-                        (Math.abs(desktopTranslateX) - 15) / 30,
-                      )
-                      const desktopTranslateY =
-                        desktopPairDistance * 5
-                      const desktopScale = Math.max(
-                        0.56,
-                        1 - desktopPairDistance * 0.25,
-                      )
-                      const desktopRotateY = clamp(
-                        desktopTranslateX * -0.2,
-                        -18,
-                        18,
-                      )
-                      const desktopBlur =
-                        desktopPairDistance > 1.15
-                          ? Math.min(
-                              4,
-                              (desktopPairDistance - 1.15) * 4,
-                            )
-                          : 0
-
-                      return (
-                        <div
-                          key={
-                            slide.type === 'recipe'
-                              ? recipeKey(slide.item, index)
-                              : 'view-all-recipes'
-                          }
-                          className={`recipe-showcase-slide absolute left-1/2 top-1/2 h-[330px] w-[248px] sm:h-[400px] sm:w-[300px] lg:h-[450px] lg:w-[338px] ${
-                            distance < 0.58
-                              ? 'pointer-events-auto'
-                              : 'pointer-events-none'
-                          } ${
-                            distance < 1.05
-                              ? 'lg:pointer-events-auto'
-                              : 'lg:pointer-events-none'
-                          }`}
-                          style={{
-                            '--recipe-mobile-x': `${translateX}vw`,
-                            '--recipe-mobile-y': `${translateY}px`,
-                            '--recipe-mobile-scale': scale,
-                            '--recipe-mobile-rotate': `${rotateY}deg`,
-                            '--recipe-mobile-blur': `${blur}px`,
-                            '--recipe-desktop-x': `${desktopTranslateX}vw`,
-                            '--recipe-desktop-y': `${desktopTranslateY}px`,
-                            '--recipe-desktop-scale': desktopScale,
-                            '--recipe-desktop-rotate': `${desktopRotateY}deg`,
-                            '--recipe-desktop-blur': `${desktopBlur}px`,
-                            transformOrigin: 'center center',
-                            opacity,
-                            zIndex: Math.round(20 - distance * 4),
-                            willChange: 'transform, opacity, filter',
-                          }}
-                        >
-                          {slide.type === 'recipe' ? (
-                            <RecipePreviewCard
-                              item={slide.item}
-                              index={index}
-                            />
-                          ) : (
-                            <ViewAllSlide
-                              onOpen={() => setRecipeModalOpen(true)}
-                            />
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="mx-auto -mt-1 w-full max-w-5xl text-center">
-                  <div className="min-h-[62px]">
-                    <p
-                      key={activeIndex}
-                      className="animate-[recipeTitleRise_.42s_ease-out] font-serif text-2xl font-semibold tracking-[-0.025em] text-[#fff7ed] sm:text-3xl"
-                    >
-                      {activeRecipe
-                        ? recipeName(activeRecipe)
-                        : 'Explore every published recipe'}
-                    </p>
-                  </div>
-
-                  <div className="mt-1 inline-flex items-center gap-4 rounded-full border border-white/12 bg-black/18 px-4 py-2.5 shadow-lg backdrop-blur-xl">
-                    <button
-                      type="button"
-                      onClick={() => scrollToSlide(activeIndex - 1)}
-                      disabled={activeIndex <= 0}
-                      className="focus-ring grid h-9 w-9 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
-                      aria-label="Previous recipe"
-                    >
-                      <ChevronLeft
-                        size={22}
-                        aria-hidden="true"
-                      />
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      {slides.map((slide, index) => (
-                        <span
-                          key={
-                            slide.type === 'recipe'
-                              ? `dot-${recipeKey(slide.item, index)}`
-                              : 'dot-view-all'
-                          }
-                          className={`block h-2 rounded-full transition-all duration-300 ${
-                            index === activeIndex
-                              ? 'w-9 bg-orange-100'
-                              : 'w-2 bg-white/28'
-                          }`}
-                        />
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => scrollToSlide(activeIndex + 1)}
-                      disabled={activeIndex >= slideCount - 1}
-                      className="focus-ring grid h-9 w-9 place-items-center rounded-full text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
-                      aria-label="Next recipe"
-                    >
-                      <ChevronRight
-                        size={22}
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mx-auto mt-4 w-full max-w-[1280px] rounded-[24px] border border-white/10 bg-white/[0.055] p-3 shadow-[0_18px_60px_rgba(0,0,0,.16)] backdrop-blur-xl sm:p-4">
-                  <div className="mb-3 flex items-center justify-between gap-4 px-1">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-200/65">
-                        Browse categories
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-white/45">
-                        Explore recipes by course.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setCategoryModalOpen(true)}
-                      className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 py-2 text-xs font-black text-white transition hover:bg-white/12"
-                    >
-                      View all categories
-                      <ChevronRight
-                        size={15}
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                    {visibleCategories.map((category, index) => (
-                      <div
-                        key={category.name}
-                        className="rounded-[18px] border border-white/10 bg-black/12 px-4 py-3 text-left"
-                      >
-                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-200/55">
-                          {String(index + 1).padStart(2, '0')}
-                        </p>
-                        <p className="mt-2 truncate text-sm font-black text-white">
-                          {category.name}
-                        </p>
-                        <p className="mt-1 text-[10px] font-semibold text-white/40">
-                          {category.count}{' '}
-                          {category.count === 1
-                            ? 'recipe'
-                            : 'recipes'}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-end border-t border-white/10 pt-3 text-[9px] font-black uppercase tracking-[0.18em] text-white/35 lg:justify-between">
-                  <span className="hidden lg:inline">
-                    Scroll down to explore. Scroll up to revisit.
-                  </span>
-                  <span>
-                    {String(activeIndex + 1).padStart(2, '0')} /{' '}
-                    {String(slideCount).padStart(2, '0')}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <SponsoredCampaignSlot
-        placement="recipe"
-        slotKey="recipe_restaurants"
-      />
-
-      <section className="border-t border-orange-950/10 bg-[linear-gradient(135deg,#ffe8c7_0%,#fff4df_46%,#f9dfc4_100%)] py-12 sm:py-16">
+      <section ref={browseRef} className="scroll-mt-[70px] border-t border-[#DCE0CF] bg-[#F7F6F2] py-10 sm:py-14" aria-label="Explore recipes by type">
         <div className="page-shell">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-800">
-                Restaurant recipes
-              </p>
-              <h2 className="mt-2 font-serif text-3xl font-semibold tracking-[-0.035em] text-[#35180d] sm:text-4xl">
-                From Restaurants
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#6f4a36]">
-                Approved dishes from Chef + Restaurant Hosts, with the source restaurant and outlet shown clearly.
-              </p>
-            </div>
-
-            {restaurantRecipes.length > 0 ? (
-              <p className="text-xs font-black text-orange-900/65">
-                {restaurantRecipes.length}{' '}
-                {restaurantRecipes.length === 1
-                  ? 'restaurant recipe'
-                  : 'restaurant recipes'}
-              </p>
-            ) : null}
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#173F35]">EPANTRY recipe collection</p>
+            <h2 className="mt-2 text-[28px] font-bold leading-tight tracking-[-0.04em] text-[#202421] sm:text-[36px]">Find your next favourite.</h2>
           </div>
 
-          {restaurantError ? (
-            <div
-              role="alert"
-              className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-800"
-            >
-              {restaurantError}
+          {/* Meal/collection selection. The first line stays one row. All other
+              types live in a native keyboard-accessible dropdown. */}
+          <div className="mt-7 rounded-[16px] border border-[#DCE0CF] bg-[#DCE0CF]/45 p-3 sm:p-4">
+            <div className="mb-3 flex items-center gap-2 text-[#173F35]">
+              <SlidersHorizontal size={18} aria-hidden="true" />
+              <h3 className="text-[15px] font-bold uppercase tracking-[0.08em]">Explore by type</h3>
             </div>
-          ) : restaurantLoading ? (
-            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={`restaurant-recipe-loading-${index}`}
-                  className="aspect-[0.78/1] animate-pulse rounded-[24px] border border-orange-950/10 bg-white/45"
-                />
+            <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-2">
+              {recipeTabs.filter((tab) => desktopMainTabs.includes(tab.id)).map(({ id, label }) => (
+                <button key={id} type="button" aria-pressed={selectedCollection === id} onClick={() => chooseCollection(id)}
+                  className={`focus-ring hidden min-h-11 shrink-0 items-center justify-center rounded-full border px-3 py-2 text-[14px] font-semibold whitespace-nowrap transition-colors lg:inline-flex ${selectedCollection === id ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}
+                >{label}</button>
               ))}
-            </div>
-          ) : restaurantRecipes.length > 0 ? (
-            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-              {restaurantRecipes.map((item, index) => (
-                <RestaurantRecipeCard
-                  key={`restaurant-${recipeKey(item, index)}`}
-                  item={item}
-                />
+              {recipeTabs.filter((tab) => mobileMainTabs.includes(tab.id)).map(({ id, label }) => (
+                <button key={id} type="button" aria-pressed={selectedCollection === id} onClick={() => chooseCollection(id)}
+                  aria-label={label}
+                  className={`focus-ring inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-2.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors lg:hidden ${selectedCollection === id ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}
+                >{id === 'all' ? 'All' : label}</button>
               ))}
-            </div>
-          ) : (
-            <div className="mt-7 rounded-[24px] border border-dashed border-orange-900/20 bg-white/45 px-6 py-10 text-center">
-              <ChefHat
-                size={34}
-                className="mx-auto text-orange-800"
-                aria-hidden="true"
+              <AdaptiveRecipeTypeSelect
+                groups={desktopMoreGroups}
+                options={desktopExtraTabs}
+                currentId={selectedCollection}
+                onSelect={chooseCollection}
               />
-              <p className="mt-3 text-sm font-black text-[#4b2818]">
-                No approved Restaurant recipes are available yet.
-              </p>
+              <AdaptiveRecipeTypeSelect
+                groups={mobileMoreGroups}
+                options={mobileExtraTabs}
+                currentId={selectedCollection}
+                onSelect={chooseCollection}
+                mobile
+              />
+            </div>
+            {/* Diet is separate: Lunch + Vegetarian, Dinner + Non-Vegetarian,
+                Restaurant Picks + Vegetarian, etc. all remain possible. */}
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#173F35]/15 pt-3">
+              <span className="mr-1 text-[14px] font-semibold text-[#173F35]">Food preference</span>
+              {[{ id: 'all', label: 'Any' }, { id: 'veg', label: 'Veg' }, { id: 'nonveg', label: 'Non-Veg' }].map(({ id, label }) => (
+                <button key={id} type="button" aria-pressed={selectedDiet === id} onClick={() => chooseDiet(id)}
+                  className={`focus-ring min-h-10 rounded-full border px-4 text-[14px] font-semibold whitespace-nowrap transition-colors ${selectedDiet === id ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}
+                >{label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Category-aware search; query and diet filter the same results. */}
+          <div className="mt-4">
+            <label className="flex min-h-[54px] items-center gap-3 rounded-[14px] border border-[#DCE0CF] bg-[#F7F6F2] px-4 transition-colors focus-within:border-[#173F35] focus-within:ring-2 focus-within:ring-[#173F35]/15">
+              <Search size={21} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+              <span className="sr-only">Search in {searchScope}</span>
+              <input type="search" value={collectionQuery} onChange={handleCollectionSearch}
+                onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)}
+                maxLength={160} placeholder={hint || `Search ${searchScope.toLowerCase()}...`}
+                className="focus-ring h-[52px] w-full min-w-0 flex-1 bg-transparent text-base text-[#202421] outline-none placeholder:text-[#202421]/60" />
+              {collectionQuery && <button type="button" aria-label="Clear recipe search"
+                onClick={() => { setCollectionQuery(''); setSearchInput(''); setVisibleCount(revealSize) }}
+                className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#DCE0CF] text-[#173F35] hover:bg-[#173F35] hover:text-[#F7F6F2]">
+                <X size={17} aria-hidden="true" />
+              </button>}
+            </label>
+          </div>
+
+          <SponsoredCampaignSlot placement="recipe" slotKey="recipe_collection" />
+
+          {(error || restaurantError) && <div role="alert" className="mt-5 rounded-[12px] border border-[#C86C42] bg-[#F7F6F2] p-4 text-sm text-[#202421]">{[error, restaurantError].filter(Boolean).join(' ')}</div>}
+          {loading ? (
+            <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-5" role="status" aria-label="Loading recipes">
+              {Array.from({ length: 6 }, (_, index) => <div key={index} className="aspect-[4/3] animate-pulse rounded-[16px] bg-[#DCE0CF] lg:aspect-[3/2]" />)}
+            </div>
+          ) : dietaryLoading && selectedDiet !== 'all' ? (
+            <div className="mt-8 flex min-h-36 items-center gap-3 text-[#173F35]" role="status"><ChefHat size={24} className="animate-pulse" /> Checking approved dietary information…</div>
+          ) : visibleRecipes.length > 0 ? (
+            <>
+              <div className="mt-6 grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+                {visibleRecipes.map(({ item, restaurant }, index) => (
+                  <RecipeGridCard key={`${restaurant ? 'restaurant' : 'standard'}-${recipeKey(item, index)}`} item={item} restaurant={restaurant} />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="mt-8 rounded-[16px] border border-dashed border-[#173F35]/30 bg-[#DCE0CF]/45 px-6 py-12 text-center">
+              <ChefHat size={36} className="mx-auto text-[#173F35]" aria-hidden="true" />
+              <h3 className="mt-3 text-xl font-bold text-[#202421]">No matching recipes yet</h3>
+              <p className="mt-2 text-base text-[#202421]">Try a different search or browse another category. Future collections will show published recipes here.</p>
             </div>
           )}
+          {!loading && canViewMore && (
+            <div className="mt-8 flex flex-col items-center gap-2 border-t border-[#DCE0CF] pt-7">
+              <button type="button" disabled={loadingMore} onClick={handleViewMore} className="focus-ring inline-flex min-h-[48px] items-center gap-2 rounded-full bg-[#173F35] px-8 text-[15px] font-bold text-[#F7F6F2] transition hover:bg-[#202421] disabled:opacity-60">
+                {loadingMore ? 'Loading more recipes…' : 'View all · Show more recipes'} <ChevronRight size={19} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          {(selectedCollection === 'all' || selectedCollection === 'restaurant') && <SponsoredCampaignSlot placement="recipe" slotKey="recipe_restaurants" />}
         </div>
       </section>
-
-      {recipeModalOpen && (
-        <ModalShell
-          onClose={() => setRecipeModalOpen(false)}
-          ariaLabel="All recipes"
-          wide
-        >
-          <header className="border-b border-stone-900/10 px-5 pb-4 pt-6 sm:px-8 sm:pb-5 sm:pt-7">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-700">
-              Recipe collection
-            </p>
-            <h2 className="mt-1.5 pr-14 font-serif text-[28px] font-semibold tracking-[-0.03em] text-[#35180d] sm:mt-2 sm:text-4xl">
-              All recipes
-            </h2>
-            <p className="mt-1 text-xs font-semibold text-stone-500 sm:mt-2 sm:text-sm">
-              {filteredModalRecipes.length}{' '}
-              {filteredModalRecipes.length === 1
-                ? 'recipe'
-                : 'recipes'}{' '}
-              shown
-            </p>
-
-            <div className="mt-4 space-y-3 lg:hidden">
-              <label className="relative block">
-                <Search
-                  size={16}
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500"
-                />
-                <input
-                  type="search"
-                  value={modalRecipeSearch}
-                  onChange={(event) => setModalRecipeSearch(event.target.value)}
-                  placeholder="Search recipes"
-                  className="focus-ring h-11 w-full rounded-2xl border border-stone-900/10 bg-white/80 pl-10 pr-4 text-sm font-semibold text-stone-900 outline-none placeholder:text-stone-400"
-                />
-              </label>
-
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  ['all', 'All'],
-                  ['veg', 'Veg'],
-                  ['nonveg', 'Non-veg'],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setModalRecipeDiet(value)}
-                    className={`rounded-xl px-3 py-2 text-[11px] font-black transition ${
-                      modalRecipeDiet === value
-                        ? 'bg-[#35180d] text-white'
-                        : 'border border-stone-900/10 bg-white/70 text-stone-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {modalDietaryLoading ? (
-                <p className="text-[10px] font-bold text-stone-500">
-                  Checking approved Veg / Non-veg classifications…
-                </p>
-              ) : null}
-            </div>
-          </header>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-            {modalDietaryLoading && modalRecipeDiet !== 'all' ? (
-              <div className="grid min-h-[220px] place-items-center rounded-[24px] border border-stone-900/10 bg-white/45 px-6 text-center">
-                <div>
-                  <ChefHat
-                    size={34}
-                    aria-hidden="true"
-                    className="mx-auto animate-pulse text-orange-700"
-                  />
-                  <p className="mt-3 text-sm font-black text-stone-800">
-                    Checking approved dietary classifications…
-                  </p>
-                </div>
-              </div>
-            ) : filteredModalRecipes.length ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-                {filteredModalRecipes.map((item, index) => (
-                  <Link
-                    key={recipeKey(item, index)}
-                    to={recipePath(item)}
-                    onClick={() => setRecipeModalOpen(false)}
-                    className="focus-ring group min-w-0 overflow-hidden rounded-[20px] border border-stone-900/10 bg-white/80 shadow-[0_10px_28px_rgba(54,28,17,0.08)] transition hover:-translate-y-0.5 hover:shadow-lg sm:rounded-[22px]"
-                  >
-                    <div className="relative aspect-[4/3] overflow-hidden bg-[#f1e7db] lg:aspect-[16/10]">
-                      {item?.dish?.heroImageUrl ? (
-                        <img
-                          src={item.dish.heroImageUrl}
-                          alt={recipeName(item)}
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
-                        />
-                      ) : (
-                        <div className="grid h-full place-items-center text-orange-700">
-                          <ChefHat
-                            size={30}
-                            aria-hidden="true"
-                          />
-                        </div>
-                      )}
-
-                      <div className="absolute inset-x-2 bottom-2 flex flex-wrap gap-1 sm:inset-x-3 sm:bottom-3 sm:gap-2">
-                        {recipeCuisine(item) && (
-                          <span className="max-w-full truncate rounded-full bg-black/55 px-2 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-white backdrop-blur sm:px-2.5 sm:text-[9px]">
-                            {recipeCuisine(item)}
-                          </span>
-                        )}
-                        <span className="max-w-full truncate rounded-full bg-[#c65d16]/85 px-2 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-white backdrop-blur sm:px-2.5 sm:text-[9px]">
-                          {recipeCourse(item)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="px-3 py-3 sm:px-4 sm:py-4 lg:min-h-[74px]">
-                      <h3 className="line-clamp-3 text-[13px] font-black leading-[1.18] text-stone-950 sm:line-clamp-2 sm:text-base lg:font-serif lg:text-lg lg:font-semibold lg:tracking-[-0.015em] lg:text-[#35180d]">
-                        {recipeName(item)}
-                      </h3>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="grid min-h-[220px] place-items-center rounded-[24px] border border-dashed border-stone-900/15 bg-white/45 px-6 text-center">
-                <div>
-                  <ChefHat
-                    size={34}
-                    aria-hidden="true"
-                    className="mx-auto text-orange-700"
-                  />
-                  <p className="mt-3 text-sm font-black text-stone-800">
-                    No recipes match these filters.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setModalRecipeSearch('')
-                      setModalRecipeDiet('all')
-                    }}
-                    className="mt-3 text-xs font-black text-orange-700 underline underline-offset-4"
-                  >
-                    Clear filters
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </ModalShell>
-      )}
-
-      {categoryModalOpen && (
-        <ModalShell
-          onClose={() => setCategoryModalOpen(false)}
-          ariaLabel="Recipe categories"
-        >
-          <header className="border-b border-stone-900/10 px-6 pb-5 pt-7 sm:px-8">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-700">
-              Browse recipes
-            </p>
-            <h2 className="mt-2 pr-14 font-serif text-3xl font-semibold tracking-[-0.03em] text-[#35180d] sm:text-4xl">
-              All categories
-            </h2>
-          </header>
-
-          <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 overflow-y-auto p-5 sm:grid-cols-3 sm:p-6 lg:grid-cols-4">
-            {categories.map((category, index) => (
-              <div
-                key={category.name}
-                className="rounded-[22px] border border-orange-900/10 bg-white/72 p-5 shadow-sm"
-              >
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-700/65">
-                  {String(index + 1).padStart(2, '0')}
-                </p>
-                <p className="mt-5 font-serif text-2xl font-semibold leading-none text-[#3f1d0f]">
-                  {category.name}
-                </p>
-                <p className="mt-3 text-xs font-bold text-stone-500">
-                  {category.count}{' '}
-                  {category.count === 1
-                    ? 'recipe'
-                    : 'recipes'}
-                </p>
-              </div>
-            ))}
-          </div>
-        </ModalShell>
-      )}
-
-      <style>{`
-        .recipe-showcase-section {
-          min-height: 100svh;
-        }
-
-        @media (min-width: 1024px) {
-          .recipe-showcase-section {
-            min-height: var(--recipe-showcase-height);
-          }
-        }
-
-        .recipe-showcase-slide {
-          transform: translate3d(
-              calc(-50% + var(--recipe-mobile-x)),
-              calc(-50% + var(--recipe-mobile-y)),
-              0
-            )
-            perspective(1200px)
-            rotateY(var(--recipe-mobile-rotate))
-            scale(var(--recipe-mobile-scale));
-          filter: blur(var(--recipe-mobile-blur));
-        }
-
-        @media (min-width: 1024px) {
-          .recipe-showcase-slide {
-            transform: translate3d(
-                calc(-50% + var(--recipe-desktop-x)),
-                calc(-50% + var(--recipe-desktop-y)),
-                0
-              )
-              perspective(1200px)
-              rotateY(var(--recipe-desktop-rotate))
-              scale(var(--recipe-desktop-scale));
-            filter: blur(var(--recipe-desktop-blur));
-          }
-        }
-
-        @keyframes recipeTitleRise {
-          from {
-            opacity: 0;
-            transform: translateY(12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </main>
   )
 }
