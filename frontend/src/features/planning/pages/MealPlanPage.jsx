@@ -1,29 +1,20 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ArrowRight,
   CalendarDays,
   CalendarRange,
   ChefHat,
-  Clock3,
   Plus,
   RefreshCw,
   ShieldCheck,
   Trash2,
   TriangleAlert,
-  UtensilsCrossed,
   UsersRound,
   X,
-} from 'lucide-react'
+} from "lucide-react";
 
-import {
-  Link,
-} from 'react-router-dom'
+import { Link } from "react-router-dom";
 
 import {
   addPlannedMeal,
@@ -32,1946 +23,1433 @@ import {
   getPlanningErrorMessage,
   listMealPlans,
   updatePlannedMeal,
-} from '../services/planning.service'
+} from "../services/planning.service";
 
-import {
-  listPublicRecipes,
-} from '../../recipes/services/recipe.service'
-
-const MEAL_PLAN_VISUALS = [
-  '/video/meal 1.png',
-  '/video/meal 2.png',
-  '/video/meal 3.png',
-  '/video/meal 4.png',
-  '/video/meal 5.png',
-]
+import { listPublicRecipes } from "../../recipes/services/recipe.service";
 
 const READINESS_LABELS = {
-  enough:
-    'Enough',
+  enough: "Enough",
 
-  likely_enough:
-    'Likely enough',
+  likely_enough: "Likely enough",
 
-  running_low_before_meal:
-    'Running low',
+  running_low_before_meal: "Running low",
 
-  expected_depleted:
-    'Expected depleted',
+  expected_depleted: "Expected depleted",
 
-  missing:
-    'Missing',
+  missing: "Missing",
 
-  needs_confirmation:
-    'Needs confirmation',
-}
+  needs_confirmation: "Needs confirmation",
+};
 
-const READINESS_CLASSES = {
-  enough:
-    'border-emerald-200 bg-emerald-50 text-emerald-800',
-
-  likely_enough:
-    'border-sky-200 bg-sky-50 text-sky-800',
-
-  running_low_before_meal:
-    'border-violet-200 bg-violet-50 text-violet-800',
-
-  expected_depleted:
-    'border-rose-200 bg-rose-50 text-rose-800',
-
-  missing:
-    'border-rose-200 bg-rose-50 text-rose-800',
-
-  needs_confirmation:
-    'border-stone-200 bg-stone-100 text-stone-700',
-}
-
-function isoDate(
-  date,
-) {
-  return date
-    .toISOString()
-    .slice(
-      0,
-      10,
-    )
+function isoDate(date) {
+  return date.toISOString().slice(0, 10);
 }
 
 function defaultPlanDates() {
-  const start =
-    new Date()
+  const start = new Date();
 
-  const end =
-    new Date()
+  const end = new Date();
 
-  end.setDate(
-    end.getDate() +
-      7,
-  )
+  end.setDate(end.getDate() + 7);
 
   return {
-    start:
-      isoDate(
-        start,
-      ),
+    start: isoDate(start),
 
-    end:
-      isoDate(
-        end,
-      ),
-  }
+    end: isoDate(end),
+  };
 }
 
-function formatDateTime(
-  value,
-) {
+function formatDateTime(value) {
   if (!value) {
-    return 'Not scheduled'
+    return "Not scheduled";
   }
 
-  return new Intl.DateTimeFormat(
-    'en-IN',
-    {
-      dateStyle:
-        'medium',
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
 
-      timeStyle:
-        'short',
-    },
-  ).format(
-    new Date(
-      value,
-    ),
-  )
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
-function formatDateOnly(
-  value,
-) {
+function formatDateOnly(value) {
   if (!value) {
-    return 'Not set'
+    return "Not set";
   }
 
-  return new Intl.DateTimeFormat(
-    'en-IN',
-    {
-      day:
-        '2-digit',
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
 
-      month:
-        'short',
+    month: "short",
 
-      year:
-        'numeric',
-    },
-  ).format(
-    new Date(
-      value,
-    ),
-  )
+    year: "numeric",
+  }).format(new Date(value));
 }
 
-function titleCase(
-  value,
-) {
+function titleCase(value) {
   if (!value) {
-    return ''
+    return "";
   }
 
-  return String(
-    value,
-  )
-    .replace(
-      /_/g,
-      ' ',
-    )
-    .replace(
-      /\b\w/g,
-      (
-        character,
-      ) =>
-        character.toUpperCase(),
-    )
-}
-
-function ReadinessBadge({
-  state,
-}) {
-  const key =
-    state ||
-    'needs_confirmation'
-
-  return (
-    <span
-      className={[
-        'inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em]',
-        READINESS_CLASSES[
-          key
-        ] ||
-          READINESS_CLASSES
-            .needs_confirmation,
-      ].join(
-        ' ',
-      )}
-    >
-      {READINESS_LABELS[
-        key
-      ] ||
-        'Needs confirmation'}
-    </span>
-  )
+  return String(value)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 export default function MealPlanPage() {
-  const defaults =
-    useMemo(
-      defaultPlanDates,
-      [],
-    )
+  const defaults = useMemo(defaultPlanDates, []);
 
-  const [
-    mealPlans,
-    setMealPlans,
-  ] =
-    useState([])
+  const [mealPlans, setMealPlans] = useState([]);
 
-  const [
-    selectedPlanId,
-    setSelectedPlanId,
-  ] =
-    useState('')
+  const [selectedPlanId, setSelectedPlanId] = useState("");
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(true)
+  const [loading, setLoading] = useState(true);
 
-  const [
-    saving,
-    setSaving,
-  ] =
-    useState(false)
+  const [saving, setSaving] = useState(false);
 
-  const [
-    deleting,
-    setDeleting,
-  ] =
-    useState(false)
+  const [deleting, setDeleting] = useState(false);
 
-  const [
-    planPendingDelete,
-    setPlanPendingDelete,
-  ] =
-    useState(null)
+  const [planPendingDelete, setPlanPendingDelete] = useState(null);
 
-  const [
-    error,
-    setError,
-  ] =
-    useState('')
+  const [error, setError] = useState("");
 
-  const [
-    recipeOptions,
-    setRecipeOptions,
-  ] =
-    useState([])
+  const [recipeOptions, setRecipeOptions] = useState([]);
 
-  const [
-    recipeOptionsLoading,
-    setRecipeOptionsLoading,
-  ] =
-    useState(true)
+  const [recipeOptionsLoading, setRecipeOptionsLoading] = useState(true);
 
-  const [
-    recipeOptionsError,
-    setRecipeOptionsError,
-  ] =
-    useState('')
+  const [recipeOptionsError, setRecipeOptionsError] = useState("");
 
-  const [
-    planForm,
-    setPlanForm,
-  ] =
-    useState({
-      title:
-        'This Week',
+  const [planForm, setPlanForm] = useState({
+    title: "This Week",
 
-      horizonStart:
-        defaults.start,
+    horizonStart: defaults.start,
 
-      horizonEnd:
-        defaults.end,
-    })
+    horizonEnd: defaults.end,
+  });
 
-  const [
-    mealForm,
-    setMealForm,
-  ] =
-    useState({
-      recipeSlug:
-        '',
+  const [mealForm, setMealForm] = useState({
+    recipeSlug: "",
 
-      plannedAt:
-        '',
+    plannedAt: "",
 
-      mealType:
-        'dinner',
+    mealType: "dinner",
 
-      servings:
-        2,
-    })
+    servings: 2,
+  });
 
-  const [
-    mealVisualIndex,
-    setMealVisualIndex,
-  ] =
-    useState(0)
+  // These overlays only reveal existing saved data; no plan or meal is duplicated.
+  const [showAllPlans, setShowAllPlans] = useState(false);
+  const [showAllMeals, setShowAllMeals] = useState(false);
+  const [activeMealId, setActiveMealId] = useState("");
+  const [scrollRequest, setScrollRequest] = useState(null);
+  const scheduleRef = useRef(null);
+  const mealRowRefs = useRef(new Map());
+  const popupCloseRef = useRef(null);
 
-  const selectedPlan =
-    useMemo(
-      () =>
-        mealPlans.find(
-          (
-            plan,
-          ) =>
-            plan.id ===
-            selectedPlanId,
-        ) ||
-        mealPlans[0] ||
-        null,
-      [
-        mealPlans,
-        selectedPlanId,
-      ],
-    )
+  const selectedPlan = useMemo(
+    () =>
+      mealPlans.find((plan) => plan.id === selectedPlanId) ||
+      mealPlans[0] ||
+      null,
+    [mealPlans, selectedPlanId]
+  );
 
-  useEffect(
-    () => {
-      if (
-        selectedPlan
-      ) {
-        return undefined
+  const savedPlansPreview = mealPlans.slice(0, 4);
+  const selectedMeals = selectedPlan?.meals || [];
+  const selectedMealsPreview = selectedMeals.slice(0, 4);
+
+  // Called only on intentional selection, never when plans load in the background.
+  // A request ID ensures re-selecting the same plan still scrolls correctly.
+  function openPlanInSchedule(planId, mealId = "") {
+    if (!planId) return;
+    setSelectedPlanId(planId);
+    setActiveMealId(mealId ? String(mealId) : "");
+    setShowAllPlans(false);
+    setShowAllMeals(false);
+    setScrollRequest({
+      planId,
+      mealId: mealId ? String(mealId) : "",
+      at: Date.now(),
+    });
+  }
+
+  useEffect(() => {
+    if (!scrollRequest || selectedPlan?.id !== scrollRequest.planId)
+      return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const mealRow = scrollRequest.mealId
+        ? mealRowRefs.current.get(scrollRequest.mealId)
+        : null;
+      const destination = mealRow || scheduleRef.current;
+      if (!destination) return;
+      const reducedMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)"
+      )?.matches;
+      destination.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+      // Give keyboard and screen-reader users the same context as pointer users.
+      destination.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [scrollRequest, selectedPlan?.id]);
+
+  useEffect(() => {
+    if (!showAllPlans && !showAllMeals) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setShowAllPlans(false);
+        setShowAllMeals(false);
       }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const frame = window.requestAnimationFrame(() =>
+      popupCloseRef.current?.focus()
+    );
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      window.cancelAnimationFrame(frame);
+    };
+  }, [showAllPlans, showAllMeals]);
 
-      const timer =
-        window.setInterval(
-          () => {
-            setMealVisualIndex(
-              (
-                current,
-              ) =>
-                (current + 1) %
-                MEAL_PLAN_VISUALS.length,
-            )
-          },
-          3200,
-        )
+  const load = useCallback(async () => {
+    setLoading(true);
 
-      return () =>
-        window.clearInterval(
-          timer,
-        )
-    },
-    [
-      selectedPlan,
-    ],
-  )
-
-  const load =
-    useCallback(
-      async () => {
-        setLoading(
-          true,
-        )
-
-        setError(
-          '',
-        )
-
-        try {
-          const result =
-            await listMealPlans()
-
-          const rows =
-            result?.mealPlans ||
-            []
-
-          setMealPlans(
-            rows,
-          )
-
-          setSelectedPlanId(
-            (
-              current,
-            ) =>
-              rows.some(
-                (
-                  row,
-                ) =>
-                  row.id ===
-                  current,
-              )
-                ? current
-                : rows[0]?.id ||
-                  '',
-          )
-        } catch (
-          loadError
-        ) {
-          setError(
-            getPlanningErrorMessage(
-              loadError,
-              'Unable to load your Meal Plan.',
-            ),
-          )
-        } finally {
-          setLoading(
-            false,
-          )
-        }
-      },
-      [],
-    )
-
-  useEffect(
-    () => {
-      load()
-    },
-    [
-      load,
-    ],
-  )
-
-  useEffect(
-    () => {
-      let active =
-        true
-
-      async function loadPublishedRecipes() {
-        setRecipeOptionsLoading(
-          true,
-        )
-
-        setRecipeOptionsError(
-          '',
-        )
-
-        try {
-          const result =
-            await listPublicRecipes({
-              page:
-                1,
-
-              limit:
-                50,
-            })
-
-          if (!active) {
-            return
-          }
-
-          setRecipeOptions(
-            Array.isArray(
-              result?.recipes,
-            )
-              ? result.recipes
-              : [],
-          )
-        } catch (
-          recipeLoadError
-        ) {
-          if (!active) {
-            return
-          }
-
-          setRecipeOptionsError(
-            recipeLoadError?.response?.data?.message ||
-              recipeLoadError?.message ||
-              'Unable to load published recipes.',
-          )
-
-          setRecipeOptions(
-            [],
-          )
-        } finally {
-          if (active) {
-            setRecipeOptionsLoading(
-              false,
-            )
-          }
-        }
-      }
-
-      loadPublishedRecipes()
-
-      return () => {
-        active =
-          false
-      }
-    },
-    [],
-  )
-
-  async function handleCreatePlan(
-    event,
-  ) {
-    event.preventDefault()
-
-    setSaving(
-      true,
-    )
-
-    setError(
-      '',
-    )
+    setError("");
 
     try {
-      const result =
-        await createMealPlan({
-          title:
-            planForm.title,
+      const result = await listMealPlans();
 
-          horizonStart:
-            new Date(
-              `${planForm.horizonStart}T00:00:00`,
-            ).toISOString(),
+      const rows = result?.mealPlans || [];
 
-          horizonEnd:
-            new Date(
-              `${planForm.horizonEnd}T23:59:59`,
-            ).toISOString(),
-        })
+      setMealPlans(rows);
 
-      setSelectedPlanId(
-        result?.mealPlan?.id ||
-        '',
-      )
-
-      await load()
-    } catch (
-      saveError
-    ) {
+      setSelectedPlanId((current) =>
+        rows.some((row) => row.id === current) ? current : rows[0]?.id || ""
+      );
+    } catch (loadError) {
       setError(
-        getPlanningErrorMessage(
-          saveError,
-        ),
-      )
+        getPlanningErrorMessage(loadError, "Unable to load your Meal Plan.")
+      );
     } finally {
-      setSaving(
-        false,
-      )
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPublishedRecipes() {
+      setRecipeOptionsLoading(true);
+
+      setRecipeOptionsError("");
+
+      try {
+        const result = await listPublicRecipes({
+          page: 1,
+
+          limit: 50,
+        });
+
+        if (!active) {
+          return;
+        }
+
+        setRecipeOptions(Array.isArray(result?.recipes) ? result.recipes : []);
+      } catch (recipeLoadError) {
+        if (!active) {
+          return;
+        }
+
+        setRecipeOptionsError(
+          recipeLoadError?.response?.data?.message ||
+            recipeLoadError?.message ||
+            "Unable to load published recipes."
+        );
+
+        setRecipeOptions([]);
+      } finally {
+        if (active) {
+          setRecipeOptionsLoading(false);
+        }
+      }
+    }
+
+    loadPublishedRecipes();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleCreatePlan(event) {
+    event.preventDefault();
+
+    setSaving(true);
+
+    setError("");
+
+    try {
+      const result = await createMealPlan({
+        title: planForm.title,
+
+        horizonStart: new Date(
+          `${planForm.horizonStart}T00:00:00`
+        ).toISOString(),
+
+        horizonEnd: new Date(`${planForm.horizonEnd}T23:59:59`).toISOString(),
+      });
+
+      setSelectedPlanId(result?.mealPlan?.id || "");
+
+      await load();
+    } catch (saveError) {
+      setError(getPlanningErrorMessage(saveError));
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function handleAddMeal(
-    event,
-  ) {
-    event.preventDefault()
+  async function handleAddMeal(event) {
+    event.preventDefault();
 
-    if (
-      !selectedPlan?.id
-    ) {
-      return
+    if (!selectedPlan?.id) {
+      return;
     }
 
-    setSaving(
-      true,
-    )
+    setSaving(true);
 
-    setError(
-      '',
-    )
+    setError("");
 
     try {
       await addPlannedMeal({
-        mealPlanId:
-          selectedPlan.id,
+        mealPlanId: selectedPlan.id,
 
-        recipeSlug:
-          mealForm.recipeSlug,
+        recipeSlug: mealForm.recipeSlug,
 
-        plannedAt:
-          new Date(
-            mealForm.plannedAt,
-          ).toISOString(),
+        plannedAt: new Date(mealForm.plannedAt).toISOString(),
 
-        mealType:
-          mealForm.mealType,
+        mealType: mealForm.mealType,
 
-        servings:
-          Number(
-            mealForm.servings,
-          ),
+        servings: Number(mealForm.servings),
 
-        priority:
-          3,
-      })
+        priority: 3,
+      });
 
-      setMealForm(
-        (
-          current,
-        ) => ({
-          ...current,
+      setMealForm((current) => ({
+        ...current,
 
-          recipeSlug:
-            '',
-        }),
-      )
+        recipeSlug: "",
+      }));
 
-      await load()
-    } catch (
-      saveError
-    ) {
-      setError(
-        getPlanningErrorMessage(
-          saveError,
-        ),
-      )
+      await load();
+    } catch (saveError) {
+      setError(getPlanningErrorMessage(saveError));
     } finally {
-      setSaving(
-        false,
-      )
+      setSaving(false);
     }
   }
 
-  async function changeMeal({
-    mealId,
-    changes,
-  }) {
-    setSaving(
-      true,
-    )
+  async function changeMeal({ mealId, changes }) {
+    setSaving(true);
 
-    setError(
-      '',
-    )
+    setError("");
 
     try {
       await updatePlannedMeal({
-        plannedMealId:
-          mealId,
+        plannedMealId: mealId,
 
         changes,
-      })
+      });
 
-      await load()
-    } catch (
-      saveError
-    ) {
-      setError(
-        getPlanningErrorMessage(
-          saveError,
-        ),
-      )
+      await load();
+    } catch (saveError) {
+      setError(getPlanningErrorMessage(saveError));
     } finally {
-      setSaving(
-        false,
-      )
+      setSaving(false);
     }
   }
 
   async function handleDeletePlan() {
-    if (
-      !planPendingDelete?.id
-    ) {
-      return
+    if (!planPendingDelete?.id) {
+      return;
     }
 
-    setDeleting(
-      true,
-    )
+    setDeleting(true);
 
-    setError(
-      '',
-    )
+    setError("");
 
     try {
       await deleteMealPlan({
-        mealPlanId:
-          planPendingDelete.id,
-      })
+        mealPlanId: planPendingDelete.id,
+      });
 
-      setPlanPendingDelete(
-        null,
-      )
+      setPlanPendingDelete(null);
 
-      await load()
-    } catch (
-      deleteError
-    ) {
+      await load();
+    } catch (deleteError) {
       setError(
-        getPlanningErrorMessage(
-          deleteError,
-          'Unable to delete this Meal Plan.',
-        ),
-      )
+        getPlanningErrorMessage(deleteError, "Unable to delete this Meal Plan.")
+      );
     } finally {
-      setDeleting(
-        false,
-      )
+      setDeleting(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#f1f6f7]">
-      <div className="page-shell py-4 sm:py-6">
-        <section className="overflow-hidden rounded-[24px] border border-[#86d8b1] bg-[#c9f3df] shadow-[0_10px_34px_rgba(31,95,68,0.09)] sm:rounded-[30px] sm:shadow-[0_18px_55px_rgba(31,95,68,0.12)]">
-          <div className="flex flex-col gap-3 p-4 sm:gap-6 sm:p-9 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-[#0f6b4f] bg-[#0f6b4f] px-2.5 py-1 text-white shadow-sm sm:gap-2 sm:px-3 sm:py-1.5">
-                <CalendarDays
-                  className="h-[13px] w-[13px] sm:h-4 sm:w-4"
-                  aria-hidden="true"
-                />
+    <main className="mpx-page">
+      <style>{`
+.mpx-page{--p:#F7F6F2;--f:#173F35;--c:#202421;--s:#D7DDCF;--a:#C56C42;--line:rgba(23,63,53,.18);--muted:#546159;min-height:100vh;width:100%;background:var(--p);color:var(--c);font-family:'Plus Jakarta Sans',Inter,system-ui,sans-serif;font-size:16px;line-height:1.55}
+.mpx-page *,.mpx-page *::before,.mpx-page *::after{box-sizing:border-box}
+.mpx-page :is(h1,h2,h3,p){margin:0}.mpx-page :is(button,input,select){font:inherit}.mpx-page button{cursor:pointer}
+.mpx-frame{width:100%;padding:clamp(18px,2.3vw,32px) clamp(16px,2.5vw,38px) 36px}
+.mpx-eyebrow{display:flex;align-items:center;gap:10px;color:var(--f);font-size:13px;font-weight:700;letter-spacing:.055em;line-height:1.4}
+.mpx-eyebrow::before{content:'';display:block;flex:0 0 22px;width:22px;height:2px;background:var(--a)}
+.mpx-intro{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(265px,.75fr);align-items:stretch;gap:26px;margin:0 0 25px}
+.mpx-intro-copy{padding:16px 0 16px 2px;display:flex;flex-direction:column;justify-content:center}
+.mpx-intro h1{max-width:790px;font-size:clamp(36px,4.1vw,58px);font-weight:650;line-height:1.08;letter-spacing:-.052em;margin:14px 0 14px;color:var(--c)}
+.mpx-intro h1 span{color:var(--f)}.mpx-intro-copy>p:last-child{font-size:16px;color:var(--muted);max-width:680px;line-height:1.65}
+.mpx-next{display:flex;flex-direction:column;justify-content:space-between;gap:18px;background:var(--f);color:var(--p);padding:26px 28px;border-top:5px solid var(--a);box-shadow:9px 9px 0 rgba(215,221,207,.8)}
+.mpx-next-label{font-size:13px;font-weight:650;color:#E6EADF;letter-spacing:.04em}.mpx-next h2{font-size:24px;font-weight:650;letter-spacing:-.035em;line-height:1.25;margin-top:12px}.mpx-next p:not(.mpx-next-label){color:#E6EAE1;font-size:14px;line-height:1.55;margin-top:7px}
+.mpx-next-link{display:inline-flex;align-items:center;justify-content:space-between;gap:13px;align-self:flex-start;min-height:44px;padding:10px 14px;background:var(--p);color:var(--f);font-size:14px;font-weight:700;text-decoration:none;transition:background .18s,transform .18s}.mpx-next-link:hover{background:var(--s);transform:translateY(-2px)}
+.mpx-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-bottom:25px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mpx-progress a{display:flex;align-items:center;gap:12px;min-width:0;padding:15px 15px 15px 0;color:var(--f);text-decoration:none;transition:background .18s}.mpx-progress a+a{padding-left:21px;border-left:1px solid var(--line)}.mpx-progress a:hover{background:rgba(215,221,207,.45)}
+.mpx-progress-n{display:flex;justify-content:center;align-items:center;flex:0 0 34px;height:34px;border:1px solid var(--a);color:var(--f);font-size:15px;font-weight:700}.mpx-progress strong{display:block;font-size:14px;font-weight:750;line-height:1.35}.mpx-progress small{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:2px}
+.mpx-error{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;margin-bottom:18px;background:#FAE7E2;border-left:4px solid #B1433B;color:#792D28;font-size:14px;line-height:1.5}
+.mpx-section{width:100%;margin:0 0 28px;scroll-margin-top:85px}.mpx-section-mark{font-size:13px;line-height:1.4;font-weight:750;letter-spacing:.055em;color:var(--f)}
+.mpx-section-title{font-size:clamp(27px,2.5vw,37px);line-height:1.16;letter-spacing:-.04em;font-weight:650;color:var(--f)}
+.mpx-description{font-size:15px;line-height:1.6;color:var(--muted);max-width:700px}
+.mpx-section-01{display:grid;grid-template-columns:minmax(255px,.67fr) minmax(0,1.33fr);border:1px solid var(--line);overflow:hidden;background:white;box-shadow:0 9px 26px rgba(23,63,53,.05)}
+.mpx-create-heading{background:var(--s);display:flex;flex-direction:column;justify-content:center;gap:17px;padding:clamp(25px,3vw,43px);border-right:1px solid var(--line);position:relative}
+.mpx-create-heading::after{content:'';position:absolute;inset:0 auto 0 0;width:5px;background:var(--a)}
+.mpx-create-heading h2{font-size:clamp(27px,2.6vw,38px);line-height:1.14;font-weight:650;letter-spacing:-.04em;color:var(--f);max-width:410px}
+.mpx-create-heading .mpx-description{color:#384D43}.mpx-create-foot{font-size:13px;color:var(--f);font-weight:650;display:flex;align-items:center;gap:9px;border-top:1px solid rgba(23,63,53,.2);padding-top:15px;margin-top:3px}
+.mpx-create-form{padding:clamp(25px,3vw,43px);align-self:center}.mpx-form-caption{font-size:17px;font-weight:700;color:var(--f);margin:0 0 18px!important}
+.mpx-fields{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:15px}
+.mpx-field{min-width:0;display:block}.mpx-field>span{display:block;font-size:14px;font-weight:650;color:var(--f);margin-bottom:9px}.mpx-input{display:block;width:100%;min-width:0;min-height:49px;padding:11px 13px;background:white;border:1px solid #B9C8BA;border-radius:5px;color:var(--c);font-size:15px;outline:0}
+.mpx-input:focus{border-color:var(--f);box-shadow:0 0 0 3px rgba(23,63,53,.12)}
+.mpx-form-footer{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:21px;flex-wrap:wrap}
+.mpx-form-footer p{font-size:13px;color:var(--muted);max-width:365px}
+.mpx-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:46px;padding:10px 17px;color:#fff;background:var(--f);border:1px solid var(--f);border-radius:5px;font-size:14px;font-weight:700;text-decoration:none;transition:background .18s,transform .18s}
+.mpx-btn:hover:not(:disabled){background:#245949;transform:translateY(-1px)}.mpx-btn:disabled,.mpx-icon:disabled,.mpx-plain:disabled{opacity:.52;cursor:not-allowed}
+.mpx-plain{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 12px;background:var(--p);border:1px solid #B9C8BA;border-radius:5px;color:var(--f);font-size:14px;font-weight:650;text-decoration:none;transition:background .18s}
+.mpx-plain:hover:not(:disabled){background:var(--s)}
+.mpx-icon{display:inline-flex;align-items:center;justify-content:center;min-height:40px;min-width:40px;padding:9px;background:var(--p);border:1px solid #CAD2C7;border-radius:5px;color:var(--f)}.mpx-icon:hover{background:var(--s)}
+.mpx-section-02{background:var(--s);padding:clamp(23px,2.9vw,41px);border-top:5px solid var(--f)}
+.mpx-section-02-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
+.mpx-section-02-head h2{margin:7px 0 9px}.mpx-section-02-head .mpx-description{color:#415449}
+.mpx-selected-block{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;min-width:0;background:var(--f);color:var(--p);border-left:6px solid var(--a);padding:25px 27px;margin-bottom:18px;gap:20px 24px;box-shadow:0 8px 20px rgba(23,63,53,.13)}
+.mpx-selected-block .mpx-section-mark{color:var(--p)}.mpx-selected-block h3{font-size:clamp(25px,3vw,39px);line-height:1.18;font-weight:650;letter-spacing:-.04em;overflow-wrap:anywhere;margin:8px 0 12px}
+.mpx-selected-meta{display:flex;align-items:center;gap:9px 22px;flex-wrap:wrap;color:#E4E9DE;font-size:14px;line-height:1.5}.mpx-selected-meta span{display:inline-flex;align-items:center;gap:8px}
+.mpx-selected-empty{max-width:600px;color:#DFE6DE;font-size:15px;line-height:1.55;margin-top:9px!important}
+.mpx-selected-side{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;gap:19px;min-width:132px}
+.mpx-selected-side-label{font-size:12px;color:#E8EDE3;letter-spacing:.05em;text-align:right}.mpx-selected-side strong{display:block;font-size:33px;line-height:1.1;color:white;text-align:right;font-weight:650;margin-top:5px}
+.mpx-delete{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 12px;color:white;font-size:13px;font-weight:650;border:1px solid rgba(247,246,242,.5);background:transparent;border-radius:5px}.mpx-delete:hover{background:rgba(247,246,242,.13)}
+.mpx-saved-area{background:var(--p);border:1px solid var(--line);padding:24px 25px}
+.mpx-saved-top{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:15px}.mpx-saved-top h3{font-size:23px;line-height:1.2;letter-spacing:-.035em;font-weight:650;color:var(--f);margin:5px 0}.mpx-saved-top p:last-child{font-size:13px;color:var(--muted)}
+.mpx-saved-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-height:none;overflow:visible;overscroll-behavior:auto;padding:2px 0}
+.mpx-plan-entry{display:flex;align-items:center;gap:12px;background:white;border:1px solid #CAD2C7;padding:17px 17px;min-width:0;transition:background .18s,border-color .18s,box-shadow .18s;position:relative;border-radius:4px}
+.mpx-plan-entry.is-active{border:1px solid var(--f);background:#EDF1EA}.mpx-plan-entry.is-active::before{content:'';position:absolute;inset:0 auto 0 0;background:var(--a);width:4px}
+.mpx-plan-entry:hover{border-color:var(--f);background:#F0F2EC;box-shadow:0 8px 18px rgba(23,63,53,.08)}.mpx-plan-main{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;color:var(--c)}
+.mpx-plan-main strong{font-size:16px;line-height:1.3;font-weight:700;display:block;overflow-wrap:anywhere}.mpx-plan-main span{display:block;color:var(--muted);font-size:13px;line-height:1.5;margin-top:5px}
+.mpx-active-label{font-size:12px;font-weight:700;letter-spacing:.02em;background:var(--f);color:white;padding:5px 7px}.mpx-no-plans{grid-column:1/-1;padding:20px;background:white;color:var(--muted);font-size:15px}
+.mpx-section-03{background:var(--p);border:1px solid var(--line);overflow:hidden}
+.mpx-schedule-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:clamp(23px,2.9vw,39px);background:var(--f);color:var(--p)}
+.mpx-schedule-head .mpx-section-mark{color:var(--p)}.mpx-schedule-head h2{font-size:clamp(28px,2.7vw,38px);color:white;margin:9px 0 8px;line-height:1.15;letter-spacing:-.042em;font-weight:650}.mpx-schedule-head .mpx-description{color:#E0E8DF}
+.mpx-count{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 106px;min-height:106px;background:var(--s);color:var(--f);padding:12px;text-align:center}.mpx-count strong{font-size:40px;line-height:1;font-weight:650}.mpx-count span{font-size:12px;line-height:1.4;margin-top:8px}
+.mpx-add-block{display:grid;grid-template-columns:minmax(170px,.55fr) minmax(0,1.45fr);align-items:start;gap:28px;background:var(--s);padding:clamp(22px,2.7vw,36px);border-bottom:1px solid var(--line)}
+.mpx-add-intro h3{font-size:23px;line-height:1.25;letter-spacing:-.03em;font-weight:650;color:var(--f);margin:8px 0 8px}.mpx-add-intro p{color:#45594D;font-size:14px;line-height:1.55}
+.mpx-add-fields{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,.9fr) minmax(90px,.5fr);gap:13px;align-items:end}
+.mpx-add-fields .mpx-field:first-child{grid-column:1/3}.mpx-add-fields .mpx-field:nth-child(2){grid-column:3/5}
+.mpx-add-fields .mpx-field-error{display:block;color:#992F2B;font-size:13px;margin-top:6px}
+.mpx-add-submit{grid-column:3/5;width:100%;align-self:end}.mpx-add-submit:disabled{opacity:.45}
+.mpx-meal-list{padding:22px clamp(20px,2.8vw,39px);display:grid;gap:14px;background:var(--p)}
+.mpx-meal{display:grid;grid-template-columns:minmax(175px,.32fr) minmax(0,1fr);background:#fff;border:1px solid #CCD5C9;transition:border-color .18s,box-shadow .18s}
+.mpx-meal:hover{border-color:var(--f);box-shadow:0 7px 20px rgba(23,63,53,.07)}
+.mpx-date{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:13px;padding:21px 20px;background:var(--s);border-right:1px solid #CCD5C9;color:var(--f)}
+.mpx-date strong{font-size:17px;font-weight:700;line-height:1.45}.mpx-meal-body{min-width:0;padding:22px 24px}
+.mpx-meal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.mpx-meal-name{font-size:23px;font-weight:650;color:var(--c);line-height:1.3;letter-spacing:-.035em;margin:8px 0 6px!important}
+.mpx-meal-serving{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:14px}.mpx-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mpx-status{font-size:12px;font-weight:700;color:var(--f);background:#E5EBE1;padding:5px 9px;line-height:1.35}.mpx-status.is-warning{color:#8B4A24;background:#F7E5D6}.mpx-status.is-danger{color:#922E2A;background:#F8E6E2}.mpx-status.is-uncertain{color:#694C7B;background:#EEE7F2}
+.mpx-forecast{background:#F3F5EF;border-top:1px solid var(--line);margin-top:18px;padding:15px 16px}.mpx-forecast h4{font-size:14px;font-weight:700;color:var(--f);margin:0 0 12px}
+.mpx-ingredients{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 19px}.mpx-ingredient{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid #DAE0D5;padding:5px 0;font-size:13px;line-height:1.5}.mpx-ingredient strong{font-weight:650;color:var(--c);overflow-wrap:anywhere}.mpx-ingredient span{text-align:right;color:#526055;overflow-wrap:anywhere}
+.mpx-meal-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px;border-top:1px solid var(--line);padding-top:15px}.mpx-action{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:7px 11px;border:1px solid #B9C8BA;background:white;color:var(--f);border-radius:5px;font-size:13px;font-weight:650}.mpx-action:hover:not(:disabled){background:var(--s)}.mpx-action:disabled{opacity:.5;cursor:not-allowed}.mpx-action.is-danger{color:#98312B;border-color:#D6A5A0}.mpx-action.is-danger:hover{background:#FBEDEA}
+.mpx-schedule-empty{text-align:center;background:white;border:1px dashed #AEBCA9;padding:29px 18px;color:var(--c)}.mpx-schedule-empty svg{color:var(--f)}.mpx-schedule-empty h3{font-size:21px;margin:9px 0 7px;font-weight:650}.mpx-schedule-empty p{font-size:14px;color:var(--muted);line-height:1.6}
+.mpx-note{display:flex;align-items:flex-start;gap:10px;background:rgba(215,221,207,.55);border-left:3px solid var(--f);color:#33483D;padding:16px 20px;font-size:13px;line-height:1.55;margin:0 0 4px}.mpx-note svg{flex:0 0 auto}
+.mpx-overlay{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(19,29,24,.63);backdrop-filter:blur(5px)}
+.mpx-dialog{width:100%;max-width:470px;background:var(--p);border-top:5px solid #A83D3B;padding:25px;box-shadow:0 22px 65px rgba(0,0,0,.22)}
+.mpx-dialog-top{display:flex;align-items:center;justify-content:space-between;gap:14px}.mpx-dialog h2{font-size:26px;line-height:1.2;font-weight:650;letter-spacing:-.03em;margin:15px 0 10px}.mpx-dialog p{font-size:14px;line-height:1.6;color:var(--muted)}.mpx-dialog-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin-top:24px}
+.mpx-page :is(button,a,input,select):focus-visible{outline:3px solid var(--a);outline-offset:3px}
+/* Selected plan's four directly accessible meals; each opens its real schedule row. */
+.mpx-quick-meals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;margin-top:22px;max-width:850px}
+.mpx-quick-title{grid-column:1/-1;font-size:13px;letter-spacing:.035em;font-weight:700;color:#E9EEE7;margin-bottom:3px}
+.mpx-quick-meal{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;text-align:left;padding:11px 12px;border-radius:4px;border:1px solid rgba(247,246,242,.32);color:var(--p);background:rgba(247,246,242,.09);transition:background .18s,border-color .18s}
+.mpx-quick-meal:hover,.mpx-quick-meal:focus-visible{background:rgba(247,246,242,.2);border-color:var(--p)}
+.mpx-quick-meal strong{display:block;font-size:14px;line-height:1.4;overflow-wrap:anywhere;font-weight:700}
+.mpx-quick-meal small{display:block;color:#DAE6DC;margin-top:3px;font-size:12px;line-height:1.4}
+.mpx-quick-meal svg{flex:0 0 auto}
+.mpx-quick-more{border:1px solid rgba(247,246,242,.55);border-radius:4px;background:transparent;color:var(--p);padding:10px 13px;min-height:42px;justify-self:start;margin-top:4px;grid-column:1/-1;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:9px}
+.mpx-quick-more:hover{background:rgba(247,246,242,.14)}
+.mpx-saved-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.mpx-saved-footer p{font-size:13px;color:var(--muted)}
+.mpx-view-all{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:10px 16px;border-radius:4px;border:1px solid var(--f);background:var(--f);color:var(--p);font-size:14px;font-weight:700;transition:background .18s}
+.mpx-view-all:hover{background:#285746}
+.mpx-plan-main:focus-visible,.mpx-quick-meal:focus-visible{outline:3px solid var(--a);outline-offset:3px}
+.mpx-meal{scroll-margin-top:105px}
+.mpx-section-03:focus,.mpx-meal:focus{outline:none}
+.mpx-meal.is-target{border-color:var(--a);box-shadow:0 0 0 3px rgba(197,108,66,.24),0 12px 28px rgba(23,63,53,.08)}
+.mpx-meal.is-target .mpx-date{border-left:4px solid var(--a)}
+.mpx-allplans-dialog{width:min(100%,870px);max-height:min(82dvh,740px);padding:0;display:flex;flex-direction:column;overflow:hidden;border-top-color:var(--a)}
+.mpx-allplans-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:23px 26px;background:var(--s);border-bottom:1px solid var(--line)}
+.mpx-allplans-head h2{font-size:27px;margin:6px 0 5px;line-height:1.2;color:var(--f)}
+.mpx-allplans-head p{font-size:14px;color:#465A4B}
+.mpx-allplans-body{padding:20px 25px 25px;overflow-y:auto;overscroll-behavior:auto;min-height:0}
+.mpx-allplans-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mpx-allplans-list .mpx-plan-entry{min-height:89px}
+.mpx-allmeals-list{display:grid;gap:9px}
+.mpx-allmeals-list button{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;padding:14px 16px;border:1px solid var(--line);background:#fff;color:var(--c);width:100%;min-height:60px}
+.mpx-allmeals-list button:hover{background:var(--s);border-color:var(--f)}
+.mpx-allmeals-list strong{display:block;font-size:16px;line-height:1.4}
+.mpx-allmeals-list small{display:block;font-size:13px;color:var(--muted);margin-top:4px}
+@media(max-width:1150px){.mpx-fields{grid-template-columns:1fr 1fr}.mpx-fields .mpx-field:first-child{grid-column:1/-1}.mpx-add-fields{grid-template-columns:1fr 1fr}.mpx-add-fields .mpx-field:first-child,.mpx-add-fields .mpx-field:nth-child(2){grid-column:auto}.mpx-add-submit{grid-column:auto}}
+@media(max-width:900px){.mpx-intro{grid-template-columns:1fr}.mpx-next{padding:24px}.mpx-next h2{margin:7px 0}.mpx-section-01{grid-template-columns:1fr}.mpx-create-heading{border-right:0;border-bottom:1px solid var(--line)}.mpx-add-block{grid-template-columns:1fr;gap:17px}.mpx-saved-list{grid-template-columns:1fr}}
+@media(max-width:630px){.mpx-quick-meals,.mpx-allplans-list{grid-template-columns:1fr}.mpx-allplans-head{padding:18px}.mpx-allplans-body{padding:15px}.mpx-allplans-dialog{max-height:78dvh}.mpx-selected-block .mpx-quick-meals{margin-top:14px}.mpx-frame{padding:13px 12px 26px}.mpx-intro{gap:16px;margin-bottom:19px}.mpx-intro-copy{padding:9px 2px}.mpx-intro h1{font-size:33px;line-height:1.12}.mpx-intro-copy>p:last-child{font-size:14px}.mpx-next{box-shadow:5px 5px 0 rgba(215,221,207,.9)}.mpx-next h2{font-size:21px}.mpx-progress{grid-template-columns:1fr}.mpx-progress a,.mpx-progress a+a{border-left:0;border-bottom:1px solid var(--line);padding:10px 7px}.mpx-progress a:last-child{border-bottom:0}.mpx-progress small{display:none}.mpx-section{margin-bottom:18px}.mpx-create-heading{padding:23px 20px;gap:13px}.mpx-create-heading h2{font-size:27px}.mpx-create-form{padding:21px 17px}.mpx-form-caption{font-size:16px}.mpx-fields{grid-template-columns:1fr}.mpx-fields .mpx-field:first-child{grid-column:auto}.mpx-form-footer{align-items:stretch;flex-direction:column}.mpx-form-footer .mpx-btn{width:100%}.mpx-section-02{padding:20px 13px}.mpx-section-02-head h2{font-size:26px}.mpx-selected-block{grid-template-columns:1fr;padding:21px 18px}.mpx-selected-block h3{font-size:28px}.mpx-selected-side{flex-direction:row;align-items:center;justify-content:space-between}.mpx-selected-side-label{text-align:left}.mpx-selected-side strong{text-align:left;font-size:25px}.mpx-saved-area{padding:18px 13px}.mpx-plan-entry{padding:12px 10px}.mpx-active-label{display:none}.mpx-schedule-head{padding:22px 17px;align-items:flex-start}.mpx-schedule-head h2{font-size:28px}.mpx-count{min-height:73px;flex-basis:72px;padding:6px}.mpx-count strong{font-size:28px}.mpx-count span{font-size:11px}.mpx-add-block{padding:20px 15px}.mpx-add-fields{grid-template-columns:1fr}.mpx-add-submit{grid-column:auto}.mpx-meal-list{padding:14px 11px}.mpx-meal{grid-template-columns:1fr}.mpx-date{flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid #CCD5C9;padding:13px 14px}.mpx-date strong{font-size:14px}.mpx-meal-body{padding:17px 14px}.mpx-meal-head{flex-direction:column}.mpx-meal-name{font-size:20px}.mpx-ingredients{grid-template-columns:1fr}.mpx-forecast{padding:13px}.mpx-note{padding:13px 14px}.mpx-dialog{padding:20px}}
+/* Mobile-only: reclaim shell + page gutters while keeping every interactive field inside the viewport. */
+@media (max-width:630px){
+  .mpx-page{width:calc(100% + var(--ep-content-gutter, 16px) + var(--ep-content-gutter, 16px) - 2px);margin-inline:calc(0px - var(--ep-content-gutter, 16px));max-width:none;min-width:0;overflow-x:clip}
+  .mpx-frame{width:100%;max-width:100%;min-width:0;padding:10px 9px 18px}
+  .mpx-mobile-hide-copy{display:none!important}
+  .mpx-intro{gap:10px;margin:0 0 11px}
+  .mpx-intro-copy{padding:7px 7px 0}
+  .mpx-intro h1{font-size:clamp(27px,8.2vw,33px);line-height:1.13;letter-spacing:-.035em;margin:6px 0 2px}
+  .mpx-eyebrow{font-size:12px;gap:8px}
+  .mpx-eyebrow::before{flex-basis:15px;width:15px}
+  .mpx-next{padding:12px 14px;gap:10px;border-top-width:3px;box-shadow:none}
+  .mpx-next h2{font-size:18px;margin:3px 0 0;line-height:1.3}
+  .mpx-next p:not(.mpx-next-label){font-size:13px;line-height:1.4;margin-top:3px}
+  .mpx-next-link{min-height:38px;padding:7px 12px;font-size:13px}
+  .mpx-progress{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px}
+  .mpx-progress a,.mpx-progress a+a{min-width:0;border-bottom:0;padding:9px 5px;display:flex;align-items:center;gap:6px}
+  .mpx-progress a+a{border-left:1px solid var(--line)}
+  .mpx-progress-n{flex:0 0 25px;width:25px;height:25px;font-size:12px}
+  .mpx-progress strong{font-size:12px;line-height:1.25;overflow-wrap:anywhere}
+  .mpx-section{margin-bottom:12px;scroll-margin-top:70px}
+  .mpx-section-mark{font-size:12px}
+  .mpx-section-title{font-size:24px}
+  .mpx-section-01{border-inline:0;box-shadow:none}
+  .mpx-create-heading{padding:13px 13px 11px;gap:6px}
+  .mpx-create-heading h2{font-size:23px;line-height:1.18}
+  .mpx-create-foot{font-size:12px;padding-top:6px;margin-top:0;gap:5px}
+  .mpx-create-form{padding:12px 12px 15px}
+  .mpx-form-caption{font-size:15px;margin-bottom:9px!important}
+  .mpx-fields{gap:9px}
+  .mpx-field>span{font-size:13px;margin-bottom:5px}
+  .mpx-input{min-height:43px;padding:9px 10px;font-size:14px;max-width:100%;min-width:0}
+  .mpx-form-footer{margin-top:11px;gap:8px}
+  .mpx-btn{min-height:42px;padding:9px 12px;font-size:14px}
+  .mpx-section-02{padding:13px 10px 12px;border-top-width:3px}
+  .mpx-section-02-head{margin-bottom:10px}
+  .mpx-section-02-head h2{font-size:23px;margin:4px 0 0}
+  .mpx-selected-block{padding:13px 12px;gap:11px;margin-bottom:10px;border-left-width:4px;box-shadow:none}
+  .mpx-selected-block h3{font-size:24px;margin:5px 0 7px}
+  .mpx-selected-meta{font-size:13px;gap:5px 10px}
+  .mpx-selected-side{gap:10px}
+  .mpx-selected-side strong{font-size:22px}
+  .mpx-quick-meals{gap:7px;margin-top:9px}
+  .mpx-quick-title{font-size:12px}
+  .mpx-quick-meal{padding:8px 10px}
+  .mpx-quick-meal strong{font-size:13px}
+  .mpx-quick-meal small{font-size:12px}
+  .mpx-saved-area{padding:12px 10px}
+  .mpx-saved-top{margin-bottom:9px}
+  .mpx-saved-top h3{font-size:19px}
+  .mpx-saved-list{gap:8px}
+  .mpx-plan-entry{padding:10px;gap:8px}
+  .mpx-plan-main strong{font-size:15px}
+  .mpx-plan-main span{font-size:12px;margin-top:3px}
+  .mpx-saved-footer{margin-top:10px;padding-top:9px}
+  .mpx-schedule-head{padding:14px 11px;gap:8px}
+  .mpx-schedule-head h2{font-size:23px;margin:4px 0 0}
+  .mpx-count{flex-basis:65px;min-height:63px;padding:5px}
+  .mpx-count strong{font-size:25px}
+  .mpx-count span{font-size:11px;margin-top:3px}
+  .mpx-add-block{padding:13px 11px;gap:10px}
+  .mpx-add-intro h3{font-size:20px;margin:4px 0 0}
+  .mpx-add-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .mpx-add-fields .mpx-field:first-child,.mpx-add-fields .mpx-field:nth-child(2){grid-column:1/-1}
+  .mpx-add-submit{grid-column:1/-1}
+  .mpx-meal-list{padding:10px 7px;gap:10px}
+  .mpx-date{padding:10px 11px;gap:8px}
+  .mpx-date strong{font-size:14px}
+  .mpx-meal-body{padding:12px 11px}
+  .mpx-meal-head{gap:10px}
+  .mpx-meal-name{font-size:19px;margin:6px 0 4px!important}
+  .mpx-forecast{padding:10px 9px;margin-top:11px}
+  .mpx-forecast h4{margin-bottom:6px}
+  .mpx-ingredients{gap:3px}
+  .mpx-ingredient{font-size:12.5px;gap:7px;padding:5px 0}
+  .mpx-meal-actions{gap:6px;margin-top:10px;padding-top:10px}
+  .mpx-action{min-height:36px;padding:6px 9px}
+  .mpx-note{padding:11px 10px;margin:0;font-size:12.5px}
+  .mpx-page :is(.mpx-section,.mpx-meal,.mpx-saved-area,.mpx-selected-block,.mpx-add-block,.mpx-intro,form){min-width:0;max-width:100%}
+}
+@media (min-width:360px) and (max-width:630px){
+  .mpx-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mpx-fields .mpx-field:first-child{grid-column:1/-1}
+}
+@media(prefers-reduced-motion:reduce){.mpx-page *{transition:none!important;transform:none!important}}
 
-                <span className="text-[8.5px] font-extrabold uppercase tracking-[0.12em] sm:text-[11px] sm:font-black sm:tracking-[0.14em]">
-                  Meal planning
-                </span>
-              </div>
+      `}</style>
 
-              <h1 className="mt-2 max-w-4xl whitespace-nowrap text-[14px] font-extrabold tracking-[-0.03em] text-[#103f32] sm:mt-4 sm:whitespace-normal sm:text-4xl sm:font-black sm:tracking-tight">
-                Plan meals without double-counting Pantry.
-              </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[10px] font-medium leading-4 text-[#356252] sm:mt-3 sm:text-sm sm:font-semibold sm:leading-7">
-                Plan upcoming meals without changing what&apos;s currently in your Pantry.
-              </p>
-            </div>
-
-            <div className="flex w-full shrink-0 items-center justify-between gap-2.5 rounded-xl border border-[#a9b7ef] bg-[#e5e9ff] p-3 shadow-[0_6px_16px_rgba(74,88,164,0.10)] sm:gap-4 sm:rounded-2xl sm:p-4 sm:shadow-[0_10px_24px_rgba(74,88,164,0.12)] lg:w-auto lg:min-w-[320px]">
-              <div>
-                <p className="text-[8.5px] font-extrabold uppercase tracking-[0.12em] text-[#46517b] sm:text-[10px] sm:font-black sm:tracking-[0.14em]">
-                  Next basket
-                </p>
-
-                <p className="mt-0.5 max-w-[180px] text-[9px] font-medium leading-3.5 text-[#5d668a] sm:mt-1 sm:text-xs sm:font-semibold sm:leading-5">
-                  Review what your planned meals may need next.
-                </p>
-              </div>
-
-              <Link
-                to="/next-basket"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#5061bd] px-3 py-2 text-[10px] font-extrabold text-white shadow-[0_6px_14px_rgba(80,97,189,0.18)] transition hover:bg-[#4352a4] sm:gap-2 sm:rounded-xl sm:px-4 sm:py-3 sm:text-sm sm:font-black sm:shadow-[0_8px_20px_rgba(80,97,189,0.22)]"
-              >
-                Open
-
-                <ArrowRight
-                  className="h-[12px] w-[12px] sm:h-4 sm:w-4"
-                  aria-hidden="true"
-                />
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-3 rounded-[20px] border border-[#bea9ee] bg-[#e9e0ff] p-3 shadow-[0_8px_22px_rgba(87,65,150,0.08)] sm:mt-5 sm:rounded-[24px] sm:p-5 sm:shadow-[0_12px_30px_rgba(87,65,150,0.10)]">
-          <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:mb-3">
-            <p className="text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#6048a9] sm:text-[10px] sm:font-black sm:tracking-[0.15em]">
-              How this page works
+      <div className="mpx-frame">
+        <header className="mpx-intro">
+          <div className="mpx-intro-copy">
+            <p className="mpx-eyebrow">EPANTRY / MEAL PLANNING</p>
+            <h1>
+              Make space for <span>meals worth sharing.</span>
+            </h1>
+            <p className="mpx-mobile-hide-copy">
+              Choose your dates, build a plan and see what your Pantry can
+              support — all in one clear schedule.
             </p>
-
-            {/* <h2 className="text-base font-black leading-tight text-[#3f2f78]">
-              Plan your meals in 4 simple steps
-            </h2> */}
           </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3 lg:grid-cols-4 lg:items-stretch">
-            <div className="min-w-0 rounded-xl border border-[#8eb8f5] bg-[#cfe3ff] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
-                  1
-                </span>
-
-                <p className="text-[10px] font-extrabold text-[#173f77] sm:text-sm sm:font-black">
-                  Create a plan
-                </p>
-              </div>
-
-              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#365b89] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
-                Give it a name and choose the start and end dates.
-              </p>
+          <aside className="mpx-next" aria-label="Next Basket">
+            <div>
+              <p className="mpx-next-label">AFTER YOU PLAN</p>
+              <h2>Shop only for what you need.</h2>
+              <p>Review missing ingredients in your Next Basket.</p>
             </div>
+            <Link className="mpx-next-link" to="/next-basket">
+              Open Next Basket <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </aside>
+        </header>
 
-            <div className="min-w-0 rounded-xl border border-[#78c6df] bg-[#ccefff] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#007a9e] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
-                  2
-                </span>
-
-                <p className="text-[10px] font-extrabold text-[#10556b] sm:text-sm sm:font-black">
-                  Add a recipe
-                </p>
-              </div>
-
-              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#356b7b] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
-                Pick the recipe, meal time and servings you are planning.
-              </p>
-            </div>
-
-            <div className="min-w-0 rounded-xl border border-[#efc759] bg-[#ffe6a3] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#d38b00] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
-                  3
-                </span>
-
-                <p className="text-[10px] font-extrabold text-[#6c4a05] sm:text-sm sm:font-black">
-                  Check Pantry
-                </p>
-              </div>
-
-              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#775d20] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
-                See what is enough, running low or missing for that meal.
-              </p>
-            </div>
-
-            <div className="min-w-0 rounded-xl border border-[#8fd1a6] bg-[#d2f2dc] px-2.5 py-2 sm:rounded-[18px] sm:px-4 sm:py-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#16794a] text-[9px] font-extrabold text-white sm:h-7 sm:w-7 sm:text-xs sm:font-black">
-                  4
-                </span>
-
-                <p className="text-[10px] font-extrabold text-[#195b3b] sm:text-sm sm:font-black">
-                  Adjust &amp; review
-                </p>
-              </div>
-
-              <p className="mt-1 text-[9px] font-medium leading-3.5 text-[#396c52] sm:mt-2 sm:text-xs sm:font-semibold sm:leading-5">
-                Adjust servings or meals, then review what you may need next.
-              </p>
-            </div>
-          </div>
-        </section>
+        <nav className="mpx-progress" aria-label="Meal planning sections">
+          <a href="#mpx-section-1">
+            <span className="mpx-progress-n">01</span>
+            <span>
+              <strong>Your schedule</strong>
+              <small>Set your dates</small>
+            </span>
+          </a>
+          <a href="#mpx-section-2">
+            <span className="mpx-progress-n">02</span>
+            <span>
+              <strong>Selected &amp; saved plans</strong>
+              <small>Choose your plan</small>
+            </span>
+          </a>
+          <a href="#mpx-section-3">
+            <span className="mpx-progress-n">03</span>
+            <span>
+              <strong>Meal schedule</strong>
+              <small>Add &amp; review meals</small>
+            </span>
+          </a>
+        </nav>
 
         {error && (
-          <div className="mt-5 flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800 shadow-sm">
-            <TriangleAlert
-              size={18}
-              className="shrink-0"
-            />
-
+          <div className="mpx-error" role="alert">
+            <TriangleAlert size={20} aria-hidden="true" />
             {error}
           </div>
         )}
 
-        <section className="mt-6 space-y-5">
-          {selectedPlan ? (
-            <>
-              <div className="grid items-start gap-5 lg:h-[406px] lg:grid-cols-[minmax(0,0.95fr)_minmax(0,0.95fr)_minmax(0,1.1fr)] lg:items-stretch">
-          <form
-            onSubmit={
-              handleCreatePlan
-            }
-            className="min-w-0 rounded-[24px] border border-[#8cbcff] bg-[#d9eaff] p-3 shadow-[0_12px_30px_rgba(50,96,170,0.10)] sm:p-5 lg:h-full"
-          >
-            <div className="flex items-start gap-2 sm:gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#2563eb] text-white shadow-sm sm:h-10 sm:w-10 sm:rounded-xl">
-                <Plus
-                  size={19}
-                  aria-hidden="true"
-                />
-              </div>
-
-              <div>
-                <h2 className="font-black text-stone-950">
-                  Create Meal Plan
-                </h2>
-
-                <p className="mt-1 text-xs font-semibold leading-5 text-[#445f89]">
-                  Give the plan a name and choose its date range.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-2.5 sm:mt-5 sm:space-y-4">
-              <label className="block">
-                <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
-                  Plan name
-                </span>
-
+        {/* 01: Create a schedule. This section is deliberately separate. */}
+        <section
+          id="mpx-section-1"
+          className="mpx-section mpx-section-01"
+          aria-labelledby="mpx-section-1-title"
+        >
+          <div className="mpx-create-heading">
+            <p className="mpx-section-mark">01 / YOUR SCHEDULE</p>
+            <h2 id="mpx-section-1-title">
+              Start with the days that work for you.
+            </h2>
+            <p className="mpx-mobile-hide-copy mpx-description">
+              Give your plan a name and select its date range. You will choose
+              your recipes next.
+            </p>
+            <p className="mpx-create-foot">
+              <CalendarRange size={19} aria-hidden="true" /> Your week, your
+              way.
+            </p>
+          </div>
+          <form className="mpx-create-form" onSubmit={handleCreatePlan}>
+            <p className="mpx-form-caption">Create a meal plan</p>
+            <div className="mpx-fields">
+              <label className="mpx-field">
+                <span>Plan name</span>
                 <input
-                  value={
-                    planForm.title
+                  className="mpx-input"
+                  placeholder="e.g. Weekday dinners"
+                  value={planForm.title}
+                  onChange={(event) =>
+                    setPlanForm((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
                   }
-                  onChange={(
-                    event,
-                  ) =>
-                    setPlanForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        title:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3"
-                  placeholder="Plan title"
                 />
               </label>
-
-              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
-                    Starts
-                  </span>
-
-                  <input
-                    type="date"
-                    value={
-                      planForm.horizonStart
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setPlanForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          horizonStart:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
-                    Ends
-                  </span>
-
-                  <input
-                    type="date"
-                    value={
-                      planForm.horizonEnd
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setPlanForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          horizonEnd:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={
-                saving
-              }
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-black text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:py-3"
-            >
-              <Plus
-                size={16}
-                aria-hidden="true"
-              />
-
-              Create Plan
-            </button>
-          </form>
-
-          <section className="min-w-0 rounded-[24px] border border-[#d7c5a8] bg-[#f3eadc] p-5 shadow-[0_12px_30px_rgba(84,67,45,0.10)] lg:h-full">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="font-black text-stone-950">
-                  Plans
-                </h2>
-
-                <p className="mt-1 text-xs text-stone-500">
-                  {mealPlans.length} active {mealPlans.length === 1 ? 'plan' : 'plans'}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={
-                  load
-                }
-                disabled={
-                  loading
-                }
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d4c09f] bg-[#fffaf2] text-[#2f654f] transition hover:bg-white hover:text-[#184936] disabled:opacity-50"
-                aria-label="Refresh Meal Plans"
-              >
-                <RefreshCw
-                  size={16}
-                  className={
-                    loading
-                      ? 'animate-spin'
-                      : ''
+              <label className="mpx-field">
+                <span>Start date</span>
+                <input
+                  className="mpx-input"
+                  type="date"
+                  value={planForm.horizonStart}
+                  onChange={(event) =>
+                    setPlanForm((current) => ({
+                      ...current,
+                      horizonStart: event.target.value,
+                    }))
                   }
                 />
+              </label>
+              <label className="mpx-field">
+                <span>End date</span>
+                <input
+                  className="mpx-input"
+                  type="date"
+                  value={planForm.horizonEnd}
+                  onChange={(event) =>
+                    setPlanForm((current) => ({
+                      ...current,
+                      horizonEnd: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+            <div className="mpx-form-footer">
+              <p className="mpx-mobile-hide-copy">
+                Saved plans are available below whenever you want to return to
+                them.
+              </p>
+              <button className="mpx-btn" type="submit" disabled={saving}>
+                <Plus size={17} aria-hidden="true" />{" "}
+                {saving ? "Saving..." : "Create plan"}{" "}
+                <ArrowRight size={17} aria-hidden="true" />
               </button>
             </div>
+          </form>
+        </section>
 
-            <div className="mt-4 space-y-2.5">
-              {mealPlans.map(
-                (
-                  plan,
-                ) => {
-                  const isSelected =
-                    selectedPlan?.id ===
-                    plan.id
-
-                  return (
-                    <div
-                      key={
-                        plan.id
-                      }
-                      className={[
-                        'group rounded-2xl border p-3 transition',
-                        isSelected
-                          ? 'border-[#c6aa7d] bg-[#e7d5bb] shadow-[0_7px_18px_rgba(84,67,45,0.12)]'
-                          : 'border-[#deceb5] bg-[#fbf6ee] hover:border-[#c6aa7d] hover:bg-[#fffdf9]',
-                      ].join(
-                        ' ',
-                      )}
-                    >
-                      <div className="flex items-start gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedPlanId(
-                              plan.id,
-                            )
-                          }
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <p
-                            className={[
-                              'truncate text-sm font-black',
-                              isSelected
-                                ? 'text-[#255542]'
-                                : 'text-stone-900',
-                            ].join(
-                              ' ',
-                            )}
-                          >
-                            {plan.title}
-                          </p>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-stone-500">
-                            <span className="inline-flex items-center gap-1">
-                              <UtensilsCrossed
-                                size={12}
-                                aria-hidden="true"
-                              />
-
-                              {(plan.meals || []).length} meals
-                            </span>
-
-                            <span className="inline-flex items-center gap-1">
-                              <CalendarRange
-                                size={12}
-                                aria-hidden="true"
-                              />
-
-                              {formatDateOnly(
-                                plan.horizonStart,
-                              )}
-                            </span>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPlanPendingDelete(
-                              plan,
-                            )
-                          }
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 opacity-100 transition hover:bg-rose-50 hover:text-rose-600 lg:opacity-0 lg:group-hover:opacity-100"
-                          aria-label={`Delete ${plan.title}`}
-                          title="Delete plan"
-                        >
-                          <Trash2
-                            size={15}
-                            aria-hidden="true"
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                },
-              )}
-
-              {!loading &&
-                mealPlans.length ===
-                  0 && (
-                  <div className="rounded-2xl border border-dashed border-[#d4c09f] bg-[#fbf6ee] px-4 py-6 text-center">
-                    <CalendarDays
-                      size={24}
-                      className="mx-auto text-stone-400"
-                    />
-
-                    <p className="mt-2 text-sm font-black text-stone-800">
-                      No active plans yet
-                    </p>
-
-                    <p className="mt-1 text-xs font-semibold leading-5 text-[#445f89]">
-                      Create a plan above to start scheduling meals.
-                    </p>
-                  </div>
-                )}
+        {/* 02: Selected plan first, saved plans second. No recipe form in this section. */}
+        <section
+          id="mpx-section-2"
+          className="mpx-section mpx-section-02"
+          aria-labelledby="mpx-section-2-title"
+        >
+          <div className="mpx-section-02-head">
+            <div>
+              <p className="mpx-section-mark">02 / YOUR PLANS</p>
+              <h2 className="mpx-section-title" id="mpx-section-2-title">
+                Know which plan you are using.
+              </h2>
+              <p className="mpx-mobile-hide-copy mpx-description">
+                Your selected plan comes first. Your saved plans are just below.
+              </p>
             </div>
-          </section>
+          </div>
 
-          <section className="min-w-0 overflow-hidden rounded-[24px] border border-[#8bd7c2] bg-[#d9f5ec] shadow-[0_12px_30px_rgba(45,118,96,0.10)] lg:flex lg:h-full lg:flex-col">
-            <div className="flex flex-col gap-2 border-b border-[#75cdb3] bg-[#bcebdc] p-3 sm:gap-4 sm:p-5 lg:relative lg:block">
-              <div className="min-w-0 lg:pr-12">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#0f766e] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">
-                    Active plan
-                  </span>
-
-                  <span className="text-xs font-bold text-[#35675d]">
-                    {(selectedPlan.meals || []).length} planned {(selectedPlan.meals || []).length === 1 ? 'meal' : 'meals'}
-                  </span>
-                </div>
-
-                <div className="lg:mt-2 lg:flex lg:min-w-0 lg:items-center lg:gap-3">
-                  <h2 className="mt-1 truncate text-xl font-black tracking-tight text-stone-950 sm:mt-2 sm:text-2xl lg:mt-0">
-                    {selectedPlan.title}
-                  </h2>
-
-                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#35675d] lg:mt-0 lg:flex-nowrap lg:whitespace-nowrap">
-                    <CalendarRange
-                      size={14}
-                      aria-hidden="true"
-                    />
-
-                    {formatDateOnly(
-                      selectedPlan.horizonStart,
-                    )}
-
-                    <span>→</span>
-
-                    {formatDateOnly(
-                      selectedPlan.horizonEnd,
-                    )}
+          <article
+            className="mpx-selected-block"
+            aria-label="Selected meal plan"
+          >
+            <div>
+              <p className="mpx-section-mark">SELECTED PLAN</p>
+              {selectedPlan ? (
+                <>
+                  <h3>{selectedPlan.title}</h3>
+                  <div className="mpx-selected-meta">
+                    <span>
+                      <CalendarRange size={17} aria-hidden="true" />{" "}
+                      {formatDateOnly(selectedPlan.horizonStart)} –{" "}
+                      {formatDateOnly(selectedPlan.horizonEnd)}
+                    </span>
+                    <span>
+                      <ChefHat size={17} aria-hidden="true" />{" "}
+                      {(selectedPlan.meals || []).length}{" "}
+                      {(selectedPlan.meals || []).length === 1
+                        ? "meal"
+                        : "meals"}{" "}
+                      scheduled
+                    </span>
+                  </div>
+                  {selectedMealsPreview.length > 0 && (
+                    <div
+                      className="mpx-quick-meals"
+                      aria-label="Meals in selected plan"
+                    >
+                      <p className="mpx-quick-title">GO TO A SCHEDULED MEAL</p>
+                      {selectedMealsPreview.map((meal) => (
+                        <button
+                          type="button"
+                          key={meal.id}
+                          className="mpx-quick-meal"
+                          onClick={() =>
+                            openPlanInSchedule(selectedPlan.id, meal.id)
+                          }
+                        >
+                          <span>
+                            <strong>
+                              {meal.recipeTitle || "Planned meal"}
+                            </strong>
+                            <small>
+                              {formatDateTime(meal.plannedAt)} ·{" "}
+                              {titleCase(meal.mealType)}
+                            </small>
+                          </span>
+                          <ArrowRight size={17} aria-hidden="true" />
+                        </button>
+                      ))}
+                      {selectedMeals.length > 4 && (
+                        <button
+                          type="button"
+                          className="mpx-quick-more"
+                          onClick={() => setShowAllMeals(true)}
+                        >
+                          View all {selectedMeals.length} meals{" "}
+                          <ArrowRight size={17} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <h3>No plan selected yet.</h3>
+                  <p className="mpx-selected-empty">
+                    Create a plan above or select one from your saved plans.
                   </p>
+                </>
+              )}
+            </div>
+            {selectedPlan && (
+              <div className="mpx-selected-side">
+                <div>
+                  <p className="mpx-selected-side-label">MEALS IN THIS PLAN</p>
+                  <strong>{(selectedPlan.meals || []).length}</strong>
                 </div>
+                <button
+                  className="mpx-delete"
+                  type="button"
+                  onClick={() => setPlanPendingDelete(selectedPlan)}
+                >
+                  <Trash2 size={16} aria-hidden="true" /> Delete plan
+                </button>
               </div>
+            )}
+          </article>
 
+          <div className="mpx-saved-area" aria-labelledby="mpx-saved-heading">
+            <div className="mpx-saved-top">
+              <div>
+                <p className="mpx-section-mark">YOUR SAVED PLANS</p>
+                <h3 id="mpx-saved-heading">Choose a plan to continue</h3>
+                <p>
+                  {mealPlans.length} {mealPlans.length === 1 ? "plan" : "plans"}{" "}
+                  saved
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() =>
-                  setPlanPendingDelete(
-                    selectedPlan,
-                  )
-                }
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[#d65252] bg-[#fff2f2] px-3 py-2 text-xs font-black text-[#a92525] transition hover:bg-white sm:px-3.5 sm:py-2.5 lg:absolute lg:bottom-5 lg:right-5 lg:h-9 lg:w-9 lg:p-0"
-                aria-label="Delete plan"
-                title="Delete plan"
+                className="mpx-icon"
+                title="Refresh meal plans"
+                aria-label="Refresh meal plans"
+                onClick={load}
+                disabled={loading}
               >
-                <Trash2
-                  size={15}
+                <RefreshCw
+                  size={19}
+                  className={loading ? "animate-spin" : ""}
                   aria-hidden="true"
                 />
-
-                <span className="lg:sr-only">
-                  Delete Plan
-                </span>
               </button>
             </div>
-
-            <form
-              onSubmit={
-                handleAddMeal
-              }
-              className="bg-[#d7f4ff] p-3 sm:p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
-            >
-              <div className="flex items-start gap-2 sm:gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#007a9e] text-white shadow-sm sm:h-10 sm:w-10 sm:rounded-xl">
-                  <ChefHat
-                    size={20}
-                    aria-hidden="true"
-                  />
-                </div>
-
-                <div>
-                  <h3 className="font-black text-stone-950">
-                    Add planned Recipe
-                  </h3>
-
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[#445f89]">
-                    Choose a recipe to add it to this meal plan.
-                  </p>
-                </div>
+            <div className="mpx-saved-list">
+              {savedPlansPreview.map((plan) => (
+                <article
+                  key={plan.id}
+                  className={`mpx-plan-entry ${
+                    selectedPlan?.id === plan.id ? "is-active" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="mpx-plan-main"
+                    onClick={() => openPlanInSchedule(plan.id)}
+                    aria-pressed={selectedPlan?.id === plan.id}
+                    title={`Open ${plan.title} and go to its meal schedule`}
+                  >
+                    <strong>{plan.title}</strong>
+                    <span>
+                      {formatDateOnly(plan.horizonStart)} –{" "}
+                      {formatDateOnly(plan.horizonEnd)} ·{" "}
+                      {(plan.meals || []).length}{" "}
+                      {(plan.meals || []).length === 1 ? "meal" : "meals"}
+                    </span>
+                  </button>
+                  {selectedPlan?.id === plan.id && (
+                    <span className="mpx-active-label">Selected</span>
+                  )}
+                  <button
+                    type="button"
+                    className="mpx-icon"
+                    aria-label={`Delete ${plan.title}`}
+                    title="Delete plan"
+                    onClick={() => setPlanPendingDelete(plan)}
+                  >
+                    <Trash2 size={17} aria-hidden="true" />
+                  </button>
+                </article>
+              ))}
+              {!loading && mealPlans.length === 0 && (
+                <p className="mpx-no-plans">
+                  No saved plans yet. Create one in section 01 to begin.
+                </p>
+              )}
+              {loading && mealPlans.length === 0 && (
+                <p className="mpx-no-plans" role="status">
+                  Loading saved plans…
+                </p>
+              )}
+            </div>
+            {mealPlans.length > 4 && (
+              <div className="mpx-saved-footer">
+                <p>Showing 4 of {mealPlans.length} saved plans</p>
+                <button
+                  type="button"
+                  className="mpx-view-all"
+                  onClick={() => setShowAllPlans(true)}
+                >
+                  View all {mealPlans.length} plans{" "}
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
               </div>
+            )}
+          </div>
+        </section>
 
-              <div className="mt-3 grid gap-2 sm:mt-5 sm:gap-3">
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.11em] text-[#315f70]">
-                    Recipe
-                  </span>
+        {/* 03: Add a meal, then review the actual scheduled meals. */}
+        <section
+          id="mpx-section-3"
+          ref={scheduleRef}
+          tabIndex={-1}
+          className="mpx-section mpx-section-03"
+          aria-labelledby="mpx-section-3-title"
+        >
+          <header className="mpx-schedule-head">
+            <div>
+              <p className="mpx-section-mark">03 / MEAL SCHEDULE</p>
+              <h2 id="mpx-section-3-title">Plan what goes on the table.</h2>
+              <p className="mpx-mobile-hide-copy mpx-description">
+                Add recipes, check servings and review the ingredients each meal
+                needs.
+              </p>
+            </div>
+            <div className="mpx-count">
+              <strong>{(selectedPlan?.meals || []).length}</strong>
+              <span>
+                {(selectedPlan?.meals || []).length === 1
+                  ? "scheduled meal"
+                  : "scheduled meals"}
+              </span>
+            </div>
+          </header>
 
+          {selectedPlan && (
+            <form className="mpx-add-block" onSubmit={handleAddMeal}>
+              <div className="mpx-add-intro">
+                <p className="mpx-section-mark">ADD A RECIPE</p>
+                <h3>What will you cook?</h3>
+                <p className="mpx-mobile-hide-copy">
+                  Choose a dish, when to make it and how many people you are
+                  cooking for.
+                </p>
+              </div>
+              <div className="mpx-add-fields">
+                <label className="mpx-field">
+                  <span>Recipe</span>
                   <select
-                    value={
-                      mealForm.recipeSlug
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setMealForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          recipeSlug:
-                            event.target.value,
-                        }),
-                      )
+                    className="mpx-input"
+                    value={mealForm.recipeSlug}
+                    onChange={(event) =>
+                      setMealForm((current) => ({
+                        ...current,
+                        recipeSlug: event.target.value,
+                      }))
                     }
                     required
                     disabled={
-                      recipeOptionsLoading ||
-                      recipeOptions.length ===
-                        0
+                      recipeOptionsLoading || recipeOptions.length === 0
                     }
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:py-3"
                   >
                     <option value="">
                       {recipeOptionsLoading
-                        ? 'Loading published recipes…'
-                        : recipeOptions.length ===
-                            0
-                          ? 'No published recipes available'
-                          : 'Choose a published recipe'}
+                        ? "Loading published recipes…"
+                        : recipeOptions.length === 0
+                        ? "No published recipes available"
+                        : "Choose a published recipe"}
                     </option>
-
-                    {recipeOptions.map(
-                      (
-                        item,
-                      ) => {
-                        const dish =
-                          item?.dish ||
-                          {}
-
-                        const recipe =
-                          item?.recipe ||
-                          {}
-
-                        const slug =
-                          dish.slug ||
-                          recipe.slug ||
-                          ''
-
-                        if (!slug) {
-                          return null
-                        }
-
-                        return (
-                          <option
-                            key={
-                              slug
-                            }
-                            value={
-                              slug
-                            }
-                          >
-                            {dish.name ||
-                              recipe.title ||
-                              slug}
-                          </option>
-                        )
-                      },
-                    )}
+                    {recipeOptions.map((item) => {
+                      const dish = item?.dish || {};
+                      const recipe = item?.recipe || {};
+                      const slug = dish.slug || recipe.slug || "";
+                      if (!slug) return null;
+                      return (
+                        <option value={slug} key={slug}>
+                          {dish.name || recipe.title || slug}
+                        </option>
+                      );
+                    })}
                   </select>
-
                   {recipeOptionsError && (
-                    <p className="mt-1.5 text-xs font-semibold text-rose-600">
+                    <span className="mpx-field-error" role="alert">
                       {recipeOptionsError}
-                    </p>
+                    </span>
                   )}
                 </label>
-
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.11em] text-[#315f70]">
-                    Date & time
-                  </span>
-
+                <label className="mpx-field">
+                  <span>Date &amp; time</span>
                   <input
+                    className="mpx-input"
                     type="datetime-local"
-                    value={
-                      mealForm.plannedAt
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setMealForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          plannedAt:
-                            event.target.value,
-                        }),
-                      )
+                    value={mealForm.plannedAt}
+                    onChange={(event) =>
+                      setMealForm((current) => ({
+                        ...current,
+                        plannedAt: event.target.value,
+                      }))
                     }
                     required
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 sm:px-4 sm:py-3"
                   />
                 </label>
-
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.11em] text-[#315f70]">
-                    Meal type
-                  </span>
-
+                <label className="mpx-field">
+                  <span>Meal type</span>
                   <select
-                    value={
-                      mealForm.mealType
+                    className="mpx-input"
+                    value={mealForm.mealType}
+                    onChange={(event) =>
+                      setMealForm((current) => ({
+                        ...current,
+                        mealType: event.target.value,
+                      }))
                     }
-                    onChange={(
-                      event,
-                    ) =>
-                      setMealForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          mealType:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 sm:px-4 sm:py-3"
                   >
-                    <option value="breakfast">
-                      Breakfast
-                    </option>
-
-                    <option value="brunch">
-                      Brunch
-                    </option>
-
-                    <option value="lunch">
-                      Lunch
-                    </option>
-
-                    <option value="snack">
-                      Snack
-                    </option>
-
-                    <option value="dinner">
-                      Dinner
-                    </option>
-
-                    <option value="other">
-                      Other
-                    </option>
+                    {[
+                      "breakfast",
+                      "brunch",
+                      "lunch",
+                      "snack",
+                      "dinner",
+                      "other",
+                    ].map((type) => (
+                      <option key={type} value={type}>
+                        {titleCase(type)}
+                      </option>
+                    ))}
                   </select>
                 </label>
-
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.11em] text-[#315f70]">
-                    Servings
-                  </span>
-
+                <label className="mpx-field">
+                  <span>Servings</span>
                   <input
+                    className="mpx-input"
                     type="number"
                     min="1"
                     max="100"
-                    value={
-                      mealForm.servings
+                    value={mealForm.servings}
+                    onChange={(event) =>
+                      setMealForm((current) => ({
+                        ...current,
+                        servings: event.target.value,
+                      }))
                     }
-                    onChange={(
-                      event,
-                    ) =>
-                      setMealForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          servings:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-[#8bcde2] bg-white/85 px-3 py-2 text-sm outline-none transition focus:border-[#007a9e] focus:bg-white focus:ring-4 focus:ring-cyan-100 sm:px-4 sm:py-3"
                   />
                 </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={
-                  saving ||
-                  !mealForm.recipeSlug ||
-                  !mealForm.plannedAt
-                }
-                className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-[#007a9e] px-4 py-2 text-sm font-black text-white shadow-[0_8px_20px_rgba(0,122,158,0.20)] transition hover:bg-[#005e7a] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:px-5 sm:py-3"
-              >
-                <Plus
-                  size={16}
-                  aria-hidden="true"
-                />
-
-                Add Meal
-              </button>
-            </form>
-          </section>
-              </div>
-
-        <section className="rounded-[24px] border border-[#d8c7ab] bg-[#f5ede2] p-5 shadow-[0_12px_30px_rgba(84,67,45,0.10)]">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#2f654f]">
-                Meal schedule
-              </p>
-
-              <h2 className="mt-1 text-xl font-black text-stone-950">
-                Planned meals
-              </h2>
-            </div>
-
-            <p className="text-xs font-bold text-[#6f6355]">
-              {(selectedPlan.meals || []).length} {(selectedPlan.meals || []).length === 1 ? 'meal' : 'meals'} in this plan
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {(selectedPlan.meals || []).map(
-              (
-                meal,
-              ) => (
-                <article
-                  key={
-                    meal.id
+                <button
+                  className="mpx-btn mpx-add-submit"
+                  type="submit"
+                  disabled={
+                    saving || !mealForm.recipeSlug || !mealForm.plannedAt
                   }
-                  className="ml-0 mr-[-2.5rem] w-[calc(100%+2.5rem)] overflow-hidden rounded-[20px] border border-[#ddccb2] bg-[#fffaf2] shadow-[0_8px_18px_rgba(84,67,45,0.08)] transition hover:-translate-y-0.5 hover:border-[#c8ad82] hover:shadow-[0_12px_24px_rgba(84,67,45,0.12)] sm:mx-0 sm:w-auto"
                 >
-                  <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ReadinessBadge
-                          state={
-                            meal.readinessState
-                          }
-                        />
+                  <Plus size={18} aria-hidden="true" /> Add planned meal
+                </button>
+              </div>
+            </form>
+          )}
 
-                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-stone-600">
-                          {titleCase(
-                            meal.mealType,
-                          )}
+          <div className="mpx-meal-list">
+            {(selectedPlan?.meals || []).map((meal) => (
+              <article
+                key={meal.id}
+                ref={(node) => {
+                  if (node) mealRowRefs.current.set(String(meal.id), node);
+                  else mealRowRefs.current.delete(String(meal.id));
+                }}
+                tabIndex={-1}
+                className={`mpx-meal ${
+                  activeMealId === String(meal.id) ? "is-target" : ""
+                }`}
+              >
+                <div className="mpx-date">
+                  <CalendarDays size={21} aria-hidden="true" />
+                  <strong>{formatDateTime(meal.plannedAt)}</strong>
+                </div>
+                <div className="mpx-meal-body">
+                  <div className="mpx-meal-head">
+                    <div>
+                      <div className="mpx-badges">
+                        <span
+                          className={`mpx-status ${
+                            ["missing", "expected_depleted"].includes(
+                              meal.readinessState
+                            )
+                              ? "is-danger"
+                              : meal.readinessState ===
+                                "running_low_before_meal"
+                              ? "is-warning"
+                              : meal.readinessState === "needs_confirmation"
+                              ? "is-uncertain"
+                              : ""
+                          }`}
+                        >
+                          {READINESS_LABELS[meal.readinessState] ||
+                            "Needs confirmation"}
                         </span>
-
-                        {meal.status !==
-                          'planned' && (
-                          <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-stone-500">
-                            {titleCase(
-                              meal.status,
-                            )}
+                        <span className="mpx-status">
+                          {titleCase(meal.mealType)}
+                        </span>
+                        {meal.status !== "planned" && (
+                          <span className="mpx-status">
+                            {titleCase(meal.status)}
                           </span>
                         )}
                       </div>
-
-                      <h3 className="mt-3 text-lg font-black text-stone-950">
-                        {meal.recipeTitle}
-                      </h3>
-
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-stone-500">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock3
-                            size={13}
-                            aria-hidden="true"
-                          />
-
-                          {formatDateTime(
-                            meal.plannedAt,
-                          )}
-                        </span>
-
-                        <span className="inline-flex items-center gap-1.5">
-                          <UsersRound
-                            size={13}
-                            aria-hidden="true"
-                          />
-
-                          {meal.servings} servings
-                        </span>
-                      </div>
+                      <h3 className="mpx-meal-name">{meal.recipeTitle}</h3>
+                      <p className="mpx-meal-serving">
+                        <UsersRound size={16} aria-hidden="true" />{" "}
+                        {meal.servings} servings
+                      </p>
                     </div>
-
                     <Link
+                      className="mpx-plain"
                       to={`/recipes/${meal.recipeSlug}`}
-                      className="inline-flex shrink-0 items-center gap-1.5 text-sm font-black text-emerald-700 transition hover:text-emerald-900"
                     >
-                      Recipe
-
-                      <ArrowRight
-                        size={15}
-                        aria-hidden="true"
-                      />
+                      View recipe <ArrowRight size={17} aria-hidden="true" />
                     </Link>
                   </div>
-
-                  {(meal.forecastLines || []).length >
-                    0 && (
-                    <div className="border-t border-[#a9cae8] bg-[#dceeff] px-4 py-3">
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-[#365f7d]">
-                        Pantry forecast
-                      </p>
-
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {meal.forecastLines.map(
-                          (
-                            line,
-                          ) => (
-                            <div
-                              key={`${line.canonicalIngredientId}:${line.requiredUnit}`}
-                              className="flex items-center justify-between gap-3 rounded-xl bg-[#f7fbff] px-3 py-2 text-xs ring-1 ring-[#a9cae8]"
-                            >
-                              <span className="min-w-0 truncate font-bold text-stone-700">
-                                {line.label || 'Ingredient'}
-                              </span>
-
-                              <span className="shrink-0 text-right text-stone-500">
-                                {line.requiredQuantity} {line.requiredUnit}
-                                {' · '}
-                                {READINESS_LABELS[
-                                  line.readinessState
-                                ] ||
-                                  'Needs confirmation'}
-                              </span>
-                            </div>
-                          ),
-                        )}
+                  {(meal.forecastLines || []).length > 0 && (
+                    <section
+                      className="mpx-forecast"
+                      aria-label={`Pantry forecast for ${meal.recipeTitle}`}
+                    >
+                      <h4>
+                        Pantry forecast · {(meal.forecastLines || []).length}{" "}
+                        ingredients
+                      </h4>
+                      <div className="mpx-ingredients">
+                        {meal.forecastLines.map((line, index) => (
+                          <div
+                            className="mpx-ingredient"
+                            key={`${line.canonicalIngredientId}:${line.requiredUnit}:${index}`}
+                          >
+                            <strong>{line.label || "Ingredient"}</strong>
+                            <span>
+                              {line.requiredQuantity} {line.requiredUnit} ·{" "}
+                              {READINESS_LABELS[line.readinessState] ||
+                                "Needs confirmation"}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    </div>
+                    </section>
                   )}
-
-                  {meal.status ===
-                    'planned' && (
-                    <div className="grid grid-cols-4 gap-1.5 border-t border-[#b8c8e8] bg-[#e9f1ff] px-2 py-2 sm:flex sm:flex-wrap sm:gap-2 sm:px-4 sm:py-3">
+                  {meal.status === "planned" && (
+                    <div className="mpx-meal-actions">
                       <button
+                        className="mpx-action"
                         type="button"
-                        disabled={
-                          saving
-                        }
+                        disabled={saving}
                         onClick={() =>
                           changeMeal({
-                            mealId:
-                              meal.id,
-
+                            mealId: meal.id,
                             changes: {
-                              servings:
-                                Math.max(
-                                  1,
-                                  Number(
-                                    meal.servings,
-                                  ) -
-                                    1,
-                                ),
+                              servings: Math.max(1, Number(meal.servings) - 1),
                             },
                           })
                         }
-                        className="w-full whitespace-nowrap rounded-lg border border-stone-200 bg-white px-1 py-2 text-[9px] font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         − Serving
                       </button>
-
                       <button
+                        className="mpx-action"
                         type="button"
-                        disabled={
-                          saving
-                        }
+                        disabled={saving}
                         onClick={() =>
                           changeMeal({
-                            mealId:
-                              meal.id,
-
-                            changes: {
-                              servings:
-                                Number(
-                                  meal.servings,
-                                ) +
-                                1,
-                            },
+                            mealId: meal.id,
+                            changes: { servings: Number(meal.servings) + 1 },
                           })
                         }
-                        className="w-full whitespace-nowrap rounded-lg border border-stone-200 bg-white px-1 py-2 text-[9px] font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         + Serving
                       </button>
-
                       <button
+                        className="mpx-action"
                         type="button"
-                        disabled={
-                          saving
-                        }
+                        disabled={saving}
                         onClick={() =>
                           changeMeal({
-                            mealId:
-                              meal.id,
-
-                            changes: {
-                              status:
-                                'skipped',
-                            },
+                            mealId: meal.id,
+                            changes: { status: "skipped" },
                           })
                         }
-                        className="w-full whitespace-nowrap rounded-lg border border-violet-200 bg-violet-50 px-1 py-2 text-[9px] font-black text-violet-800 transition hover:bg-violet-100 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         Skip meal
                       </button>
-
                       <button
+                        className="mpx-action is-danger"
                         type="button"
-                        disabled={
-                          saving
-                        }
+                        disabled={saving}
                         onClick={() =>
                           changeMeal({
-                            mealId:
-                              meal.id,
-
-                            changes: {
-                              status:
-                                'cancelled',
-                            },
+                            mealId: meal.id,
+                            changes: { status: "cancelled" },
                           })
                         }
-                        className="w-full whitespace-nowrap rounded-lg border border-rose-200 bg-rose-50 px-1 py-2 text-[9px] font-black text-rose-800 transition hover:bg-rose-100 disabled:opacity-50 sm:w-auto sm:px-3 sm:text-xs"
                       >
                         Cancel
                       </button>
                     </div>
                   )}
-                </article>
-              ),
-            )}
-
-            {(selectedPlan.meals || []).length ===
-              0 && (
-              <div className="rounded-[20px] border border-dashed border-[#b8ace9] bg-[#f1efff] p-8 text-center">
-                <ChefHat
-                  size={28}
-                  className="mx-auto text-stone-400"
-                />
-
-                <h3 className="mt-3 font-black text-stone-900">
-                  No meals planned yet
+                </div>
+              </article>
+            ))}
+            {(selectedPlan?.meals || []).length === 0 && (
+              <div className="mpx-schedule-empty">
+                <ChefHat size={29} aria-hidden="true" />
+                <h3>
+                  {selectedPlan
+                    ? "Nothing scheduled yet"
+                    : "Your schedule is waiting."}
                 </h3>
-
-                <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-stone-500">
-                  Add the first recipe above and EPANTRY will calculate its planning readiness against your Pantry.
+                <p>
+                  {selectedPlan
+                    ? "Choose a published recipe above to see its Pantry forecast here."
+                    : "Create or select a plan in sections 01 and 02, then add your first recipe."}
                 </p>
               </div>
             )}
           </div>
         </section>
-            </>
-          ) : (
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-4">
-            <form
-              onSubmit={
-                handleCreatePlan
-              }
-              className="min-w-0 rounded-[24px] border border-[#8cbcff] bg-[#d9eaff] p-3 shadow-[0_12px_30px_rgba(50,96,170,0.10)] sm:p-5 lg:p-4"
-            >
-              <div className="flex items-start gap-2 sm:gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#2563eb] text-white shadow-sm sm:h-10 sm:w-10 sm:rounded-xl lg:h-9 lg:w-9">
-                  <Plus
-                    size={19}
-                    aria-hidden="true"
-                  />
-                </div>
 
-                <div>
-                  <h2 className="font-black text-stone-950">
-                    Create Meal Plan
-                  </h2>
-
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[#445f89]">
-                    Give the plan a name and choose its date range.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2.5 sm:mt-5 sm:space-y-4 lg:mt-4 lg:space-y-3">
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
-                    Plan name
-                  </span>
-
-                  <input
-                    value={
-                      planForm.title
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setPlanForm(
-                        (
-                          current,
-                        ) => ({
-                          ...current,
-
-                          title:
-                            event.target.value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3 lg:py-2.5"
-                    placeholder="Plan title"
-                  />
-                </label>
-
-                <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
-                      Starts
-                    </span>
-
-                    <input
-                      type="date"
-                      value={
-                        planForm.horizonStart
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        setPlanForm(
-                          (
-                            current,
-                          ) => ({
-                            ...current,
-
-                            horizonStart:
-                              event.target.value,
-                          }),
-                        )
-                      }
-                      className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3 lg:py-2.5"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-[#31547f]">
-                      Ends
-                    </span>
-
-                    <input
-                      type="date"
-                      value={
-                        planForm.horizonEnd
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        setPlanForm(
-                          (
-                            current,
-                          ) => ({
-                            ...current,
-
-                            horizonEnd:
-                              event.target.value,
-                          }),
-                        )
-                      }
-                      className="w-full rounded-xl border border-[#9ebff0] bg-white/80 px-3 py-2 text-sm font-semibold text-stone-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:px-4 sm:py-3 lg:py-2.5"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={
-                  saving
-                }
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-black text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:py-3 lg:mt-4 lg:py-2.5"
-              >
-                <Plus
-                  size={16}
-                  aria-hidden="true"
-                />
-
-                Create Plan
-              </button>
-            </form>
-
-              <div
-                className="relative min-h-[360px] overflow-hidden sm:min-h-[420px] lg:min-h-[350px]"
-                aria-hidden="true"
-              >
-                {!loading && (
-                  <>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      {MEAL_PLAN_VISUALS.map(
-                        (
-                          image,
-                          index,
-                        ) => (
-                          <img
-                            key={
-                              image
-                            }
-                            src={
-                              image
-                            }
-                            alt=""
-                            className={[
-                              'absolute max-h-[92%] w-full max-w-[680px] object-contain px-4 transition-all duration-[900ms] ease-in-out lg:max-h-[86%] lg:max-w-[560px]',
-                              mealVisualIndex ===
-                              index
-                                ? 'translate-x-0 scale-100 opacity-100'
-                                : 'translate-x-6 scale-[0.97] opacity-0',
-                            ].join(
-                              ' ',
-                            )}
-                          />
-                        ),
-                      )}
-                    </div>
-
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </section>
-
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-[#5cb5ef] bg-[#bfe7ff] p-4 text-xs font-semibold leading-5 text-[#0f4c6d]">
-          <ShieldCheck
-            size={17}
-            className="mt-0.5 shrink-0"
-          />
-
-          <span>Reservations do not consume Pantry; inferred or uncertain Pantry stays uncertain until stronger evidence exists.</span>
+        <div className="mpx-note">
+          <ShieldCheck size={19} aria-hidden="true" />
+          <p>
+            Scheduled meals do not deduct Pantry stock. Estimated or unconfirmed
+            quantities stay uncertain until you check them.
+          </p>
         </div>
       </div>
 
-      {planPendingDelete && (
+      {showAllPlans && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/45 px-4 backdrop-blur-sm"
+          className="mpx-overlay"
           role="presentation"
-          onMouseDown={(
-            event,
-          ) => {
-            if (
-              event.target ===
-              event.currentTarget &&
-              !deleting
-            ) {
-              setPlanPendingDelete(
-                null,
-              )
-            }
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowAllPlans(false);
           }}
         >
-          <div
+          <section
+            className="mpx-dialog mpx-allplans-dialog"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="delete-meal-plan-title"
-            className="w-full max-w-md rounded-[24px] border border-rose-100 bg-white p-6 shadow-[0_28px_80px_rgba(28,25,23,0.24)]"
+            aria-labelledby="mpx-allplans-title"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-                <Trash2
-                  size={20}
-                  aria-hidden="true"
-                />
+            <header className="mpx-allplans-head">
+              <div>
+                <p className="mpx-section-mark">YOUR SAVED PLANS</p>
+                <h2 id="mpx-allplans-title">All {mealPlans.length} plans</h2>
+                <p>Select a plan to open its meal schedule.</p>
               </div>
-
               <button
+                ref={popupCloseRef}
                 type="button"
-                disabled={
-                  deleting
-                }
-                onClick={() =>
-                  setPlanPendingDelete(
-                    null,
-                  )
-                }
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:bg-stone-50 disabled:opacity-50"
+                className="mpx-icon"
+                aria-label="Close all plans"
+                onClick={() => setShowAllPlans(false)}
+              >
+                <X size={19} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="mpx-allplans-body">
+              <div className="mpx-allplans-list">
+                {mealPlans.map((plan) => (
+                  <article
+                    key={plan.id}
+                    className={`mpx-plan-entry ${
+                      selectedPlan?.id === plan.id ? "is-active" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="mpx-plan-main"
+                      onClick={() => openPlanInSchedule(plan.id)}
+                      aria-pressed={selectedPlan?.id === plan.id}
+                    >
+                      <strong>{plan.title}</strong>
+                      <span>
+                        {formatDateOnly(plan.horizonStart)} –{" "}
+                        {formatDateOnly(plan.horizonEnd)} ·{" "}
+                        {(plan.meals || []).length}{" "}
+                        {(plan.meals || []).length === 1 ? "meal" : "meals"}
+                      </span>
+                    </button>
+                    {selectedPlan?.id === plan.id && (
+                      <span className="mpx-active-label">Selected</span>
+                    )}
+                    <button
+                      type="button"
+                      className="mpx-icon"
+                      aria-label={`Delete ${plan.title}`}
+                      onClick={() => {
+                        setShowAllPlans(false);
+                        setPlanPendingDelete(plan);
+                      }}
+                    >
+                      <Trash2 size={17} aria-hidden="true" />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showAllMeals && selectedPlan && (
+        <div
+          className="mpx-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowAllMeals(false);
+          }}
+        >
+          <section
+            className="mpx-dialog mpx-allplans-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mpx-allmeals-title"
+          >
+            <header className="mpx-allplans-head">
+              <div>
+                <p className="mpx-section-mark">{selectedPlan.title}</p>
+                <h2 id="mpx-allmeals-title">
+                  All {selectedMeals.length} scheduled meals
+                </h2>
+                <p>
+                  Choose a meal to go straight to its Pantry forecast and
+                  actions.
+                </p>
+              </div>
+              <button
+                ref={popupCloseRef}
+                type="button"
+                className="mpx-icon"
+                aria-label="Close all meals"
+                onClick={() => setShowAllMeals(false)}
+              >
+                <X size={19} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="mpx-allplans-body">
+              <div className="mpx-allmeals-list">
+                {selectedMeals.map((meal) => (
+                  <button
+                    key={meal.id}
+                    type="button"
+                    onClick={() => openPlanInSchedule(selectedPlan.id, meal.id)}
+                  >
+                    <span>
+                      <strong>{meal.recipeTitle || "Planned meal"}</strong>
+                      <small>
+                        {formatDateTime(meal.plannedAt)} ·{" "}
+                        {titleCase(meal.mealType)} · {meal.servings} servings
+                      </small>
+                    </span>
+                    <ArrowRight size={18} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {planPendingDelete && (
+        <div
+          className="mpx-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting)
+              setPlanPendingDelete(null);
+          }}
+        >
+          <section
+            className="mpx-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mpx-delete-title"
+          >
+            <div className="mpx-dialog-top">
+              <Trash2 size={25} color="#A83D3B" aria-hidden="true" />
+              <button
+                className="mpx-icon"
+                type="button"
+                disabled={deleting}
                 aria-label="Close delete confirmation"
+                onClick={() => setPlanPendingDelete(null)}
               >
-                <X
-                  size={17}
-                  aria-hidden="true"
-                />
+                <X size={19} aria-hidden="true" />
               </button>
             </div>
-
-            <p className="mt-5 text-[11px] font-black uppercase tracking-[0.14em] text-rose-600">
-              Delete Meal Plan
+            <h2 id="mpx-delete-title">Delete {planPendingDelete.title}?</h2>
+            <p>
+              This removes the plan from your active Meal Plans and cancels its
+              still-planned meals so they no longer affect Pantry forecasting.
+              Existing planning history is preserved.
             </p>
-
-            <h2
-              id="delete-meal-plan-title"
-              className="mt-1 text-2xl font-black tracking-tight text-stone-950"
-            >
-              Delete {planPendingDelete.title}?
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-stone-600">
-              This removes the plan from your active Meal Plans and cancels its still-planned meals so they no longer affect Pantry forecasting. Existing planning history is preserved.
-            </p>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="mpx-dialog-actions">
               <button
+                className="mpx-plain"
                 type="button"
-                disabled={
-                  deleting
-                }
-                onClick={() =>
-                  setPlanPendingDelete(
-                    null,
-                  )
-                }
-                className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+                disabled={deleting}
+                onClick={() => setPlanPendingDelete(null)}
               >
-                Cancel
+                Keep plan
               </button>
-
               <button
+                className="mpx-btn"
+                style={{ background: "#A83D3B", borderColor: "#A83D3B" }}
                 type="button"
-                disabled={
-                  deleting
-                }
-                onClick={
-                  handleDeletePlan
-                }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={deleting}
+                onClick={handleDeletePlan}
               >
-                <Trash2
-                  size={15}
-                  aria-hidden="true"
-                />
-
-                {deleting
-                  ? 'Deleting...'
-                  : 'Delete Plan'}
+                <Trash2 size={16} aria-hidden="true" />{" "}
+                {deleting ? "Deleting…" : "Delete plan"}
               </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
     </main>
-  )
+  );
 }

@@ -85,7 +85,7 @@ function SourceStatusBadge({ status }) {
 
   return (
     <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${
+      className={`inline-flex rounded-full border px-3 py-1.5 text-[12px] font-bold capitalize tracking-normal ${
         styles[status] || styles.revoked
       }`}
     >
@@ -330,305 +330,309 @@ export default function PurchaseIntelligencePage() {
 
   if (isLoadingHousehold) {
     return (
-      <div className="grid min-h-[520px] place-items-center p-6">
-        <LoaderCircle className="animate-spin text-emerald-700" />
+      <div className="grid min-h-[320px] place-items-center" role="status">
+        <LoaderCircle
+          size={28}
+          className="animate-spin text-[#173F35]"
+          aria-hidden="true"
+        />
+        <span className="sr-only">Loading household</span>
       </div>
     );
   }
 
   if (!hasHousehold) {
     return (
-      <div className="p-4 sm:p-6 lg:p-7">
-        <div className="rounded-[28px] border border-stone-200 bg-white p-7 shadow-sm">
-          <ShieldCheck
-            size={34}
-            className="text-emerald-700"
-            aria-hidden="true"
-          />
-          <h1 className="mt-4 text-2xl font-black text-stone-950">
-            Create your household first
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-stone-600">
-            Connected purchase intelligence is household-scoped. Create or join
-            a household before linking a purchase source.
+      <div className="pi-page">
+        <section className="pi-household-required">
+          <ShieldCheck size={32} aria-hidden="true" />
+          <p className="pi-eyebrow">Connected purchases</p>
+          <h1>Create your household first</h1>
+          <p>
+            Purchase sources belong to a household. Create or join one to get
+            started.
           </p>
-          <Link
-            to="/account/household"
-            className="focus-ring mt-5 inline-flex rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white"
-          >
+          <Link to="/account/household" className="pi-button pi-button-primary">
             Open Household
           </Link>
-        </div>
+        </section>
+        <style>{purchasePageStyles}</style>
       </div>
     );
   }
 
+  const connectedCount = sources.filter(
+    (source) => source.status === "connected"
+  ).length;
+  const activeLearningCount = sources.filter(
+    (source) => source.status === "connected" && source.learningEnabled
+  ).length;
+
   return (
-    <div className="px-3 pb-3 pt-3 sm:px-6 sm:pb-6 sm:pt-5 lg:px-7 lg:pb-7">
-      <header className="rounded-[24px] bg-stone-950 p-4 text-white shadow-sm sm:rounded-[28px] sm:p-8">
-        <div className="flex flex-col gap-3 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-400">
-              Customer Purchase Intelligence
-            </p>
-            <h1 className="mt-2 whitespace-nowrap text-[22px] font-black tracking-tight sm:mt-3 sm:text-4xl">
-              Connected purchases
-            </h1>
-            <p className="mt-2 max-w-2xl text-[11px] leading-4 text-stone-400 sm:mt-3 sm:text-sm sm:leading-6">
-              <span className="sm:hidden">
-                Connect trusted sources. Pause, correct or delete imports
-                anytime.
-              </span>
-              <span className="hidden sm:inline">
-                Connect only the purchase sources you choose. Imported activity
-                stays correctable, pausable and deletable, and it never becomes
-                exact Pantry truth automatically.
-              </span>
-            </p>
+    <main className="pi-page">
+      <style>{purchasePageStyles}</style>
+      <header className="pi-hero">
+        <div className="pi-hero-copy">
+          <p className="pi-eyebrow">
+            <span className="pi-accent-line" /> YOUR PURCHASES, YOUR CONTROL
+          </p>
+          <h1>
+            Connected
+            <br />
+            <span>purchases.</span>
+          </h1>
+          <p className="pi-hero-description">
+            <span className="pi-desktop-copy">
+              Bring receipts and order history together. Review what EPANTRY
+              imports and decide what it can learn from.
+            </span>
+            <span className="pi-mobile-copy">
+              Review purchases and control what you share.
+            </span>
+          </p>
+          <div className="pi-hero-bottom">
+            <a className="pi-button pi-button-primary" href="#pi-add-source">
+              Add a source <span aria-hidden="true">&#8594;</span>
+            </a>
+            <a className="pi-hero-secondary" href="#pi-history">
+              Review purchases <span aria-hidden="true">&#8594;</span>
+            </a>
           </div>
-          <div className="rounded-xl border border-stone-800 bg-stone-900 px-3 py-2 text-[10px] font-bold text-stone-300 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-xs">
-            Household: {household.name || "Current household"}
+        </div>
+        <div className="pi-hero-aside">
+          <div className="pi-household-label">
+            <ShieldCheck size={17} aria-hidden="true" /> CURRENT HOUSEHOLD
           </div>
+          <p className="pi-household-name">
+            {household.name || "Current household"}
+          </p>
+          <div
+            className="pi-hero-stats"
+            aria-label="Current purchase source summary"
+          >
+            <div>
+              <strong>{sources.length}</strong>
+              <span>Sources added</span>
+            </div>
+            <div>
+              <strong>{connectedCount}</strong>
+              <span>Connected now</span>
+            </div>
+          </div>
+          <p className="pi-hero-safety">
+            <ShieldCheck size={18} aria-hidden="true" /> Imports never overwrite
+            confirmed Pantry records automatically.
+          </p>
         </div>
       </header>
 
-      <div className="mt-5">
-        <Notice notice={notice} />
-      </div>
+      <Notice notice={notice} />
 
-      <section className="mb-4 rounded-[22px] border border-stone-200 bg-white p-4 shadow-sm sm:mb-5 sm:rounded-[26px] sm:p-6">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-            How this page helps you
-          </p>
-          <h2 className="mt-1 whitespace-nowrap text-[8px] font-black leading-none tracking-[-0.015em] text-stone-950 sm:mt-2 sm:text-xl sm:leading-normal sm:tracking-normal">
-            Bring your purchases into EPANTRY without giving up control.
-          </h2>
-          <p className="mt-1 max-w-3xl text-[11px] leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
-            <span className="sm:hidden">
-              Connect a source, review imports and choose what EPANTRY may learn
-              from. Imports never replace confirmed Pantry data.
-            </span>
-            <span className="hidden sm:inline">
-              Connect a purchase source, review what EPANTRY imports, and decide
-              what can be used for learning. Imported purchases stay separate
-              from confirmed Pantry truth until stronger household evidence
-              exists.
-            </span>
-          </p>
+      <section className="pi-journey" aria-labelledby="pi-how-title">
+        <div className="pi-section-kicker">START HERE</div>
+        <div className="pi-journey-heading">
+          <h2 id="pi-how-title">Four steps. You're in control.</h2>
+          <p>Connect, review and manage purchases at your own pace.</p>
         </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="pi-journey-steps">
           {[
             {
-              step: "1",
+              num: "01",
               title: "Choose a source",
-              text: "Pick Gmail, Outlook, a supported retailer or receipt import.",
+              desc: "Pick a supported provider or receipt import.",
             },
             {
-              step: "2",
-              title: "Connect & sync",
-              text: "Authorize it once; EPANTRY imports supported purchases.",
+              num: "02",
+              title: "Connect",
+              desc: "Approve access if the provider requires it.",
             },
             {
-              step: "3",
-              title: "Review what came in",
-              text: "Review purchases, fix names or ignore what you do not need.",
+              num: "03",
+              title: "Review imports",
+              desc: "Check purchased items and correct names.",
             },
             {
-              step: "4",
+              num: "04",
               title: "Stay in control",
-              text: "Pause, disconnect or delete imported history whenever you want.",
+              desc: "Pause, disconnect or delete history.",
             },
-          ].map((item) => (
-            <div
-              key={item.step}
-              className="rounded-[16px] border border-stone-200 bg-stone-50 px-2.5 py-3 sm:rounded-[20px] sm:p-4"
-            >
-              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-100 text-[9px] font-black text-emerald-800 sm:h-7 sm:w-7 sm:text-xs">
-                  {item.step}
-                </span>
-                <h3 className="min-w-0 whitespace-nowrap text-[8px] font-black leading-none tracking-[-0.02em] text-stone-950 sm:text-sm sm:leading-normal sm:tracking-normal">
-                  {item.title}
-                </h3>
-              </div>
-              <p className="ml-auto mt-1 w-[78%] text-left text-[9px] leading-[1.25] text-stone-600 sm:mt-2 sm:w-auto sm:text-xs sm:leading-5">
-                {item.text}
-              </p>
+          ].map((step) => (
+            <div className="pi-journey-step" key={step.num}>
+              <span className="pi-journey-number">{step.num}</span>
+              <h3>{step.title}</h3>
+              <p>{step.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="rounded-[22px] border border-stone-200 bg-white p-4 shadow-sm sm:rounded-[26px] sm:p-6">
-        <div className="flex items-start gap-3">
-          <ShieldCheck
-            size={22}
-            className="mt-0.5 shrink-0 text-emerald-700"
-            aria-hidden="true"
-          />
+      <section
+        className="pi-providers"
+        id="pi-add-source"
+        aria-labelledby="pi-add-title"
+      >
+        <div className="pi-section-intro">
           <div>
-            <h2 className="text-lg font-black text-stone-950">Add a source</h2>
-            <p className="mt-1 text-[11px] leading-4 text-stone-600 sm:text-sm sm:leading-6">
-              <span className="sm:hidden">
-                Your sign-in permissions stay with the provider, not in
-                EPANTRY's app database.
-              </span>
-              <span className="hidden sm:inline">
-                Email and retailer OAuth credentials stay in the dedicated
-                provider gateway, outside the EPANTRY MongoDB application
-                database.
-              </span>
+            <p className="pi-section-kicker">01 / CONNECT</p>
+            <h2 id="pi-add-title">Add a source</h2>
+            <p>
+              Only connect what you want to share. Provider availability is
+              shown below.
             </p>
           </div>
+          <div className="pi-privacy-note">
+            <ShieldCheck size={18} aria-hidden="true" />
+            <span>
+              Provider sign-in details stay with the secure provider gateway.
+            </span>
+          </div>
         </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="pi-provider-grid">
+          {providers.length === 0 && !isLoading ? (
+            <p className="pi-muted-state">
+              No purchase-source providers are available right now.
+            </p>
+          ) : null}
           {providers.map((provider) => {
             const key = `connect:${provider.provider}`;
             const busy = busyKey === key;
-
+            const available = provider.available === true;
+            const ProviderIcon =
+              provider.provider === "gmail" || provider.provider === "outlook"
+                ? Mail
+                : provider.provider === "retailer"
+                ? ShoppingBag
+                : DatabaseZap;
             return (
               <button
                 key={provider.provider}
                 type="button"
-                disabled={busy || provider.available !== true}
+                disabled={busy || !available}
                 onClick={() => connectProvider(provider)}
-                className="focus-ring rounded-[18px] border border-stone-200 p-3 text-left transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50 sm:rounded-[22px] sm:p-4"
+                className={`pi-provider ${
+                  available ? "pi-provider-ready" : "pi-provider-unavailable"
+                }`}
               >
-                <div className="flex items-center justify-between gap-3">
-                  {provider.provider === "gmail" ||
-                  provider.provider === "outlook" ? (
-                    <Mail
-                      size={20}
-                      className="text-emerald-700"
-                      aria-hidden="true"
-                    />
-                  ) : provider.provider === "retailer" ? (
-                    <ShoppingBag
-                      size={20}
-                      className="text-emerald-700"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <DatabaseZap
-                      size={20}
-                      className="text-emerald-700"
-                      aria-hidden="true"
-                    />
-                  )}
+                <span className="pi-provider-icon">
+                  <ProviderIcon size={23} aria-hidden="true" />
+                </span>
+                <span className="pi-provider-copy">
+                  <strong>{provider.label}</strong>
+                  <small>
+                    {available
+                      ? provider.authorizationRequired
+                        ? "Secure sign-in required"
+                        : "Local import source"
+                      : "Not available yet"}
+                  </small>
+                </span>
+                <span className="pi-provider-action" aria-hidden="true">
                   {busy ? (
-                    <LoaderCircle
-                      size={17}
-                      className="animate-spin text-stone-500"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                </div>
-                <p className="mt-2 text-xs font-black text-stone-950 sm:mt-3 sm:text-sm">
-                  {provider.label}
-                </p>
-                <p className="mt-1 text-[10px] leading-4 text-stone-500 sm:text-xs sm:leading-5">
-                  {provider.available
-                    ? provider.authorizationRequired
-                      ? "Explicit authorization required."
-                      : "Local import source."
-                    : "Provider gateway not configured yet."}
-                </p>
+                    <LoaderCircle size={18} className="animate-spin" />
+                  ) : available ? (
+                    "+"
+                  ) : (
+                    "-"
+                  )}
+                </span>
               </button>
             );
           })}
         </div>
       </section>
 
-      <section className="mt-4 rounded-[22px] border border-stone-200 bg-white p-4 shadow-sm sm:mt-5 sm:rounded-[26px] sm:p-6">
-        <div className="flex items-center justify-between gap-3 sm:gap-4">
+      <section className="pi-sources" aria-labelledby="pi-sources-title">
+        <div className="pi-section-intro pi-sources-intro">
           <div>
-            <h2 className="text-base font-black text-stone-950 sm:text-lg">
-              Your connected sources
-            </h2>
-            <p className="mt-0.5 text-[10px] leading-4 text-stone-500 sm:mt-1 sm:text-sm">
-              Sync and learning controls are independent.
-            </p>
+            <p className="pi-section-kicker">02 / MANAGE</p>
+            <h2 id="pi-sources-title">Your connected sources</h2>
+            <p>Control syncing and learning independently for each source.</p>
           </div>
           <button
             type="button"
             onClick={() => void loadData()}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-2.5 py-1.5 text-[10px] font-black text-stone-700 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
+            disabled={isLoading}
+            className="pi-button pi-button-outline"
           >
-            <RefreshCw size={15} aria-hidden="true" />
+            <RefreshCw
+              size={17}
+              className={isLoading ? "animate-spin" : ""}
+              aria-hidden="true"
+            />{" "}
             Refresh
           </button>
         </div>
-
+        <div
+          className="pi-source-overview"
+          aria-label="Source settings overview"
+        >
+          <span>
+            <strong>{sources.length}</strong> total sources
+          </span>
+          <span>
+            <strong>{connectedCount}</strong> connected
+          </span>
+          <span>
+            <strong>{activeLearningCount}</strong> using learning
+          </span>
+        </div>
         {isLoading ? (
-          <div className="mt-6 flex items-center gap-2 text-sm font-semibold text-stone-500">
+          <div className="pi-muted-state pi-loading">
             <LoaderCircle
-              size={17}
+              size={18}
               className="animate-spin"
               aria-hidden="true"
-            />
+            />{" "}
             Loading sources...
           </div>
         ) : sources.length === 0 ? (
-          <p className="mt-5 rounded-2xl bg-stone-50 p-4 text-sm text-stone-600">
-            No purchase source has been connected yet.
-          </p>
+          <div className="pi-empty-source">
+            <Unplug size={23} aria-hidden="true" />
+            <div>
+              <strong>No sources connected yet</strong>
+              <span>Choose an available provider above to begin.</span>
+            </div>
+          </div>
         ) : (
-          <div className="mt-3 space-y-2 sm:mt-5 sm:space-y-3">
+          <div className="pi-source-list">
             {sources.map((source) => {
               const isBusy = busyKey.endsWith(`:${source.sourceId}`);
-
               return (
-                <article
-                  key={source.sourceId}
-                  className="rounded-[18px] border border-stone-200 p-3 sm:rounded-[22px] sm:p-5"
-                >
-                  <div className="flex flex-col gap-2.5 sm:gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-xs font-black text-stone-950 sm:text-sm">
-                          {source.displayLabel || source.provider}
-                        </h3>
-                        <SourceStatusBadge status={source.status} />
-                      </div>
-                      <p className="mt-1 text-[10px] leading-4 text-stone-500 sm:mt-2 sm:text-xs sm:leading-5">
-                        Last successful sync:{" "}
-                        {formatDateTime(source.sync?.lastSuccessfulSyncAt)}
-                      </p>
-                      <p className="mt-0.5 text-[10px] leading-4 text-stone-500 sm:mt-1 sm:text-xs sm:leading-5">
-                        Learning:{" "}
-                        {source.learningEnabled ? "enabled" : "paused"}
-                      </p>
+                <article key={source.sourceId} className="pi-source-row">
+                  <div className="pi-source-details">
+                    <div className="pi-source-heading">
+                      <h3>{source.displayLabel || source.provider}</h3>
+                      <SourceStatusBadge status={source.status} />
                     </div>
-
-                    <div
-                      className={
-                        source.provider === "receipt_import"
-                          ? "grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2"
-                          : "flex flex-wrap gap-1.5 sm:gap-2"
-                      }
-                    >
-                      {source.status === "pending_authorization" ||
-                      source.status === "reauthorization_required" ? (
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() => void authorizeSource(source)}
-                          className={
-                            source.provider === "receipt_import"
-                              ? "focus-ring inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-xl bg-emerald-700 px-1 py-2 text-[7px] font-black text-white disabled:opacity-50 sm:w-auto sm:gap-2 sm:px-3 sm:text-xs"
-                              : "focus-ring inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
-                          }
-                        >
-                          <ExternalLink size={14} aria-hidden="true" />
-                          Authorize
-                        </button>
-                      ) : null}
-
-                      {source.status === "connected" &&
-                      source.provider !== "receipt_import" ? (
+                    <div className="pi-source-facts">
+                      <span>
+                        Last synced:{" "}
+                        <strong>
+                          {formatDateTime(source.sync?.lastSuccessfulSyncAt)}
+                        </strong>
+                      </span>
+                      <span>
+                        Learning:{" "}
+                        <strong>
+                          {source.learningEnabled ? "On" : "Paused"}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="pi-source-actions">
+                    {(source.status === "pending_authorization" ||
+                      source.status === "reauthorization_required") && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => void authorizeSource(source)}
+                        className="pi-small-button pi-small-primary"
+                      >
+                        <ExternalLink size={15} aria-hidden="true" /> Authorize
+                      </button>
+                    )}
+                    {source.status === "connected" &&
+                      source.provider !== "receipt_import" && (
                         <button
                           type="button"
                           disabled={isBusy}
@@ -639,127 +643,82 @@ export default function PurchaseIntelligencePage() {
                               "Purchase-source sync requested."
                             )
                           }
-                          className={
-                            source.provider === "receipt_import"
-                              ? "focus-ring inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-xl border border-stone-200 px-1 py-2 text-[7px] font-black text-stone-700 disabled:opacity-50 sm:w-auto sm:gap-2 sm:px-3 sm:text-xs"
-                              : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-50"
-                          }
+                          className="pi-small-button"
                         >
-                          <RefreshCw size={14} aria-hidden="true" />
-                          Sync
+                          <RefreshCw size={15} aria-hidden="true" /> Sync
                         </button>
-                      ) : null}
-
-                      {source.status === "connected" ? (
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() =>
-                            void updateSource(
-                              source,
-                              "pause",
-                              "Source sync paused."
-                            )
-                          }
-                          className={
-                            source.provider === "receipt_import"
-                              ? "focus-ring inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-xl border border-stone-200 px-1 py-2 text-[7px] font-black text-stone-700 disabled:opacity-50 sm:w-auto sm:gap-2 sm:px-3 sm:text-xs"
-                              : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-50"
-                          }
-                        >
-                          <CirclePause
-                            size={14}
-                            className="h-[11px] w-[11px] sm:h-3.5 sm:w-3.5"
-                            aria-hidden="true"
-                          />
-                          Pause sync
-                        </button>
-                      ) : null}
-
-                      {source.status === "paused" ? (
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() =>
-                            void updateSource(
-                              source,
-                              "resume",
-                              "Source sync resumed."
-                            )
-                          }
-                          className={
-                            source.provider === "receipt_import"
-                              ? "focus-ring inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-xl border border-stone-200 px-1 py-2 text-[7px] font-black text-stone-700 disabled:opacity-50 sm:w-auto sm:gap-2 sm:px-3 sm:text-xs"
-                              : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-50"
-                          }
-                        >
-                          <CirclePlay
-                            size={14}
-                            className="h-[11px] w-[11px] sm:h-3.5 sm:w-3.5"
-                            aria-hidden="true"
-                          />
-                          Resume sync
-                        </button>
-                      ) : null}
-
-                      {source.status !== "revoked" ? (
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() =>
-                            void updateSource(
-                              source,
-                              source.learningEnabled
-                                ? "pause_learning"
-                                : "resume_learning",
-                              source.learningEnabled
-                                ? "Purchase learning paused."
-                                : "Purchase learning resumed."
-                            )
-                          }
-                          className={
-                            source.provider === "receipt_import"
-                              ? "focus-ring inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-xl border border-stone-200 px-1 py-2 text-[7px] font-black text-stone-700 disabled:opacity-50 sm:w-auto sm:gap-2 sm:px-3 sm:text-xs"
-                              : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-50"
-                          }
-                        >
-                          <RotateCcw
-                            size={14}
-                            className="h-[11px] w-[11px] sm:h-3.5 sm:w-3.5"
-                            aria-hidden="true"
-                          />
-                          {source.learningEnabled
-                            ? "Pause learning"
-                            : "Resume learning"}
-                        </button>
-                      ) : null}
-
-                      {source.status !== "revoked" ? (
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() =>
-                            void updateSource(
-                              source,
-                              "revoke",
-                              "Source disconnected and consent revoked."
-                            )
-                          }
-                          className={
-                            source.provider === "receipt_import"
-                              ? "focus-ring inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-xl border border-red-200 px-1 py-2 text-[7px] font-black text-red-700 disabled:opacity-50 sm:w-auto sm:gap-2 sm:px-3 sm:text-xs"
-                              : "focus-ring inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"
-                          }
-                        >
-                          <Unplug
-                            size={14}
-                            className="h-[11px] w-[11px] sm:h-3.5 sm:w-3.5"
-                            aria-hidden="true"
-                          />
-                          Disconnect
-                        </button>
-                      ) : null}
-                    </div>
+                      )}
+                    {source.status === "connected" && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() =>
+                          void updateSource(
+                            source,
+                            "pause",
+                            "Source sync paused."
+                          )
+                        }
+                        className="pi-small-button"
+                      >
+                        <CirclePause size={15} aria-hidden="true" /> Pause sync
+                      </button>
+                    )}
+                    {source.status === "paused" && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() =>
+                          void updateSource(
+                            source,
+                            "resume",
+                            "Source sync resumed."
+                          )
+                        }
+                        className="pi-small-button"
+                      >
+                        <CirclePlay size={15} aria-hidden="true" /> Resume sync
+                      </button>
+                    )}
+                    {source.status !== "revoked" && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() =>
+                          void updateSource(
+                            source,
+                            source.learningEnabled
+                              ? "pause_learning"
+                              : "resume_learning",
+                            source.learningEnabled
+                              ? "Purchase learning paused."
+                              : "Purchase learning resumed."
+                          )
+                        }
+                        className="pi-small-button"
+                      >
+                        <RotateCcw size={15} aria-hidden="true" />{" "}
+                        {source.learningEnabled
+                          ? "Pause learning"
+                          : "Resume learning"}
+                      </button>
+                    )}
+                    {source.status !== "revoked" && (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() =>
+                          void updateSource(
+                            source,
+                            "revoke",
+                            "Source disconnected and consent revoked."
+                          )
+                        }
+                        className="pi-small-button pi-small-danger"
+                      >
+                        <Unplug size={15} aria-hidden="true" /> Disconnect
+                      </button>
+                    )}
                   </div>
                 </article>
               );
@@ -768,46 +727,36 @@ export default function PurchaseIntelligencePage() {
         )}
       </section>
 
-      <section className="mt-5 rounded-[26px] border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section
+        className="pi-history"
+        id="pi-history"
+        aria-labelledby="pi-history-title"
+      >
+        <div className="pi-history-header">
           <div>
-            <div className="flex items-center gap-2">
-              <History
-                size={20}
-                className="text-emerald-700"
-                aria-hidden="true"
-              />
-              <h2 className="text-lg font-black text-stone-950">
-                Imported purchase history
-              </h2>
-            </div>
-            <p className="mt-1 text-[11px] leading-4 text-stone-500 sm:text-sm sm:leading-6">
-              <span className="sm:hidden">
-                Review, fix or ignore imports before EPANTRY may learn from
-                them.
-              </span>
-              <span className="hidden sm:inline">
-                Correct or exclude imported evidence before EPANTRY uses it for
-                optional learning.
-              </span>
+            <p className="pi-section-kicker">03 / REVIEW</p>
+            <h2 id="pi-history-title">Imported purchase history</h2>
+            <p>
+              Review purchases, correct item names or exclude records from
+              learning.
             </p>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            <select
-              value={selectedSourceId}
-              onChange={(event) => setSelectedSourceId(event.target.value)}
-              className="focus-ring rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700"
-            >
-              <option value="">All sources</option>
-              {sources.map((source) => (
-                <option key={source.sourceId} value={source.sourceId}>
-                  {source.displayLabel || source.provider}
-                  {source.status === "revoked" ? " (disconnected)" : ""}
-                </option>
-              ))}
-            </select>
-
+          <div className="pi-history-controls">
+            <label className="pi-source-filter">
+              <span>Show purchases from</span>
+              <select
+                value={selectedSourceId}
+                onChange={(event) => setSelectedSourceId(event.target.value)}
+              >
+                <option value="">All sources</option>
+                {sources.map((source) => (
+                  <option key={source.sourceId} value={source.sourceId}>
+                    {source.displayLabel || source.provider}
+                    {source.status === "revoked" ? " (disconnected)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
             {selectedSource ? (
               <button
                 type="button"
@@ -822,47 +771,61 @@ export default function PurchaseIntelligencePage() {
                     "Imported history deleted. Older records will not be silently re-imported."
                   )
                 }
-                className="focus-ring inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-xs font-black text-red-700 disabled:opacity-50"
+                className="pi-small-button pi-small-danger pi-delete-history"
               >
-                <Trash2 size={14} aria-hidden="true" />
-                Delete source history
+                <Trash2 size={16} aria-hidden="true" /> Delete source history
               </button>
             ) : null}
           </div>
         </div>
-
-        {transactions.length === 0 ? (
-          <p className="mt-5 rounded-2xl bg-stone-50 p-4 text-sm text-stone-600">
-            No imported purchases are available for this view.
-          </p>
-        ) : (
-          <div className="mt-5 space-y-4">
-            {transactions.map((transaction) => (
+        <div className="pi-history-ledger">
+          {isLoading ? (
+            <div className="pi-muted-state pi-loading">
+              <LoaderCircle
+                size={18}
+                className="animate-spin"
+                aria-hidden="true"
+              />{" "}
+              Loading purchase history...
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="pi-no-purchases">
+              <History size={26} aria-hidden="true" />
+              <h3>No imported purchases yet</h3>
+              <p>
+                Once a connected source imports purchases, you can review them
+                here.
+              </p>
+            </div>
+          ) : (
+            transactions.map((transaction, index) => (
               <article
                 key={transaction.transactionId}
-                className="rounded-[22px] border border-stone-200 p-4 sm:p-5"
+                className="pi-transaction"
               >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="text-sm font-black text-stone-950">
-                      {transaction.merchantName || "Imported purchase"}
+                <div className="pi-transaction-header">
+                  <span className="pi-transaction-number">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div className="pi-transaction-intro">
+                    <h3>{transaction.merchantName || "Imported purchase"}</h3>
+                    <p>
+                      {formatDateTime(transaction.purchasedAt)}{" "}
+                      <span aria-hidden="true">&#183;</span>{" "}
+                      {(transaction.items || []).length} items
                     </p>
-                    <p className="mt-1 text-xs text-stone-500">
-                      {formatDateTime(transaction.purchasedAt)}
-                    </p>
-                    {formatMoney(
-                      transaction.totalMinor,
-                      transaction.currency
-                    ) ? (
-                      <p className="mt-1 text-xs font-bold text-stone-700">
+                  </div>
+                  {formatMoney(transaction.totalMinor, transaction.currency) ? (
+                    <div className="pi-transaction-total">
+                      <span>Purchase total</span>
+                      <strong>
                         {formatMoney(
                           transaction.totalMinor,
                           transaction.currency
                         )}
-                      </p>
-                    ) : null}
-                  </div>
-
+                      </strong>
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     disabled={
@@ -874,78 +837,78 @@ export default function PurchaseIntelligencePage() {
                         !transaction.excludedFromLearning
                       )
                     }
-                    className="focus-ring rounded-xl border border-stone-200 px-3 py-2 text-xs font-black text-stone-700 disabled:opacity-50"
+                    className="pi-small-button pi-transaction-toggle"
                   >
                     {transaction.excludedFromLearning
                       ? "Restore to learning"
                       : "Ignore this purchase"}
                   </button>
                 </div>
-
-                <div className="mt-4 space-y-3">
-                  {(transaction.items || []).map((item) => {
-                    const draft = correctionDrafts[item.lineKey] || {};
-
-                    return (
-                      <div
-                        key={item.lineKey}
-                        className="rounded-2xl bg-stone-50 p-4"
-                      >
-                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(180px,0.7fr)_auto] lg:items-end">
-                          <div>
-                            <p className="text-xs font-black text-stone-900">
+                {(transaction.items || []).length > 0 ? (
+                  <div className="pi-purchase-items">
+                    {(transaction.items || []).map((item) => {
+                      const draft = correctionDrafts[item.lineKey] || {};
+                      return (
+                        <div className="pi-purchase-item" key={item.lineKey}>
+                          <div className="pi-item-info">
+                            <h4>
                               {item.customerOverride?.correctedLabel ||
                                 item.sourceLabel ||
                                 "Imported item"}
-                            </p>
-                            <p className="mt-1 text-[11px] leading-5 text-stone-500">
+                            </h4>
+                            <p>
                               Qty{" "}
                               {item.customerOverride?.quantity ??
                                 item.quantityFulfilled ??
                                 item.quantityOrdered ??
                                 "-"}{" "}
-                              · Match {item.matchStatus || "unmatched"}
+                              <span aria-hidden="true">&#183;</span> Match:{" "}
+                              {item.matchStatus || "unmatched"}
                             </p>
                           </div>
-
-                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                            <input
-                              value={
-                                draft.correctedLabel ??
-                                item.customerOverride?.correctedLabel ??
-                                ""
-                              }
-                              onChange={(event) =>
-                                setCorrectionDrafts((current) => ({
-                                  ...current,
-                                  [item.lineKey]: {
-                                    ...current[item.lineKey],
-                                    correctedLabel: event.target.value,
-                                  },
-                                }))
-                              }
-                              placeholder="Correct item name"
-                              className="focus-ring rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs"
-                            />
-                            <input
-                              value={
-                                draft.note ?? item.customerOverride?.note ?? ""
-                              }
-                              onChange={(event) =>
-                                setCorrectionDrafts((current) => ({
-                                  ...current,
-                                  [item.lineKey]: {
-                                    ...current[item.lineKey],
-                                    note: event.target.value,
-                                  },
-                                }))
-                              }
-                              placeholder="Correction note"
-                              className="focus-ring rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs"
-                            />
+                          <div className="pi-item-fields">
+                            <label>
+                              <span>Correct item name</span>
+                              <input
+                                value={
+                                  draft.correctedLabel ??
+                                  item.customerOverride?.correctedLabel ??
+                                  ""
+                                }
+                                onChange={(event) =>
+                                  setCorrectionDrafts((current) => ({
+                                    ...current,
+                                    [item.lineKey]: {
+                                      ...current[item.lineKey],
+                                      correctedLabel: event.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="Item name"
+                              />
+                            </label>
+                            <label>
+                              <span>Correction note</span>
+                              <input
+                                value={
+                                  draft.note ??
+                                  item.customerOverride?.note ??
+                                  ""
+                                }
+                                onChange={(event) =>
+                                  setCorrectionDrafts((current) => ({
+                                    ...current,
+                                    [item.lineKey]: {
+                                      ...current[item.lineKey],
+                                      note: event.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="Optional note"
+                              />
+                            </label>
                           </div>
-
-                          <div className="flex flex-wrap gap-2">
+                          <div className="pi-item-actions">
                             <button
                               type="button"
                               onClick={() =>
@@ -962,7 +925,7 @@ export default function PurchaseIntelligencePage() {
                                   },
                                 }))
                               }
-                              className="focus-ring rounded-xl border border-stone-200 bg-white px-3 py-2 text-[11px] font-black text-stone-700"
+                              className="pi-small-button"
                             >
                               {draft.excludedFromLearning ??
                               item.excludedFromLearning
@@ -975,21 +938,252 @@ export default function PurchaseIntelligencePage() {
                               onClick={() =>
                                 void saveItemCorrection(transaction, item)
                               }
-                              className="focus-ring rounded-xl bg-stone-950 px-3 py-2 text-[11px] font-black text-white disabled:opacity-50"
+                              className="pi-small-button pi-small-primary"
                             >
                               Save correction
                             </button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </article>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </section>
-    </div>
+      <div className="pi-privacy-footer">
+        <ShieldCheck size={17} aria-hidden="true" /> Your imported purchases
+        remain separate from confirmed Pantry quantities.
+      </div>
+    </main>
   );
 }
+
+const purchasePageStyles = `
+.pi-page { --pi-forest:#173F35; --pi-clay:#C56C42; --pi-charcoal:#202421; --pi-sage:#D7DDCF; --pi-porcelain:#F7F6F2; width:100%; min-width:0; box-sizing:border-box; background:var(--pi-porcelain); color:var(--pi-charcoal); padding:clamp(18px,2.2vw,34px); padding-bottom:42px; font-family:'Plus Jakarta Sans',sans-serif; }
+.pi-page *, .pi-page *::before, .pi-page *::after { box-sizing:border-box; }
+.pi-page h1,.pi-page h2,.pi-page h3,.pi-page h4,.pi-page p { margin:0; }
+.pi-page button,.pi-page select,.pi-page input { font:inherit; }
+.pi-page button,.pi-page a,.pi-page input,.pi-page select { -webkit-tap-highlight-color:transparent; }
+.pi-page button:focus-visible,.pi-page a:focus-visible,.pi-page input:focus-visible,.pi-page select:focus-visible { outline:3px solid var(--pi-clay); outline-offset:3px; }
+.pi-page button:disabled { opacity:.78; cursor:not-allowed; transform:none!important; }
+.pi-page .pi-eyebrow,.pi-page .pi-section-kicker { font-size:13px; font-weight:800; letter-spacing:.065em; line-height:1.5; color:var(--pi-forest); }
+.pi-page .pi-accent-line { display:inline-block; width:26px; height:2px; vertical-align:middle; margin-right:9px; background:var(--pi-clay); }
+.pi-page .pi-hero { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(315px,.72fr); overflow:hidden; min-height:310px; border:1px solid rgba(23,63,53,.12); border-radius:18px; box-shadow:0 13px 31px rgba(23,63,53,.065); }
+.pi-page .pi-hero-copy { padding:clamp(28px,3.3vw,54px); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; background:linear-gradient(140deg,#F7F6F2 45%,#EEEDE5 100%); border-top:5px solid var(--pi-clay); }
+.pi-page .pi-hero h1 { margin-top:13px; font-size:clamp(36px,3.55vw,58px); line-height:1.065; letter-spacing:-.046em; font-weight:800; color:var(--pi-charcoal); }
+.pi-page .pi-hero h1 span { color:var(--pi-forest); }
+.pi-page .pi-hero-description { font-size:16px; line-height:1.6; max-width:580px; color:#525b54; margin-top:16px; }
+.pi-page .pi-hero-bottom { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-top:24px; }
+.pi-page .pi-button { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:9px; padding:10px 17px; border:1px solid transparent; border-radius:9px; text-decoration:none; cursor:pointer; font-size:14px; font-weight:750; white-space:nowrap; transition:transform .18s ease,background .18s ease,border-color .18s ease; }
+.pi-page .pi-button:hover:not(:disabled) { transform:translateY(-2px); }
+.pi-page .pi-button-primary { color:#fff; background:var(--pi-forest); }
+.pi-page .pi-button-primary:hover { background:#245c4b; }
+.pi-page .pi-hero-secondary { color:var(--pi-forest); font-weight:750; font-size:14px; text-decoration:underline; text-decoration-color:var(--pi-clay); text-underline-offset:5px; }
+.pi-page .pi-hero-aside { background:var(--pi-forest); color:#F7F6F2; padding:clamp(26px,3vw,46px); display:flex; flex-direction:column; justify-content:space-between; position:relative; isolation:isolate; }
+.pi-page .pi-hero-aside:after { content:''; position:absolute; width:200px; height:200px; border:1px solid rgba(255,255,255,.12); border-radius:50%; right:-100px; top:-110px; pointer-events:none; z-index:-1; }
+.pi-page .pi-household-label { display:flex; gap:10px; align-items:center; font-size:13px; letter-spacing:.075em; font-weight:750; color:var(--pi-sage); }
+.pi-page .pi-household-name { font-size:clamp(25px,2.6vw,36px); font-weight:750; line-height:1.2; letter-spacing:-.03em; overflow-wrap:anywhere; margin:14px 0 28px; }
+.pi-page .pi-hero-stats { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:20px 0; border-top:1px solid rgba(255,255,255,.28); border-bottom:1px solid rgba(255,255,255,.24); }
+.pi-page .pi-hero-stats div { display:flex; flex-direction:column; gap:3px; }
+.pi-page .pi-hero-stats strong { font-size:38px; line-height:1.1; font-weight:800; color:#fff; }
+.pi-page .pi-hero-stats span { font-size:13px; color:#dbe8e0; }
+.pi-page .pi-hero-safety { margin-top:18px; display:flex; align-items:flex-start; gap:9px; font-size:13px; line-height:1.55; color:#E0E9E1; }
+.pi-page .pi-hero-safety svg { flex:none; margin-top:1px; }
+.pi-page .pi-journey { padding:32px 0 34px; border-bottom:1px solid #C9D0C5; }
+.pi-page .pi-journey-heading { display:flex; gap:18px; align-items:end; justify-content:space-between; margin-top:5px; }
+.pi-page h2 { font-size:clamp(23px,2.1vw,30px); line-height:1.2; letter-spacing:-.035em; font-weight:750; }
+.pi-page .pi-journey-heading p { font-size:14px; line-height:1.5; color:#58615B; }
+.pi-page .pi-journey-steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; margin-top:25px; }
+.pi-page .pi-journey-step { padding:5px 22px 3px; border-left:1px solid #C4CBC1; }
+.pi-page .pi-journey-step:first-child { padding-left:0; border-left:0; }
+.pi-page .pi-journey-number { display:block; color:var(--pi-clay); font-size:22px; line-height:1; font-weight:800; letter-spacing:-.04em; margin-bottom:13px; }
+.pi-page .pi-journey-step h3 { font-size:16px; line-height:1.3; color:var(--pi-forest); font-weight:750; }
+.pi-page .pi-journey-step p { margin-top:6px; font-size:13px; line-height:1.5; color:#5B635D; }
+.pi-page .pi-providers { padding:32px clamp(22px,2.4vw,36px); margin-top:30px; background:#F1EBE5; border-radius:16px; border-left:5px solid var(--pi-clay); }
+.pi-page .pi-section-intro { display:flex; align-items:end; justify-content:space-between; flex-wrap:wrap; gap:20px; }
+.pi-page .pi-section-intro h2 { margin-top:6px; }
+.pi-page .pi-section-intro p:not(.pi-section-kicker) { margin-top:7px; font-size:15px; line-height:1.5; color:#59605A; }
+.pi-page .pi-privacy-note { display:flex; max-width:330px; align-items:flex-start; gap:9px; color:var(--pi-forest); font-size:13px; line-height:1.45; font-weight:600; }
+.pi-page .pi-privacy-note svg { flex:none; }
+.pi-page .pi-provider-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; margin-top:24px; }
+.pi-page .pi-provider { appearance:none; border:1px solid #DDDAD0; border-radius:12px; background:#FAF9F6; color:var(--pi-charcoal); padding:19px 16px; min-height:150px; text-align:left; display:flex; flex-direction:column; position:relative; gap:15px; transition:box-shadow .2s ease,border-color .2s ease,transform .2s ease; }
+.pi-page .pi-provider-ready { cursor:pointer; }
+.pi-page .pi-provider-ready:hover { border-color:var(--pi-clay); box-shadow:0 10px 20px rgba(23,63,53,.08); transform:translateY(-3px); }
+.pi-page .pi-provider-unavailable { cursor:not-allowed; background:#F2F0EB; }
+.pi-page .pi-provider-icon { width:40px; height:40px; border-radius:10px; display:grid; place-items:center; background:var(--pi-sage); color:var(--pi-forest); }
+.pi-page .pi-provider-copy { display:flex; flex-direction:column; gap:5px; }
+.pi-page .pi-provider-copy strong { font-size:16px; font-weight:750; line-height:1.25; }
+.pi-page .pi-provider-copy small { font-size:13px; line-height:1.4; color:#5B625C; }
+.pi-page .pi-provider-action { position:absolute; right:15px; top:14px; font-size:20px; font-weight:600; color:var(--pi-clay); }
+.pi-page .pi-sources { margin-top:32px; background:#fff; border:1px solid #DEE1D9; padding:clamp(20px,2.4vw,34px); border-radius:16px; }
+.pi-page .pi-sources .pi-section-intro p:not(.pi-section-kicker) { max-width:600px; }
+.pi-page .pi-button-outline { background:transparent; border:1px solid #BBC5B8; color:var(--pi-forest); }
+.pi-page .pi-button-outline:hover { background:#E8EFE7; }
+.pi-page .pi-source-overview { display:flex; flex-wrap:wrap; gap:10px 25px; margin-top:23px; padding:15px 20px; background:var(--pi-sage); color:var(--pi-forest); border-radius:8px; font-size:14px; }
+.pi-page .pi-source-overview strong { font-size:18px; margin-right:4px; }
+.pi-page .pi-source-list { margin-top:8px; }
+.pi-page .pi-source-row { display:grid; grid-template-columns:minmax(240px,.8fr) minmax(0,1.3fr); gap:20px; align-items:center; padding:22px 4px; border-bottom:1px solid #D9E0D6; }
+.pi-page .pi-source-row:last-child { border-bottom:0; }
+.pi-page .pi-source-heading { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.pi-page .pi-source-heading h3 { font-size:18px; font-weight:750; color:var(--pi-charcoal); }
+.pi-page .pi-source-facts { display:flex; flex-wrap:wrap; gap:8px 19px; margin-top:9px; font-size:13px; color:#535C56; line-height:1.5; }
+.pi-page .pi-source-facts strong { color:var(--pi-forest); font-weight:700; }
+.pi-page .pi-source-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+.pi-page .pi-small-button { min-height:38px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:8px 12px; border:1px solid #CED6CC; background:#F8F9F6; color:var(--pi-forest); border-radius:8px; font-size:13px; font-weight:700; line-height:1.2; cursor:pointer; transition:background .15s ease,border-color .15s ease,transform .15s ease; }
+.pi-page .pi-small-button:hover:not(:disabled) { background:#E6EDE4; border-color:#93B0A0; transform:translateY(-1px); }
+.pi-page .pi-small-primary { color:#fff; background:var(--pi-forest); border-color:var(--pi-forest); }
+.pi-page .pi-small-primary:hover:not(:disabled) { background:#245C4B; color:#fff; }
+.pi-page .pi-small-danger { color:#A24636; border-color:#E7BFB1; background:#FFF8F4; }
+.pi-page .pi-small-danger:hover:not(:disabled) { background:#F9E8DF; border-color:var(--pi-clay); }
+.pi-page .pi-muted-state { padding:26px; font-size:15px; color:#535C56; line-height:1.5; }
+.pi-page .pi-loading { display:flex; align-items:center; gap:9px; }
+.pi-page .pi-empty-source { display:flex; align-items:center; gap:15px; color:var(--pi-forest); padding:28px 4px; }
+.pi-page .pi-empty-source div { display:flex; flex-direction:column; gap:5px; }
+.pi-page .pi-empty-source strong { font-size:16px; }
+.pi-page .pi-empty-source span { font-size:14px; color:#5B625C; }
+.pi-page .pi-history { margin-top:34px; background:#F0F1EC; border-radius:17px; overflow:hidden; border:1px solid #DDE1D8; }
+.pi-page .pi-history-header { padding:27px clamp(20px,2.4vw,36px); display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:24px; background:var(--pi-sage); border-top:4px solid var(--pi-forest); }
+.pi-page .pi-history-header h2 { margin-top:6px; }
+.pi-page .pi-history-header p:not(.pi-section-kicker) { font-size:15px; line-height:1.5; color:#4C584F; margin-top:7px; }
+.pi-page .pi-history-controls { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+.pi-page .pi-source-filter { display:flex; flex-direction:column; gap:6px; }
+.pi-page .pi-source-filter span { font-size:12px; color:var(--pi-forest); font-weight:750; }
+.pi-page .pi-source-filter select { min-height:42px; min-width:190px; max-width:min(100%,300px); background:#fff; border:1px solid #ADBCAA; color:var(--pi-charcoal); border-radius:8px; padding:8px 12px; font-size:14px; }
+.pi-page .pi-delete-history { min-height:42px; }
+.pi-page .pi-history-ledger { padding:5px clamp(16px,2.4vw,36px) 25px; }
+.pi-page .pi-transaction { border-bottom:1px solid #CBD3C8; padding:22px 0 24px; }
+.pi-page .pi-transaction:last-child { border-bottom:0; }
+.pi-page .pi-transaction-header { display:grid; grid-template-columns:42px minmax(140px,1fr) auto auto; gap:14px; align-items:center; }
+.pi-page .pi-transaction-number { width:39px; height:39px; display:grid; place-items:center; background:#E7D3C9; border-radius:50%; color:#8A422C; font-size:15px; font-weight:750; }
+.pi-page .pi-transaction-intro h3 { font-size:17px; font-weight:750; line-height:1.3; }
+.pi-page .pi-transaction-intro p { color:#58615A; font-size:13px; margin-top:5px; }
+.pi-page .pi-transaction-total { display:flex; flex-direction:column; gap:2px; color:#687069; }
+.pi-page .pi-transaction-total span { font-size:12px; }
+.pi-page .pi-transaction-total strong { font-size:20px; color:var(--pi-forest); font-weight:800; }
+.pi-page .pi-purchase-items { margin:18px 0 0 55px; background:#FAFAF7; border:1px solid #E0E4DA; border-radius:10px; }
+.pi-page .pi-purchase-item { padding:15px 17px; display:grid; grid-template-columns:minmax(150px,.9fr) minmax(270px,1.3fr) auto; gap:14px; align-items:center; border-bottom:1px solid #E1E6DB; }
+.pi-page .pi-purchase-item:last-child { border-bottom:0; }
+.pi-page .pi-item-info h4 { font-size:15px; line-height:1.35; font-weight:750; overflow-wrap:anywhere; }
+.pi-page .pi-item-info p { margin-top:5px; color:#58615B; font-size:13px; line-height:1.5; }
+.pi-page .pi-item-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.pi-page .pi-item-fields label { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.pi-page .pi-item-fields label span { color:#536158; font-size:12px; font-weight:700; }
+.pi-page .pi-item-fields input { border:1px solid #C9D0C6; background:#fff; color:var(--pi-charcoal); border-radius:8px; height:39px; width:100%; min-width:0; padding:9px 11px; font-size:13px; }
+.pi-page .pi-item-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+.pi-page .pi-no-purchases { text-align:center; padding:50px 20px; display:flex; align-items:center; flex-direction:column; gap:10px; color:#546357; }
+.pi-page .pi-no-purchases h3 { color:var(--pi-forest); font-size:20px; font-weight:750; }
+.pi-page .pi-no-purchases p { font-size:14px; line-height:1.5; }
+.pi-page .pi-privacy-footer { margin-top:18px; display:flex; align-items:center; gap:9px; color:#536257; font-size:13px; line-height:1.5; }
+.pi-page .pi-privacy-footer svg { color:var(--pi-forest); flex:none; }
+.pi-page .pi-household-required { min-height:340px; padding:38px; background:var(--pi-sage); border-left:5px solid var(--pi-clay); border-radius:14px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:14px; }
+.pi-page .pi-household-required h1 { font-size:30px; font-weight:800; color:var(--pi-forest); }
+.pi-page .pi-household-required p:not(.pi-eyebrow) { font-size:16px; line-height:1.6; max-width:610px; }
+@media (max-width:1160px) { .pi-page .pi-source-row { grid-template-columns:1fr; gap:13px; } .pi-page .pi-source-actions { justify-content:flex-start; } .pi-page .pi-purchase-item { grid-template-columns:minmax(140px,.7fr) minmax(250px,1.3fr); } .pi-page .pi-item-actions { grid-column:1/-1; justify-content:flex-start; } }
+@media (max-width:900px) { .pi-page .pi-hero { grid-template-columns:minmax(0,1fr) minmax(265px,.7fr); } .pi-page .pi-provider-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .pi-page .pi-journey-steps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 0; } .pi-page .pi-journey-step:nth-child(3) { border-left:0; padding-left:0; } .pi-page .pi-transaction-header { grid-template-columns:42px minmax(0,1fr) auto; } .pi-page .pi-transaction-toggle { grid-column:2/-1; justify-self:start; } }
+@media (max-width:670px) { .pi-page { padding:12px 12px 28px; } .pi-page .pi-hero { grid-template-columns:1fr; border-radius:12px; } .pi-page .pi-hero-copy { padding:25px 20px; } .pi-page .pi-hero h1 { font-size:33px; } .pi-page .pi-hero-description { font-size:14px; margin-top:12px; } .pi-page .pi-hero-bottom { margin-top:18px; gap:12px; } .pi-page .pi-hero-aside { padding:20px; } .pi-page .pi-household-name { font-size:24px; margin:9px 0 15px; } .pi-page .pi-hero-stats { padding:10px 0; } .pi-page .pi-hero-stats strong { font-size:28px; } .pi-page .pi-hero-safety { font-size:12.5px; margin-top:11px; } .pi-page .pi-journey { padding:25px 2px; } .pi-page .pi-journey-heading { display:block; } .pi-page .pi-journey-heading p { margin-top:7px; font-size:13px; } .pi-page .pi-journey-steps { margin-top:18px; } .pi-page .pi-journey-step { padding:3px 13px; } .pi-page .pi-journey-step h3 { font-size:14px; } .pi-page .pi-journey-step p { font-size:12.5px; } .pi-page .pi-journey-number { font-size:19px; margin-bottom:8px; } .pi-page .pi-providers { margin-top:20px; padding:22px 16px; border-radius:12px; } .pi-page .pi-section-intro p:not(.pi-section-kicker) { font-size:13.5px; } .pi-page .pi-privacy-note { font-size:12.5px; } .pi-page .pi-provider-grid { margin-top:17px; gap:9px; } .pi-page .pi-provider { padding:13px; min-height:128px; } .pi-page .pi-provider-copy strong { font-size:15px; } .pi-page .pi-provider-copy small { font-size:12.5px; } .pi-page .pi-sources { margin-top:20px; padding:20px 16px; } .pi-page .pi-source-overview { padding:12px; gap:8px 14px; font-size:12.5px; } .pi-page .pi-source-overview strong { font-size:16px; } .pi-page .pi-source-row { padding:18px 0; } .pi-page .pi-source-heading h3 { font-size:16px; } .pi-page .pi-source-facts { font-size:12.5px; } .pi-page .pi-source-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .pi-page .pi-small-button { font-size:12.5px; white-space:normal; padding:8px 9px; } .pi-page .pi-history { margin-top:20px; border-radius:12px; } .pi-page .pi-history-header { padding:22px 16px; } .pi-page .pi-history-controls { width:100%; } .pi-page .pi-source-filter { flex:1; min-width:0; } .pi-page .pi-source-filter select { width:100%; min-width:0; } .pi-page .pi-history-ledger { padding:0 14px 20px; } .pi-page .pi-transaction-header { grid-template-columns:32px minmax(0,1fr); gap:9px; } .pi-page .pi-transaction-number { width:29px; height:29px; font-size:12.5px; } .pi-page .pi-transaction-intro h3 { font-size:15px; } .pi-page .pi-transaction-total { grid-column:2; } .pi-page .pi-transaction-total strong { font-size:18px; } .pi-page .pi-transaction-toggle { grid-column:2; } .pi-page .pi-purchase-items { margin:14px 0 0; } .pi-page .pi-purchase-item { grid-template-columns:1fr; gap:12px; padding:14px; } .pi-page .pi-item-fields { grid-template-columns:1fr; } .pi-page .pi-item-actions { grid-column:1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .pi-page .pi-privacy-footer { font-size:12.5px; } .pi-page .pi-household-required { padding:26px 18px; } }
+/* Connected Purchases mobile-only: compact but breathable; desktop rules above untouched. */
+.pi-page .pi-mobile-copy { display:none; }
+@media (max-width:670px) {
+  .pi-page { width:100%; max-width:none; min-width:0; padding:5px 5px 26px; overflow-x:clip; }
+  .pi-page .pi-mobile-copy { display:inline; }
+  .pi-page .pi-desktop-copy { display:none; }
+  .pi-page .pi-hero { min-height:0; border-radius:10px; }
+  .pi-page .pi-hero-copy { padding:18px 15px 16px; }
+  .pi-page .pi-hero h1 { margin-top:7px; font-size:clamp(29px,8vw,34px); line-height:1.09; letter-spacing:-.045em; }
+  .pi-page .pi-hero-description { margin-top:9px; font-size:13.5px; line-height:1.4; }
+  .pi-page .pi-eyebrow, .pi-page .pi-section-kicker { font-size:11px; letter-spacing:.07em; }
+  .pi-page .pi-hero-bottom { display:grid; grid-template-columns:minmax(0,1.08fr) minmax(0,1fr); gap:8px; width:100%; margin-top:14px; }
+  .pi-page .pi-hero-bottom a { min-width:0; text-align:center; font-size:12px; }
+  .pi-page .pi-hero-bottom .pi-button { min-height:40px; padding:7px 8px; }
+  .pi-page .pi-hero-secondary { display:flex; justify-content:center; align-items:center; padding:7px 6px; min-height:40px; border:1px solid rgba(23,63,53,.27); border-radius:8px; text-decoration:none; }
+  .pi-page .pi-hero-aside { padding:13px 15px; display:grid; grid-template-columns:minmax(0,1fr) minmax(114px,.95fr); gap:5px 10px; align-items:center; }
+  .pi-page .pi-household-label { grid-column:1; font-size:10.5px; letter-spacing:.035em; gap:6px; }
+  .pi-page .pi-household-label svg { width:14px; height:14px; }
+  .pi-page .pi-household-name { grid-column:1; min-width:0; font-size:17px; line-height:1.2; margin:3px 0 0; }
+  .pi-page .pi-hero-stats { grid-column:2; grid-row:1 / span 2; gap:9px; padding:5px 0 5px 10px; border-top:0; border-bottom:0; border-left:1px solid rgba(255,255,255,.28); }
+  .pi-page .pi-hero-stats strong { font-size:23px; }
+  .pi-page .pi-hero-stats span { font-size:10.5px; line-height:1.2; }
+  .pi-page .pi-hero-safety { grid-column:1 / -1; margin-top:7px; padding-top:9px; border-top:1px solid rgba(255,255,255,.18); font-size:11px; line-height:1.35; }
+  .pi-page .pi-hero-safety svg { width:14px; height:14px; }
+  .pi-page .pi-journey { padding:17px 7px 18px; }
+  .pi-page h2 { font-size:clamp(20px,5.8vw,24px); line-height:1.18; }
+  .pi-page .pi-journey-heading { margin-top:4px; }
+  .pi-page .pi-journey-heading p, .pi-page .pi-journey-step p { display:none; }
+  .pi-page .pi-journey-steps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+  .pi-page .pi-journey-step, .pi-page .pi-journey-step:first-child, .pi-page .pi-journey-step:nth-child(3) { display:flex; align-items:center; gap:8px; padding:10px 8px; min-width:0; border:0; border-radius:8px; background:rgba(215,221,207,.48); }
+  .pi-page .pi-journey-number { font-size:17px; margin-bottom:0; flex-shrink:0; }
+  .pi-page .pi-journey-step h3 { font-size:12.5px; line-height:1.28; overflow-wrap:anywhere; }
+  .pi-page .pi-providers { margin-top:18px; padding:16px 12px 17px; border-radius:9px; }
+  .pi-page .pi-section-intro { gap:9px; }
+  .pi-page .pi-section-intro h2 { margin-top:4px; }
+  .pi-page .pi-providers .pi-section-intro p:not(.pi-section-kicker),
+  .pi-page .pi-sources .pi-section-intro p:not(.pi-section-kicker),
+  .pi-page .pi-history-header p:not(.pi-section-kicker) { display:none; }
+  .pi-page .pi-privacy-note { max-width:none; font-size:11.5px; line-height:1.4; }
+  .pi-page .pi-privacy-note svg { width:15px; height:15px; }
+  .pi-page .pi-provider-grid { margin-top:13px; gap:8px; }
+  .pi-page .pi-provider { min-width:0; min-height:0; gap:8px; padding:11px 10px; border-radius:9px; }
+  .pi-page .pi-provider-icon { width:32px; height:32px; border-radius:7px; }
+  .pi-page .pi-provider-icon svg { width:19px; height:19px; }
+  .pi-page .pi-provider-copy strong { font-size:14px; }
+  .pi-page .pi-provider-copy small { font-size:11.5px; line-height:1.35; }
+  .pi-page .pi-provider-action { right:9px; top:9px; }
+  .pi-page .pi-sources { margin-top:18px; padding:16px 12px 14px; border-radius:9px; }
+  .pi-page .pi-sources-intro { display:flex; flex-wrap:nowrap; align-items:center; justify-content:space-between; }
+  .pi-page .pi-sources-intro > div { min-width:0; }
+  .pi-page .pi-sources-intro .pi-button { min-height:38px; padding:7px 10px; font-size:12px; flex:none; }
+  .pi-page .pi-source-overview { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; padding:10px 8px; font-size:11px; line-height:1.35; }
+  .pi-page .pi-source-overview span { min-width:0; overflow-wrap:anywhere; }
+  .pi-page .pi-source-overview strong { font-size:16px; display:block; margin:0 0 2px; }
+  .pi-page .pi-source-list { margin-top:3px; }
+  .pi-page .pi-source-row { gap:10px; padding:13px 0 14px; }
+  .pi-page .pi-source-heading { gap:7px; }
+  .pi-page .pi-source-heading h3 { font-size:15px; }
+  .pi-page .pi-source-facts { margin-top:6px; gap:5px 13px; font-size:12px; }
+  .pi-page .pi-source-actions { gap:7px; }
+  .pi-page .pi-small-button { min-height:39px; font-size:12px; line-height:1.25; padding:7px 8px; overflow-wrap:anywhere; }
+  .pi-page .pi-history { margin-top:18px; border-radius:9px; }
+  .pi-page .pi-history-header { padding:15px 12px; gap:11px; }
+  .pi-page .pi-history-header h2 { margin-top:4px; }
+  .pi-page .pi-history-controls { gap:8px; align-items:end; }
+  .pi-page .pi-source-filter { gap:4px; }
+  .pi-page .pi-source-filter span { font-size:11px; }
+  .pi-page .pi-source-filter select { min-height:40px; font-size:13px; }
+  .pi-page .pi-history-ledger { padding:0 12px 14px; }
+  .pi-page .pi-transaction { padding:14px 0 15px; }
+  .pi-page .pi-transaction-header { grid-template-columns:29px minmax(0,1fr) auto; gap:8px; align-items:center; }
+  .pi-page .pi-transaction-number { width:28px; height:28px; font-size:12px; }
+  .pi-page .pi-transaction-intro { min-width:0; }
+  .pi-page .pi-transaction-intro h3 { font-size:14px; overflow-wrap:anywhere; }
+  .pi-page .pi-transaction-intro p { margin-top:3px; font-size:11.5px; }
+  .pi-page .pi-transaction-total { grid-column:3; grid-row:1; min-width:0; text-align:right; }
+  .pi-page .pi-transaction-total span { font-size:10.5px; }
+  .pi-page .pi-transaction-total strong { font-size:15px; overflow-wrap:anywhere; }
+  .pi-page .pi-transaction-toggle { grid-column:2 / -1; justify-self:start; min-height:34px; }
+  .pi-page .pi-purchase-items { margin:11px 0 0; border-radius:8px; }
+  .pi-page .pi-purchase-item { padding:12px 10px; gap:10px; }
+  .pi-page .pi-item-info h4 { font-size:14px; }
+  .pi-page .pi-item-info p { font-size:11.5px; margin-top:3px; }
+  .pi-page .pi-item-fields { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+  .pi-page .pi-item-fields label span { font-size:11.5px; }
+  .pi-page .pi-item-fields input { height:39px; padding:7px 8px; font-size:12px; }
+  .pi-page .pi-item-actions { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+  .pi-page .pi-muted-state { padding:17px 6px; font-size:13px; }
+  .pi-page .pi-empty-source { padding:16px 3px; }
+  .pi-page .pi-no-purchases { padding:28px 12px; }
+  .pi-page .pi-no-purchases p { font-size:12.5px; }
+  .pi-page .pi-privacy-footer { margin-top:15px; padding:0 5px; font-size:11.5px; line-height:1.4; }
+  .pi-page .pi-household-required { min-height:0; padding:23px 16px; gap:10px; }
+  .pi-page .pi-household-required h1 { font-size:25px; }
+}
+@media (max-width:359px) {
+  .pi-page .pi-hero-aside { grid-template-columns:minmax(0,1fr) minmax(104px,.88fr); }
+  .pi-page .pi-item-fields { grid-template-columns:1fr; }
+  .pi-page .pi-transaction-header { grid-template-columns:28px minmax(0,1fr); }
+  .pi-page .pi-transaction-total { grid-column:2; grid-row:auto; text-align:left; }
+}
+@media (prefers-reduced-motion:reduce) { .pi-page *, .pi-page *::before,.pi-page *::after { scroll-behavior:auto!important; transition:none!important; } }
+`;

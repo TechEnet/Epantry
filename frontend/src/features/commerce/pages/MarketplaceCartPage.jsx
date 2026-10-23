@@ -594,6 +594,16 @@ export default function MarketplaceCartPage() {
     return () => { cancelled = true }
   }, [isRecipeCart, detectedPincode])
 
+  // A live Grocery cart belongs in the same customer basket as Recipe items.
+  // Keep unrelated/historic and prepared-restaurant carts on their own ID routes.
+  useEffect(() => {
+    if (isRecipeCart || data?.cart?.sourceType !== 'direct_product') return
+    const activeGrocery = readFloatingMarketplaceCart()
+    if (activeGrocery?.cartId && String(activeGrocery.cartId) === String(cartId)) {
+      navigate('/cart/recipe', { replace: true })
+    }
+  }, [cartId, data?.cart?.sourceType, isRecipeCart, navigate])
+
   const sellerGroups =
     useMemo(
       () => {
@@ -1310,478 +1320,315 @@ export default function MarketplaceCartPage() {
   }
 
   if (isRecipeCart) {
+    const grocerySubtotal = groceryItems.reduce(
+      (sum, item) => sum + Math.max(0, Number(item?.lineTotal?.amountMinor || 0)),
+      0,
+    )
+    const groceryCurrency = groceryCartData?.cart?.currency || groceryItems.find((item) => item?.lineTotal?.currency)?.lineTotal?.currency || 'INR'
+    const hasRecipe = recipeItems.length > 0
+    const hasGroceries = groceryItems.length > 0
+    const canReviewGroceries = Boolean(groceryCartId) && hasGroceries && !groceryLoading && !groceryError
+    const recipeDeliveryBusy = Boolean(selectedRecipePincode) && (
+      recipePinCoverage.pincode !== selectedRecipePincode ||
+      recipePinCoverage.status === 'checking' ||
+      recipePinCoverage.status === 'unavailable'
+    )
+
     return (
-      <main className="min-h-screen bg-[#f5f2ea]">
-        <div className="page-shell py-3 sm:py-6 lg:py-7">
-          <Link
-            to={
-              recipeCart?.slug
-                ? `/recipes/${recipeCart.slug}`
-                : '/recipes'
+      <main className="ep-unified-basket w-full bg-[#F7F6F2] text-[#202421]">
+        <style>{`
+          .ep-unified-basket { font-family: 'Plus Jakarta Sans', Inter, sans-serif; }
+          .ep-unified-basket .ep-basket-item { transition: background-color .18s ease, border-color .18s ease; }
+          .ep-unified-basket .ep-basket-item:hover, .ep-unified-basket .ep-basket-item:focus-within { background: #eef1e9; border-color: #adc2b7; }
+          .ep-unified-basket .ep-basket-cta { transition: background-color .18s ease, transform .18s ease; }
+          .ep-unified-basket .ep-basket-cta:hover:not(:disabled) { background: #295748; transform: translateY(-1px); }
+          .ep-unified-basket .ep-basket-cta:focus-visible, .ep-unified-basket button:focus-visible, .ep-unified-basket a:focus-visible, .ep-unified-basket input:focus-visible { outline: 3px solid #C56C42; outline-offset: 3px; }
+          /* Only the unified customer basket on phones. Desktop styles are unchanged. */
+          @media (max-width: 639px) {
+            .ep-unified-basket {
+              box-sizing: border-box;
+              width: calc(100% + 16px);
+              max-width: none;
+              min-width: 0;
+              margin-inline: -8px;
             }
-            className="focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 text-[11px] font-black text-stone-500 transition hover:text-emerald-800 sm:gap-2 sm:text-sm"
-          >
-            <ArrowLeft
-              size={15}
-              aria-hidden="true"
-            />
-            Back to Recipe
-          </Link>
+            .ep-unified-basket .ep-basket-mobile-wrap { padding: 8px 8px 22px; }
+            .ep-unified-basket .ep-basket-top-links { padding-bottom: 7px; gap: 7px; }
+            .ep-unified-basket .ep-basket-top-links a { min-height: 40px; font-size: 13px; }
+            .ep-unified-basket .ep-basket-hero { border-radius: 14px; }
+            .ep-unified-basket .ep-basket-hero-main { padding: 17px 16px 12px; gap: 13px; }
+            .ep-unified-basket h1.ep-basket-hero-title { margin-top: 0; font-size: 26px !important; line-height: 1.16 !important; }
+            .ep-unified-basket .ep-basket-hero-description { margin-top: 6px; font-size: 14px; line-height: 1.45; }
+            .ep-unified-basket .ep-basket-hero-stats { padding: 9px 0; }
+            .ep-unified-basket .ep-basket-hero-stats > div { min-width: 0; padding-inline: 5px; }
+            .ep-unified-basket .ep-basket-hero-stats > div > p:first-child { font-size: 23px; line-height: 1.15; }
+            .ep-unified-basket .ep-basket-hero-stats > div > p:last-child { font-size: 12px; }
+            .ep-unified-basket .ep-basket-steps > div { min-width: 0; padding: 10px 3px; font-size: 12px; line-height: 1.2; }
+            .ep-unified-basket .ep-basket-main-grid { margin-top: 18px; gap: 19px; }
+            .ep-unified-basket .ep-basket-left-stack > * + * { margin-top: 19px !important; }
+            .ep-unified-basket .ep-basket-panel-head { padding: 14px 13px 12px; gap: 9px; align-items: center; }
+            .ep-unified-basket .ep-basket-panel-head h2 { font-size: 20px !important; line-height: 1.25 !important; }
+            .ep-unified-basket .ep-basket-panel-head > span { padding: 5px 9px; font-size: 12px; }
+            .ep-unified-basket .ep-basket-item { padding: 12px 12px; gap: 9px; }
+            .ep-unified-basket .ep-basket-item p { overflow-wrap: anywhere; }
+            .ep-unified-basket .ep-basket-item button { min-height: 40px; padding-inline: 10px; }
+            .ep-unified-basket .ep-basket-empty { padding: 16px 13px; }
+            .ep-unified-basket .ep-basket-empty p:first-child { font-size: 15px; }
+            .ep-unified-basket .ep-basket-extra-links { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding-top: 13px; }
+            .ep-unified-basket .ep-basket-extra-links a { min-width: 0; min-height: 46px; padding-inline: 10px; font-size: 13px; gap: 5px; }
+            .ep-unified-basket .ep-basket-extra-links a svg { width: 15px; flex-shrink: 0; }
+            .ep-unified-basket .ep-basket-summary-head { padding: 14px 16px 12px; }
+            .ep-unified-basket .ep-basket-summary-head h2 { font-size: 21px !important; line-height: 1.25 !important; }
+            .ep-unified-basket .ep-basket-summary-body { padding: 14px 16px 17px; }
+            .ep-unified-basket .ep-basket-summary-body > * + * { margin-top: 12px !important; }
+            .ep-unified-basket .ep-basket-summary-pin { padding: 11px 12px; }
+            .ep-unified-basket .ep-basket-summary-legal { padding-top: 11px; }
+          }
+          @media (prefers-reduced-motion: reduce) { .ep-unified-basket *, .ep-unified-basket *::before, .ep-unified-basket *::after { transition: none !important; scroll-behavior: auto !important; } }
+        `}</style>
+        <div className="ep-basket-mobile-wrap w-full px-4 pb-8 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12">
+          <div className="ep-basket-top-links flex flex-wrap items-center justify-between gap-2 pb-4">
+            <Link
+              to={recipeCart?.slug ? `/recipes/${recipeCart.slug}` : '/grocery'}
+              className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] hover:underline"
+            >
+              <ArrowLeft size={17} aria-hidden="true" />
+              <span className="sm:hidden">{hasRecipe ? 'Recipe' : 'Continue shopping'}</span>
+              <span className="hidden sm:inline">{hasRecipe ? 'Back to recipe' : 'Continue shopping'}</span>
+            </Link>
+            <Link to="/grocery" className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-[#173F35] hover:underline">
+              <span className="sm:hidden">Grocery</span><span className="hidden sm:inline">Browse grocery</span> <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          </div>
 
-          <section className="relative mt-2 overflow-hidden rounded-[22px] border border-[#24594c] bg-[linear-gradient(135deg,#153f35_0%,#1f5d4c_60%,#2a6c58_100%)] p-3 text-white shadow-[0_24px_60px_-42px_rgba(21,63,53,0.85)] sm:mt-3 sm:rounded-[28px] sm:p-6">
-            <div className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-[#f0c978]/12 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-24 left-1/3 size-56 rounded-full bg-emerald-200/10 blur-3xl" />
-
-            <div className="relative grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#f1ddb2] backdrop-blur-sm sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.18em]">
-                  <ShoppingBasket
-                    size={13}
-                    aria-hidden="true"
-                  />
-                  Your basket
-                </div>
-
-                <h1 className="mt-2 text-[24px] font-black leading-[1.02] tracking-[-0.04em] text-white sm:mt-3 sm:text-4xl">
-                  Review what you still need
+          <header className="ep-basket-hero relative overflow-hidden rounded-[20px] bg-[#173F35] text-[#F7F6F2] sm:rounded-[26px]">
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-[#C56C42]/20 [clip-path:polygon(45%_0,100%_0,100%_100%,0_100%)]" aria-hidden="true" />
+            <div className="ep-basket-hero-main relative grid gap-5 px-5 py-7 sm:px-8 sm:py-9 lg:grid-cols-[minmax(0,1fr)_245px] lg:items-center">
+              <div>
+                <p className="hidden text-xs font-bold uppercase tracking-[0.09em] text-[#D7DDCF] sm:block">EPANTRY / Your basket</p>
+                <h1 className="ep-basket-hero-title mt-2 max-w-2xl text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#F7F6F2] sm:text-[42px]">
+                  <span className="sm:hidden">Your basket</span><span className="hidden sm:inline">All your shopping, together.</span>
                 </h1>
-
-                <p className="mt-1.5 max-w-2xl text-[11px] font-medium leading-5 text-white/72 sm:mt-3 sm:text-sm sm:leading-6">
-                  Review your recipe ingredients and Grocery products together. Delivery is checked against eligible Host offers before checkout.
+                <p className="ep-basket-hero-description mt-3 max-w-xl text-[15px] leading-6 text-[#F7F6F2]/85">
+                  <span className="sm:hidden">Recipes and groceries, all in one place.</span>
+                  <span className="hidden sm:inline">Review ingredients from recipes and products from Grocery in one place.</span>
                 </p>
               </div>
-
-              <div className="flex items-center gap-2 rounded-[14px] border border-white/12 bg-white/10 px-3 py-2 backdrop-blur-sm sm:min-w-[178px] sm:rounded-2xl sm:px-4 sm:py-3">
-                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#f0d39a] text-[#173f35] shadow-[0_3px_0_#b99659] sm:size-10 sm:rounded-xl">
-                  <Package
-                    size={17}
-                    aria-hidden="true"
-                  />
+              <div className="ep-basket-hero-stats grid grid-cols-3 gap-0 border-y border-white/25 py-3 text-center lg:border-y-0 lg:border-l lg:py-1">
+                <div className="px-2">
+                  <p className="text-[26px] font-semibold tabular-nums">{totalBasketItems}</p>
+                  <p className="text-xs text-[#D7DDCF]">Total</p>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-white/55 sm:text-[9px]">
-                    In your basket
-                  </p>
-                  <p className="mt-0.5 text-sm font-black text-white sm:text-lg">
-                    {totalBasketItems} item{totalBasketItems === 1 ? '' : 's'}
-                  </p>
+                <div className="border-x border-white/25 px-2">
+                  <p className="text-[26px] font-semibold tabular-nums">{recipeItems.length}</p>
+                  <p className="text-xs text-[#D7DDCF]">Recipe</p>
+                </div>
+                <div className="px-2">
+                  <p className="text-[26px] font-semibold tabular-nums">{groceryItems.length}</p>
+                  <p className="text-xs text-[#D7DDCF]">Grocery</p>
                 </div>
               </div>
             </div>
-
-            <div className="relative mt-3 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-3">
-              {[
-                {
-                  step: '01',
-                  title: 'Review items',
-                  text: 'Keep only what you need.',
-                  Icon: ShoppingBasket,
-                  className: 'border-[#ead39d]/28 bg-[#fff2c9]/12',
-                },
-                {
-                  step: '02',
-                  title: 'Choose delivery',
-                  text: 'Use the address for this order.',
-                  Icon: MapPin,
-                  className: 'border-sky-200/20 bg-sky-200/10',
-                },
-                {
-                  step: '03',
-                  title: 'Match Hosts',
-                  text: 'See offers that can deliver there.',
-                  Icon: Store,
-                  className: 'border-emerald-200/20 bg-emerald-200/10',
-                },
-              ].map(({ step, title, text, Icon, className }) => (
-                <div
-                  key={step}
-                  className={`min-w-0 rounded-[12px] border p-2 backdrop-blur-sm sm:rounded-[18px] sm:p-3 ${className}`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-[7px] font-black tracking-[0.12em] text-white/45 sm:text-[9px]">
-                      {step}
-                    </span>
-                    <Icon
-                      size={14}
-                      className="text-white/70 sm:size-[16px]"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <p className="mt-1.5 text-[10px] font-black leading-3 text-white sm:mt-2 sm:text-xs sm:leading-4">
-                    {title}
-                  </p>
-                  <p className="mt-0.5 hidden text-[10px] leading-4 text-white/55 sm:block">
-                    {text}
-                  </p>
-                </div>
-              ))}
+            <div className="ep-basket-steps grid grid-cols-3 gap-px bg-white/20 text-xs font-medium sm:text-sm">
+              <div className="bg-[#234b3f] px-3 py-3 text-center text-white sm:px-5">01 / Review</div>
+              <div className="bg-[#234b3f] px-3 py-3 text-center text-white sm:px-5">02 / Delivery</div>
+              <div className="bg-[#234b3f] px-3 py-3 text-center text-white sm:px-5">03 / Checkout</div>
             </div>
-          </section>
+          </header>
 
           {error && (
-            <div className="mt-3 flex items-start gap-2.5 rounded-[16px] border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-800 sm:mt-4 sm:px-4 sm:py-3 sm:text-sm">
-              <AlertTriangle
-                size={17}
-                className="mt-0.5 shrink-0"
-                aria-hidden="true"
-              />
-              <span>{error}</span>
+            <div role="alert" className="mt-5 flex gap-3 border-l-4 border-rose-700 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+              <AlertTriangle className="shrink-0" size={18} aria-hidden="true" /> {error}
             </div>
           )}
-
           {recipeCoverageIssue && (
-            <section className="mt-3 overflow-hidden rounded-[18px] border border-rose-200 bg-[#fff0f2] shadow-[0_12px_32px_rgba(159,18,57,0.06)] sm:mt-4 sm:rounded-[24px]">
-              <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-                <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700 sm:size-11 sm:rounded-2xl">
-                    <AlertTriangle
-                      size={18}
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-rose-700 sm:text-[10px]">
-                      Delivery coverage
-                    </p>
-                    <h2 className="mt-0.5 text-sm font-black leading-5 text-stone-950 sm:mt-1 sm:text-lg">
-                      {recipeCoverageIssue.unmatchedNames.length > 0
-                        ? `${recipeCoverageIssue.unmatchedNames.join(', ')} ${recipeCoverageIssue.unmatchedNames.length === 1 ? 'is' : 'are'} not available for this address yet.`
-                        : 'Some items are not available for this address yet.'}
-                    </h2>
-                    <p className="mt-1 text-[10px] leading-4 text-stone-600 sm:mt-1.5 sm:text-sm sm:leading-6">
-                      We checked active Host offers for PIN <span className="font-black text-stone-800">{recipeCoverageIssue.pincode}</span>. Choose another address or remove the unavailable item.
-                    </p>
-                  </div>
+            <section className="mt-5 border-l-4 border-rose-700 bg-rose-50 px-4 py-4 sm:px-5" aria-label="Delivery coverage issue">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-rose-950">Delivery needs your attention</h2>
+                  <p className="mt-1 text-sm leading-6 text-rose-800">
+                    {recipeCoverageIssue.unmatchedNames.length
+                      ? `${recipeCoverageIssue.unmatchedNames.join(', ')} ${recipeCoverageIssue.unmatchedNames.length === 1 ? 'is' : 'are'} not available for PIN ${recipeCoverageIssue.pincode}.`
+                      : `Some recipe items cannot currently be delivered to PIN ${recipeCoverageIssue.pincode}.`}
+                  </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handlePlaceRecipeOrder}
-                  className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-rose-700 px-3.5 py-2.5 text-xs font-black text-white transition hover:bg-rose-800 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
-                >
-                  <MapPin
-                    size={15}
-                    aria-hidden="true"
-                  />
-                  Change address
+                <button type="button" onClick={handlePlaceRecipeOrder} className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800">
+                  <MapPin size={15} aria-hidden="true" /> Change address
                 </button>
               </div>
             </section>
           )}
 
-          <div className="mt-3 grid gap-3 sm:mt-5 sm:gap-5 lg:grid-cols-[minmax(0,1fr)_310px] lg:items-start xl:grid-cols-[minmax(0,1fr)_330px]">
-            <section className="overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_14px_36px_-30px_rgba(28,25,23,0.45)] sm:rounded-[26px]">
-              <header className="flex items-center justify-between gap-3 border-b border-stone-100 bg-[#faf8f2] px-3 py-3 sm:px-5 sm:py-4">
-                <div className="min-w-0">
-                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:tracking-[0.17em]">
-                    Your ingredients
-                  </p>
-                  <h2 className="mt-0.5 text-base font-black tracking-[-0.02em] text-stone-950 sm:text-xl">
-                    What you plan to buy
-                  </h2>
+          <div className="ep-basket-main-grid mt-7 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start xl:gap-8">
+            <div className="ep-basket-left-stack min-w-0 space-y-7">
+              <section className="overflow-hidden border-t-[3px] border-[#C56C42] bg-white" aria-labelledby="ep-recipe-basket-title">
+                <div className="ep-basket-panel-head flex flex-wrap items-end justify-between gap-3 border-b border-[#D7DDCF] px-4 py-5 sm:px-6">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#C56C42]">01 / From your recipes</p>
+                    <h2 id="ep-recipe-basket-title" className="mt-1 text-[23px] font-semibold tracking-[-0.03em] text-[#202421] sm:text-[27px]">Ingredients to buy</h2>
+                  </div>
+                  <span className="rounded-full bg-[#D7DDCF] px-3 py-1 text-sm font-semibold text-[#173F35]">{recipeItems.length} items</span>
                 </div>
-                <span className="shrink-0 rounded-full bg-[#dcf7e8] px-2.5 py-1 text-[10px] font-black text-emerald-900 sm:px-3 sm:py-1.5 sm:text-xs">
-                  {totalBasketItems} item{totalBasketItems === 1 ? '' : 's'}
-                </span>
-              </header>
-
-              {recipeItems.length > 0 ? (
-                <div className="grid gap-0 px-3 sm:gap-2 sm:p-4">
-                  {recipeItems.map(
-                    (item, index) => (
-                      <article
-                        key={item.canonicalIngredientId}
-                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-stone-100 py-3 last:border-b-0 sm:gap-3 sm:rounded-[18px] sm:border sm:border-stone-200 sm:bg-[#fbfaf7] sm:px-4 sm:py-3.5 sm:last:border-b"
-                      >
-                        <div className="grid size-8 place-items-center rounded-lg bg-[#e7f5ed] text-[11px] font-black text-emerald-800 sm:size-10 sm:rounded-xl sm:text-xs">
-                          {index + 1}
-                        </div>
-
+                {hasRecipe ? (
+                  <div className="divide-y divide-[#D7DDCF]/70">
+                    {recipeItems.map((item, index) => (
+                      <article key={item.canonicalIngredientId || index} className="ep-basket-item grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-l-[3px] border-transparent px-4 py-4 sm:px-6">
                         <div className="min-w-0">
-                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                            <p className="min-w-0 truncate text-[13px] font-black text-stone-950 sm:text-sm">
-                              {item.name || 'Ingredient'}
-                            </p>
-                            <span className="rounded-full bg-[#fff2c9] px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-amber-900 sm:text-[9px]">
-                              Need to buy
-                            </span>
-                            {recipeCoverageIssue?.unmatchedCanonicalIngredientIds?.includes(
-                              String(
-                                item?.canonicalIngredientId ||
-                                  '',
-                              ),
-                            ) && (
-                              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-rose-700 sm:text-[9px]">
-                                Not available here
-                              </span>
+                          <p className="text-[16px] font-semibold leading-6 text-[#202421]">{item.name || 'Ingredient'}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-[#173F35]/80">
+                            <span>{formatRecipeQuantity(item)}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>From recipe</span>
+                            {recipeCoverageIssue?.unmatchedCanonicalIngredientIds?.includes(String(item?.canonicalIngredientId || '')) && (
+                              <span className="font-semibold text-rose-700">Not available here</span>
                             )}
                           </div>
-                          <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:text-[11px]">
-                            From your selected recipe
-                          </p>
                         </div>
-
-                        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-                          <span className="hidden rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-black text-stone-600 shadow-sm sm:inline-flex">
-                            {formatRecipeQuantity(item)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleRemoveRecipeItem(
-                                item.canonicalIngredientId,
-                              )
-                            }
-                            className="focus-ring grid size-8 place-items-center rounded-lg border border-rose-100 bg-white text-rose-600 transition hover:bg-rose-50 sm:size-auto sm:min-h-9 sm:grid-cols-[auto_auto] sm:gap-1.5 sm:px-3 sm:text-xs sm:font-black"
-                            aria-label={`Remove ${item.name || 'ingredient'} from Recipe Cart`}
-                          >
-                            <Trash2
-                              size={14}
-                              aria-hidden="true"
-                            />
-                            <span className="hidden sm:inline">Remove</span>
-                          </button>
-                        </div>
-                      </article>
-                    ),
-                  )}
-                </div>
-              ) : (
-                <div className="flex min-h-[210px] items-center justify-center px-5 py-8 text-center sm:min-h-[250px] sm:py-10">
-                  <div>
-                    <div className="mx-auto grid size-10 place-items-center rounded-xl bg-[#e7f5ed] text-emerald-800 sm:size-12 sm:rounded-2xl">
-                      <ShoppingBasket
-                        size={20}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <p className="mt-3 text-sm font-black text-stone-950 sm:text-base">
-                      Nothing to buy yet
-                    </p>
-                    <p className="mx-auto mt-1 max-w-sm text-[11px] leading-5 text-stone-500 sm:text-sm sm:leading-6">
-                      Open a recipe and add only the ingredients you are missing.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {(groceryItems.length > 0 || groceryLoading || groceryError) && (
-                <div className="border-t border-stone-200 bg-[#f4f9f6] px-3 py-3 sm:px-5 sm:py-4">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">From Grocery</p>
-                      <h3 className="text-sm font-black text-stone-900 sm:text-base">
-                        {groceryItems.length} grocery product{groceryItems.length === 1 ? '' : 's'}
-                      </h3>
-                    </div>
-                    {groceryCartId && (
-                      <Link to={`/cart/${groceryCartId}`} className="focus-ring rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-50">
-                        Review Grocery Cart
-                      </Link>
-                    )}
-                  </div>
-                  {groceryLoading && <p className="text-xs text-stone-600">Checking your saved grocery items...</p>}
-                  {groceryError && <p role="status" className="my-2 text-xs text-amber-800">{groceryError}</p>}
-                  <div className="grid gap-2">
-                    {groceryItems.map((item, index) => (
-                      <article key={`grocery-${item.id || item.packId || index}`} className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-white p-3 sm:gap-3">
-                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-100 text-xs font-black text-emerald-900">{recipeItems.length + index + 1}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-black text-stone-950">{item.displayName || item.name || 'Grocery product'}</p>
-                          <p className="text-[11px] text-stone-500">{item.sellerName || 'Grocery'} · {Number(item.packCount || item.quantity || 1)} pack{Number(item.packCount || item.quantity || 1) === 1 ? '' : 's'}</p>
-                        </div>
-                        {item.lineTotal?.amountMinor !== undefined && (
-                          <span className="text-xs font-bold text-stone-800">{formatMoney(item.lineTotal.amountMinor, item.lineTotal.currency || 'INR')}</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveGroceryItem(item)}
-                          disabled={Boolean(updatingGroceryItemId) || groceryLoading || Boolean(groceryError) || groceryCartData?.cart?.sourceType !== 'direct_product'}
-                          className="focus-ring rounded-lg border border-rose-100 px-2.5 py-2 text-rose-700 hover:bg-rose-50 disabled:opacity-40"
-                          aria-label={`Remove ${item.displayName || item.name || 'grocery product'}`}
-                        >
-                          <Trash2 size={15} aria-hidden="true" />
+                        <button type="button" onClick={() => handleRemoveRecipeItem(item.canonicalIngredientId)}
+                          aria-label={`Remove ${item.name || 'ingredient'} from basket`}
+                          className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-800 hover:bg-rose-50">
+                          <Trash2 size={16} aria-hidden="true" /> <span className="hidden sm:inline">Remove</span>
                         </button>
                       </article>
                     ))}
                   </div>
-                </div>
-              )}
-            </section>
-
-            <aside className="lg:sticky lg:top-24">
-              <section className="overflow-hidden rounded-[18px] border border-[#b9d9ca] bg-[#e8f4ee] shadow-[0_16px_36px_-30px_rgba(21,63,53,0.5)] sm:rounded-[24px]">
-                <div className="border-b border-[#c9e0d5] px-3 py-3 sm:px-5 sm:py-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="grid size-9 place-items-center rounded-xl bg-[#173f35] text-white sm:size-10">
-                      <ReceiptText
-                        size={17}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px]">
-                        Next step
-                      </p>
-                      <h2 className="text-base font-black text-[#173f35] sm:text-lg">
-                        Continue to delivery
-                      </h2>
-                    </div>
+                ) : (
+                  <div className="ep-basket-empty px-5 py-6 sm:px-6">
+                    <p className="text-[16px] font-semibold text-[#202421]">No recipe ingredients in your basket.</p>
+                    <p className="mt-1 hidden text-sm text-[#173F35]/80 sm:block">Add missing ingredients from any recipe whenever you need them.</p>
+                    <Link to="/recipes" className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] underline underline-offset-4">Explore recipes <ArrowRight size={15} aria-hidden="true" /></Link>
                   </div>
-                </div>
+                )}
+              </section>
 
-                <div className="space-y-3 p-3 sm:p-5">
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.11em] text-stone-400">
-                        Basket
-                      </p>
-                      <p className="mt-0.5 text-xs font-black text-stone-800 sm:text-sm">
-                        {totalBasketItems} item{totalBasketItems === 1 ? '' : 's'} · {recipeItems.length} recipe
-                      </p>
-                    </div>
-                    <span className="grid size-8 place-items-center rounded-full bg-[#dcf7e8] text-sm font-black text-emerald-900">
-                      {totalBasketItems}
-                    </span>
+              <section className="overflow-hidden border-t-[3px] border-[#173F35] bg-[#eef1e9]" aria-labelledby="ep-grocery-basket-title">
+                <div className="ep-basket-panel-head flex flex-wrap items-end justify-between gap-3 border-b border-[#c4ccbd] px-4 py-5 sm:px-6">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#173F35]">02 / From Grocery & Brands</p>
+                    <h2 id="ep-grocery-basket-title" className="mt-1 text-[23px] font-semibold tracking-[-0.03em] text-[#202421] sm:text-[27px]">Products in your basket</h2>
                   </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-[#173F35]">{groceryItems.length} products</span>
+                </div>
+                {groceryLoading && <p role="status" className="px-5 py-4 text-sm text-[#173F35]">Checking saved grocery products...</p>}
+                {groceryError && <p role="alert" className="px-5 py-4 text-sm font-medium text-rose-800">{groceryError}</p>}
+                {hasGroceries ? (
+                  <div className="divide-y divide-[#c4ccbd]">
+                    {groceryItems.map((item, index) => (
+                      <article key={`grocery-${item.id || item.packId || index}`} className="ep-basket-item flex flex-wrap items-center justify-between gap-3 border-l-[3px] border-transparent px-4 py-4 sm:px-6">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[16px] font-semibold leading-6 text-[#202421]">{item.displayName || item.name || 'Grocery product'}</p>
+                          <p className="mt-1 text-[13px] text-[#173F35]/85">
+                            {item.sellerName || 'Grocery'} · {Number(item.packCount || item.quantity || 1)} pack{Number(item.packCount || item.quantity || 1) === 1 ? '' : 's'}
+                          </p>
+                          {item.lineTotal?.amountMinor !== undefined && (
+                            <p className="mt-2 text-[15px] font-semibold text-[#173F35]">{formatMoney(item.lineTotal.amountMinor, item.lineTotal.currency || 'INR')}</p>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => handleRemoveGroceryItem(item)}
+                          disabled={Boolean(updatingGroceryItemId) || groceryLoading || Boolean(groceryError) || groceryCartData?.cart?.sourceType !== 'direct_product'}
+                          aria-label={`Remove ${item.displayName || item.name || 'grocery product'} from basket`}
+                          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+                          <Trash2 size={16} aria-hidden="true" /> <span>Remove</span>
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : !groceryLoading && !groceryError ? (
+                  <div className="ep-basket-empty px-5 py-6 sm:px-6">
+                    <p className="text-[16px] font-semibold text-[#202421]">No Grocery products added yet.</p>
+                    <p className="mt-1 hidden text-sm text-[#173F35]/80 sm:block">Products you add from Grocery and Brands will appear here.</p>
+                    <Link to="/grocery" className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] underline underline-offset-4">Shop groceries <ArrowRight size={15} aria-hidden="true" /></Link>
+                  </div>
+                ) : null}
+              </section>
 
-                  {recipeItems.length > 0 && (
-                    <div className="rounded-xl border border-emerald-200 bg-white p-3">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-wide text-emerald-800">Recipe delivery PIN</p>
-                          <p className="mt-0.5 text-sm font-black text-stone-900">
-                            {selectedRecipePincode || 'Choose a 6-digit PIN code'}
-                            {manualRecipePincode === null && selectedRecipePincode
-                              ? <span className="ml-1 text-[10px] font-medium text-stone-500">{detectedPincode ? '· Current location' : '· Saved address'}</span>
-                              : null}
+              <div className="ep-basket-extra-links grid gap-3 border-t border-[#D7DDCF] pt-4 sm:grid-cols-2">
+                <Link to="/recipes" className="group flex min-h-14 items-center justify-between rounded-xl border border-[#D7DDCF] bg-white px-4 text-[15px] font-semibold text-[#173F35] hover:border-[#173F35]">Add from recipes <ArrowRight size={18} aria-hidden="true" /></Link>
+                <Link to="/grocery" className="group flex min-h-14 items-center justify-between rounded-xl border border-[#D7DDCF] bg-white px-4 text-[15px] font-semibold text-[#173F35] hover:border-[#173F35]">Add from Grocery <ArrowRight size={18} aria-hidden="true" /></Link>
+              </div>
+            </div>
+
+            <aside className="min-w-0 lg:sticky lg:top-24" aria-label="Basket checkout summary">
+              <div className="border-t-4 border-[#C56C42] bg-white shadow-[0_14px_36px_-28px_rgba(23,63,53,0.4)]">
+                <div className="ep-basket-summary-head bg-[#D7DDCF] px-5 py-5">
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#173F35]">Your next step</p>
+                  <h2 className="mt-1 text-[23px] font-semibold tracking-[-0.025em] text-[#202421]">Ready to review?</h2>
+                </div>
+                <div className="ep-basket-summary-body space-y-4 px-5 py-5">
+                  <div className="flex items-center justify-between border-b border-[#D7DDCF] pb-3 text-sm">
+                    <span className="text-[#202421]/80">Selected items</span>
+                    <strong className="text-lg font-semibold text-[#173F35]">{totalBasketItems}</strong>
+                  </div>
+                  {hasGroceries && groceryCartData?.items?.length > 0 && (
+                    <div className="border-b border-[#D7DDCF] pb-4">
+                      <p className="text-xs font-medium text-[#173F35]/80">Grocery item prices so far</p>
+                      <p className="mt-1 text-2xl font-semibold text-[#202421]">{formatMoney(grocerySubtotal, groceryCurrency)}</p>
+                      <p className="mt-1 hidden text-xs leading-5 text-[#202421]/75 sm:block">Recipe ingredients, delivery fees and final availability are checked before checkout.</p>
+                    </div>
+                  )}
+                  {hasRecipe && (
+                    <div className="ep-basket-summary-pin rounded-xl bg-[#F7F6F2] p-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-[#173F35]">Delivery PIN</p>
+                          <p className="mt-1 text-[16px] font-semibold text-[#202421]">{selectedRecipePincode || 'Choose PIN'}
+                            {manualRecipePincode === null && selectedRecipePincode && <span className="ml-1 text-xs font-normal text-[#173F35]/75">{detectedPincode ? '· Current location' : '· Saved address'}</span>}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRecipePincodeDraft(selectedRecipePincode)
-                            setRecipePinError('')
-                            setRecipePinEditorOpen((open) => !open)
-                          }}
-                          className="focus-ring rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50"
-                        >
+                        <button type="button" onClick={() => { setRecipePincodeDraft(selectedRecipePincode); setRecipePinError(''); setRecipePinEditorOpen((open) => !open) }}
+                          className="min-h-9 rounded-lg border border-[#D7DDCF] bg-white px-3 text-xs font-semibold text-[#173F35] hover:bg-[#D7DDCF]">
                           {recipePinEditorOpen ? 'Cancel' : 'Change PIN'}
                         </button>
                       </div>
                       {(recipePinEditorOpen || !selectedRecipePincode) && (
                         <form onSubmit={handleCheckRecipePincode} className="mt-3 space-y-2">
                           <div className="flex gap-2">
-                            <input
-                              inputMode="numeric"
-                              autoComplete="postal-code"
-                              maxLength={6}
-                              pattern="[0-9]{6}"
-                              value={recipePincodeDraft}
+                            <input inputMode="numeric" autoComplete="postal-code" maxLength={6} pattern="[0-9]{6}" value={recipePincodeDraft}
                               onChange={(event) => setRecipePincodeDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                              placeholder="Enter 6-digit PIN"
-                              aria-label="Recipe delivery PIN code"
-                              className="min-w-0 flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-900"
-                            />
-                            <button type="submit" className="focus-ring rounded-lg bg-emerald-800 px-3 py-2 text-xs font-bold text-white">Check</button>
+                              placeholder="6-digit PIN" aria-label="Delivery PIN code"
+                              className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#D7DDCF] bg-white px-3 text-sm text-[#202421]" />
+                            <button type="submit" className="min-h-11 rounded-lg bg-[#173F35] px-3 text-sm font-semibold text-white">Check</button>
                           </div>
                           {recipePinError && <p role="alert" className="text-xs text-rose-700">{recipePinError}</p>}
                           {detectedPincode && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setManualRecipePincode(null)
-                                setRecipePinEditorOpen(false)
-                                setRecipePinError('')
-                              }}
-                              className="text-left text-xs font-bold text-emerald-700 underline"
-                            >
-                              Use current-location PIN {detectedPincode}
-                            </button>
+                            <button type="button" onClick={() => { setManualRecipePincode(null); setRecipePinEditorOpen(false); setRecipePinError('') }}
+                              className="text-left text-xs font-semibold text-[#173F35] underline">Use current PIN {detectedPincode}</button>
                           )}
                         </form>
                       )}
                       {selectedRecipePincode && (
-                        <p role="status" className={`mt-2 text-xs font-semibold leading-5 ${
-                          recipePinCoverage.status === 'available' ? 'text-emerald-800'
-                            : recipePinCoverage.status === 'unavailable' ? 'text-rose-700'
-                              : 'text-stone-600'
-                        }`}>
+                        <p role="status" className={`mt-3 text-[13px] leading-5 ${recipePinCoverage.status === 'available' ? 'text-[#173F35]' : recipePinCoverage.status === 'unavailable' ? 'text-rose-700' : 'text-[#202421]/80'}`}>
                           {recipePinCoverage.pincode !== selectedRecipePincode || recipePinCoverage.status === 'checking'
-                            ? `Checking Host delivery for PIN ${selectedRecipePincode}...`
+                            ? `Checking Host availability for PIN ${selectedRecipePincode}...`
                             : recipePinCoverage.status === 'available'
-                              ? `Recipe ingredients are available for delivery to PIN ${selectedRecipePincode}.`
+                              ? `Recipe ingredients can be delivered to PIN ${selectedRecipePincode}.`
                               : recipePinCoverage.status === 'unavailable'
-                                ? `Delivery to PIN ${selectedRecipePincode} is currently unavailable${recipePinCoverage.unmatchedNames.length ? ` for ${recipePinCoverage.unmatchedNames.join(', ')}` : ' for the selected recipe ingredients'}. Please try another PIN code.`
+                                ? `Some ingredients are unavailable for PIN ${selectedRecipePincode}${recipePinCoverage.unmatchedNames?.length ? `: ${recipePinCoverage.unmatchedNames.join(', ')}` : ''}.`
                                 : recipePinCoverage.status === 'error'
-                                  ? (recipePinCoverage.message || 'Unable to confirm delivery right now. Please try a different PIN or choose an address.')
-                                  : 'Enter your delivery PIN to check available Hosts.'}
+                                  ? (recipePinCoverage.message || 'Unable to check delivery right now.')
+                                  : 'Enter your delivery PIN to check current Hosts.'}
                         </p>
                       )}
-                      <p className="mt-1.5 text-[10px] text-stone-500">Final delivery and pricing are confirmed for your selected checkout address.</p>
                     </div>
                   )}
-
                   <button
                     type="button"
-                    onClick={handlePlaceRecipeOrder}
-                    disabled={
-                      placingRecipeOrder ||
-                      recipeItems.length === 0 ||
-                      (Boolean(selectedRecipePincode) && (
-                        recipePinCoverage.pincode !== selectedRecipePincode ||
-                        recipePinCoverage.status === 'checking' ||
-                        recipePinCoverage.status === 'unavailable'
-                      ))
-                    }
-                    className={`focus-ring inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-black text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-45 sm:rounded-2xl sm:text-sm ${
-                      recipeCoverageIssue
-                        ? 'bg-rose-700 hover:bg-rose-800'
-                        : 'bg-[#173f35] hover:bg-[#0f3028]'
-                    }`}
+                    onClick={() => hasRecipe ? handlePlaceRecipeOrder() : navigate(`/checkout/${groceryCartId}`)}
+                    disabled={hasRecipe ? (placingRecipeOrder || recipeDeliveryBusy) : !canReviewGroceries}
+                    className="ep-basket-cta inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 py-3 text-[15px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {placingRecipeOrder
-                      ? 'Preparing your basket…'
-                      : recipeCoverageIssue
-                        ? 'Choose another address'
-                        : 'Review & place order'}
-                    <ArrowRight
-                      size={16}
-                      aria-hidden="true"
-                    />
+                    {placingRecipeOrder ? 'Checking availability…' : hasRecipe ? 'Review delivery & checkout' : 'Review grocery checkout'}
+                    <ArrowRight size={18} aria-hidden="true" />
                   </button>
-
-                  {groceryItems.length > 0 && groceryCartId && (
-                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50 p-3">
-                      <p className="text-xs font-bold text-emerald-950">{groceryItems.length} Grocery product{groceryItems.length === 1 ? '' : 's'} saved</p>
-                      <p className="mt-1 text-[11px] leading-4 text-emerald-900/80">Priced Host offers for these ingredients will be added to your Grocery/Brand basket before one order is placed.</p>
-                    </div>
+                  {!hasRecipe && !hasGroceries && (
+                    <p className="text-center text-sm leading-5 text-[#202421]/75">Add an ingredient or a product to begin.</p>
                   )}
-
-                  <div className="grid gap-2 border-t border-[#c9e0d5] pt-3 text-[10px] font-semibold leading-4 text-stone-600 sm:text-xs sm:leading-5">
-                    <div className="flex items-start gap-2">
-                      <ShieldCheck
-                        size={14}
-                        className="mt-0.5 shrink-0 text-emerald-700"
-                        aria-hidden="true"
-                      />
-                      <span>
-                        {recipeCoverageIssue
-                          ? 'Choose another saved address or add a new one.'
-                          : 'Your delivery address is the next step.'}
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Truck
-                        size={14}
-                        className="mt-0.5 shrink-0 text-emerald-700"
-                        aria-hidden="true"
-                      />
-                      <span>We will then show Host offers that can deliver there.</span>
-                    </div>
+                  <div className="ep-basket-summary-legal flex items-start gap-2 border-t border-[#D7DDCF] pt-4 text-xs leading-5 text-[#202421]/75">
+                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#173F35]" aria-hidden="true" />
+                    <span>Seller availability, delivery charges and final prices are checked before payment.</span>
                   </div>
                 </div>
-              </section>
+              </div>
             </aside>
           </div>
         </div>
@@ -1917,8 +1764,8 @@ export default function MarketplaceCartPage() {
     loading
   ) {
     return (
-      <main className="min-h-screen bg-[#f7f5ef]">
-        <div className="page-shell py-6 sm:py-8">
+      <main className="min-w-0 bg-[#F7F6F2]">
+        <div className="w-full px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
           <div className="h-[560px] animate-pulse rounded-[30px] border border-stone-200 bg-white" />
         </div>
       </main>
@@ -1945,8 +1792,8 @@ export default function MarketplaceCartPage() {
       {}
 
     return (
-      <main className="min-h-screen bg-[#fff5e8]">
-        <div className="page-shell py-5 sm:py-8">
+      <main className="min-w-0 bg-[#fff5e8]">
+        <div className="w-full px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
           <Link
             to={
               restaurantOrder.recipeSlug
@@ -2139,7 +1986,7 @@ export default function MarketplaceCartPage() {
     )
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f5f2ea] text-stone-950">
+    <main className="relative min-w-0 overflow-hidden bg-[#F7F6F2] text-stone-950">
       <style>{`
         @keyframes epCartRise {
           from { opacity: 0; transform: translateY(14px); }
@@ -2188,7 +2035,7 @@ export default function MarketplaceCartPage() {
         <div className="ep-cart-drift absolute -right-28 top-[34rem] h-96 w-96 rounded-full bg-lime-200/20 blur-3xl [animation-delay:-3s]" />
       </div>
 
-      <div className="page-shell relative py-5 sm:py-7 lg:py-8">
+      <div className="relative w-full px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <div className="ep-cart-rise flex flex-wrap items-center justify-between gap-3">
           <Link
             to={

@@ -27,6 +27,11 @@ const NAV_ITEMS = [
     end: true,
   },
   {
+    label: "Create listing",
+    to: "/host/listings",
+    icon: ChefHat,
+  },
+  {
     label: "Outlets & locations",
     to: "/host/hospitality/outlets",
     icon: Building2,

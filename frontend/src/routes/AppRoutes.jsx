@@ -425,14 +425,7 @@ function GlobalFloatingCartCompanion() {
     ),
   ]
 
-  const cartHref =
-    recipeItems.length >
-    0
-      ? '/cart/recipe'
-      : snapshot.marketplaceCart
-          ?.cartId
-        ? `/cart/${snapshot.marketplaceCart.cartId}`
-        : '/grocery'
+    const cartHref = '/cart/recipe'
 
   function closeCompanion() {
     setHidden(
@@ -1046,6 +1039,10 @@ const HostMarketplacePage = lazy(() => import('../features/marketplace/pages/Hos
 const HostBrandAuthorityPage = lazy(() => import('../features/brands/pages/HostBrandAuthorityPage'))
 const HostNpiPage = lazy(() => import('../features/universalProduct/pages/HostNpiPage'))
 const HostDashboardPage = lazy(() => import('../features/host/pages/HostDashboardPage'))
+const HostListingWorkspacePage = lazy(() => import('../features/host/pages/HostListingWorkspacePage'))
+const HostUnifiedListingPage = lazy(() => import('../features/host/pages/HostUnifiedListingPage'))
+const AdminUnifiedListingReviewPage = lazy(() => import('../features/host/pages/AdminUnifiedListingReviewPage'))
+const PublicApprovedHostListingsPage = lazy(() => import('../features/host/pages/PublicApprovedHostListingsPage'))
 const HostEarningsPage = lazy(() => import('../features/host/pages/HostEarningsPage'))
 const HostOrdersPage = lazy(() => import('../features/host/pages/HostOrdersPage'))
 const HostOrderDetailPage = lazy(() => import('../features/host/pages/HostOrderDetailPage'))
@@ -2441,6 +2438,7 @@ export default function AppRoutes() {
             <Route path="/brands/:brandKey/products/:packId/history" element={<BrandProductHistoryPage />} />
 
             <Route path="/recipes" element={<RecipesPage />} />
+            <Route path="/explore/host-listings" element={<PublicApprovedHostListingsPage />} />
             <Route path="/recipes/what-should-we-cook" element={<WhatShouldWeCookPage />} />
 
             <Route
@@ -2805,7 +2803,9 @@ export default function AppRoutes() {
               path="/cart/:cartId"
               element={
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.CUSTOMER}>
-                  <MarketplaceCartPage />
+                  <CustomerShell>
+                    <MarketplaceCartPage />
+                  </CustomerShell>
                 </ApplicationAccessRoute>
               }
             />
@@ -2890,6 +2890,28 @@ export default function AppRoutes() {
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
                   <HostShell>
                     <EditProfilePage audience="host" />
+                  </HostShell>
+                </ApplicationAccessRoute>
+              }
+            />
+
+            <Route
+              path="/host/listings"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
+                  <HostShell>
+                    <HostListingWorkspacePage />
+                  </HostShell>
+                </ApplicationAccessRoute>
+              }
+            />
+
+            <Route
+              path="/host/listings/new"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
+                  <HostShell>
+                    <HostUnifiedListingPage />
                   </HostShell>
                 </ApplicationAccessRoute>
               }
@@ -3340,6 +3362,10 @@ export default function AppRoutes() {
               }
             />
 
+            <Route
+              path="/admin/host-listings"
+              element={<AdminAccessRoute><AdminUnifiedListingReviewPage /></AdminAccessRoute>}
+            />
             <Route
               path="/admin/marketplace"
               element={

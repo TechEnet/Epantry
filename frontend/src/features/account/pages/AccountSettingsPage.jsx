@@ -304,38 +304,19 @@ function formatConsentName(
 
 function ConsentStatus({
   granted,
+  optional = false,
 }) {
   return (
     <span
       className={[
-        'inline-flex',
-        'items-center',
-        'gap-1.5',
-        'rounded-full',
-        'px-2.5',
-        'py-1',
-        'text-xs',
-        'font-black',
-
+        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-semibold',
         granted
-          ? 'bg-emerald-100 text-emerald-800'
-          : 'bg-stone-100 text-stone-600',
-      ].join(
-        ' ',
-      )}
+          ? 'bg-[#DCE8DE] text-[#173F35]'
+          : 'bg-[#EEEDE5] text-[#59645B]',
+      ].join(' ')}
     >
-
-      {granted && (
-        <Check
-          size={13}
-          aria-hidden="true"
-        />
-      )}
-
-      {granted
-        ? 'Accepted'
-        : 'Not accepted'}
-
+      {granted && <Check size={13} aria-hidden="true" />}
+      {optional ? (granted ? 'On' : 'Off') : (granted ? 'Accepted' : 'Not accepted')}
     </span>
   )
 }
@@ -1133,1485 +1114,340 @@ export default function AccountSettingsPage() {
   }
 
   return (
-    <main className="w-full px-3 pb-5 pt-3 sm:px-6 sm:pb-10 sm:pt-5 lg:px-8 lg:pb-12">
-
-      <div className="w-full max-w-none">
-
-
-        {/* =========================================================
-            HEADER
-        ========================================================= */}
-
-        <div>
-
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:text-xs sm:tracking-[0.18em]">
-            Account
+    <main className="w-full min-w-0 bg-[#F7F6F2] px-2 pb-5 pt-2 text-[#202421] sm:px-6 sm:pb-16 sm:pt-7 lg:px-9">
+      <div className="w-full">
+        <header className="border-b border-[#D7DDCF] pb-3 sm:pb-8">
+          <div className="mb-1.5 flex items-center gap-2 sm:mb-2 sm:gap-3">
+            <span className="h-[3px] w-7 rounded-full bg-[#C86C42]" aria-hidden="true" />
+            <p className="text-[13px] font-semibold tracking-[0.08em] text-[#173F35]">Your account</p>
+          </div>
+          <h1 className="text-[24px] font-bold leading-tight tracking-[-0.035em] sm:text-[34px]">Profile & preferences</h1>
+          <p className="mt-1 max-w-2xl text-[14px] leading-5 text-[#556158] sm:mt-2 sm:text-base sm:leading-6">
+            <span className="sm:hidden">Manage your profile, addresses, food choices and privacy.</span>
+            <span className="hidden sm:inline">Your details, delivery addresses, food choices and privacy settings—all in one place.</span>
           </p>
-
-          <h1 className="mt-1.5 text-[24px] font-black tracking-tight text-stone-950 sm:mt-3 sm:text-4xl">
-            Profile & preferences
-          </h1>
-
-          <p className="hidden mt-3 max-w-3xl text-sm leading-7 text-stone-600 sm:block">
-            Manage your EPANTRY identity, food preferences and consent settings.
-          </p>
-
-        </div>
-
-
-        {/* =========================================================
-            GLOBAL ERROR
-        ========================================================= */}
+        </header>
 
         {pageError && (
-          <div
-            className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800"
-            role="alert"
-          >
-
-            <CircleAlert
-              size={18}
-              className="mt-0.5 shrink-0"
-              aria-hidden="true"
-            />
-
-            <p className="text-sm font-semibold leading-6">
-              {pageError}
-            </p>
-
+          <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 sm:mt-5 sm:gap-3 sm:px-4 sm:py-3 text-sm font-medium leading-6 text-red-800">
+            <CircleAlert size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{pageError}</span>
           </div>
         )}
 
-
-        {/* =========================================================
-            PROFILE
-        ========================================================= */}
-
-        <section className="mt-4 rounded-[1.5rem] border border-sky-100 bg-gradient-to-br from-sky-50/70 via-white to-emerald-50/40 p-3.5 shadow-lg shadow-stone-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl">
-
-          <div className="flex items-center gap-3 sm:items-start sm:gap-4">
-
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-700 sm:size-11 sm:rounded-2xl">
-
-              <UserRound
-                size={21}
-                aria-hidden="true"
-              />
-
-            </div>
-
-            <div>
-
-              <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
-                Profile
-              </h2>
-
-              <p className="hidden mt-1 text-sm leading-6 text-stone-500 sm:block">
-                Your basic EPANTRY account identity.
-              </p>
-
-            </div>
-
+        {/* Personal profile: image, name, phone, email and save actions remain connected. */}
+        <section aria-labelledby="profile-heading" className="py-4 sm:py-9">
+          <div className="mb-3 flex items-center gap-2 sm:mb-5 sm:gap-3">
+            <span className="text-[14px] font-bold text-[#C86C42]">01</span>
+            <h2 id="profile-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]">Personal details</h2>
           </div>
-
-
-          <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-emerald-100 bg-white/80 p-3 sm:mt-7 sm:flex sm:flex-row sm:gap-4 sm:border-stone-200 sm:bg-stone-50 sm:p-4">
-
-            <div className="relative w-fit shrink-0">
-              {profile?.profilePhotoUrl ? (
-                <img
-                  src={profile.profilePhotoUrl}
-                  alt="Profile"
-                  className="h-14 w-14 rounded-full border-3 border-white object-cover shadow-sm sm:h-20 sm:w-20 sm:border-4"
-                />
-              ) : (
-                <div className="grid h-14 w-14 place-items-center rounded-full border-3 border-white bg-emerald-700 text-lg font-black text-white shadow-sm sm:h-20 sm:w-20 sm:border-4 sm:text-2xl">
-                  {String(
-                    profile?.name || 'E',
-                  )
-                    .trim()
-                    .charAt(0)
-                    .toUpperCase() || 'E'}
+          <div className="grid min-w-0 gap-0 overflow-hidden rounded-[12px] border border-[#D7DDCF] sm:rounded-[18px] lg:grid-cols-[0.85fr_1.45fr]">
+            <div className="relative flex flex-col justify-between gap-2 bg-[#173F35] p-3 text-white sm:gap-6 sm:p-7">
+              <div>
+                <p className="hidden text-sm font-medium text-[#DCE8DE] sm:block">Your profile photo</p>
+                <div className="flex items-center gap-3 sm:mt-4 sm:gap-4">
+                  <div className="relative shrink-0">
+                    {profile?.profilePhotoUrl ? (
+                      <img src={profile.profilePhotoUrl} alt="Your profile" className="h-14 w-14 rounded-full border-[3px] border-white/80 object-cover sm:h-24 sm:w-24" />
+                    ) : (
+                      <div className="grid h-14 w-14 place-items-center rounded-full border-[3px] border-white/60 bg-[#2B624E] text-2xl font-bold sm:h-24 sm:w-24 sm:text-[30px]">
+                        {String(profile?.name || 'E').trim().charAt(0).toUpperCase() || 'E'}
+                      </div>
+                    )}
+                    <label className="focus-within:ring-2 focus-within:ring-[#F7F6F2] focus-within:ring-offset-2 focus-within:ring-offset-[#173F35] absolute -bottom-1 -right-1 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-[#C86C42] text-white transition hover:bg-[#AD5631]" title="Change profile photo">
+                      {isUploadingPhoto ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Camera size={17} aria-hidden="true" />}
+                      <span className="sr-only">Change profile photo</span>
+                      <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={isUploadingPhoto} onChange={handlePhotoChange} aria-label="Change profile photo" />
+                    </label>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="break-words text-[17px] font-bold leading-snug sm:text-xl">{profile?.name || 'EPANTRY member'}</p>
+                    <p className="mt-0.5 text-[13px] leading-5 text-[#DFE9E1] sm:mt-1">{isUploadingPhoto ? 'Uploading your photo...' : <><span className="sm:hidden">Change photo with the camera icon.</span><span className="hidden sm:inline">Tap the camera to update your photo.</span></>}</p>
+                  </div>
                 </div>
-              )}
-
-              <label className="focus-ring absolute -bottom-1 -right-1 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-stone-50 bg-stone-950 text-white transition hover:bg-emerald-700 sm:h-9 sm:w-9 sm:border-4">
-                <Camera
-                  size={15}
-                  aria-hidden="true"
-                />
-                <span className="sr-only">
-                  Change profile photo
-                </span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  disabled={isUploadingPhoto}
-                  onChange={handlePhotoChange}
-                />
-              </label>
-            </div>
-
-            <div className="min-w-0">
-              <div className="sm:hidden">
-                <label
-                  htmlFor="account-name-mobile"
-                  className="mb-1 block text-[10px] font-black uppercase tracking-[0.08em] text-stone-600"
-                >
-                  Name
-                </label>
-                <input
-                  id="account-name-mobile"
-                  type="text"
-                  value={profileForm.name}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  className="focus-ring min-h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-[12px] font-bold"
-                />
-                <p className="mt-1 text-[9px] font-semibold text-stone-400">
-                  {isUploadingPhoto ? 'Uploading photo...' : 'Tap photo to change'}
-                </p>
               </div>
-
-              <div className="hidden sm:block">
-                <p className="font-black text-stone-950">
-                  Profile photo
-                </p>
-                <p className="mt-1 text-xs leading-5 text-stone-500">
-                  {isUploadingPhoto
-                    ? 'Uploading photo...'
-                    : 'JPEG, PNG or WebP.'}
-                </p>
+              <div className="border-t border-white/20 pt-2 sm:pt-4">
+                <p className="text-[13px] font-medium text-[#D3E0D7]">Sign-in email</p>
+                <p className="mt-0.5 break-all text-[14px] font-semibold leading-5 sm:mt-1 sm:text-[15px] sm:leading-6">{profile?.email || 'Not available'}</p>
+                <p className="hidden text-[13px] leading-5 text-[#D3E0D7] sm:mt-2 sm:block">Your sign-in email cannot be changed here.</p>
               </div>
             </div>
 
+            <form onSubmit={handleProfileSave} className="flex min-w-0 flex-col justify-between gap-3 bg-[#FEFDF9] p-3 sm:gap-6 sm:p-7">
+              <div>
+                <h3 className="hidden text-lg font-bold sm:block">Update your information</h3>
+                <p className="hidden text-sm leading-6 text-[#647067] sm:mt-1 sm:block">Keep your name and contact number up to date.</p>
+                <div className="mt-0 grid gap-3 sm:mt-5 sm:gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="account-name" className="mb-1 block text-[14px] font-semibold sm:mb-2">Full name</label>
+                    <input id="account-name" type="text" autoComplete="name" value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-base text-[#202421] outline-none focus:border-[#173F35]" />
+                  </div>
+                  <div>
+                    <label htmlFor="account-phone" className="mb-1 block text-[14px] font-semibold sm:mb-2">Phone number</label>
+                    <input id="account-phone" type="tel" autoComplete="tel" value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+91 98765 43210" className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-base text-[#202421] outline-none focus:border-[#173F35]" />
+                    {profile?.phoneVerified && <p className="mt-1.5 flex items-center gap-1.5 text-[13px] font-medium text-[#173F35]"><Check size={14} aria-hidden="true" /> Verified number</p>}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 border-t border-[#E2E5DC] pt-3 sm:gap-3 sm:pt-5">
+                <button type="submit" disabled={isSavingProfile} className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 text-[14px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:w-auto sm:px-5">
+                  {isSavingProfile ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
+                  Save profile
+                </button>
+                {profileMessage && <p role="status" className="text-sm font-semibold text-[#173F35]">{profileMessage}</p>}
+              </div>
+            </form>
           </div>
-
-          <form
-            onSubmit={
-              handleProfileSave
-            }
-            className="mt-3 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-5"
-          >
-
-            <div className="hidden sm:block">
-
-              <label
-                htmlFor="account-name"
-                className="mb-2 block text-sm font-bold text-stone-800"
-              >
-                Name
-              </label>
-
-              <input
-                id="account-name"
-                type="text"
-                value={
-                  profileForm.name
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setProfileForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
-
-                      name:
-                        event
-                          .target
-                          .value,
-                    }),
-                  )
-                }
-                className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 px-4 text-sm font-semibold"
-              />
-
-            </div>
-
-
-            <div>
-
-              <label
-                htmlFor="account-phone"
-                className="mb-1 block text-[10px] font-black uppercase tracking-[0.08em] text-stone-600 sm:mb-2 sm:text-sm sm:font-bold sm:normal-case sm:tracking-normal sm:text-stone-800"
-              >
-                Phone
-              </label>
-
-              <input
-                id="account-phone"
-                type="tel"
-                value={
-                  profileForm.phone
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setProfileForm(
-                    (
-                      current,
-                    ) => ({
-                      ...current,
-
-                      phone:
-                        event
-                          .target
-                          .value,
-                    }),
-                  )
-                }
-                className="focus-ring min-h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-[11px] font-semibold sm:min-h-12 sm:rounded-2xl sm:px-4 sm:text-sm"
-                placeholder="+91 98765 43210"
-              />
-
-              {profile
-                ?.phoneVerified && (
-                <p className="mt-2 text-xs font-bold text-emerald-700">
-                  Verified phone
-                </p>
-              )}
-
-            </div>
-
-
-            <div className="min-w-0 sm:col-span-2">
-
-              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.08em] text-stone-600 sm:mb-2 sm:text-sm sm:font-bold sm:normal-case sm:tracking-normal sm:text-stone-800">
-                Email
-              </p>
-
-              <div className="min-h-10 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3">
-
-                <p className="truncate text-[11px] font-black text-stone-900 sm:text-sm">
-                  {profile?.email}
-                </p>
-
-                <p className="hidden mt-1 text-xs leading-5 text-stone-500 sm:block">
-                  Firebase identity email cannot be changed from this basic profile form.
-                </p>
-
-              </div>
-
-            </div>
-
-
-            <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-
-              <button
-                type="submit"
-                disabled={
-                  isSavingProfile
-                }
-                className="focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-4 text-[11px] font-black text-white disabled:opacity-50 sm:min-h-11 sm:gap-2 sm:bg-stone-950 sm:px-5 sm:text-sm"
-              >
-
-                {isSavingProfile ? (
-                  <LoaderCircle
-                    size={17}
-                    className="animate-spin"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Save
-                    size={17}
-                    aria-hidden="true"
-                  />
-                )}
-
-                Save profile
-
-              </button>
-
-              {profileMessage && (
-                <p className="text-sm font-bold text-emerald-700">
-                  {profileMessage}
-                </p>
-              )}
-
-            </div>
-
-          </form>
-
         </section>
 
-
-        {/* =========================================================
-            SAVED ADDRESSES
-        ========================================================= */}
-
-        <section className="mt-4 rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/30 to-sky-50/40 p-3.5 shadow-lg shadow-stone-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl">
-
-          <div className="flex items-center justify-between gap-3 sm:items-start">
-
-            <div className="flex items-center gap-3 sm:items-start sm:gap-4">
-
-              <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-sky-100 text-sky-700 sm:size-11 sm:rounded-2xl sm:bg-emerald-100 sm:text-emerald-700">
-                <MapPin
-                  size={21}
-                  aria-hidden="true"
-                />
+        {/* Addresses remain editable using the existing delivery-address endpoints. */}
+        <section aria-labelledby="addresses-heading" className="border-t border-[#D7DDCF] py-4 sm:py-9">
+          <div className="flex items-center justify-between gap-2 sm:flex-wrap sm:items-end sm:gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="text-[14px] font-bold text-[#C86C42]">02</span>
+                <h2 id="addresses-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]"><span className="sm:hidden">Addresses</span><span className="hidden sm:inline">Delivery addresses</span></h2>
               </div>
-
-              <div>
-                <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
-                  Saved addresses
-                </h2>
-                <p className="hidden mt-1 text-sm leading-6 text-stone-500 sm:block">
-                  Add a delivery address or edit an existing one.
-                </p>
-              </div>
-
+              <p className="hidden text-[14px] leading-6 text-[#647067] sm:mt-1.5 sm:block">Choose where your orders should arrive.</p>
             </div>
-
-            <button
-              type="button"
-              onClick={beginAddAddress}
-              className="focus-ring hidden min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 text-sm font-black text-white transition hover:bg-emerald-700 sm:inline-flex"
-            >
-              <Plus
-                size={16}
-                aria-hidden="true"
-              />
-              Add address
-            </button>
-
+            <button type="button" onClick={beginAddAddress} className="focus-ring inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-[#173F35] bg-[#173F35] px-3 text-[13px] font-semibold text-white transition hover:bg-[#27634E] sm:gap-2 sm:px-5 sm:text-[14px]"><Plus size={17} aria-hidden="true" /> Add address</button>
           </div>
-
-          {addressMessage && (
-            <p className="mt-5 text-sm font-bold text-emerald-700">
-              {addressMessage}
-            </p>
-          )}
-
-          <div className="mt-3 grid gap-2.5 sm:mt-6 sm:gap-3 sm:grid-cols-2">
-            {addresses.length > 0 ? (
-              addresses.map(
-                (
-                  address,
-                ) => (
-                  <article
-                    key={address.id}
-                    className="rounded-2xl border border-sky-100 bg-white/80 p-3 sm:border-stone-200 sm:bg-stone-50 sm:p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-black text-stone-950">
-                            {formatAddressTitle(
-                              address,
-                            )}
-                          </p>
-                          {address.isDefault ? (
-                            <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-800">
-                              Default
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <p className="mt-2 text-sm font-semibold leading-6 text-stone-600">
-                          {address.addressLine1}
-                          {address.addressLine2
-                            ? `, ${address.addressLine2}`
-                            : ''}
-                          {`, ${address.area}, ${address.city}, ${address.state} ${address.postalCode}`}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          beginEditAddress(
-                            address,
-                          )
-                        }
-                        className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-stone-200 bg-white text-stone-700 transition hover:border-emerald-300 hover:text-emerald-700"
-                        aria-label={`Edit ${formatAddressTitle(
-                          address,
-                        )} address`}
-                      >
-                        <Pencil
-                          size={15}
-                          aria-hidden="true"
-                        />
-                      </button>
+          {addressMessage && <p role="status" className="mt-4 text-sm font-semibold text-[#173F35]">{addressMessage}</p>}
+          <div className="mt-3 grid gap-x-8 gap-y-0 border-t border-[#D7DDCF] sm:mt-5 md:grid-cols-2">
+            {addresses.length > 0 ? addresses.map((address) => (
+              <article key={address.id} className="flex items-start justify-between gap-2 border-b border-[#D7DDCF] py-3 sm:gap-4 sm:py-4">
+                <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#E5EADB] text-[#173F35] sm:size-10"><MapPin size={19} aria-hidden="true" /></span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-[16px] font-bold">{formatAddressTitle(address)}</h3>
+                      {address.isDefault && <span className="rounded-md bg-[#DCE8DE] px-2 py-0.5 text-[12px] font-semibold text-[#173F35]">Default</span>}
                     </div>
-                  </article>
-                ),
-              )
-            ) : (
-              <div className="sm:col-span-2 rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-6 text-center text-sm font-semibold text-stone-500">
-                No delivery address saved yet.
-              </div>
+                    <p className="mt-0.5 break-words text-[14px] leading-5 text-[#556158] sm:mt-1 sm:leading-6">
+                      {[address.addressLine1, address.addressLine2, address.area, address.city, address.state, address.postalCode].filter(Boolean).join(', ')}
+                    </p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => beginEditAddress(address)} aria-label={`Edit ${formatAddressTitle(address)} address`} className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl border border-[#D7DDCF] bg-white text-[#173F35] transition hover:border-[#C86C42] hover:text-[#C86C42]"><Pencil size={18} aria-hidden="true" /></button>
+              </article>
+            )) : (
+              <p className="py-5 text-[15px] text-[#647067]">You haven't added a delivery address yet.</p>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={beginAddAddress}
-            className="focus-ring mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-100/80 px-3 text-[11px] font-black text-sky-900 sm:hidden"
-          >
-            <Plus size={14} aria-hidden="true" />
-            Add address
-          </button>
-
-          {addressForm ? (
-            <form
-              onSubmit={handleAddressSubmit}
-              className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-base font-black text-stone-950">
-                  {addressForm.id
-                    ? 'Edit address'
-                    : 'Add address'}
-                </h3>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAddressForm(
-                      null,
-                    )
-                  }
-                  className="focus-ring grid h-9 w-9 place-items-center rounded-xl border border-stone-200 bg-white text-stone-600"
-                  aria-label="Close address form"
-                >
-                  <X
-                    size={16}
-                    aria-hidden="true"
-                  />
-                </button>
+          {addressForm && (
+            <form onSubmit={handleAddressSubmit} className="mt-3 min-w-0 rounded-[12px] border border-[#D7DDCF] bg-[#E9EDE4] p-3 sm:mt-5 sm:rounded-[18px] sm:p-6">
+              <div className="flex items-center justify-between gap-2 border-b border-[#C9D1C6] pb-2 sm:gap-3 sm:pb-4">
+                <h3 className="text-lg font-bold sm:text-xl">{addressForm.id ? 'Edit delivery address' : 'Add a delivery address'}</h3>
+                <button type="button" onClick={() => setAddressForm(null)} aria-label="Close address form" className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl border border-[#C9D1C6] bg-white text-[#202421]"><X size={18} aria-hidden="true" /></button>
               </div>
-
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="mt-3 grid gap-3 sm:mt-5 sm:gap-4 sm:grid-cols-2">
+                {[
+                  ['recipientName', 'Recipient name', true],
+                  ['phone', 'Recipient phone', true],
+                ].map(([key, label, required]) => (
+                  <div key={key}>
+                    <label htmlFor={`address-${key}`} className="mb-1 block text-[14px] font-semibold sm:mb-1.5">{label}</label>
+                    <input id={`address-${key}`} value={addressForm[key]} onChange={(event) => updateAddressField(key, event.target.value)} required={required} inputMode={key === 'phone' ? 'tel' : undefined} className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#CED6CB] bg-white px-4 text-[15px]" />
+                  </div>
+                ))}
                 <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Recipient name
-                  </label>
-                  <input
-                    value={addressForm.recipientName}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'recipientName',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Recipient phone
-                  </label>
-                  <input
-                    value={addressForm.phone}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'phone',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                    inputMode="tel"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Label
-                  </label>
-                  <select
-                    value={addressForm.label}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'label',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                  >
-                    {ADDRESS_LABELS.map(
-                      (
-                        label,
-                      ) => (
-                        <option
-                          key={label}
-                          value={label}
-                        >
-                          {label.charAt(0).toUpperCase() +
-                            label.slice(1)}
-                        </option>
-                      ),
-                    )}
+                  <label htmlFor="address-label" className="mb-1 block text-[14px] font-semibold sm:mb-1.5">Address type</label>
+                  <select id="address-label" value={addressForm.label} onChange={(event) => updateAddressField('label', event.target.value)} className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#CED6CB] bg-white px-4 text-[15px]">
+                    {ADDRESS_LABELS.map((label) => <option key={label} value={label}>{label.charAt(0).toUpperCase() + label.slice(1)}</option>)}
                   </select>
                 </div>
-
-                {addressForm.label === 'other' ? (
+                {addressForm.label === 'other' && (
                   <div>
-                    <label className="mb-2 block text-sm font-bold text-stone-800">
-                      Custom label
-                    </label>
-                    <input
-                      value={addressForm.customLabel}
-                      onChange={(event) =>
-                        updateAddressField(
-                          'customLabel',
-                          event.target.value,
-                        )
-                      }
-                      className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                      required
-                    />
+                    <label htmlFor="address-customLabel" className="mb-1 block text-[14px] font-semibold sm:mb-1.5">Custom label</label>
+                    <input id="address-customLabel" value={addressForm.customLabel} onChange={(event) => updateAddressField('customLabel', event.target.value)} required className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#CED6CB] bg-white px-4 text-[15px]" />
                   </div>
-                ) : null}
-
+                )}
+                {[
+                  ['addressLine1', 'House / building / street', true],
+                  ['addressLine2', 'Apartment / floor (optional)', false],
+                  ['area', 'Area or locality', true],
+                  ['landmark', 'Nearby landmark (optional)', false],
+                  ['city', 'City', true],
+                  ['state', 'State', true],
+                  ['postalCode', 'Pincode', true],
+                  ['country', 'Country', true],
+                ].map(([key, label, required]) => (
+                  <div key={key} className={key === 'addressLine1' || key === 'addressLine2' ? 'sm:col-span-2' : ''}>
+                    <label htmlFor={`address-${key}`} className="mb-1 block text-[14px] font-semibold sm:mb-1.5">{label}</label>
+                    <input id={`address-${key}`} value={addressForm[key]} onChange={(event) => updateAddressField(key, event.target.value)} required={required} inputMode={key === 'postalCode' ? 'numeric' : undefined} maxLength={key === 'postalCode' ? 6 : undefined} className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#CED6CB] bg-white px-4 text-[15px]" />
+                  </div>
+                ))}
                 <div className="sm:col-span-2">
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Address line 1
-                  </label>
-                  <input
-                    value={addressForm.addressLine1}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'addressLine1',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Address line 2
-                  </label>
-                  <input
-                    value={addressForm.addressLine2}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'addressLine2',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Area / locality
-                  </label>
-                  <input
-                    value={addressForm.area}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'area',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Landmark
-                  </label>
-                  <input
-                    value={addressForm.landmark}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'landmark',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    City
-                  </label>
-                  <input
-                    value={addressForm.city}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'city',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    State
-                  </label>
-                  <input
-                    value={addressForm.state}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'state',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Pincode
-                  </label>
-                  <input
-                    value={addressForm.postalCode}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'postalCode',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                    inputMode="numeric"
-                    maxLength={6}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Country
-                  </label>
-                  <input
-                    value={addressForm.country}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'country',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                    required
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="mb-2 block text-sm font-bold text-stone-800">
-                    Delivery instructions
-                  </label>
-                  <textarea
-                    value={addressForm.deliveryInstructions}
-                    onChange={(event) =>
-                      updateAddressField(
-                        'deliveryInstructions',
-                        event.target.value,
-                      )
-                    }
-                    className="focus-ring min-h-24 w-full resize-y rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold"
-                    maxLength={240}
-                  />
+                  <label htmlFor="address-deliveryInstructions" className="mb-1 block text-[14px] font-semibold sm:mb-1.5">Delivery instructions (optional)</label>
+                  <textarea id="address-deliveryInstructions" rows={3} value={addressForm.deliveryInstructions} onChange={(event) => updateAddressField('deliveryInstructions', event.target.value)} maxLength={240} className="focus-ring w-full rounded-xl border border-[#CED6CB] bg-white px-4 py-3 text-[15px]" />
                 </div>
               </div>
-
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isSavingAddress}
-                  className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white disabled:opacity-50"
-                >
-                  {isSavingAddress ? (
-                    <LoaderCircle
-                      size={16}
-                      className="animate-spin"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Save
-                      size={16}
-                      aria-hidden="true"
-                    />
-                  )}
-                  {addressForm.id
-                    ? 'Save address'
-                    : 'Add address'}
+              <div className="mt-3 flex justify-end sm:mt-5">
+                <button type="submit" disabled={isSavingAddress} className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 text-[14px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:w-auto sm:justify-start sm:px-5">
+                  {isSavingAddress ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
+                  {addressForm.id ? 'Save address' : 'Add address'}
                 </button>
               </div>
             </form>
-          ) : null}
-
-        </section>
-
-
-        {/* =========================================================
-            FOOD PREFERENCES
-        ========================================================= */}
-
-        <section className="mt-4 rounded-[1.5rem] border border-amber-100 bg-gradient-to-br from-amber-50/70 via-white to-emerald-50/50 p-3.5 shadow-lg shadow-amber-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl sm:shadow-stone-900/5">
-
-          <div className="flex items-center gap-3 sm:items-start sm:gap-4">
-
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 sm:size-11 sm:rounded-2xl sm:bg-emerald-100 sm:text-emerald-700">
-
-              <SlidersHorizontal
-                size={21}
-                aria-hidden="true"
-              />
-
-            </div>
-
-            <div>
-
-              <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
-                Food preferences
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 text-stone-500">
-                Explicit preferences EPANTRY can use when personalization is enabled.
-              </p>
-
-            </div>
-
-          </div>
-
-
-          <form
-            onSubmit={
-              handlePreferencesSave
-            }
-            className="mt-4 space-y-5 sm:mt-8 sm:space-y-8"
-          >
-
-
-            {/* DIET */}
-
-            <fieldset>
-
-              <legend className="text-sm font-black text-stone-900">
-                Dietary preferences
-              </legend>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-
-                {DIETARY_OPTIONS.map(
-                  (
-                    option,
-                  ) => {
-                    const selected =
-                      preferenceForm
-                        .dietaryLifestyles
-                        .includes(
-                          option.value,
-                        )
-
-                    return (
-                      <label
-                        key={
-                          option.value
-                        }
-                        className={[
-                          'cursor-pointer',
-                          'rounded-full',
-                          'border',
-                          'px-2.5',
-                          'py-1.5',
-                          'text-[11px]',
-                          'sm:px-3',
-                          'sm:py-2',
-                          'sm:text-sm',
-                          'font-bold',
-                          'transition',
-
-                          selected
-                            ? 'border-emerald-300 bg-emerald-100 text-emerald-900'
-                            : 'border-stone-200 bg-white text-stone-600',
-                        ].join(
-                          ' ',
-                        )}
-                      >
-
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={
-                            selected
-                          }
-                          onChange={() =>
-                            togglePreferenceValue(
-                              'dietaryLifestyles',
-                              option.value,
-                            )
-                          }
-                        />
-
-                        {option.label}
-
-                      </label>
-                    )
-                  },
-                )}
-
-              </div>
-
-            </fieldset>
-
-
-            {/* ALLERGENS */}
-
-            <fieldset>
-
-              <legend className="text-sm font-black text-stone-900">
-                Allergens to avoid
-              </legend>
-
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                These are user-selected filtering preferences and are not a medical safety guarantee.
-              </p>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-
-                {ALLERGEN_OPTIONS.map(
-                  (
-                    option,
-                  ) => {
-                    const selected =
-                      preferenceForm
-                        .allergens
-                        .includes(
-                          option.value,
-                        )
-
-                    return (
-                      <label
-                        key={
-                          option.value
-                        }
-                        className={[
-                          'cursor-pointer',
-                          'rounded-full',
-                          'border',
-                          'px-2.5',
-                          'py-1.5',
-                          'text-[11px]',
-                          'sm:px-3',
-                          'sm:py-2',
-                          'sm:text-sm',
-                          'font-bold',
-
-                          selected
-                            ? 'border-amber-300 bg-amber-100 text-amber-950'
-                            : 'border-stone-200 bg-white text-stone-600',
-                        ].join(
-                          ' ',
-                        )}
-                      >
-
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={
-                            selected
-                          }
-                          onChange={() =>
-                            togglePreferenceValue(
-                              'allergens',
-                              option.value,
-                            )
-                          }
-                        />
-
-                        {option.label}
-
-                      </label>
-                    )
-                  },
-                )}
-
-              </div>
-
-            </fieldset>
-
-
-            {/* FREEFORM */}
-
-            <div className="grid gap-5 sm:grid-cols-2">
-
-              <div>
-
-                <label
-                  htmlFor="preferred-cuisines"
-                  className="mb-2 block text-sm font-bold text-stone-800"
-                >
-                  Preferred cuisines
-                </label>
-
-                <input
-                  id="preferred-cuisines"
-                  type="text"
-                  value={
-                    preferenceForm
-                      .preferredCuisines
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setPreferenceForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        preferredCuisines:
-                          event
-                            .target
-                            .value,
-                      }),
-                    )
-                  }
-                  className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 px-4 text-sm font-semibold"
-                  placeholder="Indian, Italian, Thai"
-                />
-
-                <p className="mt-2 text-xs text-stone-500">
-                  Separate values with commas.
-                </p>
-
-              </div>
-
-
-              <div>
-
-                <label
-                  htmlFor="disliked-ingredients"
-                  className="mb-2 block text-sm font-bold text-stone-800"
-                >
-                  Disliked ingredients
-                </label>
-
-                <input
-                  id="disliked-ingredients"
-                  type="text"
-                  value={
-                    preferenceForm
-                      .dislikedIngredients
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setPreferenceForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        dislikedIngredients:
-                          event
-                            .target
-                            .value,
-                      }),
-                    )
-                  }
-                  className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 px-4 text-sm font-semibold"
-                  placeholder="Olives, coriander"
-                />
-
-                <p className="mt-2 text-xs text-stone-500">
-                  Separate values with commas.
-                </p>
-
-              </div>
-
-            </div>
-
-
-            {/* DISPLAY */}
-
-            <div className="grid gap-5 sm:grid-cols-2">
-
-              <div>
-
-                <label
-                  htmlFor="measurement-system"
-                  className="mb-2 block text-sm font-bold text-stone-800"
-                >
-                  Measurement system
-                </label>
-
-                <select
-                  id="measurement-system"
-                  value={
-                    preferenceForm
-                      .measurementSystem
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setPreferenceForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        measurementSystem:
-                          event
-                            .target
-                            .value,
-                      }),
-                    )
-                  }
-                  className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                >
-
-                  <option value="metric">
-                    Metric
-                  </option>
-
-                  <option value="imperial">
-                    Imperial
-                  </option>
-
-                </select>
-
-              </div>
-
-
-              <div>
-
-                <label
-                  htmlFor="account-locale"
-                  className="mb-2 block text-sm font-bold text-stone-800"
-                >
-                  Locale
-                </label>
-
-                <select
-                  id="account-locale"
-                  value={
-                    preferenceForm
-                      .locale
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setPreferenceForm(
-                      (
-                        current,
-                      ) => ({
-                        ...current,
-
-                        locale:
-                          event
-                            .target
-                            .value,
-                      }),
-                    )
-                  }
-                  className="focus-ring min-h-12 w-full rounded-2xl border border-stone-200 bg-white px-4 text-sm font-semibold"
-                >
-
-                  {LOCALE_OPTIONS.map(
-                    (
-                      option,
-                    ) => (
-                      <option
-                        key={
-                          option.value
-                        }
-                        value={
-                          option.value
-                        }
-                      >
-                        {option.label}
-                      </option>
-                    ),
-                  )}
-
-                </select>
-
-              </div>
-
-            </div>
-
-
-            <div className="flex flex-wrap items-center gap-3">
-
-              <button
-                type="submit"
-                disabled={
-                  isSavingPreferences
-                }
-                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-stone-950 px-5 text-sm font-black text-white disabled:opacity-50"
-              >
-
-                {isSavingPreferences ? (
-                  <LoaderCircle
-                    size={17}
-                    className="animate-spin"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Save
-                    size={17}
-                    aria-hidden="true"
-                  />
-                )}
-
-                Save preferences
-
-              </button>
-
-              {preferenceMessage && (
-                <p className="text-sm font-bold text-emerald-700">
-                  {preferenceMessage}
-                </p>
-              )}
-
-            </div>
-
-          </form>
-
-        </section>
-
-
-        {/* =========================================================
-            HOUSEHOLD PERSONALIZATION CONTEXT
-        ========================================================= */}
-
-        <section className="mt-4 rounded-[1.5rem] border border-violet-100 bg-violet-50/50 p-3.5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-stone-50 sm:p-8">
-
-          <div className="flex items-start gap-4">
-
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-emerald-700">
-
-              <Home
-                size={21}
-                aria-hidden="true"
-              />
-
-            </div>
-
-            <div>
-
-              <h2 className="text-xl font-black text-stone-950">
-                Household personalization context
-              </h2>
-
-              {isLoadingHousehold ? (
-                <p className="mt-2 text-sm text-stone-500">
-                  Loading household context...
-                </p>
-              ) : hasHousehold ? (
-                <p className="mt-2 text-sm leading-6 text-stone-600">
-                  Your individual preferences can later be combined with{' '}
-                  <strong>
-                    {household.name}
-                  </strong>
-                  {' '}context for shared planning. This household usually represents{' '}
-                  <strong>
-                    {household.usualPeopleCount}
-                  </strong>
-                  {' '}people.
-                </p>
-              ) : (
-                <p className="mt-2 text-sm leading-6 text-stone-600">
-                  You currently have no household. EPANTRY can still retain your individual preferences; household personalization remains optional.
-                </p>
-              )}
-
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* =========================================================
-            CONSENT
-        ========================================================= */}
-
-        <section className="mt-4 rounded-[1.5rem] border border-violet-100 bg-gradient-to-br from-violet-50/70 via-white to-sky-50/60 p-3.5 shadow-lg shadow-violet-900/5 sm:mt-8 sm:rounded-[2rem] sm:border-stone-200 sm:bg-white sm:p-8 sm:shadow-xl sm:shadow-stone-900/5">
-
-          <div className="flex items-center gap-3 sm:items-start sm:gap-4">
-
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700 sm:size-11 sm:rounded-2xl sm:bg-emerald-100 sm:text-emerald-700">
-
-              <ShieldCheck
-                size={21}
-                aria-hidden="true"
-              />
-
-            </div>
-
-            <div>
-
-              <h2 className="text-[19px] font-black text-stone-950 sm:text-2xl">
-                Consent & privacy
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 text-stone-500">
-                Consent decisions are versioned and recorded as immutable audit events.
-              </p>
-
-            </div>
-
-          </div>
-
-
-          <div className="mt-4 grid gap-2.5 sm:mt-7 sm:gap-4">
-
-
-            {/* TERMS + PRIVACY */}
-
-            {[
-              'terms_of_service',
-              'privacy_policy',
-            ].map(
-              (
-                consentType,
-              ) => {
-                const item =
-                  consentByType.get(
-                    consentType,
-                  )
-
-                return (
-                  <div
-                    key={
-                      consentType
-                    }
-                    className="rounded-2xl border border-violet-100 bg-white/80 p-3.5 sm:border-stone-200 sm:bg-stone-50 sm:p-5"
-                  >
-
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-                      <div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-
-                          <p className="font-black text-stone-950">
-                            {formatConsentName(
-                              consentType,
-                            )}
-                          </p>
-
-                          <ConsentStatus
-                            granted={
-                              item?.granted ===
-                              true
-                            }
-                          />
-
-                        </div>
-
-                        <p className="mt-2 text-xs leading-5 text-stone-500">
-                          Current version:{' '}
-                          {item
-                            ?.currentVersion ||
-                            '—'}
-                        </p>
-
-                      </div>
-
-
-                      {!item?.granted && (
-                        <button
-                          type="button"
-                          disabled={
-                            activeConsentType ===
-                            consentType
-                          }
-                          onClick={() =>
-                            handleConsentDecision(
-                              consentType,
-                              'granted',
-                            )
-                          }
-                          className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 text-xs font-black text-white disabled:opacity-50"
-                        >
-
-                          {activeConsentType ===
-                          consentType ? (
-                            <LoaderCircle
-                              size={15}
-                              className="animate-spin"
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <Check
-                              size={15}
-                              aria-hidden="true"
-                            />
-                          )}
-
-                          Accept current version
-
-                        </button>
-                      )}
-
-                    </div>
-
-                  </div>
-                )
-              },
-            )}
-
-
-            {/* OPTIONAL CONSENTS */}
-
-            {[
-              'marketing_email',
-              'personalization',
-            ].map(
-              (
-                consentType,
-              ) => {
-                const item =
-                  consentByType.get(
-                    consentType,
-                  )
-
-                const enabled =
-                  item?.granted ===
-                  true
-
-                const isPersonalization =
-                  consentType ===
-                  'personalization'
-
-                return (
-                  <div
-                    key={
-                      consentType
-                    }
-                    className="rounded-2xl border border-violet-100 bg-white/80 p-3.5 sm:border-stone-200 sm:bg-stone-50 sm:p-5"
-                  >
-
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-                      <div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-
-                          <p className="font-black text-stone-950">
-                            {formatConsentName(
-                              consentType,
-                            )}
-                          </p>
-
-                          <ConsentStatus
-                            granted={
-                              enabled
-                            }
-                          />
-
-                        </div>
-
-                        <p className="mt-2 max-w-2xl text-xs leading-5 text-stone-500">
-
-                          {isPersonalization
-                            ? 'Allows EPANTRY recommendation features to actively use your saved preferences and available household context.'
-                            : 'Allows EPANTRY to send optional promotional and marketing email communication.'}
-
-                        </p>
-
-                        {isPersonalization && (
-                          <p className="mt-2 text-xs font-bold text-stone-600">
-                            Runtime preference:{' '}
-                            {preferenceForm
-                              .personalizationEnabled
-                              ? 'Enabled'
-                              : 'Disabled'}
-                          </p>
-                        )}
-
-                      </div>
-
-
-                      <button
-                        type="button"
-                        disabled={
-                          activeConsentType ===
-                          consentType
-                        }
-                        onClick={() =>
-                          handleConsentDecision(
-                            consentType,
-
-                            enabled
-                              ? 'revoked'
-                              : 'granted',
-                          )
-                        }
-                        className={[
-                          'focus-ring',
-                          'inline-flex',
-                          'min-h-10',
-                          'items-center',
-                          'justify-center',
-                          'rounded-xl',
-                          'px-4',
-                          'text-xs',
-                          'font-black',
-                          'disabled:opacity-50',
-
-                          enabled
-                            ? 'border border-stone-300 bg-white text-stone-700'
-                            : 'bg-emerald-700 text-white',
-                        ].join(
-                          ' ',
-                        )}
-                      >
-
-                        {activeConsentType ===
-                        consentType ? (
-                          <LoaderCircle
-                            size={15}
-                            className="animate-spin"
-                            aria-hidden="true"
-                          />
-                        ) : enabled ? (
-                          'Disable'
-                        ) : (
-                          'Enable'
-                        )}
-
-                      </button>
-
-                    </div>
-
-                  </div>
-                )
-              },
-            )}
-
-          </div>
-
-
-          {consents &&
-            !consents
-              .requiredConsentsSatisfied && (
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-900">
-              One or more current required legal consent versions still need acceptance.
-            </div>
           )}
-
         </section>
 
+        {/* Food preferences use existing preference form state and API. */}
+        <section aria-labelledby="preferences-heading" className="border-t border-[#D7DDCF] py-4 sm:py-9">
+          <div className="mb-3 flex items-center gap-2 sm:mb-5 sm:gap-3">
+            <span className="text-[14px] font-bold text-[#C86C42]">03</span>
+            <h2 id="preferences-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]">Food preferences</h2>
+          </div>
+          <form onSubmit={handlePreferencesSave} className="min-w-0 overflow-hidden rounded-[12px] border border-[#D7DDCF] bg-[#E5EADB] sm:rounded-[18px]">
+            <div className="grid lg:grid-cols-2">
+              <div className="p-3 sm:p-7">
+                <p className="mb-3 max-w-lg text-[14px] leading-5 text-[#43594A] sm:mb-5 sm:leading-6"><span className="sm:hidden">Choose your food preferences below.</span><span className="hidden sm:inline">Tell us what you like to eat, and which ingredients you'd prefer to avoid.</span></p>
+                <fieldset>
+                  <legend className="text-[17px] font-bold">How do you eat?</legend>
+                  <p className="hidden text-[13px] leading-5 text-[#536557] sm:mt-1 sm:block">Choose any dietary preferences that fit you.</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
+                    {DIETARY_OPTIONS.map((option) => {
+                      const selected = preferenceForm.dietaryLifestyles.includes(option.value)
+                      return (
+                        <label key={option.value} className={`focus-within:ring-2 focus-within:ring-[#173F35] inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-2.5 py-1.5 text-[14px] font-medium transition sm:px-3 sm:py-2 ${selected ? 'border-[#173F35] bg-[#173F35] text-white' : 'border-[#C9D4C6] bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}>
+                          <input type="checkbox" className="sr-only" checked={selected} onChange={() => togglePreferenceValue('dietaryLifestyles', option.value)} />
+                          {option.label}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </fieldset>
+                <div className="my-4 h-px bg-[#C4D0C1] sm:my-6" />
+                <fieldset>
+                  <legend className="text-[17px] font-bold">Ingredients to avoid</legend>
+                  <p className="mt-1 max-w-lg text-[13px] leading-5 text-[#536557]"><span className="sm:hidden">Flag allergens; always check product labels for safety.</span><span className="hidden sm:inline">Select allergens you want flagged. Always check packaging and ingredient information for safety.</span></p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
+                    {ALLERGEN_OPTIONS.map((option) => {
+                      const selected = preferenceForm.allergens.includes(option.value)
+                      return (
+                        <label key={option.value} className={`focus-within:ring-2 focus-within:ring-[#173F35] inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-2.5 py-1.5 text-[14px] font-medium transition sm:px-3 sm:py-2 ${selected ? 'border-[#C86C42] bg-[#F7E3D7] text-[#813D23]' : 'border-[#C9D4C6] bg-[#F7F6F2] text-[#202421] hover:border-[#C86C42]'}`}>
+                          <input type="checkbox" className="sr-only" checked={selected} onChange={() => togglePreferenceValue('allergens', option.value)} />
+                          {option.label}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </fieldset>
+              </div>
+              <div className="border-t border-[#C9D3C5] bg-[#FEFDF9] p-3 sm:p-7 lg:border-l lg:border-t-0">
+                <h3 className="text-[17px] font-bold">Make it yours</h3>
+                <p className="hidden text-[14px] leading-6 text-[#647067] sm:mt-1 sm:block">Set your favorite cuisines and how measurements appear.</p>
+                <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
+                  <div>
+                    <label htmlFor="preferred-cuisines" className="mb-1 block text-[14px] font-semibold sm:mb-2">Favorite cuisines</label>
+                    <input id="preferred-cuisines" type="text" value={preferenceForm.preferredCuisines} onChange={(event) => setPreferenceForm((current) => ({ ...current, preferredCuisines: event.target.value }))} placeholder="Indian, Italian, Thai" className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-[15px]" />
+                    <p className="mt-1 text-[13px] text-[#647067] sm:mt-1.5"><span className="sm:hidden">Separate with commas.</span><span className="hidden sm:inline">Separate multiple cuisines with commas.</span></p>
+                  </div>
+                  <div>
+                    <label htmlFor="disliked-ingredients" className="mb-1 block text-[14px] font-semibold sm:mb-2">Ingredients you dislike</label>
+                    <input id="disliked-ingredients" type="text" value={preferenceForm.dislikedIngredients} onChange={(event) => setPreferenceForm((current) => ({ ...current, dislikedIngredients: event.target.value }))} placeholder="Olives, coriander" className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-[15px]" />
+                    <p className="mt-1 text-[13px] text-[#647067] sm:mt-1.5"><span className="sm:hidden">Separate with commas.</span><span className="hidden sm:inline">Separate multiple ingredients with commas.</span></p>
+                  </div>
+                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-4">
+                    <div>
+                      <label htmlFor="measurement-system" className="mb-1 block text-[14px] font-semibold sm:mb-2">Measurements</label>
+                      <select id="measurement-system" value={preferenceForm.measurementSystem} onChange={(event) => setPreferenceForm((current) => ({ ...current, measurementSystem: event.target.value }))} className="focus-ring min-h-11 min-w-0 w-full rounded-xl border border-[#D8DDD4] bg-white px-2 text-[14px] sm:min-h-12 sm:px-3 sm:text-[15px]">
+                        <option value="metric">Metric</option><option value="imperial">Imperial</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="account-locale" className="mb-1 block text-[14px] font-semibold sm:mb-2">Language & region</label>
+                      <select id="account-locale" value={preferenceForm.locale} onChange={(event) => setPreferenceForm((current) => ({ ...current, locale: event.target.value }))} className="focus-ring min-h-11 min-w-0 w-full rounded-xl border border-[#D8DDD4] bg-white px-2 text-[14px] sm:min-h-12 sm:px-3 sm:text-[15px]">
+                        {LOCALE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-[#C9D3C5] bg-[#F7F6F2] px-3 py-3 sm:gap-3 sm:px-7 sm:py-4">
+              <button type="submit" disabled={isSavingPreferences} className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 text-[14px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:w-auto sm:justify-start sm:px-5">
+                {isSavingPreferences ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
+                Save food preferences
+              </button>
+              {preferenceMessage && <p role="status" className="text-sm font-semibold text-[#173F35]">{preferenceMessage}</p>}
+            </div>
+          </form>
+        </section>
+
+        {/* This is informational; it does not alter household membership. */}
+        <section aria-labelledby="household-heading" className="flex items-start gap-2 border-l-[4px] border-[#C86C42] bg-[#F4E8DF] px-3 py-3 sm:gap-5 sm:px-7 sm:py-5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-[#A85430] sm:size-10"><Home size={20} aria-hidden="true" /></span>
+          <div>
+            <h2 id="household-heading" className="text-[17px] font-bold sm:text-[19px]">Your household</h2>
+            {isLoadingHousehold ? (
+              <p className="mt-0.5 text-[14px] leading-5 text-[#63584E] sm:mt-1 sm:leading-6">Loading household details...</p>
+            ) : hasHousehold ? (
+              <p className="mt-0.5 text-[14px] leading-5 text-[#63584E] sm:mt-1 sm:leading-6"><span className="sm:hidden">Shared meal plans: <strong className="text-[#202421]">{household.name}</strong> · <strong className="text-[#202421]">{household.usualPeopleCount}</strong> people.</span><span className="hidden sm:inline">Your food preferences are yours. For shared meal planning, EPANTRY can also consider your household <strong className="text-[#202421]">{household.name}</strong>, which usually includes <strong className="text-[#202421]">{household.usualPeopleCount}</strong> people.</span></p>
+            ) : (
+              <p className="mt-0.5 text-[14px] leading-5 text-[#63584E] sm:mt-1 sm:leading-6"><span className="sm:hidden">No household yet. Your food choices still work.</span><span className="hidden sm:inline">You haven't created a household. You can still save your personal food preferences.</span></p>
+            )}
+          </div>
+        </section>
+
+        {/* Consent buttons preserve required/optional decision semantics. */}
+        <section aria-labelledby="consent-heading" className="py-4 sm:py-10">
+          <div className="mb-3 flex items-center gap-2 sm:mb-5 sm:gap-3">
+            <span className="text-[14px] font-bold text-[#C86C42]">04</span>
+            <h2 id="consent-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]">Privacy & permissions</h2>
+          </div>
+          <p className="mb-3 max-w-3xl text-[14px] leading-5 text-[#647067] sm:mb-6 sm:leading-6"><span className="sm:hidden">Review policy approvals and optional settings.</span><span className="hidden sm:inline">Review the policies you've accepted and choose whether we can send marketing emails or personalize recommendations.</span></p>
+          <div className="border-t border-[#D7DDCF]">
+            {['terms_of_service', 'privacy_policy'].map((consentType) => {
+              const item = consentByType.get(consentType)
+              return (
+                <div key={consentType} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[#D7DDCF] py-3 sm:grid-cols-1 sm:items-stretch sm:gap-4 sm:py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
+                      <h3 className="text-[15px] font-bold leading-5 sm:text-[16px]">{formatConsentName(consentType)}</h3>
+                      <ConsentStatus granted={item?.granted === true} />
+                    </div>
+                    <p className="mt-1 text-[13px] leading-5 text-[#647067] sm:mt-1.5 sm:text-[14px] sm:leading-6">
+                      <span className="sm:hidden">{consentType === 'terms_of_service' ? 'Using EPANTRY.' : 'How your data is used.'} {item?.currentVersion ? `Version: ${item.currentVersion}` : ''}</span>
+                      <span className="hidden sm:inline">{consentType === 'terms_of_service' ? 'The terms for using EPANTRY.' : 'How we handle your personal information.'} {item?.currentVersion ? `Current version: ${item.currentVersion}` : ''}</span></p>
+                  </div>
+                  {!item?.granted && (
+                    <button type="button" disabled={activeConsentType === consentType} onClick={() => handleConsentDecision(consentType, 'granted')} className="focus-ring inline-flex min-h-11 w-fit shrink-0 items-center justify-center gap-1 rounded-xl bg-[#173F35] px-3 text-[13px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:gap-2 sm:px-5 sm:text-[14px]">
+                      {activeConsentType === consentType ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Check size={17} aria-hidden="true" />}
+                      <span className="sm:hidden">Accept</span><span className="hidden sm:inline">Accept current version</span>
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+            {['marketing_email', 'personalization'].map((consentType) => {
+              const item = consentByType.get(consentType)
+              const enabled = item?.granted === true
+              const isPersonalization = consentType === 'personalization'
+              return (
+                <div key={consentType} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[#D7DDCF] py-3 sm:grid-cols-1 sm:items-stretch sm:gap-4 sm:py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
+                      <h3 className="text-[15px] font-bold leading-5 sm:text-[16px]"><span className="sm:hidden">{isPersonalization ? 'Personalization' : 'Marketing emails'}</span><span className="hidden sm:inline">{isPersonalization ? 'Personalized recommendations' : 'Marketing emails'}</span></h3>
+                      <ConsentStatus granted={enabled} optional />
+                    </div>
+                    <p className="mt-1 max-w-3xl text-[13px] leading-5 text-[#647067] sm:mt-1.5 sm:text-[14px] sm:leading-6">
+                      <span className="sm:hidden">{isPersonalization ? 'Use food choices for better suggestions.' : 'Get occasional offers by email.'}</span>
+                      <span className="hidden sm:inline">{isPersonalization ? 'Let EPANTRY use your saved food preferences and available household details to suggest more relevant meals and products.' : 'Receive optional news, offers and promotional emails from EPANTRY.'}</span></p>
+                    {isPersonalization && <p className="mt-1 text-[13px] font-medium text-[#56675A] sm:mt-1.5">Recommendations based on your preferences: {preferenceForm.personalizationEnabled ? 'On' : 'Off'}</p>}
+                  </div>
+                  <button type="button" disabled={activeConsentType === consentType} onClick={() => handleConsentDecision(consentType, enabled ? 'revoked' : 'granted')} className={`focus-ring inline-flex min-h-11 w-fit min-w-[74px] shrink-0 items-center justify-center rounded-xl px-3 text-[13px] font-semibold transition disabled:opacity-50 sm:min-w-[100px] sm:px-5 sm:text-[14px] ${enabled ? 'border border-[#C86C42] bg-[#FFF7F2] text-[#A85430] hover:bg-[#F7E3D7]' : 'bg-[#173F35] text-white hover:bg-[#27634E]'}`}>
+                    {activeConsentType === consentType ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : enabled ? 'Disable' : 'Enable'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          {consents && !consents.requiredConsentsSatisfied && (
+            <div role="status" className="mt-3 border-l-4 border-[#C86C42] bg-[#F9EBDD] px-3 py-2 text-[14px] font-medium leading-5 text-[#754523] sm:mt-5 sm:px-4 sm:py-3 sm:leading-6"><span className="sm:hidden">Accept the latest Terms and Privacy Policy to finish setup.</span><span className="hidden sm:inline">Please accept the current Terms of Service and Privacy Policy to finish your account setup.</span></div>
+          )}
+        </section>
       </div>
     </main>
   )

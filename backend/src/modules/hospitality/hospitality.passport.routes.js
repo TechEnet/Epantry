@@ -25,6 +25,7 @@ import {
 
 import {
   requireHostAccess,
+  requireHospitalityWorkspaceAccess,
 } from '../auth/authorization.middleware.js'
 
 import {
@@ -240,6 +241,7 @@ privateRouter.use(
   loadCurrentUser,
   requireActiveAccount,
   requireHostAccess,
+  requireHospitalityWorkspaceAccess,
   requireMfaAssurance,
 )
 

@@ -18,6 +18,7 @@ import EmptyState from '../../../components/common/EmptyState'
 import { openAvailabilityNotifyModal } from '../../notifications/components/AvailabilityNotifyModal'
 import { recordCustomerSearchDemand } from '../../search/services/search.service'
 import useGroceryCatalog from '../hooks/useGroceryCatalog'
+import { listPublicHostListings } from '../../host/services/hostUnifiedListing.service'
 
 const INITIAL_BATCH = 24
 const DESKTOP_REVEAL = 12
@@ -108,6 +109,13 @@ function AdaptiveSelect({ label, value, options, onChange, disabled = false }) {
 }
 
 export default function GroceryPage() {
+  const [hostGroceryListings, setHostGroceryListings] = useState([])
+  useEffect(() => {
+    let mounted = true
+    listPublicHostListings('grocery').then((data) => { if (mounted) setHostGroceryListings(data?.listings || []) })
+      .catch(() => { if (mounted) setHostGroceryListings([]) })
+    return () => { mounted = false }
+  }, [])
   const [searchParams] = useSearchParams()
   const initialQuery = searchParams.get('q') || ''
   const {
@@ -354,6 +362,10 @@ export default function GroceryPage() {
             </label>
           </form>
 
+          {hostGroceryListings.length > 0 && !categorySlug && !brandSlug && !search && <section className="mt-6 border-y border-[#D7DDCF] py-4" aria-label="Approved Host grocery submissions">
+            <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">Recently approved Host groceries</h3><Link to="/explore/host-listings?category=grocery" className="text-sm font-semibold text-[#173F35] underline">View all</Link></div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{hostGroceryListings.slice(0, 4).map((item) => <Link key={item.id} to={`/explore/host-listings?category=grocery&item=${encodeURIComponent(item.id)}`} className="overflow-hidden border border-[#D7DDCF] bg-white hover:border-[#173F35]">{item.images?.[0] && <img src={item.images[0]} alt="" className="aspect-[4/3] w-full object-cover"/>}<div className="p-3"><p className="text-sm font-semibold text-[#C86C42]">Host-approved submission</p><h4 className="mt-1 text-base font-semibold">{item.title}</h4><p className="mt-1 text-xs text-[#526257]">Not yet a verified marketplace offer</p></div></Link>)}</div>
+          </section>}
           {error && <div role="alert" className="mt-5 rounded-[12px] border border-[#C86C42] bg-[#F7F6F2] p-4 text-sm text-[#202421]"><CircleAlert size={18} aria-hidden="true" className="mr-2 inline" />{error}</div>}
           {loading && products.length === 0 ? (
             <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-5" role="status" aria-label="Loading groceries">

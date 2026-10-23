@@ -1,969 +1,469 @@
-import {
-  useEffect,
-  useState,
-} from 'react'
-
-import {
-  Link,
-  useNavigate,
-} from 'react-router-dom'
-
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   ChefHat,
   CookingPot,
   Search,
   ShoppingBasket,
-  Sparkles,
 } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useQuery } from '@tanstack/react-query'
 
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-} from 'motion/react'
+import { useAuth } from '../../auth/context/AuthContext'
+import { listOrders } from '../../commerce/services/commerce.service'
+import { listPublicRecipes } from '../../recipes/services/recipe.service'
+import { RECIPE_VIEWED_EVENT, getRecentRecipeViews } from '../../recipes/utils/recipeEngagement'
+import { apiClient } from '../../../api/apiClient'
+import { normalizeRecipeSources, selectHeroRecipes } from '../utils/heroRecipeSelection'
 
-import {
-  landingHero,
-} from '../content/landingContent'
-
-const SLIDE_INTERVAL_MS =
-  5000
-
-const WORD_REVEAL_INTERVAL_MS =
-  125
-
-const WORD_REVEAL_TRANSITION = Object.freeze({
-  duration: 0.38,
-  ease: [0.22, 1, 0.36, 1],
-})
-
-const MESSAGE_HOLD_MS =
-  2600
-
-const INTERACTIVE_MESSAGE_HOLD_MS =
-  9000
-
-const LANDING_COOK_QUERY_KEY =
-  'epantry-cook-today-landing-input'
+import { landingHero } from '../content/landingContent'
+import { useLandingFeaturedQuery } from '../hooks/useLandingFeaturedQuery'
 
 /*
-|--------------------------------------------------------------------------
-| Desktop Hero Images
-|--------------------------------------------------------------------------
-*/
-
+ * Hero photography: five optimized WebP files per breakpoint.
+ * Desktop files: frontend/public/hero/1.webp ... 5.webp
+ * Mobile files:  frontend/public/hero/1.1.webp ... 1.5.webp
+ * Keep the matching desktop/mobile scene in the same slide position.
+ */
 const desktopHeroSlides = [
-  '/hero/1.png',
-  '/hero/2.png',
-  '/hero/3.png',
-  '/hero/4.png',
-  '/hero/5.png',
-  '/hero/6.png',
-  '/hero/7.png',
-  '/hero/8.png',
-  '/hero/9.png',
+  '/hero/1.webp',
+  '/hero/2.webp',
+  '/hero/3.webp',
+  '/hero/4.webp',
+  '/hero/5.webp',
 ]
-
-/*
-|--------------------------------------------------------------------------
-| Mobile Hero Images
-|--------------------------------------------------------------------------
-*/
 
 const mobileHeroSlides = [
-  '/hero/1.1.png',
-  '/hero/1.2.png',
-  '/hero/1.3.png',
-  '/hero/1.4.png',
-  '/hero/1.5.png',
-  '/hero/1.6.png',
+  '/hero/1.1.webp',
+  '/hero/1.2.webp',
+  '/hero/1.3.webp',
+  '/hero/1.4.webp',
+  '/hero/1.5.webp',
 ]
 
-const heroMessages = [
-  {
-    id:
-      'connected-food',
-    lead:
-      'From food discovery',
-    accent:
-      'to cooking,',
-    tail:
-      'everything stays connected.',
-  },
-  {
-    id:
-      'understand-before-buying',
-    lead:
-      'Know what you are choosing',
-    accent:
-      'before it reaches your basket.',
-    tail:
-      '',
-  },
-  {
-    id:
-      'ingredients-to-dinner',
-    lead:
-      'Turn what you have',
-    accent:
-      'into something worth cooking.',
-    tail:
-      '',
-  },
-  {
-    id:
-      'cook-today',
-    lead:
-      'What do you want',
-    accent:
-      'to cook today?',
-    tail:
-      '',
-    interactive:
-      true,
-  },
-]
+const SLIDE_INTERVAL_MS = 5000
+const LANDING_COOK_QUERY_KEY = 'epantry-cook-today-landing-input'
 
-function splitWords(value) {
-  return String(
-    value ||
-      '',
+function useMobileHero() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 767px)').matches
+      : false,
   )
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-}
 
-function messageWordCount(
-  message,
-) {
-  return (
-    splitWords(
-      message?.lead,
-    ).length +
-    splitWords(
-      message?.accent,
-    ).length +
-    splitWords(
-      message?.tail,
-    ).length
-  )
-}
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const update = (event) => setIsMobile(event.matches)
 
-function WordSequence({
-  text,
-  startIndex,
-  revealedWordCount,
-  shouldReduceMotion,
-}) {
-  const words =
-    splitWords(
-      text,
-    )
+    setIsMobile(mediaQuery.matches)
 
-  return (
-    <>
-      {words.map(
-        (word, index) => {
-          const wordIndex =
-            startIndex +
-            index
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', update)
+      return () => mediaQuery.removeEventListener('change', update)
+    }
 
-          const isVisible =
-            shouldReduceMotion ||
-            revealedWordCount >
-              wordIndex
+    mediaQuery.addListener(update)
+    return () => mediaQuery.removeListener(update)
+  }, [])
 
-          return (
-            <motion.span
-              key={`${word}-${wordIndex}`}
-              aria-hidden="true"
-              initial={false}
-              animate={
-                isVisible
-                  ? {
-                      opacity: 1,
-                      y: 0,
-                      filter:
-                        'blur(0px)',
-                    }
-                  : {
-                      opacity: 0,
-                      y: 3,
-                      filter:
-                        'blur(2px)',
-                    }
-              }
-              transition={
-                shouldReduceMotion
-                  ? {
-                      duration: 0,
-                    }
-                  : WORD_REVEAL_TRANSITION
-              }
-              className={[
-                'inline-block will-change-[opacity,transform,filter]',
-                index <
-                words.length - 1
-                  ? 'mr-[0.24em]'
-                  : '',
-              ].join(' ')}
-            >
-              <span className="inline-block whitespace-nowrap">{word}</span>
-            </motion.span>
-          )
-        },
-      )}
-    </>
-  )
+  return isMobile
 }
 
 export default function HeroSection() {
-  const shouldReduceMotion =
-    useReducedMotion()
+  const navigate = useNavigate()
+  const shouldReduceMotion = useReducedMotion()
+  const isMobile = useMobileHero()
+  const [activeSlide, setActiveSlide] = useState(0)
+  const [cookInput, setCookInput] = useState('')
+  const [cookInputError, setCookInputError] = useState('')
 
-  const navigate =
-    useNavigate()
+  const { user, isAuthenticated, customerEnabled, isBootstrapping } = useAuth()
+  const accountId = isAuthenticated ? String(user?.id || user?._id || user?.uid || '') : ''
+  const [recentViews, setRecentViews] = useState([])
 
-  const [
-    activeSlide,
-    setActiveSlide,
-  ] = useState(0)
-
-  const [
-    activeMessage,
-    setActiveMessage,
-  ] = useState(0)
-
-  const [
-    revealedWordCount,
-    setRevealedWordCount,
-  ] = useState(0)
-
-  const [
-    cookInput,
-    setCookInput,
-  ] = useState('')
-
-  const [
-    cookInputFocused,
-    setCookInputFocused,
-  ] = useState(false)
-
-  const [
-    cookInputError,
-    setCookInputError,
-  ] = useState('')
-
-  const [
-    isMobileView,
-    setIsMobileView,
-  ] = useState(() => {
-    if (
-      typeof window ===
-      'undefined'
-    ) {
-      return false
+  // Observe real Recipe Detail visits. History stays separate per signed-in
+  // account (and separate from anonymous browsing on a shared computer).
+  useEffect(() => {
+    if (isBootstrapping) return undefined
+    const refresh = () => setRecentViews(getRecentRecipeViews(accountId))
+    refresh()
+    window.addEventListener(RECIPE_VIEWED_EVENT, refresh)
+    window.addEventListener('storage', refresh)
+    return () => {
+      window.removeEventListener(RECIPE_VIEWED_EVENT, refresh)
+      window.removeEventListener('storage', refresh)
     }
+  }, [accountId, isBootstrapping])
 
-    return window.matchMedia(
-      '(max-width: 767px)',
-    ).matches
+  const { data: featuredData, isLoading: featuredLoading } = useLandingFeaturedQuery()
+  const { data: publicData, isLoading: publicLoading } = useQuery({
+    queryKey: ['landing', 'hero', 'published-recipes'],
+    queryFn: () => listPublicRecipes({ page: 1, limit: 50 }),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   })
 
-  /*
-  |--------------------------------------------------------------------------
-  | Mobile / Desktop Images
-  |--------------------------------------------------------------------------
-  */
+  // M3 public listing packets become visible here only AFTER approval.
+  // The endpoint may not yet exist in older deployments; keep the working
+  // canonical public recipes visible when that optional API returns 404.
+  const { data: approvedData } = useQuery({
+    queryKey: ['landing', 'hero', 'approved-food-listings'],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get('/public/host-listings')
+        return response?.data?.data || { listings: [] }
+      } catch (error) {
+        if (error?.response?.status === 404) return { listings: [] }
+        throw error
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+
+  // Paid orders only. Grocery ingredient purchases are not labeled as
+  // a recipe order unless the ordered item name exactly matches a live
+  // published recipe / approved prepared-food listing.
+  const { data: orderData } = useQuery({
+    queryKey: ['landing', 'hero', 'paid-order-recipe-matches', accountId],
+    queryFn: () => listOrders({ page: 1, limit: 30 }),
+    enabled: !isBootstrapping && isAuthenticated && customerEnabled === true && Boolean(accountId),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: false,
+  })
+
+  const featuredRecipes = Array.isArray(featuredData?.recipes) ? featuredData.recipes : []
+  const catalog = useMemo(() => normalizeRecipeSources({
+    publicRecipes: Array.isArray(publicData?.recipes) ? publicData.recipes : [],
+    featuredRecipes,
+    hostListings: Array.isArray(approvedData?.listings) ? approvedData.listings : [],
+  }), [publicData, featuredData, approvedData])
+  const personalizedRecipes = useMemo(() => selectHeroRecipes({
+    catalog,
+    orders: Array.isArray(orderData?.orders) ? orderData.orders : [],
+    recentViews,
+    maxItems: 9,
+  }), [catalog, orderData, recentViews])
+  const recipesLoading = (featuredLoading || publicLoading) && !personalizedRecipes.length
+
+  const heroSlides = isMobile ? mobileHeroSlides : desktopHeroSlides
+  const currentSlide = heroSlides[activeSlide % heroSlides.length]
 
   useEffect(() => {
-    const mediaQuery =
-      window.matchMedia(
-        '(max-width: 767px)',
-      )
+    if (shouldReduceMotion || heroSlides.length < 2) return undefined
 
-    const handleChange = (
-      event,
-    ) => {
-      setIsMobileView(
-        event.matches,
-      )
-    }
+    const interval = window.setInterval(() => {
+      setActiveSlide((current) => (current + 1) % heroSlides.length)
+    }, SLIDE_INTERVAL_MS)
 
-    setIsMobileView(
-      mediaQuery.matches,
-    )
+    return () => window.clearInterval(interval)
+  }, [heroSlides.length, shouldReduceMotion])
 
-    mediaQuery.addEventListener(
-      'change',
-      handleChange,
-    )
-
-    return () => {
-      mediaQuery.removeEventListener(
-        'change',
-        handleChange,
-      )
-    }
-  }, [])
-
-  const heroSlides =
-    isMobileView
-      ? mobileHeroSlides
-      : desktopHeroSlides
-
-  /*
-  |--------------------------------------------------------------------------
-  | Background Slider
-  |--------------------------------------------------------------------------
-  */
-
-  useEffect(() => {
-    if (shouldReduceMotion) {
-      return undefined
-    }
-
-    const intervalId =
-      window.setInterval(
-        () => {
-          setActiveSlide(
-            (currentSlide) =>
-              (
-                currentSlide +
-                1
-              ) %
-              heroSlides.length,
-          )
-        },
-        SLIDE_INTERVAL_MS,
-      )
-
-    return () =>
-      window.clearInterval(
-        intervalId,
-      )
-  }, [
-    shouldReduceMotion,
-    heroSlides.length,
-  ])
-
-  /*
-  |--------------------------------------------------------------------------
-  | Hero Message Word Reveal
-  |--------------------------------------------------------------------------
-  */
-
-  useEffect(() => {
-    const message =
-      heroMessages[
-        activeMessage %
-          heroMessages.length
-      ]
-
-    const totalWords =
-      messageWordCount(
-        message,
-      )
-
-    if (
-      shouldReduceMotion ||
-      totalWords ===
-        0
-    ) {
-      setRevealedWordCount(
-        totalWords,
-      )
-      return undefined
-    }
-
-    let visibleWordCount =
-      1
-
-    setRevealedWordCount(
-      visibleWordCount,
-    )
-
-    const intervalId =
-      window.setInterval(
-        () => {
-          visibleWordCount +=
-            1
-
-          setRevealedWordCount(
-            Math.min(
-              visibleWordCount,
-              totalWords,
-            ),
-          )
-
-          if (
-            visibleWordCount >=
-            totalWords
-          ) {
-            window.clearInterval(
-              intervalId,
-            )
-          }
-        },
-        WORD_REVEAL_INTERVAL_MS,
-      )
-
-    return () =>
-      window.clearInterval(
-        intervalId,
-      )
-  }, [
-    activeMessage,
-    shouldReduceMotion,
-  ])
-
-  /*
-  |--------------------------------------------------------------------------
-  | Hero Message Rotation
-  |--------------------------------------------------------------------------
-  */
-
-  useEffect(() => {
-    const message =
-      heroMessages[
-        activeMessage %
-          heroMessages.length
-      ]
-
-    const totalWords =
-      messageWordCount(
-        message,
-      )
-
-    if (
-      shouldReduceMotion ||
-      revealedWordCount <
-        totalWords ||
-      (
-        message?.interactive &&
-        cookInputFocused
-      )
-    ) {
-      return undefined
-    }
-
-    const timeoutId =
-      window.setTimeout(
-        () => {
-          setActiveMessage(
-            (currentMessage) =>
-              (
-                currentMessage +
-                1
-              ) %
-              heroMessages.length,
-          )
-        },
-        message?.interactive
-          ? INTERACTIVE_MESSAGE_HOLD_MS
-          : MESSAGE_HOLD_MS,
-      )
-
-    return () =>
-      window.clearTimeout(
-        timeoutId,
-      )
-  }, [
-    activeMessage,
-    cookInputFocused,
-    revealedWordCount,
-    shouldReduceMotion,
-  ])
-
-  const currentSlide =
-    heroSlides[
-      activeSlide %
-        heroSlides.length
-    ]
-
-  const currentMessage =
-    heroMessages[
-      activeMessage %
-        heroMessages.length
-    ]
-
-  const leadWords =
-    splitWords(
-      currentMessage.lead,
-    )
-
-  const accentWords =
-    splitWords(
-      currentMessage.accent,
-    )
-
-  const tailWords =
-    splitWords(
-      currentMessage.tail,
-    )
-
-  const headlineWordCount =
-    leadWords.length +
-    accentWords.length +
-    tailWords.length
-
-  const totalCurrentMessageWords =
-    headlineWordCount
-
-  const messageComplete =
-    revealedWordCount >=
-    totalCurrentMessageWords
-
-  function handleCookTodaySubmit(
-    event,
-  ) {
+  const handleCookTodaySubmit = (event) => {
     event.preventDefault()
+    const query = cookInput.trim()
 
-    const normalizedInput =
-      cookInput.trim()
-
-    if (!normalizedInput) {
-      setCookInputError(
-        'Tell EPANTRY what you have or what you want to make.',
-      )
+    if (!query) {
+      setCookInputError('Enter a dish or ingredients to get started.')
       return
     }
 
     setCookInputError('')
-
     try {
-      window.sessionStorage.setItem(
-        LANDING_COOK_QUERY_KEY,
-        normalizedInput,
-      )
+      window.sessionStorage.setItem(LANDING_COOK_QUERY_KEY, query)
     } catch {
-      // Navigation state still carries the input if session storage is unavailable.
+      // Navigation state remains available when storage is disabled.
     }
 
-    navigate(
-      '/cook-today',
-      {
-        state: {
-          landingCookQuery:
-            normalizedInput,
-        },
-      },
-    )
+    navigate('/cook-today', {
+      state: { landingCookQuery: query },
+    })
   }
-
-
 
   return (
     <section
-      className="hero-section-stable relative isolate m-0 flex min-h-[100svh] w-full items-center overflow-hidden p-0"
+      aria-label="Discover food and recipes with EPANTRY"
+      className="epantry-hero-refined relative isolate flex min-h-[100svh] w-full flex-col overflow-hidden bg-[#F7F6F2] text-[#202421]"
     >
-
-      {/* Keep the Hero title slightly larger than the shared type ramp.
-          Scoped !important rules are necessary because the approved
-          universal stylesheet sets h1 sizes with !important. */}
+      {/* Overrides are scoped because global EPANTRY heading rules use !important. */}
       <style>{`
-        .hero-section-stable .epantry-hero-headline {
-          font-size: 40px !important;
-          line-height: 1.1 !important;
+        .epantry-hero-refined .epantry-hero-headline {
+          font-size: clamp(38px, 9.1vw, 47px) !important;
+          line-height: 1.105 !important;
+          letter-spacing: -.045em !important;
+          font-weight: 600 !important;
+          text-transform: none !important;
+          text-wrap: balance;
+        }
+        .epantry-hero-refined .epantry-hero-photo-overlay {
+          background:
+            linear-gradient(180deg,
+              rgba(247,246,242,.84) 0%,
+              rgba(247,246,242,.67) 31%,
+              rgba(247,246,242,.18) 67%,
+              rgba(247,246,242,.03) 100%);
+        }
+        .epantry-hero-refined .epantry-hero-recipe-rail {
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+        .epantry-hero-refined .epantry-hero-recipe-rail::-webkit-scrollbar {
+          display: none;
+        }
+        /* A low, porcelain editorial shelf rather than a dark dashboard slab.
+           The narrow desktop footprint keeps the food photograph unobscured. */
+        .epantry-hero-refined .epantry-hero-recipe-ribbon {
+          width: min(100%, 790px) !important;
+          max-width: 790px !important;
+          background: linear-gradient(115deg,
+            rgba(247,246,242,.97) 0%,
+            rgba(247,246,242,.95) 52%,
+            rgba(232,238,229,.94) 100%);
+          -webkit-backdrop-filter: blur(18px);
+          backdrop-filter: blur(18px);
+          box-shadow: 0 14px 34px rgba(23,47,38,.17),
+                      inset 0 1px 0 rgba(255,255,255,.9);
+        }
+        /* EPANTRY global typography includes !important rules. Scope compact
+           sizes here so labels never collide or get truncated in the shelf. */
+        .epantry-hero-refined .epantry-hero-recipe-heading {
+          font-size: 16px !important;
+          line-height: 1.25 !important;
+          letter-spacing: -.024em !important;
+          font-weight: 700 !important;
+          text-transform: none !important;
+        }
+        .epantry-hero-refined .epantry-hero-recipe-eyebrow {
+          font-size: 11.5px !important;
+          line-height: 1.25 !important;
+          letter-spacing: .065em !important;
+        }
+        .epantry-hero-refined .epantry-hero-recipe-status {
+          font-size: 11.5px !important;
+          line-height: 1.25 !important;
+        }
+        .epantry-hero-refined .epantry-hero-recipe-name {
+          font-size: 14px !important;
+          line-height: 1.27 !important;
+          font-weight: 700 !important;
+          overflow-wrap: anywhere;
+        }
+        .epantry-hero-refined .epantry-hero-recipe-cuisine {
+          font-size: 11.5px !important;
+          line-height: 1.26 !important;
         }
         @media (min-width: 640px) {
-          .hero-section-stable .epantry-hero-headline {
-            font-size: 48px !important;
-            line-height: 1.1 !important;
+          .epantry-hero-refined .epantry-hero-headline {
+            font-size: clamp(49px, 5vw, 62px) !important;
+            line-height: 1.07 !important;
+          }
+        }
+        @media (min-width: 768px) {
+          .epantry-hero-refined .epantry-hero-photo-overlay {
+            background:
+              linear-gradient(90deg,
+                rgba(247,246,242,.85) 0%,
+                rgba(247,246,242,.68) 21%,
+                rgba(247,246,242,.25) 43%,
+                rgba(247,246,242,.02) 66%),
+              linear-gradient(0deg,
+                rgba(17,48,37,.07) 0%,
+                rgba(17,48,37,0) 25%);
           }
         }
         @media (min-width: 1024px) {
-          .hero-section-stable .epantry-hero-headline {
-            font-size: 68px !important;
-            line-height: 1.08 !important;
+          .epantry-hero-refined .epantry-hero-headline {
+            font-size: clamp(56px, 4.25vw, 66px) !important;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .epantry-hero-refined * {
+            scroll-behavior: auto !important;
           }
         }
       `}</style>
 
-      {/* =============================================================
-          HERO BACKGROUND
-      ============================================================= */}
-
-      <div
-        className="absolute inset-0 h-full w-full"
-        aria-hidden="true"
-      >
-
-        <div
-          className="absolute inset-0"
-        >
-
-          <AnimatePresence
-            mode="sync"
-            initial={false}
-          >
-
-            <motion.img
-              key={
-                currentSlide
-              }
-              src={
-                currentSlide
-              }
-              alt=""
-              initial={
-                shouldReduceMotion
-                  ? false
-                  : {
-                      opacity: 0,
-                    }
-              }
-              animate={{
-                opacity: 1,
-              }}
-              exit={
-                shouldReduceMotion
-                  ? undefined
-                  : {
-                      opacity: 0,
-                    }
-              }
-              transition={{
-                duration: 0.8,
-                ease: 'easeInOut',
-              }}
-              className="absolute inset-0 block h-full w-full object-cover object-center"
-              draggable="false"
-            />
-
-          </AnimatePresence>
-
-        </div>
-
-
-
+      {/* Full-bleed photos, five images per device and original crossfade behaviour. */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <AnimatePresence mode="sync" initial={false}>
+          <motion.img
+            key={currentSlide}
+            src={currentSlide}
+            alt=""
+            initial={shouldReduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={shouldReduceMotion ? undefined : { opacity: 0 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.8, ease: 'easeInOut' }}
+            className="absolute inset-0 h-full w-full object-cover object-[58%_center] md:object-center"
+            draggable={false}
+          />
+        </AnimatePresence>
+        <div className="epantry-hero-photo-overlay absolute inset-0" />
       </div>
 
-
-      {/* =============================================================
-          HERO CONTENT
-      ============================================================= */}
-
-      <div className="page-shell relative z-10 flex min-h-[100svh] w-full items-center py-6 sm:py-8 lg:py-10">
-
-        <div className="w-full max-w-3xl lg:w-[70%] lg:max-w-none">
-
-          {/* =========================================================
-              ROTATING HERO MESSAGE
-          ========================================================= */}
-
-          <div
-            className="relative mt-7 max-w-3xl overflow-hidden rounded-[24px] border border-white/20 bg-white/10 p-4 shadow-md shadow-[#111827]/5 backdrop-blur-[2px] md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none lg:max-w-none">
-
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/10 via-white/[0.03] to-transparent md:hidden"
-            />
-
-            <motion.div
-              key={
-                currentMessage.id
-              }
-              initial={
-                shouldReduceMotion
-                  ? false
-                  : {
-                      opacity: 0,
-                    }
-              }
-              animate={{
-                opacity: 1,
-              }}
-              transition={{
-                duration: 0.18,
-                ease: 'easeOut',
-              }}
-              className="relative z-10"
-            >
-              <h1
-                aria-label={[
-                  currentMessage.lead,
-                  currentMessage.accent,
-                  currentMessage.tail,
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                className="epantry-hero-headline max-w-3xl font-semibold uppercase tracking-[0.045em] text-[#202421] lg:max-w-none"
-                style={{
-                  color: '#202421',
-                  textShadow: '0 1px 3px #F7F6F2',
-                }}
-              >
-                <WordSequence
-                  text={
-                    currentMessage.lead
-                  }
-                  startIndex={0}
-                  revealedWordCount={
-                    revealedWordCount
-                  }
-                  shouldReduceMotion={
-                    shouldReduceMotion
-                  }
-                />
-
-                {currentMessage.accent ? (
-                  <span className="text-[#173F35]" style={{ color: '#173F35' }}>
-                    {' '}
-                    <WordSequence
-                      text={
-                        currentMessage.accent
-                      }
-                      startIndex={
-                        leadWords.length
-                      }
-                      revealedWordCount={
-                        revealedWordCount
-                      }
-                      shouldReduceMotion={
-                        shouldReduceMotion
-                      }
-                    />
-                  </span>
-                ) : null}
-
-                {currentMessage.tail ? (
-                  <>
-                    <br />
-                    <WordSequence
-                      text={
-                        currentMessage.tail
-                      }
-                      startIndex={
-                        leadWords.length +
-                        accentWords.length
-                      }
-                      revealedWordCount={
-                        revealedWordCount
-                      }
-                      shouldReduceMotion={
-                        shouldReduceMotion
-                      }
-                    />
-                  </>
-                ) : null}
-              </h1>
-
-              {currentMessage.interactive ? (
-                <div className="min-h-[86px] sm:min-h-[68px]">
-                  {messageComplete ? (
-                    <motion.form
-                  initial={
-                    shouldReduceMotion
-                      ? false
-                      : {
-                          opacity: 0,
-                          y: 4,
-                        }
-                  }
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    duration: 0.28,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  onSubmit={
-                    handleCookTodaySubmit
-                  }
-                  className="mt-5 max-w-2xl"
-                >
-                  <label
-                    htmlFor="landing-cook-today-input"
-                    className="sr-only"
-                  >
-                    What do you want to cook today?
-                  </label>
-
-                  <div className="flex flex-col gap-2 rounded-[22px] border border-[#173F35] bg-[#F7F6F2] p-2.5 shadow-[0_14px_35px_rgba(32,36,33,0.12)] backdrop-blur sm:flex-row sm:items-center">
-                    <div className="flex min-w-0 flex-1 items-center gap-3 px-2.5">
-                      <ChefHat
-                        size={19}
-                        className="shrink-0 text-[#173F35]"
-                        aria-hidden="true"
-                      />
-
-                      <input
-                        id="landing-cook-today-input"
-                        type="text"
-                        value={
-                          cookInput
-                        }
-                        onFocus={() =>
-                          setCookInputFocused(
-                            true,
-                          )
-                        }
-                        onBlur={() =>
-                          setCookInputFocused(
-                            false,
-                          )
-                        }
-                        onChange={(event) => {
-                          setCookInput(
-                            event.target.value,
-                          )
-                          if (
-                            cookInputError
-                          ) {
-                            setCookInputError(
-                              '',
-                            )
-                          }
-                        }}
-                        placeholder="Paneer, tomato, rice... or a dish idea"
-                        autoComplete="off"
-                        className="min-h-11 w-full min-w-0 bg-transparent text-sm font-bold text-[#202421] outline-none placeholder:font-semibold placeholder:text-[#202421]/75 sm:text-base"
-                        style={{ backgroundColor: '#F7F6F2', color: '#202421' }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[#173F35] px-5 text-sm font-black text-[#F7F6F2] shadow-sm transition hover:bg-[#202421]"
-                    >
-                      <Search
-                        size={16}
-                        aria-hidden="true"
-                      />
-                      Cook with EPANTRY
-                      <ArrowRight
-                        size={15}
-                        aria-hidden="true"
-                      />
-                    </button>
-                  </div>
-
-                  {cookInputError ? (
-                    <p
-                      role="alert"
-                      className="mt-2 text-xs font-bold text-red-700 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]"
-                    >
-                      {
-                        cookInputError
-                      }
-                    </p>
-                  ) : null}
-                    </motion.form>
-                  ) : null}
-                </div>
-              ) : null}
-            </motion.div>
-
-          </div>
-
-
-          {/* =========================================================
-              CTA
-          ========================================================= */}
-
+      <div className="page-shell relative z-10 flex min-h-[100svh] w-full flex-1 flex-col justify-between gap-6 px-3.5 pb-[84px] pt-7 sm:px-5 sm:pb-[90px] sm:pt-12 lg:gap-7 lg:pb-[90px] lg:pt-[clamp(58px,9svh,112px)]">
+        <div className="w-full max-w-[720px]">
           <motion.div
-            initial={
-              shouldReduceMotion
-                ? false
-                : {
-                    opacity: 0,
-                    y: 16,
-                  }
-            }
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{
-              duration: 0.5,
-              delay: 0.22,
-            }}
-            className="mt-10 flex flex-wrap gap-3 sm:mt-12"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           >
+            <p className="mb-3 inline-flex items-center gap-2.5 text-[12px] font-semibold tracking-[.06em] text-[#173F35] sm:mb-4 sm:text-[13px]">
+              <span aria-hidden="true" className="h-[3px] w-6 rounded-full bg-[#C86C42]" />
+              Good food, made simpler
+            </p>
 
-            <Link
-              to={
-                landingHero
-                  .primaryAction
-                  .path
-              }
-              className="focus-ring inline-flex items-center gap-2 rounded-full bg-[#173F35] px-6 py-3.5 text-sm font-bold text-[#F7F6F2] shadow-lg shadow-[#202421]/15 transition hover:bg-[#202421]"
-            >
+            <h1 className="epantry-hero-headline max-w-[700px] text-[#202421]">
+              What shall we <span className="text-[#173F35]">cook today?</span>
+            </h1>
 
-              <ShoppingBasket
-                size={18}
-                aria-hidden="true"
-              />
-
-
-              {
-                landingHero
-                  .primaryAction
-                  .label
-              }
-
-
-              <ArrowRight
-                size={17}
-                aria-hidden="true"
-              />
-
-            </Link>
-
-
-            <Link
-              to={
-                landingHero
-                  .secondaryAction
-                  .path
-              }
-              className="focus-ring inline-flex items-center gap-2 rounded-full border border-[#202421] bg-[#F7F6F2] px-6 py-3.5 text-sm font-bold text-[#202421] shadow-sm transition hover:border-[#173F35] hover:bg-[#DCE0CF]"
-            >
-
-              <CookingPot
-                size={18}
-                aria-hidden="true"
-              />
-
-
-              {
-                landingHero
-                  .secondaryAction
-                  .label
-              }
-
-            </Link>
-
-
-            <Link
-              to="/cook-today"
-              className="focus-ring inline-flex items-center gap-2 rounded-full border border-[#173F35] bg-[#DCE0CF] px-6 py-3.5 text-sm font-bold text-[#173F35] shadow-sm backdrop-blur transition hover:border-[#202421] hover:bg-[#F7F6F2]"
-            >
-
-              <ChefHat
-                size={18}
-                aria-hidden="true"
-              />
-
-              I want to cook today
-
-              <Sparkles
-                size={16}
-                aria-hidden="true"
-              />
-
-            </Link>
-
+            <p className="mt-3 max-w-[550px] text-[15px] font-normal leading-[1.55] text-[#3F4840] sm:mt-5 sm:text-[16px] sm:leading-[1.6]">
+              Find a recipe, check your pantry, and get what you need to make it.
+            </p>
           </motion.div>
 
+          {/* Primary discovery search is always visible, never tied to a slide. */}
+          <form onSubmit={handleCookTodaySubmit} className="mt-5 max-w-[640px] sm:mt-7">
+            <label htmlFor="landing-cook-today-input" className="sr-only">
+              What would you like to cook, or which ingredients do you have?
+            </label>
+            <div className="flex min-h-[54px] w-full items-center gap-1.5 rounded-[15px] border border-[#C9D2C6] bg-[#F7F6F2]/96 p-1.5 shadow-[0_12px_40px_rgba(30,48,38,.10)] sm:min-h-[62px] sm:gap-3 sm:p-2">
+              <Search size={19} aria-hidden="true" className="ml-2 shrink-0 text-[#173F35]" />
+              <input
+                id="landing-cook-today-input"
+                type="search"
+                autoComplete="off"
+                value={cookInput}
+                onChange={(event) => {
+                  setCookInput(event.target.value)
+                  if (cookInputError) setCookInputError('')
+                }}
+                placeholder="A dish, paneer, rice..."
+                className="min-w-0 flex-1 border-0 bg-transparent px-1 text-[14px] font-normal text-[#202421] outline-none placeholder:text-[#657069] sm:text-base"
+                aria-invalid={Boolean(cookInputError)}
+                aria-describedby={cookInputError ? 'landing-cook-error' : undefined}
+              />
+              <button
+                type="submit"
+                className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-[11px] bg-[#173F35] px-3.5 text-[13px] font-semibold text-[#F7F6F2] transition-colors hover:bg-[#225946] sm:px-5 sm:text-[15px]"
+              >
+                <span>Find recipes</span>
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+            {cookInputError ? (
+              <p id="landing-cook-error" className="mt-2 text-sm font-semibold text-[#A23524]" role="alert">
+                {cookInputError}
+              </p>
+            ) : null}
+          </form>
+
+          {/* Same destinations, now a quieter editorial secondary-action row. */}
+          <nav aria-label="Explore EPANTRY" className="mt-4 grid w-full max-w-[640px] grid-cols-3 gap-2 sm:mt-5 sm:flex sm:flex-wrap sm:gap-2.5">
+            <Link
+              to="/cook-today"
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-[#B8C5B5] bg-[#DCE0CF]/90 px-2.5 py-2 text-center text-[12px] font-semibold leading-tight text-[#173F35] transition-colors hover:border-[#173F35] hover:bg-[#DCE0CF] sm:px-4 sm:text-sm"
+            >
+              <ChefHat size={16} className="hidden shrink-0 sm:block" aria-hidden="true" />
+              Cook today
+            </Link>
+            <Link
+              to={landingHero.secondaryAction.path}
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-[#D1D7CC] bg-[#F7F6F2]/82 px-2.5 py-2 text-center text-[12px] font-semibold leading-tight text-[#202421] transition-colors hover:border-[#173F35]/55 hover:bg-[#F7F6F2] sm:px-4 sm:text-sm"
+            >
+              <CookingPot size={16} className="hidden shrink-0 sm:block" aria-hidden="true" />
+              {landingHero.secondaryAction.label}
+            </Link>
+            <Link
+              to={landingHero.primaryAction.path}
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-[#D1D7CC] bg-[#F7F6F2]/82 px-2.5 py-2 text-center text-[12px] font-semibold leading-tight text-[#202421] transition-colors hover:border-[#173F35]/55 hover:bg-[#F7F6F2] sm:px-4 sm:text-sm"
+            >
+              <ShoppingBasket size={16} className="hidden shrink-0 sm:block" aria-hidden="true" />
+              {landingHero.primaryAction.label}
+            </Link>
+          </nav>
         </div>
 
-      </div>
+        {/* Photo-first, account-aware editorial shelf. Limit desktop width to
+            leave the right-hand hero dish visible; on mobile recipes swipe. */}
+        <section
+          aria-label="Your recipe discoveries"
+          className="epantry-hero-recipe-ribbon self-start overflow-hidden rounded-[18px] border border-[#E1E6DD]/90"
+        >
+          <div className="flex min-w-0 flex-col md:flex-row">
+            <div className="relative flex min-h-[53px] shrink-0 items-center justify-between gap-3 border-b border-[#D5DDD2] px-4 py-2.5 md:min-h-[116px] md:w-[176px] md:flex-col md:items-start md:justify-center md:gap-2 md:border-b-0 md:border-r md:py-3.5">
+              <span aria-hidden="true" className="absolute bottom-3 left-0 top-3 w-[3px] rounded-r-full bg-[#C86C42] md:bottom-5 md:top-5" />
+              <div className="min-w-0">
+                <p className="epantry-hero-recipe-eyebrow font-bold uppercase text-[#A55332]">
+                  From the kitchen
+                </p>
+                <h2 className="epantry-hero-recipe-heading mt-1 text-[#173F35]">
+                  Picked for you
+                </h2>
+              </div>
+              <Link
+                to="/recipes"
+                className="focus-ring inline-flex min-h-9 shrink-0 items-center gap-1.5 text-[12px] font-semibold text-[#173F35] underline-offset-4 transition-colors hover:text-[#A55332] hover:underline"
+              >
+                All recipes <ArrowRight size={15} aria-hidden="true" />
+              </Link>
+            </div>
 
+            {personalizedRecipes.length ? (
+              <div
+                className="epantry-hero-recipe-rail flex min-w-0 flex-1 snap-x snap-mandatory overflow-x-auto"
+                role="list"
+                aria-label="Ordered, recently viewed and recommended food"
+              >
+                {personalizedRecipes.map((recipe) => (
+                  <Link
+                    key={recipe.id}
+                    to={recipe.path}
+                    role="listitem"
+                    aria-label={`${recipe.label}: ${recipe.name} (${recipe.cuisine})`}
+                    className="focus-ring group flex min-h-[108px] w-[218px] shrink-0 snap-start items-center gap-2.5 border-r border-[#D5DDD2]/75 px-2.5 py-3 transition-colors hover:bg-[#E2EADD]/70 last:border-r-0 sm:w-[218px] md:min-h-[116px] md:w-[204px]"
+                  >
+                    {recipe.image ? (
+                      <img
+                        src={recipe.image}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-[72px] w-[68px] shrink-0 rounded-[10px] object-cover shadow-[0_4px_12px_rgba(31,48,36,.13)] transition-transform duration-300 group-hover:scale-[1.035] motion-reduce:transform-none"
+                      />
+                    ) : (
+                      <span aria-hidden="true" className="flex h-[72px] w-[68px] shrink-0 items-center justify-center rounded-[10px] bg-[#D7DDCF] text-[#173F35]">
+                        <CookingPot size={22} />
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className={`epantry-hero-recipe-status block font-semibold ${recipe.label === 'Ordered' ? 'text-[#173F35]' : 'text-[#A55332]'}`}>
+                        {recipe.label}
+                      </span>
+                      <span className="epantry-hero-recipe-name mt-1 block text-[#202421]">
+                        {recipe.name}
+                      </span>
+                      <span className="epantry-hero-recipe-cuisine mt-1 block font-medium text-[#52675C]">
+                        {recipe.cuisine}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-[108px] min-w-0 flex-1 items-center px-4 py-3 text-sm text-[#334D41]">
+                {recipesLoading ? 'Finding recipes for you…' : (
+                  <Link to="/recipes" className="focus-ring inline-flex min-h-11 items-center gap-2 font-semibold text-[#173F35] hover:underline">
+                    Discover published recipes <ArrowRight size={15} aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
     </section>
   )
 }

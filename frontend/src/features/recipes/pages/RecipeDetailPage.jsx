@@ -14,49 +14,27 @@ import {
   ShieldCheck,
   ShoppingCart,
   X,
-} from 'lucide-react'
+} from "lucide-react";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useParams,
-} from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
+import { useAuth } from "../../auth/context/AuthContext";
 
-import {
-  useAuth,
-} from '../../auth/context/AuthContext'
+import { checkItemAvailability } from "../../analytics/services/analytics.service";
 
-import {
-  checkItemAvailability,
-} from '../../analytics/services/analytics.service'
-
-import {
-  openAvailabilityNotifyModal,
-} from '../../notifications/components/AvailabilityNotifyModal'
+import { openAvailabilityNotifyModal } from "../../notifications/components/AvailabilityNotifyModal";
 
 import {
   createCommerceIdempotencyKey,
   createRestaurantRecipeMarketplaceCart,
   getCommerceErrorMessage,
-} from '../../commerce/services/commerce.service'
+} from "../../commerce/services/commerce.service";
 
-import {
-  getDefaultDeliveryAddress,
-} from '../../deliveryAddresses/services/deliveryAddress.service'
+import { getDefaultDeliveryAddress } from "../../deliveryAddresses/services/deliveryAddress.service";
 
-import {
-  getRecipeFoodIntelligence,
-} from '../../foodIntelligence/services/foodIntelligence.service'
+import { getRecipeFoodIntelligence } from "../../foodIntelligence/services/foodIntelligence.service";
 
 import {
   confirmIHaveThis,
@@ -67,354 +45,223 @@ import {
   requestPantrySetupReminder,
   updatePantryStorage,
   updatePantryUseSoon,
-} from '../../pantry/services/pantry.service'
+} from "../../pantry/services/pantry.service";
+
+import { recordRecipeView } from "../utils/recipeEngagement";
 
 import {
   getPublicRecipe,
   listPublicRecipes,
   scalePublicRecipe,
-} from '../services/recipe.service'
+} from "../services/recipe.service";
 
-function formatQuantity(
-  value,
-) {
-  const numeric =
-    Number(
-      value,
-    )
+function formatQuantity(value) {
+  const numeric = Number(value);
 
-  if (
-    !Number.isFinite(
-      numeric,
-    )
-  ) {
-    return value
+  if (!Number.isFinite(numeric)) {
+    return value;
   }
 
-  return new Intl.NumberFormat(
-    undefined,
-    {
-      maximumFractionDigits:
-        3,
-    },
-  ).format(
-    numeric,
-  )
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 3,
+  }).format(numeric);
 }
 
-function formatMoney(
-  price,
-) {
-  const amountMinor =
-    Number(
-      price?.amountMinor,
-    )
+function formatMoney(price) {
+  const amountMinor = Number(price?.amountMinor);
 
-  if (
-    !Number.isInteger(
-      amountMinor,
-    ) ||
-    amountMinor <
-      0
-  ) {
-    return 'Not available'
+  if (!Number.isInteger(amountMinor) || amountMinor < 0) {
+    return "Not available";
   }
 
-  return new Intl.NumberFormat(
-    'en-IN',
-    {
-      style:
-        'currency',
-      currency:
-        price?.currency ||
-        'INR',
-      maximumFractionDigits:
-        2,
-    },
-  ).format(
-    amountMinor /
-      100,
-  )
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: price?.currency || "INR",
+    maximumFractionDigits: 2,
+  }).format(amountMinor / 100);
 }
 
-function toDateInputValue(
-  value,
-) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+function toDateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-const RECIPE_CART_PENDING_KEY =
-  'epantry-pending-recipe-cart'
+const RECIPE_CART_PENDING_KEY = "epantry-pending-recipe-cart";
 
-const PANTRY_STATUS_LABELS =
-  Object.freeze({
-    available:
-      'Available at home',
-    partial:
-      'Partially available',
-    uncertain:
-      'Needs confirmation',
-    missing:
-      'Missing',
-    untracked:
-      'Not tracking',
-  })
+const PANTRY_STATUS_LABELS = Object.freeze({
+  available: "Available at home",
+  partial: "Partially available",
+  uncertain: "Needs confirmation",
+  missing: "Missing",
+  untracked: "Not tracking",
+});
 
 function createPantryIdempotencyKey() {
   if (
-    typeof crypto !==
-      'undefined' &&
-    typeof crypto.randomUUID ===
-      'function'
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
   ) {
-    return crypto.randomUUID()
+    return crypto.randomUUID();
   }
 
   return [
-    'recipe-cooked',
+    "recipe-cooked",
     Date.now(),
-    Math.random()
-      .toString(36)
-      .slice(2),
-  ].join('-')
+    Math.random().toString(36).slice(2),
+  ].join("-");
 }
 
-function getPantryRequirementLines(
-  reconciliation,
-) {
-  if (
-    Array.isArray(
-      reconciliation?.requirements,
-    )
-  ) {
-    return reconciliation.requirements
+function getPantryRequirementLines(reconciliation) {
+  if (Array.isArray(reconciliation?.requirements)) {
+    return reconciliation.requirements;
   }
 
-  if (
-    Array.isArray(
-      reconciliation?.ingredients,
-    )
-  ) {
-    return reconciliation.ingredients
+  if (Array.isArray(reconciliation?.ingredients)) {
+    return reconciliation.ingredients;
   }
 
-  if (
-    Array.isArray(
-      reconciliation?.lines,
-    )
-  ) {
-    return reconciliation.lines
+  if (Array.isArray(reconciliation?.lines)) {
+    return reconciliation.lines;
   }
 
-  return []
+  return [];
 }
 
-function getPantryLineIngredientId(
-  line,
-) {
+function getPantryLineIngredientId(line) {
   return String(
     line?.canonicalIngredientId ||
       line?.ingredientId ||
       line?.requirement?.canonicalIngredientId ||
       line?.requirement?.ingredientId ||
-      '',
-  ).trim()
+      ""
+  ).trim();
 }
 
-function getRecipeIngredientCanonicalId(
-  ingredient,
-) {
+function getRecipeIngredientCanonicalId(ingredient) {
   return String(
     ingredient?.canonicalIngredientId ||
       ingredient?.ingredient?.id ||
       ingredient?.ingredientId ||
-      '',
-  ).trim()
+      ""
+  ).trim();
 }
 
-function getPantryLineStatus(
-  line,
-) {
+function getPantryLineStatus(line) {
   return (
     line?.status ||
     line?.availabilityStatus ||
     line?.pantryStatus ||
-    'uncertain'
-  )
+    "uncertain"
+  );
 }
 
-function savePendingRecipeCart(
-  value,
-) {
+function savePendingRecipeCart(value) {
   try {
     window.sessionStorage.setItem(
       RECIPE_CART_PENDING_KEY,
-      JSON.stringify(value),
-    )
+      JSON.stringify(value)
+    );
   } catch {
     // Session persistence is best-effort UX state only.
   }
 }
 
-
 function notifyFloatingCartUpdated() {
   window.dispatchEvent(
-    new CustomEvent(
-      'epantry-cart-updated',
-      {
-        detail: {
-          show: true,
-        },
+    new CustomEvent("epantry-cart-updated", {
+      detail: {
+        show: true,
       },
-    ),
-  )
+    })
+  );
 }
 
-function notifyFloatingCartFly({
-  name,
-  sourceElement,
-}) {
-  const rect =
-    sourceElement
-      ?.getBoundingClientRect?.()
+function notifyFloatingCartFly({ name, sourceElement }) {
+  const rect = sourceElement?.getBoundingClientRect?.();
 
   window.dispatchEvent(
-    new CustomEvent(
-      'epantry-cart-fly',
-      {
-        detail: {
-          name,
-          startRect:
-            rect
-              ? {
-                  left:
-                    rect.left +
-                    rect.width /
-                      2,
-                  top:
-                    rect.top +
-                    rect.height /
-                      2,
-                }
-              : null,
-        },
+    new CustomEvent("epantry-cart-fly", {
+      detail: {
+        name,
+        startRect: rect
+          ? {
+              left: rect.left + rect.width / 2,
+              top: rect.top + rect.height / 2,
+            }
+          : null,
       },
-    ),
-  )
+    })
+  );
 }
 
 function readPendingRecipeCart() {
   try {
-    const raw =
-      window.sessionStorage.getItem(
-        RECIPE_CART_PENDING_KEY,
-      )
+    const raw = window.sessionStorage.getItem(RECIPE_CART_PENDING_KEY);
 
-    return raw
-      ? JSON.parse(raw)
-      : null
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return null
+    return null;
   }
 }
 
-function recipeDetailLabel(
-  value,
-) {
-  return String(
-    value ||
-      '',
-  )
-    .replace(
-      /_/g,
-      ' ',
-    )
-    .replace(
-      /\b\w/g,
-      (
-        character,
-      ) =>
-        character.toUpperCase(),
-    )
+function recipeDetailLabel(value) {
+  return String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function resolveRecipeDietaryBadge(foodIntelligence) {
   const dietaryRows = Array.isArray(foodIntelligence?.dietary)
     ? foodIntelligence.dietary
-    : []
+    : [];
 
-  const eligible = dietaryRows.find((item) =>
-    String(item?.outcome || item?.status || '')
-      .trim()
-      .toLowerCase() === 'eligible',
-  )
+  const eligible = dietaryRows.find(
+    (item) =>
+      String(item?.outcome || item?.status || "")
+        .trim()
+        .toLowerCase() === "eligible"
+  );
 
   const key = String(
-    eligible?.ruleKey ||
-      eligible?.key ||
-      eligible?.label ||
-      '',
+    eligible?.ruleKey || eligible?.key || eligible?.label || ""
   )
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/-/g, '_')
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
 
-  if (key === 'vegetarian' || key === 'vegan') {
-    return { label: 'Veg', kind: 'veg' }
+  if (key === "vegetarian" || key === "vegan") {
+    return { label: "Veg", kind: "veg" };
   }
 
-  if (key === 'eggitarian' || key === 'non_vegetarian') {
-    return { label: 'Non-veg', kind: 'nonveg' }
+  if (key === "eggitarian" || key === "non_vegetarian") {
+    return { label: "Non-veg", kind: "nonveg" };
   }
 
-  return null
+  return null;
 }
 
-function RecipeDetailsSheet({
-  dish,
-  recipe,
-  ingredients,
-  foodIntelligence,
-}) {
-  const ingredientRows =
-    Array.isArray(
-      ingredients,
-    )
-      ? ingredients
-      : []
+function RecipeDetailsSheet({ dish, recipe, ingredients, foodIntelligence }) {
+  const ingredientRows = Array.isArray(ingredients) ? ingredients : [];
 
-  const nutritionRows =
-    Array.isArray(
-      foodIntelligence
-        ?.nutrition,
-    )
-      ? foodIntelligence.nutrition
-      : []
+  const nutritionRows = Array.isArray(foodIntelligence?.nutrition)
+    ? foodIntelligence.nutrition
+    : [];
 
-  const allergenRows =
-    Array.isArray(
-      foodIntelligence
-        ?.allergens,
-    )
-      ? foodIntelligence.allergens
-      : []
+  const allergenRows = Array.isArray(foodIntelligence?.allergens)
+    ? foodIntelligence.allergens
+    : [];
 
-  const dietaryRows =
-    Array.isArray(
-      foodIntelligence
-        ?.dietary,
-    )
-      ? foodIntelligence.dietary
-      : []
+  const dietaryRows = Array.isArray(foodIntelligence?.dietary)
+    ? foodIntelligence.dietary
+    : [];
 
-  const dietaryBadge = resolveRecipeDietaryBadge(foodIntelligence)
+  const dietaryBadge = resolveRecipeDietaryBadge(foodIntelligence);
 
   return (
     <div className="recipe-details-sheet flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#F1F4ED]">
@@ -424,18 +271,16 @@ function RecipeDetailsSheet({
         </p>
         <div className="mt-1 flex items-start justify-between gap-2 sm:block">
           <h2 className="min-w-0 text-[24px] font-semibold leading-[1.2] sm:mt-2 sm:text-[32px]">
-            {dish?.name ||
-              recipe?.title ||
-              'Recipe'}
+            {dish?.name || recipe?.title || "Recipe"}
           </h2>
           {dietaryBadge ? (
             <span
               className={[
-                'shrink-0 rounded-full border px-2 py-1 text-[13px] font-semibold uppercase tracking-[0.08em] sm:hidden',
-                dietaryBadge.kind === 'veg'
-                  ? 'border-lime-200 bg-lime-100/95 text-lime-900'
-                  : 'border-rose-200 bg-rose-100/95 text-rose-900',
-              ].join(' ')}
+                "shrink-0 rounded-full border px-2 py-1 text-[13px] font-semibold uppercase tracking-[0.08em] sm:hidden",
+                dietaryBadge.kind === "veg"
+                  ? "border-lime-200 bg-lime-100/95 text-lime-900"
+                  : "border-rose-200 bg-rose-100/95 text-rose-900",
+              ].join(" ")}
             >
               {dietaryBadge.label}
             </span>
@@ -454,60 +299,22 @@ function RecipeDetailsSheet({
       >
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
           {[
-            [
-              'Base servings',
-              recipe?.baseServings ??
-                '—',
-            ],
-            [
-              'Prep time',
-              `${Number(
-                recipe?.preparationTimeMinutes ||
-                  0,
-              )} min`,
-            ],
-            [
-              'Cook time',
-              `${Number(
-                recipe?.cookingTimeMinutes ||
-                  0,
-              )} min`,
-            ],
-            [
-              'Difficulty',
-              recipeDetailLabel(
-                recipe?.difficulty,
-              ) ||
-                '—',
-            ],
-            [
-              'Cuisine',
-              dish?.cuisine ||
-                '—',
-            ],
-            [
-              'Course',
-              dish?.course ||
-                '—',
-            ],
-          ].map(
-            ([
-              label,
-              value,
-            ]) => (
-              <div
-                key={label}
-                className="border-b border-[#DCE0CF] pb-2"
-              >
-                <dt className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#173F35]/65">
-                  {label}
-                </dt>
-                <dd className="mt-1 text-[14px] font-semibold text-[#202421]">
-                  {value}
-                </dd>
-              </div>
-            ),
-          )}
+            ["Base servings", recipe?.baseServings ?? "—"],
+            ["Prep time", `${Number(recipe?.preparationTimeMinutes || 0)} min`],
+            ["Cook time", `${Number(recipe?.cookingTimeMinutes || 0)} min`],
+            ["Difficulty", recipeDetailLabel(recipe?.difficulty) || "—"],
+            ["Cuisine", dish?.cuisine || "—"],
+            ["Course", dish?.course || "—"],
+          ].map(([label, value]) => (
+            <div key={label} className="border-b border-[#DCE0CF] pb-2">
+              <dt className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#173F35]/65">
+                {label}
+              </dt>
+              <dd className="mt-1 text-[14px] font-semibold text-[#202421]">
+                {value}
+              </dd>
+            </div>
+          ))}
         </dl>
 
         <div className="mt-5 border-t border-[#DCE0CF] pt-4">
@@ -516,37 +323,21 @@ function RecipeDetailsSheet({
           </p>
           <div className="mt-2 space-y-1.5">
             {ingredientRows.length ? (
-              ingredientRows.map(
-                (
-                  ingredient,
-                  index,
-                ) => (
-                  <p
-                    key={
-                      ingredient.id ||
-                      index
-                    }
-                    className="text-[14px] font-medium leading-6 text-[#202421]"
-                  >
-                    <span className="font-semibold text-[#202421]">
-                      {formatQuantity(
-                        ingredient.quantity,
-                      )}{' '}
-                      {ingredient.unit}
-                    </span>{' '}
-                    {ingredient
-                      ?.ingredient
-                      ?.name ||
-                      'Ingredient'}
-                    {ingredient.preparationState
-                      ? ` · ${ingredient.preparationState}`
-                      : ''}
-                    {ingredient.optional
-                      ? ' · optional'
-                      : ''}
-                  </p>
-                ),
-              )
+              ingredientRows.map((ingredient, index) => (
+                <p
+                  key={ingredient.id || index}
+                  className="text-[14px] font-medium leading-6 text-[#202421]"
+                >
+                  <span className="font-semibold text-[#202421]">
+                    {formatQuantity(ingredient.quantity)} {ingredient.unit}
+                  </span>{" "}
+                  {ingredient?.ingredient?.name || "Ingredient"}
+                  {ingredient.preparationState
+                    ? ` · ${ingredient.preparationState}`
+                    : ""}
+                  {ingredient.optional ? " · optional" : ""}
+                </p>
+              ))
             ) : (
               <p className="text-[14px] font-medium text-[#202421]/70">
                 Ingredient details are not available.
@@ -561,43 +352,27 @@ function RecipeDetailsSheet({
               Nutrition
             </p>
             <span className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#173F35]/65">
-              {foodIntelligence
-                ?.verificationStatus
-                ? recipeDetailLabel(
-                    foodIntelligence.verificationStatus,
-                  )
-                : 'Cannot verify'}
+              {foodIntelligence?.verificationStatus
+                ? recipeDetailLabel(foodIntelligence.verificationStatus)
+                : "Cannot verify"}
             </span>
           </div>
 
           {nutritionRows.length ? (
             <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
-              {nutritionRows.map(
-                (
-                  item,
-                  index,
-                ) => (
-                  <div
-                    key={`${item?.key ||
-                      item?.name ||
-                      'nutrient'}-${index}`}
-                    className="flex items-center justify-between gap-2 border-b border-[#DCE0CF]/50 py-1.5 text-[14px]"
-                  >
-                    <span className="font-bold text-[#202421]/70">
-                      {item?.name ||
-                        recipeDetailLabel(
-                          item?.key,
-                        )}
-                    </span>
-                    <span className="font-semibold text-[#202421]">
-                      {item?.amount ??
-                        '—'}{' '}
-                      {item?.unit ||
-                        ''}
-                    </span>
-                  </div>
-                ),
-              )}
+              {nutritionRows.map((item, index) => (
+                <div
+                  key={`${item?.key || item?.name || "nutrient"}-${index}`}
+                  className="flex items-center justify-between gap-2 border-b border-[#DCE0CF]/50 py-1.5 text-[14px]"
+                >
+                  <span className="font-bold text-[#202421]/70">
+                    {item?.name || recipeDetailLabel(item?.key)}
+                  </span>
+                  <span className="font-semibold text-[#202421]">
+                    {item?.amount ?? "—"} {item?.unit || ""}
+                  </span>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="mt-2 text-xs font-semibold text-[#202421]/70">
@@ -611,170 +386,191 @@ function RecipeDetailsSheet({
             Allergens & dietary
           </p>
           <p className="mt-2 text-xs font-semibold leading-5 text-[#202421]">
-            {foodIntelligence
-              ?.allergenStatement ||
+            {foodIntelligence?.allergenStatement ||
               (allergenRows.length
                 ? allergenRows
                     .map(
-                      (
-                        item,
-                      ) =>
-                        `${item?.name ||
-                          recipeDetailLabel(
-                            item?.key,
-                          )}: ${recipeDetailLabel(
+                      (item) =>
+                        `${
+                          item?.name || recipeDetailLabel(item?.key)
+                        }: ${recipeDetailLabel(
                           item?.relationship ||
                             item?.relationType ||
                             item?.outcome ||
-                            item?.evidenceState,
-                        )}`,
+                            item?.evidenceState
+                        )}`
                     )
-                    .join(
-                      ' · ',
-                    )
-                : 'No approved allergen declaration available')}
+                    .join(" · ")
+                : "No approved allergen declaration available")}
           </p>
 
           {dietaryRows.length ? (
             <div className="mt-2 flex flex-wrap gap-2">
-              {dietaryRows.map(
-                (
-                  item,
-                  index,
-                ) => (
-                  <span
-                    key={`${item?.ruleKey ||
-                      item?.key ||
-                      'dietary'}-${index}`}
-                    className="rounded-full border border-[#DCE0CF] bg-[#DCE0CF]/55 px-2.5 py-1 text-[13px] font-semibold text-[#173F35]"
-                  >
-                    {recipeDetailLabel(
-                      item?.label ||
-                        item?.ruleKey ||
-                        item?.key,
-                    )}: {recipeDetailLabel(
-                      item?.status ||
-                        item?.outcome,
-                    )}
-                  </span>
-                ),
-              )}
+              {dietaryRows.map((item, index) => (
+                <span
+                  key={`${item?.ruleKey || item?.key || "dietary"}-${index}`}
+                  className="rounded-full border border-[#DCE0CF] bg-[#DCE0CF]/55 px-2.5 py-1 text-[13px] font-semibold text-[#173F35]"
+                >
+                  {recipeDetailLabel(item?.label || item?.ruleKey || item?.key)}
+                  : {recipeDetailLabel(item?.status || item?.outcome)}
+                </span>
+              ))}
             </div>
           ) : null}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-
-
-
 function RecipeEvidenceFallback({ kind, evidence }) {
-  const nutrition = Array.isArray(evidence?.nutrition) ? evidence.nutrition : []
-  const allergens = Array.isArray(evidence?.allergens) ? evidence.allergens : []
-  const dietary = Array.isArray(evidence?.dietary) ? evidence.dietary : []
+  const nutrition = Array.isArray(evidence?.nutrition)
+    ? evidence.nutrition
+    : [];
+  const allergens = Array.isArray(evidence?.allergens)
+    ? evidence.allergens
+    : [];
+  const dietary = Array.isArray(evidence?.dietary) ? evidence.dietary : [];
   const title = {
-    nutrition: 'Nutrition',
-    allergens: 'Allergens',
-    dietary: 'Dietary',
-    lineage: 'Calculation source & rule lineage',
-  }[kind]
+    nutrition: "Nutrition",
+    allergens: "Allergens",
+    dietary: "Dietary",
+    lineage: "Calculation source & rule lineage",
+  }[kind];
   return (
     <div className="epantry-inline-evidence" aria-live="polite">
       <details className="epantry-intelligence-fallback group">
         <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3">
           <span>{title}</span>
-          <ChevronDown size={18} aria-hidden="true" className="epantry-intelligence-chevron shrink-0 transition-transform group-open:rotate-180" />
+          <ChevronDown
+            size={18}
+            aria-hidden="true"
+            className="epantry-intelligence-chevron shrink-0 transition-transform group-open:rotate-180"
+          />
         </summary>
         <div className="epantry-intelligence-fallback-content">
-      {kind === 'nutrition' && (
-        nutrition.length > 0 ? (
-          <dl className="mt-3 grid gap-x-6 sm:grid-cols-2">
-            {nutrition.map((row, index) => (
-              <div key={row?.key || row?.nutrientId || index} className="flex justify-between gap-4 border-b border-[#DCE0CF] py-2 text-[14px]">
-                <dt>{row?.name || recipeDetailLabel(row?.key) || 'Nutrient'}</dt>
-                <dd className="font-semibold">{row?.amount ?? '—'} {row?.unit || ''}</dd>
-              </div>
+          {kind === "nutrition" &&
+            (nutrition.length > 0 ? (
+              <dl className="mt-3 grid gap-x-6 sm:grid-cols-2">
+                {nutrition.map((row, index) => (
+                  <div
+                    key={row?.key || row?.nutrientId || index}
+                    className="flex justify-between gap-4 border-b border-[#DCE0CF] py-2 text-[14px]"
+                  >
+                    <dt>
+                      {row?.name || recipeDetailLabel(row?.key) || "Nutrient"}
+                    </dt>
+                    <dd className="font-semibold">
+                      {row?.amount ?? "—"} {row?.unit || ""}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="mt-2 text-[14px]">
+                Approved nutrition values cannot currently be verified.
+              </p>
             ))}
-          </dl>
-        ) : <p className="mt-2 text-[14px]">Approved nutrition values cannot currently be verified.</p>
-      )}
-      {kind === 'allergens' && (
-        <div className="mt-2 text-[14px]">
-          {evidence?.allergenStatement ? <p className="mb-2 font-medium">{evidence.allergenStatement}</p> : null}
-          {allergens.length ? (
-            <ul className="space-y-2">
-              {allergens.map((row, index) => (
-                <li key={row?.key || row?.allergenId || index} className="flex flex-wrap justify-between gap-3 border-b border-[#DCE0CF] py-2">
-                  <span>{row?.name || recipeDetailLabel(row?.key) || 'Allergen'}</span>
-                  <span className="font-semibold">{recipeDetailLabel(row?.relationship || row?.evidenceState || 'Recorded')}</span>
-                </li>
-              ))}
-            </ul>
-          ) : <p>{evidence?.allergenStatement ? 'No further governed allergen relationships are published.' : 'Allergen information cannot currently be verified. This is not an allergen-free claim.'}</p>}
-        </div>
-      )}
-      {kind === 'dietary' && (
-        dietary.length > 0 ? (
-          <ul className="mt-3 space-y-2 text-[14px]">
-            {dietary.map((row, index) => (
-              <li key={row?.key || row?.ruleKey || index} className="flex flex-wrap justify-between gap-3 border-b border-[#DCE0CF] py-2">
-                <span>{row?.label || recipeDetailLabel(row?.ruleKey || row?.key) || 'Dietary rule'}</span>
-                <span className="font-semibold">{recipeDetailLabel(row?.status || row?.outcome || 'Cannot verify')}</span>
-                {row?.reason && <p className="w-full text-[#202421]/75">{row.reason}</p>}
-              </li>
+          {kind === "allergens" && (
+            <div className="mt-2 text-[14px]">
+              {evidence?.allergenStatement ? (
+                <p className="mb-2 font-medium">{evidence.allergenStatement}</p>
+              ) : null}
+              {allergens.length ? (
+                <ul className="space-y-2">
+                  {allergens.map((row, index) => (
+                    <li
+                      key={row?.key || row?.allergenId || index}
+                      className="flex flex-wrap justify-between gap-3 border-b border-[#DCE0CF] py-2"
+                    >
+                      <span>
+                        {row?.name || recipeDetailLabel(row?.key) || "Allergen"}
+                      </span>
+                      <span className="font-semibold">
+                        {recipeDetailLabel(
+                          row?.relationship || row?.evidenceState || "Recorded"
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>
+                  {evidence?.allergenStatement
+                    ? "No further governed allergen relationships are published."
+                    : "Allergen information cannot currently be verified. This is not an allergen-free claim."}
+                </p>
+              )}
+            </div>
+          )}
+          {kind === "dietary" &&
+            (dietary.length > 0 ? (
+              <ul className="mt-3 space-y-2 text-[14px]">
+                {dietary.map((row, index) => (
+                  <li
+                    key={row?.key || row?.ruleKey || index}
+                    className="flex flex-wrap justify-between gap-3 border-b border-[#DCE0CF] py-2"
+                  >
+                    <span>
+                      {row?.label ||
+                        recipeDetailLabel(row?.ruleKey || row?.key) ||
+                        "Dietary rule"}
+                    </span>
+                    <span className="font-semibold">
+                      {recipeDetailLabel(
+                        row?.status || row?.outcome || "Cannot verify"
+                      )}
+                    </span>
+                    {row?.reason && (
+                      <p className="w-full text-[#202421]/75">{row.reason}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-[14px]">
+                Dietary suitability cannot currently be verified.
+              </p>
             ))}
-          </ul>
-        ) : <p className="mt-2 text-[14px]">Dietary suitability cannot currently be verified.</p>
-      )}
-      {kind === 'lineage' && (
-        <p className="mt-2 text-[14px]">{evidence?.calculation?.version
-          ? `Calculation version: ${evidence.calculation.version}. Evidence: ${recipeDetailLabel(evidence?.evidenceState || 'Unknown')}.`
-          : 'Calculation source and rule lineage are not currently available.'}</p>
-      )}
+          {kind === "lineage" && (
+            <p className="mt-2 text-[14px]">
+              {evidence?.calculation?.version
+                ? `Calculation version: ${
+                    evidence.calculation.version
+                  }. Evidence: ${recipeDetailLabel(
+                    evidence?.evidenceState || "Unknown"
+                  )}.`
+                : "Calculation source and rule lineage are not currently available."}
+            </p>
+          )}
         </div>
       </details>
     </div>
-  )
+  );
 }
 
-const RECIPE_RECOMMENDATION_LIMIT = 5
+const RECIPE_RECOMMENDATION_LIMIT = 5;
 
 function getRecipeRecommendationKey(item) {
   return String(
-    item?.dish?.id ||
-      item?.recipe?.id ||
-      item?.dish?.slug ||
-      '',
-  ).trim()
+    item?.dish?.id || item?.recipe?.id || item?.dish?.slug || ""
+  ).trim();
 }
 
 function getRecipeRecommendationName(item) {
-  return (
-    item?.dish?.name ||
-    item?.recipe?.title ||
-    'Recipe'
-  )
+  return item?.dish?.name || item?.recipe?.title || "Recipe";
 }
 
 function getRecipeRecommendationPath(item) {
-  return (
-    item?.path ||
-    `/recipes/${encodeURIComponent(
-      item?.dish?.slug || '',
-    )}`
-  )
+  return item?.path || `/recipes/${encodeURIComponent(item?.dish?.slug || "")}`;
 }
 
-function RecommendedRecipeCard({
-  item,
-}) {
-  const dish = item?.dish || {}
-  const recipe = item?.recipe || {}
+function RecommendedRecipeCard({ item }) {
+  const dish = item?.dish || {};
+  const recipe = item?.recipe || {};
   const totalMinutes =
     Number(recipe.preparationTimeMinutes || 0) +
-    Number(recipe.cookingTimeMinutes || 0)
+    Number(recipe.cookingTimeMinutes || 0);
 
   return (
     <Link
@@ -791,11 +587,7 @@ function RecommendedRecipeCard({
           />
         ) : (
           <div className="grid h-full place-items-center text-[#173F35]/45">
-            <ChefHat
-              size={44}
-              strokeWidth={1.45}
-              aria-hidden="true"
-            />
+            <ChefHat size={44} strokeWidth={1.45} aria-hidden="true" />
           </div>
         )}
 
@@ -819,9 +611,7 @@ function RecommendedRecipeCard({
         </h3>
 
         <div className="mt-1.5 flex min-h-4 items-center gap-1.5 text-[13px] font-medium text-[#202421]/70 sm:mt-2 sm:min-h-5 sm:gap-2 sm:text-[14px] sm:font-semibold">
-          {totalMinutes > 0 ? (
-            <span>{totalMinutes} min</span>
-          ) : null}
+          {totalMinutes > 0 ? <span>{totalMinutes} min</span> : null}
           {recipe.difficulty ? (
             <>
               {totalMinutes > 0 ? (
@@ -832,16 +622,16 @@ function RecommendedRecipeCard({
           ) : null}
         </div>
 
-        <span data-recipe-recommendation-cta className="mt-auto inline-flex items-center justify-between gap-2 rounded-lg bg-[#173F35] px-3 py-2.5 text-sm font-semibold text-[#F7F6F2] transition-colors group-hover:bg-[#202421] sm:mt-4">
+        <span
+          data-recipe-recommendation-cta
+          className="mt-auto inline-flex items-center justify-between gap-2 rounded-lg bg-[#173F35] px-3 py-2.5 text-sm font-semibold text-[#F7F6F2] transition-colors group-hover:bg-[#202421] sm:mt-4"
+        >
           Open recipe
-          <ArrowRight
-            size={15}
-            aria-hidden="true"
-          />
+          <ArrowRight size={15} aria-hidden="true" />
         </span>
       </div>
     </Link>
-  )
+  );
 }
 
 function RecipeRecommendationShelf({
@@ -852,7 +642,7 @@ function RecipeRecommendationShelf({
   loading,
 }) {
   if (!loading && items.length === 0) {
-    return null
+    return null;
   }
 
   return (
@@ -875,978 +665,632 @@ function RecipeRecommendationShelf({
           className="focus-ring inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-1.5 text-[13px] font-semibold text-[#173F35] shadow-sm transition hover:border-emerald-700 hover:bg-[#173F35] hover:text-white sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm sm:font-semibold"
         >
           View all
-          <ArrowRight
-            size={16}
-            aria-hidden="true"
-          />
+          <ArrowRight size={16} aria-hidden="true" />
         </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
         {loading
-          ? Array.from({ length: RECIPE_RECOMMENDATION_LIMIT }).map((_, index) => (
-              <div
-                key={index}
-                className={[
-                  'aspect-[0.76/1] animate-pulse rounded-[18px] border border-[#DCE0CF] bg-[#F7F6F2] sm:rounded-[24px]',
-                  index >= 4 ? 'hidden sm:block' : '',
-                ].join(' ')}
-              />
-            ))
+          ? Array.from({ length: RECIPE_RECOMMENDATION_LIMIT }).map(
+              (_, index) => (
+                <div
+                  key={index}
+                  className={[
+                    "aspect-[0.76/1] animate-pulse rounded-[18px] border border-[#DCE0CF] bg-[#F7F6F2] sm:rounded-[24px]",
+                    index >= 4 ? "hidden sm:block" : "",
+                  ].join(" ")}
+                />
+              )
+            )
           : items.map((item, index) => (
               <div
                 key={getRecipeRecommendationKey(item)}
-                className={index >= 4 ? 'hidden h-full sm:block' : 'h-full'}
+                className={index >= 4 ? "hidden h-full sm:block" : "h-full"}
               >
-                <RecommendedRecipeCard
-                  item={item}
-                />
+                <RecommendedRecipeCard item={item} />
               </div>
             ))}
       </div>
     </section>
-  )
+  );
 }
 
 export default function RecipeDetailPage() {
-  const {
-    slug,
-  } =
-    useParams()
+  const { slug } = useParams();
 
-  const location =
-    useLocation()
+  const location = useLocation();
 
-  const navigate =
-    useNavigate()
+  const navigate = useNavigate();
 
   const {
     isAuthenticated,
+    isBootstrapping,
+    user,
     customerEnabled,
     superAdminEnabled,
     activeMode,
-  } =
-    useAuth()
+  } = useAuth();
 
-  const [
-    data,
-    setData,
-  ] =
-    useState(
-      null,
-    )
+  const [data, setData] = useState(null);
 
-  const [
-    cookNextRecipes,
-    setCookNextRecipes,
-  ] =
-    useState(
-      [],
-    )
+  const [cookNextRecipes, setCookNextRecipes] = useState([]);
 
-  const [
-    similarRecipes,
-    setSimilarRecipes,
-  ] =
-    useState(
-      [],
-    )
+  const [similarRecipes, setSimilarRecipes] = useState([]);
 
-  const [
-    recipeRecommendationsLoading,
-    setRecipeRecommendationsLoading,
-  ] =
-    useState(
-      false,
-    )
+  const [recipeRecommendationsLoading, setRecipeRecommendationsLoading] =
+    useState(false);
 
-  const [
-    scaledData,
-    setScaledData,
-  ] =
-    useState(
-      null,
-    )
+  const [scaledData, setScaledData] = useState(null);
 
-  const [
-    servings,
-    setServings,
-  ] =
-    useState(
-      1,
-    )
+  const [servings, setServings] = useState(1);
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      true,
-    )
+  const [loading, setLoading] = useState(true);
 
-  const [
-    scaling,
-    setScaling,
-  ] =
-    useState(
-      false,
-    )
+  const [scaling, setScaling] = useState(false);
 
-  const [
-    error,
-    setError,
-  ] =
-    useState(
-      '',
-    )
+  const [error, setError] = useState("");
 
-  const [
-    recipeHeroView,
-    setRecipeHeroView,
-  ] =
-    useState(
-      'photo',
-    )
+  const [recipeHeroView, setRecipeHeroView] = useState("photo");
 
-  const [
-    detailsFoodIntelligence,
-    setDetailsFoodIntelligence,
-  ] =
-    useState(
-      null,
-    )
+  const [detailsFoodIntelligence, setDetailsFoodIntelligence] = useState(null);
 
-  const [
-    pantryReconciliation,
-    setPantryReconciliation,
-  ] =
-    useState(
-      null,
-    )
+  const [pantryReconciliation, setPantryReconciliation] = useState(null);
 
-  const [
-    pantryLoading,
-    setPantryLoading,
-  ] =
-    useState(
-      false,
-    )
+  const [pantryLoading, setPantryLoading] = useState(false);
 
-  const [
-    pantryActionKey,
-    setPantryActionKey,
-  ] =
-    useState(
-      '',
-    )
+  const [pantryActionKey, setPantryActionKey] = useState("");
 
-  const [
-    pantryError,
-    setPantryError,
-  ] =
-    useState(
-      '',
-    )
+  const [pantryError, setPantryError] = useState("");
 
-  const [
-    pantrySuccess,
-    setPantrySuccess,
-  ] =
-    useState(
-      '',
-    )
+  const [pantrySuccess, setPantrySuccess] = useState("");
 
-  const [resolvedIngredientIds, setResolvedIngredientIds] = useState(() => new Set())
-  const [pantrySetupItem, setPantrySetupItem] = useState(null)
-  const [setupQuantity, setSetupQuantity] = useState('')
-  const [setupUnit, setSetupUnit] = useState('g')
-  const [setupStorage, setSetupStorage] = useState('pantry')
-  const [setupUseSoon, setSetupUseSoon] = useState('')
-  const [setupSaving, setSetupSaving] = useState(false)
-  const [setupError, setSetupError] = useState('')
+  const [resolvedIngredientIds, setResolvedIngredientIds] = useState(
+    () => new Set()
+  );
+  const [pantrySetupItem, setPantrySetupItem] = useState(null);
+  const [setupQuantity, setSetupQuantity] = useState("");
+  const [setupUnit, setSetupUnit] = useState("g");
+  const [setupStorage, setSetupStorage] = useState("pantry");
+  const [setupUseSoon, setSetupUseSoon] = useState("");
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupError, setSetupError] = useState("");
 
-  const [
-    shoppingTray,
-    setShoppingTray,
-  ] =
-    useState(
-      [],
-    )
+  const [shoppingTray, setShoppingTray] = useState([]);
 
-  const [
-    cartError,
-    setCartError,
-  ] =
-    useState(
-      '',
-    )
+  const [cartError, setCartError] = useState("");
 
-  const [
-    restaurantOrderSubmitting,
-    setRestaurantOrderSubmitting,
-  ] =
-    useState(
-      false,
-    )
+  const [restaurantOrderSubmitting, setRestaurantOrderSubmitting] =
+    useState(false);
 
-  const [
-    restaurantOrderError,
-    setRestaurantOrderError,
-  ] =
-    useState(
-      '',
-    )
+  const [restaurantOrderError, setRestaurantOrderError] = useState("");
 
-  const restaurantOrderResumeRef =
-    useRef(
-      false,
-    )
+  const restaurantOrderResumeRef = useRef(false);
 
-  const ingredientDecisionLockRef =
-    useRef(
-      new Set(),
-    )
+  const ingredientDecisionLockRef = useRef(new Set());
 
-  const loadRecipe =
-    useCallback(
-      async () => {
-        setLoading(
-          true,
-        )
+  const loadRecipe = useCallback(async () => {
+    setLoading(true);
 
-        setError(
-          '',
-        )
+    setError("");
 
-        try {
-          const nextData =
-            await getPublicRecipe(
-              slug,
-            )
+    try {
+      const nextData = await getPublicRecipe(slug);
 
-          setData(
-            nextData,
-          )
+      setData(nextData);
 
-          const baseServings =
-            Number(
-              nextData?.recipe
-                ?.baseServings ||
-              1,
-            )
+      const baseServings = Number(nextData?.recipe?.baseServings || 1);
 
-          setServings(
-            Math.max(
-              1,
-              baseServings,
-            ),
-          )
-        } catch (loadError) {
-          setError(
-            loadError?.message ||
-            'Unable to load recipe.',
-          )
-        } finally {
-          setLoading(
-            false,
-          )
-        }
-      },
-      [
-        slug,
-      ],
-    )
+      setServings(Math.max(1, baseServings));
+    } catch (loadError) {
+      setError(loadError?.message || "Unable to load recipe.");
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
 
-  useEffect(
-    () => {
-      loadRecipe()
-    },
-    [
-      loadRecipe,
-    ],
-  )
+  useEffect(() => {
+    loadRecipe();
+  }, [loadRecipe]);
 
-  useEffect(
-    () => {
-      const currentSlug =
-        String(
-          data?.dish?.slug ||
-          slug ||
-          '',
-        ).trim()
+  useEffect(() => {
+    const currentSlug = String(data?.dish?.slug || slug || "").trim();
 
-      if (!currentSlug || !data?.dish) {
-        setCookNextRecipes([])
-        setSimilarRecipes([])
-        return undefined
-      }
+    if (!currentSlug || !data?.dish) {
+      setCookNextRecipes([]);
+      setSimilarRecipes([]);
+      return undefined;
+    }
 
-      let active = true
+    let active = true;
 
-      async function loadRecipeRecommendations() {
-        setRecipeRecommendationsLoading(true)
+    async function loadRecipeRecommendations() {
+      setRecipeRecommendationsLoading(true);
 
-        const cuisine =
-          String(
-            data?.dish?.cuisine ||
-            '',
-          ).trim()
+      const cuisine = String(data?.dish?.cuisine || "").trim();
 
-        const course =
-          String(
-            data?.dish?.course ||
-            '',
-          ).trim()
+      const course = String(data?.dish?.course || "").trim();
 
-        try {
-          const [generalResult, courseResult, cuisineResult] =
-            await Promise.all([
-              listPublicRecipes({
+      try {
+        const [generalResult, courseResult, cuisineResult] = await Promise.all([
+          listPublicRecipes({
+            page: 1,
+            limit: 24,
+          }),
+          course
+            ? listPublicRecipes({
                 page: 1,
-                limit: 24,
-              }),
-              course
-                ? listPublicRecipes({
-                    page: 1,
-                    limit: 18,
-                    course,
-                  })
-                : Promise.resolve({ recipes: [] }),
-              cuisine
-                ? listPublicRecipes({
-                    page: 1,
-                    limit: 18,
-                    cuisine,
-                  })
-                : Promise.resolve({ recipes: [] }),
-            ])
+                limit: 18,
+                course,
+              })
+            : Promise.resolve({ recipes: [] }),
+          cuisine
+            ? listPublicRecipes({
+                page: 1,
+                limit: 18,
+                cuisine,
+              })
+            : Promise.resolve({ recipes: [] }),
+        ]);
 
-          if (!active) {
-            return
-          }
+        if (!active) {
+          return;
+        }
 
-          const withoutCurrent =
-            (items) =>
-              (items || []).filter(
-                (item) =>
-                  String(
-                    item?.dish?.slug ||
-                    '',
-                  ).trim() !== currentSlug,
-              )
+        const withoutCurrent = (items) =>
+          (items || []).filter(
+            (item) => String(item?.dish?.slug || "").trim() !== currentSlug
+          );
 
-          const generalRecipes =
-            withoutCurrent(
-              generalResult?.recipes,
-            )
+        const generalRecipes = withoutCurrent(generalResult?.recipes);
 
-          const courseRecipes =
-            withoutCurrent(
-              courseResult?.recipes,
-            )
+        const courseRecipes = withoutCurrent(courseResult?.recipes);
 
-          const cuisineRecipes =
-            withoutCurrent(
-              cuisineResult?.recipes,
-            )
+        const cuisineRecipes = withoutCurrent(cuisineResult?.recipes);
 
-          const makeUnique =
-            (items) => {
-              const seen = new Set()
+        const makeUnique = (items) => {
+          const seen = new Set();
 
-              return items.filter(
-                (item) => {
-                  const key =
-                    getRecipeRecommendationKey(item)
+          return items.filter((item) => {
+            const key = getRecipeRecommendationKey(item);
 
-                  if (!key || seen.has(key)) {
-                    return false
-                  }
-
-                  seen.add(key)
-                  return true
-                },
-              )
+            if (!key || seen.has(key)) {
+              return false;
             }
 
-          const nextCook =
-            makeUnique([
-              ...courseRecipes,
-              ...generalRecipes,
-            ]).slice(0, RECIPE_RECOMMENDATION_LIMIT)
+            seen.add(key);
+            return true;
+          });
+        };
 
-          const cookKeys =
-            new Set(
-              nextCook.map(
-                getRecipeRecommendationKey,
-              ),
-            )
+        const nextCook = makeUnique([
+          ...courseRecipes,
+          ...generalRecipes,
+        ]).slice(0, RECIPE_RECOMMENDATION_LIMIT);
 
-          const nextSimilar =
-            makeUnique([
-              ...cuisineRecipes,
-              ...courseRecipes,
-              ...generalRecipes,
-            ])
-              .filter(
-                (item) =>
-                  !cookKeys.has(
-                    getRecipeRecommendationKey(item),
-                  ),
-              )
-              .slice(0, RECIPE_RECOMMENDATION_LIMIT)
+        const cookKeys = new Set(nextCook.map(getRecipeRecommendationKey));
 
-          setCookNextRecipes(nextCook)
-          setSimilarRecipes(nextSimilar)
-        } catch {
-          if (active) {
-            setCookNextRecipes([])
-            setSimilarRecipes([])
-          }
-        } finally {
-          if (active) {
-            setRecipeRecommendationsLoading(false)
-          }
+        const nextSimilar = makeUnique([
+          ...cuisineRecipes,
+          ...courseRecipes,
+          ...generalRecipes,
+        ])
+          .filter((item) => !cookKeys.has(getRecipeRecommendationKey(item)))
+          .slice(0, RECIPE_RECOMMENDATION_LIMIT);
+
+        setCookNextRecipes(nextCook);
+        setSimilarRecipes(nextSimilar);
+      } catch {
+        if (active) {
+          setCookNextRecipes([]);
+          setSimilarRecipes([]);
+        }
+      } finally {
+        if (active) {
+          setRecipeRecommendationsLoading(false);
         }
       }
+    }
 
-      loadRecipeRecommendations()
+    loadRecipeRecommendations();
 
-      return () => {
-        active = false
-      }
-    },
-    [
-      data?.dish,
-      slug,
-    ],
-  )
+    return () => {
+      active = false;
+    };
+  }, [data?.dish, slug]);
 
-  useEffect(
-    () => {
-      const recipeVersionId =
-        data?.recipe?.id
+  useEffect(() => {
+    const recipeVersionId = data?.recipe?.id;
 
-      if (!recipeVersionId) {
-        setDetailsFoodIntelligence(
-          null,
-        )
-        return undefined
-      }
+    if (!recipeVersionId) {
+      setDetailsFoodIntelligence(null);
+      return undefined;
+    }
 
-      let active =
-        true
+    let active = true;
 
-      async function loadDetailsFoodIntelligence() {
-        try {
-          const result =
-            await getRecipeFoodIntelligence(
-              recipeVersionId,
-            )
+    async function loadDetailsFoodIntelligence() {
+      try {
+        const result = await getRecipeFoodIntelligence(recipeVersionId);
 
-          if (active) {
-            setDetailsFoodIntelligence(
-              result,
-            )
-          }
-        } catch {
-          if (active) {
-            setDetailsFoodIntelligence(
-              null,
-            )
-          }
+        if (active) {
+          setDetailsFoodIntelligence(result);
+        }
+      } catch {
+        if (active) {
+          setDetailsFoodIntelligence(null);
         }
       }
+    }
 
-      loadDetailsFoodIntelligence()
+    loadDetailsFoodIntelligence();
 
-      return () => {
-        active =
-          false
-      }
-    },
-    [
-      data?.recipe?.id,
-    ],
-  )
+    return () => {
+      active = false;
+    };
+  }, [data?.recipe?.id]);
 
   const customerContextBlocked =
     isAuthenticated === true &&
-    (
-      superAdminEnabled === true ||
-      activeMode === 'host' ||
-      customerEnabled !== true
-    )
+    (superAdminEnabled === true ||
+      activeMode === "host" ||
+      customerEnabled !== true);
 
   const canUseCustomerFeatures =
     isAuthenticated &&
-    customerEnabled ===
-      true &&
-    superAdminEnabled !==
-      true &&
-    activeMode !==
-      'host'
+    customerEnabled === true &&
+    superAdminEnabled !== true &&
+    activeMode !== "host";
 
   const showCustomerActionControls =
-    canUseCustomerFeatures ||
-    customerContextBlocked
+    canUseCustomerFeatures || customerContextBlocked;
 
   function openCustomerAccessRequired() {
-    const returnTo =
-      `${location.pathname}${location.search}${location.hash}`
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
     navigate(
-      `/customer-access-required?returnTo=${encodeURIComponent(
-        returnTo,
-      )}`,
-    )
+      `/customer-access-required?returnTo=${encodeURIComponent(returnTo)}`
+    );
   }
 
+  useEffect(() => {
+    if (!data?.recipe || !slug) {
+      return;
+    }
 
-  useEffect(
-    () => {
-      if (
-        !data?.recipe ||
-        !slug
-      ) {
-        return
-      }
+    let active = true;
 
-      let active =
-        true
+    async function loadScaling() {
+      setScaling(true);
 
-      async function loadScaling() {
-        setScaling(
-          true,
-        )
+      try {
+        const nextScaledData = await scalePublicRecipe(slug, servings);
 
-        try {
-          const nextScaledData =
-            await scalePublicRecipe(
-              slug,
-              servings,
-            )
-
-          if (active) {
-            setScaledData(
-              nextScaledData,
-            )
-          }
-        } catch (scaleError) {
-          if (active) {
-            setError(
-              scaleError?.message ||
-              'Unable to scale recipe.',
-            )
-          }
-        } finally {
-          if (active) {
-            setScaling(
-              false,
-            )
-          }
+        if (active) {
+          setScaledData(nextScaledData);
+        }
+      } catch (scaleError) {
+        if (active) {
+          setError(scaleError?.message || "Unable to scale recipe.");
+        }
+      } finally {
+        if (active) {
+          setScaling(false);
         }
       }
+    }
 
-      loadScaling()
+    loadScaling();
 
-      return () => {
-        active =
-          false
+    return () => {
+      active = false;
+    };
+  }, [data?.recipe, servings, slug]);
+
+  const ingredientRows = useMemo(() => {
+    const scaled = scaledData?.scaling?.ingredients;
+
+    if (Array.isArray(scaled) && scaled.length > 0) {
+      return scaled;
+    }
+
+    return (data?.ingredients || []).map((ingredient) => ({
+      ...ingredient,
+
+      displayQuantity: ingredient.quantity,
+
+      displayUnit: ingredient.unit,
+    }));
+  }, [data?.ingredients, scaledData]);
+
+  const loadPantryReconciliation = useCallback(async () => {
+    if (!canUseCustomerFeatures || !slug) {
+      setPantryReconciliation(null);
+      return;
+    }
+
+    setPantryLoading(true);
+    setPantryError("");
+
+    try {
+      const result = await getRecipePantry(slug, {
+        targetServings: servings,
+      });
+
+      setPantryReconciliation(result);
+    } catch (pantryLoadError) {
+      setPantryError(
+        getPantryErrorMessage(
+          pantryLoadError,
+          "Unable to compare this Recipe with your Pantry."
+        )
+      );
+    } finally {
+      setPantryLoading(false);
+    }
+  }, [canUseCustomerFeatures, servings, slug]);
+
+  useEffect(() => {
+    loadPantryReconciliation();
+  }, [loadPantryReconciliation]);
+
+  const pantryLines = useMemo(
+    () => getPantryRequirementLines(pantryReconciliation),
+    [pantryReconciliation]
+  );
+
+  const pantryByIngredientId = useMemo(() => {
+    const map = new Map();
+
+    pantryLines.forEach((line) => {
+      const ingredientId = getPantryLineIngredientId(line);
+
+      if (ingredientId) {
+        map.set(ingredientId, line);
       }
-    },
-    [
-      data?.recipe,
-      servings,
-      slug,
-    ],
-  )
+    });
 
-  const ingredientRows =
-    useMemo(
-      () => {
-        const scaled =
-          scaledData?.scaling
-            ?.ingredients
+    return map;
+  }, [pantryLines]);
 
-        if (
-          Array.isArray(
-            scaled,
-          ) &&
-          scaled.length >
-            0
-        ) {
-          return scaled
-        }
+  const dish = data?.dish || {};
 
-        return (
-          data?.ingredients ||
-          []
-        ).map(
-          (
-            ingredient,
-          ) => ({
-            ...ingredient,
-
-            displayQuantity:
-              ingredient.quantity,
-
-            displayUnit:
-              ingredient.unit,
-          }),
-        )
+  useEffect(() => {
+    if (isBootstrapping || !dish?.slug || !dish?.name || !data?.recipe?.id)
+      return;
+    recordRecipeView(
+      {
+        slug: dish.slug,
+        name: dish.name,
+        image: dish.heroImageUrl || "",
+        cuisine: dish.cuisine || "",
       },
-      [
-        data?.ingredients,
-        scaledData,
-      ],
-    )
+      isAuthenticated ? user?.id || user?._id || user?.uid : ""
+    );
+  }, [
+    dish?.slug,
+    dish?.name,
+    dish?.heroImageUrl,
+    dish?.cuisine,
+    data?.recipe?.id,
+    isBootstrapping,
+    isAuthenticated,
+    user?.id,
+    user?._id,
+    user?.uid,
+  ]);
 
-  const loadPantryReconciliation =
-    useCallback(
-      async () => {
-        if (
-          !canUseCustomerFeatures ||
-          !slug
-        ) {
-          setPantryReconciliation(
-            null,
-          )
-          return
-        }
+  const recipe = data?.recipe || {};
 
-        setPantryLoading(
-          true,
-        )
-        setPantryError(
-          '',
-        )
-
-        try {
-          const result =
-            await getRecipePantry(
-              slug,
-              {
-                targetServings:
-                  servings,
-              },
-            )
-
-          setPantryReconciliation(
-            result,
-          )
-        } catch (
-          pantryLoadError
-        ) {
-          setPantryError(
-            getPantryErrorMessage(
-              pantryLoadError,
-              'Unable to compare this Recipe with your Pantry.',
-            ),
-          )
-        } finally {
-          setPantryLoading(
-            false,
-          )
-        }
-      },
-      [
-        canUseCustomerFeatures,
-        servings,
-        slug,
-      ],
-    )
-
-  useEffect(
-    () => {
-      loadPantryReconciliation()
-    },
-    [
-      loadPantryReconciliation,
-    ],
-  )
-
-  const pantryLines =
-    useMemo(
-      () =>
-        getPantryRequirementLines(
-          pantryReconciliation,
-        ),
-      [
-        pantryReconciliation,
-      ],
-    )
-
-  const pantryByIngredientId =
-    useMemo(
-      () => {
-        const map =
-          new Map()
-
-        pantryLines.forEach(
-          (line) => {
-            const ingredientId =
-              getPantryLineIngredientId(
-                line,
-              )
-
-            if (ingredientId) {
-              map.set(
-                ingredientId,
-                line,
-              )
-            }
-          },
-        )
-
-        return map
-      },
-      [
-        pantryLines,
-      ],
-    )
-
-
-  const dish =
-    data?.dish ||
-    {}
-
-  const recipe =
-    data?.recipe ||
-    {}
-
-  const restaurant =
-    data?.restaurant ||
-    null
+  const restaurant = data?.restaurant || null;
 
   const restaurantOrder =
-    scaledData?.restaurantOrder ||
-    data?.restaurantOrder ||
-    null
+    scaledData?.restaurantOrder || data?.restaurantOrder || null;
 
   const isRestaurantRecipe =
-    recipe?.source?.type ===
-      'chef' &&
-    Boolean(
-      restaurant,
-    )
+    recipe?.source?.type === "chef" && Boolean(restaurant);
 
   const restaurantOrderPriceCurrent =
-    Number(
-      restaurantOrder?.servings,
-    ) ===
-      Number(
-        servings,
-      )
+    Number(restaurantOrder?.servings) === Number(servings);
 
-  const recipeDietaryBadge = resolveRecipeDietaryBadge(detailsFoodIntelligence)
+  const recipeDietaryBadge = resolveRecipeDietaryBadge(detailsFoodIntelligence);
 
   useEffect(() => {
-    if (!data?.recipe?.id || typeof MutationObserver === 'undefined') return undefined
+    if (!data?.recipe?.id || typeof MutationObserver === "undefined")
+      return undefined;
     const ids = [
-      'recipe-nutrition-intelligence-slot',
-      'recipe-allergen-intelligence-slot',
-      'recipe-dietary-intelligence-slot',
-    ]
-    const targets = ids.map((id) => document.getElementById(id)).filter(Boolean)
+      "recipe-nutrition-intelligence-slot",
+      "recipe-allergen-intelligence-slot",
+      "recipe-dietary-intelligence-slot",
+    ];
+    const targets = ids
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
     const exposeBridgePanels = () => {
       targets.forEach((target) => {
-        const panel = target.querySelector(':scope > details')
-        if (panel && panel.dataset.epantryInitiallyOpened !== 'true') {
-          panel.open = true
-          panel.dataset.epantryInitiallyOpened = 'true'
+        const panel = target.querySelector(":scope > details");
+        if (panel && panel.dataset.epantryInitiallyOpened !== "true") {
+          panel.open = true;
+          panel.dataset.epantryInitiallyOpened = "true";
         }
-      })
-    }
-    exposeBridgePanels()
-    const observer = new MutationObserver(exposeBridgePanels)
-    targets.forEach((target) => observer.observe(target, { childList: true }))
-    return () => observer.disconnect()
-  }, [data?.recipe?.id])
-
+      });
+    };
+    exposeBridgePanels();
+    const observer = new MutationObserver(exposeBridgePanels);
+    targets.forEach((target) => observer.observe(target, { childList: true }));
+    return () => observer.disconnect();
+  }, [data?.recipe?.id]);
 
   useEffect(() => {
-    ingredientDecisionLockRef.current.clear()
-    restaurantOrderResumeRef.current = false
-    setResolvedIngredientIds(new Set())
-    setPantrySetupItem(null)
-    setSetupError('')
-    setRestaurantOrderError('')
-  }, [slug])
+    ingredientDecisionLockRef.current.clear();
+    restaurantOrderResumeRef.current = false;
+    setResolvedIngredientIds(new Set());
+    setPantrySetupItem(null);
+    setSetupError("");
+    setRestaurantOrderError("");
+  }, [slug]);
 
-  useEffect(
-    () => {
-      const savedCart =
-        readPendingRecipeCart()
+  useEffect(() => {
+    const savedCart = readPendingRecipeCart();
 
-      if (
-        savedCart?.slug ===
-          slug &&
-        Array.isArray(
-          savedCart.items,
-        )
-      ) {
-        setShoppingTray(
-          savedCart.items,
-        )
-      } else {
-        setShoppingTray([])
-      }
-    },
-    [
-      slug,
-    ],
-  )
-
+    if (savedCart?.slug === slug && Array.isArray(savedCart.items)) {
+      setShoppingTray(savedCart.items);
+    } else {
+      setShoppingTray([]);
+    }
+  }, [slug]);
 
   function setIngredientResolved(canonicalIngredientId, resolved = true) {
     setResolvedIngredientIds((current) => {
-      const next = new Set(current)
-      if (resolved) next.add(canonicalIngredientId)
-      else next.delete(canonicalIngredientId)
-      return next
-    })
+      const next = new Set(current);
+      if (resolved) next.add(canonicalIngredientId);
+      else next.delete(canonicalIngredientId);
+      return next;
+    });
   }
 
   function preparePantrySetupDrawer({ item, ingredient, name }) {
-    if (!item?.id) return
+    if (!item?.id) return;
 
-    const suggestedUnit = String(ingredient?.displayUnit || '').trim().toLowerCase()
-    const allowedUnits = new Set(['g', 'kg', 'ml', 'l', 'pcs'])
+    const suggestedUnit = String(ingredient?.displayUnit || "")
+      .trim()
+      .toLowerCase();
+    const allowedUnits = new Set(["g", "kg", "ml", "l", "pcs"]);
 
     setPantrySetupItem({
       id: item.id,
-      name: name || item.displayName || 'Pantry item',
-    })
+      name: name || item.displayName || "Pantry item",
+    });
     setSetupQuantity(
-      item?.quantity?.mode === 'exact'
-        ? String(item.quantity.value ?? '')
-        : '',
-    )
+      item?.quantity?.mode === "exact" ? String(item.quantity.value ?? "") : ""
+    );
     setSetupUnit(
       item?.quantity?.unit ||
-        (allowedUnits.has(suggestedUnit) ? suggestedUnit : 'g'),
-    )
-    setSetupStorage(item?.storageZone || 'pantry')
-    setSetupUseSoon(toDateInputValue(item?.useSoonAt))
-    setSetupError('')
+        (allowedUnits.has(suggestedUnit) ? suggestedUnit : "g")
+    );
+    setSetupStorage(item?.storageZone || "pantry");
+    setSetupUseSoon(toDateInputValue(item?.useSoonAt));
+    setSetupError("");
   }
 
   async function handleIHaveIngredient(ingredient) {
     if (customerContextBlocked) {
-      openCustomerAccessRequired()
-      return
+      openCustomerAccessRequired();
+      return;
     }
 
-    if (pantryActionKey || !canUseCustomerFeatures) return
+    if (pantryActionKey || !canUseCustomerFeatures) return;
 
-    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
+    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient);
 
     if (
       !canonicalIngredientId ||
       ingredientDecisionLockRef.current.has(canonicalIngredientId)
     ) {
       if (!canonicalIngredientId) {
-        setPantryError('This Recipe line is not linked to a canonical ingredient yet.')
+        setPantryError(
+          "This Recipe line is not linked to a canonical ingredient yet."
+        );
       }
-      return
+      return;
     }
 
-    const identity = ingredient?.ingredient || {}
+    const identity = ingredient?.ingredient || {};
 
-    ingredientDecisionLockRef.current.add(canonicalIngredientId)
-    setIngredientResolved(canonicalIngredientId, true)
-    setPantryActionKey(`have-${canonicalIngredientId}`)
-    setPantryError('')
-    setPantrySuccess('')
+    ingredientDecisionLockRef.current.add(canonicalIngredientId);
+    setIngredientResolved(canonicalIngredientId, true);
+    setPantryActionKey(`have-${canonicalIngredientId}`);
+    setPantryError("");
+    setPantrySuccess("");
 
     try {
-      const result = await confirmIHaveThis({ canonicalIngredientId })
+      const result = await confirmIHaveThis({ canonicalIngredientId });
 
       setPantrySuccess(
-        `${identity.name || 'Ingredient'} confirmed in your Living Pantry. Add a few details now for better planning.`,
-      )
+        `${
+          identity.name || "Ingredient"
+        } confirmed in your Living Pantry. Add a few details now for better planning.`
+      );
 
       setShoppingTray((current) => {
         const next = current.filter(
-          (item) => item.canonicalIngredientId !== canonicalIngredientId,
-        )
-        savePendingRecipeCart({ slug, servings, items: next })
-        notifyFloatingCartUpdated()
-        return next
-      })
+          (item) => item.canonicalIngredientId !== canonicalIngredientId
+        );
+        savePendingRecipeCart({ slug, servings, items: next });
+        notifyFloatingCartUpdated();
+        return next;
+      });
 
       preparePantrySetupDrawer({
         item: result?.item || null,
         ingredient,
-        name: identity.name || 'Ingredient',
-      })
+        name: identity.name || "Ingredient",
+      });
 
-      await loadPantryReconciliation()
+      await loadPantryReconciliation();
     } catch (confirmationError) {
-      ingredientDecisionLockRef.current.delete(canonicalIngredientId)
-      setIngredientResolved(canonicalIngredientId, false)
+      ingredientDecisionLockRef.current.delete(canonicalIngredientId);
+      setIngredientResolved(canonicalIngredientId, false);
       setPantryError(
         getPantryErrorMessage(
           confirmationError,
-          'Unable to confirm this Pantry item.',
-        ),
-      )
+          "Unable to confirm this Pantry item."
+        )
+      );
     } finally {
-      ingredientDecisionLockRef.current.delete(canonicalIngredientId)
-      setPantryActionKey('')
+      ingredientDecisionLockRef.current.delete(canonicalIngredientId);
+      setPantryActionKey("");
     }
   }
 
   async function savePantrySetupDetails() {
-    if (!pantrySetupItem?.id || setupSaving) return
+    if (!pantrySetupItem?.id || setupSaving) return;
 
-    const numericQuantity = Number(setupQuantity)
+    const numericQuantity = Number(setupQuantity);
     if (!Number.isFinite(numericQuantity) || numericQuantity < 0) {
-      setSetupError('Enter a valid quantity before saving.')
-      return
+      setSetupError("Enter a valid quantity before saving.");
+      return;
     }
     if (!setupUnit) {
-      setSetupError('Choose a quantity unit before saving.')
-      return
+      setSetupError("Choose a quantity unit before saving.");
+      return;
     }
 
-    setSetupSaving(true)
-    setSetupError('')
+    setSetupSaving(true);
+    setSetupError("");
 
     try {
       await correctPantryQuantity(pantrySetupItem.id, {
         value: numericQuantity,
         unit: setupUnit,
-      })
+      });
 
       if (setupStorage) {
-        await updatePantryStorage(pantrySetupItem.id, setupStorage)
+        await updatePantryStorage(pantrySetupItem.id, setupStorage);
       }
       if (setupUseSoon) {
-        await updatePantryUseSoon(pantrySetupItem.id, setupUseSoon)
+        await updatePantryUseSoon(pantrySetupItem.id, setupUseSoon);
       }
 
-      setPantrySuccess(`${pantrySetupItem.name} details saved in your Pantry.`)
-      setPantrySetupItem(null)
-      await loadPantryReconciliation()
+      setPantrySuccess(`${pantrySetupItem.name} details saved in your Pantry.`);
+      setPantrySetupItem(null);
+      await loadPantryReconciliation();
     } catch (saveError) {
       setSetupError(
-        getPantryErrorMessage(saveError, 'Unable to save these Pantry details.'),
-      )
+        getPantryErrorMessage(saveError, "Unable to save these Pantry details.")
+      );
     } finally {
-      setSetupSaving(false)
+      setSetupSaving(false);
     }
   }
 
   async function deferPantrySetupDetails() {
-    const itemId = pantrySetupItem?.id
-    setPantrySetupItem(null)
-    setSetupError('')
-    if (!itemId) return
+    const itemId = pantrySetupItem?.id;
+    setPantrySetupItem(null);
+    setSetupError("");
+    if (!itemId) return;
 
     try {
-      await requestPantrySetupReminder(itemId)
+      await requestPantrySetupReminder(itemId);
     } catch {
       // Best-effort reminder; the Pantry item itself is already saved.
     }
@@ -1854,396 +1298,296 @@ export default function RecipeDetailPage() {
 
   async function handleCookedRecipe() {
     if (customerContextBlocked) {
-      openCustomerAccessRequired()
-      return
+      openCustomerAccessRequired();
+      return;
     }
 
-    if (
-      pantryActionKey ||
-      !canUseCustomerFeatures
-    ) {
-      return
+    if (pantryActionKey || !canUseCustomerFeatures) {
+      return;
     }
 
-    setPantryActionKey(
-      'cooked',
-    )
-    setPantryError('')
-    setPantrySuccess('')
+    setPantryActionKey("cooked");
+    setPantryError("");
+    setPantrySuccess("");
 
     try {
-      await recordRecipeCooked(
-        slug,
-        {
-          targetServings:
-            servings,
-          idempotencyKey:
-            createPantryIdempotencyKey(),
-        },
-      )
+      await recordRecipeCooked(slug, {
+        targetServings: servings,
+        idempotencyKey: createPantryIdempotencyKey(),
+      });
 
       setPantrySuccess(
-        'Cooked Recipe recorded. Pantry consumption observations have been updated.',
-      )
+        "Cooked Recipe recorded. Pantry consumption observations have been updated."
+      );
 
-      await loadPantryReconciliation()
-    } catch (
-      cookedError
-    ) {
+      await loadPantryReconciliation();
+    } catch (cookedError) {
       setPantryError(
         getPantryErrorMessage(
           cookedError,
-          'Unable to record this cooked Recipe.',
-        ),
-      )
+          "Unable to record this cooked Recipe."
+        )
+      );
     } finally {
-      setPantryActionKey('')
+      setPantryActionKey("");
     }
   }
 
   async function addIngredientToRecipeCart(ingredient, sourceElement) {
     if (customerContextBlocked) {
-      openCustomerAccessRequired()
-      return false
+      openCustomerAccessRequired();
+      return false;
     }
     if (!isAuthenticated || customerEnabled !== true) {
-      setCartError('Sign in with Customer access to shop missing Recipe ingredients.')
-      return false
+      setCartError(
+        "Sign in with Customer access to shop missing Recipe ingredients."
+      );
+      return false;
     }
 
-    const identity = ingredient?.ingredient || {}
-    const name = identity.name || 'Ingredient'
-    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
+    const identity = ingredient?.ingredient || {};
+    const name = identity.name || "Ingredient";
+    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient);
 
     if (!canonicalIngredientId) {
       setCartError(
-        'This Recipe ingredient is not linked to a canonical ingredient and cannot be added to the Recipe Cart yet.',
-      )
-      return false
+        "This Recipe ingredient is not linked to a canonical ingredient and cannot be added to the Recipe Cart yet."
+      );
+      return false;
     }
 
-    setCartError('')
+    setCartError("");
 
     try {
-      const availability =
-        await checkItemAvailability({
-          query:
-            name,
-          canonicalIngredientId,
-          source:
-            'recipe',
-        })
+      const availability = await checkItemAvailability({
+        query: name,
+        canonicalIngredientId,
+        source: "recipe",
+      });
 
-      if (
-        availability?.available !==
-          true
-      ) {
+      if (availability?.available !== true) {
         openAvailabilityNotifyModal({
-          query:
-            name,
-          displayName:
-            name,
+          query: name,
+          displayName: name,
           canonicalIngredientId,
-          source:
-            'recipe',
-        })
+          source: "recipe",
+        });
 
-        return false
+        return false;
       }
     } catch (availabilityError) {
       setCartError(
         availabilityError?.response?.data?.message ||
           availabilityError?.message ||
-          'Unable to check whether this ingredient is available on EPANTRY right now.',
-      )
+          "Unable to check whether this ingredient is available on EPANTRY right now."
+      );
 
-      return false
+      return false;
     }
     setShoppingTray((current) => {
       const existingIndex = current.findIndex(
-        (item) => item.canonicalIngredientId === canonicalIngredientId,
-      )
+        (item) => item.canonicalIngredientId === canonicalIngredientId
+      );
       const nextItem = {
         canonicalIngredientId,
         name,
         quantity: ingredient.displayQuantity,
         unit: ingredient.displayUnit,
-      }
-      const next = existingIndex >= 0
-        ? current.map((item, index) => (index === existingIndex ? nextItem : item))
-        : [...current, nextItem]
+      };
+      const next =
+        existingIndex >= 0
+          ? current.map((item, index) =>
+              index === existingIndex ? nextItem : item
+            )
+          : [...current, nextItem];
 
-      savePendingRecipeCart({ slug, servings, items: next })
-      notifyFloatingCartUpdated()
-      return next
-    })
+      savePendingRecipeCart({ slug, servings, items: next });
+      notifyFloatingCartUpdated();
+      return next;
+    });
 
-    notifyFloatingCartFly({ name, sourceElement })
-    return true
+    notifyFloatingCartFly({ name, sourceElement });
+    return true;
   }
 
   async function handleMissingIngredient(ingredient, sourceElement) {
-    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
+    const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient);
     if (
       !canonicalIngredientId ||
       ingredientDecisionLockRef.current.has(canonicalIngredientId)
-    ) return
+    )
+      return;
 
-    ingredientDecisionLockRef.current.add(canonicalIngredientId)
+    ingredientDecisionLockRef.current.add(canonicalIngredientId);
     try {
-      const added =
-        await addIngredientToRecipeCart(
-          ingredient,
-          sourceElement,
-        )
+      const added = await addIngredientToRecipeCart(ingredient, sourceElement);
 
       if (added) {
-        setIngredientResolved(canonicalIngredientId, true)
+        setIngredientResolved(canonicalIngredientId, true);
       }
     } finally {
-      ingredientDecisionLockRef.current.delete(canonicalIngredientId)
+      ingredientDecisionLockRef.current.delete(canonicalIngredientId);
     }
   }
 
-
   async function handleDirectRestaurantOrder({
-    resumeAfterAddress =
-      false,
+    resumeAfterAddress = false,
   } = {}) {
-    if (
-      restaurantOrderSubmitting
-    ) {
-      return
+    if (restaurantOrderSubmitting) {
+      return;
     }
 
-    if (
-      !canUseCustomerFeatures
-    ) {
-      openCustomerAccessRequired()
-      return
+    if (!canUseCustomerFeatures) {
+      openCustomerAccessRequired();
+      return;
     }
 
     if (
       !isRestaurantRecipe ||
-      restaurantOrder?.available !==
-        true ||
+      restaurantOrder?.available !== true ||
       !restaurantOrderPriceCurrent
     ) {
       setRestaurantOrderError(
-        'This prepared dish is not currently available to order at the selected servings.',
-      )
-      return
+        "This prepared dish is not currently available to order at the selected servings."
+      );
+      return;
     }
 
-    setRestaurantOrderSubmitting(
-      true,
-    )
-    setRestaurantOrderError(
-      '',
-    )
+    setRestaurantOrderSubmitting(true);
+    setRestaurantOrderError("");
 
     try {
-      const addressResult =
-        await getDefaultDeliveryAddress()
+      const addressResult = await getDefaultDeliveryAddress();
 
-      const address =
-        addressResult?.address ||
-        null
+      const address = addressResult?.address || null;
 
-      const pincode =
-        String(
-          address?.postalCode ||
-            '',
-        )
-          .trim()
-          .replace(
-            /\s+/g,
-            '',
-          )
+      const pincode = String(address?.postalCode || "")
+        .trim()
+        .replace(/\s+/g, "");
 
-      if (
-        !/^\d{6}$/.test(
-          pincode,
-        )
-      ) {
-        if (
-          resumeAfterAddress
-        ) {
+      if (!/^\d{6}$/.test(pincode)) {
+        if (resumeAfterAddress) {
           throw new Error(
-            'Choose a delivery address with a valid 6-digit pincode before ordering this Restaurant dish.',
-          )
+            "Choose a delivery address with a valid 6-digit pincode before ordering this Restaurant dish."
+          );
         }
 
-        const returnTo =
-          `${location.pathname}${location.search}${location.hash}`
+        const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
         navigate(
-          `/delivery-addresses?returnTo=${encodeURIComponent(
-            returnTo,
-          )}`,
+          `/delivery-addresses?returnTo=${encodeURIComponent(returnTo)}`,
           {
             state: {
-              restaurantRecipeOrderResume:
-                true,
-              restaurantRecipeOrderServings:
-                servings,
+              restaurantRecipeOrderResume: true,
+              restaurantRecipeOrderServings: servings,
             },
-          },
-        )
-        return
+          }
+        );
+        return;
       }
 
-      const result =
-        await createRestaurantRecipeMarketplaceCart({
-          slug,
-          servings,
-          pincode,
-          fulfillmentType:
-            'delivery',
-          idempotencyKey:
-            createCommerceIdempotencyKey(
-              'restaurant-recipe-order',
-            ),
-        })
+      const result = await createRestaurantRecipeMarketplaceCart({
+        slug,
+        servings,
+        pincode,
+        fulfillmentType: "delivery",
+        idempotencyKey: createCommerceIdempotencyKey("restaurant-recipe-order"),
+      });
 
-      const cartId =
-        result?.cart?.id
+      const cartId = result?.cart?.id;
 
       if (!cartId) {
-        throw new Error(
-          'Restaurant order Cart identity was not returned.',
-        )
+        throw new Error("Restaurant order Cart identity was not returned.");
       }
 
-      navigate(
-        `/cart/${cartId}`,
-        {
-          state: {
-            restaurantRecipeOrder:
-              true,
-          },
+      navigate(`/cart/${cartId}`, {
+        state: {
+          restaurantRecipeOrder: true,
         },
-      )
+      });
     } catch (orderError) {
       setRestaurantOrderError(
         getCommerceErrorMessage(
           orderError,
-          'Unable to start this Restaurant order.',
-        ),
-      )
+          "Unable to start this Restaurant order."
+        )
+      );
     } finally {
-      setRestaurantOrderSubmitting(
-        false,
-      )
+      setRestaurantOrderSubmitting(false);
     }
   }
 
-  useEffect(
-    () => {
-      if (
-        location.state
-          ?.restaurantRecipeOrderResume !==
-          true ||
-        location.state
-          ?.deliveryAddressSaved !==
-          true ||
-        restaurantOrderResumeRef.current
-      ) {
-        return
-      }
+  useEffect(() => {
+    if (
+      location.state?.restaurantRecipeOrderResume !== true ||
+      location.state?.deliveryAddressSaved !== true ||
+      restaurantOrderResumeRef.current
+    ) {
+      return;
+    }
 
-      const requestedServings =
-        Number(
-          location.state
-            ?.restaurantRecipeOrderServings ||
-            servings,
-        )
+    const requestedServings = Number(
+      location.state?.restaurantRecipeOrderServings || servings
+    );
 
-      if (
-        Number.isInteger(
-          requestedServings,
-        ) &&
-        requestedServings >
-          0 &&
-        requestedServings !==
-          servings
-      ) {
-        setServings(
-          requestedServings,
-        )
-        return
-      }
+    if (
+      Number.isInteger(requestedServings) &&
+      requestedServings > 0 &&
+      requestedServings !== servings
+    ) {
+      setServings(requestedServings);
+      return;
+    }
 
-      if (
-        loading ||
-        scaling ||
-        !isRestaurantRecipe ||
-        !restaurantOrderPriceCurrent
-      ) {
-        return
-      }
+    if (
+      loading ||
+      scaling ||
+      !isRestaurantRecipe ||
+      !restaurantOrderPriceCurrent
+    ) {
+      return;
+    }
 
-      restaurantOrderResumeRef.current =
-        true
+    restaurantOrderResumeRef.current = true;
 
-      navigate(
-        `${location.pathname}${location.search}${location.hash}`,
-        {
-          replace:
-            true,
-          state:
-            null,
-        },
-      )
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: null,
+    });
 
-      handleDirectRestaurantOrder({
-        resumeAfterAddress:
-          true,
-      })
-    },
-    [
-      isRestaurantRecipe,
-      loading,
-      location.hash,
-      location.pathname,
-      location.search,
-      location.state,
-      navigate,
-      restaurantOrderPriceCurrent,
-      scaling,
-      servings,
-    ],
-  )
-
+    handleDirectRestaurantOrder({
+      resumeAfterAddress: true,
+    });
+  }, [
+    isRestaurantRecipe,
+    loading,
+    location.hash,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    restaurantOrderPriceCurrent,
+    scaling,
+    servings,
+  ]);
 
   if (loading) {
     return (
       <main className="page-shell min-h-screen py-10">
-
         <div className="h-[620px] animate-pulse rounded-[30px] border border-[#DCE0CF] bg-white" />
-
       </main>
-    )
+    );
   }
 
-  if (
-    error &&
-    !data
-  ) {
+  if (error && !data) {
     return (
       <main className="page-shell min-h-screen py-10">
-
         <div className="rounded-[28px] border border-red-200 bg-red-50 p-8">
-
           <h1 className="text-xl font-semibold text-red-950">
             Recipe unavailable
           </h1>
 
-          <p className="mt-2 text-sm text-red-800">
-            {
-              error
-            }
-          </p>
+          <p className="mt-2 text-sm text-red-800">{error}</p>
 
           <Link
             to="/recipes"
@@ -2251,11 +1595,9 @@ export default function RecipeDetailPage() {
           >
             Back to recipes
           </Link>
-
         </div>
-
       </main>
-    )
+    );
   }
 
   return (
@@ -4466,115 +3808,79 @@ export default function RecipeDetailPage() {
       `}</style>
 
       <div className="page-shell pb-10 pt-5 sm:pb-16 sm:pt-7">
-
         <Link
           to="/recipes"
           className="focus-ring mb-3 inline-flex items-center gap-2 rounded-full px-1 py-1 text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42]"
         >
-          <ArrowLeft
-            size={17}
-            aria-hidden="true"
-          />
-
+          <ArrowLeft size={17} aria-hidden="true" />
           Recipes
         </Link>
 
         <div className="epantry-recipe-hero mt-2 overflow-hidden rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2]">
-
           <div className="epantry-recipe-hero-grid grid gap-0 lg:grid-cols-[minmax(0,1.16fr)_minmax(0,0.84fr)]">
-
             <div className="epantry-recipe-photo relative h-[38svh] min-h-[290px] overflow-hidden bg-[#DCE0CF] sm:m-4 sm:h-[480px] sm:rounded-[12px] lg:m-5 lg:mr-0 lg:h-[540px]">
-
               <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full border border-white/60 bg-white/90 p-1 shadow-sm backdrop-blur-md sm:right-3 sm:top-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    setRecipeHeroView(
-                      'photo',
-                    )
-                  }
+                  onClick={() => setRecipeHeroView("photo")}
                   className={[
-                    'focus-ring rounded-full px-3 py-1.5 text-[13px] font-semibold transition',
-                    recipeHeroView ===
-                    'photo'
-                      ? 'bg-[#173F35] text-white'
-                      : 'text-[#202421]/80 hover:bg-[#DCE0CF]/50',
-                  ].join(
-                    ' ',
-                  )}
+                    "focus-ring rounded-full px-3 py-1.5 text-[13px] font-semibold transition",
+                    recipeHeroView === "photo"
+                      ? "bg-[#173F35] text-white"
+                      : "text-[#202421]/80 hover:bg-[#DCE0CF]/50",
+                  ].join(" ")}
                 >
                   Photo
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    setRecipeHeroView(
-                      'details',
-                    )
-                  }
+                  onClick={() => setRecipeHeroView("details")}
                   className={[
-                    'focus-ring rounded-full px-3 py-1.5 text-[13px] font-semibold transition',
-                    recipeHeroView ===
-                    'details'
-                      ? 'bg-[#173F35] text-white'
-                      : 'text-[#202421]/80 hover:bg-[#DCE0CF]/50',
-                  ].join(
-                    ' ',
-                  )}
+                    "focus-ring rounded-full px-3 py-1.5 text-[13px] font-semibold transition",
+                    recipeHeroView === "details"
+                      ? "bg-[#173F35] text-white"
+                      : "text-[#202421]/80 hover:bg-[#DCE0CF]/50",
+                  ].join(" ")}
                 >
                   Details
                 </button>
               </div>
 
-              {recipeHeroView === 'photo' && (dish.course || dish.cuisine) ? (
-                <div className="epantry-recipe-photo-caption" aria-hidden="true">
+              {recipeHeroView === "photo" && (dish.course || dish.cuisine) ? (
+                <div
+                  className="epantry-recipe-photo-caption"
+                  aria-hidden="true"
+                >
                   {dish.cuisine ? <span>{dish.cuisine}</span> : null}
                   {dish.course ? <span>{dish.course}</span> : null}
                 </div>
               ) : null}
 
-              {recipeHeroView ===
-              'details' ? (
+              {recipeHeroView === "details" ? (
                 <RecipeDetailsSheet
                   dish={dish}
                   recipe={recipe}
-                  ingredients={
-                    data?.ingredients ||
-                    []
-                  }
-                  foodIntelligence={
-                    detailsFoodIntelligence
-                  }
+                  ingredients={data?.ingredients || []}
+                  foodIntelligence={detailsFoodIntelligence}
                 />
               ) : dish.heroImageUrl ? (
                 <img
-                  src={
-                    dish.heroImageUrl
-                  }
-                  alt={
-                    dish.name
-                  }
+                  src={dish.heroImageUrl}
+                  alt={dish.name}
                   className="h-full w-full object-cover transition-transform duration-500 motion-safe:hover:scale-[1.015]"
                 />
               ) : (
                 <div className="grid h-full min-h-[320px] place-items-center">
-
                   <div className="grid h-28 w-28 place-items-center rounded-[36px] bg-white/80 text-[#173F35] shadow-sm">
-                    <ChefHat
-                      size={52}
-                      aria-hidden="true"
-                    />
+                    <ChefHat size={52} aria-hidden="true" />
                   </div>
-
                 </div>
               )}
-
             </div>
 
             <div className="epantry-recipe-mobile-info px-5 pb-6 pt-5 sm:hidden">
-
               <p className="recipe-edition-eyebrow mb-3">
-                {dish.cuisine || 'EPANTRY Recipe'}
+                {dish.cuisine || "EPANTRY Recipe"}
               </p>
               <div className="flex items-start justify-between gap-3">
                 <h1 className="min-w-0 text-[36px] font-semibold leading-[1.15] tracking-[-0.045em] text-[#202421]">
@@ -4584,11 +3890,11 @@ export default function RecipeDetailPage() {
                 {recipeDietaryBadge ? (
                   <span
                     className={[
-                      'mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-[13px] font-semibold uppercase tracking-[0.08em]',
-                      recipeDietaryBadge.kind === 'veg'
-                        ? 'border-lime-200 bg-lime-100 text-lime-900'
-                        : 'border-rose-200 bg-rose-100 text-rose-900',
-                    ].join(' ')}
+                      "mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-[13px] font-semibold uppercase tracking-[0.08em]",
+                      recipeDietaryBadge.kind === "veg"
+                        ? "border-lime-200 bg-lime-100 text-lime-900"
+                        : "border-rose-200 bg-rose-100 text-rose-900",
+                    ].join(" ")}
                   >
                     {recipeDietaryBadge.label}
                   </span>
@@ -4597,12 +3903,18 @@ export default function RecipeDetailPage() {
 
               <div className="epantry-recipe-metrics mt-5 grid grid-cols-3 gap-x-3 gap-y-2">
                 {[
-                  ['Base servings', recipe.baseServings || '—'],
-                  ['Prep time', `${Number(recipe.preparationTimeMinutes || 0)} min`],
-                  ['Cook time', `${Number(recipe.cookingTimeMinutes || 0)} min`],
-                  ['Difficulty', recipe.difficulty || '—'],
-                  ['Cuisine', dish.cuisine || '—'],
-                  ['Course', dish.course || '—'],
+                  ["Base servings", recipe.baseServings || "—"],
+                  [
+                    "Prep time",
+                    `${Number(recipe.preparationTimeMinutes || 0)} min`,
+                  ],
+                  [
+                    "Cook time",
+                    `${Number(recipe.cookingTimeMinutes || 0)} min`,
+                  ],
+                  ["Difficulty", recipe.difficulty || "—"],
+                  ["Cuisine", dish.cuisine || "—"],
+                  ["Course", dish.course || "—"],
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -4631,19 +3943,14 @@ export default function RecipeDetailPage() {
                 to={`/recipes/${dish.slug}/history`}
                 className="focus-ring mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-[#DCE0CF] bg-white px-2.5 py-1 text-[13px] font-semibold text-[#202421]/80 transition hover:bg-[#F7F6F2] hover:text-[#202421]"
               >
-                <History
-                  size={13}
-                  aria-hidden="true"
-                />
+                <History size={13} aria-hidden="true" />
                 Version history
               </Link>
-
             </div>
 
             <div className="epantry-recipe-desktop-info hidden flex-col justify-center bg-[#DCE0CF] px-6 py-8 sm:flex lg:px-9 lg:py-10">
-
               <p className="recipe-edition-eyebrow">
-                {dish.cuisine || 'EPANTRY Recipe'}
+                {dish.cuisine || "EPANTRY Recipe"}
               </p>
               <h1 className="text-[36px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#202421] lg:text-[56px] lg:leading-[1.14]">
                 {dish.name || recipe.title}
@@ -4655,12 +3962,18 @@ export default function RecipeDetailPage() {
 
               <div className="epantry-recipe-metrics mt-7 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
                 {[
-                  ['Base servings', recipe.baseServings || '—'],
-                  ['Prep time', `${Number(recipe.preparationTimeMinutes || 0)} min`],
-                  ['Cook time', `${Number(recipe.cookingTimeMinutes || 0)} min`],
-                  ['Difficulty', recipe.difficulty || '—'],
-                  ['Cuisine', dish.cuisine || '—'],
-                  ['Course', dish.course || '—'],
+                  ["Base servings", recipe.baseServings || "—"],
+                  [
+                    "Prep time",
+                    `${Number(recipe.preparationTimeMinutes || 0)} min`,
+                  ],
+                  [
+                    "Cook time",
+                    `${Number(recipe.cookingTimeMinutes || 0)} min`,
+                  ],
+                  ["Difficulty", recipe.difficulty || "—"],
+                  ["Cuisine", dish.cuisine || "—"],
+                  ["Course", dish.course || "—"],
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -4680,17 +3993,11 @@ export default function RecipeDetailPage() {
                 to={`/recipes/${dish.slug}/history`}
                 className="focus-ring mt-3 inline-flex self-end items-center gap-1.5 rounded-full border border-[#DCE0CF] bg-white px-3 py-1.5 text-[13px] font-semibold text-[#202421]/80 transition hover:bg-[#F7F6F2] hover:text-[#202421]"
               >
-                <History
-                  size={15}
-                  aria-hidden="true"
-                />
+                <History size={15} aria-hidden="true" />
                 Version history
               </Link>
-
             </div>
-
           </div>
-
         </div>
 
         {error && (
@@ -4698,9 +4005,7 @@ export default function RecipeDetailPage() {
             role="alert"
             className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800"
           >
-            {
-              error
-            }
+            {error}
           </div>
         )}
 
@@ -4713,7 +4018,7 @@ export default function RecipeDetailPage() {
                 </span>
 
                 <h2 className="mt-3 font-sans text-2xl font-semibold tracking-[-0.03em] text-[#202421] sm:text-3xl">
-                  From {restaurant?.restaurantName || 'Restaurant'}
+                  From {restaurant?.restaurantName || "Restaurant"}
                 </h2>
 
                 <div className="mt-2 flex items-center gap-2 text-xs font-bold text-[#202421]">
@@ -4722,13 +4027,12 @@ export default function RecipeDetailPage() {
                     aria-hidden="true"
                     className="shrink-0 text-[#173F35]"
                   />
-                  <span>
-                    {restaurant?.outletName || 'Restaurant outlet'}
-                  </span>
+                  <span>{restaurant?.outletName || "Restaurant outlet"}</span>
                 </div>
 
                 <p className="mt-3 max-w-2xl text-xs font-semibold leading-5 text-[#202421]">
-                  Adjust people below. Recipe ingredient quantities and the prepared-dish order price update together.
+                  Adjust people below. Recipe ingredient quantities and the
+                  prepared-dish order price update together.
                 </p>
               </div>
 
@@ -4741,7 +4045,7 @@ export default function RecipeDetailPage() {
                     <p className="mt-1 text-base font-semibold text-[#202421]">
                       {restaurantOrder?.available === true
                         ? formatMoney(restaurantOrder.pricePerServing)
-                        : 'Not available'}
+                        : "Not available"}
                     </p>
                   </div>
 
@@ -4751,10 +4055,10 @@ export default function RecipeDetailPage() {
                     </p>
                     <p className="mt-1 text-base font-semibold text-[#173F35]">
                       {scaling || !restaurantOrderPriceCurrent
-                        ? 'Updating…'
+                        ? "Updating…"
                         : restaurantOrder?.available === true
-                          ? formatMoney(restaurantOrder.totalPrice)
-                          : 'Not available'}
+                        ? formatMoney(restaurantOrder.totalPrice)
+                        : "Not available"}
                     </p>
                   </div>
                 </div>
@@ -4764,18 +4068,13 @@ export default function RecipeDetailPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        setServings((current) =>
-                          Math.max(1, current - 1),
-                        )
+                        setServings((current) => Math.max(1, current - 1))
                       }
                       disabled={servings <= 1 || restaurantOrderSubmitting}
                       className="focus-ring grid h-9 w-9 place-items-center rounded-lg text-[#173F35] transition hover:bg-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-35"
                       aria-label="Decrease Restaurant order servings"
                     >
-                      <Minus
-                        size={16}
-                        aria-hidden="true"
-                      />
+                      <Minus size={16} aria-hidden="true" />
                     </button>
 
                     <div className="min-w-12 text-center">
@@ -4790,26 +4089,19 @@ export default function RecipeDetailPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        setServings((current) =>
-                          Math.min(1000, current + 1),
-                        )
+                        setServings((current) => Math.min(1000, current + 1))
                       }
                       disabled={restaurantOrderSubmitting}
                       className="focus-ring grid h-9 w-9 place-items-center rounded-lg text-[#173F35] transition hover:bg-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-35"
                       aria-label="Increase Restaurant order servings"
                     >
-                      <Plus
-                        size={16}
-                        aria-hidden="true"
-                      />
+                      <Plus size={16} aria-hidden="true" />
                     </button>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      handleDirectRestaurantOrder()
-                    }
+                    onClick={() => handleDirectRestaurantOrder()}
                     disabled={
                       restaurantOrderSubmitting ||
                       scaling ||
@@ -4825,20 +4117,18 @@ export default function RecipeDetailPage() {
                         aria-hidden="true"
                       />
                     ) : (
-                      <ShoppingCart
-                        size={16}
-                        aria-hidden="true"
-                      />
+                      <ShoppingCart size={16} aria-hidden="true" />
                     )}
                     {restaurantOrderSubmitting
-                      ? 'Starting order…'
-                      : 'Order prepared dish'}
+                      ? "Starting order…"
+                      : "Order prepared dish"}
                   </button>
                 </div>
 
                 {restaurantOrder?.available !== true ? (
                   <p className="mt-2 text-[13px] font-bold leading-4 text-[#202421]">
-                    Direct ordering becomes available when this approved dish has an active Restaurant menu price.
+                    Direct ordering becomes available when this approved dish
+                    has an active Restaurant menu price.
                   </p>
                 ) : null}
 
@@ -4856,60 +4146,42 @@ export default function RecipeDetailPage() {
         ) : null}
 
         <div className="epantry-recipe-workspace mt-8 flex flex-col gap-8">
-
-          <section
-            className="epantry-recipe-ingredients relative order-1 min-w-0 rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] p-4 sm:p-6 lg:flex lg:flex-col"
-          >
-
+          <section className="epantry-recipe-ingredients relative order-1 min-w-0 rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] p-4 sm:p-6 lg:flex lg:flex-col">
             <div className="epantry-recipe-ingredients-intro flex shrink-0 flex-col gap-2 border-b border-[#DCE0CF] pb-2 sm:gap-3 sm:pb-3 xl:flex-row xl:items-start xl:justify-between">
-
               <div className="max-w-xl">
-
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-[#DCE0CF] bg-[#DCE0CF]/55 px-2 py-0.5 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#173F35] sm:gap-2 sm:px-3 sm:py-1 sm:text-[13px] sm:font-semibold sm:tracking-[0.16em]">
-                  <ShieldCheck
-                    size={13}
-                    aria-hidden="true"
-                  />
+                  <ShieldCheck size={13} aria-hidden="true" />
                   <span className="sm:hidden">Ingredients · Living Pantry</span>
-                  <span className="hidden sm:inline">01 / Ingredients + your Living Pantry</span>
+                  <span className="hidden sm:inline">
+                    01 / Ingredients + your Living Pantry
+                  </span>
                 </div>
 
                 <h2 className="mt-2 text-[24px] font-semibold leading-[1.25] tracking-[-0.03em] text-[#173F35] sm:text-[32px] sm:font-semibold sm:tracking-tight">
                   <span className="sm:hidden">Can I cook this at home?</span>
-                  <span className="hidden sm:inline">Ingredients & Can I cook this from home?</span>
+                  <span className="hidden sm:inline">
+                    Ingredients & Can I cook this from home?
+                  </span>
                 </h2>
-
-
               </div>
 
               <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">
-
                 {showCustomerActionControls && (
                   <>
                     <button
                       type="button"
-                      onClick={
-                        handleCookedRecipe
-                      }
-                      disabled={
-                        Boolean(
-                          pantryActionKey,
-                        )
-                      }
+                      onClick={handleCookedRecipe}
+                      disabled={Boolean(pantryActionKey)}
                       className="focus-ring inline-flex min-h-10 items-center gap-1 rounded-lg bg-[#173F35] px-3 py-2 text-[14px] font-semibold text-[#F7F6F2] transition hover:bg-[#173F35] disabled:opacity-50 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-semibold"
                     >
-                      {pantryActionKey ===
-                      'cooked' ? (
+                      {pantryActionKey === "cooked" ? (
                         <LoaderCircle
                           size={14}
                           className="animate-spin"
                           aria-hidden="true"
                         />
                       ) : (
-                        <ChefHat
-                          size={14}
-                          aria-hidden="true"
-                        />
+                        <ChefHat size={14} aria-hidden="true" />
                       )}
                       I cooked this
                     </button>
@@ -4926,11 +4198,8 @@ export default function RecipeDetailPage() {
                 <span className="whitespace-nowrap sm:whitespace-normal rounded-full bg-[#DCE0CF]/50 px-1.5 py-1 text-[13px] font-semibold text-[#202421]/80 sm:px-3 sm:py-1.5 sm:text-sm sm:font-bold">
                   {ingredientRows.length} items
                 </span>
-
               </div>
-
             </div>
-
 
             <div className="epantry-recipe-ingredients-body">
               <div className="epantry-prep-list-heading">
@@ -4940,463 +4209,462 @@ export default function RecipeDetailPage() {
                 </div>
                 <span>{ingredientRows.length} ingredients</span>
               </div>
-            <div className="epantry-recipe-servings mt-4 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-[#DCE0CF] bg-[#DCE0CF]/65 px-3 py-3 sm:mt-5 sm:gap-4 sm:px-4">
-              <div>
-                <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#173F35] sm:text-[13px] sm:font-semibold sm:tracking-[0.14em]">
-                  Servings
-                </p>
-                <p className="text-[13px] font-medium leading-tight text-[#202421]/70 sm:mt-0.5 sm:text-[13px] sm:font-semibold sm:leading-normal">
-                  <span className="sm:hidden">Quantities adjust with servings.</span>
-                  <span className="hidden sm:inline">Ingredient quantities update automatically.</span>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-0.5 rounded-lg border border-[#DCE0CF] bg-white p-0.5 sm:gap-1 sm:rounded-xl sm:p-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setServings((current) =>
-                      Math.max(1, current - 1),
-                    )
-                  }
-                  disabled={servings <= 1}
-                  className="focus-ring grid h-7 w-7 place-items-center rounded-md text-[#173F35] transition hover:bg-[#DCE0CF]/55 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8 sm:rounded-lg"
-                  aria-label="Decrease servings"
-                >
-                  <Minus size={15} aria-hidden="true" />
-                </button>
-
-                <div className="min-w-8 text-center sm:min-w-11">
-                  <p className="text-xs font-semibold text-[#202421] sm:text-sm">
-                    {servings}
+              <div className="epantry-recipe-servings mt-4 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-[#DCE0CF] bg-[#DCE0CF]/65 px-3 py-3 sm:mt-5 sm:gap-4 sm:px-4">
+                <div>
+                  <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#173F35] sm:text-[13px] sm:font-semibold sm:tracking-[0.14em]">
+                    Servings
+                  </p>
+                  <p className="text-[13px] font-medium leading-tight text-[#202421]/70 sm:mt-0.5 sm:text-[13px] sm:font-semibold sm:leading-normal">
+                    <span className="sm:hidden">
+                      Quantities adjust with servings.
+                    </span>
+                    <span className="hidden sm:inline">
+                      Ingredient quantities update automatically.
+                    </span>
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setServings((current) =>
-                      Math.min(1000, current + 1),
-                    )
-                  }
-                  className="focus-ring grid h-7 w-7 place-items-center rounded-md text-[#173F35] transition hover:bg-[#DCE0CF]/55 sm:h-8 sm:w-8 sm:rounded-lg"
-                  aria-label="Increase servings"
+                <div className="flex items-center gap-0.5 rounded-lg border border-[#DCE0CF] bg-white p-0.5 sm:gap-1 sm:rounded-xl sm:p-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setServings((current) => Math.max(1, current - 1))
+                    }
+                    disabled={servings <= 1}
+                    className="focus-ring grid h-7 w-7 place-items-center rounded-md text-[#173F35] transition hover:bg-[#DCE0CF]/55 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8 sm:rounded-lg"
+                    aria-label="Decrease servings"
+                  >
+                    <Minus size={15} aria-hidden="true" />
+                  </button>
+
+                  <div className="min-w-8 text-center sm:min-w-11">
+                    <p className="text-xs font-semibold text-[#202421] sm:text-sm">
+                      {servings}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setServings((current) => Math.min(1000, current + 1))
+                    }
+                    className="focus-ring grid h-7 w-7 place-items-center rounded-md text-[#173F35] transition hover:bg-[#DCE0CF]/55 sm:h-8 sm:w-8 sm:rounded-lg"
+                    aria-label="Increase servings"
+                  >
+                    <Plus size={15} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="epantry-prep-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Scrollable ingredient checklist and Living Pantry actions"
+              >
+                {scaling && (
+                  <p className="mt-2 text-[13px] font-bold text-[#173F35]">
+                    Recalculating quantities...
+                  </p>
+                )}
+
+                {!canUseCustomerFeatures && (
+                  <div className="epantry-recipe-access-note mt-5 rounded-2xl border border-[#DCE0CF] bg-[#F7F6F2] p-4 text-xs font-semibold leading-5 text-[#202421]/80">
+                    {customerContextBlocked
+                      ? "Switch to Customer mode or sign in with a Customer account to compare these ingredients with your Living Pantry and shop missing items."
+                      : "Sign in with Customer access to compare these ingredients with your Living Pantry and shop missing items."}
+                  </div>
+                )}
+
+                {pantryError && (
+                  <div
+                    role="alert"
+                    className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold leading-5 text-rose-800"
+                  >
+                    {pantryError}
+                  </div>
+                )}
+
+                {pantrySuccess && (
+                  <div className="mt-4 flex items-start gap-2 rounded-2xl border border-[#DCE0CF] bg-[#DCE0CF]/55 px-4 py-3 text-xs font-semibold leading-5 text-[#173F35]">
+                    <Check
+                      size={15}
+                      className="mt-0.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                    {pantrySuccess}
+                  </div>
+                )}
+
+                {cartError && (
+                  <div
+                    role="alert"
+                    className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-900"
+                  >
+                    {cartError}
+                  </div>
+                )}
+
+                <div
+                  className="epantry-recipe-ingredient-list mt-4 min-h-0 flex-1 divide-y divide-[#DCE0CF] overflow-visible rounded-[12px] border border-[#DCE0CF] bg-[#F7F6F2]"
+                  aria-label="Recipe ingredients"
                 >
-                  <Plus size={15} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
+                  {ingredientRows.map((ingredient) => {
+                    const identity = ingredient.ingredient || {};
 
-            <div
-              className="epantry-prep-scroll"
-              tabIndex={0}
-              role="region"
-              aria-label="Scrollable ingredient checklist and Living Pantry actions"
-            >
-            {scaling && (
-              <p className="mt-2 text-[13px] font-bold text-[#173F35]">
-                Recalculating quantities...
-              </p>
-            )}
+                    const canonicalIngredientId =
+                      getRecipeIngredientCanonicalId(ingredient);
 
-            {!canUseCustomerFeatures && (
-              <div className="epantry-recipe-access-note mt-5 rounded-2xl border border-[#DCE0CF] bg-[#F7F6F2] p-4 text-xs font-semibold leading-5 text-[#202421]/80">
-                {customerContextBlocked
-                  ? 'Switch to Customer mode or sign in with a Customer account to compare these ingredients with your Living Pantry and shop missing items.'
-                  : 'Sign in with Customer access to compare these ingredients with your Living Pantry and shop missing items.'}
-              </div>
-            )}
+                    const pantryLine = pantryByIngredientId.get(
+                      canonicalIngredientId
+                    );
 
-            {pantryError && (
-              <div
-                role="alert"
-                className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold leading-5 text-rose-800"
-              >
-                {pantryError}
-              </div>
-            )}
-
-            {pantrySuccess && (
-              <div className="mt-4 flex items-start gap-2 rounded-2xl border border-[#DCE0CF] bg-[#DCE0CF]/55 px-4 py-3 text-xs font-semibold leading-5 text-[#173F35]">
-                <Check
-                  size={15}
-                  className="mt-0.5 shrink-0"
-                  aria-hidden="true"
-                />
-                {pantrySuccess}
-              </div>
-            )}
-
-            {cartError && (
-              <div
-                role="alert"
-                className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold leading-5 text-amber-900"
-              >
-                {cartError}
-              </div>
-            )}
-
-            <div
-              className="epantry-recipe-ingredient-list mt-4 min-h-0 flex-1 divide-y divide-[#DCE0CF] overflow-visible rounded-[12px] border border-[#DCE0CF] bg-[#F7F6F2]"
-              aria-label="Recipe ingredients"
-            >
-
-              {ingredientRows.map(
-                (
-                  ingredient,
-                ) => {
-                  const identity =
-                    ingredient.ingredient ||
-                    {}
-
-                  const canonicalIngredientId =
-                    getRecipeIngredientCanonicalId(
-                      ingredient,
-                    )
-
-                  const pantryLine =
-                    pantryByIngredientId.get(
-                      canonicalIngredientId,
-                    )
-
-                  const pantryStatus =
-                    pantryLine
-                      ? getPantryLineStatus(
-                          pantryLine,
-                        )
+                    const pantryStatus = pantryLine
+                      ? getPantryLineStatus(pantryLine)
                       : pantryLoading
-                        ? 'checking'
-                        : 'uncertain'
+                      ? "checking"
+                      : "uncertain";
 
-                  const pantryStatusClassName =
-                    pantryStatus ===
-                    'available'
-                      ? 'bg-[#DCE0CF]/55 text-[#173F35] border-[#DCE0CF]'
-                      : pantryStatus ===
-                          'missing'
-                        ? 'bg-rose-50 text-rose-800 border-rose-200'
-                        : pantryStatus ===
-                            'partial'
-                          ? 'bg-amber-50 text-amber-800 border-amber-200'
-                          : 'bg-[#F7F6F2] text-[#202421]/80 border-[#DCE0CF]'
+                    const pantryStatusClassName =
+                      pantryStatus === "available"
+                        ? "bg-[#DCE0CF]/55 text-[#173F35] border-[#DCE0CF]"
+                        : pantryStatus === "missing"
+                        ? "bg-rose-50 text-rose-800 border-rose-200"
+                        : pantryStatus === "partial"
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : "bg-[#F7F6F2] text-[#202421]/80 border-[#DCE0CF]";
 
-                  const haveActionKey =
-                    `have-${canonicalIngredientId}`
+                    const haveActionKey = `have-${canonicalIngredientId}`;
 
-                  const decisionLocked =
-                    Boolean(
+                    const decisionLocked = Boolean(
                       canonicalIngredientId &&
-                      resolvedIngredientIds.has(canonicalIngredientId) &&
-                      ingredientDecisionLockRef.current.has(canonicalIngredientId)
-                    )
+                        resolvedIngredientIds.has(canonicalIngredientId) &&
+                        ingredientDecisionLockRef.current.has(
+                          canonicalIngredientId
+                        )
+                    );
 
-                  return (
-                    <div
-                      key={
-                        ingredient.id ||
-                        `${ingredient.lineNumber}-${ingredient.canonicalIngredientId}`
-                      }
-                      className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 bg-white px-2.5 py-1.5 transition hover:bg-[#fffaf1] sm:flex sm:flex-row sm:items-center sm:gap-2 sm:px-3 sm:py-2.5"
-                    >
+                    return (
+                      <div
+                        key={
+                          ingredient.id ||
+                          `${ingredient.lineNumber}-${ingredient.canonicalIngredientId}`
+                        }
+                        className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 bg-white px-2.5 py-1.5 transition hover:bg-[#fffaf1] sm:flex sm:flex-row sm:items-center sm:gap-2 sm:px-3 sm:py-2.5"
+                      >
+                        <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[#DCE0CF] bg-[#DCE0CF]/55 text-[13px] font-semibold text-[#173F35] sm:h-8 sm:w-8 sm:text-[14px]">
+                          {ingredient.lineNumber}
+                        </div>
 
-                      <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[#DCE0CF] bg-[#DCE0CF]/55 text-[13px] font-semibold text-[#173F35] sm:h-8 sm:w-8 sm:text-[14px]">
-                        {ingredient.lineNumber}
-                      </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <h3 className="text-[13px] font-semibold leading-tight text-[#202421] sm:text-base sm:leading-normal">
+                              {identity.name || "Canonical ingredient"}
+                            </h3>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                          <h3 className="text-[13px] font-semibold leading-tight text-[#202421] sm:text-base sm:leading-normal">
-                            {identity.name ||
-                              'Canonical ingredient'}
-                          </h3>
+                            {canUseCustomerFeatures && (
+                              <span
+                                className={`rounded-full border px-1.5 py-0.5 text-[13px] font-semibold uppercase tracking-[0.06em] sm:px-2.5 sm:py-1 sm:text-[13px] sm:tracking-[0.08em] ${pantryStatusClassName}`}
+                              >
+                                {pantryStatus === "checking"
+                                  ? "Checking pantry"
+                                  : PANTRY_STATUS_LABELS[pantryStatus] ||
+                                    "Needs confirmation"}
+                              </span>
+                            )}
+                          </div>
 
-                          {canUseCustomerFeatures && (
-                            <span
-                              className={`rounded-full border px-1.5 py-0.5 text-[13px] font-semibold uppercase tracking-[0.06em] sm:px-2.5 sm:py-1 sm:text-[13px] sm:tracking-[0.08em] ${pantryStatusClassName}`}
-                            >
-                              {pantryStatus ===
-                              'checking'
-                                ? 'Checking pantry'
-                                : PANTRY_STATUS_LABELS[
-                                    pantryStatus
-                                  ] ||
-                                  'Needs confirmation'}
-                            </span>
+                          {ingredient.preparationState && (
+                            <p className="mt-0.5 text-[13px] leading-tight text-[#202421]/70 sm:mt-1 sm:text-sm sm:leading-normal">
+                              {ingredient.preparationState}
+                            </p>
+                          )}
+
+                          {ingredient.optional && (
+                            <p className="mt-0.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#C86C42] sm:mt-1 sm:text-[13px] sm:tracking-[0.12em]">
+                              Optional
+                            </p>
                           )}
                         </div>
 
-                        {ingredient.preparationState && (
-                          <p className="mt-0.5 text-[13px] leading-tight text-[#202421]/70 sm:mt-1 sm:text-sm sm:leading-normal">
-                            {ingredient.preparationState}
-                          </p>
-                        )}
+                        <div className="col-start-2 flex flex-wrap items-center justify-end justify-self-end gap-1.5 sm:col-start-auto sm:gap-2 sm:justify-self-auto">
+                          <span className="whitespace-nowrap sm:whitespace-normal rounded-full bg-[#DCE0CF]/50 px-2 py-1.5 text-xs font-semibold text-[#202421] sm:px-3 sm:py-2 sm:text-sm">
+                            {formatQuantity(ingredient.displayQuantity)}{" "}
+                            {ingredient.displayUnit}
+                          </span>
 
-                        {ingredient.optional && (
-                          <p className="mt-0.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#C86C42] sm:mt-1 sm:text-[13px] sm:tracking-[0.12em]">
-                            Optional
-                          </p>
-                        )}
+                          <button
+                            type="button"
+                            onClick={(event) =>
+                              handleMissingIngredient(
+                                ingredient,
+                                event.currentTarget
+                              )
+                            }
+                            disabled={
+                              decisionLocked ||
+                              !canonicalIngredientId ||
+                              (!canUseCustomerFeatures &&
+                                !customerContextBlocked)
+                            }
+                            className={[
+                              "focus-ring inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-[13px] font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed sm:min-w-24 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-semibold",
+                              decisionLocked
+                                ? "pointer-events-none opacity-35 grayscale"
+                                : "disabled:opacity-45",
+                            ].join(" ")}
+                          >
+                            <ShoppingCart size={14} aria-hidden="true" />I want
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleIHaveIngredient(ingredient)}
+                            disabled={
+                              decisionLocked ||
+                              Boolean(pantryActionKey) ||
+                              !canonicalIngredientId ||
+                              (!canUseCustomerFeatures &&
+                                !customerContextBlocked)
+                            }
+                            className={`focus-ring inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-[13px] font-semibold transition disabled:cursor-not-allowed sm:min-w-24 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-semibold ${
+                              decisionLocked
+                                ? "pointer-events-none border-[#DCE0CF] bg-[#DCE0CF]/50 text-[#202421]/70 opacity-35 grayscale"
+                                : pantryStatus === "available"
+                                ? "border-emerald-700 bg-[#173F35] text-white"
+                                : "border-[#DCE0CF] bg-[#DCE0CF]/55 text-[#173F35] hover:bg-[#DCE0CF] disabled:opacity-45"
+                            }`}
+                          >
+                            {pantryActionKey === haveActionKey ? (
+                              <LoaderCircle
+                                size={14}
+                                className="animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Check size={14} aria-hidden="true" />
+                            )}
+                            I have
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="col-start-2 flex flex-wrap items-center justify-end justify-self-end gap-1.5 sm:col-start-auto sm:gap-2 sm:justify-self-auto">
-                        <span className="whitespace-nowrap sm:whitespace-normal rounded-full bg-[#DCE0CF]/50 px-2 py-1.5 text-xs font-semibold text-[#202421] sm:px-3 sm:py-2 sm:text-sm">
-                          {formatQuantity(
-                            ingredient.displayQuantity,
-                          )}{' '}
-                          {ingredient.displayUnit}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={(event) =>
-                            handleMissingIngredient(
-                              ingredient,
-                              event.currentTarget,
-                            )
-                          }
-                          disabled={
-                            decisionLocked ||
-                            !canonicalIngredientId ||
-                            (
-                              !canUseCustomerFeatures &&
-                              !customerContextBlocked
-                            )
-                          }
-                          className={[
-                            'focus-ring inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-[13px] font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed sm:min-w-24 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-semibold',
-                            decisionLocked
-                              ? 'pointer-events-none opacity-35 grayscale'
-                              : 'disabled:opacity-45',
-                          ].join(' ')}
-                        >
-                          <ShoppingCart
-                            size={14}
-                            aria-hidden="true"
-                          />
-                          I want
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleIHaveIngredient(
-                              ingredient,
-                            )
-                          }
-                          disabled={
-                            decisionLocked ||
-                            Boolean(
-                              pantryActionKey,
-                            ) ||
-                            !canonicalIngredientId ||
-                            (
-                              !canUseCustomerFeatures &&
-                              !customerContextBlocked
-                            )
-                          }
-                          className={`focus-ring inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-[13px] font-semibold transition disabled:cursor-not-allowed sm:min-w-24 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-semibold ${
-                            decisionLocked
-                              ? 'pointer-events-none border-[#DCE0CF] bg-[#DCE0CF]/50 text-[#202421]/70 opacity-35 grayscale'
-                              : pantryStatus ===
-                                'available'
-                                ? 'border-emerald-700 bg-[#173F35] text-white'
-                                : 'border-[#DCE0CF] bg-[#DCE0CF]/55 text-[#173F35] hover:bg-[#DCE0CF] disabled:opacity-45'
-                          }`}
-                        >
-                          {pantryActionKey ===
-                          haveActionKey ? (
-                            <LoaderCircle
-                              size={14}
-                              className="animate-spin"
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <Check
-                              size={14}
-                              aria-hidden="true"
-                            />
-                          )}
-                          I have
-                        </button>
-                      </div>
-
-                    </div>
-                  )
-                },
-              )}
-
-            </div>
-
-            <div className="epantry-recipe-checkout-note mt-2 flex shrink-0 flex-col gap-2 rounded-xl border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 text-[13px] leading-4 text-[#202421]/70 sm:flex-row sm:items-center sm:justify-between">
-              <p className="max-w-xl">
-                Missing adds the ingredient to your Recipe Cart. Choose or add a delivery address only when you place your order from the Cart.
-              </p>
-
-              {shoppingTray.length > 0 ? (
-                <Link
-                  to="/cart/recipe"
-                  className="focus-ring inline-flex shrink-0 items-center gap-2 rounded-xl border border-[#DCE0CF] bg-[#DCE0CF]/55 px-3 py-2 font-semibold text-[#173F35] hover:bg-[#DCE0CF]"
-                >
-                  <ShoppingCart
-                    size={14}
-                    aria-hidden="true"
-                  />
-                  Open Recipe Cart
-                </Link>
-              ) : (
-                <div className="flex shrink-0 items-center gap-2 rounded-xl border border-[#DCE0CF] bg-white px-3 py-2 font-semibold text-[#202421]/80">
-                  <MapPin
-                    size={14}
-                    className="text-[#173F35]"
-                    aria-hidden="true"
-                  />
-                  Address at checkout
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-            </div>
-            </div>
 
+                <div className="epantry-recipe-checkout-note mt-2 flex shrink-0 flex-col gap-2 rounded-xl border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 text-[13px] leading-4 text-[#202421]/70 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="max-w-xl">
+                    Missing adds the ingredient to your Recipe Cart. Choose or
+                    add a delivery address only when you place your order from
+                    the Cart.
+                  </p>
+
+                  {shoppingTray.length > 0 ? (
+                    <Link
+                      to="/cart/recipe"
+                      className="focus-ring inline-flex shrink-0 items-center gap-2 rounded-xl border border-[#DCE0CF] bg-[#DCE0CF]/55 px-3 py-2 font-semibold text-[#173F35] hover:bg-[#DCE0CF]"
+                    >
+                      <ShoppingCart size={14} aria-hidden="true" />
+                      Open Recipe Cart
+                    </Link>
+                  ) : (
+                    <div className="flex shrink-0 items-center gap-2 rounded-xl border border-[#DCE0CF] bg-white px-3 py-2 font-semibold text-[#202421]/80">
+                      <MapPin
+                        size={14}
+                        className="text-[#173F35]"
+                        aria-hidden="true"
+                      />
+                      Address at checkout
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="epantry-recipe-guide order-2 min-w-0 overflow-hidden rounded-[16px] border border-[#DCE0CF] bg-white">
-
             <div className="epantry-recipe-guide-intro border-b border-[#DCE0CF] bg-[#202421] px-5 py-6 sm:px-8 sm:py-8">
-              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#DCE0CF] sm:text-[14px] sm:tracking-[0.16em]">02 / Recipe guide</p>
-              <h2 className="mt-2 text-[24px] font-semibold leading-[1.3] tracking-[-0.025em] text-[#F7F6F2] sm:text-[28px]">Cooking & nutrition details</h2>
+              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#DCE0CF] sm:text-[14px] sm:tracking-[0.16em]">
+                02 / Recipe guide
+              </p>
+              <h2 className="mt-2 text-[24px] font-semibold leading-[1.3] tracking-[-0.025em] text-[#F7F6F2] sm:text-[28px]">
+                Cooking & nutrition details
+              </h2>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-visible" data-recipe-guide-scroll>
-
-            <div className="epantry-recipe-guide-overview grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#DCE0CF] bg-[#DCE0CF]/60 px-5 py-5 sm:grid-cols-4 sm:px-8">
-              {[
-                ['Servings', servings || recipe?.baseServings || '—'],
-                ['Prep', `${Number(recipe?.preparationTimeMinutes || 0)} min`],
-                ['Cook', `${Number(recipe?.cookingTimeMinutes || 0)} min`],
-                ['Difficulty', recipeDetailLabel(recipe?.difficulty) || '—'],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="epantry-guide-metric min-w-0 border-l-[2px] border-[#C86C42] py-1 pl-3"
-                >
-                  <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#173F35]/65 sm:text-[13px] sm:font-semibold sm:tracking-[0.12em]">
-                    {label}
-                  </p>
-                  <p className="mt-0.5 text-[14px] font-semibold capitalize text-[#173F35] sm:mt-1 sm:text-sm sm:font-semibold">
-                    {value}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <details defaultOpen className="epantry-guide-accordion group border-b border-[#DCE0CF]">
-              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-[#DCE0CF]/70 group-open:bg-[#DCE0CF]/55 sm:gap-4 sm:px-5 sm:py-4">
-                <span className="font-sans text-[13px] font-semibold text-[#173F35] sm:font-sans sm:text-xl sm:font-semibold">
-                  Cooking steps
-                </span>
-                <span className="grid h-7 w-7 place-items-center rounded-full border border-[#DCE0CF] bg-white text-[#202421]/80 transition group-open:rotate-180 group-open:border-[#DCE0CF] group-open:text-[#173F35] sm:h-8 sm:w-8">
-                  <ChevronDown size={16} aria-hidden="true" />
-                </span>
-              </summary>
-
-              <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] px-3 py-1.5 sm:px-5 sm:py-2">
-                <ol className="divide-y divide-[#DCE0CF]">
-                  {(data?.steps || []).map((step) => (
-                    <li
-                      key={step.id || step.stepNumber}
-                      className="group/step flex gap-2 px-0.5 py-2 transition hover:bg-[#DCE0CF]/65 sm:gap-3 sm:px-1 sm:py-3"
-                    >
-                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#DCE0CF] text-[13px] font-semibold text-[#173F35] ring-2 ring-emerald-50 sm:h-8 sm:w-8 sm:text-sm sm:font-semibold">
-                        {step.stepNumber}
-                      </div>
-                      <div className="min-w-0 pt-0.5">
-                        <p className="text-[15px] font-medium leading-[1.65] text-[#202421] sm:text-[16px] sm:font-medium sm:leading-[1.65]">
-                          {step.instruction}
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-1 sm:mt-1.5 sm:gap-1.5">
-                          {step.timerSeconds !== null && step.timerSeconds !== undefined && (
-                            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-amber-800 sm:px-2.5 sm:py-1 sm:text-[13px] sm:font-semibold sm:tracking-[0.08em]">
-                              {Math.round(step.timerSeconds / 60)} min timer
-                            </span>
-                          )}
-                          {step.temperature && (
-                            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-red-700 sm:px-2.5 sm:py-1 sm:text-[13px] sm:font-semibold sm:tracking-[0.08em]">
-                              {step.temperature.value}°{String(step.temperature.unit).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            </details>
-
-            <details className="epantry-guide-accordion group border-b border-[#DCE0CF]">
-              <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-[#DCE0CF]/70 group-open:bg-[#DCE0CF]/55 sm:gap-4 sm:px-5 sm:py-4">
-                <span className="font-sans text-[13px] font-semibold text-[#173F35] sm:font-sans sm:text-xl sm:font-semibold">
-                  Ingredients
-                </span>
-                <span className="grid h-7 w-7 place-items-center rounded-full border border-[#DCE0CF] bg-white text-[#202421]/80 transition group-open:rotate-180 group-open:border-[#DCE0CF] group-open:text-[#173F35] sm:h-8 sm:w-8">
-                  <ChevronDown size={16} aria-hidden="true" />
-                </span>
-              </summary>
-
-              <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 sm:px-5 sm:py-3">
-                {ingredientRows.length ? (
-                  <div className="divide-y divide-[#DCE0CF]">
-                    {ingredientRows.map((ingredient, index) => (
-                      <div
-                        key={ingredient.id || ingredient.canonicalIngredientId || index}
-                        className="flex items-start justify-between gap-2 py-1.5 sm:gap-4 sm:py-2.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-[14px] font-semibold text-[#202421] sm:text-sm sm:font-semibold">
-                            {ingredient?.ingredient?.name || ingredient?.name || 'Ingredient'}
-                          </p>
-                          {ingredient.preparationState ? (
-                            <p className="mt-0.5 text-[13px] font-medium text-[#202421]/70 sm:text-[13px] sm:font-semibold">
-                              {ingredient.preparationState}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span className="shrink-0 rounded-full border border-[#DCE0CF] bg-white px-2 py-0.5 text-[13px] font-semibold text-[#173F35] sm:px-2.5 sm:py-1 sm:text-[13px] sm:font-semibold">
-                          {formatQuantity(ingredient.displayQuantity ?? ingredient.quantity)}{' '}
-                          {ingredient.displayUnit || ingredient.unit || ''}
-                        </span>
-                      </div>
-                    ))}
+            <div
+              className="min-h-0 flex-1 overflow-visible"
+              data-recipe-guide-scroll
+            >
+              <div className="epantry-recipe-guide-overview grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#DCE0CF] bg-[#DCE0CF]/60 px-5 py-5 sm:grid-cols-4 sm:px-8">
+                {[
+                  ["Servings", servings || recipe?.baseServings || "—"],
+                  [
+                    "Prep",
+                    `${Number(recipe?.preparationTimeMinutes || 0)} min`,
+                  ],
+                  ["Cook", `${Number(recipe?.cookingTimeMinutes || 0)} min`],
+                  ["Difficulty", recipeDetailLabel(recipe?.difficulty) || "—"],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="epantry-guide-metric min-w-0 border-l-[2px] border-[#C86C42] py-1 pl-3"
+                  >
+                    <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#173F35]/65 sm:text-[13px] sm:font-semibold sm:tracking-[0.12em]">
+                      {label}
+                    </p>
+                    <p className="mt-0.5 text-[14px] font-semibold capitalize text-[#173F35] sm:mt-1 sm:text-sm sm:font-semibold">
+                      {value}
+                    </p>
                   </div>
-                ) : (
-                  <p className="text-[14px] font-medium text-[#202421]/70 sm:text-sm sm:font-semibold">
-                    Ingredient details are not currently published.
-                  </p>
-                )}
+                ))}
               </div>
-            </details>
 
-            {/* Published Food Intelligence bridge targets: keep IDs/portals working.
+              <details
+                defaultOpen
+                className="epantry-guide-accordion group border-b border-[#DCE0CF]"
+              >
+                <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-[#DCE0CF]/70 group-open:bg-[#DCE0CF]/55 sm:gap-4 sm:px-5 sm:py-4">
+                  <span className="font-sans text-[13px] font-semibold text-[#173F35] sm:font-sans sm:text-xl sm:font-semibold">
+                    Cooking steps
+                  </span>
+                  <span className="grid h-7 w-7 place-items-center rounded-full border border-[#DCE0CF] bg-white text-[#202421]/80 transition group-open:rotate-180 group-open:border-[#DCE0CF] group-open:text-[#173F35] sm:h-8 sm:w-8">
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </span>
+                </summary>
+
+                <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] px-3 py-1.5 sm:px-5 sm:py-2">
+                  <ol className="divide-y divide-[#DCE0CF]">
+                    {(data?.steps || []).map((step) => (
+                      <li
+                        key={step.id || step.stepNumber}
+                        className="group/step flex gap-2 px-0.5 py-2 transition hover:bg-[#DCE0CF]/65 sm:gap-3 sm:px-1 sm:py-3"
+                      >
+                        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#DCE0CF] text-[13px] font-semibold text-[#173F35] ring-2 ring-emerald-50 sm:h-8 sm:w-8 sm:text-sm sm:font-semibold">
+                          {step.stepNumber}
+                        </div>
+                        <div className="min-w-0 pt-0.5">
+                          <p className="text-[15px] font-medium leading-[1.65] text-[#202421] sm:text-[16px] sm:font-medium sm:leading-[1.65]">
+                            {step.instruction}
+                          </p>
+                          <div className="mt-1 flex flex-wrap gap-1 sm:mt-1.5 sm:gap-1.5">
+                            {step.timerSeconds !== null &&
+                              step.timerSeconds !== undefined && (
+                                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-amber-800 sm:px-2.5 sm:py-1 sm:text-[13px] sm:font-semibold sm:tracking-[0.08em]">
+                                  {Math.round(step.timerSeconds / 60)} min timer
+                                </span>
+                              )}
+                            {step.temperature && (
+                              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-red-700 sm:px-2.5 sm:py-1 sm:text-[13px] sm:font-semibold sm:tracking-[0.08em]">
+                                {step.temperature.value}°
+                                {String(step.temperature.unit).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </details>
+
+              <details className="epantry-guide-accordion group border-b border-[#DCE0CF]">
+                <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-[#DCE0CF]/70 group-open:bg-[#DCE0CF]/55 sm:gap-4 sm:px-5 sm:py-4">
+                  <span className="font-sans text-[13px] font-semibold text-[#173F35] sm:font-sans sm:text-xl sm:font-semibold">
+                    Ingredients
+                  </span>
+                  <span className="grid h-7 w-7 place-items-center rounded-full border border-[#DCE0CF] bg-white text-[#202421]/80 transition group-open:rotate-180 group-open:border-[#DCE0CF] group-open:text-[#173F35] sm:h-8 sm:w-8">
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </span>
+                </summary>
+
+                <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 sm:px-5 sm:py-3">
+                  {ingredientRows.length ? (
+                    <div className="divide-y divide-[#DCE0CF]">
+                      {ingredientRows.map((ingredient, index) => (
+                        <div
+                          key={
+                            ingredient.id ||
+                            ingredient.canonicalIngredientId ||
+                            index
+                          }
+                          className="flex items-start justify-between gap-2 py-1.5 sm:gap-4 sm:py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[14px] font-semibold text-[#202421] sm:text-sm sm:font-semibold">
+                              {ingredient?.ingredient?.name ||
+                                ingredient?.name ||
+                                "Ingredient"}
+                            </p>
+                            {ingredient.preparationState ? (
+                              <p className="mt-0.5 text-[13px] font-medium text-[#202421]/70 sm:text-[13px] sm:font-semibold">
+                                {ingredient.preparationState}
+                              </p>
+                            ) : null}
+                          </div>
+                          <span className="shrink-0 rounded-full border border-[#DCE0CF] bg-white px-2 py-0.5 text-[13px] font-semibold text-[#173F35] sm:px-2.5 sm:py-1 sm:text-[13px] sm:font-semibold">
+                            {formatQuantity(
+                              ingredient.displayQuantity ?? ingredient.quantity
+                            )}{" "}
+                            {ingredient.displayUnit || ingredient.unit || ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[14px] font-medium text-[#202421]/70 sm:text-sm sm:font-semibold">
+                      Ingredient details are not currently published.
+                    </p>
+                  )}
+                </div>
+              </details>
+
+              {/* Published Food Intelligence bridge targets: keep IDs/portals working.
                 Until the bridge mounts, show the same approved API response
                 or an explicit cannot-verify state. No values are invented. */}
-            <div className="epantry-recipe-intelligence" aria-label="Nutrition, allergens and dietary information">
-              <div id="recipe-nutrition-intelligence-slot" className="epantry-recipe-intelligence-slot">
-                <RecipeEvidenceFallback kind="nutrition" evidence={detailsFoodIntelligence} />
-              </div>
-              <div id="recipe-allergen-intelligence-slot" className="epantry-recipe-intelligence-slot">
-                <RecipeEvidenceFallback kind="allergens" evidence={detailsFoodIntelligence} />
-              </div>
-              <div id="recipe-dietary-intelligence-slot" className="epantry-recipe-intelligence-slot">
-                <RecipeEvidenceFallback kind="dietary" evidence={detailsFoodIntelligence} />
-              </div>
-              <div id="recipe-lineage-intelligence-slot" className="epantry-recipe-intelligence-slot">
-                <RecipeEvidenceFallback kind="lineage" evidence={detailsFoodIntelligence} />
+              <div
+                className="epantry-recipe-intelligence"
+                aria-label="Nutrition, allergens and dietary information"
+              >
+                <div
+                  id="recipe-nutrition-intelligence-slot"
+                  className="epantry-recipe-intelligence-slot"
+                >
+                  <RecipeEvidenceFallback
+                    kind="nutrition"
+                    evidence={detailsFoodIntelligence}
+                  />
+                </div>
+                <div
+                  id="recipe-allergen-intelligence-slot"
+                  className="epantry-recipe-intelligence-slot"
+                >
+                  <RecipeEvidenceFallback
+                    kind="allergens"
+                    evidence={detailsFoodIntelligence}
+                  />
+                </div>
+                <div
+                  id="recipe-dietary-intelligence-slot"
+                  className="epantry-recipe-intelligence-slot"
+                >
+                  <RecipeEvidenceFallback
+                    kind="dietary"
+                    evidence={detailsFoodIntelligence}
+                  />
+                </div>
+                <div
+                  id="recipe-lineage-intelligence-slot"
+                  className="epantry-recipe-intelligence-slot"
+                >
+                  <RecipeEvidenceFallback
+                    kind="lineage"
+                    evidence={detailsFoodIntelligence}
+                  />
+                </div>
               </div>
             </div>
-
-            </div>
-
           </section>
-
         </div>
 
         <div className="epantry-recipe-related mt-10 space-y-10 rounded-[16px] bg-[#DCE0CF] px-5 py-8 sm:mt-14 sm:space-y-12 sm:px-8 sm:py-10">
@@ -5414,13 +4682,12 @@ export default function RecipeDetailPage() {
             description={
               data?.dish?.cuisine
                 ? `More ${data.dish.cuisine} recipes with a familiar cooking direction.`
-                : 'More recipes with a similar course and cooking style.'
+                : "More recipes with a similar course and cooking style."
             }
             items={similarRecipes}
             loading={recipeRecommendationsLoading}
           />
         </div>
-
       </div>
 
       {pantrySetupItem ? (
@@ -5430,73 +4697,151 @@ export default function RecipeDetailPage() {
           aria-modal="true"
           aria-label={`Complete ${pantrySetupItem.name} Pantry details`}
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) deferPantrySetupDetails()
+            if (event.target === event.currentTarget) deferPantrySetupDetails();
           }}
         >
           <aside
             className="flex max-h-[calc(100svh-24px)] w-[min(460px,calc(100vw-24px))] flex-col overflow-hidden rounded-[24px] border border-[#DCE0CF] bg-[#F7F6F2] shadow-2xl sm:max-h-[calc(100svh-32px)] sm:w-[440px]"
-            style={{ width: 'min(460px, calc(100vw - 24px))' }}
+            style={{ width: "min(460px, calc(100vw - 24px))" }}
           >
             <div className="flex items-start justify-between gap-4 border-b border-[#DCE0CF] px-5 py-4">
               <div>
-                <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#173F35]">Added to your Pantry</p>
-                <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-[#202421]">Complete {pantrySetupItem.name}</h2>
-                <p className="mt-1.5 text-xs leading-5 text-[#202421]/80">Add what you know now. This helps EPANTRY plan meals and shopping without guessing your stock.</p>
+                <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#173F35]">
+                  Added to your Pantry
+                </p>
+                <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-[#202421]">
+                  Complete {pantrySetupItem.name}
+                </h2>
+                <p className="mt-1.5 text-xs leading-5 text-[#202421]/80">
+                  Add what you know now. This helps EPANTRY plan meals and
+                  shopping without guessing your stock.
+                </p>
               </div>
-              <button type="button" onClick={deferPantrySetupDetails} className="focus-ring grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#DCE0CF] bg-white text-[#202421]/80 hover:bg-[#DCE0CF]/50" aria-label="Close and remind me later">
+              <button
+                type="button"
+                onClick={deferPantrySetupDetails}
+                className="focus-ring grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#DCE0CF] bg-white text-[#202421]/80 hover:bg-[#DCE0CF]/50"
+                aria-label="Close and remind me later"
+              >
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
 
             <div className="min-h-0 overflow-y-auto px-5 py-4">
               <div className="rounded-2xl border border-[#DCE0CF] bg-[#DCE0CF]/55 p-3.5">
-                <p className="text-sm font-semibold text-emerald-950">{pantrySetupItem.name} is confirmed at home.</p>
-                <p className="mt-1 text-xs leading-5 text-[#173F35]">Quantity is required here. Storage and use-soon are optional but useful.</p>
+                <p className="text-sm font-semibold text-emerald-950">
+                  {pantrySetupItem.name} is confirmed at home.
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[#173F35]">
+                  Quantity is required here. Storage and use-soon are optional
+                  but useful.
+                </p>
               </div>
 
               <div className="mt-4 grid gap-4">
                 <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-[#202421]">How much do you have?</span>
+                  <span className="text-sm font-semibold text-[#202421]">
+                    How much do you have?
+                  </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-2">
-                    <input type="number" min="0" step="any" value={setupQuantity} onChange={(event) => setSetupQuantity(event.target.value)} placeholder="500" className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]" />
-                    <select value={setupUnit} onChange={(event) => setSetupUnit(event.target.value)} className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]">
-                      <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="l">L</option><option value="pcs">pcs</option>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={setupQuantity}
+                      onChange={(event) => setSetupQuantity(event.target.value)}
+                      placeholder="500"
+                      className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]"
+                    />
+                    <select
+                      value={setupUnit}
+                      onChange={(event) => setSetupUnit(event.target.value)}
+                      className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]"
+                    >
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="l">L</option>
+                      <option value="pcs">pcs</option>
                     </select>
                   </div>
                 </label>
 
                 <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-[#202421]">Where is it stored?</span>
-                  <select value={setupStorage} onChange={(event) => setSetupStorage(event.target.value)} className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]">
-                    <option value="pantry">Pantry</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="counter">Counter</option>
+                  <span className="text-sm font-semibold text-[#202421]">
+                    Where is it stored?
+                  </span>
+                  <select
+                    value={setupStorage}
+                    onChange={(event) => setSetupStorage(event.target.value)}
+                    className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]"
+                  >
+                    <option value="pantry">Pantry</option>
+                    <option value="fridge">Fridge</option>
+                    <option value="freezer">Freezer</option>
+                    <option value="counter">Counter</option>
                   </select>
                 </label>
 
                 <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-[#202421]">Use soon by</span>
-                  <input type="date" value={setupUseSoon} onChange={(event) => setSetupUseSoon(event.target.value)} className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]" />
-                  <span className="text-xs leading-5 text-[#202421]/70">Optional household reminder — this is not treated as a verified expiry date.</span>
+                  <span className="text-sm font-semibold text-[#202421]">
+                    Use soon by
+                  </span>
+                  <input
+                    type="date"
+                    value={setupUseSoon}
+                    onChange={(event) => setSetupUseSoon(event.target.value)}
+                    className="focus-ring rounded-xl border border-[#DCE0CF] bg-white px-3 py-3 text-sm font-bold text-[#202421]"
+                  />
+                  <span className="text-xs leading-5 text-[#202421]/70">
+                    Optional household reminder — this is not treated as a
+                    verified expiry date.
+                  </span>
                 </label>
               </div>
 
-              {setupError ? <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{setupError}</div> : null}
+              {setupError ? (
+                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+                  {setupError}
+                </div>
+              ) : null}
             </div>
 
             <div className="border-t border-[#DCE0CF] bg-white px-5 py-4">
-              <button type="button" onClick={savePantrySetupDetails} disabled={setupSaving} className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#173F35] disabled:cursor-not-allowed disabled:opacity-50">
-                {setupSaving ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
+              <button
+                type="button"
+                onClick={savePantrySetupDetails}
+                disabled={setupSaving}
+                className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#173F35] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {setupSaving ? (
+                  <LoaderCircle
+                    size={17}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Save size={17} aria-hidden="true" />
+                )}
                 Save Pantry details
               </button>
-              <button type="button" onClick={deferPantrySetupDetails} disabled={setupSaving} className="focus-ring mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#DCE0CF] bg-white px-4 py-3 text-sm font-semibold text-[#202421] transition hover:bg-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-50">
+              <button
+                type="button"
+                onClick={deferPantrySetupDetails}
+                disabled={setupSaving}
+                className="focus-ring mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#DCE0CF] bg-white px-4 py-3 text-sm font-semibold text-[#202421] transition hover:bg-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 <BellRing size={17} aria-hidden="true" />
                 I'll do this later
               </button>
-              <p className="mt-2 text-center text-[14px] leading-5 text-[#202421]/70">If you choose later, EPANTRY adds one notification that opens this exact Pantry item.</p>
+              <p className="mt-2 text-center text-[14px] leading-5 text-[#202421]/70">
+                If you choose later, EPANTRY adds one notification that opens
+                this exact Pantry item.
+              </p>
             </div>
           </aside>
         </div>
       ) : null}
-
     </main>
-  )
+  );
 }

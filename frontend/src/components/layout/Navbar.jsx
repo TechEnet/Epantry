@@ -122,55 +122,18 @@ import {
   }
 
   function readNavbarCartNavigation() {
-    const recipeCart =
-        readSessionJson(
-            RECIPE_CART_PENDING_KEY,
-        );
-
-    const marketplaceCart =
-        readSessionJson(
-            FLOATING_MARKETPLACE_CART_KEY,
-        );
-
-    const recipeItems =
-        Array.isArray(
-            recipeCart?.items,
-        )
-            ? recipeCart.items
-            : [];
-
-    const marketplaceItems =
-        Array.isArray(
-            marketplaceCart?.items,
-        )
-            ? marketplaceCart.items
-            : [];
-
+    const recipeCart = readSessionJson(RECIPE_CART_PENDING_KEY);
+    const marketplaceCart = readSessionJson(FLOATING_MARKETPLACE_CART_KEY);
+    const recipeItems = Array.isArray(recipeCart?.items) ? recipeCart.items : [];
+    const marketplaceItems = Array.isArray(marketplaceCart?.items) ? marketplaceCart.items : [];
     const groceryPackCount = marketplaceItems.reduce(
-        (sum, item) => sum + Math.max(1, Number(item?.quantity || 1)),
-        0,
+      (sum, item) => sum + Math.max(1, Number(item?.quantity || 1)),
+      0,
     );
 
-    if (recipeItems.length > 0) {
-        return {
-            href: '/cart/recipe',
-            count: recipeItems.length + groceryPackCount,
-        };
-    }
-
-    if (
-        marketplaceItems.length > 0 &&
-        marketplaceCart?.cartId
-    ) {
-        return {
-            href: `/cart/${marketplaceCart.cartId}`,
-            count: groceryPackCount,
-        };
-    }
-
     return {
-        href: '/cart/recipe',
-        count: 0,
+      href: '/cart/recipe',
+      count: recipeItems.length + groceryPackCount,
     };
   }
 
@@ -1623,8 +1586,8 @@ import {
 
     const brandCluster = (
         <div className="flex min-w-0 shrink-0 items-center gap-2">
-            {brand}
             {universalBackButton}
+            {brand}
         </div>
     );
 
@@ -1781,7 +1744,7 @@ import {
 
                 <div
                     ref={accountMenuRef}
-                    className="relative"
+                    className="relative translate-x-[6px]"
                 >
                     <button
                         type="button"
@@ -2341,14 +2304,14 @@ import {
                 ' ',
             )}
         >
-            <div className="page-shell">
+            <div className="page-shell epantry-navbar-shell" style={{ maxWidth: "none" }}>
                 <div className="hidden xl:block">
                     <div className="flex h-[60px] w-full min-w-0 items-center gap-2 py-0">
                         <div className="shrink-0">
                             {brandCluster}
                         </div>
   
-                        <div className="relative min-w-[140px] max-w-[340px] flex-[1_1_250px]">
+                        <div className="relative min-w-[140px] flex-[1_1_250px]">
                             <SearchBar
                                 value={
                                     currentQuery
@@ -2367,7 +2330,7 @@ import {
                         </div>
 
                         <nav
-                            className="ml-auto flex min-w-0 flex-[0_1_auto] items-center justify-end gap-0.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                            className="flex min-w-0 shrink-0 items-center justify-end gap-0.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                             aria-label="Primary navigation"
                         >
                             {widePrimaryNavItems

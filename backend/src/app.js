@@ -81,6 +81,7 @@ import {
 } from './modules/hospitality/hospitality.passport.routes.js'
 
 import hostOperationsRoutes from './modules/hostOperations/hostOperations.routes.js'
+import hostUnifiedListingRoutes from './modules/hostOperations/hostUnifiedListing.routes.js'
 import hostOperationsFinanceRoutes from './modules/hostOperations/hostOperations.finance.routes.js'
 import hostOperationsIntegrationRoutes from './modules/hostOperations/hostOperations.integration.routes.js'
 
@@ -579,6 +580,9 @@ app.use(
 
   hostOperationsRoutes,
 )
+
+// M2 unified Host listing drafts. No legacy Host endpoint is replaced.
+app.use('/api/v1', hostUnifiedListingRoutes)
 
 app.use(
   '/api/v1',

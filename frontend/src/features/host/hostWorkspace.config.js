@@ -16,6 +16,7 @@ const KNOWN_HOST_WORKSPACE_TYPES = new Set([
 const COMMON_HOST_PATHS = Object.freeze([
   '/host/operations',
   '/host/operations-center',
+  '/host/listings',
   '/host/business-profile',
   '/host/profile',
   '/host/settings',
@@ -64,6 +65,7 @@ const ROUTE_PREFIXES_BY_WORKSPACE = Object.freeze({
     ...COMMON_HOST_PATHS,
     ...COMMERCE_HOST_PATHS,
     ...BRAND_HOST_PATHS,
+    ...CHEF_RESTAURANT_PATHS,
   ],
 
   [HOST_WORKSPACE_TYPES.CHEF_RESTAURANT]: [
@@ -159,5 +161,56 @@ export function isChefRestaurantWorkspace(value) {
   return (
     normalizeHostWorkspaceType(value) ===
     HOST_WORKSPACE_TYPES.CHEF_RESTAURANT
+  )
+}
+
+/*
+ * M1 listing entry registry. Links point ONLY to existing working editors;
+ * M2 will compose their fields into one submitted listing form.
+ * Keep all existing Host routes operational during that migration.
+ */
+const HOST_LISTING_ENTRY_OPTIONS = Object.freeze([
+  {
+    id: 'grocery',
+    label: 'Grocery & packaged products',
+    description: 'Create or import products using your existing catalog tools.',
+    to: '/host/catalog',
+    enabledFor: ['b2b', 'brand_seller', 'hybrid', 'legacy'],
+  },
+  {
+    id: 'brand-recipe',
+    label: 'Brand recipe',
+    description: 'Create and manage an approved brand recipe listing.',
+    to: '/host/brand-recipes',
+    enabledFor: ['brand_seller', 'hybrid', 'legacy'],
+  },
+  {
+    id: 'kitchen-recipe',
+    label: 'Kitchen recipe, drinks & desserts',
+    description: 'Start a kitchen recipe for the dishes or drinks you prepare.',
+    to: '/host/hospitality/recipes',
+    enabledFor: ['b2b', 'chef_restaurant', 'hybrid'],
+  },
+  {
+    id: 'ready-made',
+    label: 'Ready-made food & menu items',
+    description: 'Manage the restaurant menu and prepared-item availability.',
+    to: '/host/hospitality/menus',
+    enabledFor: ['b2b', 'chef_restaurant', 'hybrid', 'legacy'],
+  },
+  {
+    id: 'offers',
+    label: 'Product price, stock & delivery',
+    description: 'Manage product offers, inventory and delivery pincodes.',
+    to: '/host/marketplace',
+    enabledFor: ['b2b', 'brand_seller', 'hybrid', 'legacy'],
+  },
+])
+
+export function getHostListingEntryOptions(value) {
+  const workspaceType = normalizeHostWorkspaceType(value)
+  return HOST_LISTING_ENTRY_OPTIONS.filter(
+    (option) => option.enabledFor.includes(workspaceType) &&
+      isHostPathAllowed(option.to, workspaceType),
   )
 }

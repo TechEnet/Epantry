@@ -435,6 +435,18 @@ canvas {
   min-width: 0;
 }
 
+/* The navbar uses the entire viewport, including wide/zoomed-out displays.
+   Apply edge gutters as padding so the rightmost account action is not pushed
+   into an additional centered container. */
+.epantry-navbar-shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding-inline-start: var(--ep-content-gutter);
+  padding-inline-end: 8px;
+}
+
 /* Existing operational workspaces have approved full-width data layouts. */
 .epantry-workspace-canvas .page-shell {
   width: calc(100% - 16px);
@@ -1587,3 +1599,52 @@ input[type=checkbox],input[type=radio] { accent-color: #173F35; }
 @media (min-width: 640px) { [class~="sm:text-[13px]"] { font-size: 14px !important; line-height: 21px !important; } }
 @media (min-width: 640px) { [class~="sm:text-[8px]"] { font-size: 14px !important; line-height: 21px !important; } }
 @media (min-width: 640px) { [class~="sm:text-[9px]"] { font-size: 14px !important; line-height: 21px !important; } }
+
+/* Zoom-out / wide-desktop layout correction.
+   Chrome zoom-out increases CSS viewport width, while fixed max-width page
+   wrappers used to stay narrow. Keep their original centering, but let
+   page-level containers grow fluidly on wider CSS viewports.
+
+   Do not widen nested reading columns, product cards, forms, modals, gallery
+   sheets, or any 75% operational workspace density controls. Navbar layout
+   continues to use its already-approved separate .epantry-navbar-shell rule.
+*/
+@media (min-width: 1440px) {
+  /* Customer, Host and Super Admin shells, and public pages using page-shell. */
+  .page-shell {
+    max-width: max(var(--ep-content-max), calc(100vw - 160px));
+    margin-inline: auto;
+  }
+
+  /* Standalone wide public page wrappers, e.g. Grocery Product Detail.
+     Restrict to wide page-size max-w-[1xxxpx] classes; never target the small
+     max-widths used by forms, text columns and dialog contents. */
+  #root main > :is(div, section)[class~="mx-auto"][class*="max-w-[1"] {
+    max-width: max(1480px, calc(100vw - 160px));
+    margin-inline: auto;
+  }
+}
+
+/* EPANTRY universal workspace edge-gap correction (desktop only).
+   Customer, Host and Super Admin shells each contain a page-shell whose
+   immediate child is the workspace panel containing a grid + sidebar.
+   Remove spacing only from THAT outer frame, never from nested page-shells,
+   public/landing sections, overlays, navbars or the actual workspace content.
+   Mobile spacing/navigation is intentionally preserved. */
+@media (min-width: 1024px) {
+  .app-content .page-shell:has(> div > .grid > aside) {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    padding-top: 0;
+    padding-inline: 0;
+  }
+
+  /* An edge-to-edge workspace should not leave decorative side seams.
+     Keep the sidebar split, its active state, and interior page padding. */
+  .app-content .page-shell:has(> div > .grid > aside) > div {
+    border-radius: 0;
+    border-inline-width: 0;
+  }
+}

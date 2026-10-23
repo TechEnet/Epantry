@@ -1972,12 +1972,12 @@ export default function ProductDetailPage() {
 
   return (
     <main className="ep-product-page min-h-screen bg-[#FDFDFA] text-[#202421]">
-      <div className="mx-auto w-full max-w-[1480px] px-5 pb-14 pt-3 sm:px-9 lg:px-14">
-        <div className="flex items-center justify-between gap-4 border-b border-[#E7E9E4] pb-3 pt-1">
-          <Link to="/grocery" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42]">
+      <div className="mx-auto w-full max-w-[1480px] px-5 pb-14 pt-0 sm:px-9 lg:px-14">
+        <div className="flex items-center justify-between gap-4 border-b border-[#E7E9E4] py-0.5">
+          <Link to="/grocery" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9">
             <ArrowLeft size={17} aria-hidden="true" /> Back to Grocery
           </Link>
-          <a href="#ep-product-facts" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42]">
+          <a href="#ep-product-facts" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9">
             Product information <ArrowRight size={16} aria-hidden="true" />
           </a>
         </div>

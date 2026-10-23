@@ -981,3 +981,31 @@ export function buildSignedProductEvidenceUrl({
     `s--${signature}--/${deliveryPath}`
   )
 }
+
+// Public Host food video upload only. Keep every existing product-evidence and
+// recipe-image intent unchanged; videos have their own signed Cloudinary scope.
+export function createHostListingVideoUploadIntent({ userId }) {
+  const cloud = requireConfig()
+  const timestamp = Math.floor(Date.now() / 1000)
+  const publicId = `${recipeImageUploadFolder(userId)}/listing-video-${crypto.randomUUID()}`
+  const signedParameters = {
+    allowed_formats: 'mp4,webm',
+    overwrite: false,
+    public_id: publicId,
+    timestamp,
+    type: 'upload',
+  }
+  return {
+    provider: 'cloudinary',
+    uploadUrl: `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloud.cloudName)}/video/upload`,
+    cloudName: cloud.cloudName,
+    apiKey: cloud.apiKey,
+    resourceType: 'video',
+    deliveryType: 'upload',
+    publicId,
+    timestamp,
+    signature: signParams(signedParameters, cloud.apiSecret),
+    signedParameters,
+    constraints: { maxBytes: 50 * 1024 * 1024, allowedMimeTypes: ['video/mp4', 'video/webm'] },
+  }
+}

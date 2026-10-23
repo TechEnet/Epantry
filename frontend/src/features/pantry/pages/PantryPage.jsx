@@ -1,1069 +1,1209 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  ArrowRight,
-  Boxes,
-  ChevronDown,
-  RefreshCw,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { ArrowRight, RefreshCw, Search, X } from "lucide-react";
 
-import {
-  Link,
-} from 'react-router-dom'
+import { Link } from "react-router-dom";
 
-import {
-  useAppStore,
-} from '../../../store/app.store'
+import { useAppStore } from "../../../store/app.store";
 
-import AdvancedPantryPanel from '../../advancedExpansion/components/AdvancedPantryPanel'
+import AdvancedPantryPanel from "../../advancedExpansion/components/AdvancedPantryPanel";
 
-import PantryStateBadge from '../components/PantryStateBadge'
+import { getPantryStatePresentation } from "../components/PantryStateBadge";
+import { getCatalogProducts } from "../../grocery/services/catalog.service";
 
 import {
   getPantry,
   getPantryErrorMessage,
   stopTrackingPantryItem,
-} from '../services/pantry.service'
-
-const PANTRY_MEMORY_HEADING =
-  'Your Pantry'
-
-const PANTRY_TRUTH_NOTICE =
-  'See what food is at home, what needs checking, and what should be used soon. EPANTRY keeps confirmed items separate from estimates so you can tell what is certain at a glance.'
+} from "../services/pantry.service";
 
 const FILTERS = [
   {
-    key:
-      'all',
+    key: "all",
 
-    label:
-      'All',
+    label: "All",
 
-    states:
-      null,
+    states: null,
   },
 
   {
-    key:
-      'confirmed',
+    key: "confirmed",
 
-    label:
-      'Confirmed',
+    label: "Confirmed",
 
-    states: [
-      'confirmed_available',
-      'replenished_elsewhere',
-    ],
+    states: ["confirmed_available", "replenished_elsewhere"],
   },
 
   {
-    key:
-      'likely',
+    key: "likely",
 
-    label:
-      'Likely',
+    label: "Likely",
 
-    states: [
-      'inferred_available',
-    ],
+    states: ["inferred_available"],
   },
 
   {
-    key:
-      'running-low',
+    key: "running-low",
 
-    label:
-      'Running low',
+    label: "Running low",
 
-    states: [
-      'running_low',
-    ],
+    states: ["running_low"],
   },
 
   {
-    key:
-      'uncertain',
+    key: "uncertain",
 
-    label:
-      'Needs checking',
+    label: "Needs checking",
 
-    states: [
-      'uncertain',
-    ],
+    states: ["uncertain"],
   },
 
   {
-    key:
-      'out',
+    key: "out",
 
-    label:
-      'Out',
+    label: "Out",
 
-    states: [
-      'out',
-    ],
+    states: ["out"],
   },
 
   {
-    key:
-      'not-tracking',
+    key: "not-tracking",
 
-    label:
-      'Not tracking',
+    label: "Not tracking",
 
-    states: [
-      'do_not_track',
-    ],
+    states: ["do_not_track"],
   },
-]
+];
 
-function getItemId(
-  item,
-) {
-  return (
-    item?._id ||
-    item?.id ||
-    item?.pantryItemId ||
-    null
-  )
+function getItemId(item) {
+  return item?._id || item?.id || item?.pantryItemId || null;
 }
 
-function getItemState(
-  item,
-) {
+function getItemState(item) {
   return (
     item?.state ||
     item?.currentState ||
     item?.projectedState ||
-    item?.projection
-      ?.state ||
-    'uncertain'
-  )
+    item?.projection?.state ||
+    "uncertain"
+  );
 }
 
-function getItemTitle(
-  item,
-) {
+function getItemTitle(item) {
   return (
     item?.displayName ||
     item?.name ||
-    item?.canonicalIngredient
-      ?.canonicalName ||
-    item?.canonicalIngredient
-      ?.name ||
-    item?.ingredient
-      ?.canonicalName ||
-    item?.ingredient
-      ?.name ||
-    item?.canonicalPack
-      ?.displayName ||
-    item?.canonicalPack
-      ?.name ||
-    item?.pack
-      ?.displayName ||
-    'Pantry item'
-  )
+    item?.canonicalIngredient?.canonicalName ||
+    item?.canonicalIngredient?.name ||
+    item?.ingredient?.canonicalName ||
+    item?.ingredient?.name ||
+    item?.canonicalPack?.displayName ||
+    item?.canonicalPack?.name ||
+    item?.pack?.displayName ||
+    "Pantry item"
+  );
 }
 
-function getQuantity(
-  item,
-) {
+function getQuantity(item) {
   return (
     item?.quantity ||
     item?.currentQuantity ||
     item?.projectedQuantity ||
-    item?.projection
-      ?.quantity ||
+    item?.projection?.quantity ||
     null
-  )
+  );
 }
 
-function formatQuantity(
-  quantity,
-) {
-  if (
-    !quantity ||
-    quantity.mode ===
-      'unknown'
-  ) {
-    return 'Quantity not confirmed'
+function formatQuantity(quantity) {
+  if (!quantity || quantity.mode === "unknown") {
+    return "Quantity not confirmed";
   }
 
   if (
-    quantity.mode ===
-      'exact' &&
-    quantity.value !==
-      undefined &&
-    quantity.value !==
-      null
+    quantity.mode === "exact" &&
+    quantity.value !== undefined &&
+    quantity.value !== null
   ) {
-    return `${quantity.value} ${quantity.unit || ''}`.trim()
+    return `${quantity.value} ${quantity.unit || ""}`.trim();
   }
 
   if (
-    quantity.mode ===
-      'range' &&
-    quantity.min !==
-      undefined &&
-    quantity.max !==
-      undefined
+    quantity.mode === "range" &&
+    quantity.min !== undefined &&
+    quantity.max !== undefined
   ) {
-    return `${quantity.min}–${quantity.max} ${quantity.unit || ''}`.trim()
+    return `${quantity.min}–${quantity.max} ${quantity.unit || ""}`.trim();
   }
 
-  if (
-    quantity.value !==
-      undefined &&
-    quantity.value !==
-      null
-  ) {
-    return `${quantity.value} ${quantity.unit || ''}`.trim()
+  if (quantity.value !== undefined && quantity.value !== null) {
+    return `${quantity.value} ${quantity.unit || ""}`.trim();
   }
 
-  return 'Quantity not confirmed'
+  return "Quantity not confirmed";
 }
 
-function formatDate(
-  value,
-) {
+function formatDate(value) {
   if (!value) {
-    return 'No recent timestamp'
+    return "No recent timestamp";
   }
 
-  const date =
-    new Date(
-      value,
-    )
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return 'No recent timestamp'
+  if (Number.isNaN(date.getTime())) {
+    return "No recent timestamp";
   }
 
-  return new Intl.DateTimeFormat(
-    'en-IN',
-    {
-      dateStyle:
-        'medium',
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
 
-      timeStyle:
-        'short',
-    },
-  ).format(
-    date,
-  )
+    timeStyle: "short",
+  }).format(date);
 }
 
-function getUpdatedAt(
-  item,
-) {
+function getUpdatedAt(item) {
   return (
     item?.lastObservedAt ||
     item?.lastObservationAt ||
-    item?.projection
-      ?.observedAt ||
+    item?.projection?.observedAt ||
     item?.updatedAt ||
     null
-  )
+  );
 }
 
-export default function PantryPage() {
-  const advancedPantryEnabled =
-    useAppStore(
-      (
-        state,
-      ) =>
-        state.featureFlags?.[
-          'm21.advanced_pantry'
-        ] ===
-        true,
+// Pantry records do not always carry photos. Use only actual images supplied
+// by the Pantry or publicly approved Grocery catalog. Never substitute an
+// unrelated product or invent a food photograph.
+function getPantryImage(item) {
+  const candidates = [
+    item?.imageUrl,
+    item?.thumbnailUrl,
+    item?.photoUrl,
+    item?.image?.url,
+    item?.image?.src,
+    item?.images?.[0]?.url,
+    item?.canonicalPack?.imageUrl,
+    item?.canonicalPack?.image?.url,
+    item?.canonicalIngredient?.imageUrl,
+  ];
+  return (
+    candidates.find(
+      (url) => typeof url === "string" && /^(https?:\/\/|\/)/i.test(url.trim())
+    ) || null
+  );
+}
+
+function normalizedFoodName(value) {
+  return String(value || "")
+    .toLocaleLowerCase("en")
+    .replace(
+      /\b\d+(?:[.,]\d+)?\s*(?:kg|g|gm|ml|l|litre|liter|pcs|pieces|pack)\b/g,
+      ""
     )
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
 
-  const [
-    items,
-    setItems,
-  ] =
-    useState([])
+function getMatchingCatalogPhoto(item, products) {
+  const pantryName = normalizedFoodName(getItemTitle(item));
+  const pantryPackId = String(
+    item?.canonicalPackId || item?.canonicalPack?.id || ""
+  );
+  if (!pantryName) return null;
+  const match = (products || []).find((product) => {
+    if (!product?.image?.url) return false;
+    if (pantryPackId && pantryPackId === String(product.packId || ""))
+      return true;
+    // A family is a canonical food identity; generic search hits or similar
+    // products (e.g. onion powder for onion) are not sufficient evidence.
+    return (
+      normalizedFoodName(product.family?.name) === pantryName ||
+      normalizedFoodName(product.displayName) === pantryName
+    );
+  });
+  return match?.image?.url || null;
+}
 
-  const [
-    selectedFilter,
-    setSelectedFilter,
-  ] =
-    useState(
-      'all',
-    )
+function PantryStatus({ state }) {
+  const { label } = getPantryStatePresentation(state);
+  const statusClass =
+    {
+      confirmed_available: "is-positive",
+      replenished_elsewhere: "is-positive",
+      running_low: "is-caution",
+      out: "is-caution",
+      inferred_available: "is-info",
+      uncertain: "is-uncertain",
+      do_not_track: "is-muted",
+    }[state] || "is-uncertain";
+  return <span className={`pk-status ${statusClass}`}>{label}</span>;
+}
 
-  const [
-    showAllItems,
-    setShowAllItems,
-  ] =
-    useState(false)
-
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(true)
-
-  const [
-    refreshing,
-    setRefreshing,
-  ] =
-    useState(false)
-
-  const [
-    error,
-    setError,
-  ] =
-    useState('')
-
-  const [
-    itemPendingRemoval,
-    setItemPendingRemoval,
-  ] =
-    useState(null)
-
-  const [
-    removingItemId,
-    setRemovingItemId,
-  ] =
-    useState(null)
-
-  const loadPantry =
-    useCallback(
-      async ({
-        refresh =
-          false,
-      } = {}) => {
-        if (refresh) {
-          setRefreshing(
-            true,
-          )
-        } else {
-          setLoading(
-            true,
-          )
-        }
-
-        setError(
-          '',
-        )
-
-        try {
-          const result =
-            await getPantry({
-              page:
-                1,
-
-              limit:
-                50,
-            })
-
-          setItems(
-            result.items,
-          )
-        } catch (
-          loadError
-        ) {
-          setError(
-            getPantryErrorMessage(
-              loadError,
-              'Unable to load your household Pantry.',
-            ),
-          )
-        } finally {
-          setLoading(
-            false,
-          )
-
-          setRefreshing(
-            false,
-          )
-        }
-      },
-      [],
-    )
-
-  useEffect(
-    () => {
-      loadPantry()
-    },
-    [
-      loadPantry,
-    ],
-  )
-
-  const selectedFilterDefinition =
-    useMemo(
-      () =>
-        FILTERS.find(
-          (
-            filter,
-          ) =>
-            filter.key ===
-            selectedFilter,
-        ) ||
-        FILTERS[0],
-      [
-        selectedFilter,
-      ],
-    )
-
-  const filteredItems =
-    useMemo(
-      () => {
-        if (
-          !selectedFilterDefinition.states
-        ) {
-          return items.filter(
-            (
-              item,
-            ) =>
-              getItemState(
-                item,
-              ) !==
-              'do_not_track',
-          )
-        }
-
-        return items.filter(
-          (
-            item,
-          ) =>
-            selectedFilterDefinition
-              .states
-              .includes(
-                getItemState(
-                  item,
-                ),
-              ),
-        )
-      },
-      [
-        items,
-        selectedFilterDefinition,
-      ],
-    )
-
-  const visibleItems =
-    filteredItems.slice(0, 6)
-
-  const allActiveItems =
-    useMemo(
-      () =>
-        items.filter(
-          (item) =>
-            getItemState(item) !==
-            'do_not_track',
-        ),
-      [items],
-    )
-
-  const confirmRemoveFromPantry =
-    useCallback(
-      async () => {
-        const itemId =
-          getItemId(
-            itemPendingRemoval,
-          )
-
-        if (!itemId) {
-          setItemPendingRemoval(
-            null,
-          )
-
-          return
-        }
-
-        setRemovingItemId(
-          itemId,
-        )
-
-        setError(
-          '',
-        )
-
-        try {
-          const result =
-            await stopTrackingPantryItem(
-              itemId,
-            )
-
-          const updatedItem =
-            result?.item ||
-            result?.pantryItem ||
-            null
-
-          setItems(
-            (
-              currentItems,
-            ) =>
-              currentItems.map(
-                (
-                  currentItem,
-                ) => {
-                  if (
-                    getItemId(
-                      currentItem,
-                    ) !==
-                    itemId
-                  ) {
-                    return currentItem
-                  }
-
-                  return updatedItem || {
-                    ...currentItem,
-
-                    state:
-                      'do_not_track',
-
-                    trackingPaused:
-                      true,
-
-                    updatedAt:
-                      new Date().toISOString(),
-                  }
-                },
-              ),
-          )
-
-          setItemPendingRemoval(
-            null,
-          )
-        } catch (
-          removeError
-        ) {
-          setError(
-            getPantryErrorMessage(
-              removeError,
-              'Unable to remove this item from your active Pantry.',
-            ),
-          )
-        } finally {
-          setRemovingItemId(
-            null,
-          )
-        }
-      },
-      [
-        itemPendingRemoval,
-      ],
-    )
+// Use only a Pantry image or a matching EPANTRY published catalog image.
+// The text fallback is intentionally NOT a simulated product photograph.
+function PantryItemVisual({ item, catalogImage = null, small = false }) {
+  const title = getItemTitle(item);
+  const photo = getPantryImage(item) || catalogImage;
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [photo]);
 
   return (
-    <main className="page-shell !p-0">
-      <div className="w-full max-w-none">
-        <section className="sticky top-0 z-0 flex h-[calc(100svh-48px)] min-h-[calc(100svh-48px)] flex-col overflow-hidden bg-[radial-gradient(circle_at_14%_16%,rgba(209,250,229,0.88),transparent_34%),radial-gradient(circle_at_86%_12%,rgba(254,243,199,0.76),transparent_30%),linear-gradient(135deg,#fbfaf6_0%,#f3f8f2_48%,#edf7f3_100%)] shadow-[0_18px_50px_rgba(28,25,23,0.06)] relative sm:h-[100svh] sm:min-h-[100svh] lg:h-[133.333svh] lg:min-h-[133.333svh]">
-          <div className="flex h-full flex-col px-4 py-3 sm:px-8 sm:py-6 lg:px-10 lg:py-7">
-            <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] content-stretch gap-2 sm:grid-rows-none sm:content-normal sm:gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-12">
-              <div className="flex min-h-0 flex-col justify-start pt-0 sm:pt-2 lg:pt-1">
-                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200/90 bg-white/80 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-800 shadow-sm backdrop-blur-sm">
-                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                  Living Pantry
-                </div>
+    <div
+      className={`pk-visual ${photo && !broken ? "pk-visual--photo" : ""} ${
+        small ? "pk-visual--small" : ""
+      }`}
+    >
+      {photo && !broken ? (
+        <img
+          src={photo}
+          alt={title}
+          loading="lazy"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <span
+          className="pk-visual__letter"
+          aria-label={`No product image available for ${title}`}
+        >
+          {title.trim().charAt(0) || "P"}
+        </span>
+      )}
+    </div>
+  );
+}
 
-                <h1 className="mt-1.5 max-w-3xl text-[30px] font-black leading-none tracking-[-0.035em] text-stone-950 sm:mt-4 sm:text-5xl sm:leading-normal sm:tracking-tight lg:text-6xl">
-                  {PANTRY_MEMORY_HEADING}
-                </h1>
+const PANTRY_STYLES = `
+/* Living Pantry — EPANTRY editorial inventory, no shelf or 3D effects. */
+.pk-page {--pk-porcelain:#F7F6F2;--pk-forest:#173F35;--pk-charcoal:#202421;--pk-sage:#D7DDCF;--pk-clay:#C56C42;--pk-line:rgba(23,63,53,.15);--pk-muted:#58645B;width:100%;max-width:none;min-width:0;margin:0;color:var(--pk-charcoal);background:var(--pk-porcelain);font:400 16px/1.55 'Plus Jakarta Sans',Inter,system-ui,sans-serif;}
+.pk-page.page-shell {width:100%!important;max-width:none!important;margin:0!important;padding:0!important;}
+.pk-page *, .pk-page *::before,.pk-page *::after {box-sizing:border-box;}
+.pk-page button,.pk-page input {font:inherit;}
+.pk-page a {text-decoration:none;}
+.pk-page :is(button,a,input):focus-visible {outline:3px solid var(--pk-clay);outline-offset:3px;}
+.pk-page button:disabled {opacity:.55;cursor:not-allowed;}
+.pk-container {width:100%;max-width:none;margin-inline:0;padding-inline:clamp(18px,2vw,30px);}
+.pk-kicker {display:inline-flex;align-items:center;gap:11px;color:var(--pk-forest);font-size:13px;font-weight:700;letter-spacing:.065em;text-transform:uppercase;}
+.pk-kicker::before {content:'';display:inline-block;width:24px;height:2px;background:var(--pk-clay);flex:none;}
+.pk-page .pk-title {max-width:650px;margin:14px 0 0;font-size:clamp(37px,4.2vw,60px)!important;font-weight:650!important;line-height:1.09!important;letter-spacing:-.05em;color:var(--pk-charcoal);}
+.pk-page .pk-title span {color:var(--pk-forest);}
+.pk-lead {max-width:580px;margin:17px 0 0;color:#49574E;font-size:16px;line-height:1.65;}
+.pk-actions {display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:24px;}
+.pk-btn {display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;border:1px solid transparent;border-radius:5px;padding:10px 19px;background:transparent;color:var(--pk-forest);font-size:14px;font-weight:700;line-height:1.3;cursor:pointer;transition:background-color .2s,color .2s,border-color .2s;white-space:normal;text-align:center;}
+.pk-btn--main {background:var(--pk-forest);color:var(--pk-porcelain);}
+.pk-btn--main:hover {background:#225545;}
+.pk-btn--line {border-color:rgba(23,63,53,.25);background:transparent;color:var(--pk-forest);}
+.pk-btn--line:hover {background:var(--pk-sage);}
+.pk-btn--soft {background:var(--pk-sage);color:var(--pk-forest);}
+.pk-btn--soft:hover {background:#c8d2bf;}
+.pk-header {border-bottom:1px solid var(--pk-line);background:var(--pk-porcelain);}
+.pk-header__grid {display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,.82fr);align-items:center;gap:clamp(28px,5vw,100px);padding-block:clamp(36px,4.5vw,66px);}
+.pk-overview {min-width:0;display:flex;flex-direction:column;border-top:4px solid var(--pk-forest);background:var(--pk-sage);padding:27px 30px 24px;}
+.pk-overview__eyebrow {color:var(--pk-forest);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+.pk-overview__count {display:flex;align-items:baseline;gap:15px;margin:14px 0 20px;padding-bottom:21px;border-bottom:1px solid rgba(23,63,53,.19);}
+.pk-overview__count strong {font-size:clamp(53px,5vw,77px);line-height:1;font-weight:650;letter-spacing:-.055em;color:var(--pk-forest);font-variant-numeric:tabular-nums;}
+.pk-overview__count span {color:var(--pk-charcoal);font-size:15px;line-height:1.5;max-width:180px;}
+.pk-overview__stats {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.pk-overview__stat {min-width:0;}
+.pk-overview__stat + .pk-overview__stat {border-left:1px solid rgba(23,63,53,.18);padding-left:16px;}
+.pk-overview__stat strong {display:block;font-size:27px;line-height:1.25;font-weight:700;color:var(--pk-forest);font-variant-numeric:tabular-nums;}
+.pk-overview__stat--warn strong {color:#9e5338;}
+.pk-overview__stat span {display:block;font-size:13px;line-height:1.5;color:#4d5d51;}
+.pk-workspace {padding-block:clamp(38px,4.5vw,62px) clamp(48px,5vw,75px);background:var(--pk-porcelain);}
+.pk-heading {display:flex;align-items:end;justify-content:space-between;gap:22px;margin-bottom:29px;}
+.pk-page .pk-heading__title {margin:12px 0 0;font-size:clamp(29px,3vw,42px)!important;line-height:1.18!important;letter-spacing:-.038em;color:var(--pk-charcoal);font-weight:650!important;}
+.pk-heading__desc {margin:9px 0 0;color:var(--pk-muted);font-size:15px;line-height:1.65;max-width:660px;}
+.pk-toolbar {display:flex;align-items:end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:24px;}
+.pk-toolbar__search {display:block;min-width:0;width:min(100%,445px);}
+.pk-field-label {display:block;color:var(--pk-forest);font-size:14px;font-weight:700;margin-bottom:9px;}
+.pk-search {display:block;position:relative;}
+.pk-search svg {position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--pk-forest);pointer-events:none;}
+.pk-search input {width:100%;height:51px;padding:11px 14px 11px 48px;border:1px solid rgba(23,63,53,.28);border-radius:5px;background:white;font-size:15px;color:var(--pk-charcoal);}
+.pk-search input::placeholder {color:#728077;}
+.pk-toolbar__note {color:var(--pk-muted);font-size:14px;margin:0 0 13px;}
+.pk-browse {border-top:1px solid var(--pk-line);border-bottom:1px solid var(--pk-line);margin-bottom:25px;}
+.pk-browse__heading {display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:15px;}
+.pk-browse__heading strong {font-size:14px;font-weight:700;color:var(--pk-forest);}
+.pk-browse__heading span {font-size:13px;color:var(--pk-muted);}
+.pk-tabs {display:flex;align-items:stretch;gap:clamp(16px,2.1vw,30px);overflow-x:auto;max-width:100%;padding-top:8px;scrollbar-width:thin;scrollbar-color:var(--pk-sage) transparent;}
+.pk-tab {flex:none;display:inline-flex;align-items:center;gap:8px;justify-content:center;min-height:50px;border:0;border-bottom:3px solid transparent;padding:10px 0 12px;background:transparent;color:#58665C;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.pk-tab:hover {color:var(--pk-forest);}
+.pk-tab[aria-pressed='true'] {border-bottom-color:var(--pk-clay);color:var(--pk-forest);font-weight:750;}
+.pk-tab__count {font-size:12px;font-weight:700;color:var(--pk-forest);background:rgba(215,221,207,.75);border-radius:999px;min-width:25px;min-height:24px;padding:3px 6px;display:inline-grid;place-items:center;}
+.pk-tab[aria-pressed='true'] .pk-tab__count {background:var(--pk-forest);color:var(--pk-porcelain);}
+.pk-list-head {display:grid;grid-template-columns:minmax(230px,2fr) minmax(100px,.9fr) minmax(125px,1fr) minmax(145px,1.2fr) minmax(160px,1.2fr);gap:18px;padding:13px 24px;background:var(--pk-sage);color:var(--pk-forest);font-size:12px;font-weight:700;letter-spacing:.035em;text-transform:uppercase;}
+.pk-list {border:1px solid var(--pk-line);border-top:0;background:var(--pk-porcelain);}
+.pk-item {display:grid;grid-template-columns:minmax(230px,2fr) minmax(100px,.9fr) minmax(125px,1fr) minmax(145px,1.2fr) minmax(160px,1.2fr);align-items:center;gap:18px;padding:17px 24px;min-height:112px;border-bottom:1px solid var(--pk-line);transition:background-color .16s;}
+.pk-item:last-child {border-bottom:0;}
+.pk-item:hover {background:rgba(215,221,207,.22);}
+.pk-item__main {display:flex;align-items:center;min-width:0;gap:16px;}
+.pk-visual {flex:0 0 77px;width:77px;height:78px;display:grid;place-items:center;overflow:hidden;background:var(--pk-sage);border-radius:4px;border:1px solid rgba(23,63,53,.09);}
+.pk-visual--photo {background:white;}
+.pk-visual img {display:block;width:100%;height:100%;object-fit:contain;}
+.pk-visual__letter {max-width:100%;color:var(--pk-forest);font-weight:600;font-size:33px;line-height:1;letter-spacing:-.07em;text-transform:uppercase;}
+.pk-visual--small {flex-basis:60px;width:60px;height:61px;}
+.pk-visual--small .pk-visual__letter {font-size:27px;}
+.pk-item__name-wrap {min-width:0;}
+.pk-page .pk-item__name {margin:0;color:var(--pk-charcoal);font-size:18px!important;line-height:1.35!important;font-weight:700!important;overflow-wrap:break-word;}
+.pk-item__minor {display:block;font-size:12.5px;color:var(--pk-muted);margin-top:5px;}
+.pk-item__quantity {min-width:0;font-weight:700;font-size:15px;color:var(--pk-charcoal);overflow-wrap:break-word;}
+.pk-item__time {min-width:0;color:var(--pk-muted);font-size:13px;line-height:1.5;}
+.pk-status {display:inline-flex;align-items:center;justify-content:center;max-width:100%;padding:6px 10px;border:1px solid rgba(23,63,53,.2);border-radius:999px;background:var(--pk-sage);color:var(--pk-forest);font-size:12px;line-height:1.35;font-weight:700;overflow-wrap:break-word;text-align:center;}
+.pk-status.is-info,.pk-status.is-muted {background:var(--pk-porcelain);color:var(--pk-forest);}
+.pk-status.is-caution,.pk-status.is-uncertain {background:rgba(197,108,66,.13);color:#88442c;border-color:rgba(197,108,66,.3);}
+.pk-item__actions {display:flex;align-items:center;justify-content:flex-end;gap:13px;flex-wrap:wrap;}
+.pk-item__action-link {display:inline-flex;align-items:center;gap:6px;color:var(--pk-forest);font-size:13px;font-weight:750;line-height:1.35;}
+.pk-item__action-link:hover {text-decoration:underline;text-underline-offset:3px;}
+.pk-item__remove {border:0;padding:6px 0;background:transparent;color:#9a4b2b;font-size:12.5px;font-weight:650;cursor:pointer;}
+.pk-item__remove:hover {text-decoration:underline;text-underline-offset:3px;}
+.pk-empty {padding:42px 28px;border:1px solid var(--pk-line);background:var(--pk-sage);}
+.pk-page .pk-empty__title {margin:0 0 10px;color:var(--pk-forest);font-size:25px!important;font-weight:650!important;}
+.pk-empty p {font-size:15px;color:var(--pk-charcoal);margin:0 0 20px;line-height:1.6;}
+.pk-bottom-row {display:flex;align-items:center;justify-content:space-between;gap:22px;flex-wrap:wrap;margin-top:23px;}
+.pk-bottom-row p {color:var(--pk-muted);font-size:13.5px;line-height:1.6;margin:0;}
+.pk-next {background:var(--pk-sage);border-top:1px solid var(--pk-line);}
+.pk-next__inner {display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.85fr);gap:clamp(30px,5vw,90px);align-items:center;padding-block:clamp(37px,5vw,60px);}
+.pk-page .pk-next__title {font-size:clamp(29px,3vw,41px)!important;font-weight:650!important;line-height:1.2!important;letter-spacing:-.035em;color:var(--pk-forest);margin:12px 0 10px;}
+.pk-next__desc {font-size:15px;color:#445347;line-height:1.65;max-width:560px;margin:0;}
+.pk-next__links {display:grid;gap:0;border-top:1px solid rgba(23,63,53,.21);}
+.pk-next__link {display:flex;align-items:center;justify-content:space-between;gap:15px;padding:18px 0;border-bottom:1px solid rgba(23,63,53,.21);font-size:16px;font-weight:700;color:var(--pk-forest);}
+.pk-next__link:hover {color:#9b4f32;}
+.pk-mobile-status, .pk-heading__desc--mobile {display:none;}
+.pk-overlay {position:fixed;inset:0;z-index:70;background:rgba(32,36,33,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:22px;}
+.pk-modal {display:flex;flex-direction:column;max-height:min(87svh,940px);width:min(100%,900px);overflow:hidden;background:var(--pk-porcelain);border-radius:9px;box-shadow:0 30px 90px rgba(15,25,20,.28);}
+.pk-modal--confirm {width:min(100%,535px);}
+.pk-modal__header {display:flex;justify-content:space-between;align-items:flex-start;gap:22px;flex:none;padding:26px 30px 22px;border-bottom:1px solid var(--pk-line);background:var(--pk-sage);}
+.pk-page .pk-modal__title {margin:10px 0 0;font-size:clamp(24px,2.4vw,31px)!important;font-weight:650!important;line-height:1.2!important;color:var(--pk-charcoal);}
+.pk-modal__hint {margin:7px 0 0;color:var(--pk-muted);font-size:14px;line-height:1.5;}
+.pk-modal__close {flex:none;display:grid;place-items:center;width:43px;height:43px;border:1px solid rgba(23,63,53,.22);border-radius:50%;background:var(--pk-porcelain);color:var(--pk-forest);cursor:pointer;}
+.pk-modal__list {flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 30px;}
+.pk-modal__item {display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.65fr) auto;align-items:center;gap:18px;padding:15px 0;border-bottom:1px solid var(--pk-line);}
+.pk-modal__name-group {display:flex;align-items:center;gap:15px;min-width:0;}
+.pk-modal__item-name {font-size:16px!important;font-weight:700!important;margin:0;color:var(--pk-charcoal);line-height:1.35!important;overflow-wrap:break-word;}
+.pk-modal__date {font-size:12.5px;color:var(--pk-muted);margin:4px 0 0;}
+.pk-modal__quantity {font-size:14px;font-weight:700;color:var(--pk-forest);margin:0 0 8px;}
+.pk-modal__actions {display:flex;justify-content:flex-end;align-items:center;gap:9px;flex-wrap:wrap;}
+.pk-modal__actions .pk-btn {min-height:40px;padding:8px 12px;font-size:12.5px;}
+.pk-modal__footer {display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px 30px;border-top:1px solid var(--pk-line);flex:none;}
+.pk-modal__footer span {font-size:13.5px;color:var(--pk-muted);}
+.pk-confirm__body {padding:26px 30px 21px;margin:0;color:var(--pk-charcoal);font-size:16px;line-height:1.65;}
+.pk-confirm__actions {display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 30px 28px;flex-wrap:wrap;}
+.pk-confirm__remove {background:var(--pk-clay);color:white;}
+.pk-confirm__remove:hover {background:#a95633;}
+@media (max-width:1100px) {
+ .pk-header__grid {grid-template-columns:minmax(0,1fr) minmax(300px,.85fr);gap:26px;}
+ .pk-list-head {grid-template-columns:minmax(200px,1.65fr) minmax(90px,.9fr) minmax(116px,1fr) minmax(120px,1fr) minmax(140px,1fr);gap:10px;padding-inline:16px;}
+ .pk-item {grid-template-columns:minmax(200px,1.65fr) minmax(90px,.9fr) minmax(116px,1fr) minmax(120px,1fr) minmax(140px,1fr);gap:10px;padding-inline:16px;}
+}
+@media (max-width:880px) {
+ .pk-header__grid {grid-template-columns:1fr;gap:28px;}
+ .pk-overview {max-width:680px;}
+ .pk-next__inner {grid-template-columns:1fr;gap:23px;}
+ .pk-list-head {display:none;}
+ .pk-item {display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:13px 20px;padding:20px;}
+ .pk-item__main {grid-column:1 / -1;}
+ .pk-item__quantity::before {content:'Quantity';display:block;margin-bottom:3px;color:var(--pk-muted);font-size:12px;font-weight:500;}
+ .pk-item__time::before {content:'Updated';display:block;margin-bottom:3px;color:var(--pk-muted);font-size:12px;}
+ .pk-item__actions {justify-content:flex-start;grid-column:1 / -1;}
+ .pk-list {border-top:1px solid var(--pk-line);}
+}
+@media (max-width:600px) {
+ .pk-container {padding-inline:18px;}
+ .pk-header__grid {padding-block:32px 38px;gap:25px;}
+ .pk-lead {font-size:15px;}
+ .pk-overview {padding:22px 20px;}
+ .pk-overview__count {gap:14px;}
+ .pk-overview__stats {gap:8px;}
+ .pk-overview__stat + .pk-overview__stat {padding-left:9px;}
+ .pk-overview__stat strong {font-size:23px;}
+ .pk-overview__stat span {font-size:12px;}
+ .pk-heading {flex-direction:column;align-items:flex-start;gap:17px;}
+ .pk-toolbar {margin-bottom:20px;}
+ .pk-toolbar__search {width:100%;}
+ .pk-toolbar__note {margin:0;}
+ .pk-browse__heading span {display:none;}
+ .pk-tabs {gap:20px;}
+ .pk-item {padding:17px 14px;gap:14px;}
+ .pk-visual {flex-basis:67px;width:67px;height:68px;}
+ .pk-item__main {gap:13px;}
+ .pk-page .pk-item__name {font-size:17px!important;}
+ .pk-bottom-row {align-items:stretch;}
+ .pk-bottom-row .pk-btn {width:100%;}
+ .pk-overlay {align-items:flex-end;padding:0;}
+ .pk-modal {max-height:91svh;width:100%;border-radius:12px 12px 0 0;}
+ .pk-modal--confirm {width:calc(100% - 24px);margin:0 12px 12px;border-radius:10px;}
+ .pk-modal__header {padding:22px 19px;}
+ .pk-modal__list {padding:0 19px;}
+ .pk-modal__item {grid-template-columns:minmax(0,1fr);gap:11px;}
+ .pk-modal__actions {justify-content:flex-start;}
+ .pk-modal__footer {padding:13px 19px;}
+ .pk-confirm__body {padding:20px 19px;}
+ .pk-confirm__actions {padding:0 19px 21px;}
+ /* Mobile-only: two compact primary actions on one line. */
+ .pk-actions {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;width:100%;margin-top:18px;}
+ .pk-actions .pk-btn {min-width:0;min-height:37px;padding:8px 5px;font-size:clamp(10.5px,2.95vw,12.5px);font-weight:700;line-height:1.25;white-space:nowrap;letter-spacing:-.02em;gap:4px;}
+ .pk-actions .pk-btn svg {display:none;}
+ /* Save height in the summary without removing any counts. */
+ .pk-overview {padding:15px 17px 14px;}
+ .pk-overview__eyebrow {font-size:11.5px;line-height:1.4;}
+ .pk-overview__count {margin:8px 0 10px;padding-bottom:10px;gap:10px;align-items:center;}
+ .pk-overview__count strong {font-size:43px;line-height:1;}
+ .pk-overview__count span {max-width:none;font-size:12.5px;line-height:1.35;}
+ .pk-overview__stats {gap:7px;}
+ .pk-overview__stat + .pk-overview__stat {padding-left:8px;}
+ .pk-overview__stat strong {font-size:20px;line-height:1.1;}
+ .pk-overview__stat span {font-size:11px;line-height:1.3;margin-top:3px;}
+ /* Replace the mobile description only: desktop copy remains unchanged. */
+ .pk-heading__desc--desktop {display:none;}
+ .pk-heading__desc--mobile {display:inline;}
+ .pk-heading__desc {font-size:clamp(12.5px,3.5vw,14px);line-height:1.45;white-space:nowrap;letter-spacing:-.022em;}
+ /* Desktop status tabs remain intact, while mobile uses the same filter state in a select. */
+ .pk-browse {margin-bottom:17px;padding-bottom:14px;}
+ .pk-browse__heading {padding-top:12px;}
+ .pk-tabs {display:none;}
+ .pk-mobile-status {display:grid;gap:6px;margin-top:9px;}
+ .pk-mobile-status label {font-size:12px;font-weight:600;color:var(--pk-muted);}
+ .pk-mobile-status select {width:100%;min-height:43px;appearance:auto;border:1px solid rgba(23,63,53,.25);border-radius:7px;background:var(--pk-porcelain);padding:9px 12px;font:650 14px/1.3 'Plus Jakarta Sans',Inter,system-ui,sans-serif;color:var(--pk-forest);cursor:pointer;}
+ .pk-mobile-status select:focus-visible {outline:3px solid var(--pk-clay);outline-offset:2px;}
+ /* Compact inventory rows with update left and Remove right. */
+ .pk-item {grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto auto;gap:8px 10px;padding:12px 13px;min-height:0;}
+ .pk-item__main {grid-column:1;grid-row:1;gap:9px;align-self:center;}
+ .pk-visual {flex:0 0 49px;width:49px;height:50px;}
+ .pk-visual__letter {font-size:25px;}
+ .pk-page .pk-item__name {font-size:16px!important;line-height:1.25!important;}
+ .pk-item__minor {font-size:11px;margin-top:2px;}
+ .pk-item > div:nth-child(3) {grid-column:2;grid-row:1;justify-self:end;align-self:center;max-width:105px;}
+ .pk-status {padding:4px 7px;font-size:10.5px;line-height:1.3;}
+ .pk-item__quantity {grid-column:1;grid-row:2;font-size:12.5px;align-self:start;}
+ .pk-item__quantity::before {font-size:10px;line-height:1.2;margin-bottom:1px;}
+ .pk-item__time {grid-column:2;grid-row:2;text-align:right;justify-self:end;font-size:11px;line-height:1.3;}
+ .pk-item__time::before {font-size:10px;line-height:1.2;margin-bottom:1px;}
+ .pk-item__actions {grid-column:1 / -1;grid-row:3;display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:8px;padding-top:9px;border-top:1px solid var(--pk-line);}
+ .pk-item__action-link {font-size:12px;}
+ .pk-item__remove {margin-left:auto;font-size:12px;text-align:right;}
+ /* Centered, self-contained dialog instead of a full-screen bottom sheet. */
+ .pk-overlay {align-items:center;justify-content:center;padding:14px;}
+ .pk-modal,.pk-modal--confirm {width:100%;max-width:430px;max-height:min(73svh,640px);margin:0;border-radius:13px;box-shadow:0 25px 70px rgba(18,32,26,.34);}
+ .pk-modal__header {gap:12px;padding:17px 18px 15px;border-bottom:3px solid var(--pk-clay);background:var(--pk-forest);color:var(--pk-porcelain);}
+ .pk-modal__header .pk-kicker {color:var(--pk-sage);font-size:11px;}
+ .pk-page .pk-modal__title {font-size:22px!important;line-height:1.22!important;margin-top:8px;color:var(--pk-porcelain)!important;}
+ .pk-modal__hint {font-size:12px;line-height:1.45;color:var(--pk-sage);}
+ .pk-modal__close {width:35px;height:35px;color:var(--pk-porcelain);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.35);}
+ .pk-modal__list {padding:1px 17px;overscroll-behavior:contain;}
+ .pk-modal__item {grid-template-columns:minmax(0,1fr);gap:9px;padding:13px 0;}
+ .pk-modal__name-group {gap:11px;}
+ .pk-modal__name-group .pk-visual {flex-basis:47px;width:47px;height:48px;}
+ .pk-modal__item-name {font-size:15px!important;}
+ .pk-modal__date {font-size:11px;line-height:1.35;margin-top:2px;}
+ .pk-modal__item > div:nth-child(2) {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:7px;}
+ .pk-modal__quantity {font-size:13px;margin:0;}
+ .pk-modal__actions {display:flex;justify-content:space-between;align-items:center;gap:9px;flex-wrap:nowrap;}
+ .pk-modal__actions .pk-btn {min-height:36px;padding:7px 12px;font-size:12px;}
+ .pk-modal__actions .pk-btn--line {margin-left:auto;}
+ .pk-modal__footer {padding:10px 17px;background:var(--pk-sage);gap:8px;}
+ .pk-modal__footer span {font-size:12px;}
+ .pk-modal__footer .pk-btn {min-height:34px;padding:7px 12px;font-size:12px;}
+ .pk-confirm__body {padding:18px 18px 16px;font-size:14px;line-height:1.55;}
+ .pk-confirm__actions {gap:8px;padding:0 18px 18px;flex-wrap:nowrap;}
+ .pk-confirm__actions .pk-btn {flex:1;min-width:0;padding:8px 10px;font-size:12px;}
 
-                <div className="mt-8 hidden max-w-xl rounded-[30px] border border-white/90 bg-white/[0.72] p-6 shadow-[0_16px_36px_rgba(28,25,23,0.05)] backdrop-blur-sm sm:block sm:p-7 lg:mt-10">
-                  <div className="space-y-3 text-base font-semibold leading-7 text-stone-600 sm:text-lg sm:leading-8">
-                    <p>Living Pantry keeps a simple memory of the food you have at home.</p>
-                    <p>It separates what you confirmed from what EPANTRY only expects, so you always know what needs checking.</p>
-                    <p>Use it to spot food to use soon and plan the next basket without relying on memory.</p>
-                  </div>
-                </div>
-              </div>
+}
+@media (prefers-reduced-motion:reduce) {.pk-page *, .pk-page *::before,.pk-page *::after {transition:none!important;animation:none!important;}}
+`;
 
-              <div className="flex min-h-0 flex-col justify-between gap-2 pb-1 sm:justify-center sm:gap-5 sm:pb-0 lg:py-7">
-                <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-2 sm:flex-none sm:grid-rows-none sm:gap-5 lg:gap-x-8 lg:gap-y-8">
-                  {[
-                    ['1', 'Tell us what is at home', 'Add or confirm the food that is actually in your kitchen.'],
-                    ['2', 'Check anything uncertain', 'If EPANTRY is unsure, it asks you to check instead of guessing.'],
-                    ['3', 'Use food before it is wasted', 'See what should be used soon before useful food gets forgotten.'],
-                    ['4', 'Plan the next basket', 'See what is missing or running low before you shop again.'],
-                  ].map(([step, title, description]) => (
-                    <article
-                      key={step}
-                      className="relative h-[80%] min-h-0 self-center overflow-hidden rounded-[16px] border border-white/90 bg-white/80 p-3 shadow-[0_8px_18px_rgba(20,83,45,0.06)] ring-1 ring-inset ring-emerald-950/5 backdrop-blur-md sm:h-auto sm:min-h-[190px] sm:self-auto sm:rounded-[28px] sm:p-5 sm:shadow-[0_18px_42px_rgba(20,83,45,0.08)]"
-                    >
-                      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300" />
-                      <div className="flex items-center justify-between gap-2 sm:gap-3">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-800 text-[10px] font-bold text-white shadow-[0_5px_12px_rgba(6,78,59,0.14)] sm:h-10 sm:w-10 sm:rounded-2xl sm:text-sm sm:font-black sm:shadow-[0_8px_18px_rgba(6,78,59,0.18)]">
-                          {step}
-                        </div>
-                        <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-emerald-700/70 sm:text-[10px] sm:font-black sm:tracking-[0.18em]">
-                          Step 0{step}
-                        </span>
-                      </div>
-                      <h2 className="mt-2 text-[12px] font-bold leading-[1.15] tracking-[-0.015em] text-stone-950 sm:mt-5 sm:text-lg sm:font-black sm:leading-tight sm:tracking-normal">
-                        {title}
-                      </h2>
-                      <p className="mt-1 text-[9.5px] font-medium leading-[1.3] text-stone-600 sm:mt-2 sm:text-sm sm:font-normal sm:leading-6">
-                        {description}
-                      </p>
-                    </article>
-                  ))}
-                </div>
+export default function PantryPage() {
+  const advancedPantryEnabled = useAppStore(
+    (state) => state.featureFlags?.["m21.advanced_pantry"] === true
+  );
 
-                <div className="flex flex-nowrap justify-end gap-2 sm:flex-wrap sm:gap-2.5 sm:pr-1">
-                  <Link
-                    to="/waste-reduction"
-                    className="focus-ring inline-flex min-h-10 flex-1 items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] font-black text-amber-950 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 sm:min-h-14 sm:min-w-[150px] sm:flex-none sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
-                  >
-                    Use food soon
-                    <ArrowRight size={16} aria-hidden="true" />
-                  </Link>
-                  <Link
-                    to="/next-basket"
-                    className="focus-ring inline-flex min-h-10 flex-1 items-center justify-between gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(4,120,87,0.16)] transition hover:bg-emerald-800 sm:min-h-14 sm:min-w-[150px] sm:flex-none sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm sm:shadow-[0_10px_24px_rgba(4,120,87,0.18)]"
-                  >
-                    Plan next basket
-                    <ArrowRight size={16} aria-hidden="true" />
-                  </Link>
-                </div>
+  const [items, setItems] = useState([]);
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    document
-                      .getElementById('pantry-food-home')
-                      ?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start',
-                      })
-                  }}
-                  className="focus-ring mx-auto inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-emerald-900/10 bg-white/90 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-950 shadow-[0_8px_20px_rgba(6,78,59,0.10)] backdrop-blur-sm transition hover:bg-white sm:hidden"
-                  aria-label="Go to your food at home"
-                >
-                  <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white shadow-sm">
-                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/25" aria-hidden="true" />
-                    <ChevronDown
-                      size={16}
-                      className="relative animate-bounce"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span>Swipe to your food</span>
-                </button>
-              </div>
+  const [selectedFilter, setSelectedFilter] = useState("all");
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [catalogPhotos, setCatalogPhotos] = useState({});
+  const checkedCatalogNames = useRef(new Set());
+
+  const [showAllItems, setShowAllItems] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [error, setError] = useState("");
+
+  const [itemPendingRemoval, setItemPendingRemoval] = useState(null);
+
+  const [removingItemId, setRemovingItemId] = useState(null);
+
+  const loadPantry = useCallback(async ({ refresh = false } = {}) => {
+    if (refresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    setError("");
+
+    try {
+      const firstPage = await getPantry({ page: 1, limit: 50 });
+      const pageCount = Math.max(1, Number(firstPage.pagination?.pages) || 1);
+      const allRecords = [...firstPage.items];
+      // The existing API is paginated (50 per page); load remaining records
+      // so the redesigned inventory and View All never omit later pages.
+      for (let page = 2; page <= pageCount; page += 1) {
+        const nextPage = await getPantry({ page, limit: 50 });
+        allRecords.push(...nextPage.items);
+      }
+      setItems(allRecords);
+    } catch (loadError) {
+      setError(
+        getPantryErrorMessage(
+          loadError,
+          "Unable to load your household Pantry."
+        )
+      );
+    } finally {
+      setLoading(false);
+
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPantry();
+  }, [loadPantry]);
+
+  const selectedFilterDefinition = useMemo(
+    () => FILTERS.find((filter) => filter.key === selectedFilter) || FILTERS[0],
+    [selectedFilter]
+  );
+
+  const filteredItems = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase();
+    return items.filter((item) => {
+      const state = getItemState(item);
+      const matchesFilter = selectedFilterDefinition.states
+        ? selectedFilterDefinition.states.includes(state)
+        : state !== "do_not_track";
+      return (
+        matchesFilter &&
+        (!term || getItemTitle(item).toLocaleLowerCase().includes(term))
+      );
+    });
+  }, [items, searchTerm, selectedFilterDefinition]);
+
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, 9),
+    [filteredItems]
+  );
+
+  // Match publicly listed Grocery photos by pack identity or exact canonical
+  // food name. Public catalog uses privacy-cleared, signed images only.
+  // Results are optional and do not affect loading or actions in the Pantry.
+  useEffect(() => {
+    const photoCandidates = showAllItems ? items : visibleItems;
+    const missing = photoCandidates.filter((item) => {
+      const name = normalizedFoodName(getItemTitle(item));
+      if (
+        !name ||
+        getPantryImage(item) ||
+        checkedCatalogNames.current.has(name)
+      )
+        return false;
+      checkedCatalogNames.current.add(name);
+      return true;
+    });
+    if (!missing.length) return;
+    async function findApprovedPhotos() {
+      for (const item of missing) {
+        const key = normalizedFoodName(getItemTitle(item));
+        try {
+          const result = await getCatalogProducts({
+            search: getItemTitle(item),
+            page: 1,
+            limit: 24,
+            listedOnly: true,
+          });
+          const photo = getMatchingCatalogPhoto(item, result.products);
+          if (photo)
+            setCatalogPhotos((previous) => ({ ...previous, [key]: photo }));
+        } catch {
+          // An unavailable catalog must never hide Pantry inventory or display
+          // a potentially unrelated picture.
+        }
+      }
+    }
+    findApprovedPhotos();
+  }, [visibleItems, items, showAllItems]);
+
+  const pantryCounts = useMemo(() => {
+    const active = items.filter(
+      (item) => getItemState(item) !== "do_not_track"
+    );
+    return {
+      active: active.length,
+      confirmed: active.filter((item) =>
+        ["confirmed_available", "replenished_elsewhere"].includes(
+          getItemState(item)
+        )
+      ).length,
+      low: active.filter((item) => getItemState(item) === "running_low").length,
+      check: active.filter((item) =>
+        ["uncertain", "inferred_available"].includes(getItemState(item))
+      ).length,
+    };
+  }, [items]);
+
+  const filterCount = (filter) =>
+    items.filter((item) =>
+      filter.states
+        ? filter.states.includes(getItemState(item))
+        : getItemState(item) !== "do_not_track"
+    ).length;
+
+  const confirmRemoveFromPantry = useCallback(async () => {
+    const itemId = getItemId(itemPendingRemoval);
+
+    if (!itemId) {
+      setItemPendingRemoval(null);
+
+      return;
+    }
+
+    setRemovingItemId(itemId);
+
+    setError("");
+
+    try {
+      const result = await stopTrackingPantryItem(itemId);
+
+      const updatedItem = result?.item || result?.pantryItem || null;
+
+      setItems((currentItems) =>
+        currentItems.map((currentItem) => {
+          if (getItemId(currentItem) !== itemId) {
+            return currentItem;
+          }
+
+          return (
+            updatedItem || {
+              ...currentItem,
+
+              state: "do_not_track",
+
+              trackingPaused: true,
+
+              updatedAt: new Date().toISOString(),
+            }
+          );
+        })
+      );
+
+      setItemPendingRemoval(null);
+    } catch (removeError) {
+      setError(
+        getPantryErrorMessage(
+          removeError,
+          "Unable to remove this item from your active Pantry."
+        )
+      );
+    } finally {
+      setRemovingItemId(null);
+    }
+  }, [itemPendingRemoval]);
+
+  return (
+    <main className="page-shell pk-page">
+      <style>{PANTRY_STYLES}</style>
+
+      <header className="pk-header" aria-labelledby="pantry-page-heading">
+        <div className="pk-container pk-header__grid">
+          <div>
+            <span className="pk-kicker">Living Pantry</span>
+            <h1 id="pantry-page-heading" className="pk-title">
+              Your Pantry.
+              <br />
+              <span>Everything in its place.</span>
+            </h1>
+            <p className="pk-lead">
+              See what you have at home, check what needs attention, and make
+              the most of your ingredients.
+            </p>
+            <div className="pk-actions">
+              <Link className="pk-btn pk-btn--main" to="/scan">
+                Add or scan an item <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+              <Link className="pk-btn pk-btn--line" to="/cook-today">
+                Cook with what I have
+              </Link>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              document
-                .getElementById('pantry-food-home')
-                ?.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'start',
-                })
-            }}
-            className="focus-ring absolute bottom-16 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-emerald-900/10 bg-white/90 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-950 shadow-[0_8px_20px_rgba(6,78,59,0.10)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white sm:inline-flex lg:bottom-24"
-            aria-label="Go to your food at home"
+          <aside
+            className="pk-overview"
+            aria-label="Live household pantry summary"
           >
-            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white shadow-sm">
-              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/25" aria-hidden="true" />
-              <ChevronDown
-                size={16}
-                className="relative animate-bounce"
-                aria-hidden="true"
-              />
-            </span>
-            <span>Scroll to your food</span>
-          </button>
-        </section>
-
-        <section
-          id="pantry-food-home"
-          className="relative z-20 -mt-6 flex h-[calc(100svh-72px)] min-h-[calc(100svh-72px)] flex-col overflow-hidden rounded-t-[36px] border-t border-emerald-100 bg-[radial-gradient(circle_at_88%_10%,rgba(186,230,253,0.30),transparent_28%),radial-gradient(circle_at_12%_92%,rgba(209,250,229,0.42),transparent_30%),linear-gradient(180deg,#fbfcfa_0%,#f5f8f3_100%)] shadow-[0_-24px_60px_rgba(28,25,23,0.10)]"
-        >
-          <div className="border-b border-emerald-100/80 px-4 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6 sm:px-7 sm:py-4">
-            <div className="min-w-0">
-              <div className="flex items-center justify-between gap-2 sm:block">
-                <p className="whitespace-nowrap text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 sm:text-[11px] sm:tracking-[0.16em]">Your food at home</p>
-
-                <button
-                  type="button"
-                  onClick={() => loadPantry({ refresh: true })}
-                  disabled={refreshing || loading}
-                  className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-white/90 px-2.5 py-1.5 text-[10px] font-bold text-stone-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-800 disabled:opacity-50 sm:hidden"
-                >
-                  <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
-                  Refresh list
-                </button>
+            <span className="pk-overview__eyebrow">Your kitchen today</span>
+            <div className="pk-overview__count">
+              <strong>{loading ? "—" : pantryCounts.active}</strong>
+              <span>items in your active Pantry</span>
+            </div>
+            <div className="pk-overview__stats">
+              <div className="pk-overview__stat">
+                <strong>{loading ? "—" : pantryCounts.confirmed}</strong>
+                <span>Confirmed</span>
               </div>
+              <div className="pk-overview__stat pk-overview__stat--warn">
+                <strong>{loading ? "—" : pantryCounts.low}</strong>
+                <span>Running low</span>
+              </div>
+              <div className="pk-overview__stat">
+                <strong>{loading ? "—" : pantryCounts.check}</strong>
+                <span>Needs checking</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </header>
 
-              <h2 className="mt-1 text-[19px] font-black leading-tight tracking-[-0.03em] text-stone-950 sm:text-2xl sm:tracking-tight">What is in your Pantry?</h2>
-              <p className="mt-0.5 whitespace-nowrap text-[9px] font-medium text-stone-500 sm:mt-1 sm:text-sm sm:font-normal">
-                <span className="sm:hidden">Filter, then open an item to check or update.</span>
-                <span className="hidden sm:inline">Choose a filter, then open an item to check or update it.</span>
+      <section
+        className="pk-workspace"
+        aria-labelledby="pantry-inventory-title"
+        id="pantry-food-home"
+      >
+        <div className="pk-container">
+          <div className="pk-heading">
+            <div>
+              <span className="pk-kicker">Your saved ingredients</span>
+              <h2 className="pk-heading__title" id="pantry-inventory-title">
+                Food at home
+              </h2>
+              <p className="pk-heading__desc">
+                <span className="pk-heading__desc--desktop">
+                  Your inventory, with quantities and status exactly as saved.
+                  Update an item whenever something changes.
+                </span>
+                <span className="pk-heading__desc--mobile">
+                  Check quantities and update items.
+                </span>
               </p>
             </div>
-
             <button
               type="button"
               onClick={() => loadPantry({ refresh: true })}
-              disabled={refreshing || loading}
-              className="focus-ring hidden items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white/90 px-4 py-2.5 text-sm font-black text-stone-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-800 disabled:opacity-50 sm:inline-flex"
+              disabled={loading || refreshing}
+              className="pk-btn pk-btn--line"
             >
-              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
-              Refresh list
+              <RefreshCw size={17} aria-hidden="true" />{" "}
+              {refreshing ? "Refreshing…" : "Refresh pantry"}
             </button>
           </div>
 
-
-          <div className="flex min-h-0 flex-1 flex-col px-3 pb-2.5 pt-2 sm:px-5 sm:pb-4 sm:pt-2.5">
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200/80 bg-white/65 px-2.5 py-2 sm:flex-row sm:items-center sm:rounded-2xl sm:px-3 sm:py-2.5">
-              <span className="text-[9px] font-black uppercase tracking-[0.13em] text-stone-500 sm:text-xs sm:tracking-[0.14em]">Show</span>
-
-              <div className="relative ml-auto sm:hidden">
-                <select
-                  value={selectedFilter}
-                  onChange={(event) => setSelectedFilter(event.target.value)}
-                  aria-label="Filter Pantry items"
-                  className="focus-ring min-w-[132px] appearance-none rounded-lg border border-stone-200 bg-white/95 py-1.5 pl-3 pr-8 text-[10px] font-bold text-stone-700 shadow-sm outline-none"
-                >
-                  {FILTERS.map((filter) => (
-                    <option key={filter.key} value={filter.key}>
-                      {filter.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500"
-                  aria-hidden="true"
+          <div className="pk-toolbar">
+            <label className="pk-toolbar__search">
+              <span className="pk-field-label">Find an ingredient</span>
+              <span className="pk-search">
+                <Search size={19} aria-hidden="true" />
+                <input
+                  type="search"
+                  placeholder="Search your pantry"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
                 />
-              </div>
+              </span>
+            </label>
+            <p className="pk-toolbar__note" aria-live="polite">
+              {loading
+                ? "Loading your Pantry…"
+                : `${filteredItems.length} ${
+                    filteredItems.length === 1 ? "item" : "items"
+                  } in this view`}
+            </p>
+          </div>
 
-              <div className="hidden flex-1 gap-2 overflow-x-auto pb-1 sm:flex sm:justify-between sm:pb-0">
-                {FILTERS.map((filter) => {
-                  const active = filter.key === selectedFilter
+          <div
+            className="pk-browse"
+            role="group"
+            aria-label="Browse pantry by status"
+          >
+            <div className="pk-browse__heading">
+              <strong>Browse by status</strong>
+              <span>Select a status to filter your ingredients</span>
+            </div>
+            <div className="pk-tabs">
+              {FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  className="pk-tab"
+                  aria-pressed={selectedFilter === filter.key}
+                  onClick={() => setSelectedFilter(filter.key)}
+                >
+                  {filter.label}
+                  <span className="pk-tab__count">
+                    {loading ? "—" : filterCount(filter)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="pk-mobile-status">
+              <label htmlFor="pk-mobile-pantry-status">Choose a status</label>
+              <select
+                id="pk-mobile-pantry-status"
+                value={selectedFilter}
+                onChange={(event) => setSelectedFilter(event.target.value)}
+              >
+                {FILTERS.map((filter) => (
+                  <option key={filter.key} value={filter.key}>
+                    {filter.label} ({loading ? "…" : filterCount(filter)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {error ? (
+            <div className="pk-empty" role="alert">
+              <h3 className="pk-empty__title">
+                Couldn't load your latest Pantry information
+              </h3>
+              <p>{error}</p>
+              <button
+                type="button"
+                onClick={() => loadPantry({ refresh: true })}
+                className="pk-btn pk-btn--line"
+              >
+                Try again
+              </button>
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="pk-empty" aria-busy="true" aria-live="polite">
+              <h3 className="pk-empty__title">Checking your Pantry…</h3>
+              <p>Loading your saved ingredients and their latest status.</p>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="pk-empty">
+              <h3 className="pk-empty__title">
+                {searchTerm.trim()
+                  ? "No ingredients found"
+                  : "No items in this status"}
+              </h3>
+              <p>
+                {searchTerm.trim()
+                  ? "Try another name or choose a different status above."
+                  : "Select another status or add an item to your Pantry."}
+              </p>
+              <Link className="pk-btn pk-btn--main" to="/scan">
+                Add or scan an item
+              </Link>
+            </div>
+          ) : (
+            <div aria-label="Saved pantry ingredients">
+              <div className="pk-list-head" aria-hidden="true">
+                <span>Ingredient</span>
+                <span>Quantity</span>
+                <span>Status</span>
+                <span>Last updated</span>
+                <span style={{ textAlign: "right" }}>Actions</span>
+              </div>
+              <div className="pk-list">
+                {visibleItems.map((item, index) => {
+                  const id = getItemId(item);
+                  const state = getItemState(item);
                   return (
-                    <button
-                      key={filter.key}
-                      type="button"
-                      onClick={() => setSelectedFilter(filter.key)}
-                      className={[
-                        'shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-black transition',
-                        active
-                          ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
-                          : 'border-stone-200 bg-white/90 text-stone-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800',
-                      ].join(' ')}
+                    <article
+                      className="pk-item"
+                      key={id || `${getItemTitle(item)}-${index}`}
                     >
-                      {filter.label}
-                    </button>
-                  )
+                      <div className="pk-item__main">
+                        <PantryItemVisual
+                          item={item}
+                          catalogImage={
+                            catalogPhotos[
+                              normalizedFoodName(getItemTitle(item))
+                            ]
+                          }
+                        />
+                        <div className="pk-item__name-wrap">
+                          <h3 className="pk-item__name">
+                            {getItemTitle(item)}
+                          </h3>
+                          <span className="pk-item__minor">
+                            Pantry ingredient
+                          </span>
+                        </div>
+                      </div>
+                      <div className="pk-item__quantity">
+                        {formatQuantity(getQuantity(item))}
+                      </div>
+                      <div>
+                        <PantryStatus state={state} />
+                      </div>
+                      <div className="pk-item__time">
+                        {formatDate(getUpdatedAt(item))}
+                      </div>
+                      <div className="pk-item__actions">
+                        {id ? (
+                          <>
+                            <Link
+                              className="pk-item__action-link"
+                              to={`/pantry/items/${encodeURIComponent(id)}`}
+                            >
+                              Check &amp; update{" "}
+                              <ArrowRight size={15} aria-hidden="true" />
+                            </Link>
+                            {state !== "do_not_track" ? (
+                              <button
+                                type="button"
+                                className="pk-item__remove"
+                                onClick={() => setItemPendingRemoval(item)}
+                                disabled={removingItemId === id}
+                                aria-label={`Remove ${getItemTitle(
+                                  item
+                                )} from active Pantry`}
+                              >
+                                Remove
+                              </button>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="pk-item__time">
+                            History unavailable
+                          </span>
+                        )}
+                      </div>
+                    </article>
+                  );
                 })}
               </div>
             </div>
+          )}
 
-            {error && (
-              <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</div>
-            )}
-
-            <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-0.5 sm:mt-3 sm:overflow-hidden sm:pr-0">
-              {loading ? (
-                <div className="grid h-full grid-cols-1 content-start gap-2.5 sm:grid-cols-1 sm:gap-3 md:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2">
-                  {[1, 2, 3, 4, 5, 6].map((key, index) => (
-                    <div
-                      key={key}
-                      className={[
-                        'h-[176px] animate-pulse rounded-[18px] border border-stone-200 bg-stone-100 sm:min-h-0 sm:h-auto sm:rounded-[20px]',
-                        index >= 4 ? 'hidden sm:block' : '',
-                      ].join(' ')}
-                    />
-                  ))}
-                </div>
-              ) : filteredItems.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-stone-300 bg-white/70 px-6 py-10 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-stone-200">
-                    <Boxes size={26} className="text-stone-400" aria-hidden="true" />
-                  </div>
-                  <h2 className="mt-4 text-lg font-black text-stone-900">Nothing to show here</h2>
-                  <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-stone-500">Try another filter, or add food to your Pantry as you cook, shop and confirm what is at home.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 content-start gap-2.5 sm:h-full sm:grid-cols-2 sm:gap-x-0 sm:gap-y-6 lg:grid-cols-[repeat(3,320px)] lg:justify-between">
-                  {visibleItems.map((item, index) => {
-                    const itemId = getItemId(item)
-                    const state = getItemState(item)
-                    return (
-                      <article
-                        key={itemId || getItemTitle(item)}
-                        className={[
-                          'group relative flex h-[176px] w-full min-w-0 flex-col overflow-hidden rounded-[18px] bg-[#edf5ef] p-3 shadow-[8px_8px_18px_#cbd8cf,-8px_-8px_18px_#ffffff] transition duration-200 hover:-translate-y-0.5 sm:h-[220px] sm:max-w-[320px] sm:min-w-[auto] sm:justify-self-center sm:rounded-[30px] sm:p-5 sm:shadow-[15px_15px_30px_#cbd8cf,-15px_-15px_30px_#ffffff] lg:justify-self-auto',
-                          index >= 4 ? 'hidden sm:flex' : '',
-                        ].join(' ')}
-                      >
-                        <div className="flex justify-center sm:pt-1">
-                          <PantryStateBadge state={state} />
-                        </div>
-
-                        <div className="flex flex-1 items-center justify-center px-2 text-center sm:px-2">
-                          <h2 className="line-clamp-2 text-[15px] font-black leading-tight tracking-[-0.02em] text-stone-950 sm:text-[18px]">
-                            {getItemTitle(item)}
-                          </h2>
-                        </div>
-
-                        <div className="mt-auto">
-                          {itemId ? (
-                            <div className="grid gap-2 sm:gap-2">
-                              <Link
-                                to={`/pantry/items/${encodeURIComponent(itemId)}`}
-                                className="focus-ring mx-auto inline-flex min-h-10 w-[88%] items-center justify-between rounded-[11px] bg-emerald-800 px-4 py-2.5 text-[11px] font-black text-white shadow-sm transition hover:bg-emerald-900 sm:min-h-9 sm:w-auto sm:rounded-[14px] sm:px-3 sm:py-2 sm:text-[11px]"
-                              >
-                                Check & update
-                                <ArrowRight className="h-[12px] w-[12px] sm:h-[14px] sm:w-[14px]" aria-hidden="true" />
-                              </Link>
-
-                              {state !== 'do_not_track' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setItemPendingRemoval(item)}
-                                  disabled={removingItemId === itemId}
-                                  className="focus-ring mx-auto inline-flex min-h-10 w-[88%] items-center justify-center gap-1.5 rounded-[11px] border border-rose-200/90 bg-white/80 px-4 py-2.5 text-[11px] font-black text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 sm:w-auto sm:rounded-[14px] sm:px-3 sm:py-2 sm:text-[10px]"
-                                >
-                                  <Trash2 className="h-[12px] w-[12px] shrink-0" aria-hidden="true" />
-                                  Remove from Pantry
-                                </button>
-                              ) : (
-                                <span className="rounded-[11px] border border-stone-300 bg-white/70 px-3 py-1.5 text-center text-[10px] font-bold text-stone-600 sm:rounded-[14px] sm:px-3 sm:py-2 sm:text-[10px]">Not being tracked</span>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-center text-[10px] font-semibold text-stone-500 sm:text-xs">History unavailable for this item.</p>
-                          )}
-                        </div>
-                      </article>
-                    )
-                  })}
-                  </div>
-
-                  {filteredItems.length > 4 ? (
-                    <div className="flex justify-center pb-1 pt-3 sm:hidden">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAllItems(true)
-                        }}
-                        className="focus-ring inline-flex items-center justify-center rounded-lg border border-stone-200 bg-white/90 px-4 py-1.5 text-[11px] font-bold text-stone-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-                      >
-                        View all
-                      </button>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </div>
-
-            <div className="hidden shrink-0 justify-center pt-2 sm:flex">
+          {!loading && items.length > 0 && (
+            <div className="pk-bottom-row">
+              <p>
+                {filteredItems.length > visibleItems.length
+                  ? `Showing ${visibleItems.length} of ${filteredItems.length} matching items.`
+                  : `${filteredItems.length} items in this view.`}{" "}
+                Your complete saved Pantry also includes items you stopped
+                tracking.
+              </p>
               <button
                 type="button"
-                onClick={() => {
-                  setShowAllItems(true)
-                }}
-                className="focus-ring inline-flex items-center justify-center rounded-xl border border-stone-200 bg-white/90 px-5 py-2 text-sm font-black text-stone-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                onClick={() => setShowAllItems(true)}
+                className="pk-btn pk-btn--main"
               >
-                View all
+                View all {items.length} saved items{" "}
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="pk-next" aria-labelledby="pantry-next-title">
+        <div className="pk-container pk-next__inner">
+          <div>
+            <span className="pk-kicker">Make the most of what you have</span>
+            <h2 id="pantry-next-title" className="pk-next__title">
+              From your pantry to your plate.
+            </h2>
+            <p className="pk-next__desc">
+              Use what's at home first, then plan the next basket around what
+              you need.
+            </p>
           </div>
-        </section>
+          <div className="pk-next__links">
+            <Link className="pk-next__link" to="/waste-reduction">
+              Use food before it goes to waste{" "}
+              <ArrowRight size={19} aria-hidden="true" />
+            </Link>
+            <Link className="pk-next__link" to="/next-basket">
+              Plan your next shopping basket{" "}
+              <ArrowRight size={19} aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </section>
 
-        {advancedPantryEnabled ? <AdvancedPantryPanel /> : null}
-      </div>
+      {advancedPantryEnabled ? <AdvancedPantryPanel /> : null}
 
-      {showAllItems ? (
+      {showAllItems && (
         <div
-          className="fixed inset-x-0 bottom-0 top-[84px] z-40 flex items-center justify-center bg-stone-950/20 px-4 py-4 backdrop-blur-xl"
+          className="pk-overlay"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setShowAllItems(false)
-            }
+            if (event.target === event.currentTarget) setShowAllItems(false);
           }}
         >
           <section
+            className="pk-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="all-pantry-items-title"
-            className="flex max-h-[calc(100svh-116px)] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] border border-white/70 bg-white/[0.72] shadow-[0_28px_90px_rgba(15,23,42,0.24)] ring-1 ring-white/55 backdrop-blur-2xl"
           >
-            <div className="flex items-center justify-between gap-4 border-b border-white/70 px-5 py-4 sm:px-6">
+            <header className="pk-modal__header">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Your food at home</p>
-                <h2 id="all-pantry-items-title" className="mt-1 text-2xl font-black tracking-tight text-stone-950">All Pantry items</h2>
+                <span className="pk-kicker">Saved ingredients</span>
+                <h2 className="pk-modal__title" id="all-pantry-items-title">
+                  Your complete Pantry
+                </h2>
+                <p className="pk-modal__hint">
+                  {items.length} saved items, including items you're not
+                  currently tracking.
+                </p>
               </div>
+              <button
+                type="button"
+                className="pk-modal__close"
+                onClick={() => setShowAllItems(false)}
+                aria-label="Close all pantry items"
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="pk-modal__list">
+              {items.length === 0 ? (
+                <p className="pk-modal__hint">No saved items yet.</p>
+              ) : (
+                items.map((item, index) => {
+                  const id = getItemId(item);
+                  const state = getItemState(item);
+                  return (
+                    <article
+                      key={`all-${id || index}`}
+                      className="pk-modal__item"
+                    >
+                      <div className="pk-modal__name-group">
+                        <PantryItemVisual
+                          item={item}
+                          small
+                          catalogImage={
+                            catalogPhotos[
+                              normalizedFoodName(getItemTitle(item))
+                            ]
+                          }
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <h3 className="pk-modal__item-name">
+                            {getItemTitle(item)}
+                          </h3>
+                          <p className="pk-modal__date">
+                            Updated {formatDate(getUpdatedAt(item))}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="pk-modal__quantity">
+                          {formatQuantity(getQuantity(item))}
+                        </p>
+                        <PantryStatus state={state} />
+                      </div>
+                      <div className="pk-modal__actions">
+                        {id ? (
+                          <>
+                            <Link
+                              className="pk-btn pk-btn--main"
+                              to={`/pantry/items/${encodeURIComponent(id)}`}
+                              onClick={() => setShowAllItems(false)}
+                            >
+                              Check &amp; update
+                            </Link>
+                            {state !== "do_not_track" ? (
+                              <button
+                                type="button"
+                                className="pk-btn pk-btn--line"
+                                onClick={() => setItemPendingRemoval(item)}
+                                disabled={removingItemId === id}
+                              >
+                                Remove
+                              </button>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span>History unavailable</span>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+            <footer className="pk-modal__footer">
+              <span>
+                {pantryCounts.active} active · {items.length} saved
+              </span>
               <button
                 type="button"
                 onClick={() => setShowAllItems(false)}
-                className="focus-ring inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/80 bg-white/80 text-stone-600 shadow-sm transition hover:bg-white"
-                aria-label="Close all Pantry items"
+                className="pk-btn pk-btn--soft"
               >
-                <X size={18} aria-hidden="true" />
+                Close
               </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-              {allActiveItems.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-white/80 bg-white/60 px-6 py-10 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-stone-200">
-                    <Boxes size={26} className="text-stone-400" aria-hidden="true" />
-                  </div>
-                  <h3 className="mt-4 text-lg font-black text-stone-900">Nothing to show here</h3>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {allActiveItems.map((item) => {
-                    const itemId = getItemId(item)
-                    const state = getItemState(item)
-
-                    return (
-                      <article
-                        key={`all-${itemId || getItemTitle(item)}`}
-                        className="group flex min-h-[220px] flex-col rounded-[22px] border border-white/80 bg-white/80 p-4 shadow-[0_10px_28px_rgba(28,25,23,0.08)] ring-1 ring-stone-950/5 backdrop-blur-md transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <PantryStateBadge state={state} />
-                          <span className="text-[10px] font-black uppercase tracking-[0.13em] text-stone-400">Pantry item</span>
-                        </div>
-
-                        <h3 className="mt-3 text-lg font-black leading-tight text-stone-950">{getItemTitle(item)}</h3>
-
-                        <div className="mt-3 rounded-2xl bg-white/70 p-3 ring-1 ring-inset ring-stone-200/80">
-                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-stone-400">Quantity</p>
-                          <p className="mt-1 text-sm font-black text-stone-900">{formatQuantity(getQuantity(item))}</p>
-                          <div className="my-2 h-px bg-stone-200" />
-                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-stone-400">Last update</p>
-                          <p className="mt-1 text-sm font-semibold text-stone-700">{formatDate(getUpdatedAt(item))}</p>
-                        </div>
-
-                        <div className="mt-auto pt-3">
-                          {itemId ? (
-                            <div className="grid gap-2">
-                              <Link
-                                to={`/pantry/items/${encodeURIComponent(itemId)}`}
-                                onClick={() => setShowAllItems(false)}
-                                className="focus-ring inline-flex items-center justify-between rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
-                              >
-                                Check & update
-                                <ArrowRight size={16} aria-hidden="true" />
-                              </Link>
-
-                              {state !== 'do_not_track' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setItemPendingRemoval(item)}
-                                  disabled={removingItemId === itemId}
-                                  className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white/80 px-4 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  <Trash2 size={14} aria-hidden="true" />
-                                  Remove from Pantry
-                                </button>
-                              ) : (
-                                <span className="rounded-xl border border-stone-200 bg-white/70 px-3 py-2 text-center text-xs font-bold text-stone-500">Not being tracked</span>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-xs font-semibold text-stone-400">History unavailable for this item.</p>
-                          )}
-                        </div>
-                      </article>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            </footer>
           </section>
         </div>
-      ) : null}
+      )}
 
-      {itemPendingRemoval ? (
+      {itemPendingRemoval && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 px-4 backdrop-blur-sm"
+          className="pk-overlay"
+          style={{ zIndex: 80 }}
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !removingItemId) {
-              setItemPendingRemoval(null)
-            }
+            if (event.target === event.currentTarget && !removingItemId)
+              setItemPendingRemoval(null);
           }}
         >
           <section
+            className="pk-modal pk-modal--confirm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="remove-pantry-item-title"
-            className="flex flex-col rounded-[28px] border border-stone-200 bg-white p-8 shadow-2xl"
-            style={{
-              width: '470px',
-              maxWidth: 'calc(100vw - 32px)',
-              minHeight: '380px',
-            }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-black uppercase tracking-[0.16em] text-rose-600">
-                  Remove from Pantry
-                </p>
-                <h2
-                  id="remove-pantry-item-title"
-                  className="mt-3 text-3xl font-black leading-tight tracking-tight text-stone-950"
-                >
-                  Remove {getItemTitle(itemPendingRemoval)}?
+            <header className="pk-modal__header">
+              <div>
+                <span className="pk-kicker">Pantry item</span>
+                <h2 className="pk-modal__title" id="remove-pantry-item-title">
+                  Stop tracking {getItemTitle(itemPendingRemoval)}?
                 </h2>
               </div>
-
               <button
                 type="button"
-                onClick={() => setItemPendingRemoval(null)}
+                className="pk-modal__close"
                 disabled={Boolean(removingItemId)}
-                className="focus-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-stone-500 transition hover:bg-stone-100 disabled:opacity-50"
+                onClick={() => setItemPendingRemoval(null)}
                 aria-label="Close remove confirmation"
               >
-                <X size={16} aria-hidden="true" />
+                <X size={20} aria-hidden="true" />
               </button>
-            </div>
-
-            <p className="mt-7 text-base leading-7 text-stone-600">
-              EPANTRY will stop tracking this item in your active Pantry. Its history will stay saved under Not tracking.
+            </header>
+            <p className="pk-confirm__body">
+              This food will leave your active Pantry, but it will remain in
+              your saved history under Not tracking.
             </p>
-
-            <div className="mt-auto grid grid-cols-2 gap-3 pt-8">
+            <div className="pk-confirm__actions">
               <button
                 type="button"
-                onClick={() => setItemPendingRemoval(null)}
+                className="pk-btn pk-btn--line"
                 disabled={Boolean(removingItemId)}
-                className="focus-ring rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+                onClick={() => setItemPendingRemoval(null)}
               >
                 Keep item
               </button>
-
               <button
                 type="button"
-                onClick={confirmRemoveFromPantry}
+                className="pk-btn pk-confirm__remove"
                 disabled={Boolean(removingItemId)}
-                className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={confirmRemoveFromPantry}
               >
-                <Trash2 size={15} aria-hidden="true" />
-                {removingItemId ? 'Removing...' : 'Remove'}
+                {removingItemId ? "Removing…" : "Stop tracking"}
               </button>
             </div>
           </section>
         </div>
-      ) : null}
+      )}
     </main>
-  )
+  );
 }

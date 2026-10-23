@@ -26,6 +26,7 @@ import {
 import {
   requireHospitalityRecipeHostAccess,
   requireHostAccess,
+  requireHospitalityWorkspaceAccess,
 } from '../auth/authorization.middleware.js'
 
 import {
@@ -247,6 +248,7 @@ router.use(
   loadCurrentUser,
   requireActiveAccount,
   requireHostAccess,
+  requireHospitalityWorkspaceAccess,
   requireMfaAssurance,
 )
 

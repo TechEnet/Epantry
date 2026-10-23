@@ -102,6 +102,12 @@ const quickAccessItems = [
     icon: Boxes,
   },
   {
+    title: 'Create Listing',
+    description: 'Choose what to list. We will open the correct existing Host editor for your business.',
+    to: '/host/listings',
+    icon: Boxes,
+  },
+  {
     title: 'Product Setup & Intake',
     description: 'Review product details, fix product data and prepare new items before listing.',
     to: '/host/product-intelligence',

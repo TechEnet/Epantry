@@ -32,6 +32,7 @@ import { Navigate, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/context/AuthContext";
 
 import {
+  getHostWorkspaceLabel,
   isHostPathAllowed,
   normalizeHostWorkspaceType,
 } from "../hostWorkspace.config";
@@ -80,6 +81,11 @@ const navigationGroups = [
     label: "Catalog & Listings",
     icon: Boxes,
     items: [
+      {
+        label: "Create Listing",
+        to: "/host/listings",
+        icon: Boxes,
+      },
       {
         label: "Product Catalog",
         to: "/host/catalog",
@@ -216,6 +222,7 @@ const navigationGroups = [
 
 const mobileNavigationOrder = [
   "/host/operations",
+  "/host/listings",
   "/host/catalog",
   "/host/scan",
   "/host/product-intelligence",
@@ -500,7 +507,7 @@ export default function HostShell({ children }) {
         </button>
 
         <span className="ml-3 text-[11px] font-black uppercase tracking-[0.14em] text-stone-700">
-          Host workspace
+          {getHostWorkspaceLabel(hostWorkspaceType)} workspace
         </span>
       </div>
 
@@ -629,7 +636,7 @@ export default function HostShell({ children }) {
                       ].join(" ")}
                     >
                       <p className="text-[13px] font-black leading-4 text-[#F7F6F2]">
-                        Host workspace
+                        {getHostWorkspaceLabel(hostWorkspaceType)} workspace
                       </p>
 
                       <p className="mt-1 whitespace-normal text-[10px] font-semibold leading-4 text-[#F7F6F2]/85">

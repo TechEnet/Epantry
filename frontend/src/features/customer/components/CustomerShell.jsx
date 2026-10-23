@@ -337,50 +337,18 @@ function readSessionJson(key) {
 }
 
 function readCustomerCartNavigation() {
-  const recipeCart =
-    readSessionJson(
-      RECIPE_CART_PENDING_KEY,
-    )
-
-  const marketplaceCart =
-    readSessionJson(
-      FLOATING_MARKETPLACE_CART_KEY,
-    )
-
-  const recipeItems =
-    Array.isArray(
-      recipeCart?.items,
-    )
-      ? recipeCart.items
-      : []
-
-  const marketplaceItems =
-    Array.isArray(
-      marketplaceCart?.items,
-    )
-      ? marketplaceCart.items
-      : []
-
-  if (recipeItems.length > 0) {
-    return {
-      href: '/cart/recipe',
-      count: recipeItems.length,
-    }
-  }
-
-  if (
-    marketplaceItems.length > 0 &&
-    marketplaceCart?.cartId
-  ) {
-    return {
-      href: `/cart/${marketplaceCart.cartId}`,
-      count: marketplaceItems.length,
-    }
-  }
+  const recipeCart = readSessionJson(RECIPE_CART_PENDING_KEY)
+  const marketplaceCart = readSessionJson(FLOATING_MARKETPLACE_CART_KEY)
+  const recipeItems = Array.isArray(recipeCart?.items) ? recipeCart.items : []
+  const marketplaceItems = Array.isArray(marketplaceCart?.items) ? marketplaceCart.items : []
+  const groceryCount = marketplaceItems.reduce(
+    (sum, item) => sum + Math.max(1, Number(item?.quantity || 1)),
+    0,
+  )
 
   return {
     href: '/cart/recipe',
-    count: 0,
+    count: recipeItems.length + groceryCount,
   }
 }
 
@@ -410,6 +378,7 @@ export default function CustomerShell({
   const isPantry = location.pathname === '/pantry'
   const isMealPlan = location.pathname === '/meal-plan'
   const isNextBasket = location.pathname === '/next-basket'
+  const isCart = location.pathname.startsWith('/cart/')
   const isWasteReduction = location.pathname === '/waste-reduction'
   const isCookToday = location.pathname === '/cook-today'
   const isHousehold = location.pathname === '/account/household'
@@ -553,7 +522,7 @@ export default function CustomerShell({
         />
       ) : null}
 
-      <div className={`page-shell ${isDashboard ? 'py-5 sm:py-7' : isScan ? 'pt-0 pb-0 sm:pb-7' : isPantry || isMealPlan || isNextBasket || isWasteReduction || isCookToday || isHousehold || isAccountSettings || isPrivacy || isOrders || isOrderDetail || isPurchaseIntelligence || isLearning || isSpending ? 'pt-0 pb-5 sm:pb-7' : 'py-5 sm:py-7'}`}>
+      <div className={`page-shell ${isDashboard ? 'py-5 sm:py-7' : isScan ? 'pt-0 pb-0 sm:pb-7' : isPantry || isMealPlan || isNextBasket || isCart || isWasteReduction || isCookToday || isHousehold || isAccountSettings || isPrivacy || isOrders || isOrderDetail || isPurchaseIntelligence || isLearning || isSpending ? 'pt-0 pb-5 sm:pb-7' : 'py-5 sm:py-7'}`}>
         <div className={`${isDashboard ? 'overflow-hidden' : 'overflow-visible'} rounded-[28px] border border-stone-200 bg-white shadow-sm`}>
           <div
             className={[

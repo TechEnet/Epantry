@@ -1897,7 +1897,7 @@ export async function getCreatorSessionJoinLink({ sessionId, actorUser }) {
   if (owner && !(
     actorUser?.hostEnabled === true &&
     actorUser?.hostAccessStatus === 'active' &&
-    actorUser?.hostWorkspaceType === 'chef_restaurant' &&
+    ['chef_restaurant', 'hybrid'].includes(actorUser?.hostWorkspaceType) &&
     actorUser?.activeMode !== 'customer'
   )) {
     throw new ApiError(403, 'Switch to an active Chef + Restaurant Host workspace to open your class.')

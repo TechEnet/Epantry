@@ -225,6 +225,12 @@ function resolveNotificationDeepLink(
       return '/admin/host-operations?tab=hospitality'
     }
 
+    case 'host_unified_listing_submitted':
+      return entityId ? `/admin/host-listings?focus=${entityId}` : '/admin/host-listings'
+
+    case 'host_unified_listing_review':
+      return entityId ? `/host/listings/new?edit=${entityId}` : '/host/listings/new'
+
     case 'creator_approval_requested':
       if (
         item.relatedEntityType ===
@@ -1651,11 +1657,13 @@ const ADMIN_NOTIFICATION_TRIGGERS = [
   'host_registration',
   'host_listing_created',
   'host_listing_updated',
+  'host_unified_listing_submitted',
 ]
 
 const HOST_NOTIFICATION_TRIGGERS = [
   'retail_media_campaign_review_result',
   'host_inventory_low',
+  'host_unified_listing_review',
 ]
 
 const HOST_NOTIFICATION_RULES = [

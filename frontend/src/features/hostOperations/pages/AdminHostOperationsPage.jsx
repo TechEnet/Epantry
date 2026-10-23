@@ -18,6 +18,7 @@ import {
 } from 'react'
 
 import {
+  Link,
   useSearchParams,
 } from 'react-router-dom'
 
@@ -667,6 +668,7 @@ export default function AdminHostOperationsPage() {
       }
     >
       <div className="min-h-[100svh] w-full bg-[#f6f4ee] pb-6 sm:pb-8">
+        <div className="border-b border-[#D7DDCF] bg-[#E7EDE3] px-4 py-3 sm:px-7"><Link className="font-semibold text-[#173F35] underline" to="/admin/host-listings">Review unified Host listing submissions →</Link></div>
         <section className="border-b border-stone-200 bg-[#edf4f1]">
           <div className="grid lg:grid-cols-[minmax(0,1fr)_420px]">
             <div className="px-4 py-3 sm:px-7 sm:py-7">

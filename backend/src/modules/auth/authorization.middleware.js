@@ -592,8 +592,7 @@ export function requireChefRestaurantHostAccess(
       user?.hostAccessStatus ===
         'active' &&
       !(user?.customerEnabled === true && user?.activeMode === 'customer') &&
-      workspaceType ===
-        'chef_restaurant'
+      ['chef_restaurant', 'hybrid'].includes(workspaceType)
     ) {
       return next()
     }
@@ -601,7 +600,7 @@ export function requireChefRestaurantHostAccess(
     return next(
       new ApiError(
         403,
-        'Chef + Restaurant Host access is required for this action.',
+        'Chef + Restaurant or Hybrid Host access is required for this action.',
         [
           {
             code:
@@ -624,14 +623,32 @@ export function requireChefRestaurantHostAccess(
   }
 }
 
-// Restaurant recipe listings are available to governed Hospitality B2B and
-// Chef + Restaurant Hosts. Other Host workspaces retain their existing boundary.
+// Preserve legacy Hospitality access while enforcing the four explicitly
+// selected Host workspaces at the API boundary. Organization/outlet grants
+// and MFA still apply to every permitted Host below.
+export function requireHospitalityWorkspaceAccess(req, res, next) {
+  try {
+    const user = requireLoadedUser(req)
+    const workspaceType = String(user?.hostWorkspaceType || '').trim().toLowerCase()
+    if (!workspaceType || ['b2b', 'chef_restaurant', 'hybrid'].includes(workspaceType)) {
+      return next()
+    }
+    return next(new ApiError(403, 'This Host workspace does not have Hospitality access.', [
+      { code: 'AUTH_HOSPITALITY_WORKSPACE_REQUIRED' },
+    ]))
+  } catch (error) {
+    return next(error)
+  }
+}
+
+// Restaurant recipe listings are available to governed Hospitality B2B,
+// Chef + Restaurant and Hybrid Hosts. Other workspace boundaries remain intact.
 // The Hospitality service still enforces organization grants and ownership.
 export function requireHospitalityRecipeHostAccess(req, res, next) {
   try {
     const user = requireLoadedUser(req)
     const workspaceType = String(user?.hostWorkspaceType || '').trim().toLowerCase()
-    const allowed = workspaceType === 'b2b' || workspaceType === 'chef_restaurant'
+    const allowed = ['b2b', 'chef_restaurant', 'hybrid'].includes(workspaceType)
     if (
       allowed &&
       userHasAnyAccess(user, ['host']) &&
@@ -641,7 +658,7 @@ export function requireHospitalityRecipeHostAccess(req, res, next) {
     ) {
       return next()
     }
-    return next(new ApiError(403, 'Hospitality B2B or Chef + Restaurant Host access is required.', [
+    return next(new ApiError(403, 'Hospitality B2B, Chef + Restaurant or Hybrid Host access is required.', [
       { code: 'AUTH_HOSPITALITY_RECIPE_HOST_REQUIRED' },
     ]))
   } catch (error) {

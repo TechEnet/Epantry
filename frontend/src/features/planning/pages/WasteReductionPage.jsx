@@ -1,235 +1,396 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CalendarClock,
-  ChefHat,
-  CircleGauge,
+  Check,
   Clock3,
   PackageCheck,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   TriangleAlert,
-} from 'lucide-react'
-
-import {
-  Link,
-  useLocation,
-} from 'react-router-dom'
-
+  X,
+} from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import {
   getPlanningErrorMessage,
   getWasteReduction,
-} from '../services/planning.service'
+  listMealPlans,
+} from "../services/planning.service";
 
-const HORIZON_OPTIONS = Object.freeze([
-  3,
-  7,
-  14,
-])
-
+/*
+ * Waste Reduction — customer presentation only.
+ * All numbers, signals, planned meals and recipe recommendations below
+ * come from the existing /waste-reduction API, never from static samples.
+ */
+const HORIZON_OPTIONS = Object.freeze([3, 7, 14]);
 const PRIORITY_LABELS = Object.freeze({
-  use_now: 'Use now',
-  use_very_soon: 'Use very soon',
-  use_soon: 'Use soon',
-  attention: 'Needs attention',
-})
+  use_now: "Use now",
+  use_very_soon: "Use very soon",
+  use_soon: "Use soon",
+  attention: "Needs attention",
+});
 
 function formatDate(value) {
-  if (!value) {
-    return 'Not provided'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Not provided'
-  }
-
+  if (!value) return "Not provided";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not provided";
   return date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatReason(value) {
-  return String(value || '')
-    .replaceAll('_', ' ')
-    .toLowerCase()
+  return String(value || "")
+    .replaceAll("_", " ")
+    .toLowerCase();
+}
+
+function getRecipeMatchMessage(possibility) {
+  switch (possibility?.reasonCode) {
+    case "USE_SOON_RECIPE_MATCH_WITH_CONFIRMED_UNRESERVED_PLANNED_BALANCE":
+      return "Uses an ingredient marked use soon, with an available quantity confirmed in your Pantry.";
+    case "USE_SOON_RECIPE_MATCH_WITH_PROVEN_BASE_LINE_COVERAGE":
+      return "Your saved Pantry quantities support the recipe’s base ingredients.";
+    case "USE_SOON_RECIPE_IDENTITY_MATCH":
+      return "Uses an ingredient you marked use soon. Check the other ingredients before cooking.";
+    default:
+      return "Suggested using your saved Pantry information. Check the recipe before cooking.";
+  }
+}
+
+function getPantryEvidenceLabel(confidenceClass) {
+  return confidenceClass === "high"
+    ? "Based on saved Pantry details"
+    : "Check your Pantry details";
+}
+
+function formatMealType(value) {
+  const label = String(value || "")
+    .replaceAll("_", " ")
+    .trim();
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : "Meal";
 }
 
 function formatProvenQuantity(quantity) {
-  if (
-    quantity?.mode !== 'exact' ||
-    !Number.isFinite(Number(quantity.value))
-  ) {
-    return 'Quantity not confirmed'
+  if (quantity?.mode !== "exact" || !Number.isFinite(Number(quantity.value))) {
+    return "Quantity not confirmed";
   }
-
-  return `${quantity.value} ${quantity.unit || ''}`.trim()
+  return `${quantity.value} ${quantity.unit || ""}`.trim();
 }
 
-function EmptySection({
-  icon: Icon = PackageCheck,
-  title,
-  body,
-}) {
+function Heading({ label, title, description, count, trailing }) {
   return (
-    <div className="flex min-h-[92px] flex-col items-center justify-center rounded-[18px] border border-dashed border-sky-100 bg-sky-50/70 px-3 py-3 text-center sm:min-h-[170px] sm:rounded-[22px] sm:px-6 sm:py-8">
-      <div className="grid h-8 w-8 place-items-center rounded-xl bg-white/90 text-sky-700 shadow-sm ring-1 ring-sky-100 sm:h-11 sm:w-11 sm:rounded-2xl">
-        <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+    <div className="flex flex-col gap-3 border-b border-[#173F35]/15 pb-5 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+      <div className="min-w-0">
+        <p className="flex items-center gap-2 text-[12px] font-semibold tracking-[0.04em] text-[#C56C42]">
+          <span className="h-px w-6 bg-[#C56C42]" />
+          {label}
+        </p>
+        <h2 className="mt-2 text-[25px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#202421] sm:text-[29px]">
+          {title}
+        </h2>
+        {description && (
+          <p className="mt-2 max-w-2xl text-[15px] leading-[1.65] text-[#202421]/75">
+            {description}
+          </p>
+        )}
       </div>
+      {(count !== undefined || trailing) && (
+        <div className="flex shrink-0 items-center gap-3 self-start sm:self-auto">
+          {count !== undefined && (
+            <span className="rounded-full border border-[#173F35]/20 bg-[#F7F6F2] px-3.5 py-2 text-[13px] font-semibold text-[#173F35] shadow-[0_2px_8px_rgba(23,63,53,0.04)]">
+              {count} {count === 1 ? "item" : "items"}
+            </span>
+          )}
+          {trailing}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      <h3 className="mt-2 whitespace-nowrap text-[12px] font-black text-stone-950 sm:mt-4 sm:text-base">
+function ActionLink({ to, children, primary = false }) {
+  return (
+    <Link
+      to={to}
+      className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-semibold transition-[background-color,transform] duration-200 motion-safe:hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C56C42] ${
+        primary
+          ? "bg-[#173F35] text-[#F7F6F2] hover:bg-[#285648]"
+          : "border border-[#173F35]/20 bg-[#F7F6F2] text-[#173F35] hover:bg-[#D7DDCF]"
+      }`}
+    >
+      {children}
+      <ArrowRight size={15} aria-hidden="true" />
+    </Link>
+  );
+}
+
+function EmptyNote({ title, body, to, action }) {
+  return (
+    <div className="flex h-full min-h-[170px] flex-col justify-center rounded-xl border border-[#173F35]/10 border-l-[4px] border-l-[#C56C42] bg-[#F7F6F2] px-5 py-6 shadow-[0_8px_20px_rgba(23,63,53,0.035)] sm:px-7">
+      <h3 className="text-[20px] font-semibold tracking-[-0.025em] text-[#173F35]">
         {title}
       </h3>
-
-      <p className="mt-1 max-w-xl whitespace-nowrap text-[8px] leading-4 text-stone-500 sm:mt-2 sm:whitespace-normal sm:text-sm sm:leading-6">
+      <p className="mt-2 max-w-lg text-[14px] leading-[1.65] text-[#202421]/75 sm:text-[15px]">
         {body}
       </p>
+      {to && (
+        <div className="mt-4 self-start">
+          <ActionLink to={to}>{action}</ActionLink>
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
-function SectionShell({
-  eyebrow,
-  title,
-  mobileTitle,
-  description,
-  mobileDescription,
-  count,
-  icon: Icon,
-  iconClassName,
-  badgeClassName,
-  children,
-  id,
-}) {
+function PantryEntry({ signal, index }) {
   return (
-    <section
-      id={id}
-      className="scroll-mt-28 overflow-hidden rounded-[22px] border border-slate-200 bg-[#f8fbff] shadow-[0_1px_0_rgba(28,25,23,0.03)] sm:rounded-[28px]"
-    >
-      <div className="flex flex-col gap-1.5 border-b border-slate-200/80 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-5">
-        <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-          <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-11 sm:w-11 sm:rounded-2xl ${iconClassName}`}>
-            <Icon className="h-[14px] w-[14px] sm:h-5 sm:w-5" />
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-400 sm:text-[10px] sm:tracking-[0.14em]">
-              {eyebrow}
+    <article className="grid min-w-0 gap-2 border-b border-[#173F35]/15 px-4 py-3.5 transition-[background-color,box-shadow] sm:py-5 duration-200 hover:bg-[#D7DDCF]/60 hover:shadow-[inset_4px_0_0_#C56C42] focus-within:bg-[#D7DDCF]/60 focus-within:shadow-[inset_4px_0_0_#C56C42] last:border-b-0 sm:grid-cols-[38px_minmax(0,1fr)] sm:gap-4 sm:px-6">
+      <span
+        aria-hidden="true"
+        className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#D7DDCF] text-[13px] font-semibold tabular-nums text-[#173F35]"
+      >
+        {String(index + 1).padStart(2, "0")}
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h3 className="min-w-0 text-[20px] font-semibold leading-[1.25] tracking-[-0.025em] text-[#202421]">
+            {signal.ingredientName}
+          </h3>
+          <span className="inline-flex rounded-full border border-[#C56C42]/30 bg-[#C56C42]/10 px-2.5 py-1 text-[13px] font-semibold text-[#173F35]">
+            {PRIORITY_LABELS[signal.priorityClass] || signal.priorityClass}
+          </span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[13px] leading-[1.5] text-[#202421]/80 sm:mt-3 sm:gap-y-2">
+          <p>
+            <span className="font-semibold text-[#173F35]">
+              {signal.signalType === "use_soon"
+                ? "Use-soon date:"
+                : "Pantry status:"}
+            </span>{" "}
+            {signal.signalType === "use_soon"
+              ? formatDate(signal.useSoonAt)
+              : "Running low"}
+          </p>
+          <p>
+            <span className="font-semibold text-[#173F35]">Quantity:</span>{" "}
+            {formatProvenQuantity(signal.provenUnreservedQuantity)}
+          </p>
+        </div>
+        {signal.plannedUseConflict && (
+          <p className="mt-3 border-l-[3px] border-[#C56C42] bg-[#C56C42]/10 px-3 py-2.5 text-[13px] leading-[1.5] text-[#202421]">
+            This item may be needed before its planned use. Review your Pantry
+            dates.
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 sm:mt-3 sm:gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-medium leading-[1.5] text-[#173F35]/80">
+              {getPantryEvidenceLabel(signal.confidenceClass)}
             </p>
+            <p className="mt-0.5 break-words text-[12px] leading-[1.5] text-[#202421]/65">
+              Evidence: {formatReason(signal.reasonCode)}
+            </p>
+          </div>
+          <Link
+            to={`/pantry/items/${signal.pantryItemId}`}
+            className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg border border-[#173F35]/25 bg-white px-4 py-2 text-[13px] font-semibold text-[#173F35] transition-colors hover:bg-[#D7DDCF] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#C56C42]"
+          >
+            Review item <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
 
-            <h2 className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-black leading-tight tracking-tight text-stone-950 sm:mt-1 sm:overflow-visible sm:whitespace-normal sm:text-2xl">
-              {mobileTitle ? (
-                <>
-                  <span className="whitespace-nowrap text-[15px] font-black sm:hidden">{mobileTitle}</span>
-                  <span className="hidden sm:inline">{title}</span>
-                </>
-              ) : (
-                title
-              )}
-            </h2>
-
-            {mobileDescription ? (
-              <>
-                <p className="mt-0.5 whitespace-nowrap text-[7.5px] font-medium leading-3 text-stone-500 sm:hidden">
-                  {mobileDescription}
-                </p>
-                <p className="mt-1 hidden max-w-3xl text-sm leading-6 text-stone-500 sm:block">
-                  {description}
-                </p>
-              </>
-            ) : (
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-stone-500">
-                {description}
+function MealEntry({ entry, rescuesByMealId }) {
+  const { plan, meal } = entry;
+  const warning = meal ? rescuesByMealId.get(String(meal.id)) : null;
+  const scheduledCount = (plan.meals || []).filter(
+    (item) => item.status === "planned"
+  ).length;
+  return (
+    <article className="border-b border-[#173F35]/15 px-4 py-3.5 transition-[background-color,box-shadow] sm:py-5 duration-200 hover:bg-[#D7DDCF]/55 hover:shadow-[inset_4px_0_0_#173F35] focus-within:bg-[#D7DDCF]/55 focus-within:shadow-[inset_4px_0_0_#173F35] last:border-b-0 sm:px-6">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-[#173F35]">
+            SAVED MEAL PLAN
+          </p>
+          <h3 className="mt-1 text-[19px] font-semibold leading-[1.3] tracking-[-0.025em] text-[#202421]">
+            {plan.title || "My Meal Plan"}
+          </h3>
+          <p className="mt-1 text-[12px] leading-[1.5] text-[#202421]/70">
+            {formatDate(plan.horizonStart)} – {formatDate(plan.horizonEnd)}
+          </p>
+        </div>
+        <span className="rounded-full bg-[#D7DDCF] px-3 py-1.5 text-[12px] font-semibold text-[#173F35]">
+          {scheduledCount} scheduled
+        </span>
+      </div>
+      {meal ? (
+        <div className="mt-3 border-l-[3px] border-[#173F35] bg-[#F7F6F2] px-4 py-3">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <p className="text-[12px] font-semibold text-[#173F35]">
+              {formatMealType(meal.mealType)} · {formatDate(meal.plannedAt)}
+            </p>
+            {Number.isFinite(Number(meal.servings)) && (
+              <p className="text-[12px] text-[#202421]/75">
+                {meal.servings}{" "}
+                {Number(meal.servings) === 1 ? "serving" : "servings"}
               </p>
             )}
           </div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <h4 className="min-w-0 flex-1 text-[16px] font-semibold leading-[1.4] text-[#202421]">
+              {meal.recipeTitle || "Planned recipe"}
+            </h4>
+            {meal.recipeSlug && (
+              <Link
+                to={`/recipes/${encodeURIComponent(meal.recipeSlug)}`}
+                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-[#173F35]/25 bg-white px-3 text-[13px] font-semibold text-[#173F35] hover:bg-[#D7DDCF] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#C56C42]"
+              >
+                Recipe <ArrowRight size={14} aria-hidden="true" />
+              </Link>
+            )}
+          </div>
         </div>
-
-        <span className={`w-fit rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-[0.06em] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.08em] ${badgeClassName}`}>
-          {count} {count === 1 ? 'item' : 'items'}
-        </span>
-      </div>
-
-      <div className="p-2.5 sm:p-6">
-        {children}
-      </div>
-    </section>
-  )
+      ) : (
+        <div className="mt-3 bg-[#F7F6F2] px-4 py-3">
+          <p className="text-[14px] leading-[1.55] text-[#202421]/75">
+            Plan saved. Add a recipe and cooking date to start scheduling.
+          </p>
+          <div className="mt-3">
+            <ActionLink to="/meal-plan">Add a meal</ActionLink>
+          </div>
+        </div>
+      )}
+      {warning && (
+        <div className="mt-3 border-l-[3px] border-[#C56C42] bg-[#C56C42]/10 px-4 py-3 text-[#202421]">
+          <p className="text-[13px] font-semibold">
+            Consider cooking this meal earlier
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed">
+            {warning.affectedItems
+              .map(
+                (item) =>
+                  `${item.ingredientName} (use soon ${formatDate(
+                    item.useSoonAt
+                  )})`
+              )
+              .join(", ")}
+            . This is based on saved Pantry dates, not a verified expiry date.
+          </p>
+          <div className="mt-3">
+            <ActionLink to="/meal-plan">Review timing</ActionLink>
+          </div>
+        </div>
+      )}
+    </article>
+  );
 }
 
 export default function WasteReductionPage() {
-  const location = useLocation()
-
-  const [horizonDays, setHorizonDays] = useState(7)
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [showAllSignals, setShowAllSignals] = useState(false)
-  const [showAllPossibilities, setShowAllPossibilities] = useState(false)
+  const location = useLocation();
+  const [horizonDays, setHorizonDays] = useState(7);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [openList, setOpenList] = useState(null);
+  const closeListButtonRef = useRef(null);
+  const pantryViewAllRef = useRef(null);
+  const mealsViewAllRef = useRef(null);
+  const [showAllPossibilities, setShowAllPossibilities] = useState(false);
+  const [mealPlans, setMealPlans] = useState([]);
+  const [mealPlansLoading, setMealPlansLoading] = useState(true);
+  const [mealPlansError, setMealPlansError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-
+    setLoading(true);
+    setError("");
+    setData(null);
     try {
-      setData(
-        await getWasteReduction({
-          horizonDays,
-        }),
-      )
+      setData(await getWasteReduction({ horizonDays }));
     } catch (loadError) {
       setError(
         getPlanningErrorMessage(
           loadError,
-          'Unable to load Waste Reduction right now.',
-        ),
-      )
+          "Unable to load Waste Reduction right now."
+        )
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [horizonDays])
+  }, [horizonDays]);
+
+  const loadMealPlans = useCallback(async () => {
+    setMealPlansLoading(true);
+    setMealPlansError("");
+    try {
+      const response = await listMealPlans();
+      setMealPlans(
+        Array.isArray(response?.mealPlans) ? response.mealPlans : []
+      );
+    } catch (loadError) {
+      setMealPlansError(
+        getPlanningErrorMessage(
+          loadError,
+          "Unable to load your saved Meal Plans."
+        )
+      );
+    } finally {
+      setMealPlansLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    load()
-  }, [load])
+    load();
+  }, [load]);
+  useEffect(() => {
+    loadMealPlans();
+  }, [loadMealPlans]);
+
+  const refreshAll = useCallback(() => {
+    load();
+    loadMealPlans();
+  }, [load, loadMealPlans]);
 
   useEffect(() => {
-    if (
-      location.pathname === '/next-possibility' &&
-      !loading
-    ) {
-      document
-        .getElementById('next-possibility')
-        ?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        })
+    if (location.pathname === "/next-possibility" && !loading) {
+      document.getElementById("next-possibility")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
-  }, [location.pathname, loading])
+  }, [location.pathname, loading]);
 
-  const signals = data?.atRiskPantrySignals || []
-  const rescues = data?.plannedMealRescues || []
-  const possibilities = data?.nextPossibilities || []
-  const visibleSignals = showAllSignals
-    ? signals
-    : signals.slice(0, 4)
+  const signals = data?.atRiskPantrySignals || [];
+  const rescues = data?.plannedMealRescues || [];
+  const possibilities = data?.nextPossibilities || [];
+  const visibleSignals = signals.slice(0, 4);
   const visiblePossibilities = showAllPossibilities
     ? possibilities
-    : possibilities.slice(0, 3)
+    : possibilities.slice(0, 3);
+
+  const savedMealCount = useMemo(
+    () =>
+      mealPlans.reduce(
+        (total, plan) =>
+          total +
+          (plan.meals || []).filter((meal) => meal.status === "planned").length,
+        0
+      ),
+    [mealPlans]
+  );
 
   const groupedRescues = useMemo(() => {
-    const groups = new Map()
-
+    const groups = new Map();
     for (const rescue of rescues) {
       const groupKey =
         rescue.plannedMealId ||
-        `${rescue.recipeVersionId || rescue.recipeTitle}:${rescue.plannedAt}`
-
+        `${rescue.recipeVersionId || rescue.recipeTitle}:${rescue.plannedAt}`;
       if (!groups.has(groupKey)) {
         groups.set(groupKey, {
           groupKey,
@@ -243,636 +404,806 @@ export default function WasteReductionPage() {
           servings: rescue.servings,
           confidenceClass: rescue.confidenceClass,
           affectedItems: [],
-        })
+        });
       }
-
-      const group = groups.get(groupKey)
-      const alreadyAdded = group.affectedItems.some(
-        (item) => item.pantryItemId === rescue.pantryItemId,
-      )
-
-      if (!alreadyAdded) {
+      const group = groups.get(groupKey);
+      if (
+        !group.affectedItems.some(
+          (item) => item.pantryItemId === rescue.pantryItemId
+        )
+      ) {
         group.affectedItems.push({
           pantryItemId: rescue.pantryItemId,
           ingredientName: rescue.ingredientName,
           useSoonAt: rescue.useSoonAt,
           confidenceClass: rescue.confidenceClass,
-        })
+        });
       }
     }
-
     return Array.from(groups.values()).map((group) => ({
       ...group,
       affectedItems: [...group.affectedItems].sort(
         (left, right) =>
           new Date(left.useSoonAt).getTime() -
             new Date(right.useSoonAt).getTime() ||
-          String(left.ingredientName || '').localeCompare(
-            String(right.ingredientName || ''),
-          ),
+          String(left.ingredientName || "").localeCompare(
+            String(right.ingredientName || "")
+          )
       ),
-    }))
-  }, [rescues])
+    }));
+  }, [rescues]);
 
-  const summaryCards = useMemo(
-    () => [
-      {
-        label: 'At-risk signals',
-        value: data?.summary?.totalAtRiskSignals ?? 0,
-        description: 'Pantry evidence that deserves a closer look.',
-      },
-      {
-        label: 'Use-soon',
-        value: data?.summary?.useSoonSignals ?? 0,
-        description: 'Household use-soon signals in this review window.',
-      },
-      {
-        label: 'Meal rescues',
-        value: groupedRescues.length,
-        description: 'Planned meals worth reviewing earlier.',
-      },
-      {
-        label: 'Possibilities',
-        value: data?.summary?.nextPossibilities ?? 0,
-        description: 'Published recipes supported by current evidence.',
-      },
-    ],
-    [data, groupedRescues.length],
-  )
+  const rescuesByMealId = useMemo(
+    () =>
+      new Map(
+        groupedRescues
+          .filter((rescue) => rescue.plannedMealId)
+          .map((rescue) => [String(rescue.plannedMealId), rescue])
+      ),
+    [groupedRescues]
+  );
+
+  // Keep the page compact: each scheduled meal counts as one item, even when
+  // several meals belong to the same saved plan. Empty plans remain visible.
+  const mealEntries = useMemo(
+    () =>
+      mealPlans.flatMap((plan) => {
+        const scheduled = (plan.meals || []).filter(
+          (meal) => meal.status === "planned"
+        );
+        return scheduled.length
+          ? scheduled.map((meal) => ({
+              key: `${plan.id}:${meal.id}`,
+              plan,
+              meal,
+            }))
+          : [{ key: `${plan.id}:empty`, plan, meal: null }];
+      }),
+    [mealPlans]
+  );
+  const visibleMealEntries = mealEntries.slice(0, 4);
+
+  useEffect(() => {
+    if (!openList) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeListButtonRef.current?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setOpenList(null);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = document.getElementById("waste-list-dialog");
+      if (!dialog) return;
+      const focusable = [
+        ...dialog.querySelectorAll(
+          'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        ),
+      ];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      (openList === "pantry"
+        ? pantryViewAllRef
+        : mealsViewAllRef
+      ).current?.focus();
+    };
+  }, [openList]);
+
+  const overview = [
+    {
+      label: "Needs a closer look",
+      value: data?.summary?.totalAtRiskSignals ?? 0,
+    },
+    { label: "Use-soon signals", value: data?.summary?.useSoonSignals ?? 0 },
+    {
+      label: "Meals in your plans",
+      value: savedMealCount,
+      waiting: mealPlansLoading && !mealPlans.length,
+    },
+    {
+      label: "Recipes to consider",
+      value: data?.summary?.nextPossibilities ?? 0,
+    },
+  ];
 
   return (
-    <main className="min-h-screen bg-[#eef4f7]">
-      <div className="page-shell py-7 sm:py-9">
-        <section className="flex h-[40svh] flex-col overflow-hidden rounded-[24px] border border-emerald-200 bg-[#dff7ef] shadow-[0_10px_34px_rgba(16,185,129,0.07)] sm:h-auto sm:rounded-[30px] sm:shadow-[0_14px_50px_rgba(16,185,129,0.08)]">
-          <div className="grid gap-2.5 px-4 py-3.5 sm:gap-7 sm:px-8 sm:py-7 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div className="flex items-start gap-2.5 sm:gap-4">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200 sm:h-13 sm:w-13 sm:rounded-[18px]">
-                <Sparkles className="h-[18px] w-[18px] sm:h-[23px] sm:w-[23px]" />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p className="text-[8.5px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:font-black sm:tracking-[0.16em]">
-                  Use what you have first
-                </p>
-
-                <h1 className="mt-1 whitespace-nowrap text-[15px] font-extrabold tracking-[-0.02em] text-stone-950 sm:mt-2 sm:max-w-3xl sm:whitespace-normal sm:text-4xl sm:font-black sm:tracking-tight">
-                  Use soon. Plan smarter. Waste less.
-                </h1>
-
-                <p className="mt-1.5 text-[10px] font-medium leading-[1.45] text-stone-600 sm:hidden">
-                  <span className="block whitespace-nowrap">See what to use soon and which meals to cook earlier.</span>
-                  <span className="block whitespace-nowrap">Find fitting recipes; “Use soon by” is not an expiry date.</span>
-                </p>
-                <p className="mt-3 hidden max-w-3xl text-sm leading-7 text-stone-600 sm:block">
-                  Keep your Pantry current. EPANTRY shows what to use soon, which meals may be worth cooking earlier, and recipes that fit what you already have. Use soon by is a household reminder, not an expiry date.
-                </p>
-              </div>
+    <main className="min-h-screen bg-[#F7F6F2] text-[#202421]">
+      <div className="w-full min-w-0 px-0 pb-5 pt-0 sm:px-6 sm:pb-12 sm:pt-6 xl:px-9">
+        {/* The opening is a purposeful editorial split — not a fixed-height hero. */}
+        <section
+          className="grid min-w-0 overflow-hidden rounded-none border-y border-[#173F35]/10 shadow-none sm:rounded-[18px] sm:border sm:shadow-[0_18px_45px_rgba(23,63,53,0.10)] lg:grid-cols-[minmax(0,1.35fr)_minmax(335px,0.65fr)]"
+          aria-labelledby="waste-page-heading"
+        >
+          <div className="relative flex flex-col justify-between bg-[#173F35] px-4 py-5 text-[#F7F6F2] sm:px-10 sm:py-10 lg:px-12 lg:py-12">
+            <div>
+              <p className="flex items-center gap-2 text-[11px] font-semibold text-[#D7DDCF] sm:gap-2.5 sm:text-[13px]">
+                <span className="h-[2px] w-7 bg-[#C56C42]" />
+                YOUR KITCHEN, LESS WASTE
+              </p>
+              <h1
+                id="waste-page-heading"
+                className="mt-2 max-w-[680px] text-[28px] font-semibold leading-[1.12] tracking-[-0.042em] sm:mt-5 sm:text-[48px] sm:leading-[1.08] sm:tracking-[-0.047em] lg:text-[54px]"
+              >
+                <span className="sm:hidden">
+                  Use more. <span className="text-[#D7DDCF]">Waste less.</span>
+                </span>
+                <span className="hidden sm:inline">Use what you have.</span>
+                <span className="hidden text-[#D7DDCF] sm:block">
+                  Waste a little less.
+                </span>
+              </h1>
+              <p className="mt-2 max-w-[600px] text-[13px] leading-[1.45] text-[#F7F6F2]/85 sm:mt-5 sm:text-[16px] sm:leading-[1.7]">
+                <span className="sm:hidden">
+                  Check ingredients, meals and recipes in one place.
+                </span>
+                <span className="hidden sm:inline">
+                  See which ingredients need attention, review your planned
+                  meals, and discover recipes that fit your Pantry.
+                </span>
+              </p>
             </div>
-
-            <div className="space-y-1.5 sm:space-y-0">
-              <div className="flex flex-wrap justify-end gap-1.5 sm:justify-start sm:gap-2 lg:justify-end">
-                <Link
-                  to="/meal-plan"
-                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-extrabold text-indigo-800 transition hover:border-indigo-300 hover:bg-indigo-100 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs sm:font-black"
-                >
-                  Meal Plan
-                </Link>
-
-                <Link
-                  to="/next-basket"
-                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-[10px] font-extrabold text-white transition hover:bg-emerald-800 sm:gap-1.5 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs sm:font-black"
-                >
-                  Next Basket
-                  <ArrowRight className="h-[11px] w-[11px] sm:h-[13px] sm:w-[13px]" />
-                </Link>
-              </div>
-
-              <div className="flex justify-end gap-1.5 sm:hidden">
-                <Link
-                  to="/pantry"
-                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[8px] font-extrabold whitespace-nowrap text-indigo-800 transition hover:border-indigo-300 hover:bg-indigo-100"
-                >
-                  Open Living Pantry
-                </Link>
-
-                <Link
-                  to="/next-basket"
-                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1.5 text-[8px] font-extrabold whitespace-nowrap text-white transition hover:bg-emerald-800"
-                >
-                  Open Next Basket feedback
-                  <ArrowRight className="h-[10px] w-[10px]" />
-                </Link>
-              </div>
+            <div className="mt-4 flex flex-nowrap gap-2 border-t border-[#F7F6F2]/20 pt-3 sm:mt-9 sm:flex-wrap sm:gap-3 sm:pt-6">
+              <Link
+                to="/pantry"
+                className="inline-flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-lg bg-[#F7F6F2] px-3 py-2 text-[12px] font-semibold text-[#173F35] transition hover:bg-[#D7DDCF] sm:min-h-[44px] sm:gap-2 sm:px-5 sm:py-3 sm:text-[14px]"
+              >
+                Review my Pantry <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+              <Link
+                to="/meal-plan"
+                className="inline-flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-lg border border-white/35 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-white/10 sm:min-h-[44px] sm:gap-2 sm:px-5 sm:py-3 sm:text-[14px]"
+              >
+                See Meal Plan <ArrowRight size={16} aria-hidden="true" />
+              </Link>
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 border-t border-emerald-200 bg-white/45 px-4 py-2.5 sm:flex-none sm:px-8 sm:py-4">
-            <div className="grid h-full grid-cols-2 grid-rows-2 gap-2 sm:h-auto sm:grid-cols-2 sm:grid-rows-none sm:gap-3 xl:grid-cols-4">
-              <div className="flex min-h-0 items-center gap-2 rounded-xl border border-emerald-100/90 bg-white/80 px-2.5 py-2 shadow-[0_3px_12px_rgba(16,185,129,0.04)] sm:gap-3 sm:rounded-2xl sm:border-0 sm:bg-white/70 sm:px-4 sm:py-3 sm:shadow-none sm:ring-1 sm:ring-emerald-100">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-800 sm:h-9 sm:w-9 sm:rounded-xl">
-                  <PackageCheck className="h-[14px] w-[14px] sm:h-[17px] sm:w-[17px]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[8.5px] font-extrabold uppercase tracking-[0.04em] text-emerald-700 sm:text-[10px] sm:font-black sm:tracking-[0.09em]">1 · Update Pantry</p>
-                  <p className="mt-0.5 text-[9px] font-medium leading-tight text-stone-600 sm:mt-1 sm:text-xs sm:font-semibold">Quantity + Use soon by</p>
-                </div>
+          <div className="flex flex-col justify-between border-t-[3px] border-[#C56C42] bg-[#D7DDCF] px-4 py-4 sm:border-t-[4px] sm:px-9 sm:py-9 lg:border-t-0 lg:border-l-[4px] lg:px-10">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[13px] font-semibold text-[#173F35]">
+                  Your review window
+                </p>
+                <p className="mt-1 text-[23px] font-semibold tracking-[-0.04em] text-[#202421] sm:mt-2 sm:text-[29px]">
+                  Next {horizonDays} days
+                </p>
+                <p className="mt-1 text-[13px] leading-[1.45] text-[#202421]/70 sm:mt-2 sm:text-[14px] sm:leading-[1.55]">
+                  <span className="sm:hidden">
+                    Check upcoming Pantry use-soon dates.
+                  </span>
+                  <span className="hidden sm:inline">
+                    Choose how far ahead to check the use-soon information saved
+                    in your household.
+                  </span>
+                </p>
               </div>
-
-              <div className="flex min-h-0 items-center gap-2 rounded-xl border border-emerald-100/90 bg-white/80 px-2.5 py-2 shadow-[0_3px_12px_rgba(16,185,129,0.04)] sm:gap-3 sm:rounded-2xl sm:border-0 sm:bg-white/70 sm:px-4 sm:py-3 sm:shadow-none sm:ring-1 sm:ring-emerald-100">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-800 sm:h-9 sm:w-9 sm:rounded-xl">
-                  <Clock3 className="h-[14px] w-[14px] sm:h-[17px] sm:w-[17px]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[8.5px] font-extrabold uppercase tracking-[0.04em] text-emerald-700 sm:text-[10px] sm:font-black sm:tracking-[0.09em]">2 · Review items</p>
-                  <p className="mt-0.5 text-[9px] font-medium leading-tight text-stone-600 sm:mt-1 sm:text-xs sm:font-semibold">Check what to use soon</p>
-                </div>
-              </div>
-
-              <div className="flex min-h-0 items-center gap-2 rounded-xl border border-emerald-100/90 bg-white/80 px-2.5 py-2 shadow-[0_3px_12px_rgba(16,185,129,0.04)] sm:gap-3 sm:rounded-2xl sm:border-0 sm:bg-white/70 sm:px-4 sm:py-3 sm:shadow-none sm:ring-1 sm:ring-emerald-100">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-800 sm:h-9 sm:w-9 sm:rounded-xl">
-                  <CalendarClock className="h-[14px] w-[14px] sm:h-[17px] sm:w-[17px]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[8.5px] font-extrabold uppercase tracking-[0.04em] text-emerald-700 sm:text-[10px] sm:font-black sm:tracking-[0.09em]">3 · Check meals</p>
-                  <p className="mt-0.5 text-[9px] font-medium leading-tight text-stone-600 sm:mt-1 sm:text-xs sm:font-semibold">See what may work earlier</p>
-                </div>
-              </div>
-
-              <div className="flex min-h-0 items-center gap-2 rounded-xl border border-emerald-100/90 bg-white/80 px-2.5 py-2 shadow-[0_3px_12px_rgba(16,185,129,0.04)] sm:gap-3 sm:rounded-2xl sm:border-0 sm:bg-white/70 sm:px-4 sm:py-3 sm:shadow-none sm:ring-1 sm:ring-emerald-100">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-800 sm:h-9 sm:w-9 sm:rounded-xl">
-                  <ChefHat className="h-[14px] w-[14px] sm:h-[17px] sm:w-[17px]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[8.5px] font-extrabold uppercase tracking-[0.04em] text-emerald-700 sm:text-[10px] sm:font-black sm:tracking-[0.09em]">4 · Pick a recipe</p>
-                  <p className="mt-0.5 text-[9px] font-medium leading-tight text-stone-600 sm:mt-1 sm:text-xs sm:font-semibold">Cook from what you have</p>
-                </div>
-              </div>
+              <CalendarClock
+                className="mt-1 shrink-0 text-[#173F35]"
+                size={25}
+                aria-hidden="true"
+              />
             </div>
-          </div>
-
-        </section>
-
-        {error && (
-          <div className="mt-5 flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">
-            <TriangleAlert size={18} className="shrink-0" />
-            {error}
-          </div>
-        )}
-
-        <section className="mt-4 rounded-[24px] border border-indigo-100 bg-[#e8eefc] px-4 py-3 shadow-[0_1px_0_rgba(28,25,23,0.03)] sm:mt-5 sm:px-6 sm:py-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0">
-              <p className="text-[15px] font-black tracking-tight text-stone-950 sm:text-xs sm:tracking-normal sm:text-stone-900">
-                Evidence review window
-              </p>
-              <p className="mt-1 whitespace-nowrap text-[9px] font-medium leading-4 text-stone-500 sm:hidden">
-                Review use-soon evidence ahead — never an expiry date.
-              </p>
-              <p className="mt-1 hidden text-[11px] leading-4 text-stone-500 sm:block">
-                Change how far ahead EPANTRY reviews household use-soon evidence. This never creates an expiry date.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <div className="inline-flex rounded-xl border border-indigo-200 bg-white/85 p-0.5 sm:p-1">
+            <div className="mt-3 sm:mt-7">
+              <div
+                className="grid grid-cols-3 gap-2"
+                role="group"
+                aria-label="Review window"
+              >
                 {HORIZON_OPTIONS.map((option) => (
                   <button
                     key={option}
                     type="button"
+                    aria-pressed={horizonDays === option}
                     onClick={() => setHorizonDays(option)}
-                    className={`rounded-lg px-3 py-1.5 text-[11px] font-black transition sm:px-4 sm:py-2 sm:text-xs ${
-                      option === horizonDays
-                        ? 'bg-indigo-700 text-white shadow-sm'
-                        : 'text-stone-600 hover:bg-indigo-50 hover:text-indigo-900'
+                    className={`min-h-[40px] rounded-md border px-2 py-2 text-[13px] font-semibold transition sm:min-h-[45px] sm:px-3 sm:text-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C56C42] ${
+                      horizonDays === option
+                        ? "border-[#173F35] bg-[#173F35] text-white"
+                        : "border-[#173F35]/20 bg-[#F7F6F2]/65 text-[#173F35] hover:bg-white"
                     }`}
                   >
                     {option} days
                   </button>
                 ))}
               </div>
-
-              <button
-                type="button"
-                onClick={load}
-                className="grid h-9 w-9 place-items-center rounded-xl border border-indigo-200 bg-white/85 text-indigo-700 transition hover:border-indigo-300 sm:h-10 sm:w-10"
-                aria-label="Refresh Waste Reduction"
-              >
-                <RefreshCw
-                  size={16}
-                  className={loading ? 'animate-spin' : ''}
-                />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-2.5 grid gap-2 sm:mt-3 sm:grid-cols-2 xl:grid-cols-4">
-            {summaryCards.map((card) => (
-              <div
-                key={card.label}
-                className="rounded-2xl border border-indigo-100 bg-white/70 px-4 py-2.5 sm:py-3"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.1em] text-stone-500">
-                    {card.label}
-                  </p>
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                </div>
-
-                <div className="mt-1 flex items-end gap-3">
-                  <p className="text-2xl font-black tracking-tight text-stone-950">
-                    {card.value}
-                  </p>
-                  <p className="pb-0.5 text-[10px] leading-4 text-stone-500">
-                    {card.description}
-                  </p>
-                </div>
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-[#173F35]/20 pt-2 sm:mt-4 sm:pt-4">
+                <p className="max-w-[245px] text-[11px] leading-[1.4] text-[#202421]/75 sm:text-[12px] sm:leading-[1.5]">
+                  “Use soon” is guidance, not a verified expiry date.
+                </p>
+                <button
+                  type="button"
+                  onClick={refreshAll}
+                  disabled={loading || mealPlansLoading}
+                  aria-label="Refresh Pantry review and Meal Plans"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#173F35]/25 text-[#173F35] transition hover:bg-white disabled:opacity-50"
+                >
+                  <RefreshCw
+                    size={18}
+                    className={
+                      loading || mealPlansLoading ? "animate-spin" : ""
+                    }
+                    aria-hidden="true"
+                  />
+                </button>
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
-        <div className="mt-3 space-y-2 sm:mt-6 sm:space-y-5">
-          <SectionShell
-            eyebrow="Use-soon priority"
-            title="Pantry items worth reviewing"
-            description="Only current household evidence appears here. No evidence means no artificial urgency."
-            mobileDescription="Current Pantry evidence only — no signal, no urgency."
-            count={signals.length}
-            icon={Clock3}
-            iconClassName="bg-violet-100 text-violet-800 ring-1 ring-violet-200"
-            badgeClassName="bg-violet-100 text-violet-900"
+        {/* Single connected statistic strip; these are API values. */}
+        <section
+          className="mt-2 grid grid-cols-2 gap-y-3 border-y border-[#173F35]/12 bg-white/85 px-2 py-4 shadow-none sm:mt-5 sm:gap-y-0 sm:rounded-xl sm:border sm:px-7 sm:py-7 sm:shadow-[0_6px_22px_rgba(23,63,53,0.035)] sm:grid-cols-4"
+          aria-label="Waste reduction summary"
+        >
+          {overview.map((item, index) => (
+            <div
+              key={item.label}
+              className={`min-w-0 px-3 sm:px-6 ${
+                index > 0 ? "sm:border-l sm:border-[#173F35]/15" : ""
+              } ${
+                index % 2 === 1
+                  ? "border-l border-[#173F35]/15 sm:border-l"
+                  : ""
+              }`}
+            >
+              <p className="text-[27px] font-semibold leading-none tracking-[-0.045em] text-[#173F35] sm:text-[38px]">
+                {item.waiting ||
+                (loading && !data && item.label !== "Meals in your plans")
+                  ? "—"
+                  : item.value}
+              </p>
+              <p className="mt-1 text-[12px] font-medium leading-[1.4] text-[#202421]/75 sm:mt-2 sm:text-[14px]">
+                {item.label}
+              </p>
+            </div>
+          ))}
+        </section>
+
+        {error && (
+          <div
+            role="alert"
+            className="mt-5 flex items-start gap-3 border-l-4 border-[#C56C42] bg-[#C56C42]/10 p-4 text-[14px] text-[#202421]"
           >
-            {!loading && signals.length === 0 ? (
-              <EmptySection
-                icon={PackageCheck}
-                title="Nothing needs attention in this window"
-                body="Your current Pantry evidence does not justify a use-soon or running-low action right now."
+            <TriangleAlert
+              className="mt-0.5 shrink-0 text-[#C56C42]"
+              size={19}
+              aria-hidden="true"
+            />
+            <div className="flex-1">
+              <p className="font-semibold">
+                We couldn't refresh your Pantry review.
+              </p>
+              <p className="mt-1">{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={load}
+              className="shrink-0 underline underline-offset-4"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {loading && !data && (
+          <div
+            role="status"
+            className="mt-5 flex items-center gap-3 bg-[#D7DDCF]/50 px-5 py-4 text-[14px] text-[#173F35]"
+          >
+            <RefreshCw size={18} className="animate-spin" aria-hidden="true" />{" "}
+            Checking your current Pantry evidence…
+          </div>
+        )}
+
+        {/* Compact, independently scannable Pantry and Meal Planning summaries. */}
+        <div
+          className={`mt-4 grid items-start gap-3 sm:mt-9 sm:gap-6 lg:grid-cols-2 xl:gap-7 ${
+            loading ? "opacity-80" : ""
+          }`}
+        >
+          <section
+            className="min-w-0 overflow-hidden border-y border-[#173F35]/15 bg-[#F7F6F2] shadow-none sm:rounded-[18px] sm:border sm:shadow-[0_12px_34px_rgba(23,63,53,0.07)]"
+            aria-labelledby="waste-pantry-title"
+          >
+            <div className="relative border-b border-[#173F35]/15 bg-[#D7DDCF]/70 px-4 py-4 sm:px-7 sm:py-6">
+              <div
+                className="absolute inset-y-0 left-0 w-[5px] bg-[#C56C42]"
+                aria-hidden="true"
               />
-            ) : (
-              <div className="grid gap-2 sm:gap-4 lg:grid-cols-2">
-                {visibleSignals.map((signal) => (
-                  <article
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[13px] font-semibold text-[#173F35]">
+                  01 / YOUR PANTRY
+                </p>
+                <span className="rounded-full border border-[#173F35]/20 bg-[#F7F6F2] px-3 py-1.5 text-[13px] font-semibold text-[#173F35]">
+                  {signals.length} {signals.length === 1 ? "item" : "items"}
+                </span>
+              </div>
+              <h2
+                id="waste-pantry-title"
+                className="mt-1.5 text-[23px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#202421] sm:mt-2 sm:text-[29px]"
+              >
+                Use first, waste less.
+              </h2>
+              <p className="mt-1 text-[13px] leading-[1.45] text-[#202421]/75 sm:mt-2 sm:text-[15px] sm:leading-[1.6]">
+                A clear look at ingredients that need your attention.
+              </p>
+            </div>
+            <div className="bg-white/90">
+              {!loading && !!data && signals.length === 0 ? (
+                <div className="p-4 sm:p-6">
+                  <EmptyNote
+                    title="Nothing urgent to review"
+                    body="Your saved Pantry evidence does not currently justify a use-soon or running-low alert for this window."
+                    to="/pantry"
+                    action="Open Pantry"
+                  />
+                </div>
+              ) : (
+                visibleSignals.map((signal, index) => (
+                  <PantryEntry
                     key={signal.signalKey}
-                    className="rounded-[18px] border border-violet-100 bg-violet-50/65 p-3 sm:rounded-[22px] sm:p-5"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
-                      <div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.07em] text-violet-900">
-                            {PRIORITY_LABELS[signal.priorityClass] || signal.priorityClass}
-                          </span>
-                          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.07em] text-stone-600 ring-1 ring-stone-200">
-                            {signal.confidenceClass} evidence
-                          </span>
-                        </div>
-
-                        <h3 className="mt-2 text-base font-black text-stone-950 sm:mt-3 sm:text-xl">
-                          {signal.ingredientName}
-                        </h3>
-                      </div>
-
-                      <Clock3 size={19} className="text-violet-700" />
-                    </div>
-
-                    <div className="mt-2 grid gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3">
-                      <div className="rounded-xl border border-stone-200 bg-white p-3 sm:rounded-2xl sm:p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.08em] text-stone-400">
-                          Current signal
-                        </p>
-                        <p className="mt-1 text-[12px] font-bold leading-4 text-stone-800 sm:mt-2 sm:text-sm sm:leading-5">
-                          {signal.signalType === 'use_soon'
-                            ? `Use soon around ${formatDate(signal.useSoonAt)}`
-                            : 'Marked as running low'}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-stone-200 bg-white p-3 sm:rounded-2xl sm:p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.08em] text-stone-400">
-                          Proven balance
-                        </p>
-                        <p className="mt-1 text-[12px] font-bold leading-4 text-stone-800 sm:mt-2 sm:text-sm sm:leading-5">
-                          {formatProvenQuantity(signal.provenUnreservedQuantity)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {signal.plannedUseConflict && (
-                      <div className="mt-2 flex gap-2 rounded-xl border border-violet-200 bg-violet-100/70 p-3 text-[10px] font-semibold leading-4 text-violet-900 sm:mt-4 sm:rounded-2xl sm:p-4 sm:text-xs sm:leading-5">
-                        <CalendarClock size={16} className="mt-0.5 shrink-0" />
-                        A planned-use date sits after this use-soon signal. Review the evidence before changing your plan.
-                      </div>
-                    )}
-
-                    <p className="mt-2 text-[10px] leading-4 text-stone-500 sm:mt-4 sm:text-xs sm:leading-5">
-                      Evidence reason: <span className="font-semibold text-stone-700">{formatReason(signal.reasonCode)}</span>
-                    </p>
-
-                    <div className="mt-2 flex flex-wrap gap-2 sm:mt-4">
-                      <Link
-                        to={`/pantry/items/${signal.pantryItemId}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-[10px] font-black text-white sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
-                      >
-                        Review / correct Pantry evidence
-                        <ArrowRight size={13} />
-                      </Link>
-
-                      <Link
-                        to="/meal-plan"
-                        className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-[10px] font-black text-sky-800 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
-                      >
-                        Meal Plan
-                      </Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-
+                    signal={signal}
+                    index={index}
+                  />
+                ))
+              )}
+            </div>
             {signals.length > 4 && (
-              <div className="mt-4 flex justify-center">
+              <div className="border-t border-[#173F35]/15 bg-[#F7F6F2] px-5 py-4 sm:px-6">
                 <button
+                  ref={pantryViewAllRef}
                   type="button"
-                  onClick={() => setShowAllSignals((current) => !current)}
-                  className="rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-xs font-black text-violet-800 transition hover:bg-violet-50"
+                  aria-haspopup="dialog"
+                  onClick={() => setOpenList("pantry")}
+                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-[#173F35] bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-[#F7F6F2] transition-colors hover:bg-[#285648] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#C56C42]"
                 >
-                  {showAllSignals ? 'View less' : `View all (${signals.length})`}
+                  View all {signals.length} Pantry items{" "}
+                  <ArrowRight size={16} aria-hidden="true" />
                 </button>
               </div>
             )}
-          </SectionShell>
+          </section>
 
-          <SectionShell
-            eyebrow="Planned-meal rescue"
-            title="Meals that may be worth moving earlier"
-            mobileTitle="Meals worth moving earlier"
-            description="These suggestions only appear when a planned meal can use Pantry evidence before its household use-soon point."
-            mobileDescription="Shown when planned meals can use food before use-soon."
-            count={groupedRescues.length}
-            icon={CalendarClock}
-            iconClassName="bg-sky-50 text-sky-700 ring-1 ring-sky-100"
-            badgeClassName="bg-sky-50 text-sky-800"
+          <section
+            className="min-w-0 overflow-hidden border-y border-[#173F35]/15 bg-white shadow-none sm:rounded-[18px] sm:border sm:shadow-[0_12px_34px_rgba(23,63,53,0.07)]"
+            aria-labelledby="waste-meal-title"
           >
-            {!loading && groupedRescues.length === 0 ? (
-              <EmptySection
-                icon={CalendarClock}
-                title="No meal rescue is needed"
-                body="No planned meal currently conflicts with a supported use-soon Pantry signal."
-              />
-            ) : (
-              <div className="grid gap-2 sm:gap-4 lg:grid-cols-2">
-                {groupedRescues.map((rescue) => (
-                  <article
-                    key={rescue.groupKey}
-                    className="rounded-[18px] border border-sky-100 bg-sky-50/45 p-3 sm:rounded-[22px] sm:p-5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-sky-800 ring-1 ring-sky-100">
-                          {rescue.confidenceClass} evidence
-                        </span>
-                        <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-sky-900">
-                          {rescue.affectedItems.length} {rescue.affectedItems.length === 1 ? 'item' : 'items'} to review
-                        </span>
-                      </div>
-                      <CalendarClock size={19} className="text-sky-600" />
-                    </div>
-
-                    <h3 className="mt-2 text-base font-black text-stone-950 sm:mt-4 sm:text-xl">
-                      {rescue.recipeTitle}
-                    </h3>
-
-                    <p className="mt-1 text-[11px] leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
-                      This meal is planned after the use-soon dates for the Pantry items below. Review the timing if you want to use them earlier.
-                    </p>
-
-                    <div className="mt-2 rounded-xl bg-white p-2.5 ring-1 ring-sky-100 sm:mt-4 sm:rounded-2xl sm:p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-stone-400">
-                        Planned meal
-                      </p>
-                      <p className="mt-1 text-sm font-black text-stone-800">
-                        {formatDate(rescue.plannedAt)}
-                      </p>
-                    </div>
-
-                    <div className="mt-2 space-y-1.5 sm:mt-3 sm:space-y-2">
-                      {rescue.affectedItems.map((item) => (
-                        <div
-                          key={item.pantryItemId}
-                          className="flex flex-col gap-2 rounded-xl bg-white p-2.5 ring-1 ring-sky-100 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:rounded-2xl sm:p-3"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-stone-900">
-                              {item.ingredientName}
-                            </p>
-                            <p className="mt-1 text-xs font-semibold text-stone-500">
-                              Use soon by {formatDate(item.useSoonAt)}
-                            </p>
-                          </div>
-
-                          <Link
-                            to={`/pantry/items/${item.pantryItemId}`}
-                            className="shrink-0 rounded-xl border border-sky-200 bg-white px-3 py-2 text-xs font-black text-sky-800"
-                          >
-                            Correct evidence
-                          </Link>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-2 sm:mt-4">
-                      <Link
-                        to="/meal-plan"
-                        className="inline-flex rounded-lg bg-sky-700 px-3 py-2 text-[10px] font-black text-white sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
-                      >
-                        Review Meal Plan
-                      </Link>
-                    </div>
-                  </article>
-                ))}
+            <div className="border-b-[3px] border-[#C56C42] bg-[#173F35] px-4 py-4 text-[#F7F6F2] sm:px-7 sm:py-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[13px] font-semibold text-[#D7DDCF]">
+                  02 / MEAL PLANNING
+                </p>
+                <span className="rounded-full border border-[#F7F6F2]/30 px-3 py-1.5 text-[13px] font-semibold text-[#F7F6F2]">
+                  {savedMealCount} {savedMealCount === 1 ? "meal" : "meals"}
+                </span>
               </div>
-            )}
-          </SectionShell>
-
-          <SectionShell
-            id="next-possibility"
-            eyebrow="Next possibility"
-            title="Recipes that fit what your Pantry can support"
-            mobileTitle="Recipes your Pantry can support"
-            description="Only published recipes justified by current use-soon evidence are shown here."
-            mobileDescription="Published recipes backed by current use-soon evidence only."
-            count={possibilities.length}
-            icon={ChefHat}
-            iconClassName="bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
-            badgeClassName="bg-emerald-50 text-emerald-800"
-          >
-            {!loading && possibilities.length === 0 ? (
-              <EmptySection
-                icon={ChefHat}
-                title="No recipe possibility is justified right now"
-                body="As use-soon Pantry evidence appears, EPANTRY can surface matching published recipes here."
-              />
-            ) : (
-              <div className="grid gap-2 sm:gap-4 lg:grid-cols-3">
-                {visiblePossibilities.map((possibility) => (
-                  <article
-                    key={possibility.possibilityKey}
-                    className="overflow-hidden rounded-[18px] border border-stone-200 bg-white shadow-[0_1px_0_rgba(28,25,23,0.03)] sm:rounded-[22px]"
-                  >
-                    {possibility.heroImageUrl ? (
-                      <div className="relative aspect-[16/9] w-full overflow-hidden border-b border-stone-100 sm:aspect-auto sm:border-b-0">
-                        <img
-                          src={possibility.heroImageUrl}
-                          alt=""
-                          className="absolute inset-0 h-full w-full object-cover object-center sm:static sm:h-44 sm:object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="grid h-32 place-items-center bg-emerald-50 text-emerald-700 sm:h-32">
-                        <ChefHat size={28} />
-                      </div>
-                    )}
-
-                    <div className="border-t border-emerald-100/70 bg-white p-3 sm:border-t-0 sm:p-5">
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-800">
-                          {possibility.confidenceClass} evidence
-                        </span>
-
-                        <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-black uppercase text-stone-600">
-                          <CircleGauge size={11} />
-                          Deterministic
-                        </span>
-                      </div>
-
-                      <h3 className="mt-2 text-base font-black text-stone-950 sm:mt-4 sm:text-xl">
-                        {possibility.recipeTitle}
-                      </h3>
-
-                      <p className="mt-1 text-[10px] leading-4 text-stone-500 sm:mt-2 sm:text-xs sm:leading-5">
-                        {formatReason(possibility.reasonCode)}
-                      </p>
-
-                      <div className="mt-2 space-y-1.5 sm:mt-4 sm:space-y-2">
-                        {(possibility.matchedIngredients || []).map((match) => (
-                          <div
-                            key={`${possibility.possibilityKey}:${match.pantryItemId}`}
-                            className="rounded-xl bg-stone-50 p-2.5 sm:rounded-2xl sm:p-3"
-                          >
-                            <p className="text-sm font-black text-stone-800">
-                              {match.ingredientName}
-                            </p>
-
-                            <p className="mt-1 text-xs leading-5 text-stone-500">
-                              Use soon {formatDate(match.useSoonAt)} · {formatProvenQuantity(match.provenUnreservedQuantity)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap gap-2 sm:mt-4">
-                        <Link
-                          to={`/recipes/${possibility.recipeSlug}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-[10px] font-black text-white sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
-                        >
-                          Open Recipe
-                          <ArrowRight size={13} />
-                        </Link>
-
-                        {possibility.matchedIngredients?.[0]?.pantryItemId && (
-                          <Link
-                            to={`/pantry/items/${possibility.matchedIngredients[0].pantryItemId}`}
-                            className="rounded-lg border border-stone-300 px-3 py-2 text-[10px] font-black text-stone-700 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
-                          >
-                            Correct evidence
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                ))}
+              <h2
+                id="waste-meal-title"
+                className="mt-1.5 text-[23px] font-semibold leading-[1.2] tracking-[-0.035em] sm:mt-2 sm:text-[29px]"
+              >
+                Meals on the calendar.
+              </h2>
+              <p className="mt-1 text-[13px] leading-[1.45] text-[#F7F6F2]/85 sm:mt-2 sm:text-[15px] sm:leading-[1.6]">
+                Your saved plans, upcoming meals and ingredient timing
+                reminders.
+              </p>
+              <div className="mt-2 sm:mt-4">
+                <ActionLink to="/meal-plan">Manage plan</ActionLink>
               </div>
-            )}
-
-
-            {possibilities.length > 3 && (
-              <div className="mt-4 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShowAllPossibilities((current) => !current)}
-                  className="rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+            </div>
+            <div className="bg-white/95">
+              {mealPlansLoading && (
+                <div
+                  role="status"
+                  className="flex items-center gap-2 px-5 py-6 text-[14px] text-[#173F35]"
                 >
-                  {showAllPossibilities
-                    ? 'View less'
-                    : `View all (${possibilities.length})`}
+                  <RefreshCw
+                    size={17}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />{" "}
+                  Loading your saved Meal Plans…
+                </div>
+              )}
+              {mealPlansError && !mealPlansLoading && (
+                <div
+                  role="alert"
+                  className="m-4 border-l-4 border-[#C56C42] bg-[#F7F6F2] p-5"
+                >
+                  <p className="text-[15px] font-semibold text-[#202421]">
+                    Your Meal Plans could not be loaded.
+                  </p>
+                  <p className="mt-1 text-[14px] text-[#202421]/70">
+                    {mealPlansError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={loadMealPlans}
+                    className="mt-3 inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-[#173F35] px-4 py-2 font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C56C42]"
+                  >
+                    <RefreshCw size={15} aria-hidden="true" /> Try again
+                  </button>
+                </div>
+              )}
+              {!mealPlansLoading &&
+                !mealPlansError &&
+                mealPlans.length === 0 && (
+                  <div className="p-4 sm:p-6">
+                    <EmptyNote
+                      title="No saved Meal Plans yet"
+                      body="Create a Meal Plan to see it here. After you add meals, their dates and recipes will appear as well."
+                      to="/meal-plan"
+                      action="Create Meal Plan"
+                    />
+                  </div>
+                )}
+              {!mealPlansLoading && !mealPlansError && mealPlans.length > 0 && (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[#173F35]/15 bg-[#D7DDCF]/40 px-4 py-3 text-[13px] text-[#173F35] sm:px-6">
+                    <span className="font-semibold">
+                      {mealPlans.length} saved{" "}
+                      {mealPlans.length === 1 ? "plan" : "plans"}
+                    </span>
+                    <span>
+                      {groupedRescues.length > 0
+                        ? `${groupedRescues.length} timing ${
+                            groupedRescues.length === 1
+                              ? "reminder"
+                              : "reminders"
+                          }`
+                        : "No ingredient timing warnings"}
+                    </span>
+                  </div>
+                  {visibleMealEntries.map((entry) => (
+                    <MealEntry
+                      key={entry.key}
+                      entry={entry}
+                      rescuesByMealId={rescuesByMealId}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+            {!mealPlansLoading && !mealPlansError && mealEntries.length > 4 && (
+              <div className="border-t border-[#173F35]/15 bg-[#F7F6F2] px-5 py-4 sm:px-6">
+                <button
+                  ref={mealsViewAllRef}
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setOpenList("meals")}
+                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-[#173F35]/25 bg-[#D7DDCF] px-5 py-2.5 text-[14px] font-semibold text-[#173F35] transition-colors hover:bg-[#173F35] hover:text-[#F7F6F2] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#C56C42]"
+                >
+                  View all {mealEntries.length} Meal Planning items{" "}
+                  <ArrowRight size={16} aria-hidden="true" />
                 </button>
               </div>
             )}
-          </SectionShell>
+          </section>
         </div>
 
-        <section className="mt-5 overflow-hidden rounded-[22px] border border-emerald-100 bg-emerald-50/60 sm:rounded-[26px]">
-          <div className="grid grid-cols-2 sm:grid-cols-1 lg:grid-cols-2">
-            <div className="border-r border-emerald-100 p-3 sm:border-r-0 sm:p-6 lg:border-r lg:border-emerald-100">
-              <div className="flex items-start gap-2 sm:gap-3">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 sm:h-10 sm:w-10 sm:rounded-2xl">
-                  <ShieldCheck className="h-[14px] w-[14px] sm:h-[19px] sm:w-[19px]" />
-                </div>
-
-                <div className="min-w-0">
-                  <h2 className="text-[10px] font-black leading-tight text-stone-950 sm:text-base">
-                    Evidence stays honest
-                  </h2>
-                  <p className="mt-1 line-clamp-2 text-[8px] font-medium leading-[1.35] text-stone-600 sm:mt-2 sm:line-clamp-none sm:text-sm sm:leading-6">
-                    <span className="sm:hidden">Use-soon is guidance, not expiry truth. Verified evidence only.</span>
-                    <span className="hidden sm:inline">EPANTRY does not claim a verified expiry date, spoilage state, leftover state or exact quantity unless that exact evidence exists. Use-soon remains household guidance, not expiry truth.</span>
-                  </p>
-                </div>
+        {/* Recipes: preserve published source images, reasons and ingredient provenance. */}
+        <section
+          id="next-possibility"
+          className="mt-5 scroll-mt-24 border-t-[3px] border-[#173F35] px-4 pt-5 sm:mt-12 sm:px-0 sm:pt-10"
+          aria-label="Recipes you could make"
+        >
+          <div className="grid gap-3 sm:gap-6 lg:grid-cols-[minmax(215px,0.27fr)_minmax(0,0.73fr)] lg:gap-9">
+            <div>
+              <p className="flex items-center gap-2 text-[12px] font-semibold text-[#C56C42]">
+                <span className="h-px w-6 bg-[#C56C42]" />
+                03 / FROM PANTRY TO PLATE
+              </p>
+              <h2 className="mt-2 max-w-[390px] text-[24px] font-semibold leading-[1.2] tracking-[-0.04em] text-[#202421] sm:mt-3 sm:text-[34px]">
+                What could you cook next?
+              </h2>
+              <p className="mt-2 max-w-sm text-[13px] leading-[1.45] text-[#202421]/70 sm:mt-3 sm:text-[15px] sm:leading-[1.65]">
+                <span className="sm:hidden">
+                  Pantry recipe ideas. Check ingredients and allergens.
+                </span>
+                <span className="hidden sm:inline">
+                  These are published recipes suggested using the available
+                  use-soon evidence. Confirm ingredients and allergens before
+                  cooking.
+                </span>
+              </p>
+              <div className="mt-2 inline-flex items-center gap-2 border-t border-[#173F35]/20 pt-2 text-[13px] font-semibold text-[#173F35] sm:mt-5 sm:pt-4">
+                <Check size={16} aria-hidden="true" /> {possibilities.length}{" "}
+                {possibilities.length === 1 ? "recipe" : "recipes"} to explore
               </div>
             </div>
 
-            <div className="bg-sky-50/70 p-3 sm:border-t sm:border-sky-100 sm:p-6 lg:border-t-0">
-              <div className="flex items-start gap-2 sm:gap-3">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700 sm:h-10 sm:w-10 sm:rounded-2xl">
-                  <RefreshCw className="h-[14px] w-[14px] sm:h-[18px] sm:w-[18px]" />
-                </div>
-
-                <div className="min-w-0">
-                  <h2 className="text-[10px] font-black leading-tight text-stone-950 sm:text-base">
-                    Correct anything that looks wrong
-                  </h2>
-                  <p className="mt-1 line-clamp-2 text-[8px] font-medium leading-[1.35] text-stone-600 sm:mt-2 sm:line-clamp-none sm:text-sm sm:leading-6">
-                    <span className="sm:hidden">Fix Pantry or Basket signals anytime. Orders and payments stay authoritative.</span>
-                    <span className="hidden sm:inline">Update Living Pantry evidence when a household signal is wrong, or use Next Basket feedback for purchase recommendations. These corrections never grant recommendation code authority over Cart, Checkout, Order or Payment truth.</span>
-                  </p>
-
-                  <div className="mt-4 hidden flex-wrap gap-2 sm:flex">
-                    <Link
-                      to="/pantry"
-                      className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white"
+            <div className="min-w-0">
+              {!loading && !!data && possibilities.length === 0 ? (
+                <EmptyNote
+                  title="No supported recipe match yet"
+                  body="As Pantry use-soon evidence becomes available, matching published recipes can appear here. Nothing is invented to fill this space."
+                  to="/recipes"
+                  action="Explore all recipes"
+                />
+              ) : (
+                <div
+                  id="waste-recipe-grid"
+                  className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                >
+                  {visiblePossibilities.map((possibility) => (
+                    <article
+                      key={possibility.possibilityKey}
+                      className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#173F35]/12 bg-white shadow-[0_8px_24px_rgba(23,63,53,0.065)] transition-[box-shadow,transform] duration-200 hover:shadow-[0_16px_32px_rgba(23,63,53,0.13)] motion-safe:hover:-translate-y-1"
                     >
-                      Open Living Pantry
-                    </Link>
-
-                    <Link
-                      to="/next-basket"
-                      className="rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-xs font-black text-sky-800"
-                    >
-                      Open Next Basket feedback
-                    </Link>
-                  </div>
+                      {possibility.heroImageUrl ? (
+                        <div className="relative aspect-[16/7] overflow-hidden bg-[#D7DDCF] sm:aspect-[16/10]">
+                          <img
+                            src={possibility.heroImageUrl}
+                            alt=""
+                            loading="lazy"
+                            className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.04]"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex aspect-[16/7] items-end bg-[#D7DDCF] p-4 sm:aspect-[16/10] sm:p-5">
+                          <span className="max-w-[230px] text-[21px] font-semibold leading-[1.25] text-[#173F35]">
+                            {possibility.recipeTitle}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex flex-1 flex-col p-3 sm:p-5">
+                        <p className="text-[12px] font-semibold text-[#C56C42]">
+                          SUGGESTED FROM YOUR PANTRY
+                        </p>
+                        <h3 className="mt-2 text-[19px] font-semibold leading-[1.3] tracking-[-0.025em] text-[#202421] sm:text-[20px]">
+                          {possibility.recipeTitle}
+                        </h3>
+                        <p className="mt-2 text-[13px] leading-[1.55] text-[#202421]/70">
+                          {getRecipeMatchMessage(possibility)}
+                        </p>
+                        <div className="mt-2 flex-1 space-y-1 border-t border-[#173F35]/15 pt-2 sm:mt-4 sm:space-y-2 sm:pt-3">
+                          {(possibility.matchedIngredients || []).map(
+                            (match) => (
+                              <div
+                                key={`${possibility.possibilityKey}:${match.pantryItemId}`}
+                                className="text-[12px] leading-[1.55] text-[#202421]/75"
+                              >
+                                <span className="font-semibold text-[#173F35]">
+                                  {match.ingredientName}
+                                </span>
+                                {" · "}Use soon {formatDate(match.useSoonAt)}
+                                {" · "}
+                                {formatProvenQuantity(
+                                  match.provenUnreservedQuantity
+                                )}
+                              </div>
+                            )
+                          )}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2 sm:mt-5">
+                          <ActionLink
+                            to={`/recipes/${possibility.recipeSlug}`}
+                            primary
+                          >
+                            Open recipe
+                          </ActionLink>
+                          {possibility.matchedIngredients?.[0]
+                            ?.pantryItemId && (
+                            <Link
+                              to={`/pantry/items/${possibility.matchedIngredients[0].pantryItemId}`}
+                              className="inline-flex min-h-[42px] items-center rounded-lg border border-[#173F35]/20 px-3 text-[12px] font-semibold text-[#173F35] hover:bg-[#D7DDCF]"
+                            >
+                              Correct evidence
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </div>
+              )}
+              {possibilities.length > 3 && (
+                <div className="mt-3 flex justify-center sm:mt-6 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPossibilities((value) => !value)}
+                    aria-expanded={showAllPossibilities}
+                    aria-controls="waste-recipe-grid"
+                    className="group inline-flex min-h-[48px] items-center justify-center gap-3 rounded-lg border-2 border-[#173F35] bg-[#173F35] px-6 py-3 text-[15px] font-semibold text-[#F7F6F2] shadow-[0_8px_20px_rgba(23,63,53,0.15)] transition-[background-color,transform,box-shadow] hover:bg-[#285648] hover:shadow-[0_12px_25px_rgba(23,63,53,0.22)] motion-safe:hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-[#C56C42]"
+                  >
+                    {showAllPossibilities
+                      ? "Show fewer recipes"
+                      : `View all ${possibilities.length} recipes`}
+                    <ArrowRight
+                      size={18}
+                      className={`transition-transform ${
+                        showAllPossibilities
+                          ? "-rotate-90"
+                          : "group-hover:translate-x-1"
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Practical provenance and next actions, not a decorative filler panel. */}
+        <section
+          className="mt-5 grid overflow-hidden border-y border-[#173F35]/15 shadow-none sm:mt-12 sm:rounded-[16px] sm:border sm:shadow-[0_10px_27px_rgba(23,63,53,0.05)] lg:grid-cols-2"
+          aria-label="Evidence and corrections"
+        >
+          <div className="bg-[#D7DDCF]/65 px-4 py-4 sm:px-8 sm:py-8">
+            <div className="flex items-center gap-3 text-[#173F35]">
+              <ShieldCheck size={20} aria-hidden="true" />
+              <p className="text-[13px] font-semibold">GOOD TO KNOW</p>
+            </div>
+            <h2 className="mt-2 text-[19px] font-semibold tracking-[-0.03em] text-[#202421] sm:mt-3 sm:text-[22px]">
+              Your evidence comes first.
+            </h2>
+            <p className="mt-1 max-w-xl text-[13px] leading-[1.45] text-[#202421]/75 sm:mt-2 sm:text-[14px] sm:leading-[1.65]">
+              <span className="sm:hidden">
+                Use-soon is guidance, not an expiry date. Quantities must be
+                confirmed.
+              </span>
+              <span className="hidden sm:inline">
+                Use-soon suggestions are household guidance, not verified expiry
+                dates or spoilage claims. Quantities are only described as
+                confirmed when the supporting evidence exists.
+              </span>
+            </p>
+          </div>
+          <div className="bg-[#173F35] px-4 py-4 text-white sm:px-8 sm:py-8">
+            <div className="flex items-center gap-3 text-[#D7DDCF]">
+              <PackageCheck size={20} aria-hidden="true" />
+              <p className="text-[13px] font-semibold">MAKE IT ACCURATE</p>
+            </div>
+            <h2 className="mt-2 text-[19px] font-semibold tracking-[-0.03em] sm:mt-3 sm:text-[22px]">
+              Something look wrong?
+            </h2>
+            <p className="mt-1 max-w-xl text-[13px] leading-[1.45] text-white/80 sm:mt-2 sm:text-[14px] sm:leading-[1.65]">
+              <span className="sm:hidden">
+                Fix Pantry or Next Basket details. Orders, payments and plans
+                stay unchanged.
+              </span>
+              <span className="hidden sm:inline">
+                Correct saved household information in Living Pantry, or update
+                your Next Basket preferences. These suggestions never change
+                Orders, Payments or Meal Plans automatically.
+              </span>
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2 sm:mt-5 sm:gap-3">
+              <Link
+                to="/pantry"
+                className="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-[#F7F6F2] px-4 py-2.5 text-[13px] font-semibold text-[#173F35] hover:bg-[#D7DDCF]"
+              >
+                Open Pantry <ArrowRight size={14} aria-hidden="true" />
+              </Link>
+              <Link
+                to="/next-basket"
+                className="inline-flex min-h-[42px] items-center gap-2 rounded-lg border border-white/40 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-white/10"
+              >
+                Next Basket feedback <ArrowRight size={14} aria-hidden="true" />
+              </Link>
             </div>
           </div>
         </section>
 
         {data?.scanPolicy?.pantry?.truncated && (
-          <div className="mt-5 flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs leading-5 text-rose-900">
-            <TriangleAlert size={16} className="mt-0.5 shrink-0" />
-            Pantry evidence scan reached its bounded limit. Recommendations shown are based only on the evidence actually scanned; missing items are not inferred.
+          <div
+            role="status"
+            className="mt-5 flex items-start gap-3 border-l-4 border-[#C56C42] bg-[#C56C42]/10 p-4 text-[13px] leading-[1.6] text-[#202421]"
+          >
+            <TriangleAlert
+              size={18}
+              className="mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            Pantry evidence scan reached its bounded limit. Suggestions are
+            based only on the evidence actually scanned; missing items have not
+            been inferred.
+          </div>
+        )}
+        {openList && (
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center px-3 py-5 sm:px-6"
+            role="presentation"
+          >
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="Close full list"
+              onClick={() => setOpenList(null)}
+              className="absolute inset-0 h-full w-full bg-[#202421]/65 backdrop-blur-[3px]"
+            />
+            <section
+              id="waste-list-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="waste-dialog-title"
+              className="relative z-10 flex max-h-[min(85svh,830px)] w-full max-w-[820px] flex-col overflow-hidden rounded-[18px] border border-[#173F35]/15 bg-[#F7F6F2] shadow-[0_30px_90px_rgba(0,0,0,0.28)]"
+            >
+              <header className="flex shrink-0 items-start justify-between gap-4 bg-[#173F35] px-5 py-5 text-[#F7F6F2] sm:px-7">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold text-[#D7DDCF]">
+                    {openList === "pantry"
+                      ? "01 / YOUR PANTRY"
+                      : "02 / MEAL PLANNING"}
+                  </p>
+                  <h2
+                    id="waste-dialog-title"
+                    className="mt-1 text-[23px] font-semibold leading-[1.25] sm:text-[27px]"
+                  >
+                    {openList === "pantry"
+                      ? "All Pantry reminders"
+                      : "All saved meals and plans"}
+                  </h2>
+                  <p className="mt-1 text-[13px] text-[#F7F6F2]/80">
+                    {openList === "pantry"
+                      ? `${signals.length} Pantry ${
+                          signals.length === 1 ? "item" : "items"
+                        }`
+                      : `${mealEntries.length} Meal Planning ${
+                          mealEntries.length === 1 ? "item" : "items"
+                        }`}
+                  </p>
+                </div>
+                <button
+                  ref={closeListButtonRef}
+                  type="button"
+                  aria-label="Close full list"
+                  onClick={() => setOpenList(null)}
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/35 text-white transition-colors hover:bg-white/15 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#C56C42]"
+                >
+                  <X size={21} aria-hidden="true" />
+                </button>
+              </header>
+              <div
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white"
+                tabIndex={0}
+              >
+                {openList === "pantry"
+                  ? signals.map((signal, index) => (
+                      <PantryEntry
+                        key={signal.signalKey}
+                        signal={signal}
+                        index={index}
+                      />
+                    ))
+                  : mealEntries.map((entry) => (
+                      <MealEntry
+                        key={entry.key}
+                        entry={entry}
+                        rescuesByMealId={rescuesByMealId}
+                      />
+                    ))}
+              </div>
+              <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-[#173F35]/15 bg-[#F7F6F2] px-5 py-3 sm:px-7">
+                <p className="text-[12px] text-[#202421]/65">
+                  All entries are from your saved EPANTRY information.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOpenList(null)}
+                  className="inline-flex min-h-[42px] shrink-0 items-center rounded-lg border border-[#173F35]/25 px-4 text-[13px] font-semibold text-[#173F35] hover:bg-[#D7DDCF] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#C56C42]"
+                >
+                  Close
+                </button>
+              </footer>
+            </section>
           </div>
         )}
       </div>
     </main>
-  )
+  );
 }
