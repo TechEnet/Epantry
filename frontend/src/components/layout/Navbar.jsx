@@ -386,6 +386,8 @@ import {
     const accountMenuRef =
         useRef(null);
 
+    const [accountActiveTab, setAccountActiveTab] = useState('explore');
+
     const [
         cartNavigation,
         setCartNavigation,
@@ -1720,6 +1722,26 @@ import {
         array.findIndex((candidate) => candidate.to === item.to) === index,
     );
 
+    // All three account groups share one compact dropdown. Users switch groups
+    // directly instead of navigating a long, stacked menu.
+    const accountTabs = [
+        { id: 'explore', label: 'Explore' },
+        { id: 'workspace', label: 'Your workspace' },
+        { id: 'tools', label: 'Account & tools' },
+    ];
+
+    const handleAccountTabKeyDown = (event, index) => {
+        let nextIndex = index;
+        if (event.key === 'ArrowRight') nextIndex = (index + 1) % accountTabs.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + accountTabs.length) % accountTabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = accountTabs.length - 1;
+        else return;
+        event.preventDefault();
+        setAccountActiveTab(accountTabs[nextIndex].id);
+        event.currentTarget.parentElement?.querySelectorAll('[role="tab"]')[nextIndex]?.focus();
+    };
+
     const submitHeaderSearch = (event) => {
         event.preventDefault();
         const query = searchDraft.trim();
@@ -1738,6 +1760,20 @@ import {
         >
             <span>{item.label}</span>
             <ArrowLeft size={15} className="ep-nav-menu-arrow" aria-hidden="true" />
+        </Link>
+    );
+
+    // Account dropdown presentation only. Role routes and permissions are unchanged.
+    const accountMenuLink = (item, compact = false) => (
+        <Link
+            key={item.to}
+            to={item.to}
+            onClick={() => setAccountMenuOpen(false)}
+            aria-current={isActive(item.to) ? 'page' : undefined}
+            className={`ep-acc-link${compact ? ' ep-acc-link-compact' : ''}${isActive(item.to) ? ' ep-acc-link-active' : ''}`}
+        >
+            <span>{item.label}</span>
+            <ArrowLeft size={14} className="ep-acc-link-arrow" aria-hidden="true" />
         </Link>
     );
 
@@ -1804,7 +1840,48 @@ import {
                 .ep-nav-userlines { display:flex; flex-direction:column; min-width:0; line-height:1.15; }
                 .ep-nav-username { max-width:122px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px !important; font-weight:700; color:#202421; }
                 .ep-nav-role { font-size:11px !important; text-transform:uppercase; letter-spacing:.09em; font-weight:700; color:#627065; margin-top:3px; }
-                .ep-nav-account-pop { width:292px; padding:0; overflow:hidden; max-height:min(78svh,620px); overflow-y:auto; }
+                /* EPANTRY account navigation: light editorial tabs, one group at a time. */
+                .ep-nav-account-pop { width:min(366px,calc(100vw - 20px)); max-height:calc(100dvh - 88px); padding:0; display:flex; flex-direction:column; overflow:hidden; border:1px solid #D7DDCF; border-radius:18px; background:#F9F8F4; box-shadow:0 19px 45px rgba(23,63,53,.16); }
+                .ep-acc-top { position:relative; flex:0 0 auto; display:flex; align-items:center; padding:16px 20px 15px; min-height:80px; border-bottom:1px solid #D8DED4; background:linear-gradient(112deg,#F7F6F2 10%,#EAEDE6 100%); }
+                .ep-acc-top:before { position:absolute; left:19px; bottom:0; content:''; width:45px; height:3px; background:#C86C42; border-radius:6px 6px 0 0; }
+                .ep-acc-identity { display:flex; align-items:center; gap:12px; min-width:0; }
+                .ep-acc-portrait { width:39px; height:39px; flex:0 0 39px; display:grid; place-items:center; border-radius:50%; background:#173F35; color:#F7F6F2; font-size:15px !important; font-weight:700; }
+                .ep-acc-namebox { display:flex; flex-direction:column; justify-content:center; gap:2px; min-width:0; }
+                .ep-acc-kicker { color:#A15B3C; font-size:10px !important; font-weight:750; letter-spacing:.11em; text-transform:uppercase; }
+                .ep-acc-name { font-size:18px !important; font-weight:750; letter-spacing:-.025em; line-height:1.18; color:#202421; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+                .ep-acc-role { color:#556B5D; font-size:12px !important; font-weight:550; }
+                .ep-acc-tabs { flex:0 0 auto; display:grid; grid-template-columns:.78fr 1.22fr 1.18fr; gap:2px; align-items:stretch; padding:0 11px; border-bottom:1px solid #DCE2D7; background:#F7F6F2; }
+                .ep-acc-tab { appearance:none; border:0; border-bottom:3px solid transparent; background:transparent; border-radius:0; padding:15px 1px 12px; color:#617267; font-family:inherit; font-size:12px !important; font-weight:700; line-height:1.2; letter-spacing:-.015em; white-space:nowrap; cursor:pointer; transition:color .18s,background .18s,border-color .18s; }
+                .ep-acc-tab:hover { color:#173F35; background:#ECF0EA; }
+                .ep-acc-tab[aria-selected="true"] { color:#173F35; border-bottom-color:#C86C42; font-weight:800; }
+                .ep-acc-tab:focus-visible { outline:2px solid #C86C42; outline-offset:-3px; border-radius:4px; }
+                .ep-acc-viewport { flex:1 1 auto; min-height:0; background:#F9F8F4; }
+                .ep-acc-scroll { box-sizing:border-box; min-height:145px; max-height:min(300px,calc(100dvh - 252px)); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#B1BDAB #EFF1EB; }
+                .ep-acc-scroll::-webkit-scrollbar { width:5px; }
+                .ep-acc-scroll::-webkit-scrollbar-track { background:#EFF1EB; }
+                .ep-acc-scroll::-webkit-scrollbar-thumb { background:#B1BDAB; border-radius:8px; }
+                .ep-acc-scroll:focus-visible { outline:2px solid #C86C42; outline-offset:-2px; }
+                .ep-acc-content { padding:2px 2px 15px; }
+                .ep-acc-section { padding:11px 19px 6px; }
+                .ep-acc-quicklinks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:13px; }
+                .ep-acc-mainlinks { display:grid; grid-template-columns:minmax(0,1fr); }
+                .ep-acc-toollinks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:13px; }
+                .ep-acc-link { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; min-height:42px; padding:10px 3px; border-bottom:1px solid #E4E9E0; border-radius:0; color:#273A2E; text-decoration:none; font-size:14px !important; line-height:1.25; font-weight:650; transition:background .16s,color .16s,padding-left .16s; }
+                .ep-acc-link:hover,.ep-acc-link-active { background:#E6EDE4; color:#173F35; padding-left:8px; }
+                .ep-acc-link-active { box-shadow:inset 2px 0 0 #C86C42; }
+                .ep-acc-link span { min-width:0; overflow-wrap:anywhere; }
+                .ep-acc-link-arrow { flex-shrink:0; transform:rotate(180deg); color:#7C9484; opacity:.7; }
+                .ep-acc-link:hover .ep-acc-link-arrow,.ep-acc-link-active .ep-acc-link-arrow { opacity:1; color:#B75C36; }
+                .ep-acc-link:focus-visible,.ep-acc-signout:focus-visible { outline:2px solid #C86C42; outline-offset:2px; }
+                .ep-acc-link-compact { font-size:13px !important; }
+                .ep-acc-switch { margin-top:9px; padding:13px 19px; border-top:1px solid #E2E7DD; background:#EEF1E9; }
+                .ep-acc-switch-label { display:block; margin-bottom:8px; color:#4F6859; font-size:11px !important; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+                .ep-acc-empty { padding:13px 0; font-size:13px !important; color:#617267; }
+                .ep-acc-footer { flex:0 0 auto; padding:7px 14px 9px; border-top:1px solid #D4DDD1; background:#F7F6F2; }
+                .ep-acc-signout { display:flex; align-items:center; width:100%; gap:10px; border:0; background:transparent; border-radius:9px; min-height:39px; padding:8px 10px; cursor:pointer; color:#93513A; text-align:left; font-family:inherit; font-size:14px !important; font-weight:700; transition:background .15s; }
+                .ep-acc-signout:hover { background:#F5E9E1; }
+                .ep-acc-signout-arrow { transform:rotate(180deg); margin-left:auto; }
+
                 .ep-nav-menu-head { padding:17px 17px 14px; background:#173F35; color:#F7F6F2; }
                 .ep-nav-menu-head strong { font-size:16px !important; font-weight:750; display:block; }
                 .ep-nav-menu-head small { font-size:12px !important; color:#D7DDCF; display:block; margin-top:3px; }
@@ -1823,7 +1900,7 @@ import {
                 .ep-nav-modal-location { display:none; } .ep-nav-mobile-collapsible { display:flex; flex-shrink:0; }
                 @media (max-width:1150px) { .ep-nav-logo img { width:143px; } .ep-nav-location-inline { width:160px; } .ep-nav-end { gap:7px; } .ep-nav-inner { padding:0 16px; } }
                 @media (max-width:760px) { .ep-nav-inner { min-height:60px; padding:0 11px; } .ep-nav-logo img { width:112px; max-height:22px; filter:saturate(1.85) contrast(1.36) brightness(.82); } .ep-nav-logo span { display:none; } .ep-nav-icon { width:37px; height:37px; border-radius:12px; } .ep-nav-location-inline { display:none; } .ep-nav-mobile-location { display:block; } .ep-nav-account { padding:3px; height:40px; border-radius:16px; } .ep-nav-avatar { width:32px; height:32px; } .ep-nav-userlines,.ep-nav-account-chevron { display:none; } .ep-nav-guest-cta { min-width:78px; height:38px; padding:0 10px; border-radius:11px; font-size:13px !important; } .ep-nav-end { gap:5px; } .ep-nav-start { gap:5px; } .ep-nav-left-notification > a { width:37px; height:37px; border-radius:12px; } .ep-nav-search-panel { position:fixed; left:12px; right:12px; top:66px; width:auto; max-height:calc(100dvh - 82px); overflow-y:auto; } .ep-nav-pop { top:calc(100% + 9px); } .ep-nav-modal-location { display:block; padding:10px 10px 6px; } .ep-nav-mobile-collapsible { display:none; } }
-                @media (max-width:430px) { .ep-nav-logo img { width:83px; } .ep-nav-icon { width:32px; height:32px; border-radius:10px; } .ep-nav-start { gap:3px; } .ep-nav-left-notification > a { width:32px; height:32px; border-radius:10px; } .ep-nav-food-glyph { width:24px; height:24px; } .ep-nav-guest-cta { min-width:68px; padding:0 7px; } .ep-nav-mobile-location { display:none; } .ep-nav-inner { padding:0 9px; } .ep-nav-end { gap:4px; } .ep-nav-account-pop { width:min(292px,calc(100vw - 20px)); } .ep-nav-search-panel { left:8px; right:8px; width:auto; } .ep-nav-search-heading { padding:17px 16px 14px; } .ep-nav-search-form { margin:13px 12px 8px; gap:7px; padding-left:9px; } .ep-nav-search-form button { padding:10px 9px; } .ep-nav-search-discovery { padding:8px 12px 15px; } }
+                @media (max-width:430px) { .ep-nav-logo img { width:83px; } .ep-nav-icon { width:32px; height:32px; border-radius:10px; } .ep-nav-start { gap:3px; } .ep-nav-left-notification > a { width:32px; height:32px; border-radius:10px; } .ep-nav-food-glyph { width:24px; height:24px; } .ep-nav-guest-cta { min-width:68px; padding:0 7px; } .ep-nav-mobile-location { display:none; } .ep-nav-inner { padding:0 9px; } .ep-nav-end { gap:4px; } .ep-nav-account-pop { width:min(366px,calc(100vw - 16px)); max-height:calc(100dvh - 70px); } .ep-acc-top { min-height:73px; padding:11px 15px; } .ep-acc-tab { font-size:11px !important; padding:13px 1px 11px; } .ep-acc-section { padding:11px 16px 9px; } .ep-acc-link { min-height:40px; } .ep-acc-scroll { max-height:calc(100dvh - 207px); } .ep-nav-search-panel { left:8px; right:8px; width:auto; } .ep-nav-search-heading { padding:17px 16px 14px; } .ep-nav-search-form { margin:13px 12px 8px; gap:7px; padding-left:9px; } .ep-nav-search-form button { padding:10px 9px; } .ep-nav-search-discovery { padding:8px 12px 15px; } }
                 @media (min-width:761px) and (max-width:950px) { .ep-nav-logo { left:50%; } .ep-nav-location-inline { display:none; } .ep-nav-mobile-location { display:block; } .ep-nav-mobile-collapsible { display:none; } .ep-nav-username { max-width:70px; } }
                 @media (prefers-reduced-motion:reduce) { .ep-nav-root * { transition-duration:0.01ms !important; animation-duration:0.01ms !important; } }
             `}</style>
@@ -2006,8 +2083,8 @@ import {
                         <div className="ep-nav-pop-anchor" ref={accountMenuRef}>
                             <button
                                 type="button" className="ep-nav-account" aria-label="Open account and navigation menu"
-                                aria-haspopup="menu" aria-expanded={accountMenuOpen}
-                                onClick={() => { setAccountMenuOpen((v) => !v); setSearchPopoverOpen(false); setLocationPopoverOpen(false); }}
+                                aria-haspopup="dialog" aria-expanded={accountMenuOpen}
+                                onClick={() => { setAccountMenuOpen((v) => !v); setAccountActiveTab('explore'); setSearchPopoverOpen(false); setLocationPopoverOpen(false); }}
                             >
                                 <span className="ep-nav-avatar">{accountInitials}</span>
                                 <span className="ep-nav-userlines">
@@ -2019,46 +2096,94 @@ import {
                             <AnimatePresence>
                                 {accountMenuOpen && (
                                     <motion.div
-                                        className="ep-nav-pop ep-nav-account-pop" role="menu" aria-label="Account and website navigation"
+                                        className="ep-nav-pop ep-nav-account-pop"
+                                        role="dialog"
+                                        aria-label="Account and website navigation"
                                         initial={{opacity:0,y:-7}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-7}}
                                         transition={{duration:.17}}
                                     >
-                                        <div className="ep-nav-menu-head">
-                                            <strong>{user?.name || 'My account'}</strong>
-                                            <small>{accountRoleLabel} · EPANTRY</small>
-                                        </div>
-                                        <div className="ep-nav-menu-group">
-                                            <div className="ep-nav-menu-title">Explore</div>
-                                            {publicLinks.map((item) => menuLink(item, () => setAccountMenuOpen(false)))}
-                                        </div>
-                                        {uniqueWorkspaceLinks.length > 0 && (
-                                            <>
-                                                <div className="ep-nav-menu-divider" />
-                                                <div className="ep-nav-menu-group">
-                                                    <div className="ep-nav-menu-title">Your workspace</div>
-                                                    {uniqueWorkspaceLinks.map((item) => menuLink(item, () => setAccountMenuOpen(false)))}
+                                        <div className="ep-acc-top">
+                                            <div className="ep-acc-identity">
+                                                <span className="ep-acc-portrait" aria-hidden="true">{accountInitials}</span>
+                                                <div className="ep-acc-namebox">
+                                                    <span className="ep-acc-kicker">Your EPANTRY account</span>
+                                                    <strong className="ep-acc-name">{user?.name || 'My account'}</strong>
+                                                    <span className="ep-acc-role">{accountRoleLabel}</span>
                                                 </div>
-                                            </>
-                                        )}
-                                        <div className="ep-nav-menu-divider" />
-                                        <div className="ep-nav-menu-group">
-                                            <div className="ep-nav-menu-title">Account</div>
-                                            {canUseScan && !hasAdminAccess && !superAdminEnabled && menuLink({ label:'Scan', to:scanDestination }, () => setAccountMenuOpen(false))}
-                                            {isCustomerPresentation && menuLink({ label:'Community', to:'/community' }, () => setAccountMenuOpen(false))}
-                                            {isCustomerPresentation && menuLink({ label:'Learn', to:'/learn' }, () => setAccountMenuOpen(false))}
-                                            {showCustomerCart && menuLink({ label:'My cart', to:cartNavigation.href }, () => setAccountMenuOpen(false))}
-                                            {hasTrackableOrder && menuLink({ label:'Track my order', to:`/orders/${encodeURIComponent(String(activeTrackingOrderId))}` }, () => setAccountMenuOpen(false))}
-                                            {menuLink({ label:'Notifications', to:'/notifications' }, () => setAccountMenuOpen(false))}
-                                            {menuLink({ label:'Account settings', to:'/account/settings' }, () => setAccountMenuOpen(false))}
-                                            <div className="ep-nav-modal-location"><NavbarLocationStatus /></div>
+                                            </div>
                                         </div>
-                                        {!hasAdminAccess && !superAdminEnabled && (
-                                            <div className="ep-nav-menu-footer"><ModeSwitcher compact /></div>
-                                        )}
-                                        <div className="ep-nav-menu-footer">
-                                            <button type="button" className="ep-nav-logout" onClick={handleLogout} disabled={isLoggingOut} role="menuitem">
+                                        <div className="ep-acc-tabs" role="tablist" aria-label="Account navigation groups">
+                                            {accountTabs.map((tab, index) => (
+                                                <button
+                                                    key={tab.id}
+                                                    type="button"
+                                                    role="tab"
+                                                    id={`ep-acc-tab-${tab.id}`}
+                                                    aria-controls={`ep-acc-panel-${tab.id}`}
+                                                    aria-selected={accountActiveTab === tab.id}
+                                                    tabIndex={accountActiveTab === tab.id ? 0 : -1}
+                                                    className="ep-acc-tab"
+                                                    onClick={() => setAccountActiveTab(tab.id)}
+                                                    onKeyDown={(event) => handleAccountTabKeyDown(event, index)}
+                                                >{tab.label}</button>
+                                            ))}
+                                        </div>
+                                        <div className="ep-acc-viewport">
+                                            <div
+                                                className="ep-acc-scroll"
+                                                role="tabpanel"
+                                                id={`ep-acc-panel-${accountActiveTab}`}
+                                                aria-labelledby={`ep-acc-tab-${accountActiveTab}`}
+                                                tabIndex={0}
+                                                key={accountActiveTab}
+                                            >
+                                                <div className="ep-acc-content">
+                                                    {accountActiveTab === 'explore' && (
+                                                        <div className="ep-acc-section">
+                                                            <div className="ep-acc-quicklinks">
+                                                                {publicLinks.map((item) => accountMenuLink(item, true))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {accountActiveTab === 'workspace' && (
+                                                        <div className="ep-acc-section">
+                                                            <div className="ep-acc-mainlinks">
+                                                                {uniqueWorkspaceLinks.length > 0
+                                                                    ? uniqueWorkspaceLinks.map((item) => accountMenuLink(item))
+                                                                    : <span className="ep-acc-empty">No workspace links available.</span>}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {accountActiveTab === 'tools' && (
+                                                        <>
+                                                            <div className="ep-acc-section">
+                                                                <div className="ep-acc-toollinks">
+                                                                    {canUseScan && !hasAdminAccess && !superAdminEnabled && accountMenuLink({ label:'Scan', to:scanDestination }, true)}
+                                                                    {isCustomerPresentation && accountMenuLink({ label:'Community', to:'/community' }, true)}
+                                                                    {isCustomerPresentation && accountMenuLink({ label:'Learn', to:'/learn' }, true)}
+                                                                    {showCustomerCart && accountMenuLink({ label:'My cart', to:cartNavigation.href }, true)}
+                                                                    {hasTrackableOrder && accountMenuLink({ label:'Track my order', to:`/orders/${encodeURIComponent(String(activeTrackingOrderId))}` }, true)}
+                                                                    {accountMenuLink({ label:'Notifications', to:'/notifications' }, true)}
+                                                                    {accountMenuLink({ label:'Account settings', to:'/account/settings' }, true)}
+                                                                </div>
+                                                                <div className="ep-nav-modal-location"><NavbarLocationStatus /></div>
+                                                            </div>
+                                                            {!hasAdminAccess && !superAdminEnabled && (
+                                                                <div className="ep-acc-switch">
+                                                                    <span className="ep-acc-switch-label">Switch workspace mode</span>
+                                                                    <ModeSwitcher compact />
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="ep-acc-footer">
+                                            <button type="button" className="ep-acc-signout" onClick={handleLogout} disabled={isLoggingOut}>
                                                 {isLoggingOut ? <LoaderCircle size={16} className="animate-spin" /> : <LogOut size={16} />}
-                                                {isLoggingOut ? 'Signing out…' : 'Sign out'}
+                                                <span>{isLoggingOut ? 'Signing out…' : 'Sign out'}</span>
+                                                <ArrowLeft size={15} className="ep-acc-signout-arrow" aria-hidden="true" />
                                             </button>
                                         </div>
                                     </motion.div>
