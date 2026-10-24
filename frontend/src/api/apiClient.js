@@ -133,6 +133,23 @@ function getRequestMethod(
     null
 }
 
+// Browsable catalogue pages are public in every account mode. This list
+// mirrors the unguarded public routes in AppRoutes.jsx and intentionally
+// excludes checkout, orders, pantry, dashboard and personal account routes.
+function isPublicBrowsingPath(pathname) {
+  const path = String(pathname || '')
+  if ([
+    '/', '/grocery', '/brands', '/recipes', '/about',
+    '/community', '/learn',
+  ].includes(path)) return true
+
+  return [
+    '/grocery/', '/brands/', '/recipes/', '/community/',
+    '/promotions/', '/creators/', '/dish-passports/',
+    '/explore/host-listings',
+  ].some(prefix => path.startsWith(prefix))
+}
+
 /*
 |--------------------------------------------------------------------------
 | Normalize API Path
@@ -472,10 +489,18 @@ apiClient.interceptors.response.use(
           'AUTH_CUSTOMER_CONTEXT_REQUIRED',
       )
 
+    // A public catalogue page can fetch optional Customer-only data in the
+    // background. A GET 403 must not eject a Host from Home / Grocery /
+    // Recipes / Product details. Explicit mutations and protected routes
+    // still retain the existing Customer access boundary.
+    const publicBrowsingLocation =
+      typeof window !== 'undefined' &&
+      isPublicBrowsingPath(window.location.pathname)
+
     if (
       customerContextRequired &&
-      typeof window !==
-        'undefined'
+      typeof window !== 'undefined' &&
+      !(publicBrowsingLocation && requestMethod === 'GET')
     ) {
       window.dispatchEvent(
         new CustomEvent(

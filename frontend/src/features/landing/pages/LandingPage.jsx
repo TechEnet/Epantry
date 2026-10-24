@@ -303,6 +303,12 @@ export default function LandingPage() {
         return;
       }
       const story = currentStory(window.scrollY);
+      // Grocery and Recipes galleries should use native touch scrolling.
+      // Brands keep the existing touch navigation unchanged.
+      if (["grocery", "recipes"].includes(story?.node.dataset.landingStory)) {
+        touchStart = null;
+        return;
+      }
       touchStart = story
         ? {
             x: event.touches[0].clientX,
@@ -985,6 +991,8 @@ function ExperienceBackdropTile({
 }
 
 function ExperienceCardFront({ category }) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#111111]">
       <img
@@ -997,16 +1005,17 @@ function ExperienceCardFront({ category }) {
         className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.02)_30%,rgba(0,0,0,0.12)_55%,rgba(0,0,0,0.79)_100%)]"
       />
       <div className="absolute inset-x-0 bottom-0 px-5 pb-7 text-center sm:px-6 sm:pb-9">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/80 sm:text-xs">
-          Explore EPANTRY
-        </p>
-        <h3 className="mt-2 text-[clamp(24px,3.3vw,40px)] font-bold leading-[1.06] tracking-[-0.035em] text-white drop-shadow-lg">
+        <h3 className="inline-flex items-center justify-center gap-2 text-[clamp(24px,3.3vw,40px)] font-bold leading-[1.06] tracking-[-0.035em] text-white drop-shadow-lg">
           {category.title}
+          <motion.span
+            aria-hidden="true"
+            className="relative top-[3px] inline-flex shrink-0 items-center sm:top-[4px]"
+            animate={reduceMotion ? undefined : { x: [0, 5, 0] }}
+            transition={reduceMotion ? undefined : { duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ArrowRight size={20} />
+          </motion.span>
         </h3>
-        <span className="mt-3 inline-flex items-center justify-center gap-1 text-xs font-semibold text-white/85 opacity-90 sm:text-sm">
-          {category.buttonText}
-          <ArrowRight size={14} aria-hidden="true" />
-        </span>
       </div>
     </div>
   );

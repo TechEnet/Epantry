@@ -2,10 +2,13 @@
 // Publication, Admin decisions, and operational offer creation are intentionally M3 responsibilities.
 export const LISTING_TYPES = Object.freeze(['grocery', 'brand_recipe', 'kitchen_recipe', 'prepared_food'])
 export const LISTING_CATEGORIES = Object.freeze([
-  'grocery', 'breakfast', 'lunch', 'dinner', 'snacks', 'drinks', 'sweets',
+  'grocery', 'breakfast', 'brunch', 'lunch', 'dinner', 'snacks', 'drinks', 'sweets',
   'desserts', 'bakery', 'main_course', 'side_dish', 'other',
 ])
 const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'tsp', 'tbsp', 'cup'])
+// Optional Hybrid grocery facets, persisted without changing the legacy grocery category.
+const GROCERY_SUBCATEGORIES = new Set(['vegetables','fruits','dairy','eggs','meat_poultry','seafood','grains_rice','pulses_legumes','spices_condiments','oils_ghee','canned_jarred','packaged_snacks','packaged_food','frozen_food','beverages','bakery_bread','other_grocery'])
+const PACKAGING_TYPES = new Set(['loose','packet','can','jar','bottle','box','tray','other'])
 const WORKSPACE_TYPES = new Set(['b2b', 'brand_seller', 'chef_restaurant', 'hybrid'])
 const ACCESS = Object.freeze({
   b2b: ['grocery', 'kitchen_recipe', 'prepared_food'],
@@ -74,6 +77,8 @@ export function normalizeListingPacket(raw = {}) {
     title: text(input.title, 180),
     description: text(input.description, 3000),
     category: text(input.category, 50),
+    grocerySubcategory: type === 'grocery' && GROCERY_SUBCATEGORIES.has(input.grocerySubcategory) ? input.grocerySubcategory : '',
+    packagingType: type === 'grocery' && PACKAGING_TYPES.has(input.packagingType) ? input.packagingType : '',
     images: list(input.images, 12).map(cleanUrl).filter(Boolean),
     videoUrl: recipeAllowed ? cleanUrl(input.videoUrl) : '',
     brandName: text(input.brandName, 140),
@@ -172,7 +177,7 @@ export function validateListingPacket(packet, { submit = false, workspace = 'leg
     if (!packet.ingredients.length || packet.ingredients.some((item) => !item.name || !item.quantity || item.quantity <= 0)) errors.push('Complete the ingredient names and quantities.')
     if (!packet.steps.length || packet.steps.some((step) => !step.instruction)) errors.push('Add all preparation instructions.')
   }
-  if (['kitchen_recipe', 'prepared_food'].includes(packet.type) && !packet.selling.outletId) errors.push('Choose the kitchen outlet before submitting. It cannot be supplied after approval.')
+  if ((packet.type === 'prepared_food' || (packet.type === 'kitchen_recipe' && packet.sellReadyMade)) && !packet.selling.outletId) errors.push('Choose the kitchen outlet before submitting. It cannot be supplied after approval.')
   if (packet.type === 'grocery' && (!packet.selling.packQuantity || packet.selling.packQuantity <= 0)) errors.push('Enter the packaged product quantity and unit.')
   if (packet.type === 'grocery' || packet.type === 'prepared_food' || packet.sellReadyMade) {
     if (packet.selling.salePrice === null || packet.selling.salePrice <= 0) errors.push('Add a selling price greater than zero.')

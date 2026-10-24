@@ -74,6 +74,26 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
   const grocerySectionRef = useRef(null)
   const groceryHeroRef = useRef(null)
 
+  // Keep the floating guide from covering the first-column product actions.
+  // It returns automatically once the Grocery gallery is out of view.
+  useEffect(() => {
+    const gallery = grocerySectionRef.current?.querySelector('.ep-landing-grocery-gallery')
+    if (!gallery || typeof IntersectionObserver === 'undefined') return undefined
+
+    const observer = new IntersectionObserver(([entry]) => {
+      document.body.classList.toggle(
+        'epantry-reading-grocery-gallery',
+        entry.isIntersecting && entry.intersectionRatio > 0.2,
+      )
+    }, { threshold: [0, 0.2, 0.5], rootMargin: '-12% 0px -12% 0px' })
+
+    observer.observe(gallery)
+    return () => {
+      observer.disconnect()
+      document.body.classList.remove('epantry-reading-grocery-gallery')
+    }
+  }, [])
+
   // Keep guided mobile scroll stops aligned to the fixed-height hero and gallery.
   useEffect(() => {
     const section = grocerySectionRef.current
@@ -113,6 +133,7 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
       className="relative"
     >
       <style>{`
+        /* Guide remains visible; edge-docking is styled in the Guide component. */
         .ep-landing-grocery-hero,
         .ep-landing-grocery-gallery {
           position: relative;
@@ -205,36 +226,48 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
           -webkit-text-fill-color: ${GROCERY_COLORS.charcoal} !important;
           filter: none;
         }
+        /* EPANTRY: centered grocery scroll cue */
         .ep-landing-grocery-hero__scroll {
           position: absolute;
-          right: clamp(20px,5vw,82px);
+          left: 50%;
+          right: auto;
           bottom: clamp(28px,5vw,70px);
           z-index: 2;
-          display: flex;
-          align-items: center;
-          gap: 15px;
-          padding: 8px 9px 8px 18px;
-          border: 1px solid ${GROCERY_COLORS.forest};
-          border-radius: 100px;
-          background: ${GROCERY_COLORS.porcelain} !important;
-          color: ${GROCERY_COLORS.forest} !important;
-          font-size: 14px;
-          font-weight: 700;
-          line-height: 20px;
+          display: grid;
+          width: 64px;
+          height: 64px;
+          place-items: center;
+          transform: translateX(-50%);
+          padding: 0;
+          border: 0;
+          border-radius: 0;
+          background: transparent !important;
+          color: #F7F6F2 !important;
+          pointer-events: none;
         }
         .ep-landing-grocery-hero__scroll-icon {
           display: grid;
-          width: 50px;
-          height: 50px;
-          flex-shrink: 0;
+          width: 64px;
+          height: 64px;
           place-items: center;
-          border: 1px solid ${GROCERY_COLORS.forest};
-          border-radius: 50%;
-          background: ${GROCERY_COLORS.forest} !important;
-          color: ${GROCERY_COLORS.porcelain} !important;
+          border: 0;
+          border-radius: 0;
+          background: transparent !important;
+          color: #F7F6F2 !important;
+          animation: epantry-grocery-scroll-down 1.8s ease-in-out infinite;
+          filter: drop-shadow(0 2px 3px rgba(15, 35, 29, .9)) drop-shadow(0 0 6px rgba(15, 35, 29, .55));
         }
         .ep-landing-grocery-hero__scroll-icon svg {
+          width: 46px;
+          height: 46px;
           transform: rotate(90deg);
+        }
+        @keyframes epantry-grocery-scroll-down {
+          0%,100% { transform: translateY(-5px); opacity: .85; }
+          50% { transform: translateY(8px); opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ep-landing-grocery-hero__scroll-icon { animation: none !important; }
         }
         .ep-landing-grocery-gallery {
           position: sticky;
@@ -254,11 +287,11 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
           background: ${GROCERY_COLORS.sage} !important;
           color: ${GROCERY_COLORS.charcoal} !important;
         }
-        /* Hold the Grocery gallery for one viewport while the Recipes
-           hero advances over it; no nested scrolling or card resizing. */
+        /* Let visitors read Grocery before the next hero slides in,
+           with a slightly shorter hold than the earlier 210svh. */
         .ep-landing-grocery-exit-hold {
           position: relative;
-          height: 100svh;
+          height: 185svh;
           pointer-events: none;
         }
         .ep-landing-grocery-gallery__header {
@@ -480,14 +513,17 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
         }
         .ep-landing-grocery-gallery__empty a { color: ${GROCERY_COLORS.forest}; }
         @media (max-width:767px) {
+          /* Natural touch scrolling; a modest reading hold on phones. */
+          .ep-landing-grocery-exit-hold { height: 135svh; }
           .ep-landing-grocery-hero__image { object-position: 68% center; }
           .ep-landing-grocery-hero__content { align-items: flex-end; padding: 20px 18px 105px; }
           .ep-landing-grocery-hero__panel { width: min(100%,470px); padding: 22px; }
           .ep-landing-grocery-hero__eyebrow { margin-bottom: 10px; font-size: 12px !important; }
           .ep-landing-grocery-hero__title { font-size: clamp(43px,11vw,60px) !important; }
           .ep-landing-grocery-hero__subline { margin-top: 13px; font-size: 15px !important; }
-          .ep-landing-grocery-hero__scroll { right: 20px; bottom: 28px; font-size: 13px; }
-          .ep-landing-grocery-hero__scroll-icon { width: 40px; height: 40px; }
+          .ep-landing-grocery-hero__scroll { left: 50%; right: auto; bottom: 28px; }
+          .ep-landing-grocery-hero__scroll-icon { width: 52px; height: 52px; }
+          .ep-landing-grocery-hero__scroll-icon svg { width: 40px; height: 40px; }
           .ep-landing-grocery-gallery {
             gap: clamp(7px,1svh,12px);
             padding: clamp(62px,8.5svh,78px) 12px clamp(9px,1.5svh,17px);
@@ -568,8 +604,7 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
           </div>
         </div>
         <div className="ep-landing-grocery-hero__scroll" aria-hidden="true">
-          <span>Scroll to explore</span>
-          <span className="ep-landing-grocery-hero__scroll-icon"><ArrowRight size={19} /></span>
+          <span className="ep-landing-grocery-hero__scroll-icon"><ArrowRight size={46} strokeWidth={2.2} /></span>
         </div>
       </div>
 
@@ -707,6 +742,22 @@ function FeaturedDiscoverySection({
   const heroRef = useRef(null)
   const displayItems = Array.isArray(items) ? (kind === 'recipes' ? items.slice(0, 8) : items) : []
 
+  // Keep the Guide accessible without covering links inside either gallery.
+  // The guide itself switches to a slim edge-tab while any gallery is visible.
+  useEffect(() => {
+    const gallery = sectionRef.current?.querySelector(kind === 'recipes' ? '.ep-recipe-showcase' : '.ep-brand-motion')
+    const flag = `epantry-reading-${kind}-gallery`
+    if (!gallery || typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver(([entry]) => {
+      document.body.classList.toggle(flag, entry.isIntersecting && entry.intersectionRatio > 0.2)
+    }, { threshold: [0, 0.2, 0.5], rootMargin: '-12% 0px -12% 0px' })
+    observer.observe(gallery)
+    return () => {
+      observer.disconnect()
+      document.body.classList.remove(flag)
+    }
+  }, [kind])
+
   useEffect(() => {
     const section = sectionRef.current
     const hero = heroRef.current
@@ -754,10 +805,10 @@ function FeaturedDiscoverySection({
           position:sticky; top:0;
           margin-top:0; border-radius:0; box-shadow:none;
         }
-        /* Hold Recipes in place for the single viewport in which the Brands
-           hero rises over the gallery; no nested gallery scroll is introduced. */
+        /* Same reading comfort as Grocery, with a modest 185svh exit hold.
+           Brands' existing scroll layout is untouched. */
         .ep-featured-story--recipes .ep-recipe-exit-hold {
-          position:relative; height:100svh; pointer-events:none;
+          position:relative; height:185svh; pointer-events:none;
         }
         .ep-featured-story--brands { margin-top:-100svh; z-index:5; }
         .ep-featured-story--brands .ep-featured-photo { position:relative; }
@@ -801,14 +852,28 @@ function FeaturedDiscoverySection({
           margin:20px 0 0; color:#202421 !important; font-size:17px !important;
           font-weight:600; line-height:1.55;
         }
+        /* Recipes + Brands hero: centered, ivory, borderless downward arrow. */
         .ep-featured-photo__cue {
-          position:absolute; right:clamp(20px,5vw,72px); bottom:32px; z-index:2;
-          display:flex; align-items:center; gap:10px;
-          border:1px solid #173F35; border-radius:999px;
-          padding:10px 16px; color:#173F35 !important; background:#F7F6F2 !important;
-          font-size:14px; font-weight:700;
+          position:absolute; left:50%; right:auto; bottom:clamp(28px,5vw,70px); z-index:2;
+          display:grid; width:64px; height:64px; place-items:center;
+          transform:translateX(-50%); padding:0; border:0; border-radius:0;
+          background:transparent !important; color:#F7F6F2 !important;
+          pointer-events:none;
         }
-        .ep-featured-photo__cue svg { transform:rotate(90deg); }
+        .ep-featured-photo__cue-icon {
+          display:grid; width:64px; height:64px; place-items:center;
+          color:#F7F6F2 !important;
+          animation:epantry-discovery-cue 1.8s ease-in-out infinite;
+          filter:drop-shadow(0 2px 3px rgba(15,35,29,.9)) drop-shadow(0 0 6px rgba(15,35,29,.55));
+        }
+        .ep-featured-photo__cue-icon svg { width:46px; height:46px; transform:rotate(90deg); }
+        @keyframes epantry-discovery-cue {
+          0%,100% { transform:translateY(-5px); opacity:.85; }
+          50% { transform:translateY(8px); opacity:1; }
+        }
+        @media (prefers-reduced-motion:reduce) {
+          .ep-featured-photo__cue-icon { animation:none !important; }
+        }
         .ep-recipe-showcase {
           position:relative; z-index:3;
           margin-top:0;
@@ -977,7 +1042,10 @@ function FeaturedDiscoverySection({
           .ep-featured-photo__eyebrow { font-size:12px !important; margin-bottom:10px; }
           .ep-featured-photo__heading { font-size:clamp(43px,11vw,60px) !important; }
           .ep-featured-photo__description { font-size:15px !important; margin-top:13px; }
-          .ep-featured-photo__cue { right:18px; bottom:20px; font-size:12px; padding:9px 12px; }
+          .ep-featured-story--recipes .ep-recipe-exit-hold { height:135svh; }
+          .ep-featured-photo__cue { left:50%; right:auto; bottom:28px; }
+          .ep-featured-photo__cue,.ep-featured-photo__cue-icon { width:52px; height:52px; }
+          .ep-featured-photo__cue-icon svg { width:40px; height:40px; }
           .ep-recipe-showcase { padding:clamp(66px,9svh,80px) 12px 15px; gap:12px; border-radius:18px 18px 0 0; }
           .ep-recipe-showcase__title { font-size:25px !important; }
           .ep-recipe-showcase__label { font-size:12px !important; }
@@ -1022,7 +1090,7 @@ function FeaturedDiscoverySection({
           </div>
         </div>
         <div className="ep-featured-photo__cue" aria-hidden="true">
-          <span>Scroll to explore</span><ArrowRight size={17} />
+          <span className="ep-featured-photo__cue-icon"><ArrowRight size={46} strokeWidth={2.2} /></span>
         </div>
       </div>
       {kind === 'recipes' ? (

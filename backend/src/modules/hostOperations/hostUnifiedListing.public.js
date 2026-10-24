@@ -5,7 +5,10 @@ export function publicListing(record) {
   const commercial = record.type === 'grocery' || record.type === 'prepared_food' || packet.sellReadyMade
   return {
     id: String(record._id), title: record.title, type: record.type,
-    category: packet.category, description: packet.description, images: packet.images || [],
+    category: packet.category,
+    grocerySubcategory: record.type === 'grocery' ? (packet.grocerySubcategory || '') : '',
+    packagingType: record.type === 'grocery' ? (packet.packagingType || '') : '',
+    description: packet.description, images: packet.images || [],
     videoUrl: packet.videoUrl || '', brandName: packet.brandName || '',
     shareRecipe: Boolean(packet.shareRecipe), sellReadyMade: Boolean(packet.sellReadyMade),
     baseServings: packet.baseServings, ingredients: packet.ingredients?.map((item) => ({

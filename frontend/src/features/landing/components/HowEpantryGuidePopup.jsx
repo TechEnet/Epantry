@@ -16,6 +16,14 @@ import { landingBenefits, landingJourneySteps } from "../content/landingContent"
 
 const GUIDE_SHOWN_KEY = "epantry-home-guide-shown-v1";
 
+// Short customer-friendly prompts rotate on the floating guide as before.
+const GUIDE_TRIGGER_LABELS = [
+  "EPANTRY guide",
+  "From food to table",
+  "How it works",
+  "Why EPANTRY",
+];
+
 const WHY_BENEFITS = [
   ...landingBenefits,
   {
@@ -90,6 +98,29 @@ const GUIDE_STYLES = String.raw`
     background: #F7F6F2; color: #173F35;
   }
   .epg-trigger-arrow { opacity: .85; margin-left: 3px; }
+  .epg-trigger-label { display:inline-block; white-space:nowrap; min-width:0; animation:epg-trigger-label-in .35s ease both; }
+  @keyframes epg-trigger-label-in {
+    from { opacity:0; transform:translateY(5px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+  /* Compact only when a Grocery or Recipes card gallery is ACTUALLY in front
+     of the user. Intersection flags alone can stay active when the next hero
+     visually overlays a pinned gallery; the button class is viewport-verified. */
+  .epg-trigger.epg-trigger--card-compact {
+    top:auto !important; left:8px !important; bottom:16px !important;
+    transform:none !important; width:46px; height:46px; min-height:46px;
+    max-width:46px; justify-content:center; gap:0; padding:0;
+    border:0; border-radius:50%; background:transparent; box-shadow:none;
+    opacity:1 !important; visibility:visible !important; pointer-events:auto !important;
+  }
+  .epg-trigger.epg-trigger--card-compact .epg-trigger-icon {
+    width:46px; height:46px; flex:0 0 46px; border-radius:50%;
+    background:#173F35; color:#F7F6F2;
+    box-shadow:0 5px 15px rgba(18,40,31,.2);
+  }
+  .epg-trigger.epg-trigger--card-compact .epg-trigger-label,
+  .epg-trigger.epg-trigger--card-compact .epg-trigger-arrow { display:none; }
+  @media (prefers-reduced-motion:reduce) { .epg-trigger-label { animation:none !important; } }
   .epg-overlay {
     position: fixed; inset: 0; z-index: 120;
     display: flex; align-items: center; justify-content: center;
@@ -365,6 +396,8 @@ export default function HowEpantryGuidePopup() {
   const [mode, setMode] = useState(initialGuideMode);
   const [activeChapter, setActiveChapter] = useState("how");
   const [atEnd, setAtEnd] = useState(false);
+  const [guideLabelIndex, setGuideLabelIndex] = useState(0);
+  const [isOverFeaturedCards, setIsOverFeaturedCards] = useState(false);
   const guideScrollRef = useRef(null);
   const dialogRef = useRef(null);
   const infoRef = useRef(null);
@@ -372,6 +405,54 @@ export default function HowEpantryGuidePopup() {
   const previouslyOpenRef = useRef(false);
   const open = mode !== "closed";
   const expanded = mode === "expanded";
+
+  useEffect(() => {
+    if (open) return undefined;
+    const timer = window.setInterval(() => {
+      setGuideLabelIndex((current) => (current + 1) % GUIDE_TRIGGER_LABELS.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [open]);
+
+  // Check the FRONTMOST content, not just IntersectionObserver visibility.
+  // Sticky galleries remain intersecting while a following full-screen hero
+  // slides over them, so intersection alone makes the Guide compact on heroes.
+  useEffect(() => {
+    let frameId = null;
+    const checkVisibleCards = () => {
+      frameId = null;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const samples = [
+        [0.5, 0.58],
+        [0.25, 0.58],
+        [0.75, 0.58],
+      ];
+      const cardGalleryIsFrontmost = samples.some(([x, y]) => {
+        const frontmost = document.elementFromPoint(width * x, height * y);
+        return Boolean(frontmost?.closest?.(
+          '.ep-landing-grocery-gallery, .ep-recipe-showcase'
+        ));
+      });
+      setIsOverFeaturedCards((current) =>
+        current === cardGalleryIsFrontmost ? current : cardGalleryIsFrontmost
+      );
+    };
+    const scheduleCheck = () => {
+      if (frameId === null) frameId = window.requestAnimationFrame(checkVisibleCards);
+    };
+
+    scheduleCheck();
+    window.addEventListener('scroll', scheduleCheck, { passive: true });
+    window.addEventListener('resize', scheduleCheck);
+    window.addEventListener('pageshow', scheduleCheck);
+    return () => {
+      window.removeEventListener('scroll', scheduleCheck);
+      window.removeEventListener('resize', scheduleCheck);
+      window.removeEventListener('pageshow', scheduleCheck);
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+    };
+  }, []);
 
   useEffect(() => {
     if (mode !== "prompt") return;
@@ -481,10 +562,10 @@ export default function HowEpantryGuidePopup() {
             onClick={() => setMode("expanded")}
             aria-label="Open EPANTRY guide"
             title="Open EPANTRY guide"
-            className="epg-trigger"
+            className={`epg-trigger${isOverFeaturedCards ? ' epg-trigger--card-compact' : ''}`}
           >
             <span className="epg-trigger-icon"><Info size={19} strokeWidth={2} aria-hidden="true" /></span>
-            <span>EPANTRY guide</span>
+            <span key={guideLabelIndex} className="epg-trigger-label" aria-hidden="true">{GUIDE_TRIGGER_LABELS[guideLabelIndex]}</span>
             <ArrowRight size={17} className="epg-trigger-arrow" aria-hidden="true" />
           </button>
         </div>

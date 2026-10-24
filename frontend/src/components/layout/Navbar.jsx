@@ -16,7 +16,7 @@ import {
     LoaderCircle,
     LogOut,
     MapPin,
-    Menu,
+    Leaf,
     Search,
     ScanLine,
     Settings,
@@ -38,7 +38,6 @@ import {
     useNavigate,
   } from 'react-router-dom';
   
-  import SearchBar from '../common/SearchBar';
   
   import {
     useAdmin,
@@ -138,14 +137,6 @@ import {
   }
 
   const BASE_NAV_ITEMS = [
-    {
-        label:
-            'Home',
-  
-        to:
-            '/',
-    },
-  
     {
         label:
             'Grocery',
@@ -288,6 +279,15 @@ import {
         .toUpperCase();
   }
   
+  // Assets live in frontend/public/Hamburger (served at /Hamburger/).
+  const MENU_ICON_IMAGES = [
+    '/Hamburger/1.webp',
+    '/Hamburger/2.svg',
+    '/Hamburger/3.webp',
+    '/Hamburger/4.svg',
+    '/Hamburger/5.webp',
+  ];
+
   export default function Navbar() {
     const setDeliveryContext =
         useLocationStore(
@@ -303,11 +303,22 @@ import {
         useLocationStore(
             (state) => state.deliveryContext,
         );
+    const [menuIconIndex, setMenuIconIndex] = useState(0);
+
     const [
         menuOpen,
         setMenuOpen,
     ] =
         useState(false);
+
+    // Fade up to the next symbol every 3 seconds. Pause when menu is open.
+    useEffect(() => {
+        if (menuOpen) return undefined;
+        const intervalId = window.setInterval(() => {
+            setMenuIconIndex((current) => (current + 1) % MENU_ICON_IMAGES.length);
+        }, 3000);
+        return () => window.clearInterval(intervalId);
+    }, [menuOpen]);
 
     const [
         mobileLocationOpen,
@@ -459,35 +470,41 @@ import {
             user,
         );
 
+    // Host access never removes public browsing. The public catalogue is
+    // readable in every mode; customer-only actions remain protected by routes.
+    const isOnHostWorkspace =
+        location.pathname === '/host' ||
+        location.pathname.startsWith('/host/');
+
     const navItems =
         useMemo(
             () => {
-                if (
-                    isHostPresentation
-                ) {
-                    return HOST_NAV_ITEMS.filter(
-                        (item) =>
-                            isHostPathAllowed(
-                                item.to,
-                                hostWorkspaceType,
+                if (isHostPresentation) {
+                    if (isOnHostWorkspace) {
+                        return [
+                            ...HOST_NAV_ITEMS.filter((item) =>
+                                isHostPathAllowed(item.to, hostWorkspaceType),
                             ),
-                    );
+                        ];
+                    }
+
+                    // In the public store, show its normal navigation, but
+                    // keep one-tap access back to the Host workspace.
+                    return [
+                        ...BASE_NAV_ITEMS,
+                        { label: 'Host Studio', to: '/host/operations' },
+                    ];
                 }
 
                 return [
                     ...BASE_NAV_ITEMS,
-                    {
-                        label:
-                            'Scan',
-
-                        to:
-                            '/scan',
-                    },
+                    { label: 'Scan', to: '/scan' },
                 ];
             },
             [
                 hostWorkspaceType,
                 isHostPresentation,
+                isOnHostWorkspace,
             ],
         );
   
@@ -1618,1248 +1635,462 @@ import {
             </Link>
         ) : null;
 
-    const desktopAccount =
-        dashboardDestination ? (
-            <Link
-                to={
-                    dashboardDestination
-                }
-                className="focus-ring flex h-9 max-w-[220px] items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-900 transition hover:border-emerald-300 hover:bg-emerald-100"
-                title={
-                    user?.email ||
-                    dashboardTitle
-                }
-            >
-                <UserRound
-                    size={15}
-                    className="shrink-0"
-                    aria-hidden="true"
-                />
-  
-                <span className="truncate">
-                    Hi, {firstName}
-                </span>
-  
-                <span
-                    className="h-4 w-px shrink-0 bg-emerald-300"
-                    aria-hidden="true"
-                />
-  
-                <LayoutDashboard
-                    size={14}
-                    className="shrink-0"
-                    aria-hidden="true"
-                />
-  
-                <span className="shrink-0">
-                    Dashboard
-                </span>
-            </Link>
-        ) : (
-            <div
-                className="flex h-9 max-w-[140px] items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-900"
-                title={
-                    user?.email ||
-                    'Signed in'
-                }
-            >
-                <UserRound
-                    size={15}
-                    className="shrink-0"
-                    aria-hidden="true"
-                />
-  
-                <span className="truncate">
-                    Hi, {firstName}
-                </span>
-            </div>
-        );
-  
-    const desktopAuth =
-        isBootstrapping ? (
-            <div className="h-9 w-28 animate-pulse rounded-full bg-stone-200" />
-        ) : isAuthenticated ? (
-            <div className="flex items-center gap-1.5">
-                <ModeSwitcher compact />
-                {customerCartButton}
-                <NotificationBell compact />
-                {desktopAccount}
-  
-                <button
-                    type="button"
-                    onClick={
-                        handleLogout
-                    }
-                    disabled={
-                        isLoggingOut
-                    }
-                    className="focus-ring flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-xs font-black text-stone-600 transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label="Sign out"
-                >
-                    {isLoggingOut ? (
-                        <LoaderCircle
-                            size={15}
-                            className="animate-spin"
-                            aria-hidden="true"
-                        />
-                    ) : (
-                        <LogOut
-                            size={15}
-                            aria-hidden="true"
-                        />
-                    )}
-  
-                    <span>
-                        {isLoggingOut
-                            ? 'Signing out'
-                            : 'Logout'}
-                    </span>
-                </button>
-            </div>
-        ) : (
-            <div className="flex items-center gap-1.5">
-                <Link
-                    to="/login"
-                    className="focus-ring flex h-9 items-center justify-center rounded-full px-3 text-xs font-black text-stone-700 transition hover:bg-stone-100 hover:text-stone-950 xl:border xl:border-stone-300 xl:bg-white xl:px-3.5 xl:shadow-sm xl:hover:border-stone-400"
-                >
-                    Login
-                </Link>
-  
-                <Link
-                    to="/register"
-                    className="focus-ring flex h-9 items-center justify-center rounded-full bg-stone-950 px-3.5 text-xs font-black text-white transition hover:bg-stone-800"
-                >
-                    Register
-                </Link>
-            </div>
-        );
-  
-    const wideDesktopAuth =
-        isBootstrapping ? (
-            <div className="h-9 w-28 animate-pulse rounded-full bg-stone-200" />
-        ) : isAuthenticated ? (
-            <div className="flex items-center gap-2">
-                {customerCartButton}
-                <NotificationBell compact />
+    // One responsive header for all screen sizes. Account actions remain
+    // governed by the existing AuthContext and route protections.
+    const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+    const [searchDraft, setSearchDraft] = useState(currentQuery);
+    const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
+    const [authOffer, setAuthOffer] = useState('Login');
+    const searchPopoverRef = useRef(null);
+    const locationPopoverRef = useRef(null);
+    const guestMenuRef = useRef(null);
 
-                <div
-                    ref={accountMenuRef}
-                    className="relative translate-x-[6px]"
-                >
-                    <button
-                        type="button"
-                        onClick={() =>
-                            setAccountMenuOpen(
-                                (value) =>
-                                    !value,
-                            )
-                        }
-                        className={[
-                            'focus-ring',
-                            'flex',
-                            'h-10',
-                            'items-center',
-                            'gap-2',
-                            'rounded-full',
-                            'border',
-                            'px-2',
-                            'pr-3',
-                            'text-left',
-                            'transition',
-                            accountMenuOpen
-                                ? 'border-emerald-300 bg-emerald-50'
-                                : 'border-stone-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/60',
-                        ].join(
-                            ' ',
-                        )}
-                        aria-haspopup="menu"
-                        aria-expanded={accountMenuOpen}
-                        aria-label="Open account menu"
-                    >
-                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-emerald-700 text-[11px] font-black text-white shadow-sm">
-                            {accountInitials}
-                        </span>
+    useEffect(() => {
+        if (isAuthenticated || isBootstrapping) return undefined;
+        const id = window.setInterval(() => {
+            setAuthOffer((current) => current === 'Login' ? 'Register' : 'Login');
+        }, 5000);
+        return () => window.clearInterval(id);
+    }, [isAuthenticated, isBootstrapping]);
 
-                        <span className="min-w-0">
-                            <span className="block max-w-[92px] truncate text-xs font-black leading-none text-stone-950">
-                                {firstName}
-                            </span>
+    useEffect(() => {
+        setSearchPopoverOpen(false);
+        setLocationPopoverOpen(false);
+        setSearchDraft(currentQuery);
+    }, [location.pathname, location.search]);
 
-                            <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.08em] text-stone-500">
-                                {accountRoleLabel}
-                            </span>
-                        </span>
+    useEffect(() => {
+        if (!searchPopoverOpen && !locationPopoverOpen && !menuOpen) return undefined;
+        const onOutside = (event) => {
+            if (searchPopoverOpen && !searchPopoverRef.current?.contains(event.target)) {
+                setSearchPopoverOpen(false);
+            }
+            if (locationPopoverOpen && !locationPopoverRef.current?.contains(event.target)) {
+                setLocationPopoverOpen(false);
+            }
+            if (menuOpen && !guestMenuRef.current?.contains(event.target)) {
+                setMenuOpen(false);
+            }
+        };
+        const onEscape = (event) => {
+            if (event.key !== 'Escape') return;
+            setSearchPopoverOpen(false);
+            setLocationPopoverOpen(false);
+            setMenuOpen(false);
+        };
+        document.addEventListener('pointerdown', onOutside);
+        document.addEventListener('keydown', onEscape);
+        return () => {
+            document.removeEventListener('pointerdown', onOutside);
+            document.removeEventListener('keydown', onEscape);
+        };
+    }, [searchPopoverOpen, locationPopoverOpen, menuOpen]);
 
-                        <ChevronDown
-                            size={14}
-                            className={[
-                                'shrink-0',
-                                'text-stone-400',
-                                'transition-transform',
-                                accountMenuOpen
-                                    ? 'rotate-180'
-                                    : '',
-                            ].join(
-                                ' ',
-                            )}
-                            aria-hidden="true"
-                        />
-                    </button>
+    const handleBrandHome = (event) => {
+        setMenuOpen(false);
+        setAccountMenuOpen(false);
+        setSearchPopoverOpen(false);
+        setLocationPopoverOpen(false);
+        if (location.pathname === '/') {
+            event.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
 
-                    <AnimatePresence>
-                        {accountMenuOpen && (
-                            <motion.div
-                                initial={{
-                                    opacity:
-                                        0,
+    const publicLinks = BASE_NAV_ITEMS.filter((item) => item.to !== '/');
+    const hostLinks = hostEnabled && (activeMode === 'host' || isHostPresentation)
+        ? HOST_NAV_ITEMS.filter((item) => isHostPathAllowed(item.to, hostWorkspaceType))
+        : [];
+    const adminLinks = (hasAdminAccess || superAdminEnabled)
+        ? [{ label: 'Super Admin Dashboard', to: '/admin' }]
+        : [];
+    const customerLinks = customerEnabled && activeMode === 'customer'
+        ? [
+            { label: 'My Dashboard', to: '/dashboard' },
+            { label: 'My Pantry', to: '/pantry' },
+            { label: 'My Orders', to: '/orders' },
+            { label: 'Meal Plans', to: '/meal-plan' },
+          ]
+        : [];
+    const primaryWorkspaceLinks = [...adminLinks, ...hostLinks, ...customerLinks];
+    if (dashboardDestination && !primaryWorkspaceLinks.some((item) => item.to === dashboardDestination)) {
+        primaryWorkspaceLinks.unshift({ label: 'Dashboard', to: dashboardDestination });
+    }
+    const uniqueWorkspaceLinks = primaryWorkspaceLinks.filter((item, index, array) =>
+        array.findIndex((candidate) => candidate.to === item.to) === index,
+    );
 
-                                    y:
-                                        -6,
+    const submitHeaderSearch = (event) => {
+        event.preventDefault();
+        const query = searchDraft.trim();
+        if (query.length < 2) return;
+        handleSearch(query);
+        setSearchPopoverOpen(false);
+    };
 
-                                    scale:
-                                        0.98,
-                                }}
-                                animate={{
-                                    opacity:
-                                        1,
+    const menuLink = (item, close) => (
+        <Link
+            key={item.to}
+            to={item.to}
+            onClick={close}
+            role="menuitem"
+            className={`ep-nav-menu-link${isActive(item.to) ? ' ep-nav-menu-active' : ''}`}
+        >
+            <span>{item.label}</span>
+            <ArrowLeft size={15} className="ep-nav-menu-arrow" aria-hidden="true" />
+        </Link>
+    );
 
-                                    y:
-                                        0,
-
-                                    scale:
-                                        1,
-                                }}
-                                exit={{
-                                    opacity:
-                                        0,
-
-                                    y:
-                                        -6,
-
-                                    scale:
-                                        0.98,
-                                }}
-                                transition={{
-                                    duration:
-                                        0.15,
-                                }}
-                                className="absolute right-0 top-[calc(100%+10px)] z-[70] w-[min(300px,calc(100vw-24px))] overflow-hidden rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] text-[#202421] shadow-2xl"
-                                role="menu"
-                                aria-label="Account navigation"
-                            >
-                                <div className="border-b border-[#DCE0CF] bg-[#F7F6F2] p-4 text-[#202421]">
-                                    <div className="flex items-center gap-3">
-                                        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#173F35] text-sm font-black text-[#F7F6F2]">
-                                            {accountInitials}
-                                        </span>
-
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-black text-stone-950">
-                                                {user?.name || 'EPANTRY Account'}
-                                            </p>
-
-                                            <p className="mt-1 truncate text-[11px] font-medium text-stone-500">
-                                                {user?.email || accountRoleLabel}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3 inline-flex rounded-full bg-[#DCE0CF] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#173F35] ring-1 ring-[#173F35]/15">
-                                        {accountRoleLabel}
-                                    </div>
-                                </div>
-
-                                <div className="p-2">
-                                    {dashboardDestination ? (
-                                        <Link
-                                            to={dashboardDestination}
-                                            onClick={() =>
-                                                setAccountMenuOpen(
-                                                    false,
-                                                )
-                                            }
-                                            className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-emerald-50 hover:text-emerald-900"
-                                            role="menuitem"
-                                        >
-                                            <LayoutDashboard
-                                                size={17}
-                                                className="text-emerald-700"
-                                                aria-hidden="true"
-                                            />
-                                            Dashboard
-                                        </Link>
-                                    ) : null}
-
-                                    {!hasAdminAccess &&
-                                    !superAdminEnabled &&
-                                    canUseScan ? (
-                                        <Link
-                                            to={scanDestination}
-                                            onClick={() =>
-                                                setAccountMenuOpen(
-                                                    false,
-                                                )
-                                            }
-                                            className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                            role="menuitem"
-                                        >
-                                            <ScanLine
-                                                size={17}
-                                                className="text-stone-500"
-                                                aria-hidden="true"
-                                            />
-                                            Scan
-                                        </Link>
-                                    ) : null}
-
-                                    <Link
-                                        to="/about"
-                                        onClick={() =>
-                                            setAccountMenuOpen(
-                                                false,
-                                            )
-                                        }
-                                        className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                        role="menuitem"
-                                    >
-                                        <Info
-                                            size={17}
-                                            className="text-stone-500"
-                                            aria-hidden="true"
-                                        />
-                                        About EPANTRY
-                                    </Link>
-
-                                    <Link
-                                        to="/account/settings"
-                                        onClick={() =>
-                                            setAccountMenuOpen(
-                                                false,
-                                            )
-                                        }
-                                        className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                        role="menuitem"
-                                    >
-                                        <Settings
-                                            size={17}
-                                            className="text-stone-500"
-                                            aria-hidden="true"
-                                        />
-                                        Account Settings
-                                    </Link>
-
-                                    {isCustomerPresentation ? (
-                                        <>
-                                            <Link
-                                                to="/community"
-                                                onClick={() =>
-                                                    setAccountMenuOpen(
-                                                        false,
-                                                    )
-                                                }
-                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                                role="menuitem"
-                                            >
-                                                <UsersRound
-                                                    size={17}
-                                                    className="text-stone-500"
-                                                    aria-hidden="true"
-                                                />
-                                                Community
-                                            </Link>
-
-                                            <Link
-                                                to="/learn"
-                                                onClick={() =>
-                                                    setAccountMenuOpen(
-                                                        false,
-                                                    )
-                                                }
-                                                className="focus-ring flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-                                                role="menuitem"
-                                            >
-                                                <BookOpen
-                                                    size={17}
-                                                    className="text-stone-500"
-                                                    aria-hidden="true"
-                                                />
-                                                Learn
-                                            </Link>
-                                        </>
-                                    ) : null}
-
-                                </div>
-
-                                {!hasAdminAccess && !superAdminEnabled ? (
-                                    <div className="border-t border-stone-100 px-3 py-3">
-                                        <ModeSwitcher compact />
-                                    </div>
-                                ) : null}
-
-                                <div className="border-t border-stone-100 p-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleLogout}
-                                        disabled={isLoggingOut}
-                                        className="focus-ring flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                        role="menuitem"
-                                    >
-                                        {isLoggingOut ? (
-                                            <LoaderCircle
-                                                size={17}
-                                                className="animate-spin"
-                                                aria-hidden="true"
-                                            />
-                                        ) : (
-                                            <LogOut
-                                                size={17}
-                                                aria-hidden="true"
-                                            />
-                                        )}
-
-                                        {isLoggingOut
-                                            ? 'Signing out'
-                                            : 'Logout'}
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </div>
-        ) : (
-            desktopAuth
-        );
-
-    const mobileAccount =
-        dashboardDestination ? (
-            <Link
-                to={
-                    dashboardDestination
-                }
-                className="focus-ring flex min-h-9 w-full items-center gap-2 border-b border-stone-300/35 px-1 text-[10px] font-black text-stone-800 transition hover:text-emerald-800 md:min-h-11 md:justify-center md:rounded-2xl md:border md:border-white/85 md:bg-white/58 md:px-3 md:text-xs md:text-emerald-950 md:shadow-sm md:backdrop-blur-xl md:hover:bg-white/78"
-                title={
-                    user?.email ||
-                    dashboardTitle
-                }
-            >
-                <UserRound
-                    size={14}
-                    className="shrink-0"
-                    aria-hidden="true"
-                />
-  
-                <span className="min-w-0 flex-1 truncate md:flex-none">
-                    Dashboard
-                </span>
-  
-                <LayoutDashboard
-                    size={13}
-                    className="shrink-0"
-                    aria-hidden="true"
-                />
-            </Link>
-        ) : (
-            <div
-                className="flex min-h-9 w-full items-center gap-2 border-b border-stone-300/35 px-1 text-[10px] font-black text-stone-800 md:min-h-11 md:justify-center md:rounded-2xl md:border md:border-white/85 md:bg-white/58 md:px-3 md:text-xs md:text-emerald-950 md:shadow-sm md:backdrop-blur-xl"
-                title={
-                    user?.email ||
-                    'Signed in'
-                }
-            >
-                <UserRound
-                    size={14}
-                    aria-hidden="true"
-                />
-  
-                <span className="min-w-0 flex-1 truncate md:flex-none">
-                    Hi, {firstName}
-                </span>
-            </div>
-        );
-
-    const mobileUtilityIconClass =
-        'focus-ring relative grid size-8 shrink-0 place-items-center rounded-[11px] border border-white/95 bg-white/72 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.12)] backdrop-blur-2xl transition hover:-translate-y-0.5 hover:bg-white/95 hover:text-stone-950';
-
-    const mobileMenuUtilities =
-        isAuthenticated ? (
-            <div className="flex min-h-10 w-full items-center justify-between gap-1.5 border-b border-stone-300/35 px-0.5 py-1.5">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setMenuOpen(false);
-                        setMobileSearchOpen(false);
-                        setMobileLocationOpen(true);
-                    }}
-                    className={mobileUtilityIconClass}
-                    aria-label="Choose location"
-                    title="Location"
-                >
-                    <MapPin
-                        size={15}
-                        strokeWidth={2.1}
-                        aria-hidden="true"
-                    />
-                </button>
-
-                <Link
-                    to={cartNavigation.href}
-                    onClick={() => {
-                        setMenuOpen(false);
-                        setMobileLocationOpen(false);
-                        setMobileSearchOpen(false);
-                    }}
-                    className={mobileUtilityIconClass}
-                    aria-label={
-                        cartNavigation.count > 0
-                            ? `Open cart with ${cartNavigation.count} item${cartNavigation.count === 1 ? '' : 's'}`
-                            : 'Open cart'
-                    }
-                    title="Cart"
-                >
-                    <ShoppingCart
-                        size={15}
-                        strokeWidth={2.1}
-                        aria-hidden="true"
-                    />
-
-                    {cartNavigation.count > 0 ? (
-                        <span className="absolute -right-1 -top-1 grid min-h-3.5 min-w-3.5 place-items-center rounded-full bg-emerald-700 px-0.5 text-[7px] font-black leading-none text-white shadow-sm">
-                            {cartNavigation.count > 99
-                                ? '99+'
-                                : cartNavigation.count}
-                        </span>
-                    ) : null}
-                </Link>
-
-                <Link
-                    to="/notifications"
-                    onClick={() => {
-                        setMenuOpen(false);
-                        setMobileLocationOpen(false);
-                        setMobileSearchOpen(false);
-                    }}
-                    className={mobileUtilityIconClass}
-                    aria-label={
-                        unreadNotificationCount > 0
-                            ? `Notifications, ${unreadNotificationCount} unread`
-                            : 'Notifications'
-                    }
-                    title="Notifications"
-                >
-                    <Bell
-                        size={15}
-                        strokeWidth={2.1}
-                        aria-hidden="true"
-                    />
-
-                    {unreadNotificationCount > 0 ? (
-                        <span className="absolute -right-1 -top-1 grid min-h-3.5 min-w-3.5 place-items-center rounded-full bg-red-600 px-0.5 text-[7px] font-black leading-none text-white shadow-sm">
-                            {unreadNotificationCount > 99
-                                ? '99+'
-                                : unreadNotificationCount}
-                        </span>
-                    ) : null}
-                </Link>
-
-                <Link
-                    to={
-                        hasTrackableOrder
-                            ? `/orders/${encodeURIComponent(
-                                String(activeTrackingOrderId),
-                            )}`
-                            : '/orders'
-                    }
-                    onClick={() => {
-                        setMenuOpen(false);
-                        setMobileLocationOpen(false);
-                        setMobileSearchOpen(false);
-                    }}
-                    className={mobileUtilityIconClass}
-                    aria-label={
-                        hasTrackableOrder
-                            ? 'Track current order'
-                            : 'Open orders and delivery'
-                    }
-                    title={
-                        hasTrackableOrder
-                            ? 'Track order'
-                            : 'Orders & delivery'
-                    }
-                >
-                    <Truck
-                        size={15}
-                        strokeWidth={2.1}
-                        aria-hidden="true"
-                    />
-                </Link>
-            </div>
-        ) : null;
-  
-    const mobileAuth =
-        isBootstrapping ? (
-            <div className="h-10 w-full animate-pulse rounded-xl bg-white/50 backdrop-blur-xl" />
-        ) : isAuthenticated ? (
-            <>
-                {mobileAccount}
-
-                <div className="flex min-h-10 w-full items-center justify-center border-b border-stone-300/35 py-1 md:rounded-xl md:border md:border-white/85 md:bg-white/52 md:px-1.5 md:shadow-sm md:backdrop-blur-2xl">
-                    <ModeSwitcher compact />
-                </div>
-
-                {mobileMenuUtilities}
-
-                {isCustomerPresentation ? (
-                    <>
-                        <Link
-                            to="/community"
-                            onClick={() => setMenuOpen(false)}
-                            className={getNavClasses('/community')}
-                        >
-                            Community
-                        </Link>
-                        <Link
-                            to="/learn"
-                            onClick={() => setMenuOpen(false)}
-                            className={getNavClasses('/learn')}
-                        >
-                            Learn
-                        </Link>
-                    </>
-                ) : null}
-
-                <button
-                    type="button"
-                    onClick={
-                        handleLogout
-                    }
-                    disabled={
-                        isLoggingOut
-                    }
-                    className="focus-ring flex min-h-9 w-full items-center justify-start gap-2 px-1 text-[10px] font-black text-red-700 transition hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-11 md:justify-center md:rounded-2xl md:border md:border-red-200/70 md:bg-red-50/72 md:px-3 md:text-xs md:shadow-sm md:backdrop-blur-xl md:hover:bg-red-50/90"
-                >
-                    {isLoggingOut ? (
-                        <LoaderCircle
-                            size={14}
-                            className="animate-spin"
-                            aria-hidden="true"
-                        />
-                    ) : (
-                        <LogOut
-                            size={14}
-                            aria-hidden="true"
-                        />
-                    )}
-  
-                    {isLoggingOut
-                        ? 'Signing out'
-                        : 'Logout'}
-                </button>
-            </>
-        ) : (
-            <>
-                <Link
-                    to="/login"
-                    className={
-                        getNavClasses(
-                            '/login',
-                        )
-                    }
-                >
-                    Login
-                </Link>
-  
-                <Link
-                    to="/register"
-                    className={
-                        getNavClasses(
-                            '/register',
-                        )
-                    }
-                >
-                    Register
-                </Link>
-            </>
-        );
-  
     return (
         <header
             className={[
-                'top-0',
-                'z-50',
-                'border-b',
-                'border-stone-200/60',
-                'backdrop-blur-xl',
-                'transition-all',
-                'duration-200',
-
-                isWorkspaceShellRoute
-                    ? 'hidden lg:block'
-                    : '',
-  
-                isHeroGlassPage
-                    ? 'fixed left-0 right-0 w-full border-white/80 bg-[#F7F6F2]/94 shadow-[0_10px_32px_rgba(17,24,39,0.10)] backdrop-blur-2xl saturate-150'
-                    : 'sticky bg-[#F7F6F2]/95',
-            ].join(
-                ' ',
-            )}
+                'ep-nav-root',
+                isWorkspaceShellRoute ? 'ep-nav-workspace' : '',
+                isHeroGlassPage ? 'ep-nav-on-hero' : '',
+            ].join(' ')}
         >
-            <div className="page-shell epantry-navbar-shell" style={{ maxWidth: "none" }}>
-                <div className="hidden xl:block">
-                    <div className="flex h-[60px] w-full min-w-0 items-center gap-2 py-0">
-                        <div className="shrink-0">
-                            {brandCluster}
-                        </div>
-  
-                        <div className="relative min-w-[140px] flex-[1_1_250px]">
-                            <SearchBar
-                                value={
-                                    currentQuery
-                                }
-                                onSubmit={
-                                    handleSearch
-                                }
-                                compact
-                            />
-
-                            {renderNavbarSearchResults()}
-                        </div>
-  
-                        <div className="w-[188px] shrink-0">
-                            <NavbarLocationStatus />
-                        </div>
-
-                        <nav
-                            className="flex min-w-0 shrink-0 items-center justify-end gap-0.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                            aria-label="Primary navigation"
-                        >
-                            {widePrimaryNavItems
-                                .map(
-                                    (
-                                        item,
-                                    ) => (
-                                        <Link
-                                            key={
-                                                item.to
-                                            }
-                                            to={
-                                                item.to
-                                            }
-                                            className={
-                                                getNavClasses(
-                                                    item.to,
-                                                )
-                                            }
-                                        >
-                                            {
-                                                item.label
-                                            }
-                                        </Link>
-                                    ),
-                                )}
-  
-                        </nav>
-  
-                        <div className="ml-1 shrink-0">
-                            {wideDesktopAuth}
-                        </div>
-                    </div>
-                </div>
-  
-                <div className="hidden py-1.5 md:block xl:hidden">
-                    <div className="flex min-h-[48px] items-center justify-between gap-3">
-                        {brandCluster}
-  
-                        <nav
-                            className="hidden items-center gap-1 lg:flex"
-                            aria-label="Primary navigation"
-                        >
-                            {navItems.map(
-                                (
-                                    item,
-                                ) => (
-                                    <Link
-                                        key={
-                                            item.to
-                                        }
-                                        to={
-                                            item.to
-                                        }
-                                        className={
-                                            getNavClasses(
-                                                item.to,
-                                            )
-                                        }
-                                    >
-                                        {
-                                            item.label
-                                        }
-                                    </Link>
-                                ),
-                            )}
-  
-                            <div className="ml-1">
-                                {isCustomerPresentation ? wideDesktopAuth : desktopAuth}
-                            </div>
-                        </nav>
-  
+            <style>{`
+                .ep-nav-root { position:sticky; top:0; z-index:90; width:100%; background:rgba(247,246,242,.97); border-bottom:1px solid #D7DDCF; box-shadow:0 5px 28px rgba(23,63,53,.075); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); color:#202421; font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,sans-serif; }
+                .ep-nav-on-hero { position:fixed; inset:0 0 auto 0; } .ep-nav-workspace { display:none; } @media (min-width:1024px) { .ep-nav-workspace { display:block; } }
+                .ep-nav-inner { width:100%; min-height:70px; display:flex; align-items:center; padding:0 clamp(12px,2.4vw,42px); position:relative; }
+                .ep-nav-start { display:flex; align-items:center; gap:9px; min-width:0; flex-shrink:0; position:relative; z-index:8; }
+                .ep-nav-end { margin-left:auto; display:flex; align-items:center; gap:10px; min-width:0; position:relative; z-index:5; }
+                .ep-nav-logo { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; min-width:0; z-index:3; text-decoration:none; }
+                .ep-nav-logo img { width:178px; height:auto; max-height:31px; object-fit:contain; filter:saturate(1.65) contrast(1.28) brightness(.86); }
+                .ep-nav-logo span { font-size:12px !important; font-weight:600; letter-spacing:.095em; color:#202421; line-height:1.2; }
+                .ep-nav-icon { width:42px; height:42px; flex-shrink:0; border:1px solid #D7DDCF; border-radius:15px; color:#173F35; background:#F7F6F2; display:grid; place-items:center; cursor:pointer; transition:background .18s,border-color .18s,transform .18s; }
+                .ep-nav-icon:hover,.ep-nav-icon[aria-expanded=true] { background:#D7DDCF; border-color:#ADBBA9; transform:translateY(-1px); }
+                .ep-nav-icon:focus-visible,.ep-nav-menu-link:focus-visible,.ep-nav-account:focus-visible,.ep-nav-guest-cta:focus-visible { outline:2px solid #C86C42; outline-offset:3px; }
+                .ep-nav-mobile-location { display:none; } .ep-nav-location-inline { width:190px; min-width:0; flex-shrink:0; }
+                .ep-nav-location-inline > * { width:100%; }
+                .ep-nav-pop-anchor { position:relative; flex-shrink:0; }
+                .ep-nav-pop { position:absolute; top:calc(100% + 13px); right:0; z-index:110; border:1px solid #D7DDCF; background:rgba(247,246,242,.99); border-radius:20px; box-shadow:0 24px 56px rgba(23,63,53,.18); padding:14px; }
+                .ep-nav-search-panel { left:0; right:auto; width:min(460px,calc(100vw - 28px)); padding:0; overflow:hidden; border-radius:18px; }
+                .ep-nav-location-panel { width:min(300px,calc(100vw - 28px)); }
+                /* Five rotating EPANTRY food-menu images; lightweight WebP/SVG assets. */
+                .ep-nav-food-menu { background:#F7F6F2; color:#173F35; border-color:#C8D2C4; border-radius:13px; }
+                .ep-nav-food-menu:hover { background:#E9EDE5; border-color:#9FAF9E; }
+                .ep-nav-food-menu[aria-expanded=true] { background:#173F35; border-color:#173F35; color:#F7F6F2; }
+                .ep-nav-food-glyph { position:relative; display:block; width:29px; height:29px; flex-shrink:0; overflow:hidden; }
+                .ep-nav-food-glyph img { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; opacity:0; transform:translateY(5px) scale(.95); transition:opacity 480ms ease,transform 480ms ease; pointer-events:none; }
+                .ep-nav-food-glyph img.is-active { opacity:1; transform:translateY(0) scale(1); }
+                @media (prefers-reduced-motion:reduce) { .ep-nav-food-glyph img { transition:none !important; transform:none !important; } }
+                .ep-nav-food-menu-head { display:flex; align-items:center; gap:9px; padding:13px 13px 12px; margin-bottom:5px; color:#F7F6F2; background:#173F35; border-radius:12px; font-size:14px !important; font-weight:750; }
+                .ep-nav-menu-back { width:100%; border:0; cursor:pointer; background:transparent; font-family:inherit; border-top:1px solid #D7DDCF; border-radius:0; text-align:left; }
+                .ep-nav-left-notification { flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+                .ep-nav-left-notification > a { width:42px; height:42px; border-radius:15px; border:1px solid #D7DDCF; background:#F7F6F2; display:grid; place-items:center; color:#173F35; text-decoration:none; }
+                .ep-nav-left-notification > a:hover { border-color:#B1C1B3; background:#D7DDCF; }
+                .ep-nav-search-heading { padding:21px 22px 17px; background:#173F35; color:#F7F6F2; display:flex; justify-content:space-between; align-items:flex-start; gap:15px; }
+                .ep-nav-search-heading > div { display:grid; gap:7px; }
+                .ep-nav-search-eyebrow { color:#E5B497; font-size:11px !important; font-weight:800; letter-spacing:.14em; }
+                .ep-nav-search-heading strong { color:#F7F6F2; font-size:21px !important; line-height:1.2; letter-spacing:-.03em; font-weight:750; }
+                .ep-nav-search-dismiss { width:32px; height:32px; flex-shrink:0; display:grid; place-items:center; border:1px solid rgba(255,255,255,.27); border-radius:10px; color:#F7F6F2; background:transparent; cursor:pointer; }
+                .ep-nav-search-dismiss:hover { background:rgba(255,255,255,.13); }
+                .ep-nav-search-form { margin:17px 19px 10px; display:flex; align-items:center; min-width:0; gap:11px; min-height:54px; border:1px solid #BAC9BA; background:#FFF; border-radius:12px; padding:6px 6px 6px 14px; color:#173F35; }
+                .ep-nav-search-form:focus-within { outline:2px solid rgba(200,108,66,.35); border-color:#C86C42; }
+                .ep-nav-search-form input { border:0; outline:0; box-shadow:none; background:transparent; min-width:0; flex:1; padding:6px 0; color:#202421; font-family:inherit; font-size:15px !important; }
+                .ep-nav-search-form input::placeholder { color:#7B887D; opacity:1; }
+                .ep-nav-search-form button { flex-shrink:0; border:0; color:#F7F6F2; background:#173F35; border-radius:9px; padding:11px 13px; font-family:inherit; font-size:14px !important; font-weight:750; cursor:pointer; }
+                .ep-nav-search-form button:disabled { background:#D7DDCF; color:#667567; cursor:not-allowed; }
+                .ep-nav-search-form button:not(:disabled):hover { background:#245447; }
+                .ep-nav-search-discovery { display:flex; align-items:center; gap:12px; padding:8px 20px 19px; flex-wrap:wrap; }
+                .ep-nav-search-discovery > span { color:#597063; font-size:12px !important; font-weight:700; }
+                .ep-nav-search-shortcuts { display:flex; flex-wrap:wrap; gap:7px; }
+                .ep-nav-search-shortcuts a { text-decoration:none; color:#173F35; background:#E9EDE5; border:1px solid #D7DDCF; border-radius:8px; padding:6px 10px; font-size:13px !important; font-weight:700; }
+                .ep-nav-search-shortcuts a:hover { color:#8D462C; background:#F6E5DC; border-color:#EDCCBC; }
+                .ep-nav-account { display:flex; align-items:center; gap:9px; border:1px solid #D7DDCF; border-radius:22px; background:#F7F6F2; padding:5px 11px 5px 5px; height:47px; cursor:pointer; color:#173F35; text-align:left; }
+                .ep-nav-account[aria-expanded=true],.ep-nav-account:hover { background:#DDE5D8; border-color:#B8C8B7; }
+                .ep-nav-avatar { width:35px; height:35px; border-radius:50%; display:grid; place-items:center; background:#173F35; color:white; font-size:14px !important; font-weight:700; }
+                .ep-nav-userlines { display:flex; flex-direction:column; min-width:0; line-height:1.15; }
+                .ep-nav-username { max-width:122px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px !important; font-weight:700; color:#202421; }
+                .ep-nav-role { font-size:11px !important; text-transform:uppercase; letter-spacing:.09em; font-weight:700; color:#627065; margin-top:3px; }
+                .ep-nav-account-pop { width:292px; padding:0; overflow:hidden; max-height:min(78svh,620px); overflow-y:auto; }
+                .ep-nav-menu-head { padding:17px 17px 14px; background:#173F35; color:#F7F6F2; }
+                .ep-nav-menu-head strong { font-size:16px !important; font-weight:750; display:block; }
+                .ep-nav-menu-head small { font-size:12px !important; color:#D7DDCF; display:block; margin-top:3px; }
+                .ep-nav-menu-group { padding:10px; }
+                .ep-nav-menu-title { font-size:11px !important; font-weight:800; letter-spacing:.13em; text-transform:uppercase; padding:5px 11px 7px; color:#C86C42; }
+                .ep-nav-menu-link { display:flex; align-items:center; justify-content:space-between; min-height:39px; padding:9px 11px; border-radius:11px; color:#202421; font-size:14px !important; font-weight:600; line-height:1.25; text-decoration:none; gap:12px; }
+                .ep-nav-menu-link:hover,.ep-nav-menu-active { background:#DCE5D9; color:#173F35; }
+                .ep-nav-menu-arrow { transform:rotate(180deg); color:#8A9D8E; flex-shrink:0; }
+                .ep-nav-menu-divider { height:1px; background:#D7DDCF; margin:1px 11px; }
+                .ep-nav-menu-footer { padding:10px 12px 12px; border-top:1px solid #D7DDCF; }
+                .ep-nav-logout { display:flex; width:100%; align-items:center; gap:10px; border:0; border-radius:11px; padding:11px; text-align:left; background:transparent; color:#9A4328; font-size:14px !important; font-weight:700; cursor:pointer; }
+                .ep-nav-logout:hover { background:#F4DED5; }
+                .ep-nav-guest-cta { min-width:99px; height:42px; background:#173F35; color:#F7F6F2; border-radius:13px; padding:0 15px; display:flex; gap:7px; align-items:center; justify-content:center; font-size:14px !important; font-weight:750; white-space:nowrap; text-decoration:none; }
+                .ep-nav-guest-cta:hover { background:#245447; }
+                .ep-nav-guest-pop { left:0; right:auto; width:248px; padding:7px; }
+                .ep-nav-modal-location { display:none; } .ep-nav-mobile-collapsible { display:flex; flex-shrink:0; }
+                @media (max-width:1150px) { .ep-nav-logo img { width:143px; } .ep-nav-location-inline { width:160px; } .ep-nav-end { gap:7px; } .ep-nav-inner { padding:0 16px; } }
+                @media (max-width:760px) { .ep-nav-inner { min-height:60px; padding:0 11px; } .ep-nav-logo img { width:112px; max-height:22px; filter:saturate(1.85) contrast(1.36) brightness(.82); } .ep-nav-logo span { display:none; } .ep-nav-icon { width:37px; height:37px; border-radius:12px; } .ep-nav-location-inline { display:none; } .ep-nav-mobile-location { display:block; } .ep-nav-account { padding:3px; height:40px; border-radius:16px; } .ep-nav-avatar { width:32px; height:32px; } .ep-nav-userlines,.ep-nav-account-chevron { display:none; } .ep-nav-guest-cta { min-width:78px; height:38px; padding:0 10px; border-radius:11px; font-size:13px !important; } .ep-nav-end { gap:5px; } .ep-nav-start { gap:5px; } .ep-nav-left-notification > a { width:37px; height:37px; border-radius:12px; } .ep-nav-search-panel { position:fixed; left:12px; right:12px; top:66px; width:auto; max-height:calc(100dvh - 82px); overflow-y:auto; } .ep-nav-pop { top:calc(100% + 9px); } .ep-nav-modal-location { display:block; padding:10px 10px 6px; } .ep-nav-mobile-collapsible { display:none; } }
+                @media (max-width:430px) { .ep-nav-logo img { width:83px; } .ep-nav-icon { width:32px; height:32px; border-radius:10px; } .ep-nav-start { gap:3px; } .ep-nav-left-notification > a { width:32px; height:32px; border-radius:10px; } .ep-nav-food-glyph { width:24px; height:24px; } .ep-nav-guest-cta { min-width:68px; padding:0 7px; } .ep-nav-mobile-location { display:none; } .ep-nav-inner { padding:0 9px; } .ep-nav-end { gap:4px; } .ep-nav-account-pop { width:min(292px,calc(100vw - 20px)); } .ep-nav-search-panel { left:8px; right:8px; width:auto; } .ep-nav-search-heading { padding:17px 16px 14px; } .ep-nav-search-form { margin:13px 12px 8px; gap:7px; padding-left:9px; } .ep-nav-search-form button { padding:10px 9px; } .ep-nav-search-discovery { padding:8px 12px 15px; } }
+                @media (min-width:761px) and (max-width:950px) { .ep-nav-logo { left:50%; } .ep-nav-location-inline { display:none; } .ep-nav-mobile-location { display:block; } .ep-nav-mobile-collapsible { display:none; } .ep-nav-username { max-width:70px; } }
+                @media (prefers-reduced-motion:reduce) { .ep-nav-root * { transition-duration:0.01ms !important; animation-duration:0.01ms !important; } }
+            `}</style>
+            <div className="ep-nav-inner">
+                <div className="ep-nav-start">
+                    <div className="ep-nav-pop-anchor" ref={guestMenuRef}>
                         <button
                             type="button"
-                            onClick={() =>
-                                setMenuOpen(
-                                    (
-                                        value,
-                                    ) =>
-                                        !value,
-                                )
-                            }
-                            className="focus-ring ml-auto grid size-11 place-items-center rounded-xl border border-stone-200 bg-white text-stone-700 lg:hidden"
-                            aria-expanded={
-                                menuOpen
-                            }
-                            aria-label={
-                                menuOpen
-                                    ? 'Close menu'
-                                    : 'Open menu'
-                            }
-                        >
-                            {menuOpen ? (
-                                <X
-                                    size={20}
-                                    aria-hidden="true"
-                                />
-                            ) : (
-                                <Menu
-                                    size={20}
-                                    aria-hidden="true"
-                                />
-                            )}
-                        </button>
-                    </div>
-  
-                    <div className="mt-1.5 grid grid-cols-2 gap-2">
-                        <div className="relative">
-                            <SearchBar
-                                value={
-                                    currentQuery
-                                }
-                                onSubmit={
-                                    handleSearch
-                                }
-                                compact
-                            />
-
-                            {renderNavbarSearchResults()}
-                        </div>
-
-                        <NavbarLocationStatus />
-                    </div>
-                </div>
-  
-                <div
-                    ref={mobileUtilityRef}
-                    className="relative md:hidden"
-                >
-                    <motion.div
-                        initial={false}
-                        animate={{
-                            height:
-                                mobileCompact && isMobileCompactPage
-                                    ? 52
-                                    : 60,
-                        }}
-                        transition={{
-                            duration: 0.28,
-                            ease: [0.22, 1, 0.36, 1],
-                        }}
-                        className="flex w-full items-center"
-                    >
-                        <Link
-                            to="/"
+                            className="ep-nav-icon ep-nav-food-menu"
+                            aria-label={menuOpen ? 'Close EPANTRY food menu' : 'Open EPANTRY food menu'}
+                            aria-expanded={menuOpen}
+                            aria-haspopup="menu"
                             onClick={() => {
-                                setMenuOpen(false);
-                                setMobileLocationOpen(false);
-                                setMobileSearchOpen(false);
+                                setMenuOpen((open) => !open);
+                                setSearchPopoverOpen(false);
+                                setLocationPopoverOpen(false);
+                                setAccountMenuOpen(false);
                             }}
-                            className="focus-ring flex shrink-0 items-center gap-1.5 rounded-[15px]"
-                            aria-label="EPANTRY home"
                         >
-                            <img
-                                src="/branding/epantry-wordmark.webp"
-                                alt="EPANTRY.in"
-                                width={1636}
-                                height={265}
-                                className="block h-auto w-[124px] max-w-full object-contain"
-                                decoding="async"
-                            />
-                        </Link>
-
-                        <div className="ml-auto flex items-center gap-1.5">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setMobileSearchOpen((value) => !value);
-                                    setMobileLocationOpen(false);
-                                    setMenuOpen(false);
-                                }}
-                                className={[
-                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
-                                    mobileSearchOpen
-                                        ? 'border-emerald-200/80 bg-emerald-50/90 text-emerald-800'
-                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
-                                ].join(' ')}
-                                aria-label="Search EPANTRY"
-                                aria-expanded={mobileSearchOpen}
-                            >
-                                <Search
-                                    size={17}
-                                    strokeWidth={2.15}
-                                    aria-hidden="true"
-                                />
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setMobileLocationOpen((value) => !value);
-                                    setMobileSearchOpen(false);
-                                    setMenuOpen(false);
-                                }}
-                                className={[
-                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
-                                    mobileLocationOpen
-                                        ? 'border-emerald-200/80 bg-emerald-50/90 text-emerald-800'
-                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
-                                ].join(' ')}
-                                aria-label="Choose location"
-                                aria-expanded={mobileLocationOpen}
-                            >
-                                <MapPin
-                                    size={17}
-                                    strokeWidth={2.15}
-                                    aria-hidden="true"
-                                />
-                            </button>
-
-                            {showMobileCartIcon ? (
-                                <Link
-                                    to={cartNavigation.href}
-                                    onClick={() => {
-                                        setMobileLocationOpen(false);
-                                        setMobileSearchOpen(false);
-                                        setMenuOpen(false);
-                                    }}
-                                    className="focus-ring relative grid size-9 shrink-0 place-items-center rounded-[14px] border border-white/75 bg-white/58 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition hover:bg-white/80 hover:text-stone-950"
-                                    aria-label={`Open cart with ${cartNavigation.count} item${cartNavigation.count === 1 ? '' : 's'}`}
-                                    title="Cart"
+                            {menuOpen ? <X size={19} aria-hidden="true" /> : (
+                                <span className="ep-nav-food-glyph" aria-hidden="true">
+                                    {MENU_ICON_IMAGES.map((src, index) => (
+                                        <img
+                                            key={src}
+                                            src={src}
+                                            alt=""
+                                            aria-hidden="true"
+                                            loading="eager"
+                                            decoding="async"
+                                            className={index === menuIconIndex ? 'is-active' : ''}
+                                            onError={(event) => {
+                                                // Preserve visibility until PNG originals are converted.
+                                                const image = event.currentTarget;
+                                                if (src.endsWith('.webp') && !image.dataset.fallbackTried) {
+                                                    image.dataset.fallbackTried = 'true';
+                                                    image.src = src.replace(/\.webp$/, '.png');
+                                                }
+                                            }}
+                                        />
+                                    ))}
+                                </span>
+                            )}
+                        </button>
+                        <AnimatePresence>
+                            {menuOpen && (
+                                <motion.div
+                                    className="ep-nav-pop ep-nav-guest-pop"
+                                    role="menu"
+                                    aria-label="Explore EPANTRY"
+                                    initial={{ opacity: 0, y: -6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -6 }}
+                                    transition={{ duration: .17 }}
                                 >
-                                    <ShoppingCart
-                                        size={17}
-                                        strokeWidth={2.1}
-                                        aria-hidden="true"
-                                    />
+                                    <div className="ep-nav-food-menu-head">
+                                        <Leaf size={17} aria-hidden="true" />
+                                        <span>Explore good food</span>
+                                    </div>
+                                    {publicLinks.map((item) => menuLink(item, () => setMenuOpen(false)))}
+                                    {showUniversalBackButton && (
+                                        <button
+                                            type="button"
+                                            className="ep-nav-menu-link ep-nav-menu-back"
+                                            role="menuitem"
+                                            onClick={() => { setMenuOpen(false); handleUniversalBack(); }}
+                                        ><span>Go back</span><ArrowLeft size={15} aria-hidden="true" /></button>
+                                    )}
+                                    <div className="ep-nav-modal-location"><NavbarLocationStatus /></div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
 
-                                    <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-emerald-700 px-1 text-[8px] font-black leading-none text-white shadow-sm">
-                                        {cartNavigation.count > 99
-                                            ? '99+'
-                                            : cartNavigation.count}
-                                    </span>
-                                </Link>
-                            ) : showMobileTrackIcon ? (
-                                <Link
-                                    to={`/orders/${encodeURIComponent(
-                                        String(
-                                            activeTrackingOrderId,
-                                        ),
-                                    )}`}
-                                    onClick={() => {
-                                        setMobileLocationOpen(false);
-                                        setMobileSearchOpen(false);
-                                        setMenuOpen(false);
-                                    }}
-                                    className="focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border border-white/75 bg-white/58 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition hover:bg-white/80 hover:text-stone-950"
-                                    aria-label="Track current order"
-                                    title="Track order"
-                                >
-                                    <Truck
-                                        size={17}
-                                        strokeWidth={2.1}
-                                        aria-hidden="true"
-                                    />
-                                </Link>
-                            ) : null}
-
-                            {showMobileNotificationIcon ? (
-                                <Link
-                                    to="/notifications"
-                                    onClick={() => {
-                                        setMobileLocationOpen(false);
-                                        setMobileSearchOpen(false);
-                                        setMenuOpen(false);
-                                    }}
-                                    className="focus-ring relative grid size-9 shrink-0 place-items-center rounded-[14px] border border-white/75 bg-white/58 text-stone-700 shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition hover:bg-white/80 hover:text-stone-950"
-                                    aria-label={`Notifications, ${unreadNotificationCount} unread`}
-                                    title="Notifications"
-                                >
-                                    <Bell
-                                        size={17}
-                                        strokeWidth={2.1}
-                                        aria-hidden="true"
-                                    />
-
-                                    <span className="absolute -right-1 -top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[8px] font-black leading-none text-white shadow-sm">
-                                        {unreadNotificationCount > 99
-                                            ? '99+'
-                                            : unreadNotificationCount}
-                                    </span>
-                                </Link>
-                            ) : null}
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setMenuOpen((value) => !value);
-                                    setMobileLocationOpen(false);
-                                    setMobileSearchOpen(false);
-                                }}
-                                className={[
-                                    'focus-ring grid size-9 shrink-0 place-items-center rounded-[14px] border shadow-[0_7px_18px_rgba(28,25,23,0.10)] backdrop-blur-xl transition',
-                                    menuOpen
-                                        ? 'border-stone-300/80 bg-stone-950 text-white'
-                                        : 'border-white/75 bg-white/58 text-stone-700 hover:bg-white/80 hover:text-stone-950',
-                                ].join(' ')}
-                                aria-expanded={menuOpen}
-                                aria-label={
-                                    menuOpen
-                                        ? 'Close menu'
-                                        : 'Open menu'
-                                }
-                            >
-                                {menuOpen ? (
-                                    <X
-                                        size={17}
-                                        strokeWidth={2.1}
-                                        aria-hidden="true"
-                                    />
-                                ) : (
-                                    <Menu
-                                        size={18}
-                                        strokeWidth={2.1}
-                                        aria-hidden="true"
-                                    />
-                                )}
-                            </button>
-                        </div>
-                    </motion.div>
-
-                    <AnimatePresence>
-                        {mobileLocationOpen ? (
-                            <motion.div
-                                initial={{ opacity: 0, y: -6, scale: 0.985 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -5, scale: 0.99 }}
-                                transition={{
-                                    duration: 0.18,
-                                    ease: [0.22, 1, 0.36, 1],
-                                }}
-                                className="absolute left-0 right-0 top-[calc(100%+7px)] z-[78] rounded-[22px] border border-white/75 bg-white/62 p-2 shadow-[0_18px_45px_rgba(28,25,23,0.15)] backdrop-blur-2xl"
-                            >
-                                <NavbarLocationStatus />
-                            </motion.div>
-                        ) : null}
-                    </AnimatePresence>
-
-                    <AnimatePresence>
-                        {mobileSearchOpen ? (
-                            <motion.div
-                                initial={{ opacity: 0, y: -6, scale: 0.985 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -5, scale: 0.99 }}
-                                transition={{
-                                    duration: 0.18,
-                                    ease: [0.22, 1, 0.36, 1],
-                                }}
-                                className="absolute left-0 right-0 top-[calc(100%+7px)] z-[78] rounded-[22px] border border-white/75 bg-white/62 p-2 shadow-[0_18px_45px_rgba(28,25,23,0.15)] backdrop-blur-2xl"
-                            >
-                                <div className="relative">
-                                    <SearchBar
-                                        value={currentQuery}
-                                        onSubmit={handleSearch}
-                                        compact
-                                    />
-
-                                    {renderNavbarSearchResults()}
-                                </div>
-                            </motion.div>
-                        ) : null}
-                    </AnimatePresence>
-                </div>
-
-                <div className="md:hidden">
-                    <NavbarLocationStatus mobileStripOnly />
-                </div>
-  
-                <AnimatePresence>
-                    {menuOpen && (
-                        <motion.div
-                            initial={{
-                                opacity:
-                                    0,
-
-                                y:
-                                    -10,
-
-                                scale:
-                                    0.985,
-                            }}
-                            animate={{
-                                opacity:
-                                    1,
-
-                                y:
-                                    0,
-
-                                scale:
-                                    1,
-                            }}
-                            exit={{
-                                opacity:
-                                    0,
-
-                                y:
-                                    -8,
-
-                                scale:
-                                    0.99,
-                            }}
-                            transition={{
-                                duration:
-                                    0.22,
-
-                                ease: [
-                                    0.22,
-                                    1,
-                                    0.36,
-                                    1,
-                                ],
-                            }}
-                            className="absolute right-2 top-[calc(100%+8px)] z-[80] w-[48vw] min-w-[168px] max-w-[220px] overflow-hidden rounded-[24px] border border-white/90 bg-white/88 shadow-[0_26px_72px_rgba(28,25,23,0.24)] backdrop-blur-[42px] saturate-150 lg:hidden md:static md:mx-0 md:mt-0 md:w-auto md:min-w-0 md:max-w-none md:rounded-none md:border-t md:border-stone-200/60 md:bg-transparent md:shadow-none md:backdrop-blur-none md:saturate-100"
-                        >
-                            <nav
-                                className="flex max-h-[calc(100svh-110px)] flex-col gap-1.5 overflow-y-auto p-2.5 md:grid md:max-h-none md:grid-cols-3 md:gap-2 md:overflow-visible md:p-3 md:py-3"
-                                aria-label="Mobile navigation"
-                            >
-                                {navItems.map(
-                                    (
-                                        item,
-                                        index,
-                                    ) => (
-                                        <Link
-                                            key={
-                                                item.to
-                                            }
-                                            to={
-                                                item.to
-                                            }
-                                            className={[
-                                                'focus-ring',
-                                                'relative',
-                                                'flex',
-                                                'min-h-8',
-                                                'items-center',
-                                                'justify-start',
-                                                'border-b',
-                                                'border-stone-300/35',
-                                                'px-1',
-                                                'text-[10px]',
-                                                'font-black',
-                                                'tracking-[0.01em]',
-                                                'md:min-h-11',
-                                                'md:justify-center',
-                                                'md:rounded-2xl',
-                                                'md:border',
-                                                'md:px-3',
-                                                'md:text-xs',
-                                                'md:shadow-sm',
-                                                'md:backdrop-blur-md',
-                                                'transition',
-                                                index ===
-                                                navItems.length - 1 &&
-                                                navItems.length % 2 === 1
-                                                    ? 'md:col-span-1'
-                                                    : '',
-                                                isActive(
-                                                    item.to,
-                                                )
-                                                    ? 'border-emerald-700/35 text-emerald-800 md:border-emerald-700/15 md:bg-emerald-700 md:text-white'
-                                                    : 'text-stone-700 hover:text-stone-950 md:border-white/70 md:bg-white/35 md:hover:bg-white/60',
-                                            ].join(
-                                                ' ',
-                                            )}
-                                        >
-                                            {
-                                                item.label
-                                            }
-                                        </Link>
-                                    ),
-                                )}
-
-                                <div className="my-1 h-px w-full bg-gradient-to-r from-transparent via-stone-400/55 to-transparent md:col-span-3" />
-
-                                {mobileAuth}
-                            </nav>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-  
-                {logoutError && (
-                    <div
-                        className="mb-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"
-                        role="alert"
+                    <div className="ep-nav-pop-anchor ep-nav-search-anchor" ref={searchPopoverRef}
+                        onMouseEnter={() => setSearchPopoverOpen(true)}
+                        onMouseLeave={(event) => {
+                            if (!event.currentTarget.contains(document.activeElement)) setSearchPopoverOpen(false);
+                        }}
                     >
-                        <CircleAlert
-                            size={15}
-                            className="mt-0.5 shrink-0"
-                            aria-hidden="true"
-                        />
-  
-                        <span className="min-w-0 flex-1 leading-5">
-                            {
-                                logoutError
-                            }
-                        </span>
-  
                         <button
                             type="button"
-                            onClick={() =>
-                                setLogoutError(
-                                    '',
-                                )
-                            }
-                            className="focus-ring grid size-6 shrink-0 place-items-center rounded-lg text-red-700 transition hover:bg-red-100"
-                            aria-label="Dismiss sign out error"
-                        >
-                            <X
-                                size={14}
-                                aria-hidden="true"
-                            />
-                        </button>
+                            className="ep-nav-icon ep-nav-search-trigger"
+                            aria-label="Search products, brands and recipes"
+                            aria-haspopup="dialog"
+                            aria-expanded={searchPopoverOpen}
+                            onFocus={() => setSearchPopoverOpen(true)}
+                            onClick={() => {
+                                setSearchPopoverOpen(true);
+                                setMenuOpen(false);
+                                setLocationPopoverOpen(false);
+                                setAccountMenuOpen(false);
+                            }}
+                        ><Search size={19} aria-hidden="true" /></button>
+                        <AnimatePresence>
+                            {searchPopoverOpen && (
+                                <motion.div
+                                    className="ep-nav-pop ep-nav-search-panel"
+                                    role="dialog"
+                                    aria-label="Search EPANTRY"
+                                    initial={{ opacity: 0, y: -7 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -7 }}
+                                    transition={{ duration: .16 }}
+                                >
+                                    <div className="ep-nav-search-heading">
+                                        <div>
+                                            <span className="ep-nav-search-eyebrow">EPANTRY SEARCH</span>
+                                            <strong>Find something good.</strong>
+                                        </div>
+                                        <button type="button" className="ep-nav-search-dismiss"
+                                            onClick={() => setSearchPopoverOpen(false)} aria-label="Close search"><X size={18} /></button>
+                                    </div>
+                                    <form onSubmit={submitHeaderSearch} role="search" className="ep-nav-search-form">
+                                        <Search size={19} aria-hidden="true" />
+                                        <input
+                                            type="search"
+                                            aria-label="Search products, brands and recipes"
+                                            value={searchDraft}
+                                            onChange={(event) => setSearchDraft(event.target.value)}
+                                            placeholder="Search groceries, brands, recipes..."
+                                            autoComplete="off"
+                                        />
+                                        <button type="submit" disabled={searchDraft.trim().length < 2}>Search</button>
+                                    </form>
+                                    <div className="ep-nav-search-discovery">
+                                        <span>Or explore</span>
+                                        <div className="ep-nav-search-shortcuts">
+                                            {[
+                                                { label: 'Grocery', to: '/grocery' },
+                                                { label: 'Recipes', to: '/recipes' },
+                                                { label: 'Brands', to: '/brands' },
+                                            ].map((item) => (
+                                                <Link key={item.to} to={item.to} onClick={() => setSearchPopoverOpen(false)}>{item.label}</Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
-                )}
+
+                    <div className="ep-nav-left-notification">
+                        {isAuthenticated && !isBootstrapping ? (
+                            <NotificationBell compact />
+                        ) : (
+                            <Link to="/login" aria-label="Sign in to view notifications" title="Sign in for notifications" className="ep-nav-icon ep-nav-guest-bell">
+                                <Bell size={18} aria-hidden="true" />
+                            </Link>
+                        )}
+                    </div>
+                </div>
+
+                <Link to="/" onClick={handleBrandHome} aria-label="EPANTRY home; click to return to top" className="ep-nav-logo">
+                    <img src="/branding/epantry-wordmark.webp" alt="EPANTRY.in" width="1636" height="265" decoding="async" />
+                    <span>Food Intelligence</span>
+                </Link>
+
+                <div className="ep-nav-end">
+                    <div className="ep-nav-location-inline"><NavbarLocationStatus /></div>
+                    <div className="ep-nav-pop-anchor ep-nav-mobile-location" ref={locationPopoverRef}>
+                        <button
+                            type="button" className="ep-nav-icon" aria-label="Delivery location"
+                            aria-expanded={locationPopoverOpen}
+                            onClick={() => { setLocationPopoverOpen((v) => !v); setSearchPopoverOpen(false); setAccountMenuOpen(false); }}
+                        ><MapPin size={19} /></button>
+                        <AnimatePresence>
+                            {locationPopoverOpen && (
+                                <motion.div className="ep-nav-pop ep-nav-location-panel" initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:.16}}>
+                                    <NavbarLocationStatus />
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {isAuthenticated && showCustomerCart ? <div className="ep-nav-mobile-collapsible">{customerCartButton}</div> : null}
+
+                    {isBootstrapping ? (
+                        <span style={{width:89,height:40,borderRadius:14,background:'#D7DDCF'}} aria-label="Loading account" />
+                    ) : isAuthenticated ? (
+                        <div className="ep-nav-pop-anchor" ref={accountMenuRef}>
+                            <button
+                                type="button" className="ep-nav-account" aria-label="Open account and navigation menu"
+                                aria-haspopup="menu" aria-expanded={accountMenuOpen}
+                                onClick={() => { setAccountMenuOpen((v) => !v); setSearchPopoverOpen(false); setLocationPopoverOpen(false); }}
+                            >
+                                <span className="ep-nav-avatar">{accountInitials}</span>
+                                <span className="ep-nav-userlines">
+                                    <span className="ep-nav-username">{firstName || 'My account'}</span>
+                                    <span className="ep-nav-role">{accountRoleLabel}</span>
+                                </span>
+                                <ChevronDown size={16} className="ep-nav-account-chevron" aria-hidden="true" />
+                            </button>
+                            <AnimatePresence>
+                                {accountMenuOpen && (
+                                    <motion.div
+                                        className="ep-nav-pop ep-nav-account-pop" role="menu" aria-label="Account and website navigation"
+                                        initial={{opacity:0,y:-7}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-7}}
+                                        transition={{duration:.17}}
+                                    >
+                                        <div className="ep-nav-menu-head">
+                                            <strong>{user?.name || 'My account'}</strong>
+                                            <small>{accountRoleLabel} · EPANTRY</small>
+                                        </div>
+                                        <div className="ep-nav-menu-group">
+                                            <div className="ep-nav-menu-title">Explore</div>
+                                            {publicLinks.map((item) => menuLink(item, () => setAccountMenuOpen(false)))}
+                                        </div>
+                                        {uniqueWorkspaceLinks.length > 0 && (
+                                            <>
+                                                <div className="ep-nav-menu-divider" />
+                                                <div className="ep-nav-menu-group">
+                                                    <div className="ep-nav-menu-title">Your workspace</div>
+                                                    {uniqueWorkspaceLinks.map((item) => menuLink(item, () => setAccountMenuOpen(false)))}
+                                                </div>
+                                            </>
+                                        )}
+                                        <div className="ep-nav-menu-divider" />
+                                        <div className="ep-nav-menu-group">
+                                            <div className="ep-nav-menu-title">Account</div>
+                                            {canUseScan && !hasAdminAccess && !superAdminEnabled && menuLink({ label:'Scan', to:scanDestination }, () => setAccountMenuOpen(false))}
+                                            {isCustomerPresentation && menuLink({ label:'Community', to:'/community' }, () => setAccountMenuOpen(false))}
+                                            {isCustomerPresentation && menuLink({ label:'Learn', to:'/learn' }, () => setAccountMenuOpen(false))}
+                                            {showCustomerCart && menuLink({ label:'My cart', to:cartNavigation.href }, () => setAccountMenuOpen(false))}
+                                            {hasTrackableOrder && menuLink({ label:'Track my order', to:`/orders/${encodeURIComponent(String(activeTrackingOrderId))}` }, () => setAccountMenuOpen(false))}
+                                            {menuLink({ label:'Notifications', to:'/notifications' }, () => setAccountMenuOpen(false))}
+                                            {menuLink({ label:'Account settings', to:'/account/settings' }, () => setAccountMenuOpen(false))}
+                                            <div className="ep-nav-modal-location"><NavbarLocationStatus /></div>
+                                        </div>
+                                        {!hasAdminAccess && !superAdminEnabled && (
+                                            <div className="ep-nav-menu-footer"><ModeSwitcher compact /></div>
+                                        )}
+                                        <div className="ep-nav-menu-footer">
+                                            <button type="button" className="ep-nav-logout" onClick={handleLogout} disabled={isLoggingOut} role="menuitem">
+                                                {isLoggingOut ? <LoaderCircle size={16} className="animate-spin" /> : <LogOut size={16} />}
+                                                {isLoggingOut ? 'Signing out…' : 'Sign out'}
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    ) : (
+                        <Link to={authOffer === 'Login' ? '/login' : '/register'} className="ep-nav-guest-cta" aria-label={`${authOffer} to EPANTRY`}>
+                            <AnimatePresence mode="wait" initial={false}>
+                                <motion.span
+                                    key={authOffer}
+                                    initial={{opacity:0,y:4}}
+                                    animate={{opacity:1,y:0}}
+                                    exit={{opacity:0,y:-4}}
+                                    transition={{duration:.35}}
+                                >{authOffer}</motion.span>
+                            </AnimatePresence>
+                        </Link>
+                    )}
+                </div>
             </div>
+            {logoutError && (
+                <div role="alert" style={{padding:'9px 20px',color:'#8A361F',fontWeight:600,fontSize:14,background:'#F7E4DC'}}>
+                    {logoutError}
+                    <button type="button" onClick={() => setLogoutError('')} aria-label="Dismiss error" style={{marginLeft:14}}><X size={14} /></button>
+                </div>
+            )}
             {location.pathname === '/' && (
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute bottom-[-3px] left-0 right-0 z-[80] h-[3px] overflow-hidden"
-                    style={{ backgroundColor: '#DCE0CF' }}
-                >
-                    <span
-                        ref={landingProgressRef}
-                        className="absolute inset-0 origin-left"
-                        style={{ backgroundColor: '#C86C42', transform: 'scaleX(0)' }}
-                    />
+                <div aria-hidden="true" style={{height:3,overflow:'hidden',background:'#D7DDCF',position:'absolute',bottom:-3,left:0,right:0,zIndex:2,pointerEvents:'none'}}>
+                    <span ref={landingProgressRef} style={{display:'block',height:'100%',background:'#C86C42',transformOrigin:'left',transform:'scaleX(0)'}} />
                 </div>
             )}
         </header>
     );
-  }
+}
