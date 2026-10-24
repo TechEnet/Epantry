@@ -21,7 +21,6 @@ import {
     ScanLine,
     Settings,
     ShoppingCart,
-    Truck,
     UserRound,
     UsersRound,
     X,
@@ -87,15 +86,32 @@ import {
       'action_required_domain',
     ]);
 
-  const NON_TRACKABLE_ORDER_STATUSES =
-    new Set([
-      'draft',
-      'delivered',
-      'customer_cancelled',
-      'seller_cancelled',
-      'returned',
-      'refunded',
-    ]);
+  // Actual ParentOrder.status values (backend commerce.transaction.models.js).
+  // Payment-pending and completed/cancelled orders are not active deliveries.
+  const ACTIVE_DELIVERY_STATUSES = new Set([
+    'confirmed',
+    'partially_unavailable',
+    'delivery_failed', // Keep visible so the customer can open the order for help.
+  ]);
+
+  function isActiveCustomerDelivery(order) {
+    const id = order?.id || order?._id;
+    const status = String(order?.status || '').trim().toLowerCase();
+    return Boolean(id) && ACTIVE_DELIVERY_STATUSES.has(status);
+  }
+
+  function displayDeliveryStatus(order) {
+    const normalized = String(order?.status || '').trim().toLowerCase();
+    if (normalized === 'delivery_failed') return 'Delivery needs attention';
+    if (normalized === 'partially_unavailable') return 'Items need attention';
+    const sellerStatuses = (Array.isArray(order?.sellerProgress) ? order.sellerProgress : [])
+      .map((seller) => String(seller?.status || '').trim().toLowerCase());
+    if (sellerStatuses.includes('out_for_delivery')) return 'Out for delivery';
+    if (sellerStatuses.includes('carrier_handoff')) return 'Handed to carrier';
+    if (sellerStatuses.includes('packed')) return 'Packed';
+    if (sellerStatuses.includes('picking')) return 'Being prepared';
+    return 'Order in progress';
+  }
 
   function readSessionJson(
     key,
@@ -288,6 +304,16 @@ import {
     '/Hamburger/5.webp',
   ];
 
+  // Curated search prompts, not search results. Selecting one runs normal EPANTRY search.
+  const NAVBAR_SEARCH_IDEAS = [
+    { query: 'Butter Chicken', kind: 'Recipe' },
+    { query: 'Alphonso Mango', kind: 'Grocery' },
+    { query: 'Palak Paneer', kind: 'Recipe' },
+    { query: 'Fresh Broccoli', kind: 'Grocery' },
+    { query: 'Thai Green Curry', kind: 'Recipe' },
+    { query: 'Rolled Oats', kind: 'Grocery' },
+  ];
+
   export default function Navbar() {
     const setDeliveryContext =
         useLocationStore(
@@ -399,8 +425,12 @@ import {
     const [
         activeTrackingOrder,
         setActiveTrackingOrder,
-    ] =
-        useState(null);
+    ] = useState(null);
+
+    // All current customer deliveries (not only the first order).
+    const [activeDeliveryOrders, setActiveDeliveryOrders] = useState([]);
+    const [deliveryPopoverOpen, setDeliveryPopoverOpen] = useState(false);
+    const deliveryPopoverRef = useRef(null);
 
     const [
         unreadNotificationCount,
@@ -786,6 +816,8 @@ import {
                 setActiveTrackingOrder(
                     null,
                 );
+                setActiveDeliveryOrders([]);
+                setDeliveryPopoverOpen(false);
                 setUnreadNotificationCount(
                     0,
                 );
@@ -815,13 +847,8 @@ import {
                     const requests =
                         await Promise.allSettled([
                             showCustomerCart
-                                ? listOrders({
-                                      page: 1,
-                                      limit: 10,
-                                  })
-                                : Promise.resolve({
-                                      orders: [],
-                                  }),
+                                ? listOrders({ page: 1, limit: 50 })
+                                : Promise.resolve({ orders: [], pagination: { pages: 1 } }),
                             listHeaderNotifications({
                                 userId: user?.id || user?._id,
                                 activeMode,
@@ -849,29 +876,30 @@ import {
                                 ? ordersResult.value.orders
                                 : [];
 
-                        const activeOrder =
-                            orders.find(
-                                (order) => {
-                                    const status =
-                                        String(
-                                            order?.status ||
-                                                '',
-                                        )
-                                            .trim()
-                                            .toLowerCase();
-
-                                    return (
-                                        status &&
-                                        !NON_TRACKABLE_ORDER_STATUSES.has(
-                                            status,
-                                        )
-                                    );
-                                },
-                            ) || null;
-
-                        setActiveTrackingOrder(
-                            activeOrder,
+                        // Backend caps /orders at 50 per page. Include older active
+                        // orders too, otherwise a customer with many past orders
+                        // sees an incorrect delivery count. Bounded to 10 pages
+                        // to prevent endless header network requests.
+                        const combinedOrders = [...orders];
+                        const availablePages = Math.min(
+                            10,
+                            Math.max(1, Number(ordersResult.value?.pagination?.pages || 1)),
                         );
+                        for (let page = 2; page <= availablePages; page += 1) {
+                            if (cancelled) return;
+                            try {
+                                const nextPage = await listOrders({ page, limit: 50 });
+                                if (cancelled) return;
+                                combinedOrders.push(...(Array.isArray(nextPage?.orders) ? nextPage.orders : []));
+                            } catch {
+                                // Preserve the latest known orders if an older page fails.
+                                break;
+                            }
+                        }
+                        const deliveryOrders = combinedOrders.filter(isActiveCustomerDelivery);
+                        setActiveDeliveryOrders(deliveryOrders);
+                        const activeOrder = deliveryOrders[0] || null;
+                        setActiveTrackingOrder(activeOrder);
 
                         if (
                             activeOrder
@@ -938,12 +966,10 @@ import {
                         ) {
                             clearDeliveryContext();
                         }
-                    } else if (
-                        !showCustomerCart
-                    ) {
-                        setActiveTrackingOrder(
-                            null,
-                        );
+                    } else if (!showCustomerCart) {
+                        setActiveTrackingOrder(null);
+                        setActiveDeliveryOrders([]);
+                        setDeliveryPopoverOpen(false);
                     }
 
                     if (
@@ -1003,6 +1029,7 @@ import {
                 'epantry:notifications-changed',
                 refreshContextualActions,
             );
+            window.addEventListener('epantry:orders-changed', refreshContextualActions);
             window.addEventListener(
                 FLOATING_CART_UPDATE_EVENT,
                 refreshContextualActions,
@@ -1023,6 +1050,7 @@ import {
                     'epantry:notifications-changed',
                     refreshContextualActions,
                 );
+                window.removeEventListener('epantry:orders-changed', refreshContextualActions);
                 window.removeEventListener(
                     FLOATING_CART_UPDATE_EVENT,
                     refreshContextualActions,
@@ -1614,7 +1642,7 @@ import {
         showCustomerCart ? (
             <Link
                 to={cartNavigation.href}
-                className="focus-ring relative grid size-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                className="focus-ring ep-nav-icon ep-nav-customer-cart"
                 aria-label={
                     cartNavigation.count > 0
                         ? `Open cart with ${cartNavigation.count} item${cartNavigation.count === 1 ? '' : 's'}`
@@ -1637,15 +1665,146 @@ import {
             </Link>
         ) : null;
 
+    const activeDeliveryCount = activeDeliveryOrders.length;
+    const customerDeliveryButton = showCustomerCart && activeDeliveryCount > 0 ? (
+        <div
+            className="ep-nav-delivery-anchor"
+            ref={deliveryPopoverRef}
+            onMouseEnter={() => {
+                if (activeDeliveryCount > 1) setDeliveryPopoverOpen(true);
+            }}
+            onMouseLeave={() => setDeliveryPopoverOpen(false)}
+        >
+            <button
+                type="button"
+                className="focus-ring ep-nav-icon ep-nav-delivery-trigger"
+                aria-label={activeDeliveryCount === 1
+                    ? 'Track your active order'
+                    : `View ${activeDeliveryCount} active deliveries`}
+                title={activeDeliveryCount === 1 ? 'Track order' : `${activeDeliveryCount} active deliveries`}
+                aria-expanded={activeDeliveryCount > 1 ? deliveryPopoverOpen : undefined}
+                aria-haspopup={activeDeliveryCount > 1 ? 'dialog' : undefined}
+                onFocus={() => {
+                    if (activeDeliveryCount > 1) setDeliveryPopoverOpen(true);
+                }}
+                onClick={() => {
+                    if (activeDeliveryCount === 1) {
+                        setDeliveryPopoverOpen(false);
+                        const id = activeDeliveryOrders[0]?.id || activeDeliveryOrders[0]?._id;
+                        if (id) navigate(`/orders/${encodeURIComponent(String(id))}`);
+                    } else {
+                        setDeliveryPopoverOpen(true);
+                        setSearchPopoverOpen(false);
+                        setLocationPopoverOpen(false);
+                        setAccountMenuOpen(false);
+                    }
+                }}
+            >
+                <svg
+                    className="ep-nav-driving-scene"
+                    width="35"
+                    height="30"
+                    viewBox="0 0 44 32"
+                    fill="none"
+                    aria-hidden="true"
+                    focusable="false"
+                >
+                    {/* Road moves behind the vehicle; the count badge stays stationary. */}
+                    <path d="M2 29H42" stroke="#C0CBBE" strokeWidth="1.4" strokeLinecap="round" />
+                    <path className="ep-nav-driving-road-marks" d="M1 29H43" stroke="#819B89" strokeWidth="1.7" strokeDasharray="5 6" />
+                    <g className="ep-nav-driving-wind" stroke="#C86C42" strokeWidth="1.65" strokeLinecap="round">
+                        <path d="M2 14H7" />
+                        <path d="M0 18H5" />
+                    </g>
+                    <g className="ep-nav-driving-vehicle">
+                        <rect x="8" y="9" width="19" height="13" rx="2.4" fill="#173F35" />
+                        <path d="M27 13.5H32.5L39 19.5V22H27V13.5Z" fill="#235A49" />
+                        <path d="M29.5 15.4H32L35.8 19H29.5V15.4Z" fill="#E4EBDD" />
+                        <path d="M10.7 11.6H23.8" stroke="#B9CDB8" strokeWidth="1.15" strokeLinecap="round" opacity=".7" />
+                        <path d="M11 19.7H24" stroke="#C86C42" strokeWidth="1.2" strokeLinecap="round" />
+                        <path d="M8 22H39" stroke="#173F35" strokeWidth="1.4" strokeLinecap="round" />
+                        <g className="ep-nav-driving-wheel ep-nav-driving-wheel-back">
+                            <circle cx="15.7" cy="23" r="3.5" fill="#173F35" stroke="#F7F6F2" strokeWidth="1.1" />
+                            <path d="M15.7 20.8V25.2M13.5 23H17.9" stroke="#F7F6F2" strokeWidth=".85" strokeLinecap="round" />
+                        </g>
+                        <g className="ep-nav-driving-wheel ep-nav-driving-wheel-front">
+                            <circle cx="33" cy="23" r="3.5" fill="#173F35" stroke="#F7F6F2" strokeWidth="1.1" />
+                            <path d="M33 20.8V25.2M30.8 23H35.2" stroke="#F7F6F2" strokeWidth=".85" strokeLinecap="round" />
+                        </g>
+                    </g>
+                </svg>
+                <span className="ep-nav-delivery-count" aria-hidden="true">
+                    {activeDeliveryCount > 99 ? '99+' : activeDeliveryCount}
+                </span>
+            </button>
+            <AnimatePresence>
+                {activeDeliveryCount > 1 && deliveryPopoverOpen && (
+                    <motion.div
+                        className="ep-nav-delivery-panel"
+                        role="dialog"
+                        aria-label="Active customer deliveries"
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: .16 }}
+                    >
+                        <div className="ep-nav-delivery-head">
+                            <div>
+                                <span className="ep-nav-delivery-eyebrow">YOUR DELIVERIES</span>
+                                <strong>Orders in progress</strong>
+                            </div>
+                            <span className="ep-nav-delivery-total">{activeDeliveryCount}</span>
+                        </div>
+                        <div className="ep-nav-delivery-list">
+                            {activeDeliveryOrders.map((order) => {
+                                const id = order.id || order._id;
+                                const title = String(order.primaryItemName || '').trim()
+                                    || `Order ${String(id).slice(-6).toUpperCase()}`;
+                                return (
+                                    <Link
+                                        key={String(id)}
+                                        to={`/orders/${encodeURIComponent(String(id))}`}
+                                        className="ep-nav-delivery-row"
+                                        onClick={() => setDeliveryPopoverOpen(false)}
+                                    >
+                                        <span className="ep-nav-delivery-row-main">
+                                            <span className="ep-nav-delivery-title">{title}</span>
+                                            <span className="ep-nav-delivery-status">{displayDeliveryStatus(order)}</span>
+                                        </span>
+                                        <ArrowLeft size={16} className="ep-nav-menu-arrow" aria-hidden="true" />
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                        <Link to="/orders" className="ep-nav-delivery-all"
+                            onClick={() => setDeliveryPopoverOpen(false)}>
+                            All orders <ArrowLeft size={15} className="ep-nav-menu-arrow" aria-hidden="true" />
+                        </Link>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    ) : null;
+
     // One responsive header for all screen sizes. Account actions remain
     // governed by the existing AuthContext and route protections.
     const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
     const [searchDraft, setSearchDraft] = useState(currentQuery);
+    const [searchIdeaIndex, setSearchIdeaIndex] = useState(0);
     const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
     const [authOffer, setAuthOffer] = useState('Login');
     const searchPopoverRef = useRef(null);
     const locationPopoverRef = useRef(null);
     const guestMenuRef = useRef(null);
+
+    // Gently rotate a sample query only while search is open and unused.
+    useEffect(() => {
+        if (!searchPopoverOpen || searchDraft.trim()) return undefined;
+        const timerId = window.setInterval(() => {
+            setSearchIdeaIndex((index) => (index + 1) % NAVBAR_SEARCH_IDEAS.length);
+        }, 2900);
+        return () => window.clearInterval(timerId);
+    }, [searchPopoverOpen, searchDraft]);
 
     useEffect(() => {
         if (isAuthenticated || isBootstrapping) return undefined;
@@ -1658,6 +1817,7 @@ import {
     useEffect(() => {
         setSearchPopoverOpen(false);
         setLocationPopoverOpen(false);
+        setDeliveryPopoverOpen(false);
         setSearchDraft(currentQuery);
     }, [location.pathname, location.search]);
 
@@ -1687,6 +1847,24 @@ import {
             document.removeEventListener('keydown', onEscape);
         };
     }, [searchPopoverOpen, locationPopoverOpen, menuOpen]);
+
+    useEffect(() => {
+        if (!deliveryPopoverOpen) return undefined;
+        const onOutside = (event) => {
+            if (deliveryPopoverRef.current && !deliveryPopoverRef.current.contains(event.target)) {
+                setDeliveryPopoverOpen(false);
+            }
+        };
+        const onEscape = (event) => {
+            if (event.key === 'Escape') setDeliveryPopoverOpen(false);
+        };
+        document.addEventListener('pointerdown', onOutside);
+        document.addEventListener('keydown', onEscape);
+        return () => {
+            document.removeEventListener('pointerdown', onOutside);
+            document.removeEventListener('keydown', onEscape);
+        };
+    }, [deliveryPopoverOpen]);
 
     const handleBrandHome = (event) => {
         setMenuOpen(false);
@@ -1816,6 +1994,41 @@ import {
                 .ep-nav-left-notification { flex-shrink:0; display:flex; align-items:center; justify-content:center; }
                 .ep-nav-left-notification > a { width:42px; height:42px; border-radius:15px; border:1px solid #D7DDCF; background:#F7F6F2; display:grid; place-items:center; color:#173F35; text-decoration:none; }
                 .ep-nav-left-notification > a:hover { border-color:#B1C1B3; background:#D7DDCF; }
+                /* Customer-only left cart and active-delivery tracker. */
+                .ep-nav-customer-cart { position:relative; text-decoration:none; }
+                 .ep-nav-delivery-anchor { position:relative; flex-shrink:0; }
+                /* Pointer bridge prevents the hover menu closing over its visual gap. */
+                .ep-nav-delivery-anchor::after { content:''; position:absolute; left:0; top:100%; width:100%; height:15px; pointer-events:auto; }
+                .ep-nav-delivery-trigger { position:relative; }
+                /* Subtle driving illusion: translating road, turning wheels, vehicle suspension. */
+                .ep-nav-driving-scene { display:block; width:35px; height:30px; overflow:visible; flex-shrink:0; }
+                .ep-nav-driving-vehicle { animation:ep-nav-drive-suspension 1.75s ease-in-out infinite; }
+                .ep-nav-driving-road-marks { animation:ep-nav-drive-road .85s linear infinite; }
+                .ep-nav-driving-wheel { transform-box:view-box; animation:ep-nav-drive-wheels 1s linear infinite; }
+                .ep-nav-driving-wheel-back { transform-origin:15.7px 23px; }
+                .ep-nav-driving-wheel-front { transform-origin:33px 23px; }
+                .ep-nav-driving-wind { animation:ep-nav-drive-wind 1.35s ease-in-out infinite; }
+                @keyframes ep-nav-drive-suspension { 0%,100% { transform:translate(0,0); } 24% { transform:translate(1.4px,-.6px); } 55% { transform:translate(2px,.15px); } 78% { transform:translate(.8px,-.5px); } }
+                @keyframes ep-nav-drive-road { to { stroke-dashoffset:22; } }
+                @keyframes ep-nav-drive-wheels { to { transform:rotate(360deg); } }
+                @keyframes ep-nav-drive-wind { 0%,100% { opacity:.3; transform:translateX(2px); } 45% { opacity:.9; transform:translateX(-1px); } }
+                @media (prefers-reduced-motion:reduce) { .ep-nav-driving-vehicle,.ep-nav-driving-road-marks,.ep-nav-driving-wheel,.ep-nav-driving-wind { animation:none !important; } }
+                .ep-nav-delivery-count { position:absolute; right:-6px; top:-7px; display:grid; place-items:center; min-width:19px; height:19px; padding:0 4px; border:2px solid #F7F6F2; border-radius:999px; background:#C86C42; color:white; font-size:10px !important; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+                .ep-nav-delivery-panel { position:absolute; z-index:125; left:0; top:calc(100% + 13px); width:350px; max-width:calc(100vw - 18px); border:1px solid #D7DDCF; border-radius:17px; background:#F7F6F2; color:#202421; box-shadow:0 22px 56px rgba(23,63,53,.18); overflow:hidden; }
+                .ep-nav-delivery-head { padding:15px 17px 13px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #D7DDCF; }
+                .ep-nav-delivery-head > div { display:grid; gap:5px; }
+                .ep-nav-delivery-eyebrow { font-size:10px !important; letter-spacing:.12em; color:#A85332; font-weight:800; }
+                .ep-nav-delivery-head strong { font-size:16px !important; color:#173F35; font-weight:750; }
+                .ep-nav-delivery-total { font-size:13px !important; font-weight:750; color:#173F35; background:#D7DDCF; border-radius:9px; padding:5px 9px; }
+                .ep-nav-delivery-list { overflow-y:auto; max-height:min(45svh,290px); overscroll-behavior:contain; }
+                .ep-nav-delivery-row { padding:12px 16px; display:flex; align-items:center; gap:12px; justify-content:space-between; border-bottom:1px solid #E0E5DA; color:#202421; text-decoration:none; }
+                .ep-nav-delivery-row:hover,.ep-nav-delivery-row:focus-visible { background:#E9EDE5; }
+                .ep-nav-delivery-row-main { min-width:0; display:grid; gap:4px; }
+                .ep-nav-delivery-title { font-size:14px !important; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                .ep-nav-delivery-status { font-size:12px !important; color:#596E61; }
+                .ep-nav-delivery-all { padding:11px 16px; display:flex; align-items:center; justify-content:space-between; text-decoration:none; color:#173F35; font-size:13px !important; font-weight:750; }
+                .ep-nav-delivery-all:hover { background:#E9EDE5; }
+                .ep-nav-delivery-trigger:focus-visible,.ep-nav-delivery-row:focus-visible,.ep-nav-delivery-all:focus-visible { outline:2px solid #C86C42; outline-offset:2px; }
                 .ep-nav-search-heading { padding:21px 22px 17px; background:#173F35; color:#F7F6F2; display:flex; justify-content:space-between; align-items:flex-start; gap:15px; }
                 .ep-nav-search-heading > div { display:grid; gap:7px; }
                 .ep-nav-search-eyebrow { color:#E5B497; font-size:11px !important; font-weight:800; letter-spacing:.14em; }
@@ -1834,6 +2047,19 @@ import {
                 .ep-nav-search-shortcuts { display:flex; flex-wrap:wrap; gap:7px; }
                 .ep-nav-search-shortcuts a { text-decoration:none; color:#173F35; background:#E9EDE5; border:1px solid #D7DDCF; border-radius:8px; padding:6px 10px; font-size:13px !important; font-weight:700; }
                 .ep-nav-search-shortcuts a:hover { color:#8D462C; background:#F6E5DC; border-color:#EDCCBC; }
+                /* Six curated, clickable ideas, with gentle movement instead of a static placeholder. */
+                .ep-nav-search-ideas { padding:4px 20px 18px; border-top:1px solid #E1E7DE; }
+                .ep-nav-search-ideas-heading { display:flex; align-items:center; justify-content:space-between; padding:10px 0 3px; }
+                .ep-nav-search-ideas-heading span { font-size:11px !important; font-weight:750; letter-spacing:.08em; color:#657869; text-transform:uppercase; }
+                .ep-nav-search-ideas-heading i { display:block; width:24px; height:2px; background:#C86C42; border-radius:2px; }
+                .ep-nav-search-ideas-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 14px; }
+                .ep-nav-search-idea { display:flex; justify-content:space-between; align-items:center; gap:5px; min-width:0; padding:10px 3px; border:0; border-bottom:1px solid #E0E6DC; background:transparent; color:#264C3F; font-family:inherit; font-size:12px !important; font-weight:650; text-align:left; cursor:pointer; transition:color .2s,background .2s; animation:ep-nav-idea-appear .36s ease both; }
+                .ep-nav-search-idea span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                .ep-nav-search-idea small { flex-shrink:0; color:#8B988E; font-size:10px !important; font-weight:600; }
+                .ep-nav-search-idea:hover,.ep-nav-search-idea:focus-visible,.ep-nav-search-idea.is-current { color:#A35231; background:rgba(200,108,66,.055); }
+                .ep-nav-search-idea:focus-visible { outline:2px solid #C86C42; outline-offset:2px; }
+                @keyframes ep-nav-idea-appear { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+                @media (prefers-reduced-motion:reduce) { .ep-nav-search-idea { animation:none !important; } }
                 .ep-nav-account { display:flex; align-items:center; gap:9px; border:1px solid #D7DDCF; border-radius:22px; background:#F7F6F2; padding:5px 11px 5px 5px; height:47px; cursor:pointer; color:#173F35; text-align:left; }
                 .ep-nav-account[aria-expanded=true],.ep-nav-account:hover { background:#DDE5D8; border-color:#B8C8B7; }
                 .ep-nav-avatar { width:35px; height:35px; border-radius:50%; display:grid; place-items:center; background:#173F35; color:white; font-size:14px !important; font-weight:700; }
@@ -1899,13 +2125,15 @@ import {
                 .ep-nav-guest-pop { left:0; right:auto; width:248px; padding:7px; }
                 .ep-nav-modal-location { display:none; } .ep-nav-mobile-collapsible { display:flex; flex-shrink:0; }
                 @media (max-width:1150px) { .ep-nav-logo img { width:143px; } .ep-nav-location-inline { width:160px; } .ep-nav-end { gap:7px; } .ep-nav-inner { padding:0 16px; } }
-                @media (max-width:760px) { .ep-nav-inner { min-height:60px; padding:0 11px; } .ep-nav-logo img { width:112px; max-height:22px; filter:saturate(1.85) contrast(1.36) brightness(.82); } .ep-nav-logo span { display:none; } .ep-nav-icon { width:37px; height:37px; border-radius:12px; } .ep-nav-location-inline { display:none; } .ep-nav-mobile-location { display:block; } .ep-nav-account { padding:3px; height:40px; border-radius:16px; } .ep-nav-avatar { width:32px; height:32px; } .ep-nav-userlines,.ep-nav-account-chevron { display:none; } .ep-nav-guest-cta { min-width:78px; height:38px; padding:0 10px; border-radius:11px; font-size:13px !important; } .ep-nav-end { gap:5px; } .ep-nav-start { gap:5px; } .ep-nav-left-notification > a { width:37px; height:37px; border-radius:12px; } .ep-nav-search-panel { position:fixed; left:12px; right:12px; top:66px; width:auto; max-height:calc(100dvh - 82px); overflow-y:auto; } .ep-nav-pop { top:calc(100% + 9px); } .ep-nav-modal-location { display:block; padding:10px 10px 6px; } .ep-nav-mobile-collapsible { display:none; } }
+                @media (max-width:760px) { .ep-nav-delivery-panel { position:fixed; top:66px; left:8px; right:8px; width:auto; max-width:none; max-height:calc(100dvh - 76px); } .ep-nav-inner { min-height:60px; padding:0 11px; } .ep-nav-logo img { width:112px; max-height:22px; filter:saturate(1.85) contrast(1.36) brightness(.82); } .ep-nav-logo span { display:none; } .ep-nav-icon { width:37px; height:37px; border-radius:12px; } .ep-nav-location-inline { display:none; } .ep-nav-mobile-location { display:block; } .ep-nav-account { padding:3px; height:40px; border-radius:16px; } .ep-nav-avatar { width:32px; height:32px; } .ep-nav-userlines,.ep-nav-account-chevron { display:none; } .ep-nav-guest-cta { min-width:78px; height:38px; padding:0 10px; border-radius:11px; font-size:13px !important; } .ep-nav-end { gap:5px; } .ep-nav-start { gap:5px; } .ep-nav-left-notification > a { width:37px; height:37px; border-radius:12px; } .ep-nav-search-panel { position:fixed; left:12px; right:12px; top:66px; width:auto; max-height:calc(100dvh - 82px); overflow-y:auto; } .ep-nav-pop { top:calc(100% + 9px); } .ep-nav-modal-location { display:block; padding:10px 10px 6px; } .ep-nav-mobile-collapsible { display:none; } }
+                @media (max-width:360px) { .ep-nav-start[data-customer-actions='true'] .ep-nav-left-notification { display:none; } }
                 @media (max-width:430px) { .ep-nav-logo img { width:83px; } .ep-nav-icon { width:32px; height:32px; border-radius:10px; } .ep-nav-start { gap:3px; } .ep-nav-left-notification > a { width:32px; height:32px; border-radius:10px; } .ep-nav-food-glyph { width:24px; height:24px; } .ep-nav-guest-cta { min-width:68px; padding:0 7px; } .ep-nav-mobile-location { display:none; } .ep-nav-inner { padding:0 9px; } .ep-nav-end { gap:4px; } .ep-nav-account-pop { width:min(366px,calc(100vw - 16px)); max-height:calc(100dvh - 70px); } .ep-acc-top { min-height:73px; padding:11px 15px; } .ep-acc-tab { font-size:11px !important; padding:13px 1px 11px; } .ep-acc-section { padding:11px 16px 9px; } .ep-acc-link { min-height:40px; } .ep-acc-scroll { max-height:calc(100dvh - 207px); } .ep-nav-search-panel { left:8px; right:8px; width:auto; } .ep-nav-search-heading { padding:17px 16px 14px; } .ep-nav-search-form { margin:13px 12px 8px; gap:7px; padding-left:9px; } .ep-nav-search-form button { padding:10px 9px; } .ep-nav-search-discovery { padding:8px 12px 15px; } }
                 @media (min-width:761px) and (max-width:950px) { .ep-nav-logo { left:50%; } .ep-nav-location-inline { display:none; } .ep-nav-mobile-location { display:block; } .ep-nav-mobile-collapsible { display:none; } .ep-nav-username { max-width:70px; } }
                 @media (prefers-reduced-motion:reduce) { .ep-nav-root * { transition-duration:0.01ms !important; animation-duration:0.01ms !important; } }
             `}</style>
             <div className="ep-nav-inner">
-                <div className="ep-nav-start">
+                <div className="ep-nav-start" data-customer-actions={showCustomerCart ? 'true' : undefined}>
+                    {!isAuthenticated && !isBootstrapping && (
                     <div className="ep-nav-pop-anchor" ref={guestMenuRef}>
                         <button
                             type="button"
@@ -1973,6 +2201,7 @@ import {
                             )}
                         </AnimatePresence>
                     </div>
+                    )}
 
                     <div className="ep-nav-pop-anchor ep-nav-search-anchor" ref={searchPopoverRef}
                         onMouseEnter={() => setSearchPopoverOpen(true)}
@@ -2020,7 +2249,7 @@ import {
                                             aria-label="Search products, brands and recipes"
                                             value={searchDraft}
                                             onChange={(event) => setSearchDraft(event.target.value)}
-                                            placeholder="Search groceries, brands, recipes..."
+                                            placeholder={`Try ${NAVBAR_SEARCH_IDEAS[searchIdeaIndex].query}...`}
                                             autoComplete="off"
                                         />
                                         <button type="submit" disabled={searchDraft.trim().length < 2}>Search</button>
@@ -2034,6 +2263,30 @@ import {
                                                 { label: 'Brands', to: '/brands' },
                                             ].map((item) => (
                                                 <Link key={item.to} to={item.to} onClick={() => setSearchPopoverOpen(false)}>{item.label}</Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="ep-nav-search-ideas" aria-label="Suggested searches">
+                                        <div className="ep-nav-search-ideas-heading">
+                                            <span>Ideas to explore</span>
+                                            <i aria-hidden="true" />
+                                        </div>
+                                        <div className="ep-nav-search-ideas-grid">
+                                            {NAVBAR_SEARCH_IDEAS.map((idea, index) => (
+                                                <button
+                                                    key={idea.query}
+                                                    type="button"
+                                                    className={`ep-nav-search-idea${index === searchIdeaIndex ? ' is-current' : ''}`}
+                                                    style={{ animationDelay: `${index * 55}ms` }}
+                                                    onClick={() => {
+                                                        setSearchDraft(idea.query);
+                                                        handleSearch(idea.query);
+                                                    }}
+                                                    title={`Search ${idea.query}`}
+                                                >
+                                                    <span>{idea.query}</span>
+                                                    <small>{idea.kind}</small>
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
@@ -2051,6 +2304,8 @@ import {
                             </Link>
                         )}
                     </div>
+                    {customerCartButton}
+                    {customerDeliveryButton}
                 </div>
 
                 <Link to="/" onClick={handleBrandHome} aria-label="EPANTRY home; click to return to top" className="ep-nav-logo">
@@ -2074,8 +2329,6 @@ import {
                             )}
                         </AnimatePresence>
                     </div>
-
-                    {isAuthenticated && showCustomerCart ? <div className="ep-nav-mobile-collapsible">{customerCartButton}</div> : null}
 
                     {isBootstrapping ? (
                         <span style={{width:89,height:40,borderRadius:14,background:'#D7DDCF'}} aria-label="Loading account" />
