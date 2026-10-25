@@ -146,7 +146,7 @@ export default function LandingPage() {
   const groceryEdgeOpacity = useTransform(
     featuredDepthProgress,
     [0, 0.22, 0.7, 1],
-    shouldReduceMotion ? [0, 0, 0, 0] : [0.65, 0.85, 0.3, 0]
+    shouldReduceMotion || isSmallViewport ? [0, 0, 0, 0] : [0.65, 0.85, 0.3, 0]
   );
 
   // Finish the desktop backdrop lift before the gallery entrance.
@@ -229,12 +229,18 @@ export default function LandingPage() {
 
   useEffect(() => {
     const updateGallery = (progress) => {
-      const visible = progress >= 0.24;
-      setIsExperienceGalleryVisible((current) => current === visible ? current : visible);
+      // A small mobile-only hysteresis stops repeated enter/exit animations
+      // when a finger hovers around the gallery reveal threshold.
+      setIsExperienceGalleryVisible((current) => {
+        const visible = isSmallViewport
+          ? (current ? progress >= 0.18 : progress >= 0.23)
+          : progress >= 0.24;
+        return current === visible ? current : visible;
+      });
     };
     updateGallery(experienceScrollProgress.get());
     return experienceScrollProgress.on("change", updateGallery);
-  }, [experienceScrollProgress]);
+  }, [experienceScrollProgress, isSmallViewport]);
 
   const getCardScrollStep = () => {
     const track = experienceCarouselRef.current;
@@ -290,29 +296,6 @@ export default function LandingPage() {
           EXPLORE EPANTRY
       ============================================================= */}
 
-      {isSmallViewport && (
-        <style>{`
-          @media (max-width: 767px) {
-            @keyframes epantry-mobile-gallery-left {
-              from { transform: translate3d(0, 0, 0); }
-              to { transform: translate3d(-33.333333%, 0, 0); }
-            }
-            @keyframes epantry-mobile-gallery-right {
-              from { transform: translate3d(-33.333333%, 0, 0); }
-              to { transform: translate3d(0, 0, 0); }
-            }
-            .epantry-mobile-gallery-left {
-              animation: epantry-mobile-gallery-left 23s linear infinite;
-            }
-            .epantry-mobile-gallery-right {
-              animation: epantry-mobile-gallery-right 25s linear infinite;
-            }
-            @media (prefers-reduced-motion: reduce) {
-              .epantry-mobile-gallery-left, .epantry-mobile-gallery-right { animation: none; }
-            }
-          }
-        `}</style>
-      )}
       <div
         data-landing-story="explore"
         data-landing-stops="0.007,0.37"
@@ -455,28 +438,34 @@ export default function LandingPage() {
                     animate={{
                       opacity: isExperienceGalleryVisible ? 1 : 0,
                       // Slide each card up from below the viewport at its original size.
-                      y: isExperienceGalleryVisible || shouldReduceMotion ? "0svh" : (isSmallViewport ? "22svh" : "85svh"),
+                      // Phone: a short composited entrance avoids the old
+                      // 22svh jump and keeps native scroll momentum smooth.
+                      y: isSmallViewport
+                        ? (isExperienceGalleryVisible || shouldReduceMotion ? 0 : 16)
+                        : (isExperienceGalleryVisible || shouldReduceMotion ? "0svh" : "85svh"),
                     }}
                     transition={{
                       // The video shows overlapping entrances: each starts while
                       // the previous card is still rising; all settle in ~0.9s.
                       y: {
                         type: "tween",
-                        duration: shouldReduceMotion ? 0 : (isSmallViewport ? 0.38 : 0.52),
-                        delay: shouldReduceMotion || !isExperienceGalleryVisible ? 0 : index * (isSmallViewport ? 0.07 : 0.18),
+                        duration: shouldReduceMotion ? 0 : (isSmallViewport ? 0.3 : 0.52),
+                        delay: shouldReduceMotion || !isExperienceGalleryVisible ? 0 : index * (isSmallViewport ? 0.045 : 0.18),
                         ease: [0.2, 0.8, 0.3, 1],
                       },
-                      // A card is fully visible as soon as it rises onscreen.
-                      opacity: { duration: 0 },
+                      opacity: {
+                        duration: shouldReduceMotion ? 0 : (isSmallViewport ? 0.24 : 0),
+                        delay: shouldReduceMotion || !isExperienceGalleryVisible ? 0 : index * (isSmallViewport ? 0.045 : 0),
+                      },
                     }}
                     className="relative h-[min(55svh,460px)] min-h-[320px] w-[64vw] max-w-[270px] shrink-0 snap-start md:h-[min(67svh,600px)] md:min-h-[390px] md:w-[29vw] md:max-w-[370px] lg:h-[min(72svh,670px)] lg:w-[28vw] lg:max-w-[410px]"
                   >
                     <Link
                       to={category.path}
                       tabIndex={isExperienceGalleryVisible ? 0 : -1}
-                      className="focus-ring group relative block h-full w-full overflow-hidden rounded-[14px] bg-[#111111] shadow-[0_34px_95px_rgba(0,0,0,0.44),0_8px_22px_rgba(0,0,0,0.20)] outline-none transition-transform duration-500 hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-white sm:rounded-[16px]"
+                      className={`focus-ring group relative block h-full w-full overflow-hidden rounded-[14px] bg-[#111111] outline-none transition-transform duration-500 hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-white sm:rounded-[16px] ${isSmallViewport ? "shadow-[0_12px_32px_rgba(0,0,0,0.25)]" : "shadow-[0_34px_95px_rgba(0,0,0,0.44),0_8px_22px_rgba(0,0,0,0.20)]"}`}
                     >
-                      <ExperienceCardFront category={category} />
+                      <ExperienceCardFront category={category} lowPower={isSmallViewport} />
                     </Link>
 
                     {/* Keep the existing subtle floor reflection on desktop. */}
@@ -569,9 +558,10 @@ function ExperienceBackdropRow({
   shouldReduceMotion,
   lowPower = false,
 }) {
-  // Three short, identical mobile groups keep the full viewport covered
-  // throughout the seamless -33.333% loop, including wider phones.
-  const repeatedGroups = ["copy-a", "copy-b", "copy-c"];
+  // On mobile, lightweight static imagery replaces the perpetual marquee.
+  // Static backdrop on phones: 18 tiles instead of 27 continually
+  // translating image tiles behind the main cards.
+  const repeatedGroups = lowPower ? ["copy-a", "copy-b"] : ["copy-a", "copy-b", "copy-c"];
   const sequence = lowPower ? row.sequence.slice(0, 3) : row.sequence;
 
   const startsLeft = lowPower || row.direction === "left";
@@ -602,13 +592,7 @@ function ExperienceBackdropRow({
                 repeat: Infinity,
               }
         }
-        className={`flex w-max items-center [will-change:transform] ${
-          lowPower && !shouldReduceMotion
-            ? startsLeft
-              ? "epantry-mobile-gallery-left"
-              : "epantry-mobile-gallery-right"
-            : ""
-        }`}
+        className={lowPower ? "flex w-max items-center" : "flex w-max items-center [will-change:transform]"}
       >
         {repeatedGroups.map((groupId) => (
           <div
@@ -675,7 +659,7 @@ function ExperienceBackdropTile({
   );
 }
 
-function ExperienceCardFront({ category }) {
+function ExperienceCardFront({ category, lowPower = false }) {
   const reduceMotion = useReducedMotion();
 
   return (
@@ -695,8 +679,8 @@ function ExperienceCardFront({ category }) {
           <motion.span
             aria-hidden="true"
             className="relative top-[3px] inline-flex shrink-0 items-center sm:top-[4px]"
-            animate={reduceMotion ? undefined : { x: [0, 5, 0] }}
-            transition={reduceMotion ? undefined : { duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+            animate={reduceMotion || lowPower ? undefined : { x: [0, 5, 0] }}
+            transition={reduceMotion || lowPower ? undefined : { duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
           >
             <ArrowRight size={20} />
           </motion.span>
