@@ -1074,69 +1074,25 @@ function FeaturedDiscoverySection({
           .ep-brand-motion__row { padding:12px 0; }
           .ep-brand-motion__name small { font-size:12px; }
 
-          /* Mobile-only: turn the clipped moving marquees into a stable,
-             readable two-column brand index. No desktop/tablet changes. */
-          .ep-featured-story--brands .ep-brand-motion {
-            height:auto; min-height:100svh; overflow:visible;
-            display:flex; flex-direction:column;
-            padding:clamp(86px,12svh,112px) 14px 28px;
-          }
+          /* Mobile-only: keep the original moving brand rows intact.
+             Align only the filters and Explore Brands action below the heading. */
           .ep-featured-story--brands .ep-brand-motion__head {
-            position:relative; inset:auto; top:auto; left:auto; right:auto;
-            flex:0 0 auto; display:flex; flex-direction:column;
-            align-items:stretch; gap:14px; width:100%; padding:0 2px 18px;
-          }
-          .ep-featured-story--brands .ep-brand-motion__head h2 {
-            font-size:clamp(29px,8vw,36px) !important;
-            line-height:1.08 !important; text-wrap:balance;
-          }
-          .ep-featured-story--brands .ep-brand-motion__head p {
-            font-size:12px !important; margin-bottom:8px;
+            align-items:flex-start;
           }
           .ep-featured-story--brands .ep-brand-motion__actions {
-            width:100%; display:flex; flex-wrap:wrap; align-items:center;
-            justify-content:space-between; gap:8px;
+            width:100%; min-width:0;
+            display:flex; flex-wrap:nowrap;
+            align-items:center; justify-content:space-between;
+            gap:8px;
           }
           .ep-featured-story--brands .ep-brand-motion__filters {
-            flex:1 1 auto; min-width:0; gap:6px;
+            display:flex; flex:0 1 auto; min-width:0; gap:6px;
+            overflow-x:auto; scrollbar-width:none;
           }
           .ep-featured-story--brands .ep-brand-motion__all {
-            flex:0 0 auto; white-space:nowrap; padding:9px 11px;
-            min-height:39px; font-size:12px !important;
-          }
-          .ep-featured-story--brands .ep-brand-motion__row--sage,
-          .ep-featured-story--brands .ep-brand-motion__mobile-row { display:none !important; }
-          .ep-featured-story--brands .ep-brand-motion__row--first {
-            position:relative; inset:auto; top:auto; left:auto; right:auto;
-            width:100%; overflow:visible; min-height:0;
-            -webkit-mask-image:none; mask-image:none;
-            flex:1 0 auto; padding:0; background:transparent;
-          }
-          .ep-featured-story--brands .ep-brand-motion__row--first .ep-brand-motion__track {
-            display:block; width:100%; min-width:0; transform:none !important;
-            animation:none !important; will-change:auto;
-          }
-          .ep-featured-story--brands .ep-brand-motion__row--first .ep-brand-motion__sequence:first-child {
-            display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
-            grid-auto-rows:minmax(106px,auto); gap:2px 12px;
-            width:100%; padding:0; margin:0; align-items:stretch;
-          }
-          .ep-featured-story--brands .ep-brand-motion__row--first .ep-brand-motion__sequence[aria-hidden="true"] {
-            display:none !important;
-          }
-          .ep-featured-story--brands .ep-brand-motion__row--first .ep-brand-motion__name {
-            width:100%; max-width:100%; min-width:0; min-height:106px;
-            margin:0; padding:14px 5px; gap:7px;
-            justify-content:center; align-items:center; text-align:center;
-            border-bottom:1px solid #D7DDCF;
-          }
-          .ep-featured-story--brands .ep-brand-motion__row--first .ep-brand-motion__name strong {
-            font-size:clamp(18px,5.3vw,23px) !important;
-            line-height:1.14 !important; letter-spacing:-.025em;
-            overflow-wrap:anywhere; text-wrap:balance;
-          }
-          .ep-featured-story--brands .ep-brand-motion__row--first .ep-brand-motion__name small {
-            font-size:12px !important; line-height:1.35;
+            margin-left:auto; flex:0 0 auto; white-space:nowrap;
+            padding:8px 10px; min-height:38px;
+            font-size:12px !important;
           }
         }
         /* Match the approved Grocery single-viewport gallery at all heights. */
