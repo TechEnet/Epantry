@@ -61,326 +61,11 @@ const EXPERIENCE_BACKDROP_ROWS = [
 ];
 
 export default function LandingPage() {
-  // Only touch screens use the guided story navigation. Desktop/trackpad
-  // must keep native wheel, keyboard and momentum scrolling: intercepting
-  // those events previously made the page feel locked.
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-    const mobileQuery = window.matchMedia("(max-width: 767px)");
-    if (!mobileQuery.matches) return undefined;
-
-    let touchStart = null;
-    let heldStop = null;
-    let busyUntil = 0;
-    let groceryScrollingUntil = 0;
-    let recipeScrollingUntil = 0;
-    let guidedScrollFrame = null;
-    let restoreGuidedScrollBehavior = null;
-
-    // Explore and Featured Grocery use one interruptible touch transition.
-    // Other landing stories keep their existing navigation untouched.
-    const stopGuidedScroll = () => {
-      if (guidedScrollFrame !== null) {
-        window.cancelAnimationFrame(guidedScrollFrame);
-        guidedScrollFrame = null;
-      }
-      if (restoreGuidedScrollBehavior) {
-        restoreGuidedScrollBehavior();
-        restoreGuidedScrollBehavior = null;
-      }
-    };
-
-    const scrollGuidedTo = (target, stepCount, isGrocery = false) => {
-      stopGuidedScroll();
-      if (isGrocery) {
-        // Browser-native smooth scroll avoids a JS scrollTo call every frame.
-        // Explicitly requesting a new target also interrupts a previous flick.
-        window.scrollTo({
-          top: target,
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "instant" : "smooth",
-        });
-        return;
-      }
-      // The global page CSS sets scroll-behavior: smooth. Override it only
-      // during this gesture, so each individual frame moves immediately on
-      // mobile Safari as well as Chromium without double-easing.
-      const root = document.documentElement;
-      const previousBehavior = root.style.scrollBehavior;
-      root.style.scrollBehavior = "auto";
-      restoreGuidedScrollBehavior = () => {
-        root.style.scrollBehavior = previousBehavior;
-      };
-
-      const from = window.scrollY;
-      const distance = target - from;
-      if (
-        Math.abs(distance) < 2 ||
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ) {
-        window.scrollTo(0, target);
-        restoreGuidedScrollBehavior();
-        restoreGuidedScrollBehavior = null;
-        return;
-      }
-
-      const duration = isGrocery
-        ? Math.min(590, 370 + (stepCount - 1) * 70)
-        : Math.min(620, 440 + (stepCount - 1) * 90);
-      let startTime = null;
-      const tick = (time) => {
-        if (startTime === null) startTime = time;
-        const progress = Math.min((time - startTime) / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        window.scrollTo(0, Math.round(from + distance * eased));
-        if (progress < 1) {
-          guidedScrollFrame = window.requestAnimationFrame(tick);
-        } else {
-          guidedScrollFrame = null;
-          if (restoreGuidedScrollBehavior) {
-            restoreGuidedScrollBehavior();
-            restoreGuidedScrollBehavior = null;
-          }
-        }
-      };
-      guidedScrollFrame = window.requestAnimationFrame(tick);
-    };
-
-    const stories = () =>
-      Array.from(document.querySelectorAll("[data-landing-story]"))
-        .map((node) => {
-          const stops = (node.dataset.landingStops || "")
-            .split(",")
-            .map(Number)
-            .filter(Number.isFinite);
-          const rect = node.getBoundingClientRect();
-          const sticky = node.querySelector("[data-landing-sticky]");
-          const start = window.scrollY + rect.top;
-          const height =
-            sticky?.getBoundingClientRect().height || window.innerHeight;
-          const travel =
-            (node.dataset.landingStory === "grocery" ||
-              node.dataset.landingStory === "recipes")
-              // The final Grocery/Recipes viewport is covered by the next hero.
-              // Release touch gestures to the incoming story at its start.
-              ? Math.max(rect.height - height, 1)
-              : node.dataset.landingStatic === "true"
-                ? rect.height
-                : Math.max(rect.height - height, 1);
-          return { node, start, travel, stops };
-        })
-        .filter((item) => item.stops.length > 0)
-        .sort((left, right) => left.start - right.start);
-
-    const currentStory = (y) =>
-      stories().find(
-        (item) => y >= item.start - 12 && y < item.start + item.travel - 8
-      );
-
-    const ignoreGesture = (target) => {
-      if (!(target instanceof Element)) return false;
-      if (
-        target.closest(
-          'input,textarea,select,[contenteditable="true"],[role="dialog"],[data-landing-scroll-ignore]'
-        )
-      )
-        return true;
-      for (let el = target; el && el !== document.body; el = el.parentElement) {
-        if (el.scrollHeight > el.clientHeight + 4) {
-          const overflow = window.getComputedStyle(el).overflowY;
-          if (overflow === "auto" || overflow === "scroll") return true;
-        }
-      }
-      return false;
-    };
-
-    const advance = (direction, storySteps = 1) => {
-      if (!mobileQuery.matches) return;
-      const now = performance.now();
-      const all = stories();
-      const story = all.find(
-        (item) =>
-          window.scrollY >= item.start - 12 &&
-          window.scrollY < item.start + item.travel - 8
-      );
-      if (!story) return;
-
-      const { node, start, travel, stops } = story;
-      const isExplore = node.dataset.landingStory === "explore";
-      const isGrocery = node.dataset.landingStory === "grocery";
-      const isRecipe = node.dataset.landingStory === "recipes";
-      const isGuided = isExplore || isGrocery || isRecipe;
-      // Keep the original cooldown for Brands; recipe gestures now behave
-      // like the already-approved mobile Grocery navigation.
-      if (!isGuided && now < busyUntil) return;
-      const positions = stops.map((stop) => start + stop * travel);
-      const y = window.scrollY;
-      const nearest = positions.reduce(
-        (best, pos, index) =>
-          Math.abs(pos - y) < Math.abs(positions[best] - y) ? index : best,
-        0
-      );
-      const steps = isGuided ? storySteps : 1;
-      let next = nearest + direction * steps;
-      if (
-        heldStop?.node === node &&
-        (Math.abs(heldStop.y - y) < 140 ||
-          (isGuided && guidedScrollFrame !== null) ||
-          (isGrocery && now < groceryScrollingUntil) ||
-          (isRecipe && now < recipeScrollingUntil))
-      ) {
-        next = heldStop.index + direction * steps;
-      } else if (direction > 0 && y < positions[0] - 16) {
-        // Grocery has no intro stage: enter at its first card.
-        next = isExplore ? Math.min(positions.length - 1, steps) : 0;
-      } else if (direction < 0 && y > positions[positions.length - 1] + 16) {
-        next = positions.length - 1;
-      }
-      // Fast flicks in Grocery/Recipes remain contained within their stories.
-      if (isGuided && steps > 1) {
-        next = Math.min(positions.length - 1, Math.max(0, next));
-      }
-
-      let target;
-      if (next < 0) {
-        const previous = [...all]
-          .reverse()
-          .find((item) => item.start < start - 10);
-        target = previous
-          ? previous.start +
-            previous.stops[previous.stops.length - 1] * previous.travel
-          : start - Math.min(window.innerHeight * 0.55, 320);
-        heldStop = null;
-      } else if (next >= positions.length) {
-        const following = all.find((item) => item.start > start + 10);
-        target = following
-          ? following.start + following.stops[0] * following.travel
-          : start + travel + Math.min(window.innerHeight * 0.2, 140);
-        heldStop = null;
-      } else {
-        target = positions[next];
-        heldStop = { node, y: target, index: next };
-      }
-
-      if (!isGuided) busyUntil = now + 760;
-      if (isGrocery) groceryScrollingUntil = now + 750;
-      if (isRecipe) recipeScrollingUntil = now + 650;
-      if (
-        node.dataset.landingStory === "recipes" &&
-        next >= 0 &&
-        next < stops.length
-      ) {
-        window.dispatchEvent(
-          new CustomEvent("epantry:recipe-stage", {
-            detail: {
-              progress:
-                stops[next] * Number(node.dataset.landingRecipeScale || 7),
-            },
-          })
-        );
-      }
-      if (isGuided) {
-        // Recipes use the same browser-native scroll as Grocery; Explore
-        // retains its approved timing/RAF behaviour without modification.
-        scrollGuidedTo(Math.max(0, Math.round(target)), steps, isGrocery || isRecipe);
-      } else {
-        window.scrollTo({
-          top: Math.max(0, Math.round(target)),
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "instant"
-            : "smooth",
-        });
-      }
-    };
-
-    const onTouchStart = (event) => {
-      if (
-        !mobileQuery.matches ||
-        event.touches.length !== 1 ||
-        ignoreGesture(event.target)
-      ) {
-        touchStart = null;
-        return;
-      }
-      const story = currentStory(window.scrollY);
-      // Grocery and Recipes galleries should use native touch scrolling.
-      // Brands keep the existing touch navigation unchanged.
-      if (["grocery", "recipes"].includes(story?.node.dataset.landingStory)) {
-        touchStart = null;
-        return;
-      }
-      touchStart = story
-        ? {
-            x: event.touches[0].clientX,
-            y: event.touches[0].clientY,
-            startedAt: performance.now(),
-            isExplore: story.node.dataset.landingStory === "explore",
-            isGrocery: story.node.dataset.landingStory === "grocery",
-            isRecipe: story.node.dataset.landingStory === "recipes",
-          }
-        : null;
-    };
-    const onTouchMove = (event) => {
-      if (!touchStart || event.touches.length !== 1) return;
-      const dx = event.touches[0].clientX - touchStart.x;
-      const dy = event.touches[0].clientY - touchStart.y;
-      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 7 && event.cancelable) {
-        event.preventDefault();
-      }
-    };
-    const onTouchEnd = (event) => {
-      if (!touchStart || !event.changedTouches.length) return;
-      const dx = event.changedTouches[0].clientX - touchStart.x;
-      const dy = event.changedTouches[0].clientY - touchStart.y;
-      const gesture = touchStart;
-      touchStart = null;
-      if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) {
-        if (gesture.isExplore) {
-          // Intro -> entire gallery -> next section; never skip the gallery.
-          advance(dy < 0 ? 1 : -1);
-        } else if (gesture.isGrocery) {
-          const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
-          // Ordinary swipes advance exactly one product. Only unusually fast,
-          // long flicks are allowed to cross three or four product stages.
-          const steps =
-            speed > 3.7 && Math.abs(dy) > 245
-              ? 4
-              : speed > 2.9 && Math.abs(dy) > 195
-                ? 3
-                : 1;
-          advance(dy < 0 ? 1 : -1, steps);
-        } else if (gesture.isRecipe) {
-          const speed = Math.abs(dy) / Math.max(performance.now() - gesture.startedAt, 1);
-          // Exactly one recipe per normal swipe. Only exceptionally quick,
-          // long flicks may pass 3-4 stages within the Recipe story.
-          const steps =
-            speed > 3.7 && Math.abs(dy) > 245
-              ? 4
-              : speed > 2.9 && Math.abs(dy) > 195
-                ? 3
-                : 1;
-          advance(dy < 0 ? 1 : -1, steps);
-        } else {
-          advance(dy < 0 ? 1 : -1);
-        }
-      }
-    };
-    const onTouchCancel = () => {
-      touchStart = null;
-    };
-
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
-    window.addEventListener("touchcancel", onTouchCancel, { passive: true });
-    return () => {
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("touchcancel", onTouchCancel);
-      stopGuidedScroll();
-    };
-  }, []);
+  // EPANTRY MOBILE NATIVE SCROLL - PERF FIX
+  // Leave vertical touch gestures to the browser on phones. The former
+  // preventDefault + scripted scrollTo snap conflicted with momentum scrolling
+  // and the pinned Featured sections, making the page visibly jerk.
+  // Explore's motion progress and gallery reveal still follow native scroll.
 
   const experienceSectionRef = useRef(null);
 
@@ -441,7 +126,7 @@ export default function LandingPage() {
   const exploreDefocusOpacity = useTransform(
     featuredDepthProgress,
     [0, 0.2, 0.7, 1],
-    shouldReduceMotion ? [0, 0, 0, 0] : [0, 0, 0.82, 1]
+    shouldReduceMotion || isSmallViewport ? [0, 0, 0, 0] : [0, 0, 0.82, 1]
   );
 
   // The incoming Grocery sheet grows into the viewport instead of
@@ -479,19 +164,19 @@ export default function LandingPage() {
   const backdropHorizontalX = useTransform(
     experienceScrollProgress,
     [0, 1],
-    shouldReduceMotion || !isSmallViewport ? ["0vw", "0vw"] : ["0vw", "-22vw"]
+    ["0vw", "0vw"]
   );
 
   const backdropDepthScale = useTransform(
     experienceScrollProgress,
     [0, 0.5, 1],
-    shouldReduceMotion ? [1, 1, 1] : [1.025, 1, 1.035]
+    shouldReduceMotion || isSmallViewport ? [1, 1, 1] : [1.025, 1, 1.035]
   );
 
   const backdropDepthRotateX = useTransform(
     experienceScrollProgress,
     [0, 0.5, 1],
-    shouldReduceMotion ? [0, 0, 0] : [0.8, -0.65, 0.9]
+    shouldReduceMotion || isSmallViewport ? [0, 0, 0] : [0.8, -0.65, 0.9]
   );
 
   useEffect(() => {
@@ -617,10 +302,10 @@ export default function LandingPage() {
               to { transform: translate3d(0, 0, 0); }
             }
             .epantry-mobile-gallery-left {
-              animation: epantry-mobile-gallery-left 9.8s linear infinite;
+              animation: epantry-mobile-gallery-left 23s linear infinite;
             }
             .epantry-mobile-gallery-right {
-              animation: epantry-mobile-gallery-right 11.2s linear infinite;
+              animation: epantry-mobile-gallery-right 25s linear infinite;
             }
             @media (prefers-reduced-motion: reduce) {
               .epantry-mobile-gallery-left, .epantry-mobile-gallery-right { animation: none; }
@@ -674,7 +359,7 @@ export default function LandingPage() {
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-0"
-              style={{ perspective: isSmallViewport && !shouldReduceMotion ? 780 : "none" }}
+              style={{ perspective: "none" }}
             >
               {/* Continuous background rows: vertical depth on desktop, horizontal depth on mobile. */}
               <motion.div
@@ -685,11 +370,11 @@ export default function LandingPage() {
                   rotateX: backdropDepthRotateX,
                   // Positive Y-rotation sends the right edge away from the viewer
                   // and brings the left edge closer as tiles travel right-to-left.
-                  rotateY: isSmallViewport && !shouldReduceMotion ? 26 : 0,
+                  rotateY: 0,
                   transformOrigin: "50% 50%",
                 }}
                 className={isSmallViewport
-                  ? "absolute -inset-x-[24%] inset-y-0 [transform-style:preserve-3d] [will-change:transform]"
+                  ? "absolute -inset-x-[24%] inset-y-0 [transform-style:flat] [will-change:transform]"
                   : "absolute -inset-x-[8%] -inset-y-[14%] [transform-style:flat] sm:[transform-style:preserve-3d] sm:[will-change:transform]"}
               >
                 {EXPERIENCE_BACKDROP_ROWS.map((row, rowIndex) => (
@@ -770,15 +455,15 @@ export default function LandingPage() {
                     animate={{
                       opacity: isExperienceGalleryVisible ? 1 : 0,
                       // Slide each card up from below the viewport at its original size.
-                      y: isExperienceGalleryVisible || shouldReduceMotion ? "0svh" : "85svh",
+                      y: isExperienceGalleryVisible || shouldReduceMotion ? "0svh" : (isSmallViewport ? "22svh" : "85svh"),
                     }}
                     transition={{
                       // The video shows overlapping entrances: each starts while
                       // the previous card is still rising; all settle in ~0.9s.
                       y: {
                         type: "tween",
-                        duration: shouldReduceMotion ? 0 : 0.52,
-                        delay: shouldReduceMotion || !isExperienceGalleryVisible ? 0 : index * 0.18,
+                        duration: shouldReduceMotion ? 0 : (isSmallViewport ? 0.38 : 0.52),
+                        delay: shouldReduceMotion || !isExperienceGalleryVisible ? 0 : index * (isSmallViewport ? 0.07 : 0.18),
                         ease: [0.2, 0.8, 0.3, 1],
                       },
                       // A card is fully visible as soon as it rises onscreen.
@@ -893,7 +578,7 @@ function ExperienceBackdropRow({
 
   return (
     <div
-      className="absolute left-0 right-0 overflow-visible [transform-style:preserve-3d]"
+      className={lowPower ? "absolute left-0 right-0 overflow-visible [transform-style:flat]" : "absolute left-0 right-0 overflow-visible [transform-style:preserve-3d]"}
       style={{
         // On phones, the image rows retain depth while moving horizontally.
         top: lowPower ? ["9%", "40%", "71%"][rowIndex] : row.top,
@@ -965,10 +650,10 @@ function ExperienceBackdropTile({
 
   return (
     <div
-      className="relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] [transform-style:preserve-3d] sm:rounded-[11px]"
+      className={`relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] sm:rounded-[11px] ${lowPower ? "[transform-style:flat]" : "[transform-style:preserve-3d]"}`}
       style={{
         width,
-        transform: `translateZ(${depthOffset}px) rotateZ(${
+        transform: `${lowPower ? "" : `translateZ(${depthOffset}px) `}rotateZ(${
           direction === "left" ? alternatingTilt : -alternatingTilt
         }deg)`,
       }}
