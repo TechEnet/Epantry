@@ -81,7 +81,8 @@ export default function LandingPage() {
       : false
   );
 
-  const [isExperienceGalleryVisible, setIsExperienceGalleryVisible] = useState(false);
+  const [isExperienceGalleryVisible, setIsExperienceGalleryVisible] =
+    useState(false);
 
   const [mobileCardIndex, setMobileCardIndex] = useState(0);
 
@@ -233,7 +234,9 @@ export default function LandingPage() {
       // when a finger hovers around the gallery reveal threshold.
       setIsExperienceGalleryVisible((current) => {
         const visible = isSmallViewport
-          ? (current ? progress >= 0.18 : progress >= 0.23)
+          ? current
+            ? progress >= 0.18
+            : progress >= 0.23
           : progress >= 0.24;
         return current === visible ? current : visible;
       });
@@ -246,7 +249,8 @@ export default function LandingPage() {
     const track = experienceCarouselRef.current;
     const card = track?.querySelector("[data-experience-card]");
     if (!track || !card) return 0;
-    const gap = Number.parseFloat(window.getComputedStyle(track).columnGap) || 12;
+    const gap =
+      Number.parseFloat(window.getComputedStyle(track).columnGap) || 12;
     return card.offsetWidth + gap;
   };
 
@@ -254,15 +258,27 @@ export default function LandingPage() {
     const track = experienceCarouselRef.current;
     const step = getCardScrollStep();
     if (!track || step <= 0) return;
-    const index = Math.max(0, Math.min(landingCategories.length - 1, Math.round(track.scrollLeft / step)));
-    setMobileCardIndex((current) => current === index ? current : index);
+    const index = Math.max(
+      0,
+      Math.min(
+        landingCategories.length - 1,
+        Math.round(track.scrollLeft / step)
+      )
+    );
+    setMobileCardIndex((current) => (current === index ? current : index));
   };
 
   const scrollExperienceCard = (direction) => {
     const track = experienceCarouselRef.current;
     const step = getCardScrollStep();
     if (!track || step <= 0) return;
-    const index = Math.max(0, Math.min(landingCategories.length - 1, Math.round(track.scrollLeft / step) + direction));
+    const index = Math.max(
+      0,
+      Math.min(
+        landingCategories.length - 1,
+        Math.round(track.scrollLeft / step) + direction
+      )
+    );
     track.scrollTo({
       left: Math.min(index * step, track.scrollWidth - track.clientWidth),
       behavior: shouldReduceMotion ? "instant" : "smooth",
@@ -379,9 +395,11 @@ export default function LandingPage() {
                   rotateY: 0,
                   transformOrigin: "50% 50%",
                 }}
-                className={isSmallViewport
-                  ? "absolute -inset-x-[24%] inset-y-0 [transform-style:flat] [will-change:transform]"
-                  : "absolute -inset-x-[8%] -inset-y-[14%] [transform-style:flat] sm:[transform-style:preserve-3d] sm:[will-change:transform]"}
+                className={
+                  isSmallViewport
+                    ? "absolute -inset-x-[24%] inset-y-0 [transform-style:flat] [will-change:transform]"
+                    : "absolute -inset-x-[8%] -inset-y-[14%] [transform-style:flat] sm:[transform-style:preserve-3d] sm:[will-change:transform]"
+                }
               >
                 {EXPERIENCE_BACKDROP_ROWS.map((row, rowIndex) => (
                   <ExperienceBackdropRow
@@ -446,7 +464,7 @@ export default function LandingPage() {
                 ref={experienceCarouselRef}
                 onScroll={onExperienceCarouselScroll}
                 aria-label="Explore grocery, brands and recipes"
-                className="flex h-full w-full items-center gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain px-[7vw] py-5 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-center md:gap-4 md:overflow-x-visible md:overflow-y-visible md:px-8 md:py-8 md:snap-none lg:gap-5 lg:px-10"
+                className="flex h-full w-full items-center gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain px-[8vw] scroll-px-[8vw] pt-[clamp(60px,10svh,100px)] pb-4 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-center md:gap-4 md:overflow-x-visible md:overflow-y-visible md:px-8 md:py-8 md:snap-none lg:gap-5 lg:px-10"
                 style={{
                   WebkitOverflowScrolling: "touch",
                   pointerEvents: isExperienceGalleryVisible ? "auto" : "none",
@@ -463,27 +481,41 @@ export default function LandingPage() {
                       // Slide each card up from below the viewport at its original size.
                       // On phones, let cards clearly rise into the scene
                       // (as on desktop); use only a composited translate.
-                      y: isExperienceGalleryVisible || shouldReduceMotion
-                        ? "0svh"
-                        : (isSmallViewport ? "62svh" : "85svh"),
+                      y:
+                        isExperienceGalleryVisible || shouldReduceMotion
+                          ? "0svh"
+                          : isSmallViewport
+                          ? "62svh"
+                          : "85svh",
                     }}
                     transition={{
                       // The video shows overlapping entrances: each starts while
                       // the previous card is still rising; all settle in ~0.9s.
                       y: {
                         type: "tween",
-                        duration: shouldReduceMotion ? 0 : (isSmallViewport ? 0.64 : 0.52),
-                        delay: shouldReduceMotion || !isExperienceGalleryVisible ? 0 : index * (isSmallViewport ? 0.10 : 0.18),
+                        duration: shouldReduceMotion
+                          ? 0
+                          : isSmallViewport
+                          ? 0.64
+                          : 0.52,
+                        delay:
+                          shouldReduceMotion || !isExperienceGalleryVisible
+                            ? 0
+                            : index * (isSmallViewport ? 0.1 : 0.18),
                         ease: [0.2, 0.8, 0.3, 1],
                       },
                       opacity: { duration: 0 },
                     }}
-                    className="relative h-[min(55svh,460px)] min-h-[320px] w-[64vw] max-w-[270px] shrink-0 snap-start md:h-[min(67svh,600px)] md:min-h-[390px] md:w-[29vw] md:max-w-[370px] lg:h-[min(72svh,670px)] lg:w-[28vw] lg:max-w-[410px]"
+                    className="relative h-[min(54svh,450px)] min-h-[340px] w-[72vw] max-w-[290px] shrink-0 snap-start md:h-[min(67svh,600px)] md:min-h-[390px] md:w-[29vw] md:max-w-[370px] lg:h-[min(72svh,670px)] lg:w-[28vw] lg:max-w-[410px]"
                   >
                     <Link
                       to={category.path}
                       tabIndex={isExperienceGalleryVisible ? 0 : -1}
-                      className={`focus-ring group relative block h-full w-full overflow-hidden rounded-[14px] bg-[#111111] outline-none transition-transform duration-500 hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-white sm:rounded-[16px] ${isSmallViewport ? "shadow-[0_12px_32px_rgba(0,0,0,0.25)]" : "shadow-[0_34px_95px_rgba(0,0,0,0.44),0_8px_22px_rgba(0,0,0,0.20)]"}`}
+                      className={`focus-ring group relative block h-full w-full overflow-hidden rounded-[14px] bg-[#111111] outline-none transition-transform duration-500 hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-white sm:rounded-[16px] ${
+                        isSmallViewport
+                          ? "shadow-[0_12px_32px_rgba(0,0,0,0.25)]"
+                          : "shadow-[0_34px_95px_rgba(0,0,0,0.44),0_8px_22px_rgba(0,0,0,0.20)]"
+                      }`}
                     >
                       <ExperienceCardFront category={category} />
                     </Link>
@@ -527,7 +559,6 @@ export default function LandingPage() {
                 </div>
               )}
             </div>
-
           </motion.div>
 
           {/* Static translucent glass behind the incoming Grocery surface.
@@ -548,10 +579,7 @@ export default function LandingPage() {
 
       {/* Grocery begins during Explore's final sticky viewport. Its hero
           slides over Explore, while the product gallery follows normally. */}
-      <div
-        ref={featuredEntranceRef}
-        className="relative z-30 -mt-[100svh]"
-      >
+      <div ref={featuredEntranceRef} className="relative z-30 -mt-[100svh]">
         <FeaturedContentSection
           groceryEntranceEdgeOpacity={groceryEdgeOpacity}
           groceryEntranceScale={groceryEntranceScale}
@@ -587,7 +615,11 @@ function ExperienceBackdropRow({
 
   return (
     <div
-      className={lowPower ? "absolute left-0 right-0 overflow-visible [transform-style:flat]" : "absolute left-0 right-0 overflow-visible [transform-style:preserve-3d]"}
+      className={
+        lowPower
+          ? "absolute left-0 right-0 overflow-visible [transform-style:flat]"
+          : "absolute left-0 right-0 overflow-visible [transform-style:preserve-3d]"
+      }
       style={{
         // On phones, the image rows retain depth while moving horizontally.
         top: lowPower ? ["9%", "40%", "71%"][rowIndex] : row.top,
@@ -659,7 +691,9 @@ function ExperienceBackdropTile({
 
   return (
     <div
-      className={`relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] sm:rounded-[11px] ${lowPower ? "[transform-style:flat]" : "[transform-style:preserve-3d]"}`}
+      className={`relative aspect-[4/5] shrink-0 overflow-hidden rounded-[9px] border border-white/[0.07] bg-white/[0.025] shadow-[0_18px_52px_rgba(0,0,0,0.48)] sm:rounded-[11px] ${
+        lowPower ? "[transform-style:flat]" : "[transform-style:preserve-3d]"
+      }`}
       style={{
         width,
         transform: `${lowPower ? "" : `translateZ(${depthOffset}px) `}rotateZ(${
@@ -677,7 +711,11 @@ function ExperienceBackdropTile({
         }
       />
 
-      <div className={`absolute inset-0 ${lowPower ? "bg-black/55" : "bg-black/10"}`} />
+      <div
+        className={`absolute inset-0 ${
+          lowPower ? "bg-black/55" : "bg-black/10"
+        }`}
+      />
 
       <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/42 to-transparent" />
     </div>
@@ -705,7 +743,11 @@ function ExperienceCardFront({ category }) {
             aria-hidden="true"
             className="relative top-[3px] inline-flex shrink-0 items-center sm:top-[4px]"
             animate={reduceMotion ? undefined : { x: [0, 5, 0] }}
-            transition={reduceMotion ? undefined : { duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+            transition={
+              reduceMotion
+                ? undefined
+                : { duration: 1.7, repeat: Infinity, ease: "easeInOut" }
+            }
           >
             <ArrowRight size={20} />
           </motion.span>
@@ -714,4 +756,3 @@ function ExperienceCardFront({ category }) {
     </div>
   );
 }
-
