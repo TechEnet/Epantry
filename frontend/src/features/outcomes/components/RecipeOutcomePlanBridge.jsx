@@ -93,14 +93,20 @@ export default function RecipeOutcomePlanBridge() {
                 Turn this Recipe into a genuine missing list
               </h2>
 
-              <p className="mt-1.5 max-w-2xl text-[10px] font-medium leading-4 text-stone-600 sm:mt-3 sm:text-base sm:font-normal sm:leading-6">
-                EPANTRY adjusts the ingredients for your selected servings, checks
-                what is confirmed in your Living Pantry, and shows what you still
-                need. Items that are only likely or uncertain stay unconfirmed
-                instead of being guessed as exact stock.
+              <p className="mt-1.5 max-w-2xl text-[14px] font-medium leading-5 text-stone-600 sm:mt-3 sm:text-base sm:font-normal sm:leading-6">
+                <span className="sm:hidden">
+                  See what you need for your servings, what's in your Living
+                  Pantry, and what's missing or unconfirmed.
+                </span>
+                <span className="hidden sm:inline">
+                  EPANTRY adjusts the ingredients for your selected servings,
+                  checks what is confirmed in your Living Pantry, and shows what
+                  you still need. Items that are only likely or uncertain stay
+                  unconfirmed instead of being guessed as exact stock.
+                </span>
               </p>
 
-              <div className="mt-2 flex items-center gap-1.5 text-[9px] font-semibold leading-4 text-stone-500 sm:mt-4 sm:gap-2 sm:text-xs sm:font-bold">
+              <div className="mt-2 hidden items-center gap-1.5 text-[9px] font-semibold leading-4 text-stone-500 sm:mt-4 sm:flex sm:gap-2 sm:text-xs sm:font-bold">
                 <ShieldCheck size={15} aria-hidden="true" />
                 Product, price, seller and checkout selection remain outside
                 this step.

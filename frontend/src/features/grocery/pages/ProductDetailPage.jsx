@@ -1227,7 +1227,7 @@ function ProductDetailsSheet({ product }) {
 
         <div
           ref={scrollAreaRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto touch-pan-y p-5 sm:p-6 [scrollbar-width:thin]"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto touch-auto p-5 sm:p-6 [scrollbar-width:thin]"
         >
           <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
             {detailRows.map(([label, value]) => (
@@ -1610,6 +1610,23 @@ export default function ProductDetailPage() {
 
   const [showAllImages, setShowAllImages] = useState(false);
 
+  // Mobile gallery: index reflects the horizontally visible slide.
+  const [gallerySlideIndex, setGallerySlideIndex] = useState(0);
+  const galleryTrackRef = useRef(null);
+
+  useEffect(() => {
+    if (!showAllImages) setGallerySlideIndex(0);
+  }, [showAllImages]);
+
+  const moveGallerySlide = (delta) => {
+    const track = galleryTrackRef.current;
+    if (!track) return;
+    const slides = Array.from(track.children);
+    const nextIndex = Math.max(0, Math.min(slides.length - 1, gallerySlideIndex + delta));
+    slides[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    setGallerySlideIndex(nextIndex);
+  };
+
   const [frequentlyBought, setFrequentlyBought] = useState([]);
 
   const [similarProducts, setSimilarProducts] = useState([]);
@@ -1982,9 +1999,9 @@ export default function ProductDetailPage() {
           </a>
         </div>
 
-        <section className="ep-product-hero grid min-w-0 gap-0 border-b border-[#E2E5DE] lg:grid-cols-[minmax(0,1.07fr)_minmax(0,0.93fr)] xl:min-h-[min(870px,96svh)]">
-          <div className="min-w-0 lg:pr-10 xl:pr-16">
-            <div className="relative flex min-h-[390px] flex-col justify-center bg-[#F6F6F2] sm:min-h-[540px] lg:min-h-[660px] xl:min-h-[min(735px,84svh)]">
+        <section className="ep-product-hero relative grid min-w-0 gap-0 border-b border-[#E2E5DE] lg:min-h-[calc(100svh-120px)] lg:items-stretch lg:grid-cols-[minmax(0,1.07fr)_minmax(0,0.93fr)]">
+          <div className="min-w-0 lg:flex lg:min-h-0 lg:flex-col lg:pr-10 xl:pr-16">
+            <div className="relative flex min-h-[390px] flex-col justify-center bg-[#F6F6F2] sm:min-h-[540px] lg:min-h-0 lg:flex-1">
               <div className="absolute left-5 top-6 z-10 text-xs font-semibold tracking-[0.08em] text-[#5C6A60] sm:left-8 sm:top-8">
                 {product.category?.name || "EPANTRY grocery"}
               </div>
@@ -2003,7 +2020,7 @@ export default function ProductDetailPage() {
                 ))}
               </div>
               <div
-                className="relative mx-auto hidden h-[575px] w-full items-center justify-center overflow-hidden px-7 pt-8 lg:flex xl:px-12"
+                className="relative mx-auto hidden h-[575px] w-full items-center justify-center overflow-hidden px-7 pt-8 lg:flex lg:h-full lg:min-h-0 xl:px-12"
                 onMouseMove={(event) => {
                   if (!productImages[0]?.url) return;
                   const bounds = event.currentTarget.getBoundingClientRect();
@@ -2019,16 +2036,11 @@ export default function ProductDetailPage() {
                   <span className="flex flex-col items-center gap-3 text-[#849187]"><Package size={72} strokeWidth={1.1} aria-hidden="true" /><span className="text-sm">Product image not available</span></span>
                 )}
               </div>
-              {zoomPreview && (
-                <div className="pointer-events-none absolute inset-4 z-20 hidden overflow-hidden border border-[#E0E4DA] bg-white shadow-lg lg:block" aria-label={`Zoomed preview of ${zoomPreview.alt}`}>
-                  <div className="h-full w-full bg-white bg-no-repeat" style={{ backgroundImage: `url(${zoomPreview.url})`, backgroundPosition: `${zoomPreview.x}% ${zoomPreview.y}%`, backgroundSize: "235%" }} />
-                </div>
-              )}
               <button type="button" onClick={() => setShowAllImages(true)} className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8">
                 <ZoomIn size={17} aria-hidden="true" /> View gallery
               </button>
             </div>
-            <div className="flex items-center gap-3 overflow-x-auto py-4 sm:gap-4 sm:py-5" role="group" aria-label="Open product images and details">
+            <div className="flex items-center gap-3 overflow-x-auto py-4 sm:gap-4 sm:py-5 lg:h-[102px] lg:flex-none lg:py-1.5" role="group" aria-label="Open product images and details">
               {productGalleryItems.map((item, index) => (
                 <button
                   key={item.type === "details" ? "product-facts-gallery-tile" : `product-tile-${item.image?.url}-${index}`}
@@ -2056,7 +2068,7 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="min-w-0 px-1 pb-10 pt-9 sm:px-4 sm:pt-14 lg:pb-14 lg:pl-8 xl:pl-14 xl:pt-20">
+          <div className="min-w-0 px-1 pb-10 pt-9 sm:px-4 sm:pt-14 lg:pb-4 lg:pl-8 lg:pt-6 xl:pl-14 xl:pt-8">
             <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-[#173F35]">
               <span className="h-[2px] w-7 bg-[#C86C42]" aria-hidden="true" />
               {product.brand?.name || "EPANTRY grocery"}
@@ -2093,6 +2105,22 @@ export default function ProductDetailPage() {
               See complete product details <ArrowRight size={17} aria-hidden="true" />
             </a>
           </div>
+          {zoomPreview && (
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 z-30 hidden w-[46.5%] overflow-hidden border-l border-[#D7DDCF] bg-[#FDFDFA] shadow-[-16px_0_36px_rgba(23,63,53,0.10)] lg:block"
+              role="img"
+              aria-label={`Zoomed preview of ${zoomPreview.alt}`}
+            >
+              <div
+                className="h-full w-full bg-white bg-no-repeat"
+                style={{
+                  backgroundImage: `url(${zoomPreview.url})`,
+                  backgroundPosition: `${zoomPreview.x}% ${zoomPreview.y}%`,
+                  backgroundSize: "235%",
+                }}
+              />
+            </div>
+          )}
         </section>
         <SponsoredCampaignSlot
           placement="product_detail"
@@ -2102,23 +2130,24 @@ export default function ProductDetailPage() {
 
         {showAllImages && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/65 p-4 backdrop-blur-sm sm:p-8"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/65 p-2 backdrop-blur-sm sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-label="All product images"
             onClick={() => setShowAllImages(false)}
           >
             <div
-              className="relative flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-[20px] border border-white/20 bg-[#F5F8F8] shadow-2xl"
+              className="relative flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-[20px] border border-white/20 bg-[#F5F8F8] shadow-2xl max-sm:h-[min(88dvh,760px)] max-sm:rounded-[17px] max-sm:border-[#D7DDCF] max-sm:bg-[#F7F6F2]"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex shrink-0 items-center justify-between border-b border-[#D7E3E5] bg-[#F8FBFA] px-5 py-4 sm:px-6">
+              <div className="flex shrink-0 items-center justify-between border-b border-[#D7E3E5] bg-[#F8FBFA] px-5 py-4 sm:px-6 max-sm:bg-[#F7F6F2] max-sm:px-4 max-sm:py-3">
                 <div>
-                  <p className="text-[12px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                  <p className="text-[12px] font-black uppercase tracking-[0.14em] text-emerald-700 max-sm:text-[#C86C42]">
                     Product gallery
                   </p>
-                  <h2 className="mt-1 text-lg font-black text-stone-950">
-                    All images ({imageCount})
+                  <h2 className="mt-1 max-w-[240px] truncate text-lg font-bold text-[#202421] sm:font-black">
+                    <span className="sm:hidden">{product.displayName}</span>
+                    <span className="hidden sm:inline">All images ({imageCount})</span>
                   </h2>
                 </div>
 
@@ -2132,20 +2161,30 @@ export default function ProductDetailPage() {
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto p-3 sm:p-5 [scrollbar-width:thin]">
-                <div className="grid auto-rows-auto items-stretch gap-4 sm:grid-cols-2">
+              <div className="min-h-0 flex-1 p-2 sm:overflow-y-auto sm:overscroll-y-auto sm:p-5 sm:[scrollbar-width:thin]">
+                <div
+                  ref={galleryTrackRef}
+                  onScroll={(event) => {
+                    if (window.matchMedia('(min-width: 640px)').matches) return;
+                    const track = event.currentTarget;
+                    const width = track.clientWidth;
+                    if (width > 0) setGallerySlideIndex(Math.min(imageCount - 1, Math.max(0, Math.round(track.scrollLeft / width))));
+                  }}
+                  className="max-sm:flex max-sm:h-full max-sm:snap-x max-sm:snap-mandatory max-sm:gap-0 max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden sm:grid sm:auto-rows-auto sm:items-stretch sm:gap-4 sm:grid-cols-2"
+                  aria-label="Product images and details, swipe horizontally"
+                >
                   {productGalleryItems.map((item, index) =>
                     item.type === "details" ? (
                       <div
                         key="all-product-details-sheet"
-                        className="h-[min(67dvh,560px)] min-h-[340px] overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white"
+                        className="h-[min(67dvh,560px)] min-h-[340px] overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white max-sm:h-full max-sm:min-h-0 max-sm:w-full max-sm:flex-none max-sm:snap-start max-sm:rounded-[12px]"
                       >
                         <ProductDetailsSheet product={product} />
                       </div>
                     ) : (
                       <div
                         key={`all-${item.image.url}-${index}`}
-                        className="flex h-[min(67dvh,560px)] min-h-[340px] items-center justify-center overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white"
+                        className="flex h-[min(67dvh,560px)] min-h-[340px] items-center justify-center overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white max-sm:h-full max-sm:min-h-0 max-sm:w-full max-sm:flex-none max-sm:snap-start max-sm:rounded-[12px]"
                       >
                         <img
                           src={item.image.url}
@@ -2155,6 +2194,20 @@ export default function ProductDetailPage() {
                       </div>
                     )
                   )}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#D7DDCF] bg-[#F7F6F2] px-4 py-2.5 sm:hidden">
+                <div className="min-w-0">
+                  <span className="text-xs font-bold tracking-[0.08em] text-[#173F35]">
+                    {String(gallerySlideIndex + 1).padStart(2, '0')} / {String(imageCount).padStart(2, '0')}
+                  </span>
+                  <p className="mt-0.5 text-xs text-[#69766C]">
+                    {productGalleryItems[gallerySlideIndex]?.type === 'details' ? 'Product information' : 'Product photo'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => moveGallerySlide(-1)} disabled={gallerySlideIndex === 0} aria-label="Previous image" className="focus-ring grid size-10 place-items-center rounded-full border border-[#D7DDCF] bg-white text-[#173F35] disabled:opacity-35"><ArrowLeft size={19} /></button>
+                  <button type="button" onClick={() => moveGallerySlide(1)} disabled={gallerySlideIndex === imageCount - 1} aria-label="Next image" className="focus-ring grid size-10 place-items-center rounded-full border border-[#D7DDCF] bg-white text-[#173F35] disabled:opacity-35"><ArrowRight size={19} /></button>
                 </div>
               </div>
             </div>

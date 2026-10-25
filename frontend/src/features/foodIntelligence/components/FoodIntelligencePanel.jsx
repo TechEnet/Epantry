@@ -761,10 +761,10 @@ export default function FoodIntelligencePanel({
             nextTargets,
           )
 
-          return Object.values(
-            nextTargets,
-          ).every(
-            Boolean,
+          return Boolean(
+            nextTargets.nutrition &&
+            nextTargets.allergen &&
+            nextTargets.dietary,
           )
         }
 
@@ -1339,6 +1339,24 @@ export default function FoodIntelligencePanel({
           )
         : null
 
+    const approvedDietary = dietary.find((item) =>
+      String(item?.status || item?.outcome || '').trim().toLowerCase() === 'eligible',
+    )
+    const approvedDietaryKey = String(
+      approvedDietary?.ruleKey || approvedDietary?.key || approvedDietary?.label || '',
+    ).trim().toLowerCase().replace(/[\s-]+/g, '_')
+    const approvedDietaryIsVeg =
+      approvedDietaryKey === 'vegetarian' || approvedDietaryKey === 'vegan'
+    const approvedDietaryIsNonVeg =
+      approvedDietaryKey === 'non_vegetarian' || approvedDietaryKey === 'eggitarian'
+    const approvedDietaryLabel = approvedDietary
+      ? approvedDietaryIsVeg
+        ? approvedDietaryKey === 'vegan' ? 'Vegan' : 'Veg'
+        : approvedDietaryIsNonVeg
+          ? approvedDietaryKey === 'eggitarian' ? 'Eggitarian' : 'Non-veg'
+          : titleCase(approvedDietary?.label || approvedDietary?.ruleKey || approvedDietary?.key)
+      : null
+
     const dietaryPortal =
       recipeTargets.dietary
         ? createPortal(
@@ -1348,52 +1366,17 @@ export default function FoodIntelligencePanel({
                 {chevron}
               </summary>
               <div className="border-t border-[#eadfca] bg-[#fbf1df] px-3 py-2.5 sm:px-5 sm:py-4">
-                <label className="mb-2 block sm:mb-3">
-                  <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">
-                    Filter dietary results
-                  </span>
-                  <select
-                    value={dietaryFilter}
-                    onChange={(event) => setDietaryFilter(event.target.value)}
-                    className="h-8 w-full rounded-lg border border-stone-200 bg-white px-2.5 text-[11px] font-semibold text-stone-700 outline-none focus:border-emerald-500 sm:h-9 sm:px-3 sm:text-xs sm:font-bold"
-                  >
-                    <option value="all">All results</option>
-                    <option value="eligible">Eligible</option>
-                    <option value="not_eligible">Not eligible</option>
-                    <option value="cannot_verify">Cannot verify</option>
-                  </select>
-                </label>
-                {filteredDietary.length === 0 ? (
-                  <EmptyIntelligence>
-                    {dietary.length === 0
-                      ? available
-                        ? 'No dietary classification was declared for this Recipe.'
-                        : 'Dietary classification cannot currently be verified.'
-                      : 'No dietary result matches this filter.'}
-                  </EmptyIntelligence>
-                ) : (
-                  <div className="divide-y divide-[#dfd1b8] overflow-hidden rounded-xl border border-[#e3d7c2] bg-white/55">
-                    {filteredDietary.map((item, index) => (
-                      <div
-                        key={item.key || index}
-                        className="flex items-start justify-between gap-2 bg-transparent p-2 sm:gap-3 sm:p-3"
-                      >
-                        <div>
-                          <p className="text-xs font-black text-stone-900">
-                            {displayName(item, 'Dietary rule')}
-                          </p>
-                          {item.reason && (
-                            <p className="mt-1 text-[10px] leading-4 text-stone-500">
-                              {item.reason}
-                            </p>
-                          )}
-                        </div>
-                        <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase tracking-wide text-stone-600 shadow-sm">
-                          {titleCase(item.status)}
-                        </span>
-                      </div>
-                    ))}
+                {approvedDietaryLabel ? (
+                  <div className="flex items-center gap-3 text-[15px] font-semibold text-[#173F35]">
+                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[7px] border-2 ${approvedDietaryIsNonVeg ? 'border-[#9E583B]' : 'border-[#278C49]'}`} aria-hidden="true">
+                      <span className={`h-3.5 w-3.5 rounded-full ${approvedDietaryIsNonVeg ? 'bg-[#B14638]' : 'bg-[#278C49]'}`} />
+                    </span>
+                    {approvedDietaryLabel}
                   </div>
+                ) : (
+                  <EmptyIntelligence>
+                    Dietary classification cannot currently be verified.
+                  </EmptyIntelligence>
                 )}
               </div>
             </details>,
@@ -1401,107 +1384,7 @@ export default function FoodIntelligencePanel({
           )
         : null
 
-    const lineagePortal =
-      recipeTargets.lineage
-        ? createPortal(
-            <details className={accordionClassName}>
-              <summary className={summaryClassName}>
-                <span className="font-sans text-[13px] font-semibold leading-5 text-[#163b2a] sm:font-serif sm:text-xl sm:font-semibold">
-                  Calculation source & rule lineage
-                </span>
-                {chevron}
-              </summary>
-              <div className="border-t border-[#eadfca] bg-[#fbf1df] px-3 py-2.5 sm:px-5 sm:py-4">
-                <div className="grid gap-3 sm:gap-5">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">Calculation</p>
-                    <dl className="mt-2 space-y-1 text-[10px] text-stone-600">
-                      <div className="flex justify-between gap-3">
-                        <dt>Version</dt>
-                        <dd className="font-bold text-stone-900">
-                          {foodIntelligence?.calculation?.version ?? '—'}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt>Evidence</dt>
-                        <dd className="font-bold text-stone-900">
-                          {titleCase(foodIntelligence?.evidenceState || 'unknown')}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt>Method</dt>
-                        <dd className="text-right font-bold text-stone-900">
-                          {verificationStatus === 'declared'
-                            ? 'Reviewed source declaration'
-                            : verificationStatus === 'calculated'
-                              ? 'Deterministic calculation'
-                              : verificationStatus === 'verified'
-                                ? 'Governed verified sources'
-                                : 'Awaiting approved evidence'}
-                        </dd>
-                      </div>
-                    </dl>
-                    {foodIntelligence?.calculation?.fingerprint && (
-                      <p className="mt-3 break-all rounded-lg bg-stone-50 p-2 font-mono text-[9px] leading-4 text-stone-500">
-                        {foodIntelligence.calculation.fingerprint}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">Sources</p>
-                    <div className="mt-2 space-y-2">
-                      {foodIntelligence?.lineage?.sources?.length ? (
-                        foodIntelligence.lineage.sources.map((source, index) => (
-                          <div
-                            key={`${source.sourceId || 'source'}-${index}`}
-                            className="rounded-lg bg-stone-50 p-2 text-[10px] leading-4 text-stone-600"
-                          >
-                            <p className="font-bold text-stone-900">
-                              {titleCase(source.sourceType || 'source')}
-                            </p>
-                            <p className="break-all">
-                              {source.sourceId || source.evidenceSourceId || 'Governed source'}
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-[10px] text-stone-400">
-                          No public source lineage available.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-stone-400">Rules</p>
-                    <div className="mt-2 space-y-2">
-                      {foodIntelligence?.lineage?.rules?.length ? (
-                        foodIntelligence.lineage.rules.map((rule, index) => (
-                          <div
-                            key={`${rule.ruleProfileId || rule.ruleKey || 'rule'}-${index}`}
-                            className="rounded-lg bg-stone-50 p-2 text-[10px] leading-4 text-stone-600"
-                          >
-                            <p className="font-bold text-stone-900">
-                              {rule.ruleKey || 'Governed rule'}
-                            </p>
-                            <p>Version {rule.ruleVersion || '—'}</p>
-                            {rule.jurisdiction && <p>{rule.jurisdiction}</p>}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-[10px] leading-4 text-stone-400">
-                          {verificationStatus === 'declared'
-                            ? 'No automated rule profile was used. This snapshot comes from a reviewed source declaration.'
-                            : 'No public rule lineage available.'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </details>,
-            recipeTargets.lineage,
-          )
-        : null
+    const lineagePortal = null
 
     return (
       <>
