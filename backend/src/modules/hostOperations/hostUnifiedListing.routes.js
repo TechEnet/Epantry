@@ -7,6 +7,7 @@ import { ApiError } from '../../utils/ApiError.js'
 import { authenticateSession, loadCurrentUser, requireActiveAccount, requireCsrfToken, requireMfaAssurance, requireRecentMfaAuthentication } from '../auth/auth.middleware.js'
 import { requireHostAccess } from '../auth/authorization.middleware.js'
 import { sensitiveResponseNoStoreMiddleware } from '../../middlewares/security.middleware.js'
+import { CanonicalIngredient } from '../catalog/catalog.models.js'
 import { HostUnifiedListingPacket } from './hostUnifiedListing.models.js'
 import { publicListing } from './hostUnifiedListing.public.js'
 import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate } from './hostUnifiedListing.logic.js'
@@ -80,6 +81,27 @@ router.post('/host/listing-packets/video-upload-intent', ...writeSecurity, wrap(
   catch (error) { problem(error?.code === 'CLOUDINARY_NOT_CONFIGURED' ? 'Video upload provider is not configured.' : 'Unable to prepare video upload.', 503) }
 }))
 
+// Host Studio's ingredient picker must use Host authorization rather than
+// the Customer-only Community composer lookup. No create/edit permissions here.
+router.get('/host/listing-packets/catalog/ingredients', ...readSecurity, wrap(async (req, res) => {
+  const search = String(req.query?.search || '').trim()
+  if (search.length < 2) return respond(res, { ingredients: [] })
+  if (search.length > 120) problem('Ingredient search is too long.')
+  const requestedLimit = Number(req.query?.limit)
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(20, Math.floor(requestedLimit))) : 6
+  const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const expression = new RegExp(escaped, 'i')
+  const rows = await CanonicalIngredient.find({
+    status: 'active',
+    $or: [{ canonicalName: expression }, { aliases: expression }, { slug: expression }],
+  }).sort({ canonicalName: 1 }).limit(limit).select('_id canonicalName slug aliases').lean()
+  respond(res, { ingredients: rows.map(row => ({
+    id: String(row._id), canonicalName: row.canonicalName, slug: row.slug,
+    aliases: row.aliases || [],
+  })) })
+}))
+
 router.get('/host/listing-packets', ...readSecurity, wrap(async (req, res) => {
   const records = await HostUnifiedListingPacket.find({ ownerUserId: actor(req) }).sort({ updatedAt: -1 }).limit(100)
   respond(res, { listings: records.map(serialize) })
@@ -103,6 +125,55 @@ router.patch('/host/listing-packets/:id', ...writeSecurity, wrap(async (req, res
   await record.save()
   respond(res, { listing: serialize(record) })
 }))
+// Restricted Host update for previously submitted, approved or rejected listings.
+// This does not bypass Super Admin review. Approved records leave the public
+// catalog until the updated packet is reviewed and approved again.
+router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap(async (req, res) => {
+  const record = await ownedRecord(req)
+  if (!['submitted_for_review', 'approved', 'rejected'].includes(record.status)) {
+    problem('Use Save full draft for an editable draft or changes-requested listing.', 409)
+  }
+  const edits = req.body?.sections
+  const editKeys = ['nutrition', 'allergens', 'dietary', 'selling', 'delivery']
+  if (!edits || typeof edits !== 'object' || Array.isArray(edits) ||
+      !Object.keys(edits).length || Object.keys(edits).some((key) => !editKeys.includes(key))) {
+    problem('Only Food facts & allergens and Selling & delivery can be updated here.')
+  }
+  if (JSON.stringify(edits).length > 40_000) problem('Food facts or selling updates exceed the permitted size.')
+  const updatedCandidate = { ...record.packet }
+  for (const key of editKeys) {
+    if (Object.prototype.hasOwnProperty.call(edits, key)) updatedCandidate[key] = edits[key]
+  }
+  // Full validation makes sure the revised listing is still eligible for review.
+  const normalized = cleanIncoming(updatedCandidate, record.workspaceType, true)
+  // Keep all identity, photo, video, ingredient and step data EXACTLY as they were.
+  const safePacket = { ...record.packet }
+  for (const key of editKeys) safePacket[key] = normalized[key]
+  const previousStatus = record.status
+  const now = new Date()
+  record.packet = safePacket
+  record.status = 'submitted_for_review'
+  record.submittedAt = now
+  record.approvedAt = null
+  record.reviewedAt = null
+  record.reviewedByUserId = null
+  record.correctionSection = ''
+  record.reviewNote = ''
+  record.reviewHistory.push({
+    decision: 'submitted_for_review', actorUserId: actor(req), at: now,
+    note: `Host updated food facts / selling details from ${previousStatus}.`,
+  })
+  await record.save()
+  await notifyActiveSuperAdminsBestEffort({
+    triggerType: 'host_unified_listing_submitted', reasonCode: 'host_unified_listing_submission',
+    explanation: `Host updated food facts / selling details for ${record.title || 'a listing'}; Super Admin review is required.`,
+    relatedEntityType: 'host_unified_listing', relatedEntityId: String(record.id),
+    sourceDomain: 'host_operations', sourceVersion: `host-unified-v${record.reviewRevision + 1}`,
+    dedupeScope: `host-unified-section-revision:${record.id}:${record.reviewHistory.length}`,
+  })
+  respond(res, { listing: serialize(record) })
+}))
+
 router.post('/host/listing-packets/:id/submit', ...writeSecurity, wrap(async (req, res) => {
   const record = await ownedRecord(req)
   if (!['draft', 'changes_requested'].includes(record.status)) problem('This listing has already been submitted.', 409)

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, ChevronDown, ClipboardList, Download, FileSpreadsheet, ImagePlus, Plus, RefreshCw, Save, Send, Trash2, UploadCloud } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronDown, ClipboardList, Download, FileSpreadsheet, ImagePlus, Plus, RefreshCw, Save, Send, Trash2, UploadCloud, ArrowUpRight, Package, Search } from 'lucide-react'
 import { useAuth } from '../../auth/context/AuthContext'
-import { searchCommunityIngredients } from '../../community/services/community.service'
+
 import { listHospitalityOutlets, listHospitalityMenus } from '../../hospitality/services/hospitality.service'
 import { listServiceAreas } from '../../marketplace/services/marketplace.service'
 import { normalizeHostWorkspaceType } from '../hostWorkspace.config'
 import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
 import {
-  createHostListingPacket, getHostListingPacket, importHostListingPackets,
-  listHostListingPackets, submitHostListingPacket, updateHostListingPacket,
+  createHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
+  listHostListingPackets, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
   uploadHostListingImage, uploadHostListingVideo, importHostListingRemoteImage,
 } from '../services/hostUnifiedListing.service'
 
@@ -83,7 +83,7 @@ const editorialStyles = String.raw`
 .uel-hero-side-kicker {text-transform:uppercase;font-size:13px!important;font-weight:850!important;letter-spacing:.13em;color:#783821!important;margin:0 0 16px}
 .uel-hero-side-title{font-weight:800!important;font-size:25px!important;letter-spacing:-.035em;line-height:1.2!important;color:#173F35!important;margin:0 0 14px}
 .uel-hero-step {display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;align-items:center;border-top:1px solid rgba(23,63,53,.22);padding:12px 0;color:#173F35}
-.uel-hero-step strong{font-size:19px;color:#AE502B;font-weight:850;letter-spacing:-.05em}
+.uel-hero-step strong{font-size:19px;color:#B45B35;font-weight:850;letter-spacing:-.05em}
 .uel-hero-step span{font-weight:700;font-size:16px;line-height:1.35}
 .uel-hero-approval {font-size:13px!important;line-height:1.5!important;color:#5F422F!important;border-top:1px solid rgba(23,63,53,.22);padding-top:13px;margin:0}
 .uel-alert {margin-top:18px;border-radius:12px;padding:14px 18px;font-size:15px!important;line-height:1.55!important}
@@ -98,7 +98,7 @@ const editorialStyles = String.raw`
 .uel-jumpbar span {color:#66746A;font-size:13px;font-weight:700;margin-right:8px}
 .uel-jumpbar a {display:inline-flex;gap:7px;align-items:center;color:#173F35;text-decoration:none;padding:8px 12px;font-size:14px;font-weight:700;border:1px solid #D1D9CD;border-radius:8px;background:#FFFFFF92}
 .uel-jumpbar a:hover {background:#EEDBD0;border-color:#D39C80}
-.uel-jumpbar a b {color:#C86C42}
+.uel-jumpbar a b {color:#B45B35}
 .uel-form {border:0;padding:0;margin-top:18px;min-width:0;display:block}
 .uel-page .uel-section{scroll-margin-top:90px;position:relative;min-width:0;border:0!important;border-top:3px solid #173F35!important;margin:0 0 20px!important;padding:clamp(20px,2.15vw,34px)!important;background:#fff!important;border-radius:0 0 16px 16px;box-shadow:0 8px 25px rgba(28,44,36,.045)}
 .uel-page .uel-section:nth-of-type(2n) {background:#EEF1E9!important}
@@ -106,8 +106,8 @@ const editorialStyles = String.raw`
 .uel-page #listing-nutrition {background:#F2F0E9!important;border-top-color:#C86C42!important}
 .uel-page #listing-selling{background:#E8EEE6!important;border-top-color:#173F35!important}
 .uel-page .uel-section > h2, .uel-page .uel-section > div:first-child > h2 {font-size:clamp(25px,2.2vw,35px)!important;line-height:1.15!important;letter-spacing:-.045em!important;font-weight:850!important;color:#173F35!important;margin:0!important}
-.uel-page .uel-section > h2:first-letter{color:#C86C42}
-.uel-page .uel-section > div:first-child > h2:first-letter{color:#C86C42}
+.uel-page .uel-section-number{color:#B45B35!important;font-variant-numeric:tabular-nums;letter-spacing:-.035em;display:inline-block}
+.uel-page .uel-bulk-section .uel-section-number{color:#B45B35!important}
 .uel-page .uel-section > p {font-size:16px!important;line-height:1.6!important;color:#4C5B52!important;max-width:1030px;margin-top:10px!important}
 .uel-page .uel-section h3 {font-size:21px!important;font-weight:800!important;color:#173F35!important;line-height:1.3!important}
 .uel-page .uel-label {font-size:15px!important;font-weight:750!important;letter-spacing:-.01em;line-height:1.45!important;color:#293D33!important;margin-bottom:9px!important}
@@ -134,19 +134,50 @@ const editorialStyles = String.raw`
 .uel-page .uel-review .uel-action{background:#C86C42!important;border-color:#C86C42!important;color:#fff!important}
 .uel-page .uel-review .uel-action:hover:not(:disabled){background:#B45630!important}
 .uel-page .uel-section.uel-review > h2 {color:#FFFFFF!important}
-.uel-page .uel-section.uel-review > h2::first-letter {color:#FFFFFF!important}
 .uel-page .uel-section.uel-review > p {color:#E6F1E9!important}
 .uel-page .uel-section.uel-review > p.font-semibold {color:#FFFFFF!important}
-.uel-history{margin-top:30px;background:#F2F3EC;border:1px solid #D7DDCF;border-radius:15px;padding:clamp(20px,2.5vw,34px)}
-.uel-history-head{display:flex;flex-wrap:wrap;gap:15px;align-items:center;justify-content:space-between;border-bottom:1px solid #C6D1C6;padding-bottom:17px}
-.uel-history .uel-eyebrow{color:#AD502E!important}
-.uel-history h2{font-size:30px!important;line-height:1.16!important;letter-spacing:-.043em!important;font-weight:850!important;color:#173F35!important}
+/* Host work archive: slim editorial index, not a collection of cards. */
+.uel-history{margin-top:32px;background:#FFFDF8;border-top:4px solid #173F35;border-bottom:1px solid #D2DDD0;padding:clamp(20px,2.5vw,35px);min-width:0}
+.uel-history-head{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;justify-content:space-between;padding-bottom:18px}
+.uel-history .uel-eyebrow{color:#A75130!important}
+.uel-history h2{font-size:clamp(27px,2.3vw,35px)!important;line-height:1.12!important;letter-spacing:-.045em!important;font-weight:850!important;color:#173F35!important;margin:0}
 .uel-history p{font-size:15px!important;color:#56645A!important}
-.uel-history-count{background:#D7DDCF;color:#173F35;border-radius:999px;padding:9px 14px;font-size:14px;font-weight:850}
-.uel-packet-list {border:none!important;margin-top:10px!important}
-.uel-packet-row {padding:16px 8px!important;gap:15px!important}
-.uel-packet-row + .uel-packet-row{border-top:1px solid #CED8C9}
-.uel-packet-title{font-size:17px!important;color:#202421!important;font-weight:750!important}
+.uel-history-count{background:#E7EFE7;color:#173F35;border-radius:7px;padding:9px 13px;font-size:14px;font-weight:800;border-left:3px solid #C86C42}
+.uel-history-filters{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:13px 0 17px;border-top:1px solid #D7DED3;border-bottom:1px solid #D7DED3}
+.uel-history-filter{border:1px solid #D2DBD1;background:transparent;color:#40584A;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;min-height:41px;font-size:14px;font-weight:750;cursor:pointer}
+.uel-history-filter:hover{background:#F0F4ED;border-color:#9DB8A7}
+.uel-history-filter[data-active='true']{background:#173F35!important;color:#FFFDF7!important;border-color:#173F35!important}
+.uel-history-filter b{font-size:12px;min-width:19px;text-align:center;padding:1px 5px;border-radius:5px;background:rgba(23,63,53,.09);color:inherit}
+.uel-history-filter[data-active='true'] b{background:rgba(255,255,255,.18)}
+.uel-packet-list{border:0!important;margin-top:0!important}
+.uel-packet-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(115px,140px) auto;gap:16px;align-items:center;padding:16px 3px!important;border-bottom:1px solid #E0E6DD;min-width:0}
+.uel-packet-row:last-child{border-bottom:0}
+.uel-packet-row:hover{background:#F2F5F0}
+.uel-packet-main{display:flex;align-items:center;gap:13px;min-width:0}
+.uel-packet-photo{flex:none;display:grid;place-items:center;width:56px;height:56px;overflow:hidden;border-radius:8px;background:#E1E9E0;color:#173F35}
+.uel-packet-photo img{width:100%;height:100%;object-fit:cover}
+.uel-packet-title{font-size:17px!important;color:#173F35!important;font-weight:800!important;line-height:1.3!important;overflow-wrap:anywhere}
+.uel-packet-meta{font-size:13px!important;color:#617165!important;margin:4px 0 0!important;line-height:1.45}
+.uel-packet-status{justify-self:start;display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:6px 10px;border-radius:6px;font-size:13px!important;font-weight:750;line-height:1.3;color:#184A36;background:#DDEEE2}
+.uel-packet-status[data-status='submitted_for_review']{background:#EDF0F4;color:#394B66}
+.uel-packet-status[data-status='changes_requested'],.uel-packet-status[data-status='rejected']{background:#F8E6DD;color:#8C472A}
+.uel-packet-status[data-status='draft']{background:#F3EDDD;color:#735322}
+.uel-packet-action{min-width:136px;white-space:nowrap!important}
+.uel-history-empty{padding:25px 2px;color:#53675A;font-size:15px}
+.uel-page .uel-updatable-fields{margin-top:0!important}
+.uel-revision-note{background:#F9EDE3;border-left:4px solid #C86C42;color:#653A29;padding:13px 16px;margin:0 0 18px;font-size:15px;line-height:1.55}
+.uel-page .uel-section.uel-locked-section{position:relative}
+.uel-page .uel-section.uel-locked-section .uel-editable-marker{display:inline-flex;margin-top:12px;padding:6px 11px;border:1px solid #B4C8B5;border-radius:8px;font-size:13px;font-weight:800;color:#173F35;background:#E5F1E8}
+@media(max-width:680px){
+  .uel-history{padding:19px 15px}
+  .uel-history-filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:13px}
+  .uel-history-filter{white-space:nowrap;flex:none}
+  .uel-packet-row{grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:14px 1px!important}
+  .uel-packet-main{grid-column:1/-1}
+  .uel-packet-status{grid-column:1}
+  .uel-packet-action{grid-column:2;min-width:0!important;padding:9px 11px!important;font-size:13px!important;min-height:40px!important}
+  .uel-packet-photo{height:51px;width:51px}
+}
 .uel-hold-note {margin:17px 0 0!important;display:flex;align-items:flex-start;gap:9px;font-size:14px!important;color:#536258!important}
 .uel-bulk-section{border:0!important;border-top:3px solid #C86C42!important;background:#fff!important;padding:clamp(20px,2.4vw,34px)!important;border-radius:0 0 16px 16px;margin:0 0 18px}
 .uel-bulk-section h2{font-size:clamp(25px,2vw,32px)!important;color:#173F35!important;font-weight:850!important;letter-spacing:-.035em!important}
@@ -299,6 +330,19 @@ const bulkTemplates = [
   { key: 'desserts', label: 'Desserts', type: 'kitchen_recipe' },
   { key: 'bakery', label: 'Bakery', type: 'kitchen_recipe' },
 ]
+const historyFilters = [
+  ['all', 'All'], ['draft', 'Drafts'], ['submitted_for_review', 'In review'],
+  ['approved', 'Approved'], ['needs_attention', 'Needs attention'],
+]
+function listingStatusLabel(status) {
+  return ({ draft: 'Draft', submitted_for_review: 'In review', approved: 'Approved',
+    rejected: 'Not approved', changes_requested: 'Changes requested' })[status] || String(status || 'Unknown').replaceAll('_', ' ')
+}
+function listingUpdatedDate(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
+}
 const emptyIngredient = () => ({ name: '', canonicalIngredientId: '', imageUrl: '', quantity: 1, unit: 'g', unitPrice: '', priceQuantity: 1, priceUnit: 'g', note: '' })
 const emptyStep = () => ({ instruction: '', timerMinutes: '', imageUrl: '' })
 function newPacket(type = 'grocery') {
@@ -335,7 +379,7 @@ function IngredientNameInput({ ingredient, onChange, className }) {
     let alive = true
     const timer = setTimeout(async () => {
       try {
-        const result = await searchCommunityIngredients({ search: query, limit: 6 })
+        const result = await searchHostListingIngredients({ search: query, limit: 6 })
         if (alive) { setMatches(result?.ingredients || []); setSearchError('') }
       } catch { if (alive) { setMatches([]); setSearchError('Catalog search is unavailable; enter the name manually for review.') } }
     }, 250)
@@ -382,6 +426,7 @@ function HostUnifiedListingEditor() {
   const [outlets, setOutlets] = useState([])
   const [menus, setMenus] = useState([])
   const [activeTab, setActiveTab] = useState('single')
+  const [historyFilter, setHistoryFilter] = useState('all')
   const fieldRef = useRef(null)
   const activeListing = existing.find((item) => item.id === editingId)
   const selectableTypes = editingId && !allowed.some((item) => item.value === form.type)
@@ -389,6 +434,12 @@ function HostUnifiedListingEditor() {
     : allowed
   const locked = ['submitted_for_review', 'approved', 'rejected'].includes(activeListing?.status)
   const correctionSection = activeListing?.status === 'changes_requested' ? activeListing?.correctionSection : ''
+  const filteredHistory = existing.filter((item) => historyFilter === 'all' ||
+    (historyFilter === 'needs_attention'
+      ? ['changes_requested', 'rejected'].includes(item.status)
+      : item.status === historyFilter))
+  const historyCount = (filter) => filter === 'all' ? existing.length : existing.filter((item) =>
+    filter === 'needs_attention' ? ['changes_requested', 'rejected'].includes(item.status) : item.status === filter).length
   const isRecipe = form.type !== 'grocery'
   const canSell = form.type === 'grocery' || form.type === 'prepared_food' || (form.type === 'kitchen_recipe' && form.sellReadyMade)
   const costs = useMemo(() => (isRecipe ? form.ingredients.map(estimateCost) : []), [isRecipe, form.ingredients])
@@ -537,6 +588,28 @@ function HostUnifiedListingEditor() {
       await load()
     } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
+  async function saveSectionRevision() {
+    if (busy || uploading || !locked || !editingId) return
+    if (activeListing?.status === 'approved' && !window.confirm(
+      'This approved listing will be temporarily hidden from customers while Super Admin reviews your updated food facts and selling details. Continue?'
+    )) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const sections = {
+        nutrition: form.nutrition, allergens: form.allergens, dietary: form.dietary,
+        selling: form.selling,
+        delivery: { ...form.delivery, postalCodes: pincodeText.split(/[\s,;]+/).filter(Boolean) },
+      }
+      const result = await submitHostListingSectionRevision(editingId, sections)
+      if (result?.listing?.packet) {
+        setForm({ ...newPacket(result.listing.packet.type), ...result.listing.packet })
+        setPincodeText((result.listing.packet.delivery?.postalCodes || []).join(', '))
+      }
+      await load()
+      setNotice('Food facts and selling changes sent to Super Admin for review. Other listing information was not changed.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+  }
   async function bulkImport() {
     if (busy) return
     let packets
@@ -640,7 +713,7 @@ function HostUnifiedListingEditor() {
         {activeTab === 'bulk' ? (
           <div className="mt-6 space-y-5">
             <section className="uel-bulk-section">
-              <h2 className="text-2xl font-bold">01 / Download your Excel template</h2>
+              <h2 className="text-2xl font-bold"><span className="uel-section-number">01</span> / Download your Excel template</h2>
               <p className="mt-2 text-sm text-[#4A5850]">Choose the template for your listing. Grocery uses product details and photos only; recipe and drink templates also include individual ingredients, their photos, preparation steps and costing.</p>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {visibleTemplates.map((item) => (
@@ -652,7 +725,7 @@ function HostUnifiedListingEditor() {
             </section>
             <section className="uel-bulk-section grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div>
-                <h2 className="text-2xl font-bold">02 / Fill the sheets and upload</h2>
+                <h2 className="text-2xl font-bold"><span className="uel-section-number">02</span> / Fill the sheets and upload</h2>
                 <p className="mt-2 text-sm leading-6 text-[#4A5850]">Open the Excel file and follow <strong>Start Here</strong>. Give each listing a unique <strong>listing_key</strong>. Use the same key in Photos, Ingredients, Steps and Allergens so every photo and detail attaches to the correct item. The sample sheet is for guidance only.</p>
                 <label htmlFor="epantry-bulk-excel" className="mt-4 block text-sm font-semibold">Choose your completed Excel (.xlsx)</label>
                 <input id="epantry-bulk-excel" type="file" disabled={busy} accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="mt-2 block w-full rounded-lg border border-[#CBD4C8] bg-white p-3 text-sm" onChange={async (event) => {
@@ -662,7 +735,7 @@ function HostUnifiedListingEditor() {
                 }}/>
                 {bulkFileName && <p className="mt-2 text-sm text-[#173F35]">Selected: {bulkFileName}</p>}
                 {bulkPreview && <div className="mt-5 border border-[#B7C6B8] bg-[#F0F4ED] p-4">
-                  <h3 className="font-bold">03 / Review before importing</h3>
+                  <h3 className="font-bold"><span className="uel-section-number">03</span> / Review before importing</h3>
                   <p className="mt-1 text-sm">{bulkPreview.packets.length} draft listings · {bulkPreview.mediaCount} unique images · {bulkPreview.template.replaceAll('_', ' ')} template</p>
                   <div className="mt-3 max-h-72 overflow-auto border-t border-[#CBD4C8]">
                     {bulkPreview.packets.map((packet, index) => <div key={index} className="flex flex-wrap justify-between gap-2 border-b border-[#CBD4C8] py-2 text-sm"><span><strong>{index + 1}. {packet.title}</strong><br/>{packet.category.replaceAll('_', ' ')}</span><span className="text-[#53635B]">{packet.images.length} photos · {packet.ingredients.length} ingredients · {packet.steps.length} steps</span></div>)}
@@ -693,9 +766,10 @@ function HostUnifiedListingEditor() {
             </details>
           </div>
         ) : (
+          <>
           <fieldset disabled={locked || busy || loading} className="uel-form min-w-0 disabled:opacity-85">
             <section id="listing-details" className={section}>
-              <h2 className="text-2xl font-bold">01 / The essentials</h2>
+              <h2 className="text-2xl font-bold"><span className="uel-section-number">01</span> / The essentials</h2>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <EditorField title="Listing type"><select value={form.type} className={field} onChange={(event) => startNew(event.target.value)}>{selectableTypes.map((item) => <option key={item.value} value={item.value}>{workspace === 'hybrid' && item.value === 'kitchen_recipe' ? 'Recipe' : usesHospitalityOperations && item.value === 'prepared_food'
                   ? (editingId && form.type === 'prepared_food' ? 'Ready-made food (existing listing)' : 'Restaurant & menu — open Hospitality Operations')
@@ -732,7 +806,7 @@ function HostUnifiedListingEditor() {
               {workspace !== 'hybrid' && isRecipe && ['kitchen_recipe', 'prepared_food'].includes(form.type) && <div className="mt-4 flex flex-wrap gap-6 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={form.shareRecipe} onChange={(event) => patch('shareRecipe', event.target.checked)}/> Share recipe</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.sellReadyMade} disabled={form.type === 'prepared_food'} onChange={(event) => patch('sellReadyMade', event.target.checked)}/> Sell ready-made item</label></div>}
             </section>
             <section id="listing-media" className={section}>
-              <h2 className="text-2xl font-bold">02 / Show it beautifully {isRecipe ? '— photos & video' : '— photos'}</h2>
+              <h2 className="text-2xl font-bold"><span className="uel-section-number">02</span> / Show it beautifully {isRecipe ? '— photos & video' : '— photos'}</h2>
               <p className="mt-1 text-sm text-[#4A5850]">Show customers what they will get. Add clear, real photos; for recipes, you can also include a cooking video and ingredient photos.</p>
               <div className="mt-4 flex flex-wrap gap-3">{form.images.map((url, index) => {
                 const role = (form.imageRoles || []).find((item) => item.url === url)?.role
@@ -773,7 +847,7 @@ function HostUnifiedListingEditor() {
               {isRecipe && <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"><EditorField title="Recipe video (uploaded or HTTPS URL)"><input className={field} type="url" value={form.videoUrl || ''} onChange={(event) => patch('videoUrl', event.target.value)} placeholder="https://..."/></EditorField><label className="mt-auto inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#173F35] px-4 py-3 text-sm font-semibold"><UploadCloud size={18}/>{uploading === 'video' ? 'Uploading...' : 'Upload video (50 MB max)'}<input className="sr-only" type="file" accept="video/mp4,video/webm" disabled={Boolean(uploading)} onChange={(event) => { uploadVideo(event.target.files?.[0]); event.target.value = '' }}/></label></div>}
             </section>
             {isRecipe && <section id="listing-ingredients" className={section}>
-              <div className="flex items-center justify-between gap-2"><h2 className="text-2xl font-bold">03 / Ingredients & costing</h2><button className={styles.secondary} type="button" onClick={() => patch('ingredients', [...form.ingredients, emptyIngredient()])}><Plus size={16} className="mr-1 inline"/>Add ingredient</button></div>
+              <div className="flex items-center justify-between gap-2"><h2 className="text-2xl font-bold"><span className="uel-section-number">03</span> / Ingredients & costing</h2><button className={styles.secondary} type="button" onClick={() => patch('ingredients', [...form.ingredients, emptyIngredient()])}><Plus size={16} className="mr-1 inline"/>Add ingredient</button></div>
               <p className="mt-2 text-sm leading-6 text-[#4A5850]">Each price is your own input for the specified purchase quantity. These are estimates, not verified marketplace prices. Different mass/volume units are converted when possible.</p>
               <div className="mt-4 space-y-4">{form.ingredients.map((item, index) => <div key={index} className="border-b border-[#D7DDCF] bg-[#EDF1E9] p-3 sm:p-4">
                 <div className="flex justify-between"><h3 className="font-semibold">Ingredient {index + 1}</h3><button type="button" disabled={form.ingredients.length === 1} onClick={() => removeRow('ingredients', index)} aria-label={`Remove ingredient ${index + 1}`}><Trash2 size={17}/></button></div>
@@ -791,11 +865,15 @@ function HostUnifiedListingEditor() {
               </div>)}</div>
               <div className="mt-4 flex flex-wrap gap-8 bg-[#D7DDCF] p-4 text-sm"><span><strong>Ingredient estimate:</strong> {formatMoney(ingredientCost)}</span><span><strong>Complete cost:</strong> {formatMoney(completeCost)}</span><span><strong>Per serving:</strong> {completeCost !== null && Number(form.baseServings) > 0 ? formatMoney(completeCost / Number(form.baseServings)) : 'Not available'}</span><span className="font-semibold text-[#9A4F31]">{costingComplete ? 'All ingredient estimates entered' : 'Some ingredient costs are missing'}</span></div>
             </section>}
-            {isRecipe && <section id="listing-steps" className={section}><div className="flex items-center justify-between gap-2"><h2 className="text-2xl font-bold">04 / How to make it</h2><button type="button" className={styles.secondary} onClick={() => patch('steps', [...form.steps, emptyStep()])}><Plus size={16} className="mr-1 inline"/>Add step</button></div>
+            {isRecipe && <section id="listing-steps" className={section}><div className="flex items-center justify-between gap-2"><h2 className="text-2xl font-bold"><span className="uel-section-number">04</span> / How to make it</h2><button type="button" className={styles.secondary} onClick={() => patch('steps', [...form.steps, emptyStep()])}><Plus size={16} className="mr-1 inline"/>Add step</button></div>
               <div className="mt-4 space-y-3">{form.steps.map((step, index) => <div key={index} className="grid items-start gap-3 border-b border-[#D7DDCF] pb-3 sm:grid-cols-[50px_minmax(0,1fr)_150px_36px]"><strong className="py-3 text-[#C86C42]">{String(index + 1).padStart(2, '0')}</strong><textarea className={field} rows={2} value={step.instruction || ''} onChange={(event) => updateRow('steps', index, { instruction: event.target.value })} placeholder="What should the customer do?"/><input className={field} type="number" min="0" value={step.timerMinutes ?? ''} onChange={(event) => updateRow('steps', index, { timerMinutes: event.target.value })} placeholder="Minutes"/><button type="button" aria-label={`Remove step ${index + 1}`} disabled={form.steps.length === 1} onClick={() => removeRow('steps', index)}><Trash2 size={17}/></button></div>)}</div>
             </section>}
-            <section id="listing-nutrition" className={section}><h2 className="text-2xl font-bold">{isRecipe ? '05' : '03'} / Food facts & allergens</h2>
+          </fieldset>
+          <fieldset disabled={busy || loading} className="uel-form uel-updatable-fields min-w-0 disabled:opacity-85">
+            {locked && <p className="uel-revision-note" role="status"><strong>Editing a previously submitted listing:</strong> Only Food facts & allergens and Selling & delivery can be changed here. Saving sends these changes to Super Admin again. If this listing is already approved, it will be temporarily hidden from customers until approved again.</p>}
+            <section id="listing-nutrition" className={`${section} ${locked ? 'uel-locked-section' : ''}`}><h2 className="text-2xl font-bold"><span className="uel-section-number">{isRecipe ? '05' : '03'}</span> / Food facts & allergens</h2>
               <p className="mt-2 text-sm text-[#4A5850]">Only enter values you can support with evidence. Leave unknown information undeclared.</p>
+              {locked && <span className="uel-editable-marker">Editable · re-approval required</span>}
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><EditorField title="Nutrition basis"><input className={field} value={form.nutrition?.basis || ''} onChange={(event) => nested('nutrition', 'basis', event.target.value)}/></EditorField>
                 {fields.map((item) => <EditorField key={item} title={item.replace(/([A-Z])/g, ' $1')}><input type="number" min="0" step="any" className={field} value={form.nutrition?.[item] ?? ''} onChange={(event) => nested('nutrition', item, event.target.value)}/></EditorField>)}
                 {workspace !== 'hybrid' && <EditorField title="Dietary declaration"><select value={form.dietary} className={field} onChange={(event) => patch('dietary', event.target.value)}>{['not_declared', 'vegetarian', 'vegan', 'non_vegetarian', 'other'].map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></EditorField>}</div>
@@ -803,8 +881,9 @@ function HostUnifiedListingEditor() {
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{allergenNames.map((key) => <EditorField key={key} title={key.replaceAll('_', ' ')}><select className={field} value={form.allergens.find((item) => item.key === key)?.relationship || ''} onChange={(event) => patch('allergens', [...form.allergens.filter((item) => item.key !== key), ...(event.target.value ? [{ key, relationship: event.target.value }] : [])])}><option value="">Not declared</option><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="does_not_contain">Does not contain</option><option value="unknown">Unknown / not verified</option></select></EditorField>)}</div>
               <EditorField title="Evidence / calculation note"><textarea rows={2} className={`${field} mt-4`} value={form.nutrition?.evidenceNote || ''} onChange={(event) => nested('nutrition', 'evidenceNote', event.target.value)}/></EditorField>
             </section>
-            {canSell && <section id="listing-selling" className={section}><span id="listing-delivery" /><h2 className="text-2xl font-bold">{isRecipe ? '06' : '04'} / Selling & delivery</h2>
+            {canSell && <section id="listing-selling" className={`${section} ${locked ? 'uel-locked-section' : ''}`}><span id="listing-delivery" /><h2 className="text-2xl font-bold"><span className="uel-section-number">{isRecipe ? '06' : '04'}</span> / Selling & delivery</h2>
               <p className="mt-1 text-sm text-[#4A5850]">Set your pricing, available stock and delivery coverage. These details are reviewed here; your existing selling and delivery settings still control live orders.</p>
+              {locked && <span className="uel-editable-marker">Editable · re-approval required</span>}
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[['listPrice', 'List price (Rs)'], ['salePrice', 'Selling price (Rs)'], ['stockQuantity', 'Available stock'], ['packagingCost', 'Packaging cost (Rs)'], ['labourCost', 'Labour cost (Rs)']].map(([key, title]) => <EditorField key={key} title={title}><input type="number" min="0" step="any" className={field} value={form.selling?.[key] ?? ''} onChange={(event) => nested('selling', key, event.target.value)}/></EditorField>)}
                 <EditorField title="Stock unit"><input className={field} value={form.selling?.stockUnit || 'piece'} onChange={(event) => nested('selling', 'stockUnit', event.target.value)}/></EditorField>
@@ -822,15 +901,55 @@ function HostUnifiedListingEditor() {
               <EditorField title="Delivery / pickup notes"><textarea rows={2} className={`${field} mt-3`} value={form.delivery?.note || ''} onChange={(event) => nested('delivery', 'note', event.target.value)}/></EditorField>
             </section>}
             <section className={`${section} uel-review`}><h2 className="text-xl font-bold">Ready for review?</h2>
-              <p className="mt-2 text-sm text-[#4A5850]">Save your progress whenever you like, or submit your completed listing to Super Admin. After submission, you can view it but cannot edit it unless changes are requested. Approval does not automatically enable marketplace sales.</p>
-              {locked && <p className="mt-3 font-semibold text-[#173F35]">This listing has been submitted and is read-only.</p>}
-              <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={busy || uploading || locked} onClick={() => save(false)} className={styles.secondary}><Save size={17} className="mr-2 inline"/>Save full draft</button><button type="button" disabled={busy || uploading || locked} onClick={() => save(true)} className={styles.button}><Send size={17} className="mr-2 inline"/>Save & submit for review</button></div>
+              <p className="mt-2 text-sm text-[#4A5850]">{locked ? 'Food facts, allergens, pricing and delivery are editable. Your other details stay protected; these changes require Super Admin review before publishing.' : 'Save your progress whenever you like, or submit your completed listing to Super Admin. Approval does not automatically enable marketplace sales.'}</p>
+              {locked ? (
+                <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={busy || Boolean(uploading)} onClick={saveSectionRevision} className={styles.button}><Send size={17} className="mr-2 inline"/>Save changes & send for review</button></div>
+              ) : (
+                <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={busy || Boolean(uploading)} onClick={() => save(false)} className={styles.secondary}><Save size={17} className="mr-2 inline"/>Save full draft</button><button type="button" disabled={busy || Boolean(uploading)} onClick={() => save(true)} className={styles.button}><Send size={17} className="mr-2 inline"/>Save & submit for review</button></div>
+              )}
             </section>
           </fieldset>
+          </>
         )}
-        <section className="uel-history">
-          <div className="uel-history-head"><div><p className="uel-eyebrow">Your work, all in one place</p><h2>Your listings & drafts</h2><p className="mt-2">Pick up a saved draft or view a listing you have already sent for review.</p></div><span className="uel-history-count">{existing.length} {existing.length === 1 ? 'listing' : 'listings'}</span></div>
-          <div className="uel-packet-list divide-y divide-[#D7DDCF]">{existing.length ? existing.map((item) => <div key={item.id} className="uel-packet-row flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="uel-packet-title">{item.title || 'Untitled draft'}</p><p className="text-sm text-[#556358]">{item.type.replaceAll('_', ' ')} / {item.status.replaceAll('_', ' ')}</p></div><button type="button" className={styles.secondary} onClick={() => { setParams({ edit: item.id }); setActiveTab('single'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>{['submitted_for_review', 'approved', 'rejected'].includes(item.status) ? 'View listing' : 'Continue editing'}</button></div>) : <p className="py-4 text-sm text-[#556358]">No unified listings yet.</p>}</div>
+        <section className="uel-history" aria-labelledby="uel-history-title">
+          <div className="uel-history-head">
+            <div>
+              <p className="uel-eyebrow">Your work, all in one place</p>
+              <h2 id="uel-history-title">Your listings & drafts</h2>
+              <p className="mt-2">A clear view of everything you've saved, submitted or published.</p>
+            </div>
+            <span className="uel-history-count">{existing.length} {existing.length === 1 ? 'listing' : 'listings'} in total</span>
+          </div>
+          <div className="uel-history-filters" role="group" aria-label="Filter saved listings by status">
+            {historyFilters.map(([key, label]) => (
+              <button key={key} type="button" className="uel-history-filter" data-active={historyFilter === key}
+                aria-pressed={historyFilter === key} onClick={() => setHistoryFilter(key)}>
+                {label} <b>{historyCount(key)}</b>
+              </button>
+            ))}
+          </div>
+          <div className="uel-packet-list">
+            {filteredHistory.length ? filteredHistory.map((item) => (
+              <div key={item.id} className="uel-packet-row">
+                <div className="uel-packet-main">
+                  <div className="uel-packet-photo">
+                    {item.packet?.images?.[0] ? <img src={item.packet.images[0]} alt="" loading="lazy"/> : <Package size={24} strokeWidth={1.6} aria-hidden="true"/>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="uel-packet-title">{item.title || 'Untitled draft'}</p>
+                    <p className="uel-packet-meta">{item.type.replaceAll('_', ' ')}{listingUpdatedDate(item.updatedAt) ? ` · Updated ${listingUpdatedDate(item.updatedAt)}` : ''}</p>
+                  </div>
+                </div>
+                <span className="uel-packet-status" data-status={item.status}>{listingStatusLabel(item.status)}</span>
+                <button type="button" className={`${styles.secondary} uel-packet-action`} onClick={() => {
+                  setParams({ edit: item.id }); setActiveTab('single'); window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}>{['submitted_for_review', 'approved', 'rejected'].includes(item.status) ? 'View listing' : 'Continue editing'} <ArrowUpRight size={16} aria-hidden="true"/></button>
+              </div>
+            )) : <div className="uel-history-empty">
+              {existing.length ? 'No listings match this status.' : 'No listings yet. Save your first draft to see it here.'}
+              {existing.length > 0 && <button type="button" className="ml-3 font-bold underline underline-offset-4 text-[#173F35]" onClick={() => setHistoryFilter('all')}>Show all</button>}
+            </div>}
+          </div>
         </section>
         <p className="uel-hold-note"><ClipboardList size={17} className="mt-1 shrink-0"/><span>Non-food categories, including cosmetics and clothing, are not available for listing yet.</span></p>
       </div>

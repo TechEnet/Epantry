@@ -13,6 +13,16 @@ async function write(method, path, data) {
 export async function listHostListingPackets() {
   return unwrap(await apiClient.get('/host/listing-packets'))
 }
+// Host-only canonical ingredient autocomplete. Never call the Customer-only
+// /community/ingredients API from Host Studio: its 403 triggers a role redirect.
+export async function searchHostListingIngredients({ search, limit = 6 } = {}) {
+  const name = String(search || '').trim()
+  if (name.length < 2) return { ingredients: [] }
+  return unwrap(await apiClient.get('/host/listing-packets/catalog/ingredients', {
+    params: { search: name.slice(0, 120), limit },
+  }))
+}
+
 export async function getHostListingPacket(id) {
   return unwrap(await apiClient.get(`/host/listing-packets/${encodeURIComponent(id)}`))
 }
@@ -21,6 +31,9 @@ export async function createHostListingPacket(packet) {
 }
 export async function updateHostListingPacket(id, packet) {
   return write('patch', `/host/listing-packets/${encodeURIComponent(id)}`, { packet })
+}
+export async function submitHostListingSectionRevision(id, sections) {
+  return write('post', `/host/listing-packets/${encodeURIComponent(id)}/section-revision`, { sections })
 }
 export async function submitHostListingPacket(id) {
   return write('post', `/host/listing-packets/${encodeURIComponent(id)}/submit`, {})
