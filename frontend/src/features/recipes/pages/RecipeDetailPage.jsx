@@ -1,6 +1,8 @@
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
+  Leaf,
   BellRing,
   Check,
   ChefHat,
@@ -73,6 +75,7 @@ import { recordRecipeView } from '../utils/recipeEngagement'
 
 import {
   getPublicRecipe,
+  getRecipeDiscovery,
   listPublicRecipes,
   scalePublicRecipe,
 } from '../services/recipe.service'
@@ -379,11 +382,35 @@ function resolveRecipeDietaryBadge(foodIntelligence) {
   return null
 }
 
+function RecipeLocalNames({ origin }) {
+  if (!origin?.localName && !origin?.englishName) return null
+  return (
+    <div className="mt-2 space-y-1.5" aria-label="Documented recipe names">
+      {origin.localName ? (
+        <p className="text-[19px] font-medium leading-snug text-[#173F35] sm:text-[22px]" lang="und">
+          {origin.localName}
+          {origin.localLanguage ? <span className="ml-2 text-[12px] font-medium text-[#202421]/60">{origin.localLanguage}</span> : null}
+        </p>
+      ) : null}
+      {origin.reading ? (
+        <p className="text-[13px] font-medium leading-5 text-[#202421]/75">
+          English reading: <span className="font-semibold text-[#202421]">{origin.reading}</span>
+        </p>
+      ) : origin.englishName ? (
+        <p className="text-[13px] font-medium leading-5 text-[#202421]/75">
+          Also known as: <span className="font-semibold text-[#202421]">{origin.englishName}</span>
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 function RecipeDetailsSheet({
   dish,
   recipe,
   ingredients,
   foodIntelligence,
+  discoveryOrigin,
 }) {
   const ingredientRows =
     Array.isArray(
@@ -443,6 +470,7 @@ function RecipeDetailsSheet({
             </span>
           ) : null}
         </div>
+        <RecipeLocalNames origin={discoveryOrigin} />
         <p className="mt-2 hidden text-[14px] font-medium leading-5 text-[#486354] sm:block">
           Published recipe details · generated from governed listing data
         </p>
@@ -738,6 +766,55 @@ function RecipeEvidenceFallback({ kind, evidence }) {
   )
 }
 
+function RecipeOriginMap({ origin, map }) {
+  const view = useMemo(() => {
+    const shapes = map?.outline || []
+    const coordinates = shapes.flatMap(feature => feature.rings || []).flat()
+    if (!coordinates.length) return null
+    const xs = coordinates.map(([x]) => x).filter(Number.isFinite)
+    const ys = coordinates.map(([,y]) => y).filter(Number.isFinite)
+    if (!xs.length || !ys.length) return null
+    const minX = Math.min(...xs), maxX = Math.max(...xs)
+    const minY = Math.min(...ys), maxY = Math.max(...ys)
+    const deltaX = Math.max(maxX - minX, 0.001)
+    const deltaY = Math.max(maxY - minY, 0.001)
+    const padding = 24
+    const scale = Math.min(552 / deltaX, 312 / deltaY)
+    const projected = ([x,y]) => [
+      padding + (x-minX)*scale + (552-deltaX*scale)/2,
+      padding + (maxY-y)*scale + (312-deltaY*scale)/2,
+    ]
+    const path = rings => rings.map(ring =>
+      ring.map((point,index) => {
+        const [x,y]=projected(point)
+        return `${index ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`
+      }).join(' ') + ' Z',
+    ).join(' ')
+    return {
+      outline: shapes.map(shape => path(shape.rings)),
+      states: (map?.states || []).map(shape => ({ name: shape.name, path: path(shape.rings) })),
+    }
+  }, [map])
+  if (!view) return (
+    <div className="flex min-h-52 items-center justify-center border border-dashed border-[#DCE0CF] bg-[#F7F6F2] px-5 text-center text-[14px] text-[#173F35]/70">
+      Verified map boundaries are not available right now.
+    </div>
+  )
+  const regionName = String(origin?.region?.name || '').toLowerCase().trim()
+  return (
+    <figure className="min-w-0 bg-[#F7F6F2] p-3 sm:p-5">
+      <svg viewBox="0 0 600 360" className="h-auto max-h-[290px] w-full" role="img" aria-label={`Map showing ${origin.country.name}${origin.region ? `, ${origin.region.name}` : ''}`}>
+        {view.outline.map((path,i) => <path key={`country-${i}`} d={path} fill="#D8E2D6" stroke="#A8BDB2" strokeWidth="1.4" fillRule="evenodd" />)}
+        {view.states.map((shape,i) => <path key={`region-${i}`} d={shape.path} fill={regionName && shape.name.toLowerCase() === regionName ? '#C86C42' : 'transparent'} stroke="#FCFCF9" strokeWidth="0.8" fillRule="evenodd" />)}
+      </svg>
+      <figcaption className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#173F35]/70">
+        <span>{origin.country.name}{origin.region?.name ? ` · ${origin.region.name}` : ''}</span>
+        <a href={map.credit?.url || 'https://www.geoboundaries.org/'} target="_blank" rel="noreferrer" className="underline underline-offset-2">{map.credit?.label || 'geoBoundaries'}</a>
+      </figcaption>
+    </figure>
+  )
+}
+
 const RECIPE_RECOMMENDATION_LIMIT = 5
 
 function getRecipeRecommendationKey(item) {
@@ -849,6 +926,7 @@ function RecipeRecommendationShelf({
   description,
   items,
   loading,
+  showViewAll = true,
 }) {
   if (!loading && items.length === 0) {
     return null
@@ -864,11 +942,14 @@ function RecipeRecommendationShelf({
           <h2 className="mt-1 text-[24px] font-semibold leading-[1.25] text-[#173F35] sm:text-[32px] sm:font-semibold sm:tracking-[-0.035em]">
             {title}
           </h2>
-          <p className="mt-1 hidden max-w-2xl text-[13px] font-medium leading-4 text-[#202421]/70 sm:mt-1.5 sm:block sm:text-sm sm:leading-6">
-            {description}
-          </p>
+          {description ? (
+            <p className="mt-1 hidden max-w-2xl text-[13px] font-medium leading-4 text-[#202421]/70 sm:mt-1.5 sm:block sm:text-sm sm:leading-6">
+              {description}
+            </p>
+          ) : null}
         </div>
 
+        {showViewAll ? (
         <Link
           to="/recipes"
           className="focus-ring inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-1.5 text-[13px] font-semibold text-[#173F35] shadow-sm transition hover:border-emerald-700 hover:bg-[#173F35] hover:text-white sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm sm:font-semibold"
@@ -879,6 +960,7 @@ function RecipeRecommendationShelf({
             aria-hidden="true"
           />
         </Link>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
@@ -960,6 +1042,9 @@ export default function RecipeDetailPage() {
     useState(
       false,
     )
+
+  const [recipeDiscovery, setRecipeDiscovery] = useState(null)
+  const [recipeDiscoveryLoading, setRecipeDiscoveryLoading] = useState(false)
 
   const [
     scaledData,
@@ -1322,6 +1407,22 @@ export default function RecipeDetailPage() {
       slug,
     ],
   )
+
+  useEffect(() => {
+    if (!slug || !data?.recipe?.id) {
+      setRecipeDiscovery(null)
+      setRecipeDiscoveryLoading(false)
+      return undefined
+    }
+    let active = true
+    setRecipeDiscovery(null)
+    setRecipeDiscoveryLoading(true)
+    getRecipeDiscovery(slug)
+      .then(result => { if (active) setRecipeDiscovery(result || null) })
+      .catch(() => { if (active) setRecipeDiscovery(null) })
+      .finally(() => { if (active) setRecipeDiscoveryLoading(false) })
+    return () => { active = false }
+  }, [slug, data?.recipe?.id])
 
   useEffect(
     () => {
@@ -4749,6 +4850,7 @@ export default function RecipeDetailPage() {
                   foodIntelligence={
                     detailsFoodIntelligence
                   }
+                  discoveryOrigin={recipeDiscovery?.origin}
                 />
               ) : dish.heroImageUrl ? (
                 <img
@@ -4798,6 +4900,8 @@ export default function RecipeDetailPage() {
                   </span>
                 ) : null}
               </div>
+
+              <RecipeLocalNames origin={recipeDiscovery?.origin} />
 
               <div className="epantry-recipe-metrics mt-5 grid grid-cols-3 gap-x-3 gap-y-2">
                 {[
@@ -4852,6 +4956,7 @@ export default function RecipeDetailPage() {
               <h1 className="text-[36px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#202421] lg:text-[56px] lg:leading-[1.14]">
                 {dish.name || recipe.title}
               </h1>
+              <RecipeLocalNames origin={recipeDiscovery?.origin} />
 
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[#202421]/80 sm:mt-3 sm:text-base sm:leading-7">
                 {recipe.description || dish.description}
@@ -5056,6 +5161,26 @@ export default function RecipeDetailPage() {
                 ) : null}
               </div>
             </div>
+          </section>
+        ) : null}
+
+        {recipeDiscovery?.origin?.country ? (
+          <section className="epantry-origin-chapter mt-8 grid gap-5 border-y border-[#DCE0CF] bg-[#F1F3EB] px-4 py-6 sm:px-7 sm:py-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-8" aria-label="Verified recipe origin">
+            <div>
+              <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#C86C42]">From its roots</p>
+              <h2 className="mt-2 text-[26px] font-semibold tracking-tight text-[#173F35] sm:text-[34px]">Origin & tradition</h2>
+              <p className="mt-2 text-[16px] font-medium text-[#202421]">
+                {recipeDiscovery.origin.country.name}
+                {recipeDiscovery.origin.region?.name ? ` · ${recipeDiscovery.origin.region.name}` : ''}
+              </p>
+              <p className="mt-3 max-w-prose text-[13px] leading-6 text-[#202421]/75">
+                Source-reported origin, not an EPANTRY popularity ranking.
+              </p>
+              {recipeDiscovery.origin.sourceUrl ? (
+                <a href={recipeDiscovery.origin.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-[13px] font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4">Verify origin on Wikidata</a>
+              ) : null}
+            </div>
+            <RecipeOriginMap origin={recipeDiscovery.origin} map={recipeDiscovery.map} />
           </section>
         ) : null}
 
@@ -5325,6 +5450,17 @@ export default function RecipeDetailPage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <Link
+                        to={`/ingredients/${encodeURIComponent(identity.id || identity.slug || identity.name || 'ingredient')}`}
+                        className="group/ingredient relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg border border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] transition duration-200 hover:scale-[1.05] hover:border-[#C86C42] hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#C86C42]"
+                        aria-label={`Explore ${identity.name || 'ingredient'} details`}
+                        title={`Explore ${identity.name || 'ingredient'}`}
+                      >
+                        {(ingredient.imageUrl || identity.imageUrl) ? (
+                          <img src={ingredient.imageUrl || identity.imageUrl} alt={identity.name || 'Ingredient'} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover/ingredient:scale-110" />
+                        ) : <Leaf size={19} aria-hidden="true" />}
+                        <ArrowUpRight size={12} aria-hidden="true" className="absolute bottom-0 right-0 rounded-tl bg-white/90 text-[#C86C42]" />
+                      </Link>
                           <h3 className="text-[13px] font-semibold leading-tight text-[#202421] sm:text-base sm:leading-normal">
                             {identity.name ||
                               'Canonical ingredient'}
@@ -5628,14 +5764,19 @@ export default function RecipeDetailPage() {
           <RecipeRecommendationShelf
             eyebrow="Same table"
             title="Similar recipes"
-            description={
-              data?.dish?.cuisine
-                ? `More ${data.dish.cuisine} recipes with a familiar cooking direction.`
-                : 'More recipes with a similar course and cooking style.'
-            }
-            items={similarRecipes}
-            loading={recipeRecommendationsLoading}
+            description="Published recipes sharing real ingredients with this dish."
+            items={recipeDiscovery?.similarRecipes || []}
+            loading={recipeDiscoveryLoading}
           />
+          {recipeDiscovery?.origin?.country && recipeDiscovery?.moreFromCountry?.length > 0 ? (
+            <RecipeRecommendationShelf
+              eyebrow="Explore this cuisine"
+              title={`More from ${recipeDiscovery.origin.country.name}`}
+              showViewAll={false}
+              items={recipeDiscovery.moreFromCountry}
+              loading={false}
+            />
+          ) : null}
         </div>
 
       </div>

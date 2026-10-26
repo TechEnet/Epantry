@@ -9,6 +9,8 @@ const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'tsp', 'tbsp', 'cu
 // Optional Hybrid grocery facets, persisted without changing the legacy grocery category.
 const GROCERY_SUBCATEGORIES = new Set(['vegetables','fruits','dairy','eggs','meat_poultry','seafood','grains_rice','pulses_legumes','spices_condiments','oils_ghee','canned_jarred','packaged_snacks','packaged_food','frozen_food','beverages','bakery_bread','other_grocery'])
 const PACKAGING_TYPES = new Set(['loose','packet','can','jar','bottle','box','tray','other'])
+// Grocery photo roles are optional metadata; image URLs remain unchanged for public consumers.
+const GROCERY_IMAGE_ROLES = new Set(['front_of_pack','ingredients_panel','allergen_statement','nutrition_panel','barcode','back_manufacturer_panel','certification_mark'])
 const WORKSPACE_TYPES = new Set(['b2b', 'brand_seller', 'chef_restaurant', 'hybrid'])
 const ACCESS = Object.freeze({
   b2b: ['grocery', 'kitchen_recipe', 'prepared_food'],
@@ -72,6 +74,13 @@ export function normalizeListingPacket(raw = {}) {
   })) : []
   const postalCodes = [...new Set(list(input.delivery?.postalCodes, 600)
     .map((code) => text(code, 12)).filter((code) => /^[1-9][0-9]{5}$/.test(code)))].slice(0, 500)
+  const images = list(input.images, 12).map(cleanUrl).filter(Boolean)
+  const imageRoles = type === 'grocery'
+    ? list(input.imageRoles, 12).map((item) => ({
+        url: cleanUrl(item?.url),
+        role: text(item?.role, 70),
+      })).filter((item) => images.includes(item.url) && GROCERY_IMAGE_ROLES.has(item.role))
+    : []
   return {
     type,
     title: text(input.title, 180),
@@ -79,7 +88,8 @@ export function normalizeListingPacket(raw = {}) {
     category: text(input.category, 50),
     grocerySubcategory: type === 'grocery' && GROCERY_SUBCATEGORIES.has(input.grocerySubcategory) ? input.grocerySubcategory : '',
     packagingType: type === 'grocery' && PACKAGING_TYPES.has(input.packagingType) ? input.packagingType : '',
-    images: list(input.images, 12).map(cleanUrl).filter(Boolean),
+    images,
+    imageRoles,
     videoUrl: recipeAllowed ? cleanUrl(input.videoUrl) : '',
     brandName: text(input.brandName, 140),
     sku: text(input.sku, 120),

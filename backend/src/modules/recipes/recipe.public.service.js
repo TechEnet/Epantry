@@ -273,6 +273,12 @@ function serializePublicIngredientIdentity(
     slug:
       ingredient.slug ||
       '',
+
+    imageUrl:
+      typeof ingredient.attributes?.approvedImageUrl === 'string' &&
+      /^https:\/\//i.test(ingredient.attributes.approvedImageUrl)
+        ? ingredient.attributes.approvedImageUrl
+        : '',
   }
 }
 

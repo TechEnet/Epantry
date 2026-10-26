@@ -482,6 +482,37 @@ export function createRecipeImageUploadIntent({
   }
 }
 
+// Host listing media only. Existing Recipe, Profile and Product Evidence
+// upload intents retain their existing behaviour and delivery policies.
+// Incoming transformations normalize and compress the STORED asset, not just
+// its CDN delivery. Never use f_auto in an incoming transformation.
+export function createHostListingImageUploadIntent({ userId }) {
+  const cloud = requireConfig()
+  const timestamp = Math.floor(Date.now() / 1000)
+  const publicId = `${recipeImageUploadFolder(userId)}/listing-image-${crypto.randomUUID()}`
+  const signedParameters = {
+    allowed_formats: 'jpg,jpeg,png,webp',
+    overwrite: false,
+    public_id: publicId,
+    timestamp,
+    transformation: 'c_limit,h_2048,w_2048,q_auto:good,f_webp',
+    type: 'upload',
+  }
+  return {
+    provider: 'cloudinary',
+    uploadUrl: `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloud.cloudName)}/image/upload`,
+    cloudName: cloud.cloudName,
+    apiKey: cloud.apiKey,
+    resourceType: 'image',
+    deliveryType: 'upload',
+    publicId,
+    timestamp,
+    signature: signParams(signedParameters, cloud.apiSecret),
+    signedParameters,
+    constraints: { maxBytes: MAX_BYTES, allowedMimeTypes: MIME_TYPES, outputFormat: 'webp' },
+  }
+}
+
 function profilePhotoUserPrefix(
   userId,
 ) {
@@ -993,6 +1024,10 @@ export function createHostListingVideoUploadIntent({ userId }) {
     overwrite: false,
     public_id: publicId,
     timestamp,
+    // Incoming Cloudinary video transcode: store a web-ready MP4 (H.264),
+    // with content-aware quality compression and no upscaling above 1080p.
+    // Unlike a delivery-only URL, this actually optimizes the stored video.
+    transformation: 'c_limit,h_1080,w_1920,q_auto:good,vc_h264,f_mp4',
     type: 'upload',
   }
   return {
@@ -1006,6 +1041,6 @@ export function createHostListingVideoUploadIntent({ userId }) {
     timestamp,
     signature: signParams(signedParameters, cloud.apiSecret),
     signedParameters,
-    constraints: { maxBytes: 50 * 1024 * 1024, allowedMimeTypes: ['video/mp4', 'video/webm'] },
+    constraints: { maxBytes: 50 * 1024 * 1024, allowedMimeTypes: ['video/mp4', 'video/webm'], outputFormat: 'mp4' },
   }
 }

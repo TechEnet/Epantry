@@ -11,6 +11,8 @@ import {
   listPublicProductsController,
 } from './catalog.public.controller.js'
 
+import { getIngredientKnowledgeController } from './ingredient.knowledge.controller.js'
+
 const router =
   Router()
 
@@ -42,6 +44,11 @@ router.get(
 | Public Categories
 |--------------------------------------------------------------------------
 */
+
+router.get(
+  '/ingredients/knowledge/:ref',
+  getIngredientKnowledgeController,
+)
 
 router.get(
   '/categories',

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { rejectPrivilegedImpersonation } from '../admin/adminSafety.middleware.js'
 import { loadAdminAuthorization, requireAdminAccess } from '../admin/adminPermission.middleware.js'
 import { createNotificationIntentBestEffort, notifyActiveSuperAdminsBestEffort } from '../notifications/notification.service.js'
-import { createHostListingVideoUploadIntent, createRecipeImageUploadIntent } from '../../integrations/media/cloudinary.provider.js'
+import { createHostListingImageUploadIntent, createHostListingVideoUploadIntent } from '../../integrations/media/cloudinary.provider.js'
 import { ApiError } from '../../utils/ApiError.js'
 import { authenticateSession, loadCurrentUser, requireActiveAccount, requireCsrfToken, requireMfaAssurance, requireRecentMfaAuthentication } from '../auth/auth.middleware.js'
 import { requireHostAccess } from '../auth/authorization.middleware.js'
@@ -60,7 +60,7 @@ function serialize(record) {
 }
 
 router.post('/host/listing-packets/image-upload-intent', ...writeSecurity, wrap(async (req, res) => {
-  try { respond(res, { uploadIntent: createRecipeImageUploadIntent({ userId: actor(req) }) }) }
+  try { respond(res, { uploadIntent: createHostListingImageUploadIntent({ userId: actor(req) }) }) }
   catch (error) { problem(error?.code === 'CLOUDINARY_NOT_CONFIGURED' ? 'Image upload provider is not configured.' : 'Unable to prepare image upload.', 503) }
 }))
 

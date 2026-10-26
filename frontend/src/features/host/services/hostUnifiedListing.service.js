@@ -42,6 +42,9 @@ export async function uploadHostListingVideo(file) {
   const response = await fetch(intent.uploadUrl, { method: 'POST', body: data })
   const json = await response.json().catch(() => ({}))
   if (!response.ok || !json.secure_url) throw new Error(json?.error?.message || 'Video upload failed.')
+  if (json.resource_type !== 'video' || json.format !== 'mp4') {
+    throw new Error('Video optimization did not return the expected MP4. Please retry.')
+  }
   return json.secure_url
 }
 
@@ -59,6 +62,9 @@ export async function uploadHostListingImage(file) {
   const response = await fetch(intent.uploadUrl, { method: 'POST', body: data })
   const json = await response.json().catch(() => ({}))
   if (!response.ok || !json.secure_url) throw new Error(json?.error?.message || 'Image upload failed.')
+  if (json.resource_type !== 'image' || json.format !== 'webp') {
+    throw new Error('Image optimization did not return the expected WebP. Please retry.')
+  }
   return json.secure_url
 }
 

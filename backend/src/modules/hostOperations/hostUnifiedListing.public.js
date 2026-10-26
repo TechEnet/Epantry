@@ -13,6 +13,7 @@ export function publicListing(record) {
     shareRecipe: Boolean(packet.shareRecipe), sellReadyMade: Boolean(packet.sellReadyMade),
     baseServings: packet.baseServings, ingredients: packet.ingredients?.map((item) => ({
       name: item.name, quantity: item.quantity, unit: item.unit, imageUrl: item.imageUrl,
+      canonicalIngredientId: /^[a-f0-9]{24}$/i.test(String(item.canonicalIngredientId || '')) ? item.canonicalIngredientId : '',
     })) || [],
     steps: packet.shareRecipe ? packet.steps?.map((item) => ({ instruction: item.instruction, timerMinutes: item.timerMinutes, imageUrl: item.imageUrl })) || [] : [],
     nutrition: packet.nutrition ? {

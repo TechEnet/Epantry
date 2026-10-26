@@ -173,16 +173,21 @@ export default function PublicApprovedHostListingsPage() {
                           className="flex items-center gap-3 border-b border-[#D7DDCF] py-2"
                           key={index}
                         >
-                          {row.imageUrl && (
-                            <img
-                              src={row.imageUrl}
-                              alt=""
-                              className="h-12 w-12 rounded object-cover"
-                            />
-                          )}
-                          <span>
-                            {row.name} · {row.quantity} {row.unit}
-                          </span>
+                          <Link
+                            to={`/ingredients/${encodeURIComponent(row.canonicalIngredientId || row.name)}?listing=${encodeURIComponent(item.id)}`}
+                            title={`Explore ${row.name}`}
+                            aria-label={`Explore ${row.name} ingredient details`}
+                            className="group/ingredient relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] text-[#173F35] transition duration-200 hover:scale-105 hover:border-[#C86C42] hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#C86C42]"
+                          >
+                            {row.imageUrl ? (
+                              <img src={row.imageUrl} alt={row.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover/ingredient:scale-110" />
+                            ) : <span className="text-xl" aria-hidden="true">✳</span>}
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-white/95 px-1 text-xs text-[#C86C42]" aria-hidden="true">↗</span>
+                          </Link>
+                          <div className="min-w-0">
+                            <Link to={`/ingredients/${encodeURIComponent(row.canonicalIngredientId || row.name)}?listing=${encodeURIComponent(item.id)}`} className="font-semibold text-[#173F35] underline-offset-2 hover:underline">{row.name}</Link>
+                            <span className="text-[#57665B]"> · {row.quantity} {row.unit}</span>
+                          </div>
                         </li>
                       ))}
                     </ul>

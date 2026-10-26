@@ -1,3 +1,5 @@
+import { getRecipeDiscovery } from './recipe.discovery.service.js'
+
 import {
   ApiError,
 } from '../../utils/ApiError.js'
@@ -149,6 +151,12 @@ export async function getWhatShouldWeCookController(
 
       data,
     })
+}
+
+export async function getRecipeDiscoveryController(req, res) {
+  const { slug } = parseOrThrow(publicRecipeSlugParamsSchema, req.params)
+  const data = await getRecipeDiscovery(slug)
+  return res.status(200).json({ success: true, message: 'Recipe discovery loaded.', data })
 }
 
 export async function getPublicRecipeController(

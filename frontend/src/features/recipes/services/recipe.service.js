@@ -116,6 +116,13 @@ export async function getPublicRecipe(
   )
 }
 
+export async function getRecipeDiscovery(slug) {
+  const response = await apiClient.get(
+    `/recipes/${encodeURIComponent(slug)}/discovery`,
+  )
+  return unwrap(response)
+}
+
 export async function getPublicRecipeHistory(
   slug,
   limit =

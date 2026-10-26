@@ -19,6 +19,7 @@ import {
 
 import {
   getPublicRecipeController,
+  getRecipeDiscoveryController,
   generateAiCookController,
   getPublicRecipeHistoryController,
   getWhatShouldWeCookController,
@@ -50,6 +51,11 @@ router.post(
   requireCustomerAccess,
   requireCsrfToken,
   generateAiCookController,
+)
+
+router.get(
+  '/:slug/discovery',
+  getRecipeDiscoveryController,
 )
 
 router.get(

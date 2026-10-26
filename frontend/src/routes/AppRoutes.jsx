@@ -990,6 +990,7 @@ const BrandDetailPage = lazy(() => import('../features/brands/pages/BrandDetailP
 const BrandProductHistoryPage = lazy(() => import('../features/brands/pages/BrandProductHistoryPage'))
 const RecipesPage = lazy(() => import('../features/recipes/pages/RecipesPage'))
 const RecipeDetailPage = lazy(() => import('../features/recipes/pages/RecipeDetailPage'))
+const IngredientKnowledgePage = lazy(() => import('../features/ingredients/pages/IngredientKnowledgePage'))
 const RecipeHistoryPage = lazy(() => import('../features/recipes/pages/RecipeHistoryPage'))
 const WhatShouldWeCookPage = lazy(() => import('../features/recipes/pages/WhatShouldWeCookPage'))
 const AiCookTodayPage = lazy(() => import('../features/recipes/pages/AiCookTodayPage'))
@@ -2438,6 +2439,7 @@ export default function AppRoutes() {
             <Route path="/brands/:brandKey/products/:packId/history" element={<BrandProductHistoryPage />} />
 
             <Route path="/recipes" element={<RecipesPage />} />
+            <Route path="/ingredients/:ref" element={<IngredientKnowledgePage />} />
             <Route path="/explore/host-listings" element={<PublicApprovedHostListingsPage />} />
             <Route path="/recipes/what-should-we-cook" element={<WhatShouldWeCookPage />} />
 
