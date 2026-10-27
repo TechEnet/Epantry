@@ -46,7 +46,7 @@ function cleanIncoming(raw, workspace, submit = false) {
 }
 async function ownedRecord(req) {
   if (!/^[a-f\d]{24}$/i.test(String(req.params.id || ''))) problem('Invalid listing identifier.')
-  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, ownerUserId: actor(req) })
+  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, ownerUserId: actor(req), deletedAt: null })
   if (!record) problem('Listing not found in this Host workspace.', 404)
   return record
 }
@@ -103,7 +103,7 @@ router.get('/host/listing-packets/catalog/ingredients', ...readSecurity, wrap(as
 }))
 
 router.get('/host/listing-packets', ...readSecurity, wrap(async (req, res) => {
-  const records = await HostUnifiedListingPacket.find({ ownerUserId: actor(req) }).sort({ updatedAt: -1 }).limit(100)
+  const records = await HostUnifiedListingPacket.find({ ownerUserId: actor(req), deletedAt: null }).sort({ updatedAt: -1 }).limit(100)
   respond(res, { listings: records.map(serialize) })
 }))
 router.get('/host/listing-packets/:id', ...readSecurity, wrap(async (req, res) => {
@@ -174,6 +174,18 @@ router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap
   respond(res, { listing: serialize(record) })
 }))
 
+// Host may remove any OWN listing. Keep review history and the database record
+// intact, while hiding it from Host history, discovery and active admin queues.
+router.delete('/host/listing-packets/:id', ...writeSecurity, wrap(async (req, res) => {
+  if (!objectId(req.params.id)) problem('Invalid listing identifier.')
+  const record = await HostUnifiedListingPacket.findOneAndUpdate(
+    { _id: req.params.id, ownerUserId: actor(req), deletedAt: null },
+    { $set: { deletedAt: new Date(), deletedByUserId: actor(req) } },
+    { new: true, runValidators: true },
+  )
+  if (!record) problem('Listing not found in this Host workspace.', 404)
+  respond(res, { id: String(record.id), removed: true })
+}))
 router.post('/host/listing-packets/:id/submit', ...writeSecurity, wrap(async (req, res) => {
   const record = await ownedRecord(req)
   if (!['draft', 'changes_requested'].includes(record.status)) problem('This listing has already been submitted.', 409)
@@ -210,12 +222,13 @@ router.post('/host/listing-packets/bulk', ...writeSecurity, wrap(async (req, res
 router.get('/admin/host-listing-packets', ...adminSecurity, superAdminOnly, wrap(async (req, res) => {
   const filter = ['submitted_for_review', 'changes_requested', 'approved', 'rejected'].includes(req.query.status)
     ? { status: req.query.status } : { status: { $ne: 'draft' } }
+  filter.deletedAt = null
   const rows = await HostUnifiedListingPacket.find(filter).sort({ submittedAt: -1 }).limit(150)
   respond(res, { listings: rows.map(serialize) })
 }))
 router.get('/admin/host-listing-packets/:id', ...adminSecurity, superAdminOnly, wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
-  const record = await HostUnifiedListingPacket.findById(req.params.id)
+  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, deletedAt: null })
   if (!record) problem('Listing not found.', 404)
   respond(res, { listing: serialize(record) })
 }))
@@ -230,7 +243,7 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
   const now = new Date()
   // Conditional update makes a decision atomic; a second reviewer cannot silently overwrite it.
   const record = await HostUnifiedListingPacket.findOneAndUpdate(
-    { _id: req.params.id, status: 'submitted_for_review' },
+    { _id: req.params.id, status: 'submitted_for_review', deletedAt: null },
     { $set: { status: decision, reviewedAt: now, reviewedByUserId: actor(req),
         reviewNote: note, correctionSection: decision === 'changes_requested' ? section : '',
         ...(decision === 'approved' ? { approvedAt: now } : {}) },
@@ -258,15 +271,35 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
 router.get('/public/host-listings', wrap(async (req, res) => {
   const category = String(req.query?.category || '').trim().toLowerCase()
   const type = String(req.query?.type || '').trim().toLowerCase()
-  const filter = { status: 'approved' }
+  const filter = { status: 'approved', deletedAt: null }
   if (category) filter['packet.category'] = category
   if (type) filter.type = type
   const rows = await HostUnifiedListingPacket.find(filter).sort({ approvedAt: -1 }).limit(100).lean()
   respond(res, { listings: rows.map(publicListing) })
 }))
+// Return only the match for the requested PIN, never the Host's full private
+// service-area list. Approved Host packets are not verified Marketplace offers.
+router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
+  if (!objectId(req.params.id)) problem('Invalid listing identifier.')
+  const pincode = String(req.query?.pincode || '').trim()
+  if (!/^[1-9][0-9]{5}$/.test(pincode)) problem('Enter a valid six-digit PIN code.')
+  const record = await HostUnifiedListingPacket.findOne({
+    _id: req.params.id, type: 'grocery', status: 'approved', deletedAt: null,
+  }).select('packet.selling.salePrice packet.delivery.fulfillment packet.delivery.postalCodes').lean()
+  if (!record) problem('This approved grocery listing is unavailable.', 404)
+  const delivery = record.packet?.delivery || {}
+  const pickupOnly = delivery.fulfillment === 'pickup'
+  const declaredCoverage = !pickupOnly && (delivery.postalCodes || []).some(code => String(code).trim() === pincode)
+  const rawPrice = record.packet?.selling?.salePrice
+  const declaredPrice = rawPrice !== null && rawPrice !== undefined && Number.isFinite(Number(rawPrice)) && Number(rawPrice) >= 0 ? Number(rawPrice) : null
+  respond(res, { pincode, declaredCoverage, pickupOnly,
+    declaredPrice: declaredCoverage ? declaredPrice : null,
+    priceSource: 'host_declared_unverified', purchasable: false })
+}))
+
 router.get('/public/host-listings/:id', wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
-  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, status: 'approved' }).lean()
+  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, status: 'approved', deletedAt: null }).lean()
   if (!record) problem('This approved listing is unavailable.', 404)
   respond(res, { listing: publicListing(record) })
 }))

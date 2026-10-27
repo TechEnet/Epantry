@@ -2193,6 +2193,18 @@ function NetworkIssueScreen() {
   )
 }
 
+function CanonicalProductDetailExtras() {
+  const { slug } = useParams()
+  if (String(slug || '').startsWith('host--')) return null
+  return <ProductFoodIntelligenceBridge />
+}
+
+function CanonicalRecipeDetailExtras() {
+  const { slug } = useParams()
+  if (String(slug || '').startsWith('host--')) return null
+  return <><RecipeFoodIntelligenceBridge /><RecipePantryBridge /><RecipeOutcomePlanBridge /></>
+}
+
 export default function AppRoutes() {
   const navigate =
     useNavigate()
@@ -2429,7 +2441,7 @@ export default function AppRoutes() {
               element={
                 <>
                   <ProductDetailPage />
-                  <ProductFoodIntelligenceBridge />
+                  <CanonicalProductDetailExtras />
                 </>
               }
             />
@@ -2448,9 +2460,7 @@ export default function AppRoutes() {
               element={
                 <>
                   <RecipeDetailPage />
-                  <RecipeFoodIntelligenceBridge />
-                  <RecipePantryBridge />
-                  <RecipeOutcomePlanBridge />
+                  <CanonicalRecipeDetailExtras />
                 </>
               }
             />

@@ -1,3 +1,5 @@
+import { getPublicHostListing } from '../../host/services/hostUnifiedListing.service'
+import { hostListingIdFromSlug, hostListingAsRecipe, scaleHostRecipe } from '../../host/services/approvedHostDetail.adapter'
 import { optimizeUploadImage } from '../../../lib/optimizeUploadImage'
 import {
   apiClient,
@@ -104,6 +106,11 @@ export async function listPublicRecipes(
 export async function getPublicRecipe(
   slug,
 ) {
+  const hostId = hostListingIdFromSlug(slug)
+  if (hostId) {
+    const result = await getPublicHostListing(hostId)
+    return hostListingAsRecipe(result?.listing)
+  }
   const response =
     await apiClient.get(
       `/recipes/${encodeURIComponent(
@@ -149,6 +156,11 @@ export async function scalePublicRecipe(
   slug,
   servings,
 ) {
+  const hostId = hostListingIdFromSlug(slug)
+  if (hostId) {
+    const result = await getPublicHostListing(hostId)
+    return scaleHostRecipe(hostListingAsRecipe(result?.listing), servings)
+  }
   const response =
     await apiClient.get(
       `/recipes/${encodeURIComponent(

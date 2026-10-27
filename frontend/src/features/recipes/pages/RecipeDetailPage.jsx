@@ -71,7 +71,7 @@ import {
   updatePantryUseSoon,
 } from '../../pantry/services/pantry.service'
 
-import { recordRecipeView } from '../utils/recipeEngagement'
+import { recordApprovedFoodView, recordRecipeView } from '../utils/recipeEngagement'
 
 import {
   getPublicRecipe,
@@ -989,11 +989,47 @@ function RecipeRecommendationShelf({
   )
 }
 
+
+function HostDeclaredRecipeFacts({ submission, section }) {
+  const nutrition = submission?.nutrition || {}
+  const facts = [
+    ['Energy', 'energyKcal', 'kcal'], ['Protein', 'proteinG', 'g'],
+    ['Carbohydrates', 'carbohydrateG', 'g'], ['Fat', 'fatG', 'g'],
+    ['Fibre', 'fiberG', 'g'], ['Sugar', 'sugarG', 'g'], ['Sodium', 'sodiumMg', 'mg'],
+  ].filter(([, key]) => nutrition[key] !== null && nutrition[key] !== undefined && nutrition[key] !== '')
+  const allergenRows = (submission?.allergens || []).map(row => ({
+    name: typeof row === 'string' ? row : (row.key || row.name || row.allergenKey || ''),
+    status: typeof row === 'string' ? 'Host-declared' : (row.status || row.relationType || row.value || 'Host-declared'),
+  })).filter(row => row.name)
+  const name = section === 'nutrition' ? 'Nutrition' : section === 'allergens' ? 'Allergens' : 'Dietary'
+  return (
+    <details className="epantry-guide-accordion group border-b border-[#DCE0CF]">
+      <summary className="focus-ring flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-[15px] font-semibold text-[#173F35] sm:px-5 sm:py-4 sm:text-xl">
+        {name} <ChevronDown size={17} className="transition group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] p-4 sm:p-5">
+        <p className="mb-3 text-sm text-[#79543D]">Host-declared information. Listing approval does not independently verify food claims.</p>
+        {section === 'nutrition' ? (facts.length ? (
+          <dl className="grid gap-x-6 sm:grid-cols-2">
+            {facts.map(([label, key, unit]) => <div key={key} className="flex justify-between border-b border-[#DCE0CF] py-2 text-sm"><dt>{label}</dt><dd className="font-semibold">{nutrition[key]} {unit}</dd></div>)}
+          </dl>
+        ) : <p className="text-sm">Nutrition not declared.</p>) : null}
+        {section === 'allergens' ? (allergenRows.length ? (
+          <dl className="space-y-2">{allergenRows.map((row, i) => <div key={i} className="flex flex-wrap justify-between gap-2 border-b border-[#DCE0CF] pb-2 text-sm"><dt>{row.name}</dt><dd className="font-semibold">{row.status}</dd></div>)}</dl>
+        ) : <p className="text-sm">Allergen status not declared.</p>) : null}
+        {section === 'dietary' ? <p className="text-sm">{submission?.dietary || 'Not declared'}</p> : null}
+      </div>
+    </details>
+  )
+}
+
 export default function RecipeDetailPage() {
   const {
     slug,
   } =
     useParams()
+
+  const hostListingMode = String(slug || '').startsWith('host--')
 
   const location =
     useLocation()
@@ -1252,6 +1288,8 @@ export default function RecipeDetailPage() {
     ],
   )
 
+  useEffect(() => { setRecipeHeroView('photo') }, [slug])
+
   useEffect(
     () => {
       const currentSlug =
@@ -1261,7 +1299,7 @@ export default function RecipeDetailPage() {
           '',
         ).trim()
 
-      if (!currentSlug || !data?.dish) {
+      if (!currentSlug || !data?.dish || hostListingMode) {
         setCookNextRecipes([])
         setSimilarRecipes([])
         return undefined
@@ -1405,6 +1443,7 @@ export default function RecipeDetailPage() {
     [
       data?.dish,
       slug,
+      hostListingMode,
     ],
   )
 
@@ -1429,7 +1468,7 @@ export default function RecipeDetailPage() {
       const recipeVersionId =
         data?.recipe?.id
 
-      if (!recipeVersionId) {
+      if (!recipeVersionId || hostListingMode) {
         setDetailsFoodIntelligence(
           null,
         )
@@ -1469,11 +1508,12 @@ export default function RecipeDetailPage() {
     },
     [
       data?.recipe?.id,
+      hostListingMode,
     ],
   )
 
   const customerContextBlocked =
-    isAuthenticated === true &&
+    !hostListingMode && isAuthenticated === true &&
     (
       superAdminEnabled === true ||
       activeMode === 'host' ||
@@ -1481,7 +1521,7 @@ export default function RecipeDetailPage() {
     )
 
   const canUseCustomerFeatures =
-    isAuthenticated &&
+    !hostListingMode && isAuthenticated &&
     customerEnabled ===
       true &&
     superAdminEnabled !==
@@ -1714,6 +1754,12 @@ export default function RecipeDetailPage() {
     {}
 
   useEffect(() => {
+    if (hostListingMode) {
+      if (!isBootstrapping && data?.hostSubmission?.id) {
+        recordApprovedFoodView(data.hostSubmission, isAuthenticated ? (user?.id || user?._id || user?.uid) : '')
+      }
+      return
+    }
     if (isBootstrapping || !dish?.slug || !dish?.name || !data?.recipe?.id) return
     recordRecipeView({
       slug: dish.slug,
@@ -1721,7 +1767,7 @@ export default function RecipeDetailPage() {
       image: dish.heroImageUrl || '',
       cuisine: dish.cuisine || '',
     }, isAuthenticated ? (user?.id || user?._id || user?.uid) : '')
-  }, [dish?.slug, dish?.name, dish?.heroImageUrl, dish?.cuisine, data?.recipe?.id, isBootstrapping, isAuthenticated, user?.id, user?._id, user?.uid])
+  }, [dish?.slug, dish?.name, dish?.heroImageUrl, dish?.cuisine, data?.recipe?.id, data?.hostSubmission, hostListingMode, isBootstrapping, isAuthenticated, user?.id, user?._id, user?.uid])
 
   const recipe =
     data?.recipe ||
@@ -4810,6 +4856,20 @@ export default function RecipeDetailPage() {
                 >
                   Photo
                 </button>
+                {data?.hostSubmission?.videoUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setRecipeHeroView('video')}
+                    className={[
+                      'focus-ring rounded-full px-3 py-1.5 text-[13px] font-semibold transition',
+                      recipeHeroView === 'video'
+                        ? 'bg-[#173F35] text-white'
+                        : 'text-[#202421]/80 hover:bg-[#DCE0CF]/50',
+                    ].join(' ')}
+                  >
+                    Video
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() =>
@@ -4838,7 +4898,17 @@ export default function RecipeDetailPage() {
                 </div>
               ) : null}
 
-              {recipeHeroView ===
+              {recipeHeroView === 'video' && data?.hostSubmission?.videoUrl ? (
+                <video
+                  key={data.hostSubmission.videoUrl}
+                  src={data.hostSubmission.videoUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="h-full w-full bg-[#173F35] object-contain"
+                  aria-label={`${dish.name || 'Recipe'} preparation video`}
+                />
+              ) : recipeHeroView ===
               'details' ? (
                 <RecipeDetailsSheet
                   dish={dish}
@@ -4935,7 +5005,7 @@ export default function RecipeDetailPage() {
                 </p>
               </div>
 
-              <Link
+              {!hostListingMode && <Link
                 to={`/recipes/${dish.slug}/history`}
                 className="focus-ring mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-[#DCE0CF] bg-white px-2.5 py-1 text-[13px] font-semibold text-[#202421]/80 transition hover:bg-[#F7F6F2] hover:text-[#202421]"
               >
@@ -4944,7 +5014,7 @@ export default function RecipeDetailPage() {
                   aria-hidden="true"
                 />
                 Version history
-              </Link>
+              </Link>}
 
             </div>
 
@@ -4985,7 +5055,7 @@ export default function RecipeDetailPage() {
                 ))}
               </div>
 
-              <Link
+              {!hostListingMode && <Link
                 to={`/recipes/${dish.slug}/history`}
                 className="focus-ring mt-3 inline-flex self-end items-center gap-1.5 rounded-full border border-[#DCE0CF] bg-white px-3 py-1.5 text-[13px] font-semibold text-[#202421]/80 transition hover:bg-[#F7F6F2] hover:text-[#202421]"
               >
@@ -4994,7 +5064,7 @@ export default function RecipeDetailPage() {
                   aria-hidden="true"
                 />
                 Version history
-              </Link>
+              </Link>}
 
             </div>
 
@@ -5341,9 +5411,11 @@ export default function RecipeDetailPage() {
 
             {!canUseCustomerFeatures && (
               <div className="epantry-recipe-access-note mt-5 rounded-2xl border border-[#DCE0CF] bg-[#F7F6F2] p-4 text-xs font-semibold leading-5 text-[#202421]/80">
-                {customerContextBlocked
-                  ? 'Switch to Customer mode or sign in with a Customer account to compare these ingredients with your Living Pantry and shop missing items.'
-                  : 'Sign in with Customer access to compare these ingredients with your Living Pantry and shop missing items.'}
+                {hostListingMode
+                  ? 'This is a Super Admin-approved Host submission. Ingredient quantities are Host-declared; Living Pantry matching and shopping require a separately published canonical EPANTRY recipe.'
+                  : customerContextBlocked
+                    ? 'Switch to Customer mode or sign in with a Customer account to compare these ingredients with your Living Pantry and shop missing items.'
+                    : 'Sign in with Customer access to compare these ingredients with your Living Pantry and shop missing items.'}
               </div>
             )}
 
@@ -5736,12 +5808,15 @@ export default function RecipeDetailPage() {
                 or an explicit cannot-verify state. No values are invented. */}
             <div className="epantry-recipe-intelligence" aria-label="Nutrition, allergens and dietary information">
               <div id="recipe-nutrition-intelligence-slot" className="epantry-recipe-intelligence-slot">
+                {hostListingMode ? <HostDeclaredRecipeFacts submission={data?.hostSubmission} section="nutrition" /> : null}
                 <RecipeEvidenceFallback kind="nutrition" evidence={detailsFoodIntelligence} />
               </div>
               <div id="recipe-allergen-intelligence-slot" className="epantry-recipe-intelligence-slot">
+                {hostListingMode ? <HostDeclaredRecipeFacts submission={data?.hostSubmission} section="allergens" /> : null}
                 <RecipeEvidenceFallback kind="allergens" evidence={detailsFoodIntelligence} />
               </div>
               <div id="recipe-dietary-intelligence-slot" className="epantry-recipe-intelligence-slot">
+                {hostListingMode ? <HostDeclaredRecipeFacts submission={data?.hostSubmission} section="dietary" /> : null}
                 <RecipeEvidenceFallback kind="dietary" evidence={detailsFoodIntelligence} />
               </div>
             </div>

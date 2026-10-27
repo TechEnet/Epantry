@@ -7,6 +7,8 @@ const listingPacketSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   status: { type: String, enum: ['draft', 'submitted_for_review', 'changes_requested', 'approved', 'rejected'], default: 'draft', index: true },
   packet: { type: mongoose.Schema.Types.Mixed, required: true },
+  deletedAt: { type: Date, default: null, index: true },
+  deletedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   submittedAt: { type: Date, default: null },
   approvedAt: { type: Date, default: null },
   reviewedAt: { type: Date, default: null },

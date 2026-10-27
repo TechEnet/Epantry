@@ -7,6 +7,7 @@ import {
   Boxes,
   ChefHat,
   CircleUserRound,
+  ClipboardCheck,
   Crown,
   DatabaseZap,
   FileSearch,
@@ -376,6 +377,12 @@ export default function AdminShell({
             hasAdminPermission("host.review.read") ||
             hasAdminPermission("marketplace.read") ||
             hasAdminPermission("trust_safety.read"),
+        },
+        {
+          label: "Host Listing Review",
+          to: "/admin/host-listings",
+          icon: ClipboardCheck,
+          visible: isRootSuperAdmin,
         },
         {
           label: "Orders & Disputes",

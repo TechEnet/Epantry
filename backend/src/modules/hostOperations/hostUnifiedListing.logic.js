@@ -91,7 +91,20 @@ export function normalizeListingPacket(raw = {}) {
     images,
     imageRoles,
     videoUrl: recipeAllowed ? cleanUrl(input.videoUrl) : '',
+    videoFileName: recipeAllowed && cleanUrl(input.videoUrl)
+      ? text(input.videoFileName, 180).replace(/[\/\\\x00-\x1f\x7f]/g, '').trim()
+      : '',
     brandName: text(input.brandName, 140),
+    // Host-declared origin is not an independently verified geography claim.
+    countryOfOrigin: text(input.countryOfOrigin, 100),
+    regionOfOrigin: text(input.regionOfOrigin, 100),
+    localRecipeName: recipeAllowed ? text(input.localRecipeName, 200) : '',
+    localRecipeLanguage: recipeAllowed ? text(input.localRecipeLanguage, 80) : '',
+    englishNameReading: recipeAllowed ? text(input.englishNameReading, 200) : '',
+    productFamily: type === 'grocery' ? text(input.productFamily, 160) : '',
+    manufacturerPacker: type === 'grocery' ? text(input.manufacturerPacker, 180) : '',
+    unitsPerPack: type === 'grocery' ? finiteNonnegative(input.unitsPerPack) : null,
+    servingSize: type === 'grocery' ? text(input.servingSize, 100) : '',
     sku: text(input.sku, 120),
     baseServings: finiteNonnegative(input.baseServings),
     ingredients,
@@ -178,6 +191,9 @@ export function validateListingPacket(packet, { submit = false, workspace = 'leg
   if (!canHostListType(workspace, packet.type)) errors.push('This Host workspace cannot create that listing type.')
   if (JSON.stringify(packet).length > MAX_LISTING_BYTES) errors.push('Listing exceeds the permitted size.')
   if (!submit) return errors
+  if (packet.countryOfOrigin && !/^[\p{L} .,&()'-]{2,100}$/u.test(packet.countryOfOrigin)) errors.push('Country of origin should be a country name, not a code or URL.')
+  if (packet.regionOfOrigin && !packet.countryOfOrigin) errors.push('Choose a country before adding a region or state.')
+  if (packet.unitsPerPack !== null && (!Number.isInteger(packet.unitsPerPack) || packet.unitsPerPack < 1)) errors.push('Units per pack must be a whole number greater than zero.')
   if (packet.title.length < 3) errors.push('Item name must contain at least three characters.')
   if (!LISTING_CATEGORIES.includes(packet.category)) errors.push('Choose a valid food category.')
   if (!packet.images.length) errors.push('Upload at least one image for the listing.')

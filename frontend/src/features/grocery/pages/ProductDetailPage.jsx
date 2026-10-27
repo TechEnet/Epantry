@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { apiClient } from "../../../api/apiClient";
 
 import { Link, useParams } from "react-router-dom";
 
@@ -561,6 +562,124 @@ function DetailCard({
         {children}
       </div>
     </details>
+  );
+}
+
+// The original catalogue price checker uses verified Marketplace Pack offers.
+// Approved Host packets have no Pack ID yet, so never create a fake Pack/Offer
+// or activate checkout. Reuse the SAME delivery checker styling with an
+// explicit Host-declared, PIN-specific public lookup instead.
+function HostListingPincodeCheck({ product }) {
+  const currentLocation = useLocationStore((state) => state.currentLocation);
+  const { requestCurrentLocation, status: locationStatus } = useCurrentLocation();
+  const detectedPincode = String(currentLocation?.postcode || "").replace(/\s/g, "").match(/^\d{6}$/)?.[0] || "";
+  const [manualPincode, setManualPincode] = useState(null);
+  const [manualDraft, setManualDraft] = useState("");
+  const [manualEditorOpen, setManualEditorOpen] = useState(false);
+  const [pinEntryError, setPinEntryError] = useState("");
+  const [quote, setQuote] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState("");
+  const pin = manualPincode === null ? detectedPincode : manualPincode;
+  const listingId = String(product?.hostSubmission?.id || "");
+  const needsManualPin = !pin || manualEditorOpen;
+
+  useEffect(() => {
+    let cancelled = false;
+    setQuote(null);
+    setError("");
+    if (!/^[0-9]{6}$/.test(pin) || !/^[a-f0-9]{24}$/i.test(listingId)) {
+      setChecking(false);
+      return () => { cancelled = true; };
+    }
+    setChecking(true);
+    apiClient.get(`/public/host-listings/${encodeURIComponent(listingId)}/pincode-quote`, { params: { pincode: pin } })
+      .then((response) => {
+        if (!cancelled) setQuote(response?.data?.data ?? response?.data ?? null);
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(cause?.response?.data?.message || cause?.message || "Unable to check this PIN right now.");
+      })
+      .finally(() => { if (!cancelled) setChecking(false); });
+    return () => { cancelled = true; };
+  }, [listingId, pin]);
+
+  function submitPincode(event) {
+    event.preventDefault();
+    const next = manualDraft.trim();
+    if (!/^[1-9][0-9]{5}$/.test(next)) {
+      setPinEntryError("Enter a valid 6-digit delivery PIN code.");
+      return;
+    }
+    setPinEntryError("");
+    setManualPincode(next);
+    setManualEditorOpen(false);
+  }
+
+  return (
+    <section className="ep-product-offers min-w-0 border-t-[3px] border-[#214E4A] bg-[#E8F2F1] px-4 py-3 sm:px-5 sm:py-3" aria-label="Check Host listing price by PIN code">
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-[#C7DCD8] pb-2.5 sm:flex-nowrap">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#CFE4E1] text-[#174E49]">
+          <Store size={19} aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">Check price by pincode</h2>
+          <p className="mt-0.5 text-[13px] leading-5 text-[#676E67]">
+            {pin ? `Delivery PIN ${pin} · Host-declared listing` : "Enter a delivery PIN to check the Host's stated service area and price."}
+          </p>
+        </div>
+        {pin && !manualEditorOpen && (
+          <button type="button" onClick={() => { setManualDraft(pin); setManualEditorOpen(true); setPinEntryError(""); }} className="focus-ring ml-auto shrink-0 rounded-full border border-[#A9C8C4] bg-white px-3 py-2 text-sm font-semibold text-[#173F35] hover:border-[#173F35]">Change PIN</button>
+        )}
+      </div>
+
+      {needsManualPin && (
+        <form onSubmit={submitPincode} className="space-y-2 pb-2 pt-2.5">
+          <label htmlFor="host-product-delivery-pincode" className="block text-xs font-semibold text-stone-700">Enter your delivery PIN code</label>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="relative min-w-0">
+              <MapPin size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true" />
+              <input id="host-product-delivery-pincode" required inputMode="numeric" autoComplete="postal-code" maxLength={6} pattern="[0-9]{6}"
+                value={manualDraft} onFocus={() => { if (!detectedPincode && locationStatus !== "requesting") void requestCurrentLocation(); }}
+                onChange={(event) => { setManualDraft(event.target.value.replace(/\D/g, "").slice(0, 6)); setPinEntryError(""); }}
+                className="focus-ring h-12 w-full rounded-lg border border-[#A9C8C4] bg-white pl-10 pr-3 text-[15px] font-medium text-[#202421] outline-none transition focus:border-[#174E49] focus:ring-2 focus:ring-[#CFE4E1]"
+                placeholder="Enter 6-digit pincode" />
+            </div>
+            <button type="submit" className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#174E49] px-5 py-2 text-[15px] font-semibold text-white transition hover:bg-[#286C62]">
+              <Search size={15} aria-hidden="true" /> Check delivery
+            </button>
+          </div>
+          {detectedPincode && (
+            <button type="button" onClick={() => { setManualPincode(null); setManualDraft(""); setManualEditorOpen(false); setPinEntryError(""); }}
+              className="focus-ring inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">Use current-location PIN {detectedPincode}</button>
+          )}
+          {!detectedPincode && locationStatus === "requesting" && <p className="text-xs text-stone-500">Finding your location PIN...</p>}
+          {pinEntryError && <p role="alert" className="text-xs font-semibold text-rose-700">{pinEntryError}</p>}
+          {manualEditorOpen && pin && <button type="button" onClick={() => setManualEditorOpen(false)} className="text-xs font-semibold text-stone-600 underline">Cancel</button>}
+        </form>
+      )}
+
+      {pin && !manualEditorOpen && (
+        <div className="pt-3">
+          {checking ? (
+            <p role="status" className="bg-white/75 px-3 py-2 text-sm text-[#4C655D]">Checking Host-declared service area for {pin}...</p>
+          ) : error ? (
+            <p role="alert" className="border-l-[3px] border-rose-500 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p>
+          ) : quote ? (
+            <div className="border-l-[3px] border-[#2F856D] bg-white/75 px-3 py-3">
+              <p className="text-[14px] font-semibold leading-6 text-[#173F35]">
+                {quote.pickupOnly ? "This Host lists pickup only, not delivery." : quote.declaredCoverage
+                  ? `This Host has listed delivery to PIN ${pin}.` : `This Host has not listed delivery to PIN ${pin}.`}
+              </p>
+              {quote.declaredCoverage && quote.declaredPrice !== null && quote.declaredPrice !== undefined && (
+                <p className="mt-1 text-[22px] font-semibold text-[#202421]">₹{Number(quote.declaredPrice).toLocaleString("en-IN", { maximumFractionDigits: 2 })} <span className="text-[12px] font-medium text-[#647168]">Host-declared price</span></p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      )}
+      <p className="mt-3 text-[13px] leading-5 text-[#51665E]">Super Admin approved this submission for display. Host coverage and prices are declarations, not a verified live Marketplace offer. Add to Cart requires a separately approved offer.</p>
+    </section>
   );
 }
 
@@ -1221,7 +1340,7 @@ function ProductDetailsSheet({ product }) {
             {product?.displayName || "Product"}
           </h2>
           <p className="mt-2 text-[13px] font-medium leading-5 text-[#536D65]">
-            Published listing details · generated from governed product data
+            {product?.isHostListing ? "Super Admin-approved Host submission · Host-declared facts" : "Published listing details · generated from governed product data"}
           </p>
         </div>
 
@@ -2099,7 +2218,7 @@ export default function ProductDetailPage() {
               </button>
             )}
             <div className="mt-10 sm:mt-12">
-              <MarketplaceOffers product={product} />
+              {product.isHostListing ? <HostListingPincodeCheck product={product} /> : <MarketplaceOffers product={product} />}
             </div>
             <a href="#ep-product-facts" className="focus-ring mt-8 inline-flex min-h-11 items-center gap-3 border-b border-[#173F35] text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42]">
               See complete product details <ArrowRight size={17} aria-hidden="true" />
@@ -2330,7 +2449,7 @@ export default function ProductDetailPage() {
               <p className="mt-5 max-w-sm text-[15px] leading-7 text-[#555268]">Published product facts, clearly presented. Information that has not been supplied is marked as not declared.</p>
             </div>
             <div className="min-w-0 bg-[#FFFDF9] px-6 py-7 sm:px-9 sm:py-9">
-              {product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && (
+              {!product.isHostListing && product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && (
                 <div className="border-b border-[#DDE0D9] pb-7">
                   <h3 className="text-lg font-semibold text-[#173F35]">About this product</h3>
                   <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#4C554D]">{product.description}</p>
@@ -2384,7 +2503,7 @@ export default function ProductDetailPage() {
               <DetailCard
                 title="Ingredients"
                 icon={Package}
-                description="Reviewed ingredient declaration and recognized ingredients"
+                description="Ingredient information and recognized ingredients"
               >
                 <div className="space-y-4">
                   {product.ingredientDeclarationText && (
@@ -2395,10 +2514,10 @@ export default function ProductDetailPage() {
                         </span>
                         <div>
                           <p className="text-[13px] font-black uppercase tracking-[0.12em] text-emerald-700">
-                            Reviewed ingredient declaration
+                            {product.isHostListing ? "Host-declared ingredient information" : "Reviewed ingredient declaration"}
                           </p>
                           <p className="mt-0.5 text-[13px] text-stone-500">
-                            Published from the approved product record
+                            {product.isHostListing ? "Declared by the Host; not independently food-verified" : "Published from the approved product record"}
                           </p>
                         </div>
                       </div>
@@ -2525,7 +2644,7 @@ export default function ProductDetailPage() {
               <DetailCard
                 title="Allergens"
                 icon={ShieldCheck}
-                description="Reviewed allergen declaration and governed relationships"
+                description="Allergen declarations and available relationships"
               >
                 <div className="space-y-4">
                   {product.allergenStatement ? (
@@ -2536,7 +2655,7 @@ export default function ProductDetailPage() {
                         </span>
                         <div className="min-w-0">
                           <p className="text-[13px] font-black uppercase tracking-[0.12em] text-amber-800">
-                            Reviewed package declaration
+                            {product.isHostListing ? "Host-declared allergen information" : "Reviewed package declaration"}
                           </p>
                           <p className="mt-1.5 text-sm font-bold leading-5 text-stone-900">
                             {product.allergenStatement}

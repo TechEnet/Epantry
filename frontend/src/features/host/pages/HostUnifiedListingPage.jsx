@@ -8,7 +8,7 @@ import { listServiceAreas } from '../../marketplace/services/marketplace.service
 import { normalizeHostWorkspaceType } from '../hostWorkspace.config'
 import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
 import {
-  createHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
+  createHostListingPacket, deleteHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
   listHostListingPackets, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
   uploadHostListingImage, uploadHostListingVideo, importHostListingRemoteImage,
 } from '../services/hostUnifiedListing.service'
@@ -260,6 +260,71 @@ const editorialStyles = String.raw`
   .uel-page .uel-section>p{margin-top:7px!important}
 }
 
+
+/* Recipe ingredients: readable purchasing groups, not a pile of generic cards. */
+.uel-ingredient-intro{margin:10px 0 0!important;color:#4A5E53!important;font-size:15px!important;line-height:1.6!important}
+.uel-ingredient-list{margin-top:20px;display:grid;gap:16px}
+.uel-ingredient-row{border:1px solid #DAE4D8;border-left:4px solid #C86C42;border-radius:13px;background:#F6F9F5;padding:19px 20px 17px;min-width:0}
+.uel-ingredient-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}
+.uel-ingredient-heading h3{margin:0!important;font-size:19px!important}
+.uel-row-delete{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:7px 10px;border:1px solid #E8CDCA;border-radius:8px;background:#FFF9F7;color:#963F3A;font-size:13px;font-weight:750;cursor:pointer}
+.uel-row-delete:hover:not(:disabled){background:#FCE7E2;border-color:#CF8F81}
+.uel-row-delete:disabled{opacity:.4;cursor:not-allowed}
+.uel-ingredient-fields{display:grid;gap:15px 17px;grid-template-columns:repeat(4,minmax(0,1fr))}
+.uel-ingredient-fields .uel-span-two{grid-column:span 2}
+.uel-ingredient-fields .uel-span-full{grid-column:1/-1}
+.uel-ingredient-photo-line{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.uel-ingredient-photo-line img{width:58px;height:58px;border-radius:9px;object-fit:cover;border:1px solid #D6DED2}
+.uel-ingredient-cost{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:7px;padding:13px 14px;background:#E7F0E8;border-radius:9px;color:#173F35;font-size:15px;font-weight:750}
+.uel-cost-total{margin-top:18px;padding:17px 20px;background:#DDE7DD;border-radius:11px;display:flex;flex-wrap:wrap;align-items:center;gap:13px 30px;color:#173F35;font-size:15px}
+.uel-cost-total strong{font-weight:850}
+.uel-cost-note{flex-basis:100%;color:#8F4C2B;font-size:14px;font-weight:700}
+/* Sequential instructions: a readable cooking timeline with distinct timer controls. */
+.uel-step-intro{margin:9px 0 0!important;color:#4A5E53!important;font-size:15px!important;line-height:1.6!important}
+.uel-step-list{display:grid;gap:0;margin-top:20px}
+.uel-step-row{display:grid;grid-template-columns:52px minmax(0,1fr) 160px 43px;gap:14px;align-items:start;padding:17px 0;border-top:1px solid #DCE4DB;min-width:0}
+.uel-step-row:first-child{border-top:0;padding-top:0}
+.uel-step-index{width:45px;height:45px;display:grid;place-items:center;background:#E8EFE4;border-radius:11px;font-size:17px;font-weight:850;color:#AC532E;font-variant-numeric:tabular-nums}
+.uel-step-row .uel-label{margin-bottom:7px!important}
+.uel-step-row textarea.uel-input{min-height:90px!important}
+.uel-step-remove{margin-top:29px;display:grid;place-items:center;width:41px;height:41px}
+.uel-step-add-bottom{margin-top:5px!important}
+/* Uploaded file names are deliberately shown instead of long Cloudinary URLs. */
+.uel-video-uploaded{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:9px;padding:13px 15px;border:1px solid #B9D2BF;border-radius:11px;background:#EAF3E9;color:#173F35;min-width:0}
+.uel-video-filename{display:block;max-width:100%;overflow-wrap:anywhere;font-size:15px;font-weight:800}
+.uel-video-link{color:#245849;text-decoration:underline;text-underline-offset:3px;font-size:14px;font-weight:750}
+/* Custom allergens extend the fixed common list without making extra fields required. */
+.uel-other-allergen{margin-top:16px;border:1px solid #D1DCD0;border-radius:12px;background:#F6F9F4;padding:15px 17px}
+.uel-other-allergen-button{display:inline-flex;gap:7px;align-items:center;border:1px solid #173F35;border-radius:9px;padding:10px 13px;background:#E9F3EA;color:#173F35;font-size:14px;font-weight:800;cursor:pointer}
+.uel-other-allergen-button:hover{background:#D7EAD9}
+.uel-custom-allergen-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,200px) auto;align-items:end;gap:11px;margin-top:13px}
+.uel-custom-allergen-list{display:grid;gap:10px;margin-top:13px}
+.uel-custom-allergen-item{display:flex;flex-wrap:wrap;align-items:center;gap:11px;justify-content:space-between;padding:10px 11px;border-radius:9px;background:white;border:1px solid #DEE7DA}
+.uel-custom-allergen-item strong{min-width:110px;color:#173F35;overflow-wrap:anywhere}
+.uel-custom-allergen-item select{max-width:240px;flex:1}
+.uel-packet-controls{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap;min-width:0}
+.uel-packet-delete{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #E7B8AF;border-radius:9px;background:#FFF8F5;color:#9E3B32;min-height:43px;padding:9px 12px;font-size:14px;font-weight:800;cursor:pointer}
+.uel-packet-delete:hover:not(:disabled){background:#FBE4DF;border-color:#BF6961}
+.uel-packet-delete:disabled{cursor:not-allowed;opacity:.55}
+@media(max-width:960px){.uel-ingredient-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){
+  .uel-ingredient-row{padding:15px 13px;border-radius:10px}
+  .uel-ingredient-heading{margin-bottom:13px}
+  .uel-ingredient-fields{gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .uel-cost-total{padding:15px 13px;gap:10px 18px}
+  .uel-step-row{grid-template-columns:36px minmax(0,1fr) 42px;gap:10px;padding:15px 0}
+  .uel-step-index{width:34px;height:34px;font-size:14px;border-radius:8px}
+  .uel-step-text{grid-column:2}
+  .uel-step-time{grid-column:2}
+  .uel-step-remove{grid-column:3;grid-row:1;margin-top:0}
+  .uel-custom-allergen-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .uel-custom-allergen-row > button{grid-column:1/-1}
+  .uel-packet-controls{grid-column:2;flex-wrap:wrap;gap:7px}
+  .uel-packet-controls .uel-packet-action{min-width:0!important}
+  .uel-packet-delete{padding:8px 10px;min-height:40px;font-size:13px}
+}
+@media(max-width:400px){.uel-ingredient-fields{grid-template-columns:1fr}.uel-ingredient-fields .uel-span-two{grid-column:1}.uel-custom-allergen-row{grid-template-columns:1fr}}
+
 @media (prefers-reduced-motion:reduce){.uel-page a,.uel-page button{transition:none!important}}
 `
 
@@ -347,8 +412,9 @@ const emptyIngredient = () => ({ name: '', canonicalIngredientId: '', imageUrl: 
 const emptyStep = () => ({ instruction: '', timerMinutes: '', imageUrl: '' })
 function newPacket(type = 'grocery') {
   return {
-    type, title: '', description: '', category: type === 'grocery' ? 'grocery' : 'other', grocerySubcategory: '', packagingType: '', images: [], imageRoles: [], videoUrl: '',
-    brandName: '', sku: '', baseServings: 4, ingredients: [emptyIngredient()], steps: [emptyStep()],
+    type, title: '', description: '', category: type === 'grocery' ? 'grocery' : 'other', grocerySubcategory: '', packagingType: '', images: [], imageRoles: [], videoUrl: '', videoFileName: '',
+    brandName: '', sku: '', countryOfOrigin: '', regionOfOrigin: '', localRecipeName: '', localRecipeLanguage: '', englishNameReading: '',
+    productFamily: '', manufacturerPacker: '', unitsPerPack: '', servingSize: '', baseServings: 4, ingredients: [emptyIngredient()], steps: [emptyStep()],
     nutrition: { basis: 'Per serving', evidenceNote: '' }, allergens: [], dietary: 'not_declared',
     shareRecipe: type === 'brand_recipe' || type === 'kitchen_recipe', sellReadyMade: type === 'prepared_food',
     selling: { listPrice: '', salePrice: '', stockQuantity: '', stockUnit: 'piece', packQuantity: '', packUnit: 'piece', minimumOrderQuantity: 1, maximumOrderQuantity: '', barcode: '', packagingCost: '', labourCost: '', outletId: '', menuId: '' },
@@ -409,6 +475,7 @@ function HostUnifiedListingEditor() {
   const initialType = allowed.some((item) => item.value === requestedType) ? requestedType : allowed[0]?.value || 'grocery'
   const [form, setForm] = useState(() => newPacket(initialType))
   const [editingId, setEditingId] = useState('')
+  const [revisingApproved, setRevisingApproved] = useState(false)
   const [existing, setExisting] = useState([])
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -422,17 +489,22 @@ function HostUnifiedListingEditor() {
   const [pincodeText, setPincodeText] = useState('')
   const [savedPostalCodes, setSavedPostalCodes] = useState([])
   const [selectedGroceryPhotoRole, setSelectedGroceryPhotoRole] = useState('front_of_pack')
+  const [showOtherAllergen, setShowOtherAllergen] = useState(false)
+  const [otherAllergenName, setOtherAllergenName] = useState('')
+  const [otherAllergenStatus, setOtherAllergenStatus] = useState('')
   const pincodeEditedRef = useRef(false)
+  const skipPendingEditLoadRef = useRef(false)
   const [outlets, setOutlets] = useState([])
   const [menus, setMenus] = useState([])
   const [activeTab, setActiveTab] = useState('single')
   const [historyFilter, setHistoryFilter] = useState('all')
   const fieldRef = useRef(null)
+  const editIdFromUrl = params.get('edit') || ''
   const activeListing = existing.find((item) => item.id === editingId)
   const selectableTypes = editingId && !allowed.some((item) => item.value === form.type)
     ? [...allowed, ...types.filter((item) => item.value === form.type)]
     : allowed
-  const locked = ['submitted_for_review', 'approved', 'rejected'].includes(activeListing?.status)
+  const locked = ['submitted_for_review', 'approved', 'rejected'].includes(activeListing?.status) && !revisingApproved
   const correctionSection = activeListing?.status === 'changes_requested' ? activeListing?.correctionSection : ''
   const filteredHistory = existing.filter((item) => historyFilter === 'all' ||
     (historyFilter === 'needs_attention'
@@ -443,6 +515,7 @@ function HostUnifiedListingEditor() {
   const isRecipe = form.type !== 'grocery'
   const canSell = form.type === 'grocery' || form.type === 'prepared_food' || (form.type === 'kitchen_recipe' && form.sellReadyMade)
   const costs = useMemo(() => (isRecipe ? form.ingredients.map(estimateCost) : []), [isRecipe, form.ingredients])
+  const customAllergens = (form.allergens || []).filter((item) => !allergenNames.includes(item.key))
   const knownCosts = costs.filter((cost) => cost !== null)
   const costingComplete = isRecipe && costs.length > 0 && knownCosts.length === costs.length
   const ingredientCost = knownCosts.length ? knownCosts.reduce((sum, value) => sum + value, 0) : null
@@ -504,21 +577,25 @@ function HostUnifiedListingEditor() {
   }, [savedPostalCodes, editingId, params])
 
   useEffect(() => {
-    const id = params.get('edit')
-    if (!id || id === editingId) return
+    // Only load a saved listing when the URL's edit ID changes. Editing state
+    // is not a dependency: clearing it for 'Start a new listing' must NOT
+    // cause the previous approved/submitted listing to load again and lock the form.
+    if (!editIdFromUrl) return undefined
     let cancelled = false
+    skipPendingEditLoadRef.current = false
     setLoading(true)
-    getHostListingPacket(id).then((data) => {
-      if (cancelled) return
+    getHostListingPacket(editIdFromUrl).then((data) => {
+      if (cancelled || skipPendingEditLoadRef.current) return
       setForm({ ...newPacket(data.listing.packet.type), ...data.listing.packet })
       pincodeEditedRef.current = true
       setPincodeText((data.listing.packet.delivery?.postalCodes || []).join(', '))
       setEditingId(data.listing.id)
+      setRevisingApproved(false)
       setActiveTab('single')
-    }).catch((cause) => { if (!cancelled) setError(errorMessage(cause)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+    }).catch((cause) => { if (!cancelled && !skipPendingEditLoadRef.current) setError(errorMessage(cause)) })
+      .finally(() => { if (!cancelled && !skipPendingEditLoadRef.current) setLoading(false) })
     return () => { cancelled = true }
-  }, [params, editingId])
+  }, [editIdFromUrl])
   const patch = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const nested = (key, sub, value) => setForm((current) => ({ ...current, [key]: { ...current[key], [sub]: value } }))
   const updateRow = (key, index, patchValue) => setForm((current) => ({
@@ -533,9 +610,15 @@ function HostUnifiedListingEditor() {
         : '/host/hospitality/recipes')
       return
     }
+    // A previously started edit fetch can still be in flight. Ignore its
+    // result so it cannot replace the fresh editable form with an old listing.
+    skipPendingEditLoadRef.current = true
+    setLoading(false)
     const packet = newPacket(type)
     packet.delivery.postalCodes = [...savedPostalCodes]
     pincodeEditedRef.current = false
+    setShowOtherAllergen(false); setOtherAllergenName(''); setOtherAllergenStatus('')
+    setRevisingApproved(false)
     setForm(packet); setPincodeText(savedPostalCodes.join(', ')); setEditingId(''); setError(''); setNotice('')
     setParams({ type }); window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -566,7 +649,7 @@ function HostUnifiedListingEditor() {
     setUploading('video'); setError('')
     try {
       const url = await uploadHostListingVideo(file)
-      patch('videoUrl', url)
+      setForm((current) => ({ ...current, videoUrl: url, videoFileName: String(file.name || 'Recipe video').slice(0, 180) }))
       setNotice('Video uploaded. Save this listing to keep it.')
     } catch (cause) { setError(errorMessage(cause)) } finally { setUploading('') }
   }
@@ -586,6 +669,7 @@ function HostUnifiedListingEditor() {
       setParams({ edit: id })
       setNotice(submit ? 'Listing submitted to Super Admin for review. You will be notified after a decision.' : 'Draft saved. You can continue editing here.')
       await load()
+      if (revisingApproved) setRevisingApproved(false)
     } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
   async function saveSectionRevision() {
@@ -609,6 +693,36 @@ function HostUnifiedListingEditor() {
       setNotice('Food facts and selling changes sent to Super Admin for review. Other listing information was not changed.')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+  }
+  function addOtherAllergen() {
+    const name = otherAllergenName.trim().replace(/\s+/g, ' ')
+    const key = name.toLowerCase().replace(/\s+/g, '_')
+    if (name.length < 2 || name.length > 70 || !/^[a-z][a-z0-9_ -]*$/i.test(name)) {
+      setError('Enter an allergen name using 2–70 letters, numbers or spaces.'); return
+    }
+    if (!otherAllergenStatus) { setError('Choose how this additional allergen relates to the food.'); return }
+    if (allergenNames.includes(key) || form.allergens.some((entry) => entry.key === key)) {
+      setError('This allergen is already listed. Change its existing declaration instead.'); return
+    }
+    if (form.allergens.length >= 20) { setError('This listing has reached the allergen limit.'); return }
+    patch('allergens', [...form.allergens, { key, relationship: otherAllergenStatus }])
+    setOtherAllergenName(''); setOtherAllergenStatus(''); setError(''); setShowOtherAllergen(false)
+  }
+  async function deleteListing(item) {
+    if (busy || uploading || !item?.id) return
+    const approved = item.status === 'approved'
+    const message = approved
+      ? `Remove "${item.title || 'this listing'}" from your Host Studio and public EPANTRY? It will stop appearing to customers. Super Admin audit history will be retained.`
+      : `Remove "${item.title || 'this listing'}" from your Host Studio? The record will be hidden, while any existing review history stays available for audit.`
+    if (!window.confirm(message)) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await deleteHostListingPacket(item.id)
+      if (editingId === item.id) startNew(initialType)
+      await load()
+      setNotice(`"${item.title || 'Listing'}" was removed from your listings.`)
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { setBusy(false) }
   }
   async function bulkImport() {
     if (busy) return
@@ -767,6 +881,11 @@ function HostUnifiedListingEditor() {
           </div>
         ) : (
           <>
+          {activeListing?.status === 'approved' && !revisingApproved && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#C86C42] bg-[#FFF0E7] px-4 py-3">
+            <p className="text-[15px] font-semibold text-[#173F35]">Need to update this approved listing? Edit the full details and submit them for Super Admin re-approval.</p>
+            <button type="button" className={styles.button} onClick={() => { if (window.confirm('Saving this revised listing will temporarily remove it from customer discovery until Super Admin approves it again. Continue editing?')) setRevisingApproved(true) }}>Edit complete listing</button>
+          </div>}
+          {revisingApproved && <p role="status" className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF0E7] p-3 text-[15px] font-semibold text-[#173F35]">Editing the approved listing. Save & submit for review to publish the changes only after Super Admin approval.</p>}
           <fieldset disabled={locked || busy || loading} className="uel-form min-w-0 disabled:opacity-85">
             <section id="listing-details" className={section}>
               <h2 className="text-2xl font-bold"><span className="uel-section-number">01</span> / The essentials</h2>
@@ -786,6 +905,19 @@ function HostUnifiedListingEditor() {
                 {workspace === 'hybrid' && <EditorField title="Food preference"><select className={field} value={form.dietary || 'not_declared'} onChange={(event) => patch('dietary', event.target.value)}>{dietaryOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></EditorField>}
                 <EditorField title="Brand name (if applicable)"><input className={field} value={form.brandName || ''} onChange={(event) => patch('brandName', event.target.value)}/></EditorField>
                 <EditorField title="Your SKU (if applicable)"><input className={field} value={form.sku || ''} onChange={(event) => patch('sku', event.target.value)}/></EditorField>
+                <EditorField title={isRecipe ? 'Country of origin (Host-declared)' : 'Country of origin (as on product label)'}><input className={field} value={form.countryOfOrigin || ''} maxLength={100} onChange={(event) => patch('countryOfOrigin', event.target.value)} placeholder="e.g. India"/></EditorField>
+                <EditorField title={isRecipe ? 'Region / state of origin (if known)' : 'Region / state (optional)'}><input className={field} value={form.regionOfOrigin || ''} maxLength={100} onChange={(event) => patch('regionOfOrigin', event.target.value)} placeholder="e.g. Punjab"/></EditorField>
+                {isRecipe && <>
+                  <EditorField title="Recipe name in its local language (optional)"><input className={field} value={form.localRecipeName || ''} maxLength={200} onChange={(event) => patch('localRecipeName', event.target.value)} placeholder="Use the authentic written name, if known"/></EditorField>
+                  <EditorField title="Language of local name (optional)"><input className={field} value={form.localRecipeLanguage || ''} maxLength={80} onChange={(event) => patch('localRecipeLanguage', event.target.value)} placeholder="e.g. Hindi"/></EditorField>
+                  <EditorField title="English pronunciation / reading (optional)"><input className={field} value={form.englishNameReading || ''} maxLength={200} onChange={(event) => patch('englishNameReading', event.target.value)} placeholder="Use only when documented"/></EditorField>
+                </>}
+                {form.type === 'grocery' && <>
+                  <EditorField title="Product family"><input className={field} maxLength={160} value={form.productFamily || ''} onChange={(event) => patch('productFamily', event.target.value)} placeholder="e.g. Cooking oil"/></EditorField>
+                  <EditorField title="Units in one pack"><input className={field} type="number" min="1" step="1" value={form.unitsPerPack ?? ''} onChange={(event) => patch('unitsPerPack', event.target.value)} placeholder="e.g. 1"/></EditorField>
+                  <EditorField title="Manufacturer / packer (from label)"><input className={field} maxLength={180} value={form.manufacturerPacker || ''} onChange={(event) => patch('manufacturerPacker', event.target.value)} placeholder="Use actual manufacturer name"/></EditorField>
+                  <EditorField title="Serving size (from label)"><input className={field} maxLength={100} value={form.servingSize || ''} onChange={(event) => patch('servingSize', event.target.value)} placeholder="e.g. 30 g"/></EditorField>
+                </>}
                 {isRecipe && <EditorField title="Servings / batch yield"><input type="number" min="1" className={field} value={form.baseServings ?? ''} onChange={(event) => patch('baseServings', event.target.value)}/></EditorField>}
               </div>
               <EditorField title="Description"><textarea rows={2} maxLength={3000} className={`${field} mt-4`} value={form.description} onChange={(event) => patch('description', event.target.value)}/></EditorField>
@@ -844,29 +976,55 @@ function HostUnifiedListingEditor() {
                   <p className="mt-3 text-[14px] text-[#54635B]">{form.images.length}/12 total listing photos uploaded. You can skip all extra packaging photos.</p>
                 </div>
               </details>}
-              {isRecipe && <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"><EditorField title="Recipe video (uploaded or HTTPS URL)"><input className={field} type="url" value={form.videoUrl || ''} onChange={(event) => patch('videoUrl', event.target.value)} placeholder="https://..."/></EditorField><label className="mt-auto inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#173F35] px-4 py-3 text-sm font-semibold"><UploadCloud size={18}/>{uploading === 'video' ? 'Uploading...' : 'Upload video (50 MB max)'}<input className="sr-only" type="file" accept="video/mp4,video/webm" disabled={Boolean(uploading)} onChange={(event) => { uploadVideo(event.target.files?.[0]); event.target.value = '' }}/></label></div>}
-            </section>
-            {isRecipe && <section id="listing-ingredients" className={section}>
-              <div className="flex items-center justify-between gap-2"><h2 className="text-2xl font-bold"><span className="uel-section-number">03</span> / Ingredients & costing</h2><button className={styles.secondary} type="button" onClick={() => patch('ingredients', [...form.ingredients, emptyIngredient()])}><Plus size={16} className="mr-1 inline"/>Add ingredient</button></div>
-              <p className="mt-2 text-sm leading-6 text-[#4A5850]">Each price is your own input for the specified purchase quantity. These are estimates, not verified marketplace prices. Different mass/volume units are converted when possible.</p>
-              <div className="mt-4 space-y-4">{form.ingredients.map((item, index) => <div key={index} className="border-b border-[#D7DDCF] bg-[#EDF1E9] p-3 sm:p-4">
-                <div className="flex justify-between"><h3 className="font-semibold">Ingredient {index + 1}</h3><button type="button" disabled={form.ingredients.length === 1} onClick={() => removeRow('ingredients', index)} aria-label={`Remove ingredient ${index + 1}`}><Trash2 size={17}/></button></div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <EditorField title="Ingredient name"><IngredientNameInput className={field} ingredient={item} onChange={(value) => updateRow('ingredients', index, value)}/></EditorField>
-                  <EditorField title="Amount used"><input className={field} type="number" min="0" step="any" value={item.quantity ?? ''} onChange={(event) => updateRow('ingredients', index, { quantity: event.target.value })}/></EditorField>
-                  <EditorField title="Unit"><select className={field} value={item.unit} onChange={(event) => updateRow('ingredients', index, { unit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
-                  <EditorField title="Purchased pack price (Rs)"><input className={field} type="number" min="0" step="0.01" value={item.unitPrice ?? ''} onChange={(event) => updateRow('ingredients', index, { unitPrice: event.target.value })}/></EditorField>
-                  <EditorField title="Pack quantity"><input className={field} type="number" min="0" step="any" value={item.priceQuantity ?? ''} onChange={(event) => updateRow('ingredients', index, { priceQuantity: event.target.value })}/></EditorField>
-                  <EditorField title="Pack unit"><select className={field} value={item.priceUnit} onChange={(event) => updateRow('ingredients', index, { priceUnit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
-                  <EditorField title="Ingredient photo"><div className="flex items-center gap-2">{item.imageUrl && <img src={item.imageUrl} alt={item.name || 'Ingredient'} className="h-11 w-12 rounded object-cover"/>}<label className="cursor-pointer rounded-lg border border-[#A3B5A4] bg-white px-3 py-3 text-xs font-semibold"><ImagePlus size={15} className="mr-1 inline"/>Upload<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={Boolean(uploading)} onChange={(event) => { uploadImage(event.target.files?.[0], 'ingredients', index); event.target.value = '' }}/></label></div></EditorField>
-                  <div className="self-end pb-3 text-sm font-semibold text-[#173F35]">Estimated usage: {formatMoney(costs[index])}</div>
+              {isRecipe && <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <div className="min-w-0">
+                  <p className="uel-label mb-2 block">Recipe video (optional)</p>
+                  {form.videoUrl && form.videoFileName ? (
+                    <div className="uel-video-uploaded">
+                      <div className="min-w-0"><span className="text-[13px] text-[#557366]">Uploaded from your device</span><strong className="uel-video-filename">{form.videoFileName}</strong></div>
+                      <a className="uel-video-link" href={form.videoUrl} target="_blank" rel="noopener noreferrer">Preview video <ArrowUpRight size={15} className="inline"/></a>
+                    </div>
+                  ) : <input aria-label="Recipe video HTTPS link" className={field} type="url" value={form.videoUrl || ''} onChange={(event) => setForm((current) => ({ ...current, videoUrl: event.target.value, videoFileName: '' }))} placeholder="Paste an HTTPS video link (optional)"/>}
+                  {form.videoUrl && form.videoFileName && <button type="button" className="mt-2 text-[13px] font-semibold text-[#315A4A] underline underline-offset-2" onClick={() => patch('videoFileName', '')}>Edit video URL manually</button>}
                 </div>
-                <EditorField title="Preparation / purchasing note"><input className={`${field} mt-2`} value={item.note || ''} onChange={(event) => updateRow('ingredients', index, { note: event.target.value })}/></EditorField>
+                <label className="inline-flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#173F35] bg-[#F7F6F2] px-4 py-3 text-[15px] font-semibold text-[#173F35]"><UploadCloud size={18}/>{uploading === 'video' ? 'Uploading...' : form.videoUrl ? 'Replace video' : 'Upload video (50 MB max)'}<input className="sr-only" type="file" accept="video/mp4,video/webm" disabled={Boolean(uploading)} onChange={(event) => { uploadVideo(event.target.files?.[0]); event.target.value = '' }}/></label>
+              </div>}
+            </section>
+            {isRecipe && <section id="listing-ingredients" className={`${section} uel-ingredient-editor`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-2xl font-bold"><span className="uel-section-number">03</span> / Ingredients & costing</h2>
+                <button className={styles.secondary} type="button" onClick={() => patch('ingredients', [...form.ingredients, emptyIngredient()])}><Plus size={16} className="mr-1 inline"/> Add ingredient</button>
+              </div>
+              <p className="uel-ingredient-intro">List what goes into this recipe. For costs, enter what you paid for the full purchased pack and how much of it you use. We'll calculate the ingredient cost automatically.</p>
+              <div className="uel-ingredient-list">{form.ingredients.map((item, index) => <div key={index} className="uel-ingredient-row">
+                <div className="uel-ingredient-heading">
+                  <h3>Ingredient {String(index + 1).padStart(2, '0')}{item.name ? <span className="ml-2 text-[14px] font-medium text-[#617565]">· {item.name}</span> : null}</h3>
+                  <button type="button" className="uel-row-delete" disabled={form.ingredients.length === 1} onClick={() => removeRow('ingredients', index)} aria-label={`Remove ingredient ${index + 1}`}><Trash2 size={16}/> Remove</button>
+                </div>
+                <div className="uel-ingredient-fields">
+                  <div className="uel-span-two"><EditorField title="Ingredient name"><IngredientNameInput className={field} ingredient={item} onChange={(value) => updateRow('ingredients', index, value)}/></EditorField></div>
+                  <EditorField title="Quantity used in recipe"><input className={field} type="number" min="0" step="any" value={item.quantity ?? ''} onChange={(event) => updateRow('ingredients', index, { quantity: event.target.value })}/></EditorField>
+                  <EditorField title="Unit used"><select className={field} value={item.unit} onChange={(event) => updateRow('ingredients', index, { unit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
+                  <EditorField title="Price paid for purchased pack (₹)"><input className={field} type="number" min="0" step="0.01" value={item.unitPrice ?? ''} onChange={(event) => updateRow('ingredients', index, { unitPrice: event.target.value })}/></EditorField>
+                  <EditorField title="Amount in purchased pack"><input className={field} type="number" min="0" step="any" value={item.priceQuantity ?? ''} onChange={(event) => updateRow('ingredients', index, { priceQuantity: event.target.value })}/></EditorField>
+                  <EditorField title="Purchased pack unit"><select className={field} value={item.priceUnit} onChange={(event) => updateRow('ingredients', index, { priceUnit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
+                  <div><EditorField title="Ingredient photo (optional)"><div className="uel-ingredient-photo-line">{item.imageUrl && <img src={item.imageUrl} alt={item.name || 'Ingredient'}/>}<label className="inline-flex min-h-[46px] cursor-pointer items-center gap-2 rounded-lg border border-[#A3B5A4] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35]"><ImagePlus size={17}/> {item.imageUrl ? 'Change photo' : 'Upload photo'}<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={Boolean(uploading)} onChange={(event) => { uploadImage(event.target.files?.[0], 'ingredients', index); event.target.value = '' }}/></label></div></EditorField></div>
+                  <div className="uel-span-full"><EditorField title="Preparation / purchasing note (optional)"><input className={field} value={item.note || ''} onChange={(event) => updateRow('ingredients', index, { note: event.target.value })} placeholder="Example: Finely chopped, or purchased from local market"/></EditorField></div>
+                  <div className="uel-span-full uel-ingredient-cost"><span>Estimated cost used in this recipe</span><strong>{formatMoney(costs[index])}</strong></div>
+                </div>
               </div>)}</div>
-              <div className="mt-4 flex flex-wrap gap-8 bg-[#D7DDCF] p-4 text-sm"><span><strong>Ingredient estimate:</strong> {formatMoney(ingredientCost)}</span><span><strong>Complete cost:</strong> {formatMoney(completeCost)}</span><span><strong>Per serving:</strong> {completeCost !== null && Number(form.baseServings) > 0 ? formatMoney(completeCost / Number(form.baseServings)) : 'Not available'}</span><span className="font-semibold text-[#9A4F31]">{costingComplete ? 'All ingredient estimates entered' : 'Some ingredient costs are missing'}</span></div>
+              <div className="uel-cost-total" aria-live="polite"><span><strong>Ingredient total:</strong> {formatMoney(ingredientCost)}</span><span><strong>Complete cost:</strong> {formatMoney(completeCost)}</span><span><strong>Per serving:</strong> {completeCost !== null && Number(form.baseServings) > 0 ? formatMoney(completeCost / Number(form.baseServings)) : 'Not available'}</span><span className="uel-cost-note">{costingComplete ? 'All ingredient prices have been entered.' : 'Add purchased-pack prices and quantities to complete the estimate.'} Estimated from Host-entered prices.</span></div>
             </section>}
-            {isRecipe && <section id="listing-steps" className={section}><div className="flex items-center justify-between gap-2"><h2 className="text-2xl font-bold"><span className="uel-section-number">04</span> / How to make it</h2><button type="button" className={styles.secondary} onClick={() => patch('steps', [...form.steps, emptyStep()])}><Plus size={16} className="mr-1 inline"/>Add step</button></div>
-              <div className="mt-4 space-y-3">{form.steps.map((step, index) => <div key={index} className="grid items-start gap-3 border-b border-[#D7DDCF] pb-3 sm:grid-cols-[50px_minmax(0,1fr)_150px_36px]"><strong className="py-3 text-[#C86C42]">{String(index + 1).padStart(2, '0')}</strong><textarea className={field} rows={2} value={step.instruction || ''} onChange={(event) => updateRow('steps', index, { instruction: event.target.value })} placeholder="What should the customer do?"/><input className={field} type="number" min="0" value={step.timerMinutes ?? ''} onChange={(event) => updateRow('steps', index, { timerMinutes: event.target.value })} placeholder="Minutes"/><button type="button" aria-label={`Remove step ${index + 1}`} disabled={form.steps.length === 1} onClick={() => removeRow('steps', index)}><Trash2 size={17}/></button></div>)}</div>
+            {isRecipe && <section id="listing-steps" className={`${section} uel-steps-editor`}>
+              <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-bold"><span className="uel-section-number">04</span> / How to make it</h2></div>
+              <p className="uel-step-intro">Write each action in the order it happens. Add an approximate time only when useful; customers can follow these instructions step by step.</p>
+              <div className="uel-step-list">{form.steps.map((step, index) => <div key={index} className="uel-step-row">
+                <span className="uel-step-index" aria-label={`Step ${index + 1}`}>{String(index + 1).padStart(2, '0')}</span>
+                <div className="uel-step-text"><EditorField title={`Step ${index + 1} · What to do`}><textarea className={field} rows={2} value={step.instruction || ''} onChange={(event) => updateRow('steps', index, { instruction: event.target.value })} placeholder="Example: Heat oil and add cumin seeds."/></EditorField></div>
+                <div className="uel-step-time"><EditorField title="Time (minutes, optional)"><input className={field} type="number" min="0" value={step.timerMinutes ?? ''} onChange={(event) => updateRow('steps', index, { timerMinutes: event.target.value })} placeholder="e.g. 5"/></EditorField></div>
+                <button type="button" className="uel-row-delete uel-step-remove" title={`Remove step ${index + 1}`} aria-label={`Remove step ${index + 1}`} disabled={form.steps.length === 1} onClick={() => removeRow('steps', index)}><Trash2 size={17}/></button>
+              </div>)}</div>
+              <button type="button" className={`${styles.secondary} uel-step-add-bottom`} onClick={() => patch('steps', [...form.steps, emptyStep()])}><Plus size={17} className="mr-1 inline"/> Add step</button>
             </section>}
           </fieldset>
           <fieldset disabled={busy || loading} className="uel-form uel-updatable-fields min-w-0 disabled:opacity-85">
@@ -879,13 +1037,21 @@ function HostUnifiedListingEditor() {
                 {workspace !== 'hybrid' && <EditorField title="Dietary declaration"><select value={form.dietary} className={field} onChange={(event) => patch('dietary', event.target.value)}>{['not_declared', 'vegetarian', 'vegan', 'non_vegetarian', 'other'].map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></EditorField>}</div>
               <h3 className="mt-5 text-lg font-semibold">Allergen information</h3>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{allergenNames.map((key) => <EditorField key={key} title={key.replaceAll('_', ' ')}><select className={field} value={form.allergens.find((item) => item.key === key)?.relationship || ''} onChange={(event) => patch('allergens', [...form.allergens.filter((item) => item.key !== key), ...(event.target.value ? [{ key, relationship: event.target.value }] : [])])}><option value="">Not declared</option><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="does_not_contain">Does not contain</option><option value="unknown">Unknown / not verified</option></select></EditorField>)}</div>
+              <div className="uel-other-allergen">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><h4 className="text-[16px] font-bold text-[#173F35]">Another allergen to declare?</h4><p className="mt-1 text-[14px] text-[#52665A]">Only add one if relevant. Additional allergens are optional.</p></div>
+                  <button type="button" className="uel-other-allergen-button" aria-expanded={showOtherAllergen} onClick={() => setShowOtherAllergen((current) => !current)}><Plus size={17}/> Other allergen</button>
+                </div>
+                {customAllergens.length > 0 && <div className="uel-custom-allergen-list">{customAllergens.map((entry) => <div className="uel-custom-allergen-item" key={entry.key}><strong>{entry.key.replaceAll('_', ' ')}</strong><select className={field} aria-label={`Declaration for ${entry.key.replaceAll('_', ' ')}`} value={entry.relationship} onChange={(event) => patch('allergens', form.allergens.map((item) => item.key === entry.key ? { ...item, relationship: event.target.value } : item))}><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="does_not_contain">Does not contain</option><option value="unknown">Unknown / not verified</option></select><button type="button" className="uel-row-delete" onClick={() => patch('allergens', form.allergens.filter((item) => item.key !== entry.key))}><Trash2 size={15}/> Remove</button></div>)}</div>}
+                {showOtherAllergen && <div className="uel-custom-allergen-row"><EditorField title="Allergen name"><input className={field} value={otherAllergenName} maxLength={70} onChange={(event) => setOtherAllergenName(event.target.value)} placeholder="e.g. Mustard"/></EditorField><EditorField title="Declaration"><select className={field} value={otherAllergenStatus} onChange={(event) => setOtherAllergenStatus(event.target.value)}><option value="">Choose</option><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="does_not_contain">Does not contain</option><option value="unknown">Unknown / not verified</option></select></EditorField><button type="button" className={styles.secondary} onClick={addOtherAllergen}>Add allergen</button></div>}
+              </div>
               <EditorField title="Evidence / calculation note"><textarea rows={2} className={`${field} mt-4`} value={form.nutrition?.evidenceNote || ''} onChange={(event) => nested('nutrition', 'evidenceNote', event.target.value)}/></EditorField>
             </section>
             {canSell && <section id="listing-selling" className={`${section} ${locked ? 'uel-locked-section' : ''}`}><span id="listing-delivery" /><h2 className="text-2xl font-bold"><span className="uel-section-number">{isRecipe ? '06' : '04'}</span> / Selling & delivery</h2>
               <p className="mt-1 text-sm text-[#4A5850]">Set your pricing, available stock and delivery coverage. These details are reviewed here; your existing selling and delivery settings still control live orders.</p>
               {locked && <span className="uel-editable-marker">Editable · re-approval required</span>}
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {[['listPrice', 'List price (Rs)'], ['salePrice', 'Selling price (Rs)'], ['stockQuantity', 'Available stock'], ['packagingCost', 'Packaging cost (Rs)'], ['labourCost', 'Labour cost (Rs)']].map(([key, title]) => <EditorField key={key} title={title}><input type="number" min="0" step="any" className={field} value={form.selling?.[key] ?? ''} onChange={(event) => nested('selling', key, event.target.value)}/></EditorField>)}
+                {[['listPrice', 'List price (Rs)'], ['salePrice', 'Selling price (Rs)'], ['stockQuantity', 'Available stock'], ['packagingCost', 'Packaging cost (Rs)'], ['labourCost', 'Preparation / staff cost (₹, optional)']].map(([key, title]) => <EditorField key={key} title={title}><input type="number" min="0" step="any" className={field} value={form.selling?.[key] ?? ''} onChange={(event) => nested('selling', key, event.target.value)}/></EditorField>)}
                 <EditorField title="Stock unit"><input className={field} value={form.selling?.stockUnit || 'piece'} onChange={(event) => nested('selling', 'stockUnit', event.target.value)}/></EditorField>
                 <EditorField title="Pack / portion quantity"><input className={field} type="number" min="0" step="any" value={form.selling?.packQuantity ?? ''} onChange={(event) => nested('selling', 'packQuantity', event.target.value)}/></EditorField>
                 <EditorField title="Pack / portion unit"><select className={field} value={form.selling?.packUnit || 'piece'} onChange={(event) => nested('selling', 'packUnit', event.target.value)}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
@@ -941,9 +1107,12 @@ function HostUnifiedListingEditor() {
                   </div>
                 </div>
                 <span className="uel-packet-status" data-status={item.status}>{listingStatusLabel(item.status)}</span>
-                <button type="button" className={`${styles.secondary} uel-packet-action`} onClick={() => {
-                  setParams({ edit: item.id }); setActiveTab('single'); window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}>{['submitted_for_review', 'approved', 'rejected'].includes(item.status) ? 'View listing' : 'Continue editing'} <ArrowUpRight size={16} aria-hidden="true"/></button>
+                <div className="uel-packet-controls">
+                  <button type="button" className={`${styles.secondary} uel-packet-action`} onClick={() => {
+                    setParams({ edit: item.id }); setActiveTab('single'); window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}>{['submitted_for_review', 'approved', 'rejected'].includes(item.status) ? 'View listing' : 'Continue editing'} <ArrowUpRight size={16} aria-hidden="true"/></button>
+                  <button type="button" className="uel-packet-delete" disabled={busy || Boolean(uploading)} aria-label={`Delete ${item.title || 'listing'}`} onClick={() => deleteListing(item)}><Trash2 size={16} aria-hidden="true"/> Delete</button>
+                </div>
               </div>
             )) : <div className="uel-history-empty">
               {existing.length ? 'No listings match this status.' : 'No listings yet. Save your first draft to see it here.'}
