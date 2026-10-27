@@ -759,85 +759,6 @@ function RecipeEvidenceFallback({ kind, evidence }) {
   )
 }
 
-function RecipeOriginMap({ origin, map }) {
-  const view = useMemo(() => {
-    const shapes = map?.outline || []
-    const coordinates = shapes.flatMap(feature => feature.rings || []).flat()
-    if (!coordinates.length) return null
-    const xs = coordinates.map(([x]) => x).filter(Number.isFinite)
-    const ys = coordinates.map(([, y]) => y).filter(Number.isFinite)
-    if (!xs.length || !ys.length) return null
-    const minX = Math.min(...xs), maxX = Math.max(...xs)
-    const minY = Math.min(...ys), maxY = Math.max(...ys)
-    const dx = Math.max(maxX - minX, 0.001)
-    const dy = Math.max(maxY - minY, 0.001)
-    const scale = Math.min(548 / dx, 294 / dy)
-    const project = ([x, y]) => [
-      26 + (x - minX) * scale + (548 - dx * scale) / 2,
-      26 + (maxY - y) * scale + (294 - dy * scale) / 2,
-    ]
-    const path = rings => rings.map(ring =>
-      ring.map((point, index) => {
-        const [x, y] = project(point)
-        return `${index ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`
-      }).join(' ') + ' Z',
-    ).join(' ')
-    return {
-      outline: shapes.map(shape => path(shape.rings)),
-      states: (map?.states || []).map(shape => ({ name: shape.name, path: path(shape.rings) })),
-    }
-  }, [map])
-  const regionName = String(origin?.region?.name || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '')
-  const regionMatch = view?.states?.some(shape => String(shape.name || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '') === regionName)
-  const locationLabel = [origin?.region?.name, origin?.country?.name].filter(Boolean).join(', ')
-  return (
-    <figure className="min-w-0 overflow-hidden rounded-[12px] border border-[#D4DFD4] bg-[#F9FBF8]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DCE5DC] px-4 py-3 sm:px-5">
-        <span className="text-[13px] font-semibold text-[#173F35]">Geographic location</span>
-        {regionMatch ? (
-          <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#965131]">
-            <span className="h-2.5 w-2.5 rounded-[2px] bg-[#C86C42]" aria-hidden="true" />
-            {origin.region.name} highlighted
-          </span>
-        ) : null}
-      </div>
-      {view ? (
-        <svg viewBox="0 0 600 350" className="mx-auto block h-auto max-h-[340px] w-full px-3 py-2" role="img" aria-label={`Map of ${origin.country.name}${regionMatch ? ` highlighting ${origin.region.name}` : ''}`}>
-          {view.outline.map((shape, index) => (
-            <path key={`country-${index}`} d={shape} fill="#DCE7DD" stroke="#789E8B" strokeWidth="1.6" fillRule="evenodd" strokeLinejoin="round" />
-          ))}
-          {view.states.map((shape, index) => {
-            const selected = Boolean(regionName) && String(shape.name || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '') === regionName
-            return (
-              <path key={`region-${index}`} d={shape.path} fill={selected ? '#C86C42' : 'transparent'} stroke={selected ? '#8D4529' : '#B4C9B9'} strokeWidth={selected ? '2.6' : '0.7'} fillRule="evenodd" strokeLinejoin="round">
-                <title>{shape.name}{selected ? ' — selected region' : ''}</title>
-              </path>
-            )
-          })}
-        </svg>
-      ) : (
-        <div className="flex min-h-[185px] flex-col items-center justify-center gap-2 px-5 py-6 text-center">
-          <MapPin size={25} className="text-[#C86C42]" aria-hidden="true" />
-          <strong className="text-[19px] text-[#173F35]">{locationLabel || 'Recipe origin'}</strong>
-          <p className="max-w-sm text-[13px] text-[#51675A]">Explore the stated location on a map.</p>
-        </div>
-      )}
-      <figcaption className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[#DCE5DC] px-4 py-3 text-[13px] text-[#51675A] sm:px-5">
-        <span>{locationLabel || origin?.country?.name}</span>
-        <span className="flex flex-wrap gap-x-4 gap-y-2">
-          {map?.credit?.url ? (
-            <a href={map.credit.url} target="_blank" rel="noopener noreferrer" className="underline decoration-[#A6BFAE] underline-offset-2">{map.credit.label || 'Map source'}</a>
-          ) : null}
-          {map?.stateCredit?.url && map.stateCredit.url !== map?.credit?.url ? (
-            <a href={map.stateCredit.url} target="_blank" rel="noopener noreferrer" className="underline decoration-[#A6BFAE] underline-offset-2">{map.stateCredit.label || 'Region boundary source'}</a>
-          ) : null}
-          <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(locationLabel)}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-2">Open location ↗</a>
-        </span>
-      </figcaption>
-    </figure>
-  )
-}
-
 const RECIPE_RECOMMENDATION_LIMIT = 5
 
 function getRecipeRecommendationKey(item) {
@@ -5288,28 +5209,37 @@ export default function RecipeDetailPage() {
         ) : null}
 
         {recipeDiscovery?.origin?.country ? (
-          <section className="epantry-origin-chapter mt-8 grid gap-0 overflow-hidden border-y border-[#CFDBD0] bg-[#F1F5EF] lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]" aria-label="Recipe geographic origin">
-            <div className="flex min-w-0 flex-col justify-center px-5 py-7 sm:px-9 sm:py-10 lg:pr-12">
-              <p className="text-[13px] font-bold uppercase tracking-[0.13em] text-[#A65836]">From its roots</p>
-              <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[36px]">Origin & tradition</h2>
-              <div className="mt-5 border-l-[3px] border-[#C86C42] pl-4">
-                <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#607466]">{recipeDiscovery.origin.region?.name ? 'Country · Region' : 'Country of origin'}</p>
-                <p className="mt-1 text-[19px] font-semibold leading-snug text-[#173F35] sm:text-[22px]">
-                  {recipeDiscovery.origin.country.name}
-                  {recipeDiscovery.origin.region?.name ? ` / ${recipeDiscovery.origin.region.name}` : ''}
+          <section className="epantry-origin-chapter mt-8 border-y border-[#CFDBD0] bg-[#F1F5EF]" aria-label="Recipe origin and tradition">
+            <div className="grid min-w-0 gap-6 px-5 py-7 sm:px-9 sm:py-9 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10">
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold uppercase tracking-[0.13em] text-[#A65836]">From its roots</p>
+                <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[36px]">Origin & tradition</h2>
+                <p className="mt-3 max-w-[42ch] text-[15px] leading-6 text-[#51675A]">
+                  Explore the place associated with this recipe, without assuming it represents every variation of the dish.
                 </p>
               </div>
-              <p className="mt-5 max-w-[45ch] text-[14px] leading-6 text-[#51675A]">
-                {recipeDiscovery.origin.sourceType === 'host_declared'
-                  ? 'Origin stated by the Host. Location is displayed as declared, not independently verified.'
-                  : 'Origin based on available documented sources, not a claim of worldwide popularity.'}
-              </p>
-              {recipeDiscovery.origin.sourceUrl ? (
-                <a href={recipeDiscovery.origin.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex w-fit text-[13px] font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4">Explore source on Wikidata ↗</a>
-              ) : null}
-            </div>
-            <div className="min-w-0 border-t border-[#CFDBD0] p-3 sm:p-5 lg:border-l lg:border-t-0 lg:p-7">
-              <RecipeOriginMap origin={recipeDiscovery.origin} map={recipeDiscovery.map} />
+              <div className="min-w-0 border-t border-[#CBD9CE] pt-5 lg:border-l lg:border-t-0 lg:py-2 lg:pl-8">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#A65836]">Country</p>
+                    <p className="mt-1 text-[25px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[30px]">{recipeDiscovery.origin.country.name}</p>
+                  </div>
+                  {recipeDiscovery.origin.region?.name ? (
+                    <div className="min-w-0 border-t border-[#CBD9CE] pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+                      <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#A65836]">Region / State</p>
+                      <p className="mt-1 text-[25px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[30px]">{recipeDiscovery.origin.region.name}</p>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#CBD9CE] pt-3 text-[13px] leading-5 text-[#536B5C]">
+                  <span>{recipeDiscovery.origin.sourceType === 'host_declared'
+                    ? 'Host-declared recipe origin · Not independently verified'
+                    : 'Documented recipe geography · Source attributed'}</span>
+                  {recipeDiscovery.origin.sourceUrl ? (
+                    <a href={recipeDiscovery.origin.sourceUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4">View documented source ↗</a>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </section>
         ) : null}

@@ -6,54 +6,6 @@ import {
 } from 'lucide-react'
 import { getIngredientKnowledge } from '../services/ingredientKnowledge.service'
 
-function IngredientMap({ origin, map }) {
-  const drawing = useMemo(() => {
-    const shapes = Array.isArray(map?.outline) ? map.outline : []
-    const points = shapes.flatMap(shape => shape.rings || []).flat()
-    if (!points.length) return null
-    const xs = points.map(point => point[0]).filter(Number.isFinite)
-    const ys = points.map(point => point[1]).filter(Number.isFinite)
-    if (!xs.length || !ys.length) return null
-    const minX = Math.min(...xs), maxX = Math.max(...xs)
-    const minY = Math.min(...ys), maxY = Math.max(...ys)
-    const dx = Math.max(0.001, maxX - minX), dy = Math.max(0.001, maxY - minY)
-    const scale = Math.min(560 / dx, 280 / dy)
-    const project = ([x, y]) => [
-      20 + (x - minX) * scale + (560 - dx * scale) / 2,
-      20 + (maxY - y) * scale + (280 - dy * scale) / 2,
-    ]
-    const shapePath = rings => rings.map(ring =>
-      ring.map((point, index) => {
-        const [x, y] = project(point)
-        return `${index ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`
-      }).join(' ') + ' Z',
-    ).join(' ')
-    return {
-      countries: shapes.map(shape => shapePath(shape.rings)),
-      states: (map?.states || []).map(shape => ({ name: shape.name, path: shapePath(shape.rings) })),
-    }
-  }, [map])
-
-  if (!drawing || !origin?.country?.name) return null
-  const selected = String(origin.region?.name || '').toLowerCase().trim()
-  return (
-    <div className="overflow-hidden rounded-xl border border-[#C6D9CD] bg-[#E6F4ED] p-3 sm:p-4">
-      <svg viewBox="0 0 600 320" className="mx-auto h-auto max-h-[260px] w-full" role="img" aria-label={`Map of ${origin.country.name}${origin.region?.name ? `, ${origin.region.name}` : ''}`}>
-        {drawing.countries.map((path, index) => (
-          <path key={index} d={path} fill="#BDD9C8" stroke="#8EAD9A" strokeWidth="1.2" fillRule="evenodd" />
-        ))}
-        {drawing.states.map((state, index) => (
-          <path key={index} d={state.path} fill={selected && state.name.toLowerCase() === selected ? '#C86C42' : 'transparent'} stroke="#F7F6F2" strokeWidth=".9" fillRule="evenodd" />
-        ))}
-      </svg>
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[13px] text-[#385F4B]">
-        <span className="font-semibold">{origin.country.name}{origin.region?.name ? ` · ${origin.region.name}` : ''}</span>
-        {map.credit?.url ? <a href={map.credit.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Map source</a> : null}
-      </div>
-    </div>
-  )
-}
-
 function IngredientSectionHeading({ eyebrow, title, count, note, end }) {
   return (
     <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-[#CFD9CE] pb-3 sm:pb-4">
@@ -213,6 +165,13 @@ export default function IngredientKnowledgePage() {
   const locationRows = locationView === 'regions' ? regionLocations : countryLocations
   const visibleLocations = locationRows.slice(locationIndex, locationIndex + 4)
   const hasSource = Boolean(data?.sources?.length)
+  const sectionIndex = {
+    locations: 1,
+    varieties: 1 + Number(locations.length > 0),
+    products: 1 + Number(locations.length > 0) + Number(varieties.length > 0),
+    dishes: 1 + Number(locations.length > 0) + Number(varieties.length > 0) + Number(products.length > 0),
+  }
+  const stepLabel = number => String(number).padStart(2, '0')
 
   return (
     <main className="min-h-screen bg-[#F6F4EE] text-[#202421]">
@@ -249,15 +208,14 @@ export default function IngredientKnowledgePage() {
               {!ingredient.catalogMatched ? <p className="mt-3 text-[13px] text-[#825A45]">This ingredient is not yet matched to an active EPANTRY catalog item. Recipe associations cannot be confirmed.</p> : null}
             </header>
 
-            <section className="py-7 sm:py-9" aria-label="Top Locations">
-              <IngredientSectionHeading eyebrow="01 / Places & origins" title="Top Locations" count={locations.length} note="Documented origin and catalog locations. These are not worldwide popularity rankings." end={locationRows.length > 4 ? <div className="flex gap-2"><button type="button" onClick={() => setLocationIndex(index => Math.max(0, index - 1))} disabled={locationIndex === 0} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Previous locations"><ChevronLeft size={18} /></button><button type="button" onClick={() => setLocationIndex(index => Math.min(locationRows.length - 4, index + 1))} disabled={locationIndex >= locationRows.length - 4} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Next locations"><ChevronRight size={18} /></button></div> : null} />
+            {locations.length ? <section className="py-7 sm:py-9" aria-label="Ingredient geography and dishes">
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.locations)} / Locations & cooking traditions`} title="Places connected to this ingredient" count={locations.length} note="Documented ingredient origins and locations of approved EPANTRY dishes are identified separately. Not worldwide rankings." end={locationRows.length > 4 ? <div className="flex gap-2"><button type="button" onClick={() => setLocationIndex(index => Math.max(0, index - 1))} disabled={locationIndex === 0} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Previous locations"><ChevronLeft size={18} /></button><button type="button" onClick={() => setLocationIndex(index => Math.min(locationRows.length - 4, index + 1))} disabled={locationIndex >= locationRows.length - 4} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Next locations"><ChevronRight size={18} /></button></div> : null} />
               {locations.length ? <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => { setLocationView('countries'); setLocationIndex(0) }} className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${locationView === 'countries' ? 'bg-[#173F35] text-white' : 'border border-[#B9CEBC] bg-white text-[#173F35]'}`}>Countries ({countryLocations.length})</button>{regionLocations.length > 0 ? <button type="button" onClick={() => { setLocationView('regions'); setLocationIndex(0) }} className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${locationView === 'regions' ? 'bg-[#173F35] text-white' : 'border border-[#B9CEBC] bg-white text-[#173F35]'}`}>Regions ({regionLocations.length})</button> : null}</div> : null}
-              {locations.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">{visibleLocations.map((place, index) => <LocationTile key={`${place.name}-${place.region || ''}`} place={place} number={locationIndex + index + 1} />)}</div> : <EmptyLine>No documented ingredient location is available yet.</EmptyLine>}
-              {data.origin?.country && data.map ? <div className="mt-5 max-w-[680px]"><IngredientMap origin={data.origin} map={data.map} /></div> : null}
-            </section>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">{visibleLocations.map((place, index) => <LocationTile key={`${place.name}-${place.region || ''}`} place={place} number={locationIndex + index + 1} />)}</div>
+            </section> : null}
 
-            <section className="border-t border-[#D5DED3] bg-[#FFF1E8]/50 px-4 py-7 sm:px-6 sm:py-9" aria-label="Ingredient types">
-              <IngredientSectionHeading eyebrow="02 / Ingredient varieties" title={`${name} Types in the World`} count={varieties.length} note="Explore actual active ingredient varieties from the EPANTRY catalog. No invented global rankings or ratings." />
+            {varieties.length ? <section className="border-t border-[#D5DED3] bg-[#FFF1E8]/50 px-4 py-7 sm:px-6 sm:py-9" aria-label="Ingredient types">
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.varieties)} / Ingredient varieties`} title={`${name} Types in the World`} count={varieties.length} note="Explore actual active ingredient varieties from the EPANTRY catalog. No invented global rankings or ratings." />
               {varieties.length ? (
                 <>
                   <div className="mt-4 flex flex-wrap items-center gap-2.5">
@@ -266,16 +224,16 @@ export default function IngredientKnowledgePage() {
                   </div>
                   {filteredVarieties.length ? <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 lg:grid-cols-4">{filteredVarieties.map((item, index) => <VarietyTile key={item.id} item={item} number={index + 1} />)}</div> : <EmptyLine>No varieties match this search.</EmptyLine>}
                 </>
-              ) : <EmptyLine>There are no additional confirmed varieties in the EPANTRY catalog yet.</EmptyLine>}
-            </section>
+              ) : null}
+            </section> : null}
 
-            <section className="border-t border-[#D5DED3] py-7 sm:py-9" aria-label="Ingredient products">
-              <IngredientSectionHeading eyebrow="03 / Approved marketplace" title={`${name} Products`} count={products.length} note="Real approved grocery listings from EPANTRY Hosts. Prices and ratings are not estimated." />
-              {products.length ? <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 lg:grid-cols-4">{products.map(item => <ProductTile key={item.id} item={item} />)}</div> : <EmptyLine tint="peach">No approved Host product is connected to this ingredient yet.</EmptyLine>}
-            </section>
+            {products.length ? <section className="border-t border-[#D5DED3] py-7 sm:py-9" aria-label="Ingredient products">
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.products)} / Approved marketplace`} title={`${name} Products`} count={products.length} note="Real approved grocery listings from EPANTRY Hosts. Prices and ratings are not estimated." />
+              <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 lg:grid-cols-4">{products.map(item => <ProductTile key={item.id} item={item} />)}</div>
+            </section> : null}
 
             <section className="border-t border-[#D5DED3] bg-[#E6F4ED]/55 px-4 py-7 sm:px-6 sm:py-9" aria-label="Dishes with ingredient">
-              <IngredientSectionHeading eyebrow="04 / Cook with it" title={`Dishes with ${name}`} count={dishes.length} note="Only recipes and food listings published on EPANTRY with a matching canonical ingredient." />
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.dishes)} / Cook with it`} title={`Dishes with ${name}`} count={dishes.length} note="Only recipes and food listings published on EPANTRY with a matching canonical ingredient." />
               {dishes.length ? (
                 <>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -293,7 +251,7 @@ export default function IngredientKnowledgePage() {
               ) : <EmptyLine>No published EPANTRY dishes with this ingredient are available yet.</EmptyLine>}
             </section>
 
-            <p className="border-t border-[#D5DED3] pb-3 pt-5 text-[13px] leading-5 text-[#647168]">Origin and descriptions appear only where documented. Locations and catalog products do not represent worldwide rankings. EPANTRY dish links are based on approved records, and encyclopedia references are not nutrition or food-safety claims.</p>
+            <p className="border-t border-[#D5DED3] pb-3 pt-5 text-[13px] leading-5 text-[#647168]">Variety and product collections appear only when approved catalog records are linked to this ingredient. Origin and descriptions appear only where documented. Locations and catalog products do not represent worldwide rankings. EPANTRY dish links are based on approved records, and encyclopedia references are not nutrition or food-safety claims.</p>
           </>
         ) : null}
       </div>

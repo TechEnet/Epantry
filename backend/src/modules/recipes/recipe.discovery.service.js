@@ -274,10 +274,8 @@ export async function getRecipeDiscovery(slug) {
   // Published and active checks stay centralized in the existing service.
   const published = await getPublicRecipe(slug)
   const origin = await resolveOrigin(published.dish.name)
-  const [map, related] = await Promise.all([
-    origin.country ? loadMap(origin.country, origin.region) : Promise.resolve(null),
-    findRelated(published),
-  ])
+  // Location remains as text; maps are intentionally not requested by Recipe Detail.
+  const related = await findRelated(published)
 
   let moreFromCountry = []
   // Prevent language/cuisine metadata alone from being treated as factual origin.
@@ -298,7 +296,7 @@ export async function getRecipeDiscovery(slug) {
   return {
     name: published.dish.name,
     origin,
-    map,
+    map: null,
     similarRecipes: related.similar,
     moreFromCountry,
     // An AI answer or cuisine tag does not prove country-by-country popularity.
@@ -396,7 +394,7 @@ export async function getHostRecipeDiscovery(record) {
   } catch { /* Public canonical discovery is optional; never expose unpublished data. */ }
   return {
     name: record.title, origin,
-    map: origin.country?.iso3 ? await loadMap(origin.country, origin.region) : null,
+    map: null,
     similarRecipes, moreFromCountry,
     dataPolicy: 'Origin provided by Host when declared; recommendations contain only approved/published recipes.',
   }

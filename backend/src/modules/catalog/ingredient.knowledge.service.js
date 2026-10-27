@@ -7,7 +7,6 @@ import { CanonicalIngredient } from './catalog.models.js'
 import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
 import { Dish, RecipeIngredient, RecipeVersion } from '../recipes/recipe.models.js'
 import { getPublicRecipe } from '../recipes/recipe.public.service.js'
-import { loadMap } from '../recipes/recipe.discovery.service.js'
 import { ApiError } from '../../utils/ApiError.js'
 
 const OBJECT_ID = /^[a-f\d]{24}$/i
@@ -260,7 +259,7 @@ async function approvedHostDishesForIngredient(canonicalId) {
     status: 'approved',
     type: { $in: ['brand_recipe', 'kitchen_recipe', 'prepared_food'] },
     'packet.ingredients.canonicalIngredientId': String(canonicalId),
-  }).select('_id title type packet.images packet.category packet.shareRecipe').sort({ approvedAt: -1 }).limit(10).lean()
+  }).select('_id title type packet.images packet.category packet.shareRecipe packet.countryOfOrigin packet.regionOfOrigin').sort({ approvedAt: -1 }).limit(10).lean()
   return listings.filter(row => row.type === 'prepared_food' || row.packet?.shareRecipe).slice(0, 8).map(row => ({
     id: String(row._id),
     name: row.title,
@@ -268,6 +267,36 @@ async function approvedHostDishesForIngredient(canonicalId) {
     category: safeWord(row.packet?.category, 60),
     path: `/explore/host-listings?item=${String(row._id)}`,
   }))
+}
+
+// Cooking locations are NOT assertions about an ingredient's botanical origin.
+// Expose only Host-declared places on approved public recipes that use this
+// exact canonical ingredient, separately labelled from verified origins.
+async function approvedDishLocations(canonicalId) {
+  if (!canonicalId) return []
+  const rows = await HostUnifiedListingPacket.find({
+    status: 'approved',
+    type: { $in: ['brand_recipe', 'kitchen_recipe', 'prepared_food'] },
+    'packet.ingredients.canonicalIngredientId': String(canonicalId),
+    'packet.countryOfOrigin': { $exists: true, $ne: '' },
+  }).select('title packet.countryOfOrigin packet.regionOfOrigin packet.shareRecipe type').limit(60).lean()
+  const seen = new Set()
+  return rows.filter(row => row.type === 'prepared_food' || row.packet?.shareRecipe).map(row => {
+    const name = safeWord(row.packet?.countryOfOrigin, 90)
+    const region = safeWord(row.packet?.regionOfOrigin, 90)
+    if (!name || !/^[\p{L} .,&()'-]{2,90}$/u.test(name) || (region && !/^[\p{L} .,&()'-]{2,90}$/u.test(region))) return null
+    return {
+      name, iso3: '', region, imageUrl: '',
+      description: `EPANTRY-approved dish · Host-declared location`,
+      sourceUrl: '',
+    }
+  }).filter(place => {
+    if (!place) return false
+    const key = `${norm(place.name)}:${norm(place.region)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).slice(0, 8)
 }
 
 async function approvedHostIngredientImage(canonicalId, listingId, name) {
@@ -367,6 +396,7 @@ async function approvedIngredientProducts(ingredient, varieties) {
       { 'packet.ingredientId': { $in: linkedIds } },
       { 'packet.ingredients.canonicalIngredientId': { $in: linkedIds } },
       { title: { $in: exactTitle } },
+      { 'packet.productFamily': { $in: exactTitle } },
     ],
   }).select('_id title packet.category packet.grocerySubcategory packet.images packet.brandName packet.ingredients')
     .sort({ approvedAt: -1 }).limit(18).lean()
@@ -401,19 +431,17 @@ export async function getIngredientKnowledge(rawKey, { listingId = '' } = {}) {
     }
     return null
   }
-  const [facts, relatedRecipes, relatedHostDishes, varieties, hostImage] = await Promise.all([
+  const [facts, relatedRecipes, relatedHostDishes, varieties, hostImage, dishLocations] = await Promise.all([
     lookupFacts(),
     ingredient ? publishedDishesForIngredient(ingredient._id) : Promise.resolve([]),
     ingredient ? approvedHostDishesForIngredient(ingredient._id) : Promise.resolve([]),
     ingredient ? CanonicalIngredient.find({ parentId: ingredient._id, status: 'active' })
       .select('_id slug canonicalName attributes').sort({ canonicalName: 1 }).limit(24).lean() : Promise.resolve([]),
     approvedHostIngredientImage(ingredient?._id, listingId, name),
+    approvedDishLocations(ingredient?._id),
   ])
   const origin = facts?.origin || null
-  const [map, topProducts] = await Promise.all([
-    origin?.country ? loadMap(origin.country, origin.region) : Promise.resolve(null),
-    approvedIngredientProducts(ingredient, varieties),
-  ])
+  const topProducts = await approvedIngredientProducts(ingredient, varieties)
   const varietyRows = varieties.map(row => {
     const place = verifiedCatalogPlace(row.attributes)
     return {
@@ -423,7 +451,14 @@ export async function getIngredientKnowledge(rawKey, { listingId = '' } = {}) {
       place,
     }
   })
-  const topLocations = uniqueLocations(origin, varietyRows, verifiedCatalogPlace(ingredient?.attributes))
+  const documentedLocations = uniqueLocations(origin, varietyRows, verifiedCatalogPlace(ingredient?.attributes))
+  const seenLocations = new Set(documentedLocations.map(place => `${norm(place.name)}:${norm(place.region)}`))
+  const topLocations = [...documentedLocations, ...dishLocations.filter(place => {
+    const key = `${norm(place.name)}:${norm(place.region)}`
+    if (seenLocations.has(key)) return false
+    seenLocations.add(key)
+    return true
+  })].slice(0, 12)
   // Existing canonical approved media may be reused; never manufacture a photo.
   const canonicalImage = media(ingredient?.attributes?.approvedImageUrl)
   const commonsImage = facts?.image || null
@@ -443,7 +478,7 @@ export async function getIngredientKnowledge(rawKey, { listingId = '' } = {}) {
       catalogMatched: Boolean(ingredient),
     },
     overview: facts?.summary || '',
-    origin, map,
+    origin, map: null,
     topLocations,
     varieties: varietyRows.map(({ place, ...publicVariety }) => publicVariety),
     topProducts,
