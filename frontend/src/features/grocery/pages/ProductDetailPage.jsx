@@ -2710,11 +2710,112 @@ export default function ProductDetailPage() {
                 </div>
               </DetailCard>
 
-              <div id="product-dietary-intelligence-slot" />
+              {product.isHostListing ? (
+                <>
+                  <DetailCard
+                    title="Dietary"
+                    icon={ShieldCheck}
+                    description="Dietary preference declared for this product"
+                  >
+                    {(() => {
+                      const declared = String(product.hostSubmission?.dietary || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+                      const choices = {
+                        vegetarian: { label: 'Vegetarian', colour: '#16803D' },
+                        vegan: { label: 'Vegan', colour: '#16803D' },
+                        non_vegetarian: { label: 'Non-vegetarian', colour: '#8B3F27' },
+                        nonveg: { label: 'Non-vegetarian', colour: '#8B3F27' },
+                      };
+                      const selected = choices[declared];
+                      return (
+                        <div className="space-y-3">
+                          <div className="inline-flex items-center gap-3 border-b border-[#C8D5D2] bg-white/80 px-4 py-3">
+                            {selected ? (
+                              <span
+                                aria-hidden="true"
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-[3px] border-[2px]"
+                                style={{ borderColor: selected.colour }}
+                              >
+                                <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: selected.colour }} />
+                              </span>
+                            ) : (
+                              <ShieldCheck className="text-[#718078]" size={24} aria-hidden="true" />
+                            )}
+                            <span className="text-[16px] font-semibold text-[#173F35]">
+                              {selected?.label || (declared === 'other' ? 'Other dietary preference' : 'Not declared')}
+                            </span>
+                          </div>
+                          <p className="text-sm leading-6 text-[#596A63]">
+                            {selected || declared === 'other'
+                              ? 'Declared by the Host. This dietary claim has not been independently verified by EPANTRY.'
+                              : 'No dietary preference has been declared for this listing.'}
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </DetailCard>
 
-              <div id="product-lineage-intelligence-slot" />
+                  <DetailCard
+                    title="Calculation source & rule lineage"
+                    icon={Factory}
+                    description="Where the published product information comes from"
+                  >
+                    <div className="divide-y divide-[#D2DED9] text-[15px]">
+                      <div className="grid gap-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
+                        <span className="font-semibold text-[#173F35]">Product information</span>
+                        <span>Submitted by the Host and approved by a Super Admin for publication.</span>
+                      </div>
+                      <div className="grid gap-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
+                        <span className="font-semibold text-[#173F35]">Nutrition basis</span>
+                        <span>{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : 'Not declared'} · Host-provided values, not independently calculated or verified.</span>
+                      </div>
+                      <div className="grid gap-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
+                        <span className="font-semibold text-[#173F35]">Safety information</span>
+                        <span>Allergen and dietary information is based on the Host declaration, not a laboratory or food-safety assessment.</span>
+                      </div>
+                      <p className="py-3 text-sm text-[#596A63]">
+                        No independently verified calculation sources or food-intelligence rule lineage have been published for this Host listing.
+                      </p>
+                    </div>
+                  </DetailCard>
 
-              <div id="product-food-intelligence-slot" />
+                  <DetailCard
+                    title="Product Food Intelligence"
+                    icon={ShieldCheck}
+                    description="What is known about this product and what still needs verification"
+                  >
+                    <div className="space-y-4">
+                      <div className="border-l-[3px] border-[#C86C42] bg-[#FFF0E5] px-4 py-3">
+                        <p className="font-semibold text-[#805036]">Host-declared · Not independently verified</p>
+                        <p className="mt-1 text-sm leading-6 text-[#675B51]">
+                          Super Admin approval publishes the listing. It does not certify nutrition values, allergens, dietary claims or food-safety compliance.
+                        </p>
+                      </div>
+                      <div className="divide-y divide-[#D2DED9]">
+                        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+                          <span className="font-semibold text-[#173F35]">Nutrition values</span>
+                          <span>{product.nutrition?.nutrients?.length ? `${product.nutrition.nutrients.length} Host-declared values` : 'Not declared'}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+                          <span className="font-semibold text-[#173F35]">Allergen declarations</span>
+                          <span>{product.allergens?.length ? `${product.allergens.length} Host-declared relationships` : 'No declaration recorded'}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+                          <span className="font-semibold text-[#173F35]">Independent verification</span>
+                          <span>Not available</span>
+                        </div>
+                      </div>
+                    </div>
+                  </DetailCard>
+                </>
+              ) : (
+                <>
+                  <div id="product-dietary-intelligence-slot" />
+
+                  <div id="product-lineage-intelligence-slot" />
+
+                  <div id="product-food-intelligence-slot" />
+                </>
+              )}
             </div>
           </div>
           <div className="min-w-0 h-full border-t-[3px] border-[#66557B] bg-[#F0EAF7] px-5 pb-6 pt-7 sm:px-8 sm:pb-9 sm:pt-9">

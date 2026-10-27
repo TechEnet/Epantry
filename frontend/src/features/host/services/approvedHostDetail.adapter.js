@@ -79,7 +79,7 @@ export function hostListingAsGrocery(listing) {
   const images = (listing.images || []).map((url, i) => ({ url, alt: `${text(listing.title)} image ${i+1}` })).filter(i => i.url)
   const allergens = (listing.allergens || []).map(a => ({
     allergenKey: text(typeof a === 'string' ? a : (a.key || a.name || a.allergenKey)),
-    relationType: text(typeof a === 'string' ? 'declared' : (a.status || a.relationType || a.value || 'declared')),
+    relationType: text(typeof a === 'string' ? 'declared' : (a.relationship || a.relationType || a.status || a.value || 'declared')),
   })).filter(a => a.allergenKey)
   return {
     isHostListing: true, hostSubmission: listing,
