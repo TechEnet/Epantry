@@ -385,9 +385,9 @@ function resolveRecipeDietaryBadge(foodIntelligence) {
 function RecipeLocalNames({ origin }) {
   if (!origin?.localName && !origin?.englishName) return null
   return (
-    <div className="mt-2 space-y-1.5" aria-label="Documented recipe names">
+    <div className="mt-3 min-w-0 space-y-2 break-words" aria-label="Documented recipe names">
       {origin.localName ? (
-        <p className="text-[19px] font-medium leading-snug text-[#173F35] sm:text-[22px]" lang="und">
+        <p className="block whitespace-normal break-words text-[18px] font-medium leading-[1.5] text-[#173F35] sm:text-[21px]" lang="und">
           {origin.localName}
           {origin.localLanguage ? <span className="ml-2 text-[12px] font-medium text-[#202421]/60">{origin.localLanguage}</span> : null}
         </p>
@@ -488,13 +488,6 @@ function RecipeDetailsSheet({
               'Base servings',
               recipe?.baseServings ??
                 '—',
-            ],
-            [
-              'Prep time',
-              `${Number(
-                recipe?.preparationTimeMinutes ||
-                  0,
-              )} min`,
             ],
             [
               'Cook time',
@@ -772,21 +765,20 @@ function RecipeOriginMap({ origin, map }) {
     const coordinates = shapes.flatMap(feature => feature.rings || []).flat()
     if (!coordinates.length) return null
     const xs = coordinates.map(([x]) => x).filter(Number.isFinite)
-    const ys = coordinates.map(([,y]) => y).filter(Number.isFinite)
+    const ys = coordinates.map(([, y]) => y).filter(Number.isFinite)
     if (!xs.length || !ys.length) return null
     const minX = Math.min(...xs), maxX = Math.max(...xs)
     const minY = Math.min(...ys), maxY = Math.max(...ys)
-    const deltaX = Math.max(maxX - minX, 0.001)
-    const deltaY = Math.max(maxY - minY, 0.001)
-    const padding = 24
-    const scale = Math.min(552 / deltaX, 312 / deltaY)
-    const projected = ([x,y]) => [
-      padding + (x-minX)*scale + (552-deltaX*scale)/2,
-      padding + (maxY-y)*scale + (312-deltaY*scale)/2,
+    const dx = Math.max(maxX - minX, 0.001)
+    const dy = Math.max(maxY - minY, 0.001)
+    const scale = Math.min(548 / dx, 294 / dy)
+    const project = ([x, y]) => [
+      26 + (x - minX) * scale + (548 - dx * scale) / 2,
+      26 + (maxY - y) * scale + (294 - dy * scale) / 2,
     ]
     const path = rings => rings.map(ring =>
-      ring.map((point,index) => {
-        const [x,y]=projected(point)
+      ring.map((point, index) => {
+        const [x, y] = project(point)
         return `${index ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`
       }).join(' ') + ' Z',
     ).join(' ')
@@ -795,21 +787,52 @@ function RecipeOriginMap({ origin, map }) {
       states: (map?.states || []).map(shape => ({ name: shape.name, path: path(shape.rings) })),
     }
   }, [map])
-  if (!view) return (
-    <div className="flex min-h-52 items-center justify-center border border-dashed border-[#DCE0CF] bg-[#F7F6F2] px-5 text-center text-[14px] text-[#173F35]/70">
-      Verified map boundaries are not available right now.
-    </div>
-  )
-  const regionName = String(origin?.region?.name || '').toLowerCase().trim()
+  const regionName = String(origin?.region?.name || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const regionMatch = view?.states?.some(shape => String(shape.name || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '') === regionName)
+  const locationLabel = [origin?.region?.name, origin?.country?.name].filter(Boolean).join(', ')
   return (
-    <figure className="min-w-0 bg-[#F7F6F2] p-3 sm:p-5">
-      <svg viewBox="0 0 600 360" className="h-auto max-h-[290px] w-full" role="img" aria-label={`Map showing ${origin.country.name}${origin.region ? `, ${origin.region.name}` : ''}`}>
-        {view.outline.map((path,i) => <path key={`country-${i}`} d={path} fill="#D8E2D6" stroke="#A8BDB2" strokeWidth="1.4" fillRule="evenodd" />)}
-        {view.states.map((shape,i) => <path key={`region-${i}`} d={shape.path} fill={regionName && shape.name.toLowerCase() === regionName ? '#C86C42' : 'transparent'} stroke="#FCFCF9" strokeWidth="0.8" fillRule="evenodd" />)}
-      </svg>
-      <figcaption className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#173F35]/70">
-        <span>{origin.country.name}{origin.region?.name ? ` · ${origin.region.name}` : ''}</span>
-        <a href={map.credit?.url || 'https://www.geoboundaries.org/'} target="_blank" rel="noreferrer" className="underline underline-offset-2">{map.credit?.label || 'geoBoundaries'}</a>
+    <figure className="min-w-0 overflow-hidden rounded-[12px] border border-[#D4DFD4] bg-[#F9FBF8]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DCE5DC] px-4 py-3 sm:px-5">
+        <span className="text-[13px] font-semibold text-[#173F35]">Geographic location</span>
+        {regionMatch ? (
+          <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#965131]">
+            <span className="h-2.5 w-2.5 rounded-[2px] bg-[#C86C42]" aria-hidden="true" />
+            {origin.region.name} highlighted
+          </span>
+        ) : null}
+      </div>
+      {view ? (
+        <svg viewBox="0 0 600 350" className="mx-auto block h-auto max-h-[340px] w-full px-3 py-2" role="img" aria-label={`Map of ${origin.country.name}${regionMatch ? ` highlighting ${origin.region.name}` : ''}`}>
+          {view.outline.map((shape, index) => (
+            <path key={`country-${index}`} d={shape} fill="#DCE7DD" stroke="#789E8B" strokeWidth="1.6" fillRule="evenodd" strokeLinejoin="round" />
+          ))}
+          {view.states.map((shape, index) => {
+            const selected = Boolean(regionName) && String(shape.name || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '') === regionName
+            return (
+              <path key={`region-${index}`} d={shape.path} fill={selected ? '#C86C42' : 'transparent'} stroke={selected ? '#8D4529' : '#B4C9B9'} strokeWidth={selected ? '2.6' : '0.7'} fillRule="evenodd" strokeLinejoin="round">
+                <title>{shape.name}{selected ? ' — selected region' : ''}</title>
+              </path>
+            )
+          })}
+        </svg>
+      ) : (
+        <div className="flex min-h-[185px] flex-col items-center justify-center gap-2 px-5 py-6 text-center">
+          <MapPin size={25} className="text-[#C86C42]" aria-hidden="true" />
+          <strong className="text-[19px] text-[#173F35]">{locationLabel || 'Recipe origin'}</strong>
+          <p className="max-w-sm text-[13px] text-[#51675A]">Explore the stated location on a map.</p>
+        </div>
+      )}
+      <figcaption className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[#DCE5DC] px-4 py-3 text-[13px] text-[#51675A] sm:px-5">
+        <span>{locationLabel || origin?.country?.name}</span>
+        <span className="flex flex-wrap gap-x-4 gap-y-2">
+          {map?.credit?.url ? (
+            <a href={map.credit.url} target="_blank" rel="noopener noreferrer" className="underline decoration-[#A6BFAE] underline-offset-2">{map.credit.label || 'Map source'}</a>
+          ) : null}
+          {map?.stateCredit?.url && map.stateCredit.url !== map?.credit?.url ? (
+            <a href={map.stateCredit.url} target="_blank" rel="noopener noreferrer" className="underline decoration-[#A6BFAE] underline-offset-2">{map.stateCredit.label || 'Region boundary source'}</a>
+          ) : null}
+          <a href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(locationLabel)}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-2">Open location ↗</a>
+        </span>
       </figcaption>
     </figure>
   )
@@ -1081,6 +1104,38 @@ export default function RecipeDetailPage() {
 
   const [recipeDiscovery, setRecipeDiscovery] = useState(null)
   const [recipeDiscoveryLoading, setRecipeDiscoveryLoading] = useState(false)
+  const prepScrollRef = useRef(null)
+  useEffect(() => {
+    const node = prepScrollRef.current
+    if (!node) return undefined
+    // At either end of the ingredient checklist, send wheel movement to the
+    // document (or an actual scrollable parent), never trap the user in Prep list.
+    const forwardAtBoundary = (event) => {
+      if (event.ctrlKey || event.defaultPrevented || event.deltaY === 0) return
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
+      const max = Math.max(0, node.scrollHeight - node.clientHeight)
+      const available = delta > 0 ? Math.max(0, max - node.scrollTop) : Math.max(0, node.scrollTop)
+      // Let the checklist scroll natively until this gesture would hit its edge.
+      if (max > 2 && available >= Math.abs(delta) - 1) return
+      event.preventDefault()
+      if (max > 2) node.scrollTop = delta > 0 ? max : 0
+      let remaining = delta - (delta > 0 ? available : -available)
+      let parent = node.parentElement
+      while (parent && parent !== document.body && Math.abs(remaining) > 0.5) {
+        const scrollMax = Math.max(0, parent.scrollHeight - parent.clientHeight)
+        const overflow = window.getComputedStyle(parent).overflowY
+        if (scrollMax > 1 && /auto|scroll/.test(overflow)) {
+          const before = parent.scrollTop
+          parent.scrollTop = Math.min(scrollMax, Math.max(0, before + remaining))
+          remaining -= parent.scrollTop - before
+        }
+        parent = parent.parentElement
+      }
+      if (Math.abs(remaining) > 0.5) window.scrollBy(0, remaining)
+    }
+    node.addEventListener('wheel', forwardAtBoundary, { passive: false })
+    return () => node.removeEventListener('wheel', forwardAtBoundary)
+  }, [data?.recipe?.id, data?.hostSubmission?.id])
 
   const [
     scaledData,
@@ -1299,7 +1354,7 @@ export default function RecipeDetailPage() {
           '',
         ).trim()
 
-      if (!currentSlug || !data?.dish || hostListingMode) {
+      if (!currentSlug || !data?.dish) {
         setCookNextRecipes([])
         setSimilarRecipes([])
         return undefined
@@ -1448,7 +1503,7 @@ export default function RecipeDetailPage() {
   )
 
   useEffect(() => {
-    if (!slug || !data?.recipe?.id) {
+    if (!slug || (!data?.recipe?.id && !data?.hostSubmission?.id)) {
       setRecipeDiscovery(null)
       setRecipeDiscoveryLoading(false)
       return undefined
@@ -1461,7 +1516,7 @@ export default function RecipeDetailPage() {
       .catch(() => { if (active) setRecipeDiscovery(null) })
       .finally(() => { if (active) setRecipeDiscoveryLoading(false) })
     return () => { active = false }
-  }, [slug, data?.recipe?.id])
+  }, [slug, data?.recipe?.id, data?.hostSubmission?.id])
 
   useEffect(
     () => {
@@ -4976,7 +5031,6 @@ export default function RecipeDetailPage() {
               <div className="epantry-recipe-metrics mt-5 grid grid-cols-3 gap-x-3 gap-y-2">
                 {[
                   ['Base servings', recipe.baseServings || '—'],
-                  ['Prep time', `${Number(recipe.preparationTimeMinutes || 0)} min`],
                   ['Cook time', `${Number(recipe.cookingTimeMinutes || 0)} min`],
                   ['Difficulty', recipe.difficulty || '—'],
                   ['Cuisine', dish.cuisine || '—'],
@@ -5035,7 +5089,6 @@ export default function RecipeDetailPage() {
               <div className="epantry-recipe-metrics mt-7 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
                 {[
                   ['Base servings', recipe.baseServings || '—'],
-                  ['Prep time', `${Number(recipe.preparationTimeMinutes || 0)} min`],
                   ['Cook time', `${Number(recipe.cookingTimeMinutes || 0)} min`],
                   ['Difficulty', recipe.difficulty || '—'],
                   ['Cuisine', dish.cuisine || '—'],
@@ -5235,22 +5288,29 @@ export default function RecipeDetailPage() {
         ) : null}
 
         {recipeDiscovery?.origin?.country ? (
-          <section className="epantry-origin-chapter mt-8 grid gap-5 border-y border-[#DCE0CF] bg-[#F1F3EB] px-4 py-6 sm:px-7 sm:py-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-8" aria-label="Verified recipe origin">
-            <div>
-              <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#C86C42]">From its roots</p>
-              <h2 className="mt-2 text-[26px] font-semibold tracking-tight text-[#173F35] sm:text-[34px]">Origin & tradition</h2>
-              <p className="mt-2 text-[16px] font-medium text-[#202421]">
-                {recipeDiscovery.origin.country.name}
-                {recipeDiscovery.origin.region?.name ? ` · ${recipeDiscovery.origin.region.name}` : ''}
-              </p>
-              <p className="mt-3 max-w-prose text-[13px] leading-6 text-[#202421]/75">
-                Source-reported origin, not an EPANTRY popularity ranking.
+          <section className="epantry-origin-chapter mt-8 grid gap-0 overflow-hidden border-y border-[#CFDBD0] bg-[#F1F5EF] lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]" aria-label="Recipe geographic origin">
+            <div className="flex min-w-0 flex-col justify-center px-5 py-7 sm:px-9 sm:py-10 lg:pr-12">
+              <p className="text-[13px] font-bold uppercase tracking-[0.13em] text-[#A65836]">From its roots</p>
+              <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[36px]">Origin & tradition</h2>
+              <div className="mt-5 border-l-[3px] border-[#C86C42] pl-4">
+                <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#607466]">{recipeDiscovery.origin.region?.name ? 'Country · Region' : 'Country of origin'}</p>
+                <p className="mt-1 text-[19px] font-semibold leading-snug text-[#173F35] sm:text-[22px]">
+                  {recipeDiscovery.origin.country.name}
+                  {recipeDiscovery.origin.region?.name ? ` / ${recipeDiscovery.origin.region.name}` : ''}
+                </p>
+              </div>
+              <p className="mt-5 max-w-[45ch] text-[14px] leading-6 text-[#51675A]">
+                {recipeDiscovery.origin.sourceType === 'host_declared'
+                  ? 'Origin stated by the Host. Location is displayed as declared, not independently verified.'
+                  : 'Origin based on available documented sources, not a claim of worldwide popularity.'}
               </p>
               {recipeDiscovery.origin.sourceUrl ? (
-                <a href={recipeDiscovery.origin.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-[13px] font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4">Verify origin on Wikidata</a>
+                <a href={recipeDiscovery.origin.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex w-fit text-[13px] font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4">Explore source on Wikidata ↗</a>
               ) : null}
             </div>
-            <RecipeOriginMap origin={recipeDiscovery.origin} map={recipeDiscovery.map} />
+            <div className="min-w-0 border-t border-[#CFDBD0] p-3 sm:p-5 lg:border-l lg:border-t-0 lg:p-7">
+              <RecipeOriginMap origin={recipeDiscovery.origin} map={recipeDiscovery.map} />
+            </div>
           </section>
         ) : null}
 
@@ -5399,6 +5459,7 @@ export default function RecipeDetailPage() {
 
             <div
               className="epantry-prep-scroll"
+              ref={prepScrollRef}
               tabIndex={0}
               role="region"
               aria-label="Scrollable ingredient checklist and Living Pantry actions"
@@ -5696,27 +5757,6 @@ export default function RecipeDetailPage() {
 
             <div className="min-h-0 flex-1 overflow-visible" data-recipe-guide-scroll>
 
-            <div className="epantry-recipe-guide-overview grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#DCE0CF] bg-[#DCE0CF]/60 px-5 py-5 sm:grid-cols-4 sm:px-8">
-              {[
-                ['Servings', servings || recipe?.baseServings || '—'],
-                ['Prep', `${Number(recipe?.preparationTimeMinutes || 0)} min`],
-                ['Cook', `${Number(recipe?.cookingTimeMinutes || 0)} min`],
-                ['Difficulty', recipeDetailLabel(recipe?.difficulty) || '—'],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="epantry-guide-metric min-w-0 border-l-[2px] border-[#C86C42] py-1 pl-3"
-                >
-                  <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#173F35]/65 sm:text-[13px] sm:font-semibold sm:tracking-[0.12em]">
-                    {label}
-                  </p>
-                  <p className="mt-0.5 text-[14px] font-semibold capitalize text-[#173F35] sm:mt-1 sm:text-sm sm:font-semibold">
-                    {value}
-                  </p>
-                </div>
-              ))}
-            </div>
-
             <details defaultOpen className="epantry-guide-accordion group border-b border-[#DCE0CF]">
               <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-[#DCE0CF]/70 group-open:bg-[#DCE0CF]/55 sm:gap-4 sm:px-5 sm:py-4">
                 <span className="font-sans text-[13px] font-semibold text-[#173F35] sm:font-sans sm:text-xl sm:font-semibold">
@@ -5830,15 +5870,15 @@ export default function RecipeDetailPage() {
         <div className="epantry-recipe-related mt-10 space-y-10 rounded-[16px] bg-[#DCE0CF] px-5 py-8 sm:mt-14 sm:space-y-12 sm:px-8 sm:py-10">
           <RecipeRecommendationShelf
             eyebrow="Cook next"
-            title="More recipes to try"
+            title="More from EPANTRY"
             description="A fresh set of published EPANTRY recipes that fit naturally into your next cooking session."
             items={cookNextRecipes}
             loading={recipeRecommendationsLoading}
           />
 
           <RecipeRecommendationShelf
-            eyebrow="Same table"
-            title="Similar recipes"
+            eyebrow="Same ingredients"
+            title="Recipes with shared ingredients"
             description="Published recipes sharing real ingredients with this dish."
             items={recipeDiscovery?.similarRecipes || []}
             loading={recipeDiscoveryLoading}
@@ -5846,7 +5886,7 @@ export default function RecipeDetailPage() {
           {recipeDiscovery?.origin?.country && recipeDiscovery?.moreFromCountry?.length > 0 ? (
             <RecipeRecommendationShelf
               eyebrow="Explore this cuisine"
-              title={`More from ${recipeDiscovery.origin.country.name}`}
+              title={`More from ${recipeDiscovery.origin.region?.name || recipeDiscovery.origin.country.name}`}
               showViewAll={false}
               items={recipeDiscovery.moreFromCountry}
               loading={false}

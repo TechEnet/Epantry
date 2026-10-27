@@ -124,9 +124,12 @@ export async function getPublicRecipe(
 }
 
 export async function getRecipeDiscovery(slug) {
-  const response = await apiClient.get(
-    `/recipes/${encodeURIComponent(slug)}/discovery`,
-  )
+  const hostId = hostListingIdFromSlug(slug)
+  if (hostId) {
+    const response = await apiClient.get(`/public/host-listings/${encodeURIComponent(hostId)}/discovery`)
+    return unwrap(response)?.discovery || null
+  }
+  const response = await apiClient.get(`/recipes/${encodeURIComponent(slug)}/discovery`)
   return unwrap(response)
 }
 

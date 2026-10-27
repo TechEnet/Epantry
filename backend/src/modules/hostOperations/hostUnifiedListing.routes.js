@@ -10,6 +10,7 @@ import { sensitiveResponseNoStoreMiddleware } from '../../middlewares/security.m
 import { CanonicalIngredient } from '../catalog/catalog.models.js'
 import { HostUnifiedListingPacket } from './hostUnifiedListing.models.js'
 import { publicListing } from './hostUnifiedListing.public.js'
+import { getHostRecipeDiscovery } from '../recipes/recipe.discovery.service.js'
 import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate } from './hostUnifiedListing.logic.js'
 import { importHostListingRemoteImage } from './hostListingMediaImport.service.js'
 
@@ -117,8 +118,19 @@ router.post('/host/listing-packets', ...writeSecurity, wrap(async (req, res) => 
 }))
 router.patch('/host/listing-packets/:id', ...writeSecurity, wrap(async (req, res) => {
   const record = await ownedRecord(req)
-  if (!['draft', 'changes_requested'].includes(record.status)) problem('Submitted listings are locked until Super Admin requests corrections.', 409)
+  if (!['draft', 'changes_requested', 'approved'].includes(record.status)) problem('Submitted listings are locked until Super Admin requests corrections.', 409)
+  // Explicit Host-initiated revision. Once saved, the previously approved version
+  // is withdrawn from public queries until Super Admin approves the new submission.
+  const revisingApproved = record.status === 'approved'
   const packet = cleanIncoming(req.body?.packet, record.workspaceType)
+  if (revisingApproved) {
+    record.status = 'draft'
+    record.approvedAt = null
+    record.reviewedAt = null
+    record.reviewedByUserId = null
+    record.reviewNote = ''
+    record.correctionSection = ''
+  }
   record.packet = packet
   record.type = packet.type
   record.title = packet.title
@@ -297,6 +309,12 @@ router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
     priceSource: 'host_declared_unverified', purchasable: false })
 }))
 
+router.get('/public/host-listings/:id/discovery', wrap(async (req, res) => {
+  if (!objectId(req.params.id)) problem('Invalid listing identifier.')
+  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, status: 'approved', deletedAt: null }).lean()
+  if (!record || record.type === 'grocery') problem('Approved recipe not found.', 404)
+  respond(res, { discovery: await getHostRecipeDiscovery(record) })
+}))
 router.get('/public/host-listings/:id', wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
   const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, status: 'approved', deletedAt: null }).lean()

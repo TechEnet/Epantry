@@ -5,6 +5,8 @@
  * not an editorial approval or a replacement for the host's published dish name.
  */
 import { RecipeIngredient } from './recipe.models.js'
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+import { publicListing } from '../hostOperations/hostUnifiedListing.public.js'
 import { getPublicRecipe, listPublicRecipes } from './recipe.public.service.js'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -38,7 +40,7 @@ async function fetchJson(url, { timeout = REQUEST_LIMIT_MS, maxBytes = 2_400_000
   const parsed = new URL(url)
   const allowedHosts = new Set([
     'www.wikidata.org', 'www.geoboundaries.org', 'geoboundaries.org',
-    'raw.githubusercontent.com', 'github.com', 'media.githubusercontent.com',
+    'raw.githubusercontent.com', 'github.com', 'media.githubusercontent.com', 'objects.githubusercontent.com',
   ])
   if (parsed.protocol !== 'https:' || !allowedHosts.has(parsed.hostname)) return null
   try {
@@ -97,7 +99,7 @@ function noOrigin(name) {
   }
 }
 
-async function resolveOrigin(name) {
+export async function resolveOrigin(name) {
   const key = normalized(name)
   if (!key) return noOrigin(name)
   const cached = remembered(originCache, key)
@@ -169,32 +171,69 @@ function toRings(geojson, maxFeatures = 55) {
     const polygons = geometry?.type === 'Polygon'
       ? [geometry.coordinates]
       : geometry?.type === 'MultiPolygon' ? geometry.coordinates : []
-    const rings = polygons.slice(0, 25).flatMap(polygon => polygon.slice(0, 2).map(ring => simplifyRing(ring)).filter(Boolean))
-    return rings.length ? [{ name: String(feature?.properties?.shapeName || feature?.properties?.name || '').slice(0, 100), rings }] : []
+    // A country can contain many disconnected islands. Truncating the first
+    // 25 polygons clipped India's island groups and produced an incomplete map.
+    const rings = polygons.slice(0, 240).flatMap(polygon => polygon.slice(0, 2).map(ring => simplifyRing(ring)).filter(Boolean))
+    return rings.length ? [{ name: String(feature?.properties?.shapeName || feature?.properties?.name || feature?.properties?.st_nm || feature?.properties?.ST_NM || feature?.properties?.STATE || feature?.properties?.State || feature?.properties?.State_Name || feature?.properties?.NAME_1 || '').slice(0, 100), rings }] : []
   })
 }
 
 export async function loadMap(country, region) {
   if (!country?.iso3) return null
-  const key = country.iso3
+  // Map with ADM1 is different data from country-only map. The old country-only
+  // cache silently prevented state highlighting when a second recipe loaded.
+  const regionName = normalized(region?.name)
+  const key = `${country.iso3}:${regionName || 'country'}`
   const cached = remembered(mapCache, key)
   if (cached !== undefined) return cached
+
   const readLevel = async level => {
-    const metadata = await fetchJson(`${GB_API}${key}/${level}/`, { timeout: 3000 })
-    const geoURL = metadata?.simplifiedGeometryGeoJSON
-    if (!geoURL) return []
-    const json = await fetchJson(geoURL, { timeout: 4500 })
-    return toRings(json)
+    const metadata = await fetchJson(`${GB_API}${country.iso3}/${level}/`, { timeout: 3800 })
+    const geometryUrl = metadata?.simplifiedGeometryGeoJSON
+    if (!geometryUrl) return []
+    // geoBoundaries serves its actual GeoJSON on github.com; both hosts are
+    // allowlisted above. A URL from any other origin is still rejected.
+    const geojson = await fetchJson(geometryUrl, { timeout: 6500, maxBytes: 6_000_000 })
+    return toRings(geojson, level === 'ADM1' ? 80 : 55)
   }
-  const outline = await readLevel('ADM0')
+
+  let outline = await readLevel('ADM0')
+  let credit = { label: country.iso3 === 'IND' ? 'geoBoundaries (India, CC BY 2.5 IN)' : 'geoBoundaries (source-specific licence)', url: 'https://www.geoboundaries.org/' }
+  if (!outline.length) {
+    const earth = await fetchJson('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson', {
+      timeout: 5500, maxBytes: 1_700_000,
+    })
+    const features = Array.isArray(earth?.features) ? earth.features : []
+    const selected = features.find(feature => [feature.properties?.ADM0_A3, feature.properties?.SOV_A3, feature.properties?.ISO_A3, feature.properties?.GU_A3].includes(country.iso3))
+    outline = selected ? toRings({ type: 'FeatureCollection', features: [selected] }) : []
+    if (outline.length) credit = { label: 'Natural Earth (public domain)', url: 'https://www.naturalearthdata.com/' }
+  }
+
+  let states = regionName ? await readLevel('ADM1') : []
+  let stateCredit = null
+  // Public MIT-licensed India state data is a fallback if the large geoBoundaries
+  // ADM1 file is temporarily unreachable. It is not presented as verified origin.
+  if (regionName && country.iso3 === 'IND' && (!states.length || !states.some(item => normalized(item.name) === regionName))) {
+    const indiaStates = await fetchJson('https://raw.githubusercontent.com/AbhinavSwami28/india-official-geojson/main/india-states-simplified.geojson', {
+      timeout: 5500, maxBytes: 1_000_000,
+    })
+    const fallbackStates = toRings(indiaStates, 55)
+    if (fallbackStates.some(item => normalized(item.name) === regionName)) {
+      states = fallbackStates
+      stateCredit = { label: 'India States (community dataset)', url: 'https://github.com/AbhinavSwami28/india-official-geojson' }
+      // CRITICAL: keep the complete country ADM0 boundary. State features are
+      // *only* an overlay for region highlighting, not a replacement for India.
+      // Previously `outline = fallbackStates` cut/warped India's silhouette.
+    }
+  }
+  // Only use state geometry as the silhouette if *no* ADM0 provider succeeded.
+  // Never substitute it for an actual country outline during a normal request.
+  if (!outline.length && states.length) {
+    outline = states
+    if (stateCredit) credit = stateCredit
+  }
   if (!outline.length) return remember(mapCache, key, null, UNKNOWN_TTL)
-  // Keep state boundaries as separate polygons. Region is highlighted only
-  // when Wikidata has actually identified a matching administrative unit.
-  const stateShapes = region?.name ? await readLevel('ADM1') : []
-  return remember(mapCache, key, {
-    outline, states: stateShapes,
-    credit: { label: 'geoBoundaries (CC BY 4.0)', url: 'https://www.geoboundaries.org/' },
-  }, MAP_TTL)
+  return remember(mapCache, key, { outline, states, credit, stateCredit }, MAP_TTL)
 }
 
 function normalizedSet(values) {
@@ -265,5 +304,100 @@ export async function getRecipeDiscovery(slug) {
     // An AI answer or cuisine tag does not prove country-by-country popularity.
     worldwidePopularity: null,
     dataPolicy: 'Only documented geographic facts and published EPANTRY recipes are returned.',
+  }
+}
+
+
+// Approved Host submissions reuse the SAME customer Recipe Detail component.
+// Their supplied geographic assertions remain visibly Host-declared, not
+// Wikidata-verified. Discovery never leaks private Host costs or draft records.
+const HOST_ISO3 = Object.freeze({
+  india: 'IND', japan: 'JPN', china: 'CHN', france: 'FRA', italy: 'ITA',
+  thailand: 'THA', 'united states': 'USA', usa: 'USA', 'united kingdom': 'GBR',
+  mexico: 'MEX', spain: 'ESP', germany: 'DEU', 'south korea': 'KOR',
+  indonesia: 'IDN', vietnam: 'VNM', turkey: 'TUR', pakistan: 'PAK',
+  nepal: 'NPL', 'sri lanka': 'LKA', bangladesh: 'BGD', 'united arab emirates': 'ARE',
+  australia: 'AUS', canada: 'CAN', brazil: 'BRA', russia: 'RUS',
+  malaysia: 'MYS', singapore: 'SGP', morocco: 'MAR', egypt: 'EGY',
+  nigeria: 'NGA', peru: 'PER', argentina: 'ARG', 'south africa': 'ZAF',
+})
+const publicHostFilter = { status: 'approved', deletedAt: null }
+function listItemFromHost(record) {
+  const l = publicListing(record)
+  return {
+    path: `/recipes/host--${l.id}`,
+    dish: { slug: `host--${l.id}`, name: l.title, heroImageUrl: l.images?.[0] || '',
+      cuisine: l.countryOfOrigin || '', course: l.category || '' },
+    recipe: { id: `host--${l.id}` },
+  }
+}
+function nameSet(items) {
+  return new Set((items || []).map(item => normalized(item?.name || item?.ingredient?.name)).filter(Boolean))
+}
+export async function getHostRecipeDiscovery(record) {
+  if (!record || record.status !== 'approved' || record.deletedAt || record.type === 'grocery') return null
+  const packet = record.packet || {}
+  const declaredCountry = String(packet.countryOfOrigin || '').trim()
+  const declaredRegion = String(packet.regionOfOrigin || '').trim()
+  // Wikidata is used for documented names; it must never overwrite a Host's
+  // explicitly declared country with an unrelated or fuzzy search result.
+  const documented = await resolveOrigin(record.title)
+  const origin = {
+    ...documented,
+    hostName: record.title,
+    localName: packet.localRecipeName || documented.localName || '',
+    localLanguage: packet.localRecipeName ? (packet.localRecipeLanguage || '') : documented.localLanguage,
+    reading: packet.englishNameReading || documented.reading || '',
+    country: declaredCountry ? { name: declaredCountry,
+      iso3: HOST_ISO3[normalized(declaredCountry)] || (normalized(documented.country?.name) === normalized(declaredCountry) ? documented.country.iso3 : '') } : documented.country,
+    region: declaredRegion ? { name: declaredRegion } : (declaredCountry ? null : documented.region),
+    sourceUrl: declaredCountry ? '' : documented.sourceUrl,
+    sourceType: declaredCountry ? 'host_declared' : 'wikidata',
+    verified: !declaredCountry && documented.verified,
+  }
+  // Only fetch real published records. Host packet data is NOT a catalogue
+  // recipe version, so name equality is the narrow truthful similarity test.
+  const hosts = await HostUnifiedListingPacket.find({ ...publicHostFilter,
+    type: { $in: ['kitchen_recipe', 'brand_recipe', 'prepared_food'] },
+    _id: { $ne: record._id },
+  }).sort({ approvedAt: -1 }).limit(60).lean()
+  const originalNames = nameSet(packet.ingredients)
+  const rankedHosts = hosts.map(other => {
+    const ingredients = nameSet(other.packet?.ingredients)
+    const common = [...originalNames].filter(n => ingredients.has(n)).length
+    return { other, common }
+  }).filter(x => x.common > 0).sort((a,b) => b.common - a.common)
+  let moreFromCountry = hosts.filter(other => origin.country &&
+    normalized(other.packet?.countryOfOrigin) === normalized(origin.country.name) &&
+    (!origin.region?.name || normalized(other.packet?.regionOfOrigin) === normalized(origin.region.name)))
+    .slice(0, 5).map(listItemFromHost)
+  let similarRecipes = rankedHosts.slice(0, 5).map(({other}) => listItemFromHost(other))
+  // Include genuine published canonical EPANTRY recipes when ingredient names
+  // overlap. Never claim the ingredients are canonical-matched without evidence.
+  try {
+    const page = await listPublicRecipes({ page: 1, limit: 24, search: '', cuisine: '', course: '', tag: '', sourceScope: 'all' })
+    const candidates = (page?.recipes || []).filter(x => x?.dish?.slug).slice(0, 16)
+    const checked = await Promise.all(candidates.map(async c => {
+      try {
+        const published = await getPublicRecipe(c.dish.slug)
+        const similar = [...nameSet(published.ingredients)].filter(n => originalNames.has(n)).length
+        const originalCountry = origin.country ? await resolveOrigin(c.dish.name) : null
+        return { c, similar, originalCountry }
+      } catch { return null }
+    }))
+    for (const candidate of checked.filter(Boolean)) {
+      if (candidate.similar > 0 && similarRecipes.length < 5)
+        similarRecipes.push(candidate.c)
+      if (origin.country && candidate.originalCountry?.country?.name &&
+          normalized(candidate.originalCountry.country.name) === normalized(origin.country.name) &&
+          (!origin.region?.name || normalized(candidate.originalCountry.region?.name) === normalized(origin.region.name)) &&
+          moreFromCountry.length < 5) moreFromCountry.push(candidate.c)
+    }
+  } catch { /* Public canonical discovery is optional; never expose unpublished data. */ }
+  return {
+    name: record.title, origin,
+    map: origin.country?.iso3 ? await loadMap(origin.country, origin.region) : null,
+    similarRecipes, moreFromCountry,
+    dataPolicy: 'Origin provided by Host when declared; recommendations contain only approved/published recipes.',
   }
 }

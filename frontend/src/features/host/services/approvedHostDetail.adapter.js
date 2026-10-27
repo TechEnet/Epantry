@@ -38,7 +38,7 @@ export function hostListingAsRecipe(listing) {
     dish: {
       id: null, slug, name: text(listing.title), description: text(listing.description),
       heroImageUrl: (listing.images || [])[0] || '',
-      cuisine: '', course: readable(listing.category || 'Recipe'),
+      cuisine: text(listing.countryOfOrigin), course: readable(listing.category || 'Recipe'),
     },
     recipe: {
       id: null, title: text(listing.title), description: text(listing.description),
@@ -88,17 +88,19 @@ export function hostListingAsGrocery(listing) {
     images, image: images[0] || null,
     category: { name: readable(listing.grocerySubcategory || listing.category || 'Grocery'), slug: text(listing.category) },
     brand: listing.brandName ? { name: text(listing.brandName) } : null,
-    family: null, variant: null,
-    netQuantity,
-    pack: { name: netQuantity ? `${netQuantity.value} ${netQuantity.unit}` : readable(listing.packagingType), type: readable(listing.packagingType) },
+    family: listing.productFamily ? { name: text(listing.productFamily) } : null, variant: null,
+    netQuantity, unitsPerPack: finite(listing.unitsPerPack), servingSize: text(listing.servingSize),
+    manufacturerPacker: text(listing.manufacturerPacker), regionOfOrigin: text(listing.regionOfOrigin),
+    pack: { name: netQuantity ? `${netQuantity.value} ${netQuantity.unit}` : readable(listing.packagingType), type: readable(listing.packagingType), multipackCount: finite(listing.unitsPerPack) },
     // No canonical pack or public marketplace offer is claimed by listing approval.
     packId: null, canonicalPackId: null,
-    manufacturerName: '', countryOfOrigin: '', barcode: '', gtin: '',
+    manufacturerName: text(listing.manufacturerPacker), countryOfOrigin: text(listing.countryOfOrigin),
+    barcode: text(listing.barcode), gtin: text(listing.barcode),
     ingredientDeclarationText: (listing.ingredients || []).map(a => text(a.name)).filter(Boolean).join(', '),
     ingredients: (listing.ingredients || []).map(a => ({ displayName: text(a.name), percentage: null })),
     allergenStatement: allergens.map(a => `${readable(a.allergenKey)}: ${readable(a.relationType)}`).join(' · '),
     allergens,
-    nutrition: { basis: text(nutrition.basis), nutrients: keys
+    nutrition: { basis: text(nutrition.basis), servingSize: /^\s*(\d+(?:\.\d+)?)\s*(kg|g|ml|l|piece)\s*$/i.test(text(listing.servingSize)) ? { value: Number(text(listing.servingSize).match(/\d+(?:\.\d+)?/)[0]), unit: text(listing.servingSize).match(/(kg|g|ml|l|piece)\s*$/i)[1].toLowerCase() } : null, nutrients: keys
       .filter(([key]) => finite(nutrition[key]) !== null)
       .map(([key, nutrientKey, unit]) => ({ nutrientKey, amount: finite(nutrition[key]), unit })) },
     claims: [], certifications: [],

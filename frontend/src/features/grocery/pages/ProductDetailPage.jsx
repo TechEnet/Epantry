@@ -2466,7 +2466,7 @@ export default function ProductDetailPage() {
                   ["Pack type", product.pack?.type || "Not declared"],
                   ["Units per pack", product.pack?.multipackCount != null ? String(product.pack.multipackCount) : "Not declared"],
                   ["Manufacturer / packer", product.manufacturerName || "Not declared"],
-                  ["Serving size", product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : "Not declared"],
+                  ["Serving size", product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : product.servingSize || "Not declared"],
                 ].map(([label, value]) => (
                   <div key={label} className="min-w-0 border-b border-[#DEE4DF] py-4">
                     <dt className="text-[13px] font-medium text-[#737970]">{label}</dt>
@@ -2722,7 +2722,7 @@ export default function ProductDetailPage() {
             <h2 className="mt-3 text-[28px] font-medium tracking-[-0.045em] text-[#202421] sm:text-4xl">Nutrition facts</h2>
             <dl className="mt-6 grid grid-cols-2 gap-4 border-b border-[#CDD8CD] pb-5">
               <div><dt className="text-[13px] font-medium text-[#6B776C]">Basis</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : "Not declared"}</dd></div>
-              <div><dt className="text-[13px] font-medium text-[#6B776C]">Serving size</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : "Not declared"}</dd></div>
+              <div><dt className="text-[13px] font-medium text-[#6B776C]">Serving size</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : product.servingSize || "Not declared"}</dd></div>
             </dl>
             <div className="mt-4">
               {product.nutrition?.nutrients?.length > 0 ? (

@@ -10,10 +10,17 @@ export function publicListing(record) {
     packagingType: record.type === 'grocery' ? (packet.packagingType || '') : '',
     description: packet.description, images: packet.images || [],
     videoUrl: packet.videoUrl || '', brandName: packet.brandName || '',
+    countryOfOrigin: packet.countryOfOrigin || '', regionOfOrigin: packet.regionOfOrigin || '',
+    localRecipeName: packet.localRecipeName || '', localRecipeLanguage: packet.localRecipeLanguage || '',
+    englishNameReading: packet.englishNameReading || '',
+    productFamily: record.type === 'grocery' ? (packet.productFamily || '') : '',
+    manufacturerPacker: record.type === 'grocery' ? (packet.manufacturerPacker || '') : '',
+    unitsPerPack: record.type === 'grocery' ? (packet.unitsPerPack ?? null) : null,
+    servingSize: record.type === 'grocery' ? (packet.servingSize || '') : '',
+    barcode: record.type === 'grocery' ? (packet.selling?.barcode || '') : '',
     shareRecipe: Boolean(packet.shareRecipe), sellReadyMade: Boolean(packet.sellReadyMade),
     baseServings: packet.baseServings, ingredients: packet.ingredients?.map((item) => ({
       name: item.name, quantity: item.quantity, unit: item.unit, imageUrl: item.imageUrl,
-      canonicalIngredientId: /^[a-f0-9]{24}$/i.test(String(item.canonicalIngredientId || '')) ? item.canonicalIngredientId : '',
     })) || [],
     steps: packet.shareRecipe ? packet.steps?.map((item) => ({ instruction: item.instruction, timerMinutes: item.timerMinutes, imageUrl: item.imageUrl })) || [] : [],
     nutrition: packet.nutrition ? {
