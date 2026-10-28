@@ -1,3 +1,4 @@
+import { hostDetailPath } from '../../host/services/approvedHostDetail.adapter'
 export const normalizeName = (value) => String(value || '')
   .normalize('NFKC')
   .toLocaleLowerCase('en')
@@ -85,7 +86,7 @@ export function normalizeRecipeSources({
         ? String(item.images[0] || '')
         : '',
       cuisine: kind,
-      path: `/explore/host-listings?item=${encodeURIComponent(item.id)}`,
+      path: hostDetailPath(item),
       publishedAt: item.approvedAt || '',
     })
   }

@@ -745,7 +745,7 @@ function RecipeEvidenceFallback({ kind, evidence }) {
         dietaryBadge ? (
           <div className="mt-3 flex items-center gap-3 text-[15px] font-semibold text-[#173F35]">
             <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border-2 ${dietaryBadge.kind === 'veg' ? 'border-[#278C49]' : 'border-[#9E583B]'}`} aria-hidden="true">
-              <span className={`h-3 w-3 rounded-full ${dietaryBadge.kind === 'veg' ? 'bg-[#278C49]' : 'bg-[#B14638]'}`} />
+              {dietaryBadge.kind === 'veg' ? <span className="h-3 w-3 rounded-full bg-[#278C49]" /> : <span className="h-0 w-0 border-x-[7px] border-b-[13px] border-x-transparent border-b-[#9E583B]" />}
             </span>
             {dietaryBadge.label}
           </div>
@@ -946,7 +946,7 @@ function HostDeclaredRecipeFacts({ submission, section }) {
   ].filter(([, key]) => nutrition[key] !== null && nutrition[key] !== undefined && nutrition[key] !== '')
   const allergenRows = (submission?.allergens || []).map(row => ({
     name: typeof row === 'string' ? row : (row.key || row.name || row.allergenKey || ''),
-    status: typeof row === 'string' ? 'Host-declared' : (row.status || row.relationType || row.value || 'Host-declared'),
+    status: typeof row === 'string' ? 'Not specified' : String(row.status || row.relationType || row.value || 'Not specified').replace(/host[- ]declared/gi, 'Declared').replace(/_/g, ' ').replace(/^\w/, letter => letter.toUpperCase()),
   })).filter(row => row.name)
   const name = section === 'nutrition' ? 'Nutrition' : section === 'allergens' ? 'Allergens' : 'Dietary'
   return (
@@ -956,7 +956,7 @@ function HostDeclaredRecipeFacts({ submission, section }) {
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#B9ACDE] bg-white text-[#173F35] transition-transform group-open:rotate-180"><ChevronDown size={16} aria-hidden="true" /></span>
       </summary>
       <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] p-4 sm:p-5">
-        <p className="mb-3 text-sm text-[#79543D]">Host-declared information. Listing approval does not independently verify food claims.</p>
+        
         {section === 'nutrition' ? (facts.length ? (
           <dl className="grid gap-x-6 sm:grid-cols-2">
             {facts.map(([label, key, unit]) => <div key={key} className="flex justify-between border-b border-[#DCE0CF] py-2 text-sm"><dt>{label}</dt><dd className="font-semibold">{nutrition[key]} {unit}</dd></div>)}
@@ -965,7 +965,16 @@ function HostDeclaredRecipeFacts({ submission, section }) {
         {section === 'allergens' ? (allergenRows.length ? (
           <dl className="space-y-2">{allergenRows.map((row, i) => <div key={i} className="flex flex-wrap justify-between gap-2 border-b border-[#DCE0CF] pb-2 text-sm"><dt>{row.name}</dt><dd className="font-semibold">{row.status}</dd></div>)}</dl>
         ) : <p className="text-sm">Allergen status not declared.</p>) : null}
-        {section === 'dietary' ? <p className="text-sm">{submission?.dietary || 'Not declared'}</p> : null}
+        {section === 'dietary' ? (() => {
+          const value = String(submission?.dietary || '').toLowerCase().trim().replace(/[_-]/g, ' ')
+          const nonVeg = /non.?veg|non vegetarian|meat|eggetarian/i.test(value)
+          const veg = !nonVeg && /vegetarian|^veg$|vegan/i.test(value)
+          const label = nonVeg ? 'Non-vegetarian' : veg ? (value === 'vegan' ? 'Vegan' : 'Vegetarian') : (submission?.dietary || 'Not declared')
+          return <div className="inline-flex items-center gap-2.5 text-[15px] font-semibold text-[#173F35]">
+            {(nonVeg || veg) && <span aria-label={nonVeg ? 'Non-vegetarian symbol' : 'Vegetarian symbol'} className={`grid h-[23px] w-[23px] place-items-center rounded-[3px] border-2 ${nonVeg ? 'border-[#9A4836]' : 'border-[#16803D]'}`}>{nonVeg ? <span className="h-0 w-0 border-x-[6px] border-b-[11px] border-x-transparent border-b-[#9A4836]"/> : <span className="h-[10px] w-[10px] rounded-full bg-[#16803D]"/>}</span>}
+            {label}
+          </div>
+        })() : null}
       </div>
     </details>
   )
@@ -977,7 +986,7 @@ export default function RecipeDetailPage() {
   } =
     useParams()
 
-  const hostListingMode = String(slug || '').startsWith('host--')
+  const hostListingMode = /(?:^host--[a-f0-9]{24}$|-[a-f0-9]{10}$)/i.test(String(slug || ''))
 
   const location =
     useLocation()
@@ -5220,9 +5229,9 @@ export default function RecipeDetailPage() {
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 border-t border-[#CAD9CC] pt-4 sm:gap-6 lg:border-l lg:border-t-0 lg:py-1 lg:pl-8">
                 <div className="min-w-0">
                   <p className="text-[13px] font-bold uppercase tracking-[.1em] text-[#A65836]">Country</p>
-                  <Link to={countryExplorePath(recipeDiscovery.origin.country.name)} aria-label={`Explore food from ${recipeDiscovery.origin.country.name}`} title={`Discover food from ${recipeDiscovery.origin.country.name}`} className="mt-2 inline-flex h-[52px] min-w-[68px] items-center justify-center gap-1.5 rounded-lg border border-[#CBD9CE] bg-white/80 px-3 text-[32px] shadow-sm transition hover:border-[#C86C42] hover:bg-[#FFF4EC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C86C42]">
+                  <Link to={countryExplorePath(recipeDiscovery.origin.country.name)} aria-label={`Explore food from ${recipeDiscovery.origin.country.name}`} title={`Discover food from ${recipeDiscovery.origin.country.name}`} className="mt-1 inline-flex min-h-10 items-center gap-0.5 text-[29px] transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C86C42]">
                     {countryFlag(recipeDiscovery.origin.country.name) ? <span role="img" aria-label={`${recipeDiscovery.origin.country.name} flag`}>{countryFlag(recipeDiscovery.origin.country.name)}</span> : <Globe2 size={28} strokeWidth={1.6} aria-hidden="true" />}
-                    <ArrowUpRight size={15} className="self-start text-[#A65836]" aria-hidden="true" />
+                    <ArrowUpRight size={11} className="self-start mt-1 text-[#A65836]" aria-hidden="true" />
                   </Link>
                 </div>
                 {recipeDiscovery.origin.region?.name ? (

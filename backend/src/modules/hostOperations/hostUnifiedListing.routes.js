@@ -12,7 +12,7 @@ import { HostUnifiedListingPacket } from './hostUnifiedListing.models.js'
 import { ProductVersion } from '../catalog/catalog.models.js'
 import { listPublicProducts } from '../catalog/catalog.public.service.js'
 import { listPublicRecipes } from '../recipes/recipe.public.service.js'
-import { publicListing } from './hostUnifiedListing.public.js'
+import { publicListing, publicHostSlug } from './hostUnifiedListing.public.js'
 import { getHostRecipeDiscovery } from '../recipes/recipe.discovery.service.js'
 import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate } from './hostUnifiedListing.logic.js'
 import { importHostListingRemoteImage } from './hostListingMediaImport.service.js'
@@ -257,11 +257,14 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
   if (section && !SECTIONS.has(section)) problem('Choose a valid correction section.')
   const now = new Date()
   // Conditional update makes a decision atomic; a second reviewer cannot silently overwrite it.
+  const pendingForSlug = decision === 'approved' ? await HostUnifiedListingPacket.findOne(
+    { _id: req.params.id, status: 'submitted_for_review', deletedAt: null }).select('_id title publicSlug') : null
+  const approvedPublicSlug = pendingForSlug ? publicHostSlug(pendingForSlug) : ''
   const record = await HostUnifiedListingPacket.findOneAndUpdate(
     { _id: req.params.id, status: 'submitted_for_review', deletedAt: null },
     { $set: { status: decision, reviewedAt: now, reviewedByUserId: actor(req),
         reviewNote: note, correctionSection: decision === 'changes_requested' ? section : '',
-        ...(decision === 'approved' ? { approvedAt: now } : {}) },
+        ...(decision === 'approved' ? { approvedAt: now, publicSlug: approvedPublicSlug } : {}) },
       $inc: { reviewRevision: 1 },
       $push: { reviewHistory: { decision, actorUserId: actor(req), note,
         section: decision === 'changes_requested' ? section : '', at: now } } },
@@ -433,7 +436,7 @@ router.get('/public/country-discovery/:countryName', wrap(async (req, res) => {
   const [history, hostRecords, canonicalRecipes, canonicalGrocery] = await Promise.all([
     wikiFoodStory(name),
     HostUnifiedListingPacket.find({ status: 'approved', deletedAt: null, 'packet.countryOfOrigin': origin })
-      .select('_id title type packet.category packet.images packet.shareRecipe packet.sellReadyMade').sort({ approvedAt: -1 }).limit(250).lean(),
+      .select('_id title publicSlug type packet.category packet.images packet.shareRecipe packet.sellReadyMade').sort({ approvedAt: -1 }).limit(250).lean(),
     publicCountryRecipes(name), publicCountryGrocery(name),
   ])
   const recipes = [...canonicalRecipes]
@@ -442,9 +445,9 @@ router.get('/public/country-discovery/:countryName', wrap(async (req, res) => {
     const card = { title: String(row.title || ''),
       imageUrl: previewImage(row.packet?.images?.[0]), caption: String(row.packet?.category || '').replace(/_/g, ' '),
       sourceLabel: 'Super Admin-approved Host listing · Host-declared country' }
-    if (row.type === 'grocery') grocery.push({ ...card, path: `/grocery/product/host--${row._id}` })
+    if (row.type === 'grocery') grocery.push({ ...card, path: `/grocery/product/${publicHostSlug(row)}` })
     else if (row.type === 'kitchen_recipe' || row.type === 'brand_recipe' || (row.type === 'prepared_food' && row.packet?.shareRecipe)) {
-      recipes.push({ ...card, path: `/recipes/host--${row._id}` })
+      recipes.push({ ...card, path: `/recipes/${publicHostSlug(row)}` })
     }
   }
   respond(res, { country: { name }, history, recipes, grocery })
@@ -459,8 +462,34 @@ router.get('/public/host-listings', wrap(async (req, res) => {
   if (category) filter['packet.category'] = category
   if (type) filter.type = type
   const rows = await HostUnifiedListingPacket.find(filter).sort({ approvedAt: -1 }).limit(100).lean()
+  // One-time lightweight backfill for approved pre-slug submissions.
+  const legacy = rows.filter(row => !row.publicSlug)
+  if (legacy.length) await Promise.all(legacy.map(row =>
+    HostUnifiedListingPacket.updateOne({ _id: row._id, $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] },
+      { $set: { publicSlug: publicHostSlug(row) } })))
   respond(res, { listings: rows.map(publicListing) })
 }))
+// Resolve friendly Host URLs without exposing unapproved records. Older host--id
+// links continue to work. This route is BEFORE the /:id catch-all.
+router.get('/public/host-listings/by-slug/:slug', wrap(async (req, res) => {
+  const slug = String(req.params.slug || '').trim().toLowerCase()
+  if (!/^[a-z0-9][a-z0-9-]{1,199}$/.test(slug)) problem('Invalid listing URL.', 404)
+  let record = await HostUnifiedListingPacket.findOne({ publicSlug: slug, status: 'approved', deletedAt: null }).lean()
+  if (!record) {
+    // Compatibility for the already-approved listings created before publicSlug existed.
+    const older = await HostUnifiedListingPacket.find({ status: 'approved', deletedAt: null,
+      $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] })
+      .select('_id title type publicSlug packet').sort({ approvedAt: -1 }).limit(300).lean()
+    record = older.find(row => publicHostSlug(row) === slug) || null
+    if (record) {
+      await HostUnifiedListingPacket.updateOne({ _id: record._id, $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] },
+        { $set: { publicSlug: slug } })
+    }
+  }
+  if (!record) problem('This approved listing is unavailable.', 404)
+  respond(res, { listing: publicListing(record) })
+}))
+
 // Return only the match for the requested PIN, never the Host's full private
 // service-area list. Approved Host packets are not verified Marketplace offers.
 router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {

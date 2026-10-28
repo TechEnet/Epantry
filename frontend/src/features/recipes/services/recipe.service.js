@@ -1,5 +1,5 @@
-import { getPublicHostListing } from '../../host/services/hostUnifiedListing.service'
-import { hostListingIdFromSlug, hostListingAsRecipe, scaleHostRecipe } from '../../host/services/approvedHostDetail.adapter'
+import { getPublicHostListing, getPublicHostListingBySlug } from '../../host/services/hostUnifiedListing.service'
+import { hostListingIdFromSlug, isHostDetailSlug, hostListingAsRecipe, scaleHostRecipe } from '../../host/services/approvedHostDetail.adapter'
 import { optimizeUploadImage } from '../../../lib/optimizeUploadImage'
 import {
   apiClient,
@@ -111,6 +111,7 @@ export async function getPublicRecipe(
     const result = await getPublicHostListing(hostId)
     return hostListingAsRecipe(result?.listing)
   }
+  if (isHostDetailSlug(slug)) return hostListingAsRecipe((await getPublicHostListingBySlug(slug))?.listing)
   const response =
     await apiClient.get(
       `/recipes/${encodeURIComponent(
@@ -127,6 +128,11 @@ export async function getRecipeDiscovery(slug) {
   const hostId = hostListingIdFromSlug(slug)
   if (hostId) {
     const response = await apiClient.get(`/public/host-listings/${encodeURIComponent(hostId)}/discovery`)
+    return unwrap(response)?.discovery || null
+  }
+  if (isHostDetailSlug(slug)) {
+    const record = (await getPublicHostListingBySlug(slug))?.listing
+    const response = await apiClient.get(`/public/host-listings/${encodeURIComponent(record.id)}/discovery`)
     return unwrap(response)?.discovery || null
   }
   const response = await apiClient.get(`/recipes/${encodeURIComponent(slug)}/discovery`)
@@ -163,6 +169,10 @@ export async function scalePublicRecipe(
   if (hostId) {
     const result = await getPublicHostListing(hostId)
     return scaleHostRecipe(hostListingAsRecipe(result?.listing), servings)
+  }
+  if (isHostDetailSlug(slug)) {
+    const record = (await getPublicHostListingBySlug(slug))?.listing
+    return scaleHostRecipe(hostListingAsRecipe(record), servings)
   }
   const response =
     await apiClient.get(

@@ -1,5 +1,5 @@
-import { getPublicHostListing } from '../../host/services/hostUnifiedListing.service'
-import { hostListingIdFromSlug, hostListingAsGrocery } from '../../host/services/approvedHostDetail.adapter'
+import { getPublicHostListing, getPublicHostListingBySlug } from '../../host/services/hostUnifiedListing.service'
+import { hostListingIdFromSlug, isHostDetailSlug, hostListingAsGrocery } from '../../host/services/approvedHostDetail.adapter'
 import {
   useCallback,
   useEffect,
@@ -98,7 +98,9 @@ export function useProductDetail(
           const hostId = hostListingIdFromSlug(normalizedSlug)
           const result = hostId
             ? { product: hostListingAsGrocery((await getPublicHostListing(hostId))?.listing) }
-            : await getCatalogProduct(normalizedSlug)
+            : isHostDetailSlug(normalizedSlug)
+              ? { product: hostListingAsGrocery((await getPublicHostListingBySlug(normalizedSlug))?.listing) }
+              : await getCatalogProduct(normalizedSlug)
 
           if (
             requestSequence

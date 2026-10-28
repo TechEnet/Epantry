@@ -5,6 +5,7 @@
  */
 import { CanonicalIngredient } from './catalog.models.js'
 import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+import { publicHostSlug } from '../hostOperations/hostUnifiedListing.public.js'
 import { Dish, RecipeIngredient, RecipeVersion } from '../recipes/recipe.models.js'
 import { getPublicRecipe } from '../recipes/recipe.public.service.js'
 import { ApiError } from '../../utils/ApiError.js'
@@ -259,13 +260,13 @@ async function approvedHostDishesForIngredient(canonicalId) {
     status: 'approved',
     type: { $in: ['brand_recipe', 'kitchen_recipe', 'prepared_food'] },
     'packet.ingredients.canonicalIngredientId': String(canonicalId),
-  }).select('_id title type packet.images packet.category packet.shareRecipe packet.countryOfOrigin packet.regionOfOrigin').sort({ approvedAt: -1 }).limit(10).lean()
+  }).select('_id title publicSlug type packet.images packet.category packet.shareRecipe packet.countryOfOrigin packet.regionOfOrigin').sort({ approvedAt: -1 }).limit(10).lean()
   return listings.filter(row => row.type === 'prepared_food' || row.packet?.shareRecipe).slice(0, 8).map(row => ({
     id: String(row._id),
     name: row.title,
     imageUrl: media(row.packet?.images?.[0]),
     category: safeWord(row.packet?.category, 60),
-    path: `/explore/host-listings?item=${String(row._id)}`,
+    path: `/recipes/${publicHostSlug(row)}`,
   }))
 }
 
@@ -279,15 +280,15 @@ async function approvedDishLocations(canonicalId) {
     type: { $in: ['brand_recipe', 'kitchen_recipe', 'prepared_food'] },
     'packet.ingredients.canonicalIngredientId': String(canonicalId),
     'packet.countryOfOrigin': { $exists: true, $ne: '' },
-  }).select('title packet.countryOfOrigin packet.regionOfOrigin packet.shareRecipe type').limit(60).lean()
+  }).select('title publicSlug packet.images packet.countryOfOrigin packet.regionOfOrigin packet.shareRecipe type').limit(60).lean()
   const seen = new Set()
   return rows.filter(row => row.type === 'prepared_food' || row.packet?.shareRecipe).map(row => {
     const name = safeWord(row.packet?.countryOfOrigin, 90)
     const region = safeWord(row.packet?.regionOfOrigin, 90)
     if (!name || !/^[\p{L} .,&()'-]{2,90}$/u.test(name) || (region && !/^[\p{L} .,&()'-]{2,90}$/u.test(region))) return null
     return {
-      name, iso3: '', region, imageUrl: '',
-      description: `EPANTRY-approved dish · Host-declared location`,
+      name, iso3: '', region, imageUrl: media(row.packet?.images?.[0]),
+      description: `Location of an EPANTRY-published dish`,
       sourceUrl: '',
     }
   }).filter(place => {
@@ -369,7 +370,7 @@ function uniqueLocations(origin, varieties, ingredientPlace) {
   }
   const seen = new Set()
   return places.filter(place => {
-    const key = `${place.iso3}:${(place.region || '').toLowerCase()}`
+    const key = `${place.iso3 || norm(place.name)}:${norm(place.region)}`
     if (!key || seen.has(key)) return false
     seen.add(key)
     return true
@@ -398,7 +399,7 @@ async function approvedIngredientProducts(ingredient, varieties) {
       { title: { $in: exactTitle } },
       { 'packet.productFamily': { $in: exactTitle } },
     ],
-  }).select('_id title packet.category packet.grocerySubcategory packet.images packet.brandName packet.ingredients')
+  }).select('_id title publicSlug packet.category packet.grocerySubcategory packet.images packet.brandName packet.ingredients')
     .sort({ approvedAt: -1 }).limit(18).lean()
   return rows.map(row => ({
     id: String(row._id),
@@ -406,7 +407,7 @@ async function approvedIngredientProducts(ingredient, varieties) {
     category: safeWord(row.packet?.grocerySubcategory || row.packet?.category, 80),
     brand: safeWord(row.packet?.brandName, 100),
     imageUrl: media(row.packet?.images?.[0]),
-    path: `/explore/host-listings?item=${String(row._id)}`,
+    path: `/grocery/product/${publicHostSlug(row)}`,
   }))
 }
 

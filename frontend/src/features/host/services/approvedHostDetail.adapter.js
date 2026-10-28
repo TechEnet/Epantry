@@ -3,6 +3,14 @@
 // they do not turn a Host submission into a governed catalog product or recipe.
 export const HOST_DETAIL_PREFIX = 'host--'
 const HOST_ID = /^[a-f\d]{24}$/i
+export const isHostDetailSlug = (slug) => /^host--[a-f0-9]{24}$/i.test(String(slug || '')) || /-[a-f0-9]{10}$/i.test(String(slug || ''))
+export function hostPrettySlug(listing) {
+  if (listing?.slug) return String(listing.slug)
+  const base = String(listing?.title || listing?.name || 'host-food')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 110) || 'host-food'
+  return `${base}-${String(listing?.id || '').slice(-10)}`
+}
 export function hostListingIdFromSlug(slug) {
   const value = String(slug || '')
   const id = value.startsWith(HOST_DETAIL_PREFIX) ? value.slice(HOST_DETAIL_PREFIX.length) : ''
@@ -11,9 +19,10 @@ export function hostListingIdFromSlug(slug) {
 export function hostDetailPath(listing) {
   const id = String(listing?.id || '')
   if (!HOST_ID.test(id)) return '/explore/host-listings'
+  const slug = encodeURIComponent(hostPrettySlug(listing))
   return listing.type === 'grocery'
-    ? `/grocery/product/${HOST_DETAIL_PREFIX}${id}`
-    : `/recipes/${HOST_DETAIL_PREFIX}${id}`
+    ? `/grocery/product/${slug}`
+    : `/recipes/${slug}`
 }
 function text(value) { return String(value ?? '').trim() }
 function finite(value) {
@@ -25,7 +34,7 @@ function readable(value) { return text(value).replace(/_/g, ' ').replace(/\b\w/g
 export function hostListingAsRecipe(listing) {
   if (!listing || listing.type === 'grocery') throw new Error('This listing is not a recipe.')
   const baseServings = Math.max(1, finite(listing.baseServings) || 1)
-  const slug = `${HOST_DETAIL_PREFIX}${listing.id}`
+  const slug = hostPrettySlug(listing)
   const steps = (listing.steps || []).map((step, i) => ({
     id: `${listing.id}-step-${i}`, stepNumber: i + 1,
     instruction: text(step.instruction),
@@ -83,7 +92,7 @@ export function hostListingAsGrocery(listing) {
   })).filter(a => a.allergenKey)
   return {
     isHostListing: true, hostSubmission: listing,
-    slug: `${HOST_DETAIL_PREFIX}${listing.id}`,
+    slug: hostPrettySlug(listing),
     displayName: text(listing.title), description: text(listing.description),
     images, image: images[0] || null,
     category: { name: readable(listing.grocerySubcategory || listing.category || 'Grocery'), slug: text(listing.category) },

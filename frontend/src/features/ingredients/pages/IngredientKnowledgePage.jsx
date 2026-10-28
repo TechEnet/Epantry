@@ -5,13 +5,14 @@ import {
   Globe2, Leaf, MapPin, Search, ShoppingBag, SlidersHorizontal, Sprout,
 } from 'lucide-react'
 import { getIngredientKnowledge } from '../services/ingredientKnowledge.service'
+import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
 
 function IngredientSectionHeading({ eyebrow, title, count, note, end }) {
   return (
     <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-[#CFD9CE] pb-3 sm:pb-4">
       <div className="min-w-0">
         {eyebrow ? <p className="mb-1.5 text-[13px] font-bold uppercase tracking-[.1em] text-[#B45E3B]">{eyebrow}</p> : null}
-        <h2 className="font-serif text-[22px] font-semibold leading-[1.2] tracking-[-.035em] text-[#173F35] sm:text-[28px]">
+        <h2 className="text-[25px] font-semibold leading-[1.2] tracking-[-.035em] text-[#173F35] sm:text-[30px]">
           {title}
           {typeof count === 'number' && count > 0 ? <span className="ml-2 align-middle font-sans text-[13px] font-semibold tracking-normal text-[#657769]">({count})</span> : null}
         </h2>
@@ -50,12 +51,13 @@ function LocationTile({ place, number }) {
     <article className="group min-w-0">
       <div className="relative">
         <MediaFrame imageUrl={place.imageUrl} alt={place.name} icon={Globe2} tone="blue" />
-        <span className="absolute left-2 top-2 rounded-full bg-[#F7F6F2]/95 px-2.5 py-1 text-[12px] font-semibold text-[#173F35]">{String(number).padStart(2, '0')}</span>
+        <span className="absolute left-2 top-2 rounded-md bg-[#F7F6F2]/95 px-2.5 py-1 text-[12px] font-semibold text-[#173F35]">{String(number).padStart(2, '0')}</span>
       </div>
       <div className="pt-3">
-        <h3 className="text-[17px] font-semibold text-[#173F35]">{place.name}</h3>
+        <h3 className="text-[17px] font-semibold text-[#173F35]">{countryFlag(place.name) ? <span aria-hidden="true" className="mr-1.5">{countryFlag(place.name)}</span> : null}{place.name}</h3>
         {place.region ? <p className="mt-0.5 flex items-center gap-1 text-[13px] text-[#536D5C]"><MapPin size={12} aria-hidden="true" /> {place.region}</p> : null}
         {place.description ? <p className="mt-1 text-[13px] leading-5 text-[#647167]">{place.description}</p> : null}
+        {countryFlag(place.name) ? <Link to={countryExplorePath(place.name)} className="mt-1.5 inline-flex items-center gap-1 text-[13px] font-semibold text-[#173F35] hover:underline">Explore foods <ArrowUpRight size={13}/></Link> : null}
         {place.sourceUrl ? <a href={place.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-[13px] font-semibold text-[#A55735] hover:underline">View source <ArrowUpRight size={13} aria-hidden="true" /></a> : null}
       </div>
     </article>
@@ -164,12 +166,13 @@ export default function IngredientKnowledgePage() {
   const regionLocations = locations.filter(place => Boolean(place.region))
   const locationRows = locationView === 'regions' ? regionLocations : countryLocations
   const visibleLocations = locationRows.slice(locationIndex, locationIndex + 4)
-  const hasSource = Boolean(data?.sources?.length)
+  const sources = (data?.sources || []).filter(source => Boolean(source?.url))
+  const hasSource = sources.length > 0
   const sectionIndex = {
     locations: 1,
-    varieties: 1 + Number(locations.length > 0),
-    products: 1 + Number(locations.length > 0) + Number(varieties.length > 0),
-    dishes: 1 + Number(locations.length > 0) + Number(varieties.length > 0) + Number(products.length > 0),
+    varieties: 1,
+    products: 1,
+    dishes: 2,
   }
   const stepLabel = number => String(number).padStart(2, '0')
 
@@ -194,28 +197,28 @@ export default function IngredientKnowledgePage() {
           <>
             <header className="mt-5 border-b border-[#CAD6CA] pb-7 sm:mt-7 sm:pb-9">
               <p className="inline-flex items-center gap-2 text-[13px] font-bold uppercase tracking-[.09em] text-[#B45E3B]"><Sprout size={16} aria-hidden="true" /> EPANTRY · Ingredient Atlas</p>
-              <div className={`mt-3 grid gap-5 ${ingredient.imageUrl ? 'lg:grid-cols-[minmax(0,1.4fr)_minmax(250px,.6fr)] lg:items-center' : ''}`}>
+              <div className={`mt-3 grid gap-6 ${ingredient.imageUrl ? 'lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,.5fr)] lg:items-center' : ''}`}>
                 <div className="min-w-0">
-                  <h1 className="break-words font-serif text-[28px] font-semibold leading-[1.1] sm:text-[34px] tracking-[-.045em] text-[#173F35]">{name}</h1>
+                  <h1 className="break-words text-[38px] font-semibold leading-[1.05] sm:text-[52px] tracking-[-.055em] text-[#173F35]">{name}</h1>
                   {ingredient.aliases?.length ? <p className="mt-2 text-[14px] text-[#647168]">Also called: {ingredient.aliases.slice(0, 5).join(' · ')}</p> : null}
                   {data.overview ? (
                     <p className="mt-3 max-w-[80ch] text-[15px] leading-[1.65] text-[#415A49] sm:text-[16px]">{data.overview}</p>
-                  ) : <p className="mt-3 text-[15px] leading-6 text-[#607266]">Verified background information is not available for this ingredient yet.</p>}
-                  {hasSource ? <div className="mt-4 flex flex-wrap gap-2">{data.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#B7C8B9] bg-[#E6F4ED] px-3 py-1.5 text-[13px] font-semibold text-[#173F35] hover:border-[#173F35]"><BookOpen size={14} aria-hidden="true" />{source.name}<ArrowUpRight size={13} aria-hidden="true" /></a>)}</div> : null}
+                  ) : <p className="mt-3 text-[15px] leading-6 text-[#607266]">Explore the published EPANTRY recipes, places and products connected to {name}.</p>}
+                  {hasSource ? <div className="mt-4 flex flex-wrap gap-2">{sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#B7C8B9] bg-[#E6F4ED] px-3 py-1.5 text-[13px] font-semibold text-[#173F35] hover:border-[#173F35]"><BookOpen size={14} aria-hidden="true" />{source.name || (source.url?.includes('wikipedia.org') ? 'Wikipedia' : source.url?.includes('wikidata.org') ? 'Wikidata' : 'Reference')}<ArrowUpRight size={13} aria-hidden="true" /></a>)}</div> : null}
                 </div>
-                {ingredient.imageUrl ? <figure className="overflow-hidden rounded-[14px] bg-[#DDF3E7]"><img src={ingredient.imageUrl} alt={name} className="aspect-[5/3] w-full object-cover lg:aspect-[4/3]" /><figcaption className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px] text-[#52685B]"><span>{ingredient.imageSource || 'Approved ingredient image'}{ingredient.imageCredit ? ` · ${ingredient.imageCredit}` : ''}</span>{ingredient.imageCreditUrl ? <a href={ingredient.imageCreditUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{ingredient.imageLicense || 'Image credit'} <ArrowUpRight size={12} className="inline" /></a> : null}</figcaption></figure> : null}
+                {ingredient.imageUrl ? <figure className="overflow-hidden rounded-[8px] bg-[#DDF3E7]"><img src={ingredient.imageUrl} alt={name} className="aspect-[5/3] w-full object-cover lg:aspect-[4/3]" /><figcaption className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[13px] text-[#52685B]"><span>{ingredient.imageSource || 'Approved ingredient image'}{ingredient.imageCredit ? ` · ${ingredient.imageCredit}` : ''}</span>{ingredient.imageCreditUrl ? <a href={ingredient.imageCreditUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{ingredient.imageLicense || 'Image credit'} <ArrowUpRight size={12} className="inline" /></a> : null}</figcaption></figure> : null}
               </div>
               {!ingredient.catalogMatched ? <p className="mt-3 text-[13px] text-[#825A45]">This ingredient is not yet matched to an active EPANTRY catalog item. Recipe associations cannot be confirmed.</p> : null}
             </header>
 
             {locations.length ? <section className="py-7 sm:py-9" aria-label="Ingredient geography and dishes">
-              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.locations)} / Locations & cooking traditions`} title="Places connected to this ingredient" count={locations.length} note="Documented ingredient origins and locations of approved EPANTRY dishes are identified separately. Not worldwide rankings." end={locationRows.length > 4 ? <div className="flex gap-2"><button type="button" onClick={() => setLocationIndex(index => Math.max(0, index - 1))} disabled={locationIndex === 0} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Previous locations"><ChevronLeft size={18} /></button><button type="button" onClick={() => setLocationIndex(index => Math.min(locationRows.length - 4, index + 1))} disabled={locationIndex >= locationRows.length - 4} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Next locations"><ChevronRight size={18} /></button></div> : null} />
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.locations)} / Locations & cooking traditions`} title="Top Locations" count={locations.length} note="Locations linked to published EPANTRY recipes or documented ingredient origins." end={locationRows.length > 4 ? <div className="flex gap-2"><button type="button" onClick={() => setLocationIndex(index => Math.max(0, index - 1))} disabled={locationIndex === 0} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Previous locations"><ChevronLeft size={18} /></button><button type="button" onClick={() => setLocationIndex(index => Math.min(locationRows.length - 4, index + 1))} disabled={locationIndex >= locationRows.length - 4} className="grid h-9 w-9 place-items-center rounded-full border border-[#B8CCBB] bg-white text-[#173F35] disabled:opacity-40" aria-label="Next locations"><ChevronRight size={18} /></button></div> : null} />
               {locations.length ? <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => { setLocationView('countries'); setLocationIndex(0) }} className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${locationView === 'countries' ? 'bg-[#173F35] text-white' : 'border border-[#B9CEBC] bg-white text-[#173F35]'}`}>Countries ({countryLocations.length})</button>{regionLocations.length > 0 ? <button type="button" onClick={() => { setLocationView('regions'); setLocationIndex(0) }} className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${locationView === 'regions' ? 'bg-[#173F35] text-white' : 'border border-[#B9CEBC] bg-white text-[#173F35]'}`}>Regions ({regionLocations.length})</button> : null}</div> : null}
               <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">{visibleLocations.map((place, index) => <LocationTile key={`${place.name}-${place.region || ''}`} place={place} number={locationIndex + index + 1} />)}</div>
             </section> : null}
 
             {varieties.length ? <section className="border-t border-[#D5DED3] bg-[#FFF1E8]/50 px-4 py-7 sm:px-6 sm:py-9" aria-label="Ingredient types">
-              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.varieties)} / Ingredient varieties`} title={`${name} Types in the World`} count={varieties.length} note="Explore actual active ingredient varieties from the EPANTRY catalog. No invented global rankings or ratings." />
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.varieties)} / Ingredient varieties`} title={`Popular ${name} Types & Varieties`} count={varieties.length} note="Explore ingredient varieties recorded in EPANTRY's catalog." />
               {varieties.length ? (
                 <>
                   <div className="mt-4 flex flex-wrap items-center gap-2.5">
@@ -228,12 +231,12 @@ export default function IngredientKnowledgePage() {
             </section> : null}
 
             {products.length ? <section className="border-t border-[#D5DED3] py-7 sm:py-9" aria-label="Ingredient products">
-              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.products)} / Approved marketplace`} title={`${name} Products`} count={products.length} note="Real approved grocery listings from EPANTRY Hosts. Prices and ratings are not estimated." />
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.products)} / Approved marketplace`} title={`${name} Products`} count={products.length} note="Approved products published by EPANTRY Hosts." />
               <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-5 lg:grid-cols-4">{products.map(item => <ProductTile key={item.id} item={item} />)}</div>
             </section> : null}
 
             <section className="border-t border-[#D5DED3] bg-[#E6F4ED]/55 px-4 py-7 sm:px-6 sm:py-9" aria-label="Dishes with ingredient">
-              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.dishes)} / Cook with it`} title={`Dishes with ${name}`} count={dishes.length} note="Only recipes and food listings published on EPANTRY with a matching canonical ingredient." />
+              <IngredientSectionHeading eyebrow={`${stepLabel(sectionIndex.dishes)} / Cook with it`} title={`Dishes with ${name}`} count={dishes.length} note="Recipes and food listings published on EPANTRY using this ingredient." />
               {dishes.length ? (
                 <>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -251,7 +254,7 @@ export default function IngredientKnowledgePage() {
               ) : <EmptyLine>No published EPANTRY dishes with this ingredient are available yet.</EmptyLine>}
             </section>
 
-            <p className="border-t border-[#D5DED3] pb-3 pt-5 text-[13px] leading-5 text-[#647168]">Variety and product collections appear only when approved catalog records are linked to this ingredient. Origin and descriptions appear only where documented. Locations and catalog products do not represent worldwide rankings. EPANTRY dish links are based on approved records, and encyclopedia references are not nutrition or food-safety claims.</p>
+            <p className="border-t border-[#D5DED3] pb-3 pt-5 text-[13px] leading-5 text-[#647168]">Ingredient details come from linked EPANTRY records and cited public references. Only available published recipes and approved products are shown.</p>
           </>
         ) : null}
       </div>

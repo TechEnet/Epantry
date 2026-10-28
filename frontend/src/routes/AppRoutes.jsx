@@ -2196,13 +2196,13 @@ function NetworkIssueScreen() {
 
 function CanonicalProductDetailExtras() {
   const { slug } = useParams()
-  if (String(slug || '').startsWith('host--')) return null
+  if (/(?:^host--[a-f0-9]{24}$|-[a-f0-9]{10}$)/i.test(String(slug || ''))) return null
   return <ProductFoodIntelligenceBridge />
 }
 
 function CanonicalRecipeDetailExtras() {
   const { slug } = useParams()
-  if (String(slug || '').startsWith('host--')) return null
+  if (/(?:^host--[a-f0-9]{24}$|-[a-f0-9]{10}$)/i.test(String(slug || ''))) return null
   return <><RecipeFoodIntelligenceBridge /><RecipePantryBridge /><RecipeOutcomePlanBridge /></>
 }
 

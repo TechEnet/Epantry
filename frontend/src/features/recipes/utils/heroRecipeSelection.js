@@ -1,3 +1,4 @@
+import { hostDetailPath } from '../../host/services/approvedHostDetail.adapter'
 /*
  * Pure, testable personalized recommendation selector.
  * Purchases come ONLY from paid EPANTRY order history. No title inferred
@@ -75,7 +76,7 @@ export function normalizeRecipeSources({ publicRecipes = [], featuredRecipes = [
       name: item.title,
       image: Array.isArray(item.images) ? String(item.images[0] || '') : '',
       cuisine: kind,
-      path: `/explore/host-listings?item=${encodeURIComponent(item.id)}`,
+      path: hostDetailPath(item),
       publishedAt: item.approvedAt || '',
     })
   }

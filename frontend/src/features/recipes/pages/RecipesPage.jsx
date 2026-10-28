@@ -21,6 +21,7 @@ import { recordCustomerSearchDemand } from "../../search/services/search.service
 
 import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
 import { listPublicHostListings } from "../../host/services/hostUnifiedListing.service";
+import { hostDetailPath } from "../../host/services/approvedHostDetail.adapter";
 
 function recipeKey(item, index = 0) {
   return (
@@ -1313,9 +1314,7 @@ export default function RecipesPage() {
                 {visibleHostListings.map((item) => (
                   <Link
                     key={item.id}
-                    to={`/explore/host-listings?item=${encodeURIComponent(
-                      item.id
-                    )}`}
+                    to={hostDetailPath(item)}
                     className="overflow-hidden rounded-xl border border-[#D7DDCF] bg-white hover:border-[#173F35]"
                   >
                     {item.images?.[0] && (

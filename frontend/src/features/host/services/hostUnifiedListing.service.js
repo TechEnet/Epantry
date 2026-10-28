@@ -38,9 +38,6 @@ export async function submitHostListingSectionRevision(id, sections) {
 export async function submitHostListingPacket(id) {
   return write('post', `/host/listing-packets/${encodeURIComponent(id)}/submit`, {})
 }
-export async function deleteHostListingPacket(id) {
-  return write('delete', `/host/listing-packets/${encodeURIComponent(id)}`, {})
-}
 export async function importHostListingPackets(packets) {
   return write('post', '/host/listing-packets/bulk', { packets })
 }
@@ -93,6 +90,9 @@ export async function reviewAdminHostListingPacket(id, decision) {
 }
 export async function listPublicHostListings(category = '') {
   return unwrap(await apiClient.get('/public/host-listings', { params: category ? { category } : {} }))
+}
+export async function getPublicHostListingBySlug(slug) {
+  return unwrap(await apiClient.get(`/public/host-listings/by-slug/${encodeURIComponent(slug)}`))
 }
 export async function getPublicHostListing(id) {
   return unwrap(await apiClient.get(`/public/host-listings/${encodeURIComponent(id)}`))

@@ -5,6 +5,8 @@ const listingPacketSchema = new mongoose.Schema({
   workspaceType: { type: String, required: true },
   type: { type: String, required: true, index: true },
   title: { type: String, default: '' },
+  // Stable, customer-friendly URL independent of Host account and approval revision.
+  publicSlug: { type: String, default: undefined, trim: true, lowercase: true, maxlength: 200, unique: true, sparse: true },
   status: { type: String, enum: ['draft', 'submitted_for_review', 'changes_requested', 'approved', 'rejected'], default: 'draft', index: true },
   packet: { type: mongoose.Schema.Types.Mixed, required: true },
   deletedAt: { type: Date, default: null, index: true },

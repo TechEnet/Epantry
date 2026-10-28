@@ -1,10 +1,21 @@
+// A Host packet keeps its own governed identity while sharing customer detail routes.
+// Suffix prevents same-name Host listings colliding with each other or catalog slugs.
+export function publicHostSlug(record) {
+  if (record?.publicSlug) return String(record.publicSlug)
+  const base = String(record?.title || record?.packet?.title || 'host-food')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 110) || 'host-food'
+  const id = String(record?._id || record?.id || '')
+  return `${base}-${id.slice(-10)}`
+}
+
 // Public read model for approved Host listing packets. Never expose
 // private Host-cost, inventory, delivery service-area or raw operational data.
 export function publicListing(record) {
   const packet = record.packet || {}
   const commercial = record.type === 'grocery' || record.type === 'prepared_food' || packet.sellReadyMade
   return {
-    id: String(record._id), title: record.title, type: record.type,
+    id: String(record._id), slug: publicHostSlug(record), title: record.title, type: record.type,
     category: packet.category,
     grocerySubcategory: record.type === 'grocery' ? (packet.grocerySubcategory || '') : '',
     packagingType: record.type === 'grocery' ? (packet.packagingType || '') : '',

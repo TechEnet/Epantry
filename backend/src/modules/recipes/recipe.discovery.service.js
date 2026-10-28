@@ -6,6 +6,7 @@
  */
 import { RecipeIngredient } from './recipe.models.js'
 import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+import { publicHostSlug } from '../hostOperations/hostUnifiedListing.public.js'
 import { publicListing } from '../hostOperations/hostUnifiedListing.public.js'
 import { getPublicRecipe, listPublicRecipes } from './recipe.public.service.js'
 
@@ -323,8 +324,8 @@ const publicHostFilter = { status: 'approved', deletedAt: null }
 function listItemFromHost(record) {
   const l = publicListing(record)
   return {
-    path: `/recipes/host--${l.id}`,
-    dish: { slug: `host--${l.id}`, name: l.title, heroImageUrl: l.images?.[0] || '',
+    path: `/recipes/${l.slug || publicHostSlug(l)}`,
+    dish: { slug: l.slug || publicHostSlug(l), name: l.title, heroImageUrl: l.images?.[0] || '',
       cuisine: l.countryOfOrigin || '', course: l.category || '' },
     recipe: { id: `host--${l.id}` },
   }
