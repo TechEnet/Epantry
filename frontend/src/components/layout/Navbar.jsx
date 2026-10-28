@@ -699,8 +699,9 @@ import {
                     ? 'Open Customer dashboard'
                     : 'Signed in';
 
+    // Back is a navigation action, not an authenticated-only action.
+    // Keep it off the landing/auth entry pages, and show it on all other routes.
     const showUniversalBackButton =
-        isAuthenticated &&
         ![
             '/',
             '/login',
@@ -1620,7 +1621,7 @@ import {
                 onClick={
                     handleUniversalBack
                 }
-                className="focus-ring grid size-10 shrink-0 place-items-center rounded-full border border-stone-200 bg-white/90 text-stone-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                className="focus-ring ep-nav-icon ep-nav-back"
                 aria-label="Go to previous page"
                 title="Previous page"
             >
@@ -1631,12 +1632,6 @@ import {
             </button>
         ) : null;
 
-    const brandCluster = (
-        <div className="flex min-w-0 shrink-0 items-center gap-2">
-            {universalBackButton}
-            {brand}
-        </div>
-    );
 
     const customerCartButton =
         showCustomerCart ? (
@@ -2133,6 +2128,7 @@ import {
             `}</style>
             <div className="ep-nav-inner">
                 <div className="ep-nav-start" data-customer-actions={showCustomerCart ? 'true' : undefined}>
+                    {universalBackButton}
                     {!isAuthenticated && !isBootstrapping && (
                     <div className="ep-nav-pop-anchor" ref={guestMenuRef}>
                         <button

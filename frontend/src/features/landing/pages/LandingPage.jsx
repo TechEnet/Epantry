@@ -506,7 +506,7 @@ export default function LandingPage() {
                       },
                       opacity: { duration: 0 },
                     }}
-                    className="relative h-[min(54svh,450px)] min-h-[340px] w-[72vw] max-w-[290px] shrink-0 snap-start md:h-[min(67svh,600px)] md:min-h-[390px] md:w-[29vw] md:max-w-[370px] lg:h-[min(72svh,670px)] lg:w-[28vw] lg:max-w-[410px]"
+                    className="relative h-[min(54svh,450px)] min-h-[340px] w-[72vw] max-w-[290px] shrink-0 snap-start md:h-[min(67svh,600px)] md:min-h-[390px] md:w-[29vw] md:max-w-[370px] lg:h-[min(72svh,670px)] lg:w-[28vw] lg:max-w-[410px] 2xl:h-[min(76svh,850px)] 2xl:max-w-[520px]"
                   >
                     <Link
                       to={category.path}

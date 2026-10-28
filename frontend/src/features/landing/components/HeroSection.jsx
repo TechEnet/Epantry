@@ -271,8 +271,8 @@ export default function HeroSection() {
         /* A low, porcelain editorial shelf rather than a dark dashboard slab.
            The narrow desktop footprint keeps the food photograph unobscured. */
         .epantry-hero-refined .epantry-hero-recipe-ribbon {
-          width: min(100%, 790px) !important;
-          max-width: 790px !important;
+          width: min(100%, clamp(790px, 55vw, 1080px)) !important;
+          max-width: 1080px !important;
           background: linear-gradient(115deg,
             rgba(247,246,242,.97) 0%,
             rgba(247,246,242,.95) 52%,
@@ -331,7 +331,7 @@ export default function HeroSection() {
         }
         @media (min-width: 1024px) {
           .epantry-hero-refined .epantry-hero-headline {
-            font-size: clamp(56px, 4.25vw, 66px) !important;
+            font-size: clamp(56px, 4.6vw, 88px) !important;
           }
         }
         @media (prefers-reduced-motion: reduce) {
@@ -360,7 +360,7 @@ export default function HeroSection() {
       </div>
 
       <div className="page-shell relative z-10 flex min-h-[100svh] w-full flex-1 flex-col justify-between gap-6 px-3.5 pb-[84px] pt-7 sm:px-5 sm:pb-[90px] sm:pt-12 lg:gap-7 lg:pb-[90px] lg:pt-[clamp(58px,9svh,112px)]">
-        <div className="w-full max-w-[720px]">
+        <div className="w-full max-w-[720px] 2xl:max-w-[960px]">
           <motion.div
             initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -381,7 +381,7 @@ export default function HeroSection() {
           </motion.div>
 
           {/* Primary discovery search is always visible, never tied to a slide. */}
-          <form onSubmit={handleCookTodaySubmit} className="mt-5 max-w-[640px] sm:mt-7">
+          <form onSubmit={handleCookTodaySubmit} className="mt-5 max-w-[640px] sm:mt-7 2xl:max-w-[860px]">
             <label htmlFor="landing-cook-today-input" className="sr-only">
               What would you like to cook, or which ingredients do you have?
             </label>
@@ -417,7 +417,7 @@ export default function HeroSection() {
           </form>
 
           {/* Same destinations, now a quieter editorial secondary-action row. */}
-          <nav aria-label="Explore EPANTRY" className="mt-4 grid w-full max-w-[640px] grid-cols-3 gap-2 sm:mt-5 sm:flex sm:flex-wrap sm:gap-2.5">
+          <nav aria-label="Explore EPANTRY" className="mt-4 grid w-full max-w-[640px] grid-cols-3 gap-2 sm:mt-5 sm:flex sm:flex-wrap sm:gap-2.5 2xl:max-w-[860px]">
             <Link
               to="/cook-today"
               className="focus-ring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-[#B8C5B5] bg-[#DCE0CF]/90 px-2.5 py-2 text-center text-[12px] font-semibold leading-tight text-[#173F35] transition-colors hover:border-[#173F35] hover:bg-[#DCE0CF] sm:px-4 sm:text-sm"

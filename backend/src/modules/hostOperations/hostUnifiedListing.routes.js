@@ -324,10 +324,25 @@ function previewImage(image) {
 // fallback for periods when the public encyclopedia endpoint is unreachable.
 const KNOWN_FOOD_CULTURES = {
   india: {
-    summary: 'Indian food has evolved across centuries of regional traditions, changing trade routes and cultural exchanges. Its cuisines range from grain-based everyday meals and vegetable dishes to richly spiced curries, breads and rice preparations. Ingredients, cooking methods and tastes vary substantially between regions. Dishes such as biryani and samosa are examples of well-known foods associated with Indian culinary history.',
-    url: 'https://nchm.nic.in/sites/default/files/2022-11/Indian_Food_Heritage.pdf',
-    source: 'National Council for Hotel Management · Indian Food Heritage',
-    dishes: ['Biryani', 'Samosa', 'Roti', 'Dal'],
+    // Source checked against the Government of India's Press Information Bureau
+    // World Food India 2017 address (Nov 5, 2017), with a separate Ministry
+    // of Culture source for India's diverse regional food traditions.
+    summary: 'Indian cuisine reflects a wide range of regional food traditions, crops, spices and cooking methods. The Government of India describes differences across states, from sarson da saag in Punjab and dhokla in Gujarat to dosa in southern India. Dal, biryani and other everyday dishes have many regional preparations. Trade and travel have also shaped foods such as samosa.',
+    url: 'https://www.pib.gov.in/PressReleasePage.aspx?PRID=1508300&lang=2&reg=48',
+    source: 'Press Information Bureau · World Food India 2017',
+    sources: [
+      { label: 'Press Information Bureau · Food traditions', url: 'https://www.pib.gov.in/PressReleasePage.aspx?PRID=1508300&lang=2&reg=48' },
+      { label: 'Ministry of Culture · Regional cuisine', url: 'https://www.pib.gov.in/newsite/PrintRelease.aspx?lang=2&reg=48&relid=159991' },
+    ],
+    // These are explicitly mentioned by the government source above.
+    // Do not treat them as a popularity ranking or an exclusive origin claim.
+    dishes: [
+      { name: 'Biryani', region: 'Many regional preparations' },
+      { name: 'Dosa', region: 'Tamil Nadu and southern India' },
+      { name: 'Dhokla', region: 'Gujarat' },
+      { name: 'Sarson da saag', region: 'Punjab' },
+      { name: 'Samosa', region: 'Food shaped by cultural exchange' },
+    ],
   },
 }
 async function wikiFoodStory(country) {
