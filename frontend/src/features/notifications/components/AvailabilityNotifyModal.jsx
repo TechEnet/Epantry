@@ -393,7 +393,7 @@ export default function AvailabilityNotifyModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[180] grid place-items-center bg-black/28 px-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[180] grid place-items-center bg-[#0D1C18]/55 px-4 backdrop-blur-[2px]"
       role="presentation"
       onMouseDown={(event) => {
         if (
@@ -408,14 +408,14 @@ export default function AvailabilityNotifyModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="availability-notify-title"
-        className="relative max-h-[calc(100dvh-32px)] overflow-y-auto rounded-[24px] border border-emerald-200 bg-[#fbfcf7] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:p-6"
-        style={{ width: 'min(460px, calc(100vw - 32px))', maxWidth: '100%' }}
+        className="relative max-h-[calc(100dvh-32px)] overflow-y-auto rounded-[24px] border border-[#D9DED2] border-t-[3px] border-t-[#CF8666] bg-[#F0F2EB] p-5 shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:p-6"
+        style={{ width: 'min(460px, calc(100vw - 32px))', maxWidth: '100%', backgroundColor: '#F0F2EB', borderColor: '#D9DED2', borderTopColor: '#CF8666', color: '#173F35' }}
       >
         <button
           type="button"
           onClick={close}
           disabled={saving}
-          className="focus-ring absolute right-3 top-3 grid size-9 place-items-center rounded-full border border-stone-200 bg-white text-stone-500 transition hover:text-stone-950 disabled:opacity-40"
+          className="focus-ring absolute right-3 top-3 grid size-9 place-items-center rounded-full border border-[#CFD9CD] bg-[#F8F6EF] text-[#173F35] transition hover:text-[#0E3027] disabled:opacity-40"
           aria-label="Close"
         >
           <X
@@ -424,38 +424,52 @@ export default function AvailabilityNotifyModal() {
           />
         </button>
 
-        <div className="grid size-11 place-items-center rounded-2xl bg-emerald-700 text-white shadow-[0_10px_24px_rgba(4,120,87,0.18)]">
-          {success ? (
-            <CheckCircle2
-              size={20}
-              aria-hidden="true"
-            />
-          ) : (
-            <BellRing
-              size={20}
-              aria-hidden="true"
-            />
-          )}
+        <div className="flex items-center gap-3 pr-10">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#F4D9CA] text-[#173F35]">
+            {success ? (
+              <CheckCircle2
+                size={19}
+                aria-hidden="true"
+              />
+            ) : (
+              <BellRing
+                size={19}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+          <p
+            className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#AA573B]"
+            style={{ color: '#AA573B' }}
+          >
+            {success
+              ? 'Notification saved'
+              : 'Availability update'}
+          </p>
         </div>
-
-        <p className="mt-4 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700">
-          {success
-            ? 'Notification saved'
-            : 'Not available yet'}
-        </p>
 
         <h2
           id="availability-notify-title"
-          className="mt-1 text-[20px] font-black leading-[1.08] tracking-[-0.03em] text-stone-950"
+          className="mt-4 break-words text-[23px] font-extrabold leading-[1.16] tracking-[-0.025em] text-[#173F35]"
+          style={{ color: '#173F35' }}
         >
           {success
             ? 'We’ll keep an eye on it.'
-            : `${detail.displayName} isn’t available on EPANTRY yet.`}
+            : detail.displayName}
         </h2>
 
-        <p className="mt-2 text-[11px] font-medium leading-5 text-stone-600">
+        {!success ? (
+          <p className="mt-1 text-[15px] font-semibold leading-5 text-[#2A594B]">
+            Not available on EPANTRY yet
+          </p>
+        ) : null}
+
+        <p
+          className="mt-2 text-[13px] font-medium leading-[1.5] text-[#52665C]"
+          style={{ color: '#52665C' }}
+        >
           {success ||
-            'Tap Notify Me and we’ll send you an EPANTRY notification when a sellable listing becomes available.'}
+            'Tap Notify Me to get an alert when this item is available to buy.'}
         </p>
 
         {error ? (
@@ -465,12 +479,12 @@ export default function AvailabilityNotifyModal() {
         ) : null}
 
         {!success ? (
-          <div className="mt-5 grid grid-cols-2 gap-2.5">
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={close}
               disabled={saving}
-              className="focus-ring h-11 rounded-xl border border-stone-200 bg-white text-[11px] font-black text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+              className="focus-ring h-11 rounded-xl border border-[#C8D3C6] bg-[#F8F6F0] text-[13px] font-semibold text-[#173F35] transition hover:bg-[#E7EBE3] disabled:opacity-50"
             >
               Cancel
             </button>
@@ -479,7 +493,7 @@ export default function AvailabilityNotifyModal() {
               type="button"
               onClick={handleNotify}
               disabled={saving}
-              className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-[11px] font-black text-white shadow-[0_10px_24px_rgba(4,120,87,0.16)] transition hover:bg-emerald-800 disabled:opacity-55"
+              className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#173F35] px-3 text-[13px] font-semibold text-white shadow-[0_10px_24px_rgba(4,120,87,0.16)] transition hover:bg-[#275A4C] disabled:opacity-55"
             >
               <BellRing
                 size={14}
@@ -496,7 +510,7 @@ export default function AvailabilityNotifyModal() {
           <button
             type="button"
             onClick={close}
-            className="focus-ring mt-5 h-11 w-full rounded-xl bg-emerald-700 text-[11px] font-black text-white transition hover:bg-emerald-800"
+            className="focus-ring mt-4 h-11 w-full rounded-xl bg-[#173F35] text-[13px] font-semibold text-white transition hover:bg-[#275A4C]"
           >
             Done
           </button>

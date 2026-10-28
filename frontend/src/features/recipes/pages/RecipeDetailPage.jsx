@@ -66,6 +66,7 @@ import {
 import {
   confirmIHaveThis,
   correctPantryQuantity,
+  getPantry,
   getPantryErrorMessage,
   getRecipePantry,
   recordRecipeCooked,
@@ -980,6 +981,35 @@ function HostDeclaredRecipeFacts({ submission, section }) {
   )
 }
 
+// Host recipes have no canonical RecipeVersion ID, but matched ingredients
+// still use the customer's SAME canonical Pantry identity and purchase checks.
+// Read the existing inventory rather than calling /recipes/host-slug/pantry.
+async function reconcileHostRecipeIngredientsWithPantry(ingredients) {
+  const relevantIds = [...new Set((ingredients || [])
+    .map(getRecipeIngredientCanonicalId).filter(Boolean))]
+  if (!relevantIds.length) return { ingredients: [] }
+  const first = await getPantry({ page: 1, limit: 50 })
+  const pantryItems = [...(first.items || [])]
+  const pages = Math.min(100, Math.max(1, Number(first.pagination?.pages) || 1))
+  for (let page = 2; page <= pages; page += 1) {
+    const result = await getPantry({ page, limit: 50 })
+    pantryItems.push(...(result.items || []))
+  }
+  const matching = new Map()
+  for (const item of pantryItems) {
+    const id = String(item?.canonicalIngredientId || item?.canonicalIngredient?._id ||
+      item?.canonicalIngredient?.id || item?.ingredient?.id || '').trim()
+    if (!id || !relevantIds.includes(id)) continue
+    const state = String(item?.state || item?.currentState || item?.projectedState ||
+      item?.projection?.state || 'uncertain')
+    const mapped = ['confirmed_available', 'replenished_elsewhere', 'inferred_available'].includes(state)
+      ? 'available' : state === 'running_low' ? 'partial' : state === 'out' ? 'missing' : 'uncertain'
+    matching.set(id, { canonicalIngredientId: id, status: mapped })
+  }
+  return { ingredients: relevantIds.map(id => matching.get(id) ||
+    { canonicalIngredientId: id, status: 'uncertain' }) }
+}
+
 export default function RecipeDetailPage() {
   const {
     slug,
@@ -1469,7 +1499,7 @@ export default function RecipeDetailPage() {
   )
 
   const customerContextBlocked =
-    !hostListingMode && isAuthenticated === true &&
+    isAuthenticated === true &&
     (
       superAdminEnabled === true ||
       activeMode === 'host' ||
@@ -1477,7 +1507,7 @@ export default function RecipeDetailPage() {
     )
 
   const canUseCustomerFeatures =
-    !hostListingMode && isAuthenticated &&
+    isAuthenticated &&
     customerEnabled ===
       true &&
     superAdminEnabled !==
@@ -1621,14 +1651,12 @@ export default function RecipeDetailPage() {
         )
 
         try {
-          const result =
-            await getRecipePantry(
-              slug,
-              {
-                targetServings:
-                  servings,
-              },
-            )
+          const result = hostListingMode
+            ? await reconcileHostRecipeIngredientsWithPantry(data?.ingredients || [])
+            : await getRecipePantry(
+                slug,
+                { targetServings: servings },
+              )
 
           setPantryReconciliation(
             result,
@@ -1652,6 +1680,8 @@ export default function RecipeDetailPage() {
         canUseCustomerFeatures,
         servings,
         slug,
+        hostListingMode,
+        data?.ingredients,
       ],
     )
 
@@ -5276,7 +5306,7 @@ export default function RecipeDetailPage() {
 
                 {showCustomerActionControls && (
                   <>
-                    <button
+                    {!hostListingMode && <button
                       type="button"
                       onClick={
                         handleCookedRecipe
@@ -5302,7 +5332,7 @@ export default function RecipeDetailPage() {
                         />
                       )}
                       I cooked this
-                    </button>
+                    </button>}
 
                     <Link
                       to="/pantry"
@@ -5400,7 +5430,7 @@ export default function RecipeDetailPage() {
               </p>
             )}
 
-            {!canUseCustomerFeatures && !hostListingMode && (
+            {!canUseCustomerFeatures && (
               <div className="epantry-recipe-access-note mt-5 rounded-2xl border border-[#DCE0CF] bg-[#F7F6F2] p-4 text-xs font-semibold leading-5 text-[#202421]/80">
                 {customerContextBlocked
                     ? 'Switch to Customer mode or sign in with a Customer account to compare these ingredients with your Living Pantry and shop missing items.'
@@ -5542,6 +5572,12 @@ export default function RecipeDetailPage() {
                           )}
                         </div>
 
+                        {canUseCustomerFeatures && !canonicalIngredientId && (
+                          <span className="text-[12px] font-medium text-[#A65836]">
+                            Ingredient catalog match needed
+                          </span>
+                        )}
+
                         {ingredient.preparationState && (
                           <p className="mt-0.5 text-[13px] leading-tight text-[#202421]/70 sm:mt-1 sm:text-sm sm:leading-normal">
                             {ingredient.preparationState}
@@ -5571,6 +5607,7 @@ export default function RecipeDetailPage() {
                               event.currentTarget,
                             )
                           }
+                          title={!canonicalIngredientId ? 'This ingredient needs to be matched to the EPANTRY catalog before Pantry and Cart actions are available.' : undefined}
                           disabled={
                             decisionLocked ||
                             !canonicalIngredientId ||
@@ -5600,6 +5637,7 @@ export default function RecipeDetailPage() {
                               ingredient,
                             )
                           }
+                          title={!canonicalIngredientId ? 'This ingredient needs to be matched to the EPANTRY catalog before Pantry and Cart actions are available.' : undefined}
                           disabled={
                             decisionLocked ||
                             Boolean(

@@ -453,6 +453,47 @@ router.get('/public/country-discovery/:countryName', wrap(async (req, res) => {
   respond(res, { country: { name }, history, recipes, grocery })
 }))
 
+// For a published Host recipe, resolve EACH ingredient against the active EPANTRY
+// catalog before allowing its customer Pantry/Recipe Cart actions. Host-provided
+// IDs are never trusted on their own: the saved ingredient name must also match.
+function ingredientIdentityKey(value) {
+  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+async function publicListingWithIngredientIdentities(record) {
+  const published = publicListing(record)
+  if (record.type === 'grocery' || !published.ingredients?.length) return published
+  const original = (record.packet?.ingredients || []).slice(0, 100)
+  const ids = [...new Set(original.map(line => String(line?.canonicalIngredientId || '').trim())
+    .filter(value => objectId(value)))]
+  const names = [...new Set(original.map(line => String(line?.name || '').trim())
+    .filter(value => value.length >= 2 && value.length <= 200))]
+  const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const exactNames = names.map(name => new RegExp(`^\\s*${escapeRegex(name).replace(/\\ /g, '\\s+')}\\s*$`, 'i'))
+  const conditions = []
+  if (ids.length) conditions.push({ _id: { $in: ids } })
+  if (exactNames.length) {
+    conditions.push({ canonicalName: { $in: exactNames } }, { aliases: { $in: exactNames } })
+  }
+  if (!conditions.length) return published
+  const catalog = await CanonicalIngredient.find({ status: 'active', $or: conditions })
+    .select('_id canonicalName aliases slug').lean()
+  const resolved = original.map(line => {
+    const inputKey = ingredientIdentityKey(line?.name)
+    if (!inputKey) return ''
+    const possible = catalog.filter(item => [item.canonicalName, ...(item.aliases || [])]
+      .some(name => ingredientIdentityKey(name) === inputKey))
+    // Never guess between ambiguous canonical matches.
+    const savedId = String(line?.canonicalIngredientId || '').trim()
+    const byId = possible.find(item => String(item._id) === savedId)
+    const match = byId || (possible.length === 1 ? possible[0] : null)
+    return match ? String(match._id) : ''
+  })
+  return { ...published, ingredients: published.ingredients.map((line, index) => ({
+    ...line, canonicalIngredientId: resolved[index] || '',
+  })) }
+}
+
 // Public read model: only Super-Admin-approved packets, no private cost, stock,
 // Host service area, raw evidence notes or unrelated draft data is returned.
 router.get('/public/host-listings', wrap(async (req, res) => {
@@ -487,7 +528,7 @@ router.get('/public/host-listings/by-slug/:slug', wrap(async (req, res) => {
     }
   }
   if (!record) problem('This approved listing is unavailable.', 404)
-  respond(res, { listing: publicListing(record) })
+  respond(res, { listing: await publicListingWithIngredientIdentities(record) })
 }))
 
 // Return only the match for the requested PIN, never the Host's full private
@@ -520,6 +561,6 @@ router.get('/public/host-listings/:id', wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
   const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, status: 'approved', deletedAt: null }).lean()
   if (!record) problem('This approved listing is unavailable.', 404)
-  respond(res, { listing: publicListing(record) })
+  respond(res, { listing: await publicListingWithIngredientIdentities(record) })
 }))
 export default router

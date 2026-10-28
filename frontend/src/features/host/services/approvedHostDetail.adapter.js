@@ -57,8 +57,12 @@ export function hostListingAsRecipe(listing) {
     },
     ingredients: (listing.ingredients || []).map((line, i) => ({
       id: `${listing.id}-ingredient-${i}`, lineNumber: i + 1,
-      ingredient: { name: text(line.name), imageUrl: text(line.imageUrl) },
-      canonicalIngredientId: null, // Not verified by Host listing approval.
+      ingredient: { id: /^[a-f\d]{24}$/i.test(text(line.canonicalIngredientId)) ? text(line.canonicalIngredientId) : null,
+        name: text(line.name), imageUrl: text(line.imageUrl) },
+      // The public endpoint has checked both the active catalog ID and the
+      // ingredient name. Approval alone never creates a canonical identity.
+      canonicalIngredientId: /^[a-f\d]{24}$/i.test(text(line.canonicalIngredientId))
+        ? text(line.canonicalIngredientId) : null,
       quantity: finite(line.quantity) ?? text(line.quantity), unit: text(line.unit),
       preparationState: '', optional: false,
     })),
