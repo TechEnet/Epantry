@@ -11,6 +11,18 @@ import {
 
 const scrollPositions = new Map()
 
+// Detail views are always entered from the beginning. Preserve Back/Forward
+// position restoration for browse/search/list pages.
+function isItemDetailPath(pathname) {
+  return (
+    /^\/grocery\/product\/[^/]+\/?$/.test(pathname) ||
+    (
+      /^\/recipes\/[^/]+\/?$/.test(pathname) &&
+      pathname !== '/recipes/what-should-we-cook'
+    )
+  )
+}
+
 export default function ScrollToTop() {
   const location = useLocation()
   const navigationType = useNavigationType()
@@ -51,6 +63,7 @@ export default function ScrollToTop() {
 
     let cancelled = false
     const timerIds = []
+    const frameIds = []
 
     function clearRestoreTimers() {
       timerIds.forEach((timerId) => {
@@ -65,9 +78,51 @@ export default function ScrollToTop() {
 
       cancelled = true
       clearRestoreTimers()
+      frameIds.forEach((frameId) => {
+        window.cancelAnimationFrame(frameId)
+      })
     }
 
-    if (navigationType === 'POP') {
+    if (isItemDetailPath(currentPathname)) {
+      // index.css makes document scrolling smooth. A normal "auto" reset
+      // would animate through the previous page's footer. Force an immediate
+      // top reset, including on POP and direct-load navigation.
+      function openItemAtTop() {
+        if (cancelled) return
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: 'instant',
+        })
+      }
+
+      openItemAtTop()
+
+      // Lazy-loaded detail views can replace a much taller browse page.
+      // Repeat briefly after render so that layout changes cannot leave the
+      // viewport at the previous page's bottom. Never fight user scrolling.
+      frameIds.push(
+        window.requestAnimationFrame(openItemAtTop),
+      )
+      ;[80, 240, 500].forEach((delay) => {
+        timerIds.push(
+          window.setTimeout(openItemAtTop, delay),
+        )
+      })
+
+      window.addEventListener('wheel', stopRestore, {
+        passive: true,
+        once: true,
+      })
+      window.addEventListener('touchstart', stopRestore, {
+        passive: true,
+        once: true,
+      })
+      window.addEventListener('pointerdown', stopRestore, {
+        passive: true,
+        once: true,
+      })
+    } else if (navigationType === 'POP') {
       const savedPosition =
         scrollPositions.get(locationKey)
 

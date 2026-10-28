@@ -167,8 +167,6 @@ const PANTRY_STATUS_LABELS =
       'Available at home',
     partial:
       'Partially available',
-    uncertain:
-      'Needs confirmation',
     missing:
       'Missing',
     untracked:
@@ -4830,6 +4828,26 @@ export default function RecipeDetailPage() {
             padding: 18px 0 !important;
           }
         }
+        /* PREP SCROLL CHAIN: the fixed-height chapter itself must not be a
+           hidden-scroll ancestor. Only .epantry-prep-scroll is scrollable;
+           at its top/bottom the browser can scroll the document normally. */
+        @media (min-width: 640px) {
+          .epantry-recipe-detail .epantry-recipe-ingredients,
+          .epantry-recipe-detail .epantry-recipe-ingredients > .epantry-recipe-ingredients-body {
+            overflow: clip !important;
+            overscroll-behavior-y: auto !important;
+          }
+          .epantry-recipe-detail .epantry-prep-scroll {
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            overscroll-behavior-y: auto !important;
+          }
+        }
+        @media (min-width: 1024px) {
+          .epantry-recipe-detail .epantry-recipe-ingredients > .epantry-recipe-ingredients-intro {
+            overflow: clip !important;
+          }
+        }
       `}</style>
 
       <div className="page-shell pb-10 pt-5 sm:pb-16 sm:pt-7">
@@ -5557,26 +5575,16 @@ export default function RecipeDetailPage() {
                               'Canonical ingredient'}
                           </h3>
 
-                          {canUseCustomerFeatures && (
+                          {canUseCustomerFeatures && pantryStatus !== 'uncertain' && (
                             <span
                               className={`rounded-full border px-1.5 py-0.5 text-[13px] font-semibold uppercase tracking-[0.06em] sm:px-2.5 sm:py-1 sm:text-[13px] sm:tracking-[0.08em] ${pantryStatusClassName}`}
                             >
-                              {pantryStatus ===
-                              'checking'
+                              {pantryStatus === 'checking'
                                 ? 'Checking pantry'
-                                : PANTRY_STATUS_LABELS[
-                                    pantryStatus
-                                  ] ||
-                                  'Needs confirmation'}
+                                : PANTRY_STATUS_LABELS[pantryStatus]}
                             </span>
                           )}
                         </div>
-
-                        {canUseCustomerFeatures && !canonicalIngredientId && (
-                          <span className="text-[12px] font-medium text-[#A65836]">
-                            Ingredient catalog match needed
-                          </span>
-                        )}
 
                         {ingredient.preparationState && (
                           <p className="mt-0.5 text-[13px] leading-tight text-[#202421]/70 sm:mt-1 sm:text-sm sm:leading-normal">
