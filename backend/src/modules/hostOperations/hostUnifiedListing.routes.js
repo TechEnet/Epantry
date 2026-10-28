@@ -9,6 +9,9 @@ import { requireHostAccess } from '../auth/authorization.middleware.js'
 import { sensitiveResponseNoStoreMiddleware } from '../../middlewares/security.middleware.js'
 import { CanonicalIngredient } from '../catalog/catalog.models.js'
 import { HostUnifiedListingPacket } from './hostUnifiedListing.models.js'
+import { ProductVersion } from '../catalog/catalog.models.js'
+import { listPublicProducts } from '../catalog/catalog.public.service.js'
+import { listPublicRecipes } from '../recipes/recipe.public.service.js'
 import { publicListing } from './hostUnifiedListing.public.js'
 import { getHostRecipeDiscovery } from '../recipes/recipe.discovery.service.js'
 import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate } from './hostUnifiedListing.logic.js'
@@ -276,6 +279,147 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
     dedupeKey: `host-unified-decision:${record.id}:${record.reviewRevision}`,
   })
   respond(res, { listing: serialize(record) })
+}))
+
+// Country discovery is public-only and never exposes operational Host fields.
+// Country names identify declared origin, not a claim that every food is native to that location.
+const countryHistoryCache = new Map()
+const DEMONYM = {
+  india: 'Indian', japan: 'Japanese', italy: 'Italian', mexico: 'Mexican',
+  china: 'Chinese', thailand: 'Thai', france: 'French', germany: 'German',
+  spain: 'Spanish', greece: 'Greek', korea: 'Korean',
+  'south korea': 'Korean', vietnam: 'Vietnamese', turkey: 'Turkish',
+  'united states': 'American', 'united kingdom': 'British',
+  pakistan: 'Pakistani', bangladesh: 'Bangladeshi', nepal: 'Nepali',
+  indonesia: 'Indonesian', portugal: 'Portuguese', brazil: 'Brazilian',
+}
+const COUNTRY_CODES = {
+  india: ['IN', 'IND'], japan: ['JP', 'JPN'], italy: ['IT', 'ITA'],
+  mexico: ['MX', 'MEX'], 'united states': ['US', 'USA'],
+  'united kingdom': ['GB', 'GBR'], france: ['FR', 'FRA'],
+  thailand: ['TH', 'THA'], china: ['CN', 'CHN'],
+}
+function countryKey(value) {
+  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+function safeCountry(value) {
+  const name = String(value || '').trim()
+  if (!name || name.length > 85 || !/^[\p{L}\p{M} .'-]+$/u.test(name)) throw new ApiError(400, 'Choose a valid country.')
+  return name
+}
+function escapedRegex(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+function countryRegex(name) {
+  const variants = [name, ...(COUNTRY_CODES[countryKey(name)] || [])]
+  return new RegExp(`^(?:${variants.map(escapedRegex).join('|')})$`, 'i')
+}
+function previewImage(image) {
+  const candidate = typeof image === 'string' ? image : (image?.url || image?.imageUrl || '')
+  return typeof candidate === 'string' && /^https:\/\//i.test(candidate) ? candidate : ''
+}
+async function wikiHistory(country) {
+  const cacheKey = countryKey(country)
+  const saved = countryHistoryCache.get(cacheKey)
+  if (saved && saved.until > Date.now()) return saved.value
+  const wikiTitle = `History of ${country}`
+  const api = new URL('https://en.wikipedia.org/w/api.php')
+  for (const [key, value] of Object.entries({
+    action: 'query', format: 'json', redirects: '1', titles: wikiTitle,
+    prop: 'extracts', exintro: '1', explaintext: '1', exsectionformat: 'plain',
+  })) api.searchParams.set(key, value)
+  let value = null
+  try {
+    const response = await fetch(api, {
+      headers: { Accept: 'application/json', 'User-Agent': process.env.EPANTRY_WIKIMEDIA_USER_AGENT || 'EPANTRYFoodDiscovery/1.0 (https://epantry.in)' },
+      signal: AbortSignal.timeout(5500),
+    })
+    if (response.ok && Number(response.headers.get('content-length') || 0) <= 200000) {
+      const raw = await response.text()
+      if (raw.length <= 200000) {
+        const json = JSON.parse(raw)
+        const page = Object.values(json?.query?.pages || {})[0]
+        const exact = countryKey(page?.title) === countryKey(wikiTitle) || (json?.query?.redirects || []).some(row => countryKey(row.from) === countryKey(wikiTitle))
+        const summary = typeof page?.extract === 'string' ? page.extract.replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim() : ''
+        if (exact && page?.missing === undefined && summary.length >= 70) {
+          const excerpt = summary.slice(0, 2900)
+          const boundary = excerpt.lastIndexOf('. ')
+          value = {
+            summary: summary.length > 2900 && boundary > 900 ? excerpt.slice(0, boundary + 1) : excerpt,
+            url: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`,
+            source: 'Wikipedia',
+          }
+        }
+      }
+    }
+  } catch { /* No invented history when public encyclopedia is unreachable. */ }
+  if (countryHistoryCache.size > 80) countryHistoryCache.delete(countryHistoryCache.keys().next().value)
+  countryHistoryCache.set(cacheKey, { until: Date.now() + (value ? 86400000 : 3600000), value })
+  return value
+}
+
+async function publicCountryRecipes(country) {
+  const cuisine = DEMONYM[countryKey(country)] || country
+  const cards = []
+  for (let page = 1; page <= 12; page++) {
+    // This existing service enforces published versions and Restaurant visibility gates.
+    const result = await listPublicRecipes({ page, limit: 100, cuisine })
+    for (const row of result?.recipes || []) {
+      if (!row?.dish?.slug) continue
+      cards.push({
+        title: row.dish.name, path: `/recipes/${encodeURIComponent(row.dish.slug)}`,
+        imageUrl: previewImage(row.dish.heroImageUrl),
+        caption: row.dish.course || 'Recipe', sourceLabel: 'EPANTRY published recipe · cuisine',
+      })
+    }
+    if (page >= (result?.pagination?.pages || 0)) break
+  }
+  return cards
+}
+async function publicCountryGrocery(country) {
+  const codes = countryRegex(country)
+  const now = new Date()
+  const rows = await ProductVersion.find({
+    countryOfOrigin: codes, publicationStatus: 'published',
+    $and: [{ $or: [{ effectiveFrom: null }, { effectiveFrom: { $lte: now } }] },
+      { $or: [{ effectiveTo: null }, { effectiveTo: { $gt: now } }] }],
+  }).select('_id').limit(1200).lean()
+  const matched = new Set(rows.map(row => String(row._id)))
+  if (!matched.size) return []
+  const cards = []
+  for (let page = 1; page <= 12; page++) {
+    // Read through the EXISTING public listing service. No drafts or unapproved media.
+    const result = await listPublicProducts({ page, limit: 100 })
+    for (const row of result?.products || []) {
+      if (!matched.has(String(row.productVersionId)) || !row.slug) continue
+      cards.push({ title: row.displayName, path: `/grocery/product/${encodeURIComponent(row.slug)}`,
+        imageUrl: previewImage(row.image), caption: row.category?.name || 'Grocery',
+        sourceLabel: 'EPANTRY published product · declared origin' })
+    }
+    if (page >= (result?.pagination?.pages || 0)) break
+  }
+  return cards
+}
+// Country is a public discovery page, not an endorsement of geographic provenance.
+router.get('/public/country-discovery/:countryName', wrap(async (req, res) => {
+  const name = safeCountry(req.params.countryName)
+  const origin = countryRegex(name)
+  const [history, hostRecords, canonicalRecipes, canonicalGrocery] = await Promise.all([
+    wikiHistory(name),
+    HostUnifiedListingPacket.find({ status: 'approved', deletedAt: null, 'packet.countryOfOrigin': origin })
+      .select('_id title type packet.category packet.images packet.shareRecipe packet.sellReadyMade').sort({ approvedAt: -1 }).limit(250).lean(),
+    publicCountryRecipes(name), publicCountryGrocery(name),
+  ])
+  const recipes = [...canonicalRecipes]
+  const grocery = [...canonicalGrocery]
+  for (const row of hostRecords) {
+    const card = { title: String(row.title || ''),
+      imageUrl: previewImage(row.packet?.images?.[0]), caption: String(row.packet?.category || '').replace(/_/g, ' '),
+      sourceLabel: 'Super Admin-approved Host listing · Host-declared country' }
+    if (row.type === 'grocery') grocery.push({ ...card, path: `/grocery/product/host--${row._id}` })
+    else if (row.type === 'kitchen_recipe' || row.type === 'brand_recipe' || (row.type === 'prepared_food' && row.packet?.shareRecipe)) {
+      recipes.push({ ...card, path: `/recipes/host--${row._id}` })
+    }
+  }
+  respond(res, { country: { name }, history, recipes, grocery })
 }))
 
 // Public read model: only Super-Admin-approved packets, no private cost, stock,

@@ -8,6 +8,7 @@ import {
   ChefHat,
   ChevronDown,
   History,
+  Globe2,
   LoaderCircle,
   MapPin,
   Minus,
@@ -33,6 +34,8 @@ import {
   useParams,
 } from 'react-router-dom'
 
+
+import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
 
 import {
   useAuth,
@@ -5222,7 +5225,11 @@ export default function RecipeDetailPage() {
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="min-w-0">
                     <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#A65836]">Country</p>
-                    <p className="mt-1 text-[25px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[30px]">{recipeDiscovery.origin.country.name}</p>
+                    <Link to={countryExplorePath(recipeDiscovery.origin.country.name)} aria-label={`Explore ${recipeDiscovery.origin.country.name} history, recipes and grocery`} className="group mt-1 inline-flex max-w-full items-center gap-3 text-[25px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] transition-colors hover:text-[#A65836] focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#A65836] sm:text-[30px]">
+                      {countryFlag(recipeDiscovery.origin.country.name) ? <span role="img" aria-label={`${recipeDiscovery.origin.country.name} flag`} className="shrink-0 text-[27px] leading-none sm:text-[32px]">{countryFlag(recipeDiscovery.origin.country.name)}</span> : <Globe2 size={25} strokeWidth={1.6} className="shrink-0" aria-hidden="true" />}
+                      <span className="break-words underline decoration-transparent underline-offset-4 group-hover:decoration-[#A65836]">{recipeDiscovery.origin.country.name}</span>
+                      <ArrowUpRight size={19} className="shrink-0 opacity-65 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+                    </Link>
                   </div>
                   {recipeDiscovery.origin.region?.name ? (
                     <div className="min-w-0 border-t border-[#CBD9CE] pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">

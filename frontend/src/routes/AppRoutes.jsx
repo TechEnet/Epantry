@@ -1044,6 +1044,7 @@ const HostListingWorkspacePage = lazy(() => import('../features/host/pages/HostL
 const HostUnifiedListingPage = lazy(() => import('../features/host/pages/HostUnifiedListingPage'))
 const AdminUnifiedListingReviewPage = lazy(() => import('../features/host/pages/AdminUnifiedListingReviewPage'))
 const PublicApprovedHostListingsPage = lazy(() => import('../features/host/pages/PublicApprovedHostListingsPage'))
+const CountryExplorePage = lazy(() => import('../features/countries/pages/CountryExplorePage'))
 const HostEarningsPage = lazy(() => import('../features/host/pages/HostEarningsPage'))
 const HostOrdersPage = lazy(() => import('../features/host/pages/HostOrdersPage'))
 const HostOrderDetailPage = lazy(() => import('../features/host/pages/HostOrderDetailPage'))
@@ -2452,6 +2453,7 @@ export default function AppRoutes() {
 
             <Route path="/recipes" element={<RecipesPage />} />
             <Route path="/ingredients/:ref" element={<IngredientKnowledgePage />} />
+            <Route path="/explore/countries/:countryName" element={<CountryExplorePage />} />
             <Route path="/explore/host-listings" element={<PublicApprovedHostListingsPage />} />
             <Route path="/recipes/what-should-we-cook" element={<WhatShouldWeCookPage />} />
 
