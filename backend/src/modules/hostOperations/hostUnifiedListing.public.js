@@ -19,7 +19,7 @@ export function publicListing(record) {
     servingSize: record.type === 'grocery' ? (packet.servingSize || '') : '',
     barcode: record.type === 'grocery' ? (packet.selling?.barcode || '') : '',
     shareRecipe: Boolean(packet.shareRecipe), sellReadyMade: Boolean(packet.sellReadyMade),
-    baseServings: packet.baseServings, ingredients: packet.ingredients?.map((item) => ({
+    baseServings: packet.baseServings, difficulty: record.type === 'grocery' ? '' : (packet.difficulty || 'not_declared'), ingredients: packet.ingredients?.map((item) => ({
       name: item.name, quantity: item.quantity, unit: item.unit, imageUrl: item.imageUrl,
     })) || [],
     steps: packet.shareRecipe ? packet.steps?.map((item) => ({ instruction: item.instruction, timerMinutes: item.timerMinutes, imageUrl: item.imageUrl })) || [] : [],

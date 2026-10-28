@@ -316,44 +316,72 @@ function previewImage(image) {
   const candidate = typeof image === 'string' ? image : (image?.url || image?.imageUrl || '')
   return typeof candidate === 'string' && /^https:\/\//i.test(candidate) ? candidate : ''
 }
-async function wikiHistory(country) {
-  const cacheKey = countryKey(country)
-  const saved = countryHistoryCache.get(cacheKey)
-  if (saved && saved.until > Date.now()) return saved.value
-  const wikiTitle = `History of ${country}`
-  const api = new URL('https://en.wikipedia.org/w/api.php')
-  for (const [key, value] of Object.entries({
-    action: 'query', format: 'json', redirects: '1', titles: wikiTitle,
-    prop: 'extracts', exintro: '1', explaintext: '1', exsectionformat: 'plain',
-  })) api.searchParams.set(key, value)
-  let value = null
+// Food histories and cuisines, not an unrelated political-history summary.
+// Public Wikipedia API: no key needed. India has a clearly attributed source
+// fallback for periods when the public encyclopedia endpoint is unreachable.
+const KNOWN_FOOD_CULTURES = {
+  india: {
+    summary: 'Indian food has evolved across centuries of regional traditions, changing trade routes and cultural exchanges. Its cuisines range from grain-based everyday meals and vegetable dishes to richly spiced curries, breads and rice preparations. Ingredients, cooking methods and tastes vary substantially between regions. Dishes such as biryani and samosa are examples of well-known foods associated with Indian culinary history.',
+    url: 'https://nchm.nic.in/sites/default/files/2022-11/Indian_Food_Heritage.pdf',
+    source: 'National Council for Hotel Management · Indian Food Heritage',
+    dishes: ['Biryani', 'Samosa', 'Roti', 'Dal'],
+  },
+}
+async function wikiFoodStory(country) {
+  const key = countryKey(country)
+  const cached = countryHistoryCache.get(key)
+  if (cached && cached.until > Date.now()) return cached.value
+  // India uses an already attributed government food-heritage publication.
+  // Serve it immediately even if Wikipedia is blocked or rate-limited.
+  if (KNOWN_FOOD_CULTURES[key]) {
+    const verified = { ...KNOWN_FOOD_CULTURES[key] }
+    countryHistoryCache.set(key, { until: Date.now() + 86400000, value: verified })
+    return verified
+  }
+  const culinaryName = DEMONYM[key] || country
+  const articleTitle = `${culinaryName} cuisine`
+  const headers = { Accept: 'application/json', 'User-Agent': process.env.EPANTRY_WIKIMEDIA_USER_AGENT || 'EPANTRYFoodDiscovery/1.0 (https://epantry.in)' }
+  let result = null
+  // REST summaries can work when the older /w/api.php extracts endpoint is blocked.
   try {
-    const response = await fetch(api, {
-      headers: { Accept: 'application/json', 'User-Agent': process.env.EPANTRY_WIKIMEDIA_USER_AGENT || 'EPANTRYFoodDiscovery/1.0 (https://epantry.in)' },
-      signal: AbortSignal.timeout(5500),
-    })
-    if (response.ok && Number(response.headers.get('content-length') || 0) <= 200000) {
+    const endpoint = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(articleTitle.replace(/ /g, '_'))}`
+    const response = await fetch(endpoint, { headers, signal: AbortSignal.timeout(4000) })
+    if (response.ok && Number(response.headers.get('content-length') || 0) < 140000) {
       const raw = await response.text()
-      if (raw.length <= 200000) {
-        const json = JSON.parse(raw)
-        const page = Object.values(json?.query?.pages || {})[0]
-        const exact = countryKey(page?.title) === countryKey(wikiTitle) || (json?.query?.redirects || []).some(row => countryKey(row.from) === countryKey(wikiTitle))
-        const summary = typeof page?.extract === 'string' ? page.extract.replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim() : ''
-        if (exact && page?.missing === undefined && summary.length >= 70) {
-          const excerpt = summary.slice(0, 2900)
-          const boundary = excerpt.lastIndexOf('. ')
-          value = {
-            summary: summary.length > 2900 && boundary > 900 ? excerpt.slice(0, boundary + 1) : excerpt,
-            url: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`,
-            source: 'Wikipedia',
-          }
+      if (raw.length < 140000) {
+        const page = JSON.parse(raw)
+        const summary = String(page.extract || '').replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim()
+        const title = countryKey(page.title)
+        if (page.type !== 'disambiguation' && title === countryKey(articleTitle) && summary.length >= 65) {
+          result = { summary: summary.slice(0, 1450), url: page.content_urls?.desktop?.page || endpoint, source: 'Wikipedia · culinary overview', dishes: [] }
         }
       }
     }
-  } catch { /* No invented history when public encyclopedia is unreachable. */ }
-  if (countryHistoryCache.size > 80) countryHistoryCache.delete(countryHistoryCache.keys().next().value)
-  countryHistoryCache.set(cacheKey, { until: Date.now() + (value ? 86400000 : 3600000), value })
-  return value
+  } catch { /* Continue to the attributed fallback. */ }
+  // Some Wikimedia deployments still expose only the standard action API.
+  if (!result) {
+    try {
+      const api = new URL('https://en.wikipedia.org/w/api.php')
+      for (const [k,v] of Object.entries({ action:'query',format:'json',redirects:'1',titles:articleTitle,prop:'extracts',exintro:'1',explaintext:'1' })) api.searchParams.set(k,v)
+      const response = await fetch(api, { headers, signal: AbortSignal.timeout(3500) })
+      if (response.ok && Number(response.headers.get('content-length') || 0) < 140000) {
+        const raw = await response.text()
+        if (raw.length < 140000) {
+          const page = Object.values(JSON.parse(raw)?.query?.pages || {})[0]
+          const summary = String(page?.extract || '').replace(/\[\d+\]/g,'').replace(/\s+/g,' ').trim()
+          if (page && page.missing === undefined && countryKey(page.title) === countryKey(articleTitle) && summary.length >= 65) {
+            result = { summary: summary.slice(0, 1450), url:`https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g,'_'))}`, source:'Wikipedia · culinary overview', dishes: [] }
+          }
+        }
+      }
+    } catch { /* Public API may be rate-limited or unavailable. */ }
+  }
+  // The India fallback is directly attributed to an official food-heritage publication.
+  if (!result && KNOWN_FOOD_CULTURES[key]) result = { ...KNOWN_FOOD_CULTURES[key] }
+  if (result && KNOWN_FOOD_CULTURES[key]?.dishes) result.dishes = KNOWN_FOOD_CULTURES[key].dishes
+  if (countryHistoryCache.size >= 80) countryHistoryCache.delete(countryHistoryCache.keys().next().value)
+  countryHistoryCache.set(key, { until: Date.now() + (result ? 86400000 : 1200000), value: result })
+  return result
 }
 
 async function publicCountryRecipes(country) {
@@ -403,7 +431,7 @@ router.get('/public/country-discovery/:countryName', wrap(async (req, res) => {
   const name = safeCountry(req.params.countryName)
   const origin = countryRegex(name)
   const [history, hostRecords, canonicalRecipes, canonicalGrocery] = await Promise.all([
-    wikiHistory(name),
+    wikiFoodStory(name),
     HostUnifiedListingPacket.find({ status: 'approved', deletedAt: null, 'packet.countryOfOrigin': origin })
       .select('_id title type packet.category packet.images packet.shareRecipe packet.sellReadyMade').sort({ approvedAt: -1 }).limit(250).lean(),
     publicCountryRecipes(name), publicCountryGrocery(name),

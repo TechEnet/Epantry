@@ -414,7 +414,7 @@ function newPacket(type = 'grocery') {
   return {
     type, title: '', description: '', category: type === 'grocery' ? 'grocery' : 'other', grocerySubcategory: '', packagingType: '', images: [], imageRoles: [], videoUrl: '', videoFileName: '',
     brandName: '', sku: '', countryOfOrigin: '', regionOfOrigin: '', localRecipeName: '', localRecipeLanguage: '', englishNameReading: '',
-    productFamily: '', manufacturerPacker: '', unitsPerPack: '', servingSize: '', baseServings: 4, ingredients: [emptyIngredient()], steps: [emptyStep()],
+    productFamily: '', manufacturerPacker: '', unitsPerPack: '', servingSize: '', baseServings: 4, difficulty: 'not_declared', ingredients: [emptyIngredient()], steps: [emptyStep()],
     nutrition: { basis: 'Per serving', evidenceNote: '' }, allergens: [], dietary: 'not_declared',
     shareRecipe: type === 'brand_recipe' || type === 'kitchen_recipe', sellReadyMade: type === 'prepared_food',
     selling: { listPrice: '', salePrice: '', stockQuantity: '', stockUnit: 'piece', packQuantity: '', packUnit: 'piece', minimumOrderQuantity: 1, maximumOrderQuantity: '', barcode: '', packagingCost: '', labourCost: '', outletId: '', menuId: '' },
@@ -920,6 +920,7 @@ function HostUnifiedListingEditor() {
                   <EditorField title="Barcode / GTIN (from label, optional)"><input className={field} type="text" maxLength={100} value={form.selling?.barcode || ''} onChange={(event) => nested('selling', 'barcode', event.target.value)} placeholder="Enter the barcode printed on the pack" autoComplete="off"/></EditorField>
                 </>}
                 {isRecipe && <EditorField title="Servings / batch yield"><input type="number" min="1" className={field} value={form.baseServings ?? ''} onChange={(event) => patch('baseServings', event.target.value)}/></EditorField>}
+                {isRecipe && <EditorField title="How difficult is this recipe?"><select aria-label="Recipe difficulty" className={field} value={form.difficulty || 'not_declared'} onChange={(event) => patch('difficulty', event.target.value)}><option value="not_declared">Not declared</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></EditorField>}
               </div>
               <EditorField title="Description"><textarea rows={2} maxLength={3000} className={`${field} mt-4`} value={form.description} onChange={(event) => patch('description', event.target.value)}/></EditorField>
               {workspace === 'hybrid' && form.type === 'kitchen_recipe' && (

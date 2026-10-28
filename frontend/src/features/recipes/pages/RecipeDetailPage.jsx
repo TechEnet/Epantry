@@ -711,7 +711,7 @@ function RecipeEvidenceFallback({ kind, evidence }) {
       <details className="epantry-intelligence-fallback group">
         <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3">
           <span>{title}</span>
-          <ChevronDown size={18} aria-hidden="true" className="epantry-intelligence-chevron shrink-0 transition-transform group-open:rotate-180" />
+          <span className="epantry-unified-chevron grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#B9ACDE] bg-white text-[#173F35] transition-transform group-open:rotate-180"><ChevronDown size={16} aria-hidden="true" /></span>
         </summary>
         <div className="epantry-intelligence-fallback-content">
       {kind === 'nutrition' && (
@@ -952,7 +952,8 @@ function HostDeclaredRecipeFacts({ submission, section }) {
   return (
     <details className="epantry-guide-accordion group border-b border-[#DCE0CF]">
       <summary className="focus-ring flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-[15px] font-semibold text-[#173F35] sm:px-5 sm:py-4 sm:text-xl">
-        {name} <ChevronDown size={17} className="transition group-open:rotate-180" />
+        <span className="flex-1">{name}</span>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#B9ACDE] bg-white text-[#173F35] transition-transform group-open:rotate-180"><ChevronDown size={16} aria-hidden="true" /></span>
       </summary>
       <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] p-4 sm:p-5">
         <p className="mb-3 text-sm text-[#79543D]">Host-declared information. Listing approval does not independently verify food claims.</p>
@@ -1028,39 +1029,6 @@ export default function RecipeDetailPage() {
 
   const [recipeDiscovery, setRecipeDiscovery] = useState(null)
   const [recipeDiscoveryLoading, setRecipeDiscoveryLoading] = useState(false)
-  const prepScrollRef = useRef(null)
-  useEffect(() => {
-    const node = prepScrollRef.current
-    if (!node) return undefined
-    // At either end of the ingredient checklist, send wheel movement to the
-    // document (or an actual scrollable parent), never trap the user in Prep list.
-    const forwardAtBoundary = (event) => {
-      if (event.ctrlKey || event.defaultPrevented || event.deltaY === 0) return
-      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
-      const max = Math.max(0, node.scrollHeight - node.clientHeight)
-      const available = delta > 0 ? Math.max(0, max - node.scrollTop) : Math.max(0, node.scrollTop)
-      // Let the checklist scroll natively until this gesture would hit its edge.
-      if (max > 2 && available >= Math.abs(delta) - 1) return
-      event.preventDefault()
-      if (max > 2) node.scrollTop = delta > 0 ? max : 0
-      let remaining = delta - (delta > 0 ? available : -available)
-      let parent = node.parentElement
-      while (parent && parent !== document.body && Math.abs(remaining) > 0.5) {
-        const scrollMax = Math.max(0, parent.scrollHeight - parent.clientHeight)
-        const overflow = window.getComputedStyle(parent).overflowY
-        if (scrollMax > 1 && /auto|scroll/.test(overflow)) {
-          const before = parent.scrollTop
-          parent.scrollTop = Math.min(scrollMax, Math.max(0, before + remaining))
-          remaining -= parent.scrollTop - before
-        }
-        parent = parent.parentElement
-      }
-      if (Math.abs(remaining) > 0.5) window.scrollBy(0, remaining)
-    }
-    node.addEventListener('wheel', forwardAtBoundary, { passive: false })
-    return () => node.removeEventListener('wheel', forwardAtBoundary)
-  }, [data?.recipe?.id, data?.hostSubmission?.id])
-
   const [
     scaledData,
     setScaledData,
@@ -4685,6 +4653,36 @@ export default function RecipeDetailPage() {
           color: #FFFFFF !important;
           border-color: #C86C42 !important;
         }
+        /* OCT28: consistent chapter boundaries and native scroll chaining. */
+        .epantry-recipe-detail .epantry-recipe-ingredients > .epantry-recipe-ingredients-intro,
+        .epantry-recipe-detail .epantry-recipe-guide > .epantry-recipe-guide-intro {
+          border-top: 4px solid #C86C42 !important;
+        }
+        .epantry-recipe-detail .epantry-prep-scroll {
+          overscroll-behavior-y: auto !important;
+          scroll-behavior: auto !important;
+          touch-action: pan-y !important;
+        }
+        .epantry-recipe-detail .epantry-recipe-intelligence-slot > details > summary > .epantry-unified-chevron,
+        .epantry-recipe-detail .epantry-intelligence-fallback > summary > .epantry-unified-chevron,
+        .epantry-recipe-detail .epantry-recipe-intelligence-slot > details > summary > span:last-child {
+          display: grid !important;
+          place-items: center !important;
+          width: 32px !important;
+          height: 32px !important;
+          flex: 0 0 32px !important;
+          border: 1px solid #B9ACDE !important;
+          border-radius: 999px !important;
+          background: #FFFFFF !important;
+        }
+        .epantry-recipe-detail .epantry-recipe-intelligence-slot > details > summary > .epantry-unified-chevron > svg,
+        .epantry-recipe-detail .epantry-intelligence-fallback > summary > .epantry-unified-chevron > svg {
+          transform: none !important;
+        }
+        .epantry-recipe-detail .epantry-guide-accordion > summary::-webkit-details-marker,
+        .epantry-recipe-detail .epantry-intelligence-fallback > summary::-webkit-details-marker {
+          display: none;
+        }
         /* Restore original Prep list layout; only alternating row colours vary. */
         .epantry-recipe-detail .epantry-recipe-ingredient-list > div.epantry-prep-row--white {
           background: #FFFCF9 !important;
@@ -5212,40 +5210,27 @@ export default function RecipeDetailPage() {
         ) : null}
 
         {recipeDiscovery?.origin?.country ? (
-          <section className="epantry-origin-chapter mt-8 border-y border-[#CFDBD0] bg-[#F1F5EF]" aria-label="Recipe origin and tradition">
-            <div className="grid min-w-0 gap-6 px-5 py-7 sm:px-9 sm:py-9 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10">
-              <div className="min-w-0">
-                <p className="text-[13px] font-bold uppercase tracking-[0.13em] text-[#A65836]">From its roots</p>
-                <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[36px]">Origin & tradition</h2>
-                <p className="mt-3 max-w-[42ch] text-[15px] leading-6 text-[#51675A]">
-                  Explore the place associated with this recipe, without assuming it represents every variation of the dish.
-                </p>
+          <section className="epantry-origin-chapter mt-7 border-y border-[#C8D9CB] bg-[#EAF2EA]" aria-label="Recipe origin and tradition">
+            <div className="grid gap-5 px-5 py-6 sm:px-9 sm:py-8 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-10">
+              <div className="min-w-0 border-l-[3px] border-[#C86C42] pl-4 sm:pl-5">
+                <p className="text-[13px] font-bold uppercase tracking-[.12em] text-[#A65836]">From its roots</p>
+                <h2 className="mt-2 text-[27px] font-semibold tracking-[-.035em] text-[#173F35] sm:text-[33px]">Origin & tradition</h2>
+                <p className="mt-1 text-[15px] leading-6 text-[#4D6255]">{recipeDiscovery.origin.region?.name ? `${recipeDiscovery.origin.region.name}, ${recipeDiscovery.origin.country.name}` : recipeDiscovery.origin.country.name}</p>
               </div>
-              <div className="min-w-0 border-t border-[#CBD9CE] pt-5 lg:border-l lg:border-t-0 lg:py-2 lg:pl-8">
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#A65836]">Country</p>
-                    <Link to={countryExplorePath(recipeDiscovery.origin.country.name)} aria-label={`Explore ${recipeDiscovery.origin.country.name} history, recipes and grocery`} className="group mt-1 inline-flex max-w-full items-center gap-3 text-[25px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] transition-colors hover:text-[#A65836] focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#A65836] sm:text-[30px]">
-                      {countryFlag(recipeDiscovery.origin.country.name) ? <span role="img" aria-label={`${recipeDiscovery.origin.country.name} flag`} className="shrink-0 text-[27px] leading-none sm:text-[32px]">{countryFlag(recipeDiscovery.origin.country.name)}</span> : <Globe2 size={25} strokeWidth={1.6} className="shrink-0" aria-hidden="true" />}
-                      <span className="break-words underline decoration-transparent underline-offset-4 group-hover:decoration-[#A65836]">{recipeDiscovery.origin.country.name}</span>
-                      <ArrowUpRight size={19} className="shrink-0 opacity-65 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
-                    </Link>
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 border-t border-[#CAD9CC] pt-4 sm:gap-6 lg:border-l lg:border-t-0 lg:py-1 lg:pl-8">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold uppercase tracking-[.1em] text-[#A65836]">Country</p>
+                  <Link to={countryExplorePath(recipeDiscovery.origin.country.name)} aria-label={`Explore food from ${recipeDiscovery.origin.country.name}`} title={`Discover food from ${recipeDiscovery.origin.country.name}`} className="mt-2 inline-flex h-[52px] min-w-[68px] items-center justify-center gap-1.5 rounded-lg border border-[#CBD9CE] bg-white/80 px-3 text-[32px] shadow-sm transition hover:border-[#C86C42] hover:bg-[#FFF4EC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C86C42]">
+                    {countryFlag(recipeDiscovery.origin.country.name) ? <span role="img" aria-label={`${recipeDiscovery.origin.country.name} flag`}>{countryFlag(recipeDiscovery.origin.country.name)}</span> : <Globe2 size={28} strokeWidth={1.6} aria-hidden="true" />}
+                    <ArrowUpRight size={15} className="self-start text-[#A65836]" aria-hidden="true" />
+                  </Link>
+                </div>
+                {recipeDiscovery.origin.region?.name ? (
+                  <div className="min-w-0 border-l border-[#CAD9CC] pl-4 sm:pl-6">
+                    <p className="text-[13px] font-bold uppercase tracking-[.1em] text-[#A65836]">Region / state</p>
+                    <p className="mt-2 break-words text-[23px] font-semibold leading-tight text-[#173F35] sm:text-[26px]">{recipeDiscovery.origin.region.name}</p>
                   </div>
-                  {recipeDiscovery.origin.region?.name ? (
-                    <div className="min-w-0 border-t border-[#CBD9CE] pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
-                      <p className="text-[12px] font-bold uppercase tracking-[0.13em] text-[#A65836]">Region / State</p>
-                      <p className="mt-1 text-[25px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[30px]">{recipeDiscovery.origin.region.name}</p>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#CBD9CE] pt-3 text-[13px] leading-5 text-[#536B5C]">
-                  <span>{recipeDiscovery.origin.sourceType === 'host_declared'
-                    ? 'Host-declared recipe origin · Not independently verified'
-                    : 'Documented recipe geography · Source attributed'}</span>
-                  {recipeDiscovery.origin.sourceUrl ? (
-                    <a href={recipeDiscovery.origin.sourceUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4">View documented source ↗</a>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
             </div>
           </section>
@@ -5396,7 +5381,6 @@ export default function RecipeDetailPage() {
 
             <div
               className="epantry-prep-scroll"
-              ref={prepScrollRef}
               tabIndex={0}
               role="region"
               aria-label="Scrollable ingredient checklist and Living Pantry actions"
@@ -5407,11 +5391,9 @@ export default function RecipeDetailPage() {
               </p>
             )}
 
-            {!canUseCustomerFeatures && (
+            {!canUseCustomerFeatures && !hostListingMode && (
               <div className="epantry-recipe-access-note mt-5 rounded-2xl border border-[#DCE0CF] bg-[#F7F6F2] p-4 text-xs font-semibold leading-5 text-[#202421]/80">
-                {hostListingMode
-                  ? 'This is a Super Admin-approved Host submission. Ingredient quantities are Host-declared; Living Pantry matching and shopping require a separately published canonical EPANTRY recipe.'
-                  : customerContextBlocked
+                {customerContextBlocked
                     ? 'Switch to Customer mode or sign in with a Customer account to compare these ingredients with your Living Pantry and shop missing items.'
                     : 'Sign in with Customer access to compare these ingredients with your Living Pantry and shop missing items.'}
               </div>

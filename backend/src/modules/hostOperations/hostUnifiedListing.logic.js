@@ -107,6 +107,7 @@ export function normalizeListingPacket(raw = {}) {
     servingSize: type === 'grocery' ? text(input.servingSize, 100) : '',
     sku: text(input.sku, 120),
     baseServings: finiteNonnegative(input.baseServings),
+    difficulty: recipeAllowed && ['easy', 'medium', 'hard'].includes(String(input.difficulty || '').toLowerCase()) ? String(input.difficulty).toLowerCase() : 'not_declared',
     ingredients,
     steps,
     nutrition: {
