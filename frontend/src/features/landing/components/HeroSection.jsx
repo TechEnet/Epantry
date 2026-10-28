@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -45,6 +45,20 @@ const mobileHeroSlides = [
 const SLIDE_INTERVAL_MS = 5000
 const LANDING_COOK_QUERY_KEY = 'epantry-cook-today-landing-input'
 
+// Never fade out a visible photo until its replacement is fully loaded.
+// If an asset is unavailable, skip it rather than showing the bare hero background.
+function nextReadyHeroSlide(slides, current, ready) {
+  const currentIndex = slides.indexOf(current)
+  if (currentIndex < 0) return current
+
+  for (let offset = 1; offset < slides.length; offset += 1) {
+    const candidate = slides[(currentIndex + offset) % slides.length]
+    if (ready.has(candidate)) return candidate
+  }
+
+  return current
+}
+
 function useMobileHero() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined'
@@ -74,7 +88,11 @@ export default function HeroSection() {
   const navigate = useNavigate()
   const shouldReduceMotion = useReducedMotion()
   const isMobile = useMobileHero()
-  const [activeSlide, setActiveSlide] = useState(0)
+  // Keep the last visible image mounted even while another breakpoint's
+  // photos load (e.g. rotating a laptop or resizing its browser window).
+  const heroSlides = isMobile ? mobileHeroSlides : desktopHeroSlides
+  const [currentSlide, setCurrentSlide] = useState(() => heroSlides[0])
+  const readyHeroSlides = useRef(new Set())
   const [cookInput, setCookInput] = useState('')
   const [cookInputError, setCookInputError] = useState('')
 
@@ -148,18 +166,56 @@ export default function HeroSection() {
   }), [catalog, orderData, recentViews])
   const recipesLoading = (featuredLoading || publicLoading) && !personalizedRecipes.length
 
-  const heroSlides = isMobile ? mobileHeroSlides : desktopHeroSlides
-  const currentSlide = heroSlides[activeSlide % heroSlides.length]
+  // Decode the incoming slide before the timer can display it. Loading only
+  // after changing <motion.img src> could leave the hero blank for seconds on
+  // slow networks, because the previous photo has already faded away.
+  useEffect(() => {
+    let mounted = true
+    const preloads = heroSlides.map((src, index) => {
+      const photo = new window.Image()
+      photo.decoding = 'async'
+      if (index === 0) photo.fetchPriority = 'high'
+
+      const markReady = () => {
+        if (!mounted) return
+        readyHeroSlides.current.add(src)
+        // On a responsive breakpoint change, retain the previous photo until
+        // the first new-viewport image is actually ready to display.
+        setCurrentSlide((visible) => (heroSlides.includes(visible) ? visible : src))
+      }
+      photo.onload = () => {
+        if (typeof photo.decode === 'function') {
+          photo.decode().then(markReady, markReady)
+        } else {
+          markReady()
+        }
+      }
+      // A failed/404 asset must never replace a working hero photo.
+      photo.onerror = () => {}
+      photo.src = src
+      return photo
+    })
+
+    return () => {
+      mounted = false
+      preloads.forEach((photo) => {
+        photo.onload = null
+        photo.onerror = null
+      })
+    }
+  }, [isMobile])
 
   useEffect(() => {
     if (shouldReduceMotion || heroSlides.length < 2) return undefined
 
     const interval = window.setInterval(() => {
-      setActiveSlide((current) => (current + 1) % heroSlides.length)
+      setCurrentSlide((visible) =>
+        nextReadyHeroSlide(heroSlides, visible, readyHeroSlides.current),
+      )
     }, SLIDE_INTERVAL_MS)
 
     return () => window.clearInterval(interval)
-  }, [heroSlides.length, shouldReduceMotion])
+  }, [isMobile, shouldReduceMotion])
 
   const handleCookTodaySubmit = (event) => {
     event.preventDefault()
