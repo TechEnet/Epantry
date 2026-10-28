@@ -541,24 +541,24 @@ function DetailCard({
   icon: Icon = null,
 }) {
   return (
-    <details className="group border-b border-[#C8D5D2] last:border-b-0">
-      <summary className="focus-ring flex min-h-[82px] cursor-pointer list-none items-center justify-between gap-4 py-4 text-left transition-colors hover:bg-[#F5F9F8] sm:py-5 [&::-webkit-details-marker]:hidden">
-        <span className="flex min-w-0 items-center gap-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-[#C9D7D4] bg-[#E3F0ED] text-[#174E49]">
-            {Icon ? <Icon size={19} strokeWidth={1.8} aria-hidden="true" /> : <ShieldCheck size={19} strokeWidth={1.8} aria-hidden="true" />}
+    <details className="group border-b border-[#C8D8D4] border-l-[3px] border-l-transparent transition-colors open:border-l-[#C86C42] last:border-b-0">
+      <summary className="focus-ring flex min-h-[72px] cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-white/65 group-open:bg-[#F8FCFA] sm:gap-4 sm:px-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-[#BFD5CC] bg-[#F8FCFA] text-[#174E49] group-open:border-[#D6C5B8] group-open:bg-[#F7E9DF]">
+            {Icon ? <Icon size={18} strokeWidth={1.8} aria-hidden="true" /> : <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" />}
           </span>
           <span className="min-w-0">
-            <span className={`block text-[17px] font-semibold tracking-[-0.015em] sm:text-lg ${accent ? "text-[#173F35]" : "text-[#202421]"}`}>
+            <span className={`block text-[16px] font-semibold tracking-[-0.015em] sm:text-[17px] ${accent ? "text-[#173F35]" : "text-[#202421]"}`}>
               {title}
             </span>
-            {description && <span className="mt-1 block text-sm leading-5 text-[#66736F]">{description}</span>}
+            {description && <span className="mt-0.5 block text-[13px] leading-5 text-[#536B64] sm:text-[14px]">{description}</span>}
           </span>
         </span>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#C8D5D2] bg-white text-[#174E49] transition-colors group-open:bg-[#174E49] group-open:text-white">
-          <ChevronDown size={18} className="transition-transform group-open:rotate-180" aria-hidden="true" />
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#C8D5D2] bg-white text-[#174E49] transition-colors group-open:border-[#174E49] group-open:bg-[#174E49] group-open:text-white">
+          <ChevronDown size={17} className="transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
         </span>
       </summary>
-      <div className="min-w-0 pb-7 pl-0 pt-2 text-[15px] leading-7 text-[#343B36] sm:pb-8 sm:pl-[60px]">
+      <div className="min-w-0 bg-white/35 px-3 pb-5 pt-3 text-[15px] leading-[1.55] text-[#283E35] sm:px-5 sm:pb-6">
         {children}
       </div>
     </details>
@@ -678,7 +678,6 @@ function HostListingPincodeCheck({ product }) {
           ) : null}
         </div>
       )}
-      <p className="mt-3 text-[13px] leading-5 text-[#51665E]">Super Admin approved this submission for display. Host coverage and prices are declarations, not a verified live Marketplace offer. Add to Cart requires a separately approved offer.</p>
     </section>
   );
 }
@@ -1332,29 +1331,31 @@ function ProductDetailsSheet({ product }) {
   return (
     <div className="flex h-full min-h-0 w-full items-stretch justify-center bg-[#E9EFF5] p-3 sm:p-4">
       <div className="flex h-full min-h-0 w-full max-w-[760px] flex-col overflow-hidden border border-[#CEDCE5] bg-[#FFFCF8]">
-        <div className="shrink-0 border-b border-[#C9DDD7] bg-[#DDECE6] px-4 py-4 text-[#173F35] sm:px-6 sm:py-5">
+        <div className="shrink-0 border-b border-[#C9DDD7] bg-[#DDECE6] px-4 py-3 text-[#173F35] sm:px-5 sm:py-3">
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#2D665B]">
             EPANTRY · Product details sheet
           </p>
-          <h2 className="mt-1 text-[17px] font-black leading-[1.08] sm:mt-2 sm:text-3xl sm:leading-tight">
+          <h2 className="mt-1 text-[19px] font-semibold leading-[1.2] sm:text-[25px] sm:leading-[1.22]">
             {product?.displayName || "Product"}
           </h2>
-          <p className="mt-2 text-[13px] font-medium leading-5 text-[#536D65]">
-            {product?.isHostListing ? "Super Admin-approved Host submission · Host-declared facts" : "Published listing details · generated from governed product data"}
-          </p>
+          {!product?.isHostListing && (
+            <p className="mt-1.5 text-[13px] font-medium leading-[1.5] text-[#536D65]">
+              Published listing details · generated from governed product data
+            </p>
+          )}
         </div>
 
         <div
           ref={scrollAreaRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-auto touch-auto p-5 sm:p-6 [scrollbar-width:thin]"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-auto p-4 sm:p-5 [scrollbar-width:thin]"
         >
           <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
             {detailRows.map(([label, value]) => (
               <div key={label} className="border-b border-stone-100 pb-2">
-                <dt className="text-[12px] font-black uppercase tracking-[0.1em] text-stone-400">
+                <dt className="text-[13px] font-semibold uppercase tracking-[0.06em] text-stone-500">
                   {label}
                 </dt>
-                <dd className="mt-1 min-w-0 break-words text-xs font-black text-stone-900">
+                <dd className="mt-1 min-w-0 break-words text-[14px] font-semibold leading-[1.45] text-stone-900">
                   {value}
                 </dd>
               </div>
@@ -1362,10 +1363,10 @@ function ProductDetailsSheet({ product }) {
           </dl>
 
           <div className="mt-5 border-t border-stone-200 pt-4">
-            <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-emerald-700">
               Ingredients
             </p>
-            <p className="mt-2 text-xs font-semibold leading-5 text-stone-700">
+            <p className="mt-2 text-[14px] font-medium leading-[1.55] text-stone-700">
               {product?.ingredientDeclarationText ||
                 (product?.ingredients?.length
                   ? product.ingredients
@@ -1377,10 +1378,10 @@ function ProductDetailsSheet({ product }) {
           </div>
 
           <div className="mt-4 border-t border-stone-200 pt-4">
-            <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-emerald-700">
               Allergens
             </p>
-            <p className="mt-2 text-xs font-semibold leading-5 text-stone-700">
+            <p className="mt-2 text-[14px] font-medium leading-[1.55] text-stone-700">
               {product?.allergenStatement ||
                 (allergens.length
                   ? allergens
@@ -1397,10 +1398,10 @@ function ProductDetailsSheet({ product }) {
 
           <div className="mt-4 border-t border-stone-200 pt-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-emerald-700">
                 Nutrition
               </p>
-              <span className="text-[12px] font-black text-stone-500">
+              <span className="text-[13px] font-semibold text-stone-500">
                 {product?.nutrition?.basis
                   ? productDetailLabel(product.nutrition.basis)
                   : "Declared basis"}
@@ -1412,7 +1413,7 @@ function ProductDetailsSheet({ product }) {
                 {nutrients.map((nutrient, index) => (
                   <div
                     key={`${nutrient?.nutrientKey || "nutrient"}-${index}`}
-                    className="flex items-center justify-between gap-2 border-b border-stone-100 py-1.5 text-[12px]"
+                    className="flex items-center justify-between gap-2 border-b border-stone-100 py-1.5 text-[13px]"
                   >
                     <span className="font-bold text-stone-500">
                       {productDetailLabel(nutrient?.nutrientKey)}
@@ -1424,7 +1425,7 @@ function ProductDetailsSheet({ product }) {
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-xs font-semibold text-stone-500">
+              <p className="mt-2 text-[14px] font-medium text-stone-500">
                 Nutrition not declared.
               </p>
             )}
@@ -1432,7 +1433,7 @@ function ProductDetailsSheet({ product }) {
 
           {product?.claims?.length || product?.certifications?.length ? (
             <div className="mt-4 border-t border-stone-200 pt-4">
-              <p className="text-[12px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-emerald-700">
                 Claims & certifications
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -1442,7 +1443,7 @@ function ProductDetailsSheet({ product }) {
                 ].map((item, index) => (
                   <span
                     key={`${item?.key || item?.label || "detail"}-${index}`}
-                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-black text-emerald-800"
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[13px] font-semibold text-emerald-800"
                   >
                     {item?.label || productDetailLabel(item?.key)}
                   </span>
@@ -1728,6 +1729,8 @@ export default function ProductDetailPage() {
   const [zoomPreview, setZoomPreview] = useState(null);
 
   const [showAllImages, setShowAllImages] = useState(false);
+  const [activeProductPhoto, setActiveProductPhoto] = useState(0);
+  const mobileHeroGalleryRef = useRef(null);
 
   // Mobile gallery: index reflects the horizontally visible slide.
   const [gallerySlideIndex, setGallerySlideIndex] = useState(0);
@@ -1736,6 +1739,11 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!showAllImages) setGallerySlideIndex(0);
   }, [showAllImages]);
+
+  useEffect(() => {
+    setActiveProductPhoto(0);
+    setZoomPreview(null);
+  }, [product?.slug]);
 
   const moveGallerySlide = (delta) => {
     const track = galleryTrackRef.current;
@@ -2098,6 +2106,7 @@ export default function ProductDetailPage() {
       ];
 
   const imageCount = productGalleryItems.length;
+  const selectedProductPhoto = productImages[activeProductPhoto] || productImages[0] || null;
 
   const hasClaimsOrCertifications =
     product.claims?.length > 0 || product.certifications?.length > 0;
@@ -2120,11 +2129,11 @@ export default function ProductDetailPage() {
 
         <section className="ep-product-hero relative grid min-w-0 gap-0 border-b border-[#E2E5DE] lg:min-h-[calc(100svh-120px)] lg:items-stretch lg:grid-cols-[minmax(0,1.07fr)_minmax(0,0.93fr)]">
           <div className="min-w-0 lg:flex lg:min-h-0 lg:flex-col lg:pr-10 xl:pr-16">
-            <div className="relative flex min-h-[390px] flex-col justify-center bg-[#F6F6F2] sm:min-h-[540px] lg:min-h-0 lg:flex-1">
+            <div className="relative flex min-h-[390px] flex-col justify-center overflow-hidden bg-[#EEF2EC] sm:min-h-[540px] lg:min-h-0 lg:flex-1">
               <div className="absolute left-5 top-6 z-10 text-xs font-semibold tracking-[0.08em] text-[#5C6A60] sm:left-8 sm:top-8">
                 {product.category?.name || "EPANTRY grocery"}
               </div>
-              <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-6 pt-16 [scrollbar-width:thin] lg:hidden" aria-label="Swipe product images and details">
+              <div ref={mobileHeroGalleryRef} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-6 pt-16 [scrollbar-width:thin] lg:hidden" aria-label="Swipe product images and details">
                 {productGalleryItems.map((item, index) => (
                   <div
                     key={item.type === "details" ? "mobile-product-details-sheet" : `mobile-${item.image?.url}-${index}`}
@@ -2139,34 +2148,56 @@ export default function ProductDetailPage() {
                 ))}
               </div>
               <div
-                className="relative mx-auto hidden h-[575px] w-full items-center justify-center overflow-hidden px-7 pt-8 lg:flex lg:h-full lg:min-h-0 xl:px-12"
+                className="relative mx-auto hidden h-[575px] w-full items-center justify-center overflow-hidden px-5 pb-7 pt-12 lg:flex lg:h-full lg:min-h-0 xl:px-7"
                 onMouseMove={(event) => {
-                  if (!productImages[0]?.url) return;
+                  if (!selectedProductPhoto?.url) return;
                   const bounds = event.currentTarget.getBoundingClientRect();
                   const x = Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100));
                   const y = Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100));
-                  setZoomPreview({ url: productImages[0].url, alt: productImages[0].alt || product.displayName, x, y });
+                  setZoomPreview({ url: selectedProductPhoto.url, alt: selectedProductPhoto.alt || product.displayName, x, y });
                 }}
                 onMouseLeave={() => setZoomPreview(null)}
               >
-                {productImages[0]?.url ? (
-                  <img src={productImages[0].url} alt={productImages[0].alt || product.displayName} className="h-full w-full object-contain" />
+                {selectedProductPhoto?.url ? (
+                  <img src={selectedProductPhoto.url} alt={selectedProductPhoto.alt || product.displayName} className="h-full w-full object-contain drop-shadow-[0_15px_25px_rgba(20,54,42,0.10)] transition-opacity duration-300" />
                 ) : (
                   <span className="flex flex-col items-center gap-3 text-[#849187]"><Package size={72} strokeWidth={1.1} aria-hidden="true" /><span className="text-sm">Product image not available</span></span>
                 )}
               </div>
-              <button type="button" onClick={() => setShowAllImages(true)} className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8">
+              {productImages.length > 1 && (
+                <span className="pointer-events-none absolute bottom-7 left-7 z-10 hidden rounded-full border border-[#D2DED4] bg-white/90 px-3 py-1.5 text-[13px] font-semibold text-[#173F35] lg:block">
+                  {String(Math.min(activeProductPhoto, productImages.length - 1) + 1).padStart(2, "0")} / {String(productImages.length).padStart(2, "0")}
+                </span>
+              )}
+              <button type="button" onClick={() => setShowAllImages(true)} className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8">
                 <ZoomIn size={17} aria-hidden="true" /> View gallery
               </button>
             </div>
-            <div className="flex items-center gap-3 overflow-x-auto py-4 sm:gap-4 sm:py-5 lg:h-[102px] lg:flex-none lg:py-1.5" role="group" aria-label="Open product images and details">
+            <div className="flex items-center gap-2.5 overflow-x-auto border-b border-[#DDE6DB] py-3 sm:gap-3 sm:py-4 lg:h-[108px] lg:flex-none lg:py-2" role="group" aria-label="Select product photos or open the product information gallery">
               {productGalleryItems.map((item, index) => (
                 <button
                   key={item.type === "details" ? "product-facts-gallery-tile" : `product-tile-${item.image?.url}-${index}`}
                   type="button"
-                  onClick={() => setShowAllImages(true)}
-                  className="focus-ring flex h-[75px] w-[75px] shrink-0 items-center justify-center border border-[#DBDFD7] bg-[#F9F9F5] text-[#173F35] transition hover:border-[#173F35] sm:h-[88px] sm:w-[88px]"
-                  aria-label={item.type === "details" ? "Open full product information sheet" : `View ${item.image?.alt || "product photograph"}`}
+                  onClick={() => {
+                    if (item.type === "details") {
+                      setShowAllImages(true);
+                    } else {
+                      // ProductGalleryItems has one details tile at index 1.
+                      setActiveProductPhoto(index === 0 ? 0 : index - 1);
+                      setZoomPreview(null);
+                      const mobileTrack = mobileHeroGalleryRef.current;
+                      const mobileSlide = mobileTrack?.children[index];
+                      if (mobileTrack && mobileSlide && window.innerWidth < 1024) {
+                        mobileTrack.scrollTo({
+                          left: mobileSlide.offsetLeft - mobileTrack.offsetLeft,
+                          behavior: "smooth",
+                        });
+                      }
+                    }
+                  }}
+                  aria-pressed={item.type === "image" ? (index === 0 ? 0 : index - 1) === activeProductPhoto : undefined}
+                  className={`focus-ring flex h-[75px] w-[75px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border bg-[#FFFEFA] text-[#173F35] transition hover:border-[#173F35] sm:h-[88px] sm:w-[88px] ${item.type === "image" && (index === 0 ? 0 : index - 1) === activeProductPhoto ? "border-[#C86C42] ring-2 ring-[#C86C42]/30" : "border-[#DBDFD7]"}`}
+                  aria-label={item.type === "details" ? "Open full product information sheet" : `Show ${item.image?.alt || "product photograph"}`}
                 >
                   {item.type === "details" ? (
                     <div className="flex h-full w-full flex-col overflow-hidden bg-[#FFFCF7] text-left" aria-hidden="true">
@@ -2180,7 +2211,7 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <img src={item.image.url} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-2" />
+                    <img src={item.image.url} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-1.5" />
                   )}
                 </button>
               ))}
@@ -2204,9 +2235,12 @@ export default function ProductDetailPage() {
               )}
               {product.category?.name && <span className="h-1 w-1 rounded-full bg-[#9CAEA5]" aria-hidden="true" />}
               <span className="text-[16px] font-semibold text-[#202421]">{formatQuantity(product.netQuantity)}</span>
-              {product.pack?.name && product.pack.name !== product.displayName && (
-                <span className="text-[14px] font-medium text-[#637267]">{product.pack.name}</span>
-              )}
+              {product.pack?.name &&
+                product.pack.name !== product.displayName &&
+                String(product.pack.name).replace(/\s+/g, "").toLowerCase() !==
+                  String(formatQuantity(product.netQuantity)).replace(/\s+/g, "").toLowerCase() && (
+                  <span className="text-[14px] font-medium text-[#637267]">{product.pack.name}</span>
+                )}
             </div>
             {product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && <p className="mt-5 max-w-xl whitespace-pre-line text-[15px] leading-[1.75] text-[#495149] sm:text-base">{product.description}</p>}
             {(!product.description || product.description.trim() === "Created through governed M14 NPI to M04 catalog handoff.") && product.ingredientDeclarationText && (
@@ -2296,7 +2330,7 @@ export default function ProductDetailPage() {
                     item.type === "details" ? (
                       <div
                         key="all-product-details-sheet"
-                        className="h-[min(67dvh,560px)] min-h-[340px] overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white max-sm:h-full max-sm:min-h-0 max-sm:w-full max-sm:flex-none max-sm:snap-start max-sm:rounded-[12px]"
+                        className="h-[min(53dvh,420px)] min-h-[280px] self-start overflow-hidden rounded-[14px] border border-[#CDDFE2] bg-white max-sm:h-full max-sm:min-h-0 max-sm:w-full max-sm:flex-none max-sm:snap-start max-sm:rounded-[12px]"
                       >
                         <ProductDetailsSheet product={product} />
                       </div>
@@ -2497,13 +2531,13 @@ export default function ProductDetailPage() {
             <p className="text-sm font-semibold text-[#476B7C]">02 / Ingredients &amp; safety</p>
             <h2 className="mb-2 mt-3 text-[29px] font-semibold tracking-[-0.045em] text-[#1C454D] sm:text-[36px]">Ingredients & safety</h2>
             <p className="mb-5 max-w-lg text-sm leading-6 text-[#51666A]">
-              Open a section to read its published details, declarations and reviewed evidence.
+              Product details, ingredients and dietary information in one place.
             </p>
             <div className="min-w-0">
               <DetailCard
                 title="Ingredients"
                 icon={Package}
-                description="Ingredient information and recognized ingredients"
+                description="Ingredients used in this product"
               >
                 <div className="space-y-4">
                   {product.ingredientDeclarationText && (
@@ -2514,10 +2548,10 @@ export default function ProductDetailPage() {
                         </span>
                         <div>
                           <p className="text-[13px] font-black uppercase tracking-[0.12em] text-emerald-700">
-                            {product.isHostListing ? "Host-declared ingredient information" : "Reviewed ingredient declaration"}
+                            {product.isHostListing ? "Ingredient list" : "Ingredient declaration"}
                           </p>
                           <p className="mt-0.5 text-[13px] text-stone-500">
-                            {product.isHostListing ? "Declared by the Host; not independently food-verified" : "Published from the approved product record"}
+                            {product.isHostListing ? "As provided for this product" : "Published ingredient details"}
                           </p>
                         </div>
                       </div>
@@ -2559,7 +2593,7 @@ export default function ProductDetailPage() {
                       <p className="text-sm leading-5 text-stone-500">
                         {product.ingredientDeclarationText
                           ? "Canonical ingredient mapping is still pending. The reviewed package declaration is shown above."
-                          : "Ingredient information has not been published for this product."}
+                          : "No ingredient list available."}
                       </p>
                     </div>
                   )}
@@ -2569,7 +2603,7 @@ export default function ProductDetailPage() {
               <DetailCard
                 title="Product origin"
                 icon={Globe2}
-                description="Where this product comes from and who made or packed it"
+                description="Country and manufacturer details"
               >
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="border-l-[3px] border-[#173F35] bg-[#EDF1EA] px-5 py-4">
@@ -2606,7 +2640,7 @@ export default function ProductDetailPage() {
                 </div>
               </DetailCard>
 
-              <DetailCard title="Published claims & certifications" icon={BadgeCheck} description="Approved product claims and certification references">
+              <DetailCard title="Published claims & certifications" icon={BadgeCheck} description="Claims and certifications listed for this product">
                 {hasClaimsOrCertifications ? (
                   <div className="flex flex-wrap gap-2">
                     {product.claims?.map((claim, index) => (
@@ -2636,7 +2670,7 @@ export default function ProductDetailPage() {
                   </div>
                 ) : (
                   <p className="border-l-[3px] border-[#9DB9B0] bg-white/70 px-4 py-3 text-sm leading-6 text-[#566660]">
-                    No published claims or certifications are declared for this product.
+                    No claims or certifications listed.
                   </p>
                 )}
               </DetailCard>
@@ -2644,10 +2678,14 @@ export default function ProductDetailPage() {
               <DetailCard
                 title="Allergens"
                 icon={ShieldCheck}
-                description="Allergen declarations and available relationships"
+                description="Allergens listed for this product"
               >
                 <div className="space-y-4">
-                  {product.allergenStatement ? (
+                  {product.allergenStatement && !(
+                    product.isHostListing &&
+                    product.allergens?.length > 0 &&
+                    /^[\w\s-]+:\s*(?:declared|contains|may contain)$/i.test(String(product.allergenStatement).trim())
+                  ) ? (
                     <div className="border-l-[3px] border-[#c77b42] bg-[#FFF1DF] px-5 py-4">
                       <div className="flex items-start gap-3">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-white shadow-sm">
@@ -2655,14 +2693,10 @@ export default function ProductDetailPage() {
                         </span>
                         <div className="min-w-0">
                           <p className="text-[13px] font-black uppercase tracking-[0.12em] text-amber-800">
-                            {product.isHostListing ? "Host-declared allergen information" : "Reviewed package declaration"}
+                            {product.isHostListing ? "Allergen statement" : "Package allergen statement"}
                           </p>
                           <p className="mt-1.5 text-sm font-bold leading-5 text-stone-900">
                             {product.allergenStatement}
-                          </p>
-                          <p className="mt-2 text-[13px] leading-4 text-stone-500">
-                            A missing positive allergen relationship is not
-                            treated as an allergen-free claim.
                           </p>
                         </div>
                       </div>
@@ -2671,26 +2705,19 @@ export default function ProductDetailPage() {
 
                   {product.allergens?.length > 0 ? (
                     <div>
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-[13px] font-black uppercase tracking-[0.12em] text-stone-400">
-                          Published allergen relationships
-                        </p>
-                        <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[13px] font-black text-stone-600">
-                          {product.allergens.length} recorded
-                        </span>
-                      </div>
+                      <p className="mb-2 text-[14px] font-semibold text-[#49685F]">Allergen details</p>
 
                       <div className="grid gap-2 sm:grid-cols-2">
                         {product.allergens.map((allergen, index) => (
                           <div
                             key={`${allergen.allergenKey}-${index}`}
-                            className="flex items-center justify-between gap-3 border-b border-[#d6ddd2] bg-[#F8FAF5] px-3 py-3"
+                            className="flex items-center justify-between gap-3 border-b border-[#D2DED9] bg-[#F9FCFA] px-3 py-3"
                           >
                             <span className="text-sm font-black capitalize text-stone-800">
                               {allergen.allergenKey}
                             </span>
                             <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[13px] font-black uppercase tracking-wide text-stone-500 shadow-sm">
-                              {allergen.relationType}
+                              {String(allergen.relationType || "Declared").replaceAll("_", " ")}
                             </span>
                           </div>
                         ))}
@@ -2700,8 +2727,8 @@ export default function ProductDetailPage() {
                     <div className="border-l-2 border-[#d0d9cf] bg-[#F9F9F4] px-4 py-3">
                       <p className="text-sm leading-5 text-stone-500">
                         {product.allergenStatement
-                          ? "No positive governed allergen relationship is published beyond the reviewed package declaration above."
-                          : "Allergen data is currently unknown or not published. EPANTRY does not infer missing safety facts."}
+                          ? "See the allergen statement above."
+                          : "No allergen information available."}
                       </p>
                     </div>
                   )}
@@ -2715,7 +2742,7 @@ export default function ProductDetailPage() {
                   <DetailCard
                     title="Dietary"
                     icon={ShieldCheck}
-                    description="Dietary preference declared for this product"
+                    description="Vegetarian, vegan or non-vegetarian"
                   >
                     {(() => {
                       const declared = String(product.hostSubmission?.dietary || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
@@ -2744,11 +2771,6 @@ export default function ProductDetailPage() {
                               {selected?.label || (declared === 'other' ? 'Other dietary preference' : 'Not declared')}
                             </span>
                           </div>
-                          <p className="text-sm leading-6 text-[#596A63]">
-                            {selected || declared === 'other'
-                              ? 'Declared by the Host. This dietary claim has not been independently verified by EPANTRY.'
-                              : 'No dietary preference has been declared for this listing.'}
-                          </p>
                         </div>
                       );
                     })()}
@@ -2757,54 +2779,43 @@ export default function ProductDetailPage() {
                   <DetailCard
                     title="Calculation source & rule lineage"
                     icon={Factory}
-                    description="Where the published product information comes from"
+                    description="Source of product and nutrition details"
                   >
-                    <div className="divide-y divide-[#D2DED9] text-[15px]">
-                      <div className="grid gap-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
-                        <span className="font-semibold text-[#173F35]">Product information</span>
-                        <span>Submitted by the Host and approved by a Super Admin for publication.</span>
+                    <dl className="divide-y divide-[#D2DED9] text-[15px]">
+                      <div className="grid gap-1 py-3 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4">
+                        <dt className="font-semibold text-[#173F35]">Listing source</dt>
+                        <dd>Seller-supplied product details</dd>
                       </div>
-                      <div className="grid gap-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
-                        <span className="font-semibold text-[#173F35]">Nutrition basis</span>
-                        <span>{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : 'Not declared'} · Host-provided values, not independently calculated or verified.</span>
+                      <div className="grid gap-1 py-3 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4">
+                        <dt className="font-semibold text-[#173F35]">Nutrition reference</dt>
+                        <dd>{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : 'Not specified'}</dd>
                       </div>
-                      <div className="grid gap-1 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4">
-                        <span className="font-semibold text-[#173F35]">Safety information</span>
-                        <span>Allergen and dietary information is based on the Host declaration, not a laboratory or food-safety assessment.</span>
+                      <div className="grid gap-1 py-3 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4">
+                        <dt className="font-semibold text-[#173F35]">Allergen source</dt>
+                        <dd>Product listing</dd>
                       </div>
-                      <p className="py-3 text-sm text-[#596A63]">
-                        No independently verified calculation sources or food-intelligence rule lineage have been published for this Host listing.
-                      </p>
-                    </div>
+                    </dl>
                   </DetailCard>
 
                   <DetailCard
                     title="Product Food Intelligence"
                     icon={ShieldCheck}
-                    description="What is known about this product and what still needs verification"
+                    description="At-a-glance food information"
                   >
-                    <div className="space-y-4">
-                      <div className="border-l-[3px] border-[#C86C42] bg-[#FFF0E5] px-4 py-3">
-                        <p className="font-semibold text-[#805036]">Host-declared · Not independently verified</p>
-                        <p className="mt-1 text-sm leading-6 text-[#675B51]">
-                          Super Admin approval publishes the listing. It does not certify nutrition values, allergens, dietary claims or food-safety compliance.
-                        </p>
+                    <dl className="divide-y divide-[#D2DED9]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+                        <dt className="font-semibold text-[#173F35]">Nutrition</dt>
+                        <dd>{product.nutrition?.nutrients?.length ? `${product.nutrition.nutrients.length} nutrients listed` : 'No values listed'}</dd>
                       </div>
-                      <div className="divide-y divide-[#D2DED9]">
-                        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-                          <span className="font-semibold text-[#173F35]">Nutrition values</span>
-                          <span>{product.nutrition?.nutrients?.length ? `${product.nutrition.nutrients.length} Host-declared values` : 'Not declared'}</span>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-                          <span className="font-semibold text-[#173F35]">Allergen declarations</span>
-                          <span>{product.allergens?.length ? `${product.allergens.length} Host-declared relationships` : 'No declaration recorded'}</span>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-                          <span className="font-semibold text-[#173F35]">Independent verification</span>
-                          <span>Not available</span>
-                        </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+                        <dt className="font-semibold text-[#173F35]">Allergens</dt>
+                        <dd>{product.allergens?.length ? `${product.allergens.length} allergen entries` : 'No entries listed'}</dd>
                       </div>
-                    </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+                        <dt className="font-semibold text-[#173F35]">Information provided by</dt>
+                        <dd>Seller</dd>
+                      </div>
+                    </dl>
                   </DetailCard>
                 </>
               ) : (
