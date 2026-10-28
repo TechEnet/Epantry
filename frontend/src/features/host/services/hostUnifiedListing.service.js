@@ -38,6 +38,9 @@ export async function submitHostListingSectionRevision(id, sections) {
 export async function submitHostListingPacket(id) {
   return write('post', `/host/listing-packets/${encodeURIComponent(id)}/submit`, {})
 }
+export async function deleteHostListingPacket(id) {
+  return write('delete', `/host/listing-packets/${encodeURIComponent(id)}`, {})
+}
 export async function importHostListingPackets(packets) {
   return write('post', '/host/listing-packets/bulk', { packets })
 }
