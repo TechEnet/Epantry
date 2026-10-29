@@ -129,6 +129,7 @@ import searchRoutes from './modules/search/search.routes.js'
 
 import universalProductRoutes from './modules/universalProduct/universalProduct.routes.js'
 
+import bookmarkRoutes from './modules/bookmarks/bookmark.routes.js'
 import accountRoutes from './modules/users/account.routes.js'
 import healthRoutes from './routes/health.routes.js'
 
@@ -303,6 +304,8 @@ app.use(
 
   householdRoutes,
 )
+
+app.use('/api/v1/bookmarks', bookmarkRoutes)
 
 app.use(
   '/api/v1/pantry',

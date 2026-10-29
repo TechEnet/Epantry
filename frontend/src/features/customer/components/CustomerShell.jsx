@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import {
   BookOpen,
+  Bookmark,
   ChefHat,
   Home,
   LayoutDashboard,
@@ -76,6 +77,11 @@ const navigationGroups = [
     label: 'Plan & Shop',
     icon: ShoppingBasket,
     items: [
+      {
+        label: 'Saved items',
+        to: '/saved-items',
+        icon: Bookmark,
+      },
       {
         label: 'Meal Planner',
         to: '/meal-plan',

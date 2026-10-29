@@ -1045,6 +1045,7 @@ const HostUnifiedListingPage = lazy(() => import('../features/host/pages/HostUni
 const AdminUnifiedListingReviewPage = lazy(() => import('../features/host/pages/AdminUnifiedListingReviewPage'))
 const PublicApprovedHostListingsPage = lazy(() => import('../features/host/pages/PublicApprovedHostListingsPage'))
 const CountryExplorePage = lazy(() => import('../features/countries/pages/CountryExplorePage'))
+const SavedItemsPage = lazy(() => import('../features/bookmarks/pages/SavedItemsPage'))
 const HostEarningsPage = lazy(() => import('../features/host/pages/HostEarningsPage'))
 const HostOrdersPage = lazy(() => import('../features/host/pages/HostOrdersPage'))
 const HostOrderDetailPage = lazy(() => import('../features/host/pages/HostOrderDetailPage'))
@@ -1169,6 +1170,7 @@ function getAuthenticatedHomePath({
 function GuestOnlyRoute({
   children,
 }) {
+  const location = useLocation()
   const {
     isAuthenticated,
     isBootstrapping,
@@ -1194,9 +1196,10 @@ function GuestOnlyRoute({
         activeMode,
       })
 
+    const bookmarkReturn = getSafeReturnTo(location.search)
     return (
       <Navigate
-        to={authenticatedHome}
+        to={bookmarkReturn?.startsWith('/saved-items?saveKind=') ? bookmarkReturn : authenticatedHome}
         replace
       />
     )
@@ -2560,6 +2563,17 @@ export default function AppRoutes() {
                 <AuthenticatedRoute>
                   <CustomerAccessRequiredPage />
                 </AuthenticatedRoute>
+              }
+            />
+
+            <Route
+              path="/saved-items"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.CUSTOMER}>
+                  <CustomerShell>
+                    <SavedItemsPage />
+                  </CustomerShell>
+                </ApplicationAccessRoute>
               }
             />
 

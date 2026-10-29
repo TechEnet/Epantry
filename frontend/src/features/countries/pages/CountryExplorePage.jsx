@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Globe2, ShoppingBag, UtensilsCrossed } from 'lucide-react'
 import { apiClient } from '../../../api/apiClient'
 import { countryFlag } from '../utils/country.utils'
+import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 
 // A live API response from an older backend may still contain the obsolete
 // NCHM PDF link. Never render that URL on the customer page.
@@ -38,6 +39,7 @@ const countryKey = (value) => String(value || '').normalize('NFKD').replace(/[\u
 
 function PublicationTile({ item, type }) {
   return (
+    <div className="relative min-w-0">
     <Link
       to={item.path}
       className="group block min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B45B37]"
@@ -59,6 +61,8 @@ function PublicationTile({ item, type }) {
         <h3 className="mt-0.5 text-[16px] font-semibold leading-[1.4] text-[#173F35] group-hover:underline group-hover:decoration-[#B45B37] group-hover:underline-offset-4">{item.title}</h3>
       </div>
     </Link>
+    <BookmarkButton kind={type} slug={String(item.path || '').split('/').pop()} title={item.title} className="absolute right-2 top-2" />
+    </div>
   )
 }
 

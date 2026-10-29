@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Link } from "react-router-dom";
+import BookmarkButton from "../../bookmarks/components/BookmarkButton";
 
 import { listPublicRecipes } from "../services/recipe.service";
 
@@ -307,6 +308,7 @@ function RecipeTile({ item, restaurant = false }) {
   const subtitle = restaurant ? venue : cuisine || recipeCourse(item);
 
   return (
+    <div className="relative h-full min-w-0">
     <Link
       to={recipePath(item)}
       aria-label={`Explore recipe: ${title}`}
@@ -353,6 +355,8 @@ function RecipeTile({ item, restaurant = false }) {
         </span>
       </div>
     </Link>
+    <BookmarkButton kind="recipe" slug={recipePath(item).split('/').pop()} title={title} className="absolute right-3 top-3" />
+    </div>
   );
 }
 
@@ -1312,8 +1316,8 @@ export default function RecipesPage() {
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {visibleHostListings.map((item) => (
+                  <div key={item.id} className="relative min-w-0">
                   <Link
-                    key={item.id}
                     to={hostDetailPath(item)}
                     className="overflow-hidden rounded-xl border border-[#D7DDCF] bg-white hover:border-[#173F35]"
                   >
@@ -1334,6 +1338,8 @@ export default function RecipesPage() {
                       <p className="mt-1 text-sm text-[#56645C]">See details</p>
                     </div>
                   </Link>
+                  <BookmarkButton kind="recipe" slug={hostDetailPath(item).split('/').pop()} title={item.title} className="absolute right-2 top-2" />
+                  </div>
                 ))}
               </div>
             </section>

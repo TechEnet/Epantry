@@ -3,6 +3,7 @@ import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../auth/context/AuthContext";
 import { recordApprovedFoodView } from "../../recipes/utils/recipeEngagement";
 import { hostDetailPath } from "../services/approvedHostDetail.adapter";
+import BookmarkButton from "../../bookmarks/components/BookmarkButton";
 import {
   getPublicHostListing,
   listPublicHostListings,
@@ -145,8 +146,8 @@ export default function PublicApprovedHostListingsPage() {
             {!item && (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {list.map((row) => (
+                  <div key={row.id} className="relative min-w-0">
                   <Link
-                    key={row.id}
                     to={hostDetailPath(row)}
                     className="block overflow-hidden border border-[#D7DDCF] bg-white transition hover:border-[#173F35]"
                   >
@@ -170,6 +171,8 @@ export default function PublicApprovedHostListingsPage() {
                       </p>
                     </div>
                   </Link>
+                  <BookmarkButton kind={row.type === 'grocery' ? 'grocery' : 'recipe'} slug={hostDetailPath(row).split('/').pop()} title={row.title} className="absolute right-2 top-2" />
+                  </div>
                 ))}
                 {!list.length && (
                   <p className="col-span-full py-10 text-base">

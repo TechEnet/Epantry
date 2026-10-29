@@ -6,6 +6,7 @@ import {
 import {
   Link,
 } from 'react-router-dom'
+import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 
 function formatQuantity(
   quantity,
@@ -47,6 +48,7 @@ export default function ProductCard({
     return (
       <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#dfe5db] bg-white shadow-[0_3px_12px_rgba(25,52,35,0.035)] transition-all duration-300 hover:-translate-y-1 hover:border-[#9cbaa4] hover:shadow-[0_18px_35px_-15px_rgba(18,62,40,0.22)] focus-within:border-[#538769] motion-reduce:transform-none motion-reduce:transition-none">
         <div className="relative m-3 mb-0 overflow-hidden rounded-2xl bg-[#f7f8f3]">
+          <BookmarkButton kind="grocery" slug={product?.slug} title={product?.displayName} className="absolute right-2 top-2" />
           <Link
             to={productPath}
             aria-label={`View ${product?.displayName || 'grocery product'}`}
@@ -70,7 +72,7 @@ export default function ProductCard({
               Canonical
             </span>
             {quantity && (
-              <span className="max-w-[48%] rounded-full border border-[#e1e4db] bg-white/95 px-2.5 py-1 text-[10px] font-semibold text-[#5f6c5d] shadow-sm">
+              <span className="absolute right-0 top-12 max-w-[58%] rounded-full border border-[#e1e4db] bg-white/95 px-2.5 py-1 text-[10px] font-semibold text-[#5f6c5d] shadow-sm">
                 {quantity}
               </span>
             )}
@@ -113,6 +115,8 @@ export default function ProductCard({
 
   return (
     <article className="group relative overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white p-3 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#16A34A]/30 hover:shadow-xl hover:shadow-[#111827]/10">
+
+      <BookmarkButton kind="grocery" slug={product?.slug} title={product?.displayName} className="absolute right-5 top-5" />
 
       {/* =========================================================
           IMAGE FRAME

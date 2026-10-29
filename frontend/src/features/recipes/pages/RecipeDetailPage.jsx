@@ -36,6 +36,7 @@ import {
 
 
 import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
+import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 
 import {
   useAuth,
@@ -799,6 +800,7 @@ function RecommendedRecipeCard({
     Number(recipe.cookingTimeMinutes || 0)
 
   return (
+    <div className="relative h-full min-w-0">
     <Link
       to={getRecipeRecommendationPath(item)}
       className="focus-ring group flex h-full min-w-0 flex-col overflow-hidden rounded-[12px] border border-[#DCE0CF] bg-[#F7F6F2] transition-transform duration-300 hover:-translate-y-1 motion-reduce:transform-none motion-reduce:transition-none"
@@ -863,6 +865,8 @@ function RecommendedRecipeCard({
         </span>
       </div>
     </Link>
+    <BookmarkButton kind="recipe" slug={getRecipeRecommendationPath(item).split('/').pop()} title={getRecipeRecommendationName(item)} className="absolute right-2 top-2" />
+    </div>
   )
 }
 

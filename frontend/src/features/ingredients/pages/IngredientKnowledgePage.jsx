@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { getIngredientKnowledge } from '../services/ingredientKnowledge.service'
 import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
+import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 
 const C = {
   ink: '#173F35',
@@ -116,6 +117,7 @@ function VarietyTile({ item, number }) {
 
 function ProductTile({ item }) {
   return (
+    <div className="relative min-w-0">
     <Link to={item.path} className="group block min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F35]">
       <div className="relative">
         <MediaFrame imageUrl={item.imageUrl} alt={item.name} icon={ShoppingBag} tone="peach" />
@@ -125,6 +127,8 @@ function ProductTile({ item }) {
       <h3 className="mt-0.5 line-clamp-2 text-[17px] font-bold leading-[1.35] text-[#173F35] group-hover:underline group-hover:underline-offset-2">{item.name}</h3>
       {item.category ? <p className="mt-1 text-[14px] capitalize text-[#607268]">{String(item.category).replaceAll('_', ' ')}</p> : null}
     </Link>
+    <BookmarkButton kind="grocery" slug={String(item.path || '').split('/').pop()} title={item.name} className="absolute right-2 top-2" />
+    </div>
   )
 }
 
@@ -137,6 +141,7 @@ function DishTile({ item, isHost }) {
   const time = isHost ? 0 : Number(recipe.preparationTimeMinutes || 0) + Number(recipe.cookingTimeMinutes || 0)
   const type = isHost ? 'Host food' : dish.course || 'Recipe'
   return (
+    <div className="relative min-w-0">
     <Link to={href} className="group block min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F35]">
       <div className="relative">
         <MediaFrame imageUrl={imageUrl} alt={name} tone="sage" />
@@ -147,6 +152,8 @@ function DishTile({ item, isHost }) {
       {!isHost && dish.cuisine ? <p className="mt-1 text-[14px] text-[#5B6D60]">{dish.cuisine}</p> : null}
       {time > 0 ? <p className="mt-1 text-[14px] text-[#5B6D60]">{time} min</p> : null}
     </Link>
+    <BookmarkButton kind="recipe" slug={String(href || '').split('/').pop()} title={name} className="absolute right-2 top-2" />
+    </div>
   )
 }
 

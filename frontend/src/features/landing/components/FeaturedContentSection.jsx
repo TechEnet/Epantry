@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useLandingFeaturedQuery } from '../hooks/useLandingFeaturedQuery'
+import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 
 export default function FeaturedContentSection() {
   const navigate = useNavigate()
@@ -359,6 +360,7 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
           gap: clamp(10px,1.3svh,16px) clamp(12px,1.6vw,22px);
         }
         .ep-landing-grocery-card {
+          position: relative;
           box-sizing: border-box;
           display: flex;
           min-width: 0;
@@ -370,6 +372,12 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
           background: ${GROCERY_COLORS.porcelain} !important;
           color: ${GROCERY_COLORS.charcoal} !important;
           transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+        }
+        .ep-landing-grocery-card > .ep-featured-bookmark {
+          position: absolute !important;
+          top: 12px;
+          right: 12px;
+          z-index: 12;
         }
         .ep-landing-grocery-card:hover {
           transform: translateY(-4px);
@@ -547,6 +555,7 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
           }
           .ep-landing-grocery-card:nth-child(n+5) { display: none; }
           .ep-landing-grocery-card { border-radius: 12px; }
+          .ep-landing-grocery-card > .ep-featured-bookmark { top:7px; right:7px; width:34px; height:34px; }
           .ep-landing-grocery-card__image-wrap { height: auto; min-height: 0; flex: 1 1 auto; }
           .ep-landing-grocery-card__category { font-size: 12px; line-height: 17px; }
           .ep-landing-grocery-card__text { padding: clamp(5px,.7svh,9px) 9px 2px; gap: 2px; }
@@ -644,6 +653,12 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
                   key={product?.id || product?.slug || `grocery-${index}`}
                   className="ep-landing-grocery-card"
                 >
+                  <BookmarkButton
+                    kind="grocery"
+                    slug={product?.slug || productPath.split('/').filter(Boolean).pop()}
+                    title={product?.name || 'Grocery product'}
+                    className="ep-featured-bookmark"
+                  />
                   <Link
                     to={productPath}
                     className="ep-landing-grocery-card__main"
@@ -914,6 +929,13 @@ function FeaturedDiscoverySection({
           transition:transform .22s ease,box-shadow .22s ease;
         }
         .ep-recipe-tile:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(32,36,33,.13); }
+        .ep-recipe-tile__link {
+          display:flex; flex:1 1 auto; flex-direction:column; min-height:0; min-width:0;
+          color:inherit !important; text-decoration:none;
+        }
+        .ep-recipe-tile > .ep-featured-bookmark {
+          position:absolute !important; top:12px; right:12px; z-index:12;
+        }
         .ep-recipe-tile__image {
           display:block; flex:1 1 auto; min-height:0; overflow:hidden;
           background:#F7F6F2 !important;
@@ -1055,6 +1077,7 @@ function FeaturedDiscoverySection({
             grid-template-rows:repeat(2,minmax(0,1fr)); gap:10px;
           }
           .ep-recipe-tile:nth-child(n+5) { display:none; }
+          .ep-recipe-tile > .ep-featured-bookmark { top:7px; right:7px; width:34px; height:34px; }
           .ep-recipe-tile__details { padding:7px 8px; }
           .ep-recipe-tile__type { font-size:11px; }
           .ep-recipe-tile__name { font-size:13px; }
@@ -1133,22 +1156,30 @@ function FeaturedDiscoverySection({
             ) : displayItems.map((recipe, index) => {
               const path = recipe?.path || (recipe?.slug ? `/recipes/${encodeURIComponent(recipe.slug)}` : '/recipes')
               return (
-                <Link key={recipe?.id || recipe?.slug || index} className="ep-recipe-tile" to={path} aria-label={`View ${recipe?.name || 'recipe'}`}>
-                  <div className="ep-recipe-tile__image">
-                    {recipe?.image ? (
-                      <img src={recipe.image} alt={recipe?.name || 'Recipe'} loading="lazy" decoding="async" />
-                    ) : (
-                      <span className="ep-recipe-tile__fallback">Recipe photo coming soon</span>
-                    )}
-                  </div>
-                  <div className="ep-recipe-tile__details">
-                    <span>
-                      <span className="ep-recipe-tile__type">{recipe?.cuisine || recipe?.dietaryType || 'Recipe'}</span>
-                      <span className="ep-recipe-tile__name">{recipe?.name || 'Recipe'}</span>
-                    </span>
-                    <span className="ep-recipe-tile__arrow"><ArrowRight size={16} /></span>
-                  </div>
-                </Link>
+                <article key={recipe?.id || recipe?.slug || index} className="ep-recipe-tile">
+                  <BookmarkButton
+                    kind="recipe"
+                    slug={recipe?.slug || path.split('/').filter(Boolean).pop()}
+                    title={recipe?.name || 'Recipe'}
+                    className="ep-featured-bookmark"
+                  />
+                  <Link className="ep-recipe-tile__link" to={path} aria-label={`View ${recipe?.name || 'recipe'}`}>
+                    <div className="ep-recipe-tile__image">
+                      {recipe?.image ? (
+                        <img src={recipe.image} alt={recipe?.name || 'Recipe'} loading="lazy" decoding="async" />
+                      ) : (
+                        <span className="ep-recipe-tile__fallback">Recipe photo coming soon</span>
+                      )}
+                    </div>
+                    <div className="ep-recipe-tile__details">
+                      <span>
+                        <span className="ep-recipe-tile__type">{recipe?.cuisine || recipe?.dietaryType || 'Recipe'}</span>
+                        <span className="ep-recipe-tile__name">{recipe?.name || 'Recipe'}</span>
+                      </span>
+                      <span className="ep-recipe-tile__arrow"><ArrowRight size={16} /></span>
+                    </div>
+                  </Link>
+                </article>
               )
             })}
           </div>

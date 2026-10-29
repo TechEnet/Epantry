@@ -49,6 +49,7 @@ import { listPublicRecipes } from "../../recipes/services/recipe.service";
 import { openAvailabilityNotifyModal } from "../../notifications/components/AvailabilityNotifyModal";
 
 import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
+import BookmarkButton from "../../bookmarks/components/BookmarkButton";
 
 function formatQuantity(quantity) {
   if (!quantity || quantity.value === undefined || quantity.value === null) {
@@ -1542,7 +1543,7 @@ function RecommendationProductCard({ product }) {
       : "";
 
   return (
-    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[17px] border border-[#CBDDD7] bg-[#FFFEFB] shadow-[0_5px_16px_rgba(22,57,46,0.05)] transition duration-300 hover:-translate-y-1 hover:border-[#709D91] hover:shadow-[0_14px_28px_rgba(22,57,46,0.12)] motion-reduce:transform-none motion-reduce:transition-none">
+    <article className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[17px] border border-[#CBDDD7] bg-[#FFFEFB] shadow-[0_5px_16px_rgba(22,57,46,0.05)] transition duration-300 hover:-translate-y-1 hover:border-[#709D91] hover:shadow-[0_14px_28px_rgba(22,57,46,0.12)] motion-reduce:transform-none motion-reduce:transition-none">
       <Link
         to={path}
         className="focus-ring relative block aspect-[1/1] overflow-hidden bg-[#F5F8F4]"
@@ -1565,6 +1566,7 @@ function RecommendationProductCard({ product }) {
         </span>
       </Link>
 
+      <BookmarkButton kind="grocery" slug={product?.slug} title={product?.displayName} className="absolute right-3 top-3" />
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         {product?.brand?.name ? (
           <p className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#346E60]">
@@ -1614,6 +1616,7 @@ function CountryListingCard({ listing }) {
     : item?.category?.name || item?.brand?.name || "Grocery";
 
   return (
+    <div className="relative min-w-0">
     <Link
       to={path}
       className="focus-ring group flex min-w-0 items-center gap-3 rounded-2xl border border-stone-200 bg-white p-2.5 shadow-[0_8px_24px_rgba(28,25,23,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_28px_rgba(4,120,87,0.10)] motion-reduce:transform-none"
@@ -1655,6 +1658,8 @@ function CountryListingCard({ listing }) {
         aria-hidden="true"
       />
     </Link>
+    <BookmarkButton kind={isRecipe ? 'recipe' : 'grocery'} slug={path.split('/').pop()} title={title} className="absolute right-2 top-2" />
+    </div>
   );
 }
 
