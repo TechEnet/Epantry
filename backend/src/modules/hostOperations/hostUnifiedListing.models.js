@@ -14,6 +14,8 @@ const listingPacketSchema = new mongoose.Schema({
   publishedTitle: { type: String, default: '' },
   publishedType: { type: String, default: '' },
   publishedRevision: { type: Number, default: 0 },
+  // Reviewed product-evidence draft; the catalog itself retains full version history.
+  catalogNpiDraftId: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProductDraft', default: null },
   catalogLinkedAt: { type: Date, default: null },
   catalogLinkedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   deletedAt: { type: Date, default: null, index: true },

@@ -10,6 +10,7 @@ import {
   listAdminHostListingPackets,
   reviewAdminHostListingPacket,
   linkAdminHostListingCatalog,
+  createAdminHostListingCatalogDraft,
 } from '../services/hostUnifiedListing.service'
 
 const correctionSections = [
@@ -157,6 +158,8 @@ export default function AdminUnifiedListingReviewPage() {
   const [filter, setFilter] = useState('submitted_for_review')
   const [note, setNote] = useState('')
   const [canonicalVersionId, setCanonicalVersionId] = useState('')
+  const [npiDraftId, setNpiDraftId] = useState('')
+  const [catalogCategory, setCatalogCategory] = useState('')
   const [section, setSection] = useState('details')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -206,6 +209,17 @@ export default function AdminUnifiedListingReviewPage() {
       setCanonicalVersionId('')
       await load()
       setSuccess('Published catalog product linked. The Host can set up an eligible Marketplace offer.')
+    } catch (cause) { setError(getError(cause)) }
+    finally { setBusy(false) }
+  }
+
+  async function createCatalogDraft() {
+    if (!selected || busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || catalogCategory.trim().length < 2) return
+    setBusy(true); setError(''); setSuccess('')
+    try {
+      await createAdminHostListingCatalogDraft(selected.id, { npiDraftId, categoryName: catalogCategory.trim() })
+      setNpiDraftId(''); setCatalogCategory('')
+      setSuccess('Catalog draft created from reviewed evidence. Publish it through Catalog review before linking it for selling.')
     } catch (cause) { setError(getError(cause)) }
     finally { setBusy(false) }
   }
@@ -410,6 +424,20 @@ export default function AdminUnifiedListingReviewPage() {
             <p className="mt-2 text-[14px]">{packet.catalogProductVersionId
               ? `Linked catalog version: ${packet.catalogProductVersionId}`
               : 'No published catalog product linked yet.'}</p>
+            {!packet.catalogProductVersionId && selected.type === 'grocery' && <details className="mt-4 rounded-lg border border-[#D9E3DB] bg-[#F5F8F4] p-4">
+              <summary className="cursor-pointer text-[16px] font-semibold text-[#173F35]">Create a catalog draft from reviewed product evidence</summary>
+              <p className="mt-2 text-[15px] text-[#52685A]">First review the Host's pack-label evidence in Product Review. Only approved evidence from this Host can create a catalog draft.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="text-[15px] font-semibold">Approved evidence record ID
+                  <input className={`${inputClass} mt-1`} value={npiDraftId} maxLength={24} onChange={event => setNpiDraftId(event.target.value.trim())} placeholder="24-character evidence ID" />
+                </label>
+                <label className="text-[15px] font-semibold">Approved product category
+                  <input className={`${inputClass} mt-1`} value={catalogCategory} maxLength={180} onChange={event => setCatalogCategory(event.target.value)} placeholder="e.g. Groceries" />
+                </label>
+              </div>
+              <button type="button" className="mt-3 min-h-11 rounded-lg bg-[#173F35] px-4 font-semibold text-white disabled:opacity-50" disabled={busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || catalogCategory.trim().length < 2} onClick={createCatalogDraft}>Create catalog draft</button>
+            </details>}
+            {!packet.catalogProductVersionId && <Link to="/admin/catalog" className="mt-3 inline-flex min-h-11 items-center text-[15px] font-semibold text-[#173F35] underline underline-offset-4">Open catalog review for a new product</Link>}
             {!packet.catalogProductVersionId && <div className="mt-3 flex flex-wrap items-end gap-3">
               <label className="min-w-0 flex-1 text-[15px] font-semibold">Published product version ID
                 <input className={`${inputClass} mt-1`} value={canonicalVersionId} maxLength={24}

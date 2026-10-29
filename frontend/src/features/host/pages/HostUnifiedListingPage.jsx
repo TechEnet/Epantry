@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, ChevronDown, ClipboardList, Download, FileSpreadsheet, ImagePlus, Plus, RefreshCw, Save, Send, Trash2, UploadCloud, ArrowUpRight, Package, Search } from 'lucide-react'
 import { useAuth } from '../../auth/context/AuthContext'
 
 import { listHospitalityOutlets, listHospitalityMenus } from '../../hospitality/services/hospitality.service'
-import { listServiceAreas } from '../../marketplace/services/marketplace.service'
+import {
+  listServiceAreas, listInventoryNodes, createInventoryNode,
+  createHostOffer, createHostPriceRule, createInventorySnapshots,
+  createServiceArea, getHostOfferReadiness, activateHostOffer,
+} from '../../marketplace/services/marketplace.service'
+import { listHostNpiDrafts } from '../../universalProduct/services/universalProduct.service'
+import { listHostRecipeListingHistory, listHostBrandRecipeSubmissions } from '../../hostOperations/services/hostOperations.service'
 import { normalizeHostWorkspaceType } from '../hostWorkspace.config'
 import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
 import {
@@ -12,6 +18,13 @@ import {
   listHostListingPackets, listHostApprovedBrands, checkHostListingBarcode, searchHostPublishedProducts, getHostListingSellingReadiness, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
   uploadHostListingImage, uploadHostListingVideo, importHostListingRemoteImage,
 } from '../services/hostUnifiedListing.service'
+
+// Existing approved records keep their original governance and identifiers.
+// Management tools are mounted inside the one Host Listing Studio route until
+// their legacy records are safely migrated; no existing records are deleted.
+const ProductEvidenceWorkspace = lazy(() => import('../../universalProduct/pages/HostNpiPage'))
+const BrandRecipeHistoryWorkspace = lazy(() => import('../../hostOperations/pages/HostOperationsPage'))
+const KitchenRecipeHistoryWorkspace = lazy(() => import('../../hospitality/pages/RestaurantRecipesPage'))
 
 const editorialStyles = String.raw`
 /* EPANTRY host editor: isolated design. No global host/navbar/footer overrides. */
@@ -457,6 +470,213 @@ function IngredientNameInput({ ingredient, onChange, className }) {
     {ingredient.canonicalIngredientId && <p className="mt-1 text-xs text-[#173F35]">Matched with EPANTRY ingredient</p>}
     {searchError && <p className="mt-1 text-xs text-[#9A4F31]">{searchError}</p>}
   </div>
+}
+
+
+// This editor uses the existing Marketplace permission and readiness checks.
+// An approved Host packet is NOT itself an active offer or a published Pack.
+function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
+  const [nodes, setNodes] = useState([])
+  const [areas, setAreas] = useState([])
+  const [nodeId, setNodeId] = useState('')
+  const [newNodeName, setNewNodeName] = useState('')
+  const [price, setPrice] = useState('')
+  const [salePrice, setSalePrice] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [postalCodes, setPostalCodes] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [currentOfferId, setCurrentOfferId] = useState('')
+  const [offerState, setOfferState] = useState('')
+  const [checks, setChecks] = useState(null)
+  const approved = Boolean(readiness?.approved && readiness?.catalogLinked && readiness?.packId)
+  const packId = readiness?.packId || ''
+  const enabled = approved && Boolean(listingId)
+  const activeOfferId = currentOfferId || readiness?.offerId || ''
+  const fail = (cause) => cause?.response?.data?.message || cause?.message || 'Could not update selling details.'
+
+  useEffect(() => {
+    setPrice(listing?.selling?.listPrice ?? '')
+    setSalePrice(listing?.selling?.salePrice ?? '')
+    setQuantity(listing?.selling?.stockQuantity ?? '')
+    setPostalCodes((listing?.delivery?.postalCodes || []).join(', '))
+    setCurrentOfferId(''); setOfferState(''); setChecks(null); setNotice(''); setError('')
+  }, [listingId])
+  useEffect(() => {
+    if (!enabled) return undefined
+    let live = true
+    Promise.all([listInventoryNodes({ status: 'active', limit: 100 }), listServiceAreas({ status: 'active', limit: 100 })])
+      .then(([inventory, coverage]) => {
+        if (!live) return
+        const nodeRows = inventory?.inventoryNodes || []
+        setNodes(nodeRows)
+        setAreas(coverage?.serviceAreas || [])
+        setNodeId(current => current || (nodeRows.length === 1 ? String(nodeRows[0].id || '') : ''))
+      }).catch(cause => { if (live) setError(fail(cause)) })
+    return () => { live = false }
+  }, [enabled, packId])
+
+  async function refreshChecks(id) {
+    const result = await getHostOfferReadiness(id)
+    setChecks(result?.readiness || result || null)
+    return result
+  }
+
+  async function saveSelling() {
+    setError(''); setNotice('')
+    const list = Number(price), sale = salePrice === '' ? null : Number(salePrice)
+    const stock = Number(quantity)
+    if (!Number.isFinite(list) || Math.round(list * 100) < 1 || (sale !== null && (!Number.isFinite(sale) || Math.round(sale * 100) < 1 || sale > list))) {
+      setError('Enter a valid list price and a selling price no higher than the list price.'); return
+    }
+    if (!Number.isSafeInteger(stock) || stock < 0) { setError('Enter available stock as a whole number.'); return }
+    if (!nodeId && !newNodeName.trim()) { setError('Select your stock location or enter a new one.'); return }
+    const codes = [...new Set(postalCodes.split(/[\s,;]+/).map(value => value.trim()).filter(Boolean))]
+    if (!codes.length || codes.some(value => !/^[1-9][0-9]{5}$/.test(value))) {
+      setError('Enter the six-digit pincodes covered by this offer.'); return
+    }
+    setBusy(true)
+    try {
+      let offerId = activeOfferId
+      // Create is always draft. Marketplace enforces unique Pack and Host ownership.
+      if (!offerId) {
+        const created = await createHostOffer({ packId, fulfillmentTypes: [listing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'],
+          minimumOrderQuantity: Math.max(1, Number(listing?.selling?.minimumOrderQuantity) || 1),
+          maximumOrderQuantity: listing?.selling?.maximumOrderQuantity ? Number(listing.selling.maximumOrderQuantity) : null })
+        offerId = String(created?.offer?.id || created?.offer?._id || '')
+        if (!offerId) throw new Error('The offer was created, but the offer ID could not be read. Refresh before trying again.')
+        setCurrentOfferId(offerId)
+      }
+      let selectedNodeId = nodeId
+      if (!selectedNodeId) {
+        const newNode = await createInventoryNode({ name: newNodeName.trim(), nodeType: 'warehouse' })
+        selectedNodeId = String(newNode?.inventoryNode?.id || newNode?.inventoryNode?._id || '')
+        if (!selectedNodeId) throw new Error('Stock location could not be confirmed. Refresh your stock locations.')
+        setNodeId(selectedNodeId)
+        setNodes(previous => [...previous, { id: selectedNodeId, name: newNodeName.trim(), status: 'active' }])
+      }
+      const listMinor = Math.round(list * 100)
+      const saleMinor = sale === null ? null : Math.round(sale * 100)
+      await createHostPriceRule(offerId, {
+        listPrice: { amountMinor: listMinor, currency: 'INR' },
+        salePrice: saleMinor === null ? null : { amountMinor: saleMinor, currency: 'INR' },
+        effectiveFrom: new Date().toISOString(), effectiveTo: null, source: 'manual',
+        changeReason: 'Host updated the listing selling price',
+      })
+      await createInventorySnapshots([{
+        offerId, inventoryNodeId: selectedNodeId, availableQuantity: stock, reservedQuantity: 0,
+        sourceType: 'manual', sourceReference: `listing:${listingId}`,
+      }])
+      {
+        const fulfillmentType = listing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
+        const coverage = areas.find(area => area.status === 'active' &&
+          (!area.inventoryNodeId || String(area.inventoryNodeId) === selectedNodeId) &&
+          codes.every(code => (area.postalCodes || []).includes(code)) && (area.fulfillmentTypes || []).includes(fulfillmentType))
+        if (!coverage) {
+          // Never edit another item's delivery areas or silently widen their coverage.
+          const result = await createServiceArea({
+            name: `Service for ${listingId.slice(-8)} (${selectedNodeId.slice(-6)})`,
+            inventoryNodeId: selectedNodeId, postalCodes: codes, fulfillmentTypes: [fulfillmentType],
+          })
+          if (result?.serviceArea) setAreas(previous => [...previous, result.serviceArea])
+        }
+      }
+      await refreshChecks(offerId)
+      setNotice(readiness?.offerStatus === 'active' ? 'Price, stock and service areas updated.' : 'Price, stock and service areas saved. Activate your offer when ready.')
+      setOfferState(readiness?.offerStatus === 'active' ? 'active' : 'draft')
+      onUpdated?.()
+    } catch (cause) {
+      setError(`${fail(cause)} Any earlier saved changes remain in your Marketplace record. Check the status before retrying.`)
+    } finally { setBusy(false) }
+  }
+
+  async function activateSelling() {
+    if (!activeOfferId) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await activateHostOffer(activeOfferId)
+      setOfferState('active')
+      await refreshChecks(activeOfferId)
+      setNotice('Your offer is active. Customers can buy it where stock and delivery eligibility are confirmed.')
+      onUpdated?.()
+    } catch (cause) { setError(fail(cause)) }
+    finally { setBusy(false) }
+  }
+
+  if (!listingId || !readiness?.approved) return null
+  return <section className="mb-4 border border-[#CAD8CC] bg-[#F3F5F0] p-4" aria-label="Sell this listing">
+    <h3 className="text-lg font-semibold text-[#173F35]">Price, stock & selling</h3>
+    {!enabled ? <p className="mt-1 text-sm">{readiness?.message || 'A published catalog match is required before this item can be sold.'}</p> : <>
+      <p className="mt-1 text-sm">Manage this product here. Only an active, approved offer can be purchased.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <EditorField title="List price (₹)"><input className={styles.field} type="number" min="0.01" step="0.01" value={price} onChange={e => setPrice(e.target.value)}/></EditorField>
+        <EditorField title="Selling price (₹, optional)"><input className={styles.field} type="number" min="0.01" step="0.01" value={salePrice} onChange={e => setSalePrice(e.target.value)}/></EditorField>
+        <EditorField title="Available stock (units)"><input className={styles.field} type="number" min="0" step="1" value={quantity} onChange={e => setQuantity(e.target.value)}/></EditorField>
+        <EditorField title="Stock location"><select className={styles.field} value={nodeId} onChange={e => setNodeId(e.target.value)}>
+          <option value="">Add a stock location</option>
+          {nodes.filter(item => item.status === 'active').map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select></EditorField>
+        {!nodeId && <EditorField title="New stock location name"><input className={styles.field} value={newNodeName} onChange={e => setNewNodeName(e.target.value)} placeholder="Your store or kitchen"/></EditorField>}
+        <EditorField title="Service pincodes"><input className={styles.field} value={postalCodes} onChange={e => setPostalCodes(e.target.value)} placeholder="110001, 110002"/></EditorField>
+      </div>
+      {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
+      {notice && <p role="status" className="mt-3 text-sm text-[#173F35]">{notice}</p>}
+      {checks && <p className="mt-3 text-sm">{checks?.ready ? 'Ready to activate.' : 'Some selling checks still need attention.'}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className={styles.secondary} disabled={busy} onClick={saveSelling}>{busy ? 'Saving…' : 'Save selling details'}</button>
+        {activeOfferId && <button type="button" className={styles.button} disabled={busy || offerState === 'active' || readiness?.offerStatus === 'active'} onClick={activateSelling}>Activate selling</button>}
+      </div>
+    </>}
+  </section>
+}
+
+
+function PreviouslyListedItems({ workspace }) {
+  const [records, setRecords] = useState([])
+  const [pending, setPending] = useState(true)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let active = true
+    const requests = [
+      workspace === 'chef_restaurant' ? Promise.resolve({ drafts: [] }) : listHostNpiDrafts({ page: 1, limit: 100 }),
+      workspace === 'b2b' ? Promise.resolve({ recipes: [] }) : listHostRecipeListingHistory(),
+      workspace === 'brand_seller' || workspace === 'hybrid' || workspace === 'legacy'
+        ? listHostBrandRecipeSubmissions({ page: 1, limit: 100 }) : Promise.resolve({ submissions: [] }),
+    ]
+    Promise.allSettled(requests).then(results => {
+      if (!active) return
+      const items = []
+      if (results[0]?.status === 'fulfilled') (results[0].value?.drafts || []).forEach(record => items.push({
+        id: record.id, title: record.productName || record.canonicalName || record.name || record.barcode || 'Saved product',
+        category: 'Product', status: record.status || record.verificationStatus || 'Saved', manage: 'product-evidence',
+      }))
+      if (results[1]?.status === 'fulfilled') (results[1].value?.recipes || []).forEach(record => items.push({
+        id: record.id, title: record.title || 'Saved recipe', category: 'Recipe', status: record.status || 'Saved', manage: ['brand_seller', 'hybrid', 'legacy'].includes(workspace) ? 'brand-recipes' : '',
+      }))
+      if (results[2]?.status === 'fulfilled') (results[2].value?.submissions || []).forEach(record => items.push({
+        id: record.id, title: record.title || 'Brand recipe submission', category: 'Brand recipe', status: record.status || 'Submitted', manage: 'brand-recipes',
+      }))
+      setRecords(items)
+      setFailed(results.some(result => result.status === 'rejected'))
+      setPending(false)
+    })
+    return () => { active = false }
+  }, [workspace])
+  if (pending) return <p className="mt-3 text-sm text-[#54635B]">Loading previous listings…</p>
+  if (!records.length && !failed) return null
+  return <section className="mt-5 border-t border-[#CDD9C9] pt-5" aria-label="Previously listed items">
+    <h3 className="text-lg font-semibold text-[#173F35]">Previously listed items</h3>
+    <p className="mt-1 text-sm text-[#54635B]">Your existing records remain saved. Their approval and published versions are unchanged.</p>
+    {failed && <p className="mt-2 text-sm text-[#99622D]">Some older records could not be loaded. They have not been changed.</p>}
+    <div className="mt-3 divide-y divide-[#DFE7DC]">{records.map(row => <div key={`${row.category}-${row.id}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-2 text-sm">
+      <span className="min-w-0 break-words"><strong className="text-[#173F35]">{row.title}</strong> <span className="text-[#6B766C]">· {row.category}</span></span>
+      <div className="flex shrink-0 items-center gap-3">
+        <span className="capitalize text-[#526353]">{String(row.status).replace(/_/g, ' ')}</span>
+        {row.manage && <Link to={`/host/listings/new?manage=${row.manage}${row.manage === 'brand-recipes' && row.id ? `&editRecipe=${encodeURIComponent(row.id)}` : ''}`} className="font-semibold text-[#173F35] underline underline-offset-4">Manage</Link>}
+      </div>
+    </div>)}</div>
+  </section>
 }
 
 function HostUnifiedListingEditor() {
@@ -1145,11 +1365,7 @@ function HostUnifiedListingEditor() {
               <div className="mb-4 border-l-4 border-[#173F35] bg-[#EEF2EA] p-4" role="status">
                 <p className="font-semibold text-[#173F35]">Selling status</p>
                 <p className="mt-1 text-sm text-[#40544A]">{sellingReadiness.message}</p>
-                {sellingReadiness.marketplacePath && (
-                  <Link className={`${styles.secondary} mt-3 inline-flex items-center gap-2`} to={sellingReadiness.marketplacePath}>
-                    {sellingReadiness.hasOffer ? 'Manage price & stock' : 'Set up price & stock'} <ArrowUpRight size={16}/>
-                  </Link>
-                )}
+                {sellingReadiness.catalogLinked && <p className="mt-2 text-sm text-[#40544A]">Set price and stock below without leaving this page.</p>}
               </div>
             )}
             <section className={`${section} uel-review`}><h2 className="text-xl font-bold">Ready for review?</h2>
@@ -1161,6 +1377,8 @@ function HostUnifiedListingEditor() {
               )}
             </section>
           </fieldset>
+          {editingId && canSell && <HostListingSalesSetup listingId={editingId} listing={activeListing?.packet || form}
+            readiness={sellingReadiness} onUpdated={() => { load(); getHostListingSellingReadiness(editingId).then(data => setSellingReadiness(data?.readiness || null)).catch(() => {}) }} />}
           </>
         )}
         <section className="uel-history" aria-labelledby="uel-history-title">
@@ -1205,6 +1423,7 @@ function HostUnifiedListingEditor() {
               {existing.length > 0 && <button type="button" className="ml-3 font-bold underline underline-offset-4 text-[#173F35]" onClick={() => setHistoryFilter('all')}>Show all</button>}
             </div>}
           </div>
+          <PreviouslyListedItems workspace={workspace} />
         </section>
         <p className="uel-hold-note"><ClipboardList size={17} className="mt-1 shrink-0"/><span>Non-food categories, including cosmetics and clothing, are not available for listing yet.</span></p>
       </div>
@@ -1219,8 +1438,23 @@ export default function HostUnifiedListingPage() {
   const { currentUser } = useAuth()
   const [params] = useSearchParams()
   const workspace = normalizeHostWorkspaceType(currentUser)
-  const isEditingExistingPacket = Boolean(params.get('edit'))
-  const requestedType = params.get('type')
-
+  const managementView = params.get('manage') || ''
+  const canManageProducts = ['b2b', 'brand_seller', 'hybrid', 'legacy'].includes(workspace)
+  const canManageBrandRecipes = ['brand_seller', 'hybrid', 'legacy'].includes(workspace)
+  const canManageKitchenRecipes = ['chef_restaurant', 'hybrid', 'b2b', 'legacy'].includes(workspace)
+  const management = managementView === 'product-evidence' && canManageProducts
+    ? <ProductEvidenceWorkspace />
+    : managementView === 'brand-recipes' && canManageBrandRecipes
+      ? <BrandRecipeHistoryWorkspace section="recipes" />
+      : managementView === 'kitchen-recipes' && canManageKitchenRecipes
+        ? <KitchenRecipeHistoryWorkspace />
+        : null
+  if (managementView) {
+    if (!management) return <Navigate to="/host/listings/new" replace />
+    return <div className="min-w-0 w-full">
+      <div className="px-4 pt-5 sm:px-7"><Link to="/host/listings/new" className="inline-flex items-center gap-2 text-base font-semibold text-[#173F35]"><ArrowLeft size={18} /> Back to Listing Studio</Link></div>
+      <Suspense fallback={<p className="p-6 text-base" role="status">Loading your listings…</p>}>{management}</Suspense>
+    </div>
+  }
   return <HostUnifiedListingEditor />
 }

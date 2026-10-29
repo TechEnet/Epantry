@@ -108,6 +108,9 @@ export async function reviewAdminHostListingPacket(id, decision) {
 export async function linkAdminHostListingCatalog(id, productVersionId) {
   return write('post', `/admin/host-listing-packets/${encodeURIComponent(id)}/link-catalog`, { productVersionId })
 }
+export async function createAdminHostListingCatalogDraft(id, { npiDraftId, categoryName }) {
+  return write('post', `/admin/host-listing-packets/${encodeURIComponent(id)}/catalog-draft`, { npiDraftId, categoryName })
+}
 export async function listPublicHostListings(category = '') {
   return unwrap(await apiClient.get('/public/host-listings', { params: category ? { category } : {} }))
 }

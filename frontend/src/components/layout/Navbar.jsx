@@ -205,10 +205,10 @@ import {
 
     {
         label:
-            'Recipe Listings',
+            'Create Listing',
 
         to:
-            '/host/brand-recipes',
+            '/host/listings',
     },
 
     {

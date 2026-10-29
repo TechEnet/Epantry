@@ -55,8 +55,8 @@ const HOST_ITEMS = Object.freeze([
     icon: ScanLine,
   },
   {
-    label: 'NPI',
-    to: '/host/product-intelligence',
+    label: 'Listings',
+    to: '/host/listings',
     icon: PackageSearch,
   },
   {

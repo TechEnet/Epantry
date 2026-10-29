@@ -1038,7 +1038,6 @@ const DeliveryAddressPage = lazy(() => import('../features/deliveryAddresses/pag
 
 const HostMarketplacePage = lazy(() => import('../features/marketplace/pages/HostMarketplacePage'))
 const HostBrandAuthorityPage = lazy(() => import('../features/brands/pages/HostBrandAuthorityPage'))
-const HostNpiPage = lazy(() => import('../features/universalProduct/pages/HostNpiPage'))
 const HostDashboardPage = lazy(() => import('../features/host/pages/HostDashboardPage'))
 const HostListingWorkspacePage = lazy(() => import('../features/host/pages/HostListingWorkspacePage'))
 const HostUnifiedListingPage = lazy(() => import('../features/host/pages/HostUnifiedListingPage'))
@@ -1053,7 +1052,6 @@ const HostOperationsPage = lazy(() => import('../features/hostOperations/pages/H
 const HostBusinessProfilePage = lazy(() => import('../features/hostOperations/pages/HostBusinessProfilePage'))
 const HostFulfillmentPage = lazy(() => import('../features/hostOperations/pages/HostFulfillmentPage'))
 const HospitalityPage = lazy(() => import('../features/hospitality/pages/HospitalityPage'))
-const RestaurantRecipesPage = lazy(() => import('../features/hospitality/pages/RestaurantRecipesPage'))
 const HostAnalyticsPage = lazy(() => import('../features/analytics/pages/HostAnalyticsPage'))
 const HostListingHistoryPage = lazy(() => import('../features/listingHistory/pages/HostListingHistoryPage'))
 
@@ -1638,13 +1636,9 @@ function HospitalityRoute({
     >
       {canUseHospitality ? (
         <HospitalityShell>
-          {section === 'restaurantRecipes' ? (
-            <RestaurantRecipesPage />
-          ) : (
-            <HospitalityPage
-              section={section}
-            />
-          )}
+          <HospitalityPage
+            section={section}
+          />
         </HospitalityShell>
       ) : (
         <Navigate
@@ -3005,9 +2999,7 @@ export default function AppRoutes() {
               element={
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
                   <HostShell>
-                    {typeof window !== 'undefined' && !new URLSearchParams(window.location.search).get('editRecipe')
-                      ? <Navigate to="/host/listings/new?type=brand_recipe" replace />
-                      : <HostOperationsPage section="recipes" />}
+                    <Navigate to={`/host/listings/new?manage=brand-recipes${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('editRecipe') ? `&editRecipe=${encodeURIComponent(new URLSearchParams(window.location.search).get('editRecipe'))}` : ''}`} replace />
                   </HostShell>
                 </ApplicationAccessRoute>
               }
@@ -3073,7 +3065,7 @@ export default function AppRoutes() {
               element={
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
                   <HostShell>
-                    <HostNpiPage />
+                    <Navigate to="/host/listings/new?manage=product-evidence" replace />
                   </HostShell>
                 </ApplicationAccessRoute>
               }
@@ -3149,7 +3141,7 @@ export default function AppRoutes() {
             <Route path="/host/hospitality/outlets" element={<HospitalityRoute section="outlets" />} />
             <Route path="/host/hospitality/suppliers" element={<HospitalityRoute section="suppliers" />} />
             <Route path="/host/hospitality/products" element={<HospitalityRoute section="products" />} />
-            <Route path="/host/hospitality/recipes" element={<HospitalityRoute section="restaurantRecipes" />} />
+            <Route path="/host/hospitality/recipes" element={<Navigate to="/host/listings/new?manage=kitchen-recipes" replace />} />
             <Route path="/host/hospitality/legacy-recipes" element={<HospitalityRoute section="recipes" />} />
             <Route path="/host/hospitality/menus" element={<HospitalityRoute section="menus" />} />
             <Route path="/host/hospitality/procurement" element={<HospitalityRoute section="procurement" />} />

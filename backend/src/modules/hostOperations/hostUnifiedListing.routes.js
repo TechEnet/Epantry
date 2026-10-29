@@ -11,6 +11,8 @@ import { CanonicalIngredient } from '../catalog/catalog.models.js'
 import { HostUnifiedListingPacket } from './hostUnifiedListing.models.js'
 import { ProductVersion, Brand, Pack, ProductVariant, ProductFamily } from '../catalog/catalog.models.js'
 import { BrandAuthorityGrant } from '../brands/brandAuthority.models.js'
+import { CommunityProductDraft } from '../universalProduct/universalProduct.models.js'
+import { materializeNpiDraftToCatalog } from '../universalProduct/universalProduct.catalogHandoff.service.js'
 import { MarketplaceOrganization, HostOffer } from '../marketplace/marketplace.models.js'
 import { validateOfferCanonicalPack } from '../marketplace/marketplace.host.service.js'
 import { listPublicProducts, buildPublicProductSlug } from '../catalog/catalog.public.service.js'
@@ -132,9 +134,24 @@ async function validateBrandAuthority(packet, ownerUserId) {
   }).select('_id').lean()
   if (!authority) problem('Your business is not yet approved to publish recipes for this brand.', 403)
 }
+// A newly reviewed NPI draft becomes sellable ONLY after its canonical version
+// is separately published. Match the approved Host packet again at read time:
+// a replaced catalog version or changed identity never inherits old eligibility.
+async function resolveRecordPublishedCatalog(record) {
+  const approved = publishedHostRecord(record)
+  if (approved.packet?.catalogProductVersionId) return resolvePublishedCatalog(approved.packet)
+  if (!record.catalogNpiDraftId || approved.type !== 'grocery') return null
+  const draft = await CommunityProductDraft.findOne({
+    _id: record.catalogNpiDraftId, createdByUserId: record.ownerUserId,
+    status: 'approved_for_catalog', readyForCatalog: true,
+  }).select('catalogProductVersionId').lean()
+  if (!draft?.catalogProductVersionId) return null
+  return resolvePublishedCatalog({ ...approved.packet,
+    catalogProductVersionId: String(draft.catalogProductVersionId) })
+}
 async function approvedPublicProjection(record) {
   const approved = publishedHostRecord(record)
-  const catalog = await resolvePublishedCatalog(approved.packet)
+  const catalog = await resolveRecordPublishedCatalog(record)
   return publicListing({ ...record,
     verifiedPackId: catalog?.packId || null,
     verifiedProductPath: catalog?.productPath || null,
@@ -271,7 +288,7 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
   const approved = hasPublishedVersion ? publishedHostRecord(record.toObject()) : null
   const readiness = {
     approved: hasPublishedVersion, catalogLinked: false, hasOffer: false,
-    offerStatus: null, marketplacePath: null,
+    packId: null, offerId: null, offerStatus: null, marketplacePath: null,
     message: 'Submit this listing for Super Admin approval before setting up sales.',
   }
   if (!approved) return respond(res, { readiness })
@@ -279,13 +296,14 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
     readiness.message = 'This recipe is shared with customers and is not a sellable product.'
     return respond(res, { readiness })
   }
-  const catalog = await resolvePublishedCatalog(approved.packet)
+  const catalog = await resolveRecordPublishedCatalog(record.toObject())
   if (!catalog) {
     readiness.message = 'An approved catalog product is needed before Marketplace selling can be enabled.'
     return respond(res, { readiness })
   }
   const packId = catalog.packId
   readiness.catalogLinked = true
+  readiness.packId = packId
   readiness.marketplacePath = `/host/marketplace?packId=${packId}`
   const organization = await MarketplaceOrganization.findOne({ ownerUserId: actor(req), status: 'active' })
     .select('_id').lean()
@@ -298,6 +316,7 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
   }).select('_id status').lean()
   if (offer) {
     readiness.hasOffer = true
+    readiness.offerId = String(offer._id)
     readiness.offerStatus = offer.status
     readiness.marketplacePath = `/host/marketplace?editOffer=${String(offer._id)}`
     readiness.message = offer.status === 'active'
@@ -482,6 +501,47 @@ router.post('/admin/host-listing-packets/:id/link-catalog', ...adminWrite, super
   )
   if (!matched) problem('The listing changed. Refresh before linking its product.', 409)
   respond(res, { listing: serialize(matched), catalogLinked: true })
+}))
+
+// Create a canonical catalog draft ONLY from evidence already reviewed through
+// the existing NPI governance process. The result is NOT automatically published
+// or activated for sale; independent catalog publication is still required.
+router.post('/admin/host-listing-packets/:id/catalog-draft', ...adminWrite, superAdminOnly, wrap(async (req, res) => {
+  if (!objectId(req.params.id)) problem('Invalid listing identifier.')
+  const npiDraftId = String(req.body?.npiDraftId || '').trim()
+  const categoryName = String(req.body?.categoryName || '').trim()
+  if (!objectId(npiDraftId)) problem('Choose a reviewed product evidence record.')
+  if (categoryName.length < 2 || categoryName.length > 180) problem('Enter the approved product category name.')
+  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, deletedAt: null })
+  if (!record || !(record.status === 'approved' || record.publishedPacket)) problem('Approve this listing first.', 409)
+  const approved = publishedHostRecord(record.toObject())
+  if (approved.type !== 'grocery') problem('Product evidence publication is only available for grocery listings.', 409)
+  const organization = await MarketplaceOrganization.findOne({ ownerUserId: record.ownerUserId, status: 'active' }).select('_id').lean()
+  if (!organization) problem('The listing Host must have an active business.', 409)
+  const npiDraft = await CommunityProductDraft.findOne({
+    _id: npiDraftId,
+    organizationId: organization._id,
+    createdByUserId: record.ownerUserId,
+    status: 'approved_for_catalog', readyForCatalog: true,
+  }).select('_id barcode candidateFields catalogProductVersionId').lean()
+  if (!npiDraft) problem('Select this Host’s approved product evidence record.', 409)
+  const expectedBarcode = String(approved.packet?.selling?.barcode || '').trim()
+  const evidenceBarcode = String(npiDraft.barcode || npiDraft.candidateFields?.gtin?.value || '').trim()
+  if (expectedBarcode && expectedBarcode !== evidenceBarcode) problem('This evidence record has a different product barcode.', 409)
+  const evidenceName = String(npiDraft.candidateFields?.displayName?.value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  const listingName = String(approved.title || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!evidenceName || evidenceName !== listingName) problem('The evidence product name must match the approved listing.', 409)
+  const result = await materializeNpiDraftToCatalog({
+    draftId: npiDraft._id, categoryName, packType: 'other',
+    reason: 'Approved Host listing product evidence handoff',
+    actorUser: req.currentUser, adminAuthorization: req.adminAuthorization, requestId: req.requestId,
+  })
+  // Revisions submitted during the handoff cannot inherit an obsolete match.
+  const linked = await HostUnifiedListingPacket.updateOne({
+    _id: record._id, publishedRevision: record.publishedRevision, deletedAt: null,
+  }, { $set: { catalogNpiDraftId: npiDraft._id } })
+  if (!linked.matchedCount) problem('The listing changed during catalog review. Refresh and check its latest approved version.', 409)
+  respond(res, { handoff: result, catalogReviewRequired: true })
 }))
 
 router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdminOnly, wrap(async (req, res) => {
