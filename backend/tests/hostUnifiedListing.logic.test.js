@@ -106,3 +106,13 @@ test('Product label evidence and recipe preparation details survive normalizatio
   assert.equal(recipe.ingredients[0].preparationState, 'Chopped')
   assert.equal(recipe.ingredients[0].scalingRule, 'fixed')
 })
+
+
+test('Ready-made listings retain the governed catalog link and never self-publish', () => {
+  const packet = normalizeListingPacket({ type: 'prepared_food', title: 'Mango shake',
+    catalogProductVersionId: '507f1f77bcf86cd799439011', sellReadyMade: true,
+    selling: { packQuantity: 1, packUnit: 'piece' } })
+  assert.equal(packet.catalogProductVersionId, '507f1f77bcf86cd799439011')
+  assert.equal(packet.sellReadyMade, true)
+  assert.ok(!Object.hasOwn(packet, 'purchasable'))
+})

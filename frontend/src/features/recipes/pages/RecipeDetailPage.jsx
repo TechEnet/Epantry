@@ -5270,6 +5270,15 @@ export default function RecipeDetailPage() {
           </section>
         ) : null}
 
+        {data?.hostSubmission?.sellReadyMade === true && data?.hostSubmission?.marketplaceProductPath ? (
+          <section className="border-y border-[#C7D8CA] bg-[#EDF4EB] p-5 sm:p-7" aria-label="Buy this prepared food">
+            <h2 className="text-xl font-semibold text-[#173F35]">Want it ready-made?</h2>
+            <p className="mt-2 text-sm text-[#40544A]">Check available sellers, actual prices and delivery for your area.</p>
+            <Link to={data.hostSubmission.marketplaceProductPath} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#173F35] px-4 py-2 font-semibold text-white">
+              View verified offers <ArrowUpRight size={17} aria-hidden="true"/>
+            </Link>
+          </section>
+        ) : null}
         {recipeDiscovery?.origin?.country ? (
           <section className="epantry-origin-chapter mt-7 border-y border-[#C8D9CB] bg-[#EAF2EA]" aria-label="Recipe origin and tradition">
             <div className="grid gap-5 px-5 py-6 sm:px-9 sm:py-8 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-10">

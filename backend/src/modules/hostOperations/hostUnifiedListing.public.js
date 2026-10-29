@@ -9,29 +9,61 @@ export function publicHostSlug(record) {
   return `${base}-${id.slice(-10)}`
 }
 
+// Existing approved records without snapshots remain publicly accessible.
+// A newer submitted/draft/rejected revision NEVER changes the last approved read model.
+export function publicHostListingFilter(extra = {}) {
+  return { ...extra, deletedAt: null, $or: [
+    { status: 'approved' },
+    { publishedPacket: { $exists: true, $ne: null } },
+  ] }
+}
+export function publishedHostRecord(record) {
+  if (!record?.publishedPacket) return record
+  return { ...record, status: 'approved', packet: record.publishedPacket,
+    title: record.publishedTitle || record.publishedPacket.title || record.title,
+    type: record.publishedType || record.publishedPacket.type || record.type }
+}
+
 // Public read model for approved Host listing packets. Never expose
 // private Host-cost, inventory, delivery service-area or raw operational data.
 export function publicListing(record) {
-  const packet = record.packet || {}
-  const commercial = record.type === 'grocery' || record.type === 'prepared_food' || packet.sellReadyMade
+  const approved = publishedHostRecord(record)
+  const packet = approved.packet || {}
+  const commercial = approved.type === 'grocery' || approved.type === 'prepared_food' || packet.sellReadyMade
   return {
-    id: String(record._id), slug: publicHostSlug(record), title: record.title, type: record.type,
+    id: String(record._id), slug: publicHostSlug(record), title: approved.title, type: approved.type,
     category: packet.category,
-    grocerySubcategory: record.type === 'grocery' ? (packet.grocerySubcategory || '') : '',
-    packagingType: record.type === 'grocery' ? (packet.packagingType || '') : '',
+    grocerySubcategory: approved.type === 'grocery' ? (packet.grocerySubcategory || '') : '',
+    packagingType: approved.type === 'grocery' ? (packet.packagingType || '') : '',
     description: packet.description, images: packet.images || [],
     videoUrl: packet.videoUrl || '', brandName: packet.brandName || '',
     countryOfOrigin: packet.countryOfOrigin || '', regionOfOrigin: packet.regionOfOrigin || '',
     localRecipeName: packet.localRecipeName || '', localRecipeLanguage: packet.localRecipeLanguage || '',
     englishNameReading: packet.englishNameReading || '',
-    productFamily: record.type === 'grocery' ? (packet.productFamily || '') : '',
-    manufacturerPacker: record.type === 'grocery' ? (packet.manufacturerPacker || '') : '',
-    unitsPerPack: record.type === 'grocery' ? (packet.unitsPerPack ?? null) : null,
-    servingSize: record.type === 'grocery' ? (packet.servingSize || '') : '',
-    barcode: record.type === 'grocery' ? (packet.selling?.barcode || '') : '',
+    productFamily: approved.type === 'grocery' ? (packet.productFamily || '') : '',
+    manufacturerPacker: approved.type === 'grocery' ? (packet.manufacturerPacker || '') : '',
+    unitsPerPack: approved.type === 'grocery' ? (packet.unitsPerPack ?? null) : null,
+    servingSize: approved.type === 'grocery' ? (packet.servingSize || '') : '',
+    barcode: approved.type === 'grocery' ? (packet.selling?.barcode || '') : '',
+    // Only resolved from a published canonical ProductVersion by the public route.
+    canonicalPackId: record.verifiedPackId || null,
+    // Link to the existing canonical product screen, whose Marketplace controls
+    // perform live seller, price, inventory and serviceability checks.
+    marketplaceProductPath: record.verifiedProductPath || null,
+    packQuantity: approved.type === 'grocery' ? (packet.selling?.packQuantity ?? null) : null,
+    packUnit: approved.type === 'grocery' ? (packet.selling?.packUnit || '') : '',
+    cuisine: approved.type === 'grocery' ? '' : (packet.cuisine || ''),
+    preparationMinutes: approved.type === 'grocery' ? null : (packet.preparationMinutes ?? null),
+    cookingMinutes: approved.type === 'grocery' ? null : (packet.cookingMinutes ?? null),
     shareRecipe: Boolean(packet.shareRecipe), sellReadyMade: Boolean(packet.sellReadyMade),
-    baseServings: packet.baseServings, difficulty: record.type === 'grocery' ? '' : (packet.difficulty || 'not_declared'), ingredients: packet.ingredients?.map((item) => ({
+    baseServings: packet.shareRecipe ? packet.baseServings : null,
+    difficulty: approved.type === 'grocery' || !packet.shareRecipe ? '' : (packet.difficulty || 'not_declared'),
+    // Full quantities and preparation instructions are private unless the
+    // Host has explicitly chosen to share the approved recipe.
+    ingredients: (packet.shareRecipe ? packet.ingredients : [])?.map((item) => ({
       name: item.name, quantity: item.quantity, unit: item.unit, imageUrl: item.imageUrl,
+      role: item.role || 'main', preparationState: item.preparationState || '',
+      scalingRule: item.scalingRule || 'proportional',
     })) || [],
     steps: packet.shareRecipe ? packet.steps?.map((item) => ({ instruction: item.instruction, timerMinutes: item.timerMinutes, imageUrl: item.imageUrl })) || [] : [],
     nutrition: packet.nutrition ? {

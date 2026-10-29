@@ -23,13 +23,22 @@ export async function searchHostListingIngredients({ search, limit = 6 } = {}) {
   }))
 }
 
+export async function listHostApprovedBrands() {
+  return unwrap(await apiClient.get('/host/listing-packets/catalog/approved-brands'))
+}
 export async function checkHostListingBarcode(gtin) {
   return unwrap(await apiClient.get('/host/listing-packets/catalog/barcode', {
     params: { gtin: String(gtin || '').trim() },
   }))
 }
+export async function searchHostPublishedProducts(search) {
+  return unwrap(await apiClient.get('/host/listing-packets/catalog/published-products', { params: { search } }))
+}
 export async function getHostListingPacket(id) {
   return unwrap(await apiClient.get(`/host/listing-packets/${encodeURIComponent(id)}`))
+}
+export async function getHostListingSellingReadiness(id) {
+  return unwrap(await apiClient.get(`/host/listing-packets/${encodeURIComponent(id)}/selling-readiness`))
 }
 export async function createHostListingPacket(packet) {
   return write('post', '/host/listing-packets', { packet })

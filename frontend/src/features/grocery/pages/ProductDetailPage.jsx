@@ -2257,7 +2257,9 @@ export default function ProductDetailPage() {
               </button>
             )}
             <div className="mt-10 sm:mt-12">
-              {product.isHostListing ? <HostListingPincodeCheck product={product} /> : <MarketplaceOffers product={product} />}
+              {product.isHostListing && !product.canonicalPackId
+                ? <HostListingPincodeCheck product={product} />
+                : <MarketplaceOffers product={product} />}
             </div>
             <a href="#ep-product-facts" className="focus-ring mt-8 inline-flex min-h-11 items-center gap-3 border-b border-[#173F35] text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42]">
               See complete product details <ArrowRight size={17} aria-hidden="true" />

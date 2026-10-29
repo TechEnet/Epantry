@@ -120,7 +120,7 @@ export function normalizeListingPacket(raw = {}) {
     unitsPerPack: type === 'grocery' ? finiteNonnegative(input.unitsPerPack) : null,
     servingSize: type === 'grocery' ? text(input.servingSize, 100) : '',
     sku: text(input.sku, 120),
-    catalogProductVersionId: type === 'grocery' ? text(input.catalogProductVersionId, 24) : '',
+    catalogProductVersionId: commercial ? text(input.catalogProductVersionId, 24) : '',
     labelDeclaration: type === 'grocery' ? {
       ingredients: text(input.labelDeclaration?.ingredients, 6000),
       allergens: text(input.labelDeclaration?.allergens, 3000),

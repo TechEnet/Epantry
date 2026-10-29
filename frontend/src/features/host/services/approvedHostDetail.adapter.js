@@ -47,12 +47,12 @@ export function hostListingAsRecipe(listing) {
     dish: {
       id: null, slug, name: text(listing.title), description: text(listing.description),
       heroImageUrl: (listing.images || [])[0] || '',
-      cuisine: text(listing.countryOfOrigin), course: readable(listing.category || 'Recipe'),
+      cuisine: text(listing.cuisine || listing.countryOfOrigin), course: readable(listing.category || 'Recipe'),
     },
     recipe: {
       id: null, title: text(listing.title), description: text(listing.description),
-      baseServings, preparationTimeMinutes: 0,
-      cookingTimeMinutes: steps.reduce((sum, step) => sum + (step.timerSeconds || 0), 0) / 60,
+      baseServings, preparationTimeMinutes: finite(listing.preparationMinutes) ?? 0,
+      cookingTimeMinutes: finite(listing.cookingMinutes) ?? steps.reduce((sum, step) => sum + (step.timerSeconds || 0), 0) / 60,
       difficulty: ['easy', 'medium', 'hard'].includes(String(listing.difficulty || '').toLowerCase()) ? readable(listing.difficulty) : 'Not declared', source: { type: 'host_submission' },
     },
     ingredients: (listing.ingredients || []).map((line, i) => ({
@@ -64,7 +64,8 @@ export function hostListingAsRecipe(listing) {
       canonicalIngredientId: /^[a-f\d]{24}$/i.test(text(line.canonicalIngredientId))
         ? text(line.canonicalIngredientId) : null,
       quantity: finite(line.quantity) ?? text(line.quantity), unit: text(line.unit),
-      preparationState: '', optional: false,
+      preparationState: text(line.preparationState), optional: line.role === 'optional',
+      scalingRule: line.scalingRule || 'proportional',
     })),
     steps,
   }
@@ -76,7 +77,7 @@ export function scaleHostRecipe(original, servings) {
       ingredients: (original?.ingredients || []).map(line => ({
         ...line,
         displayQuantity: typeof line.quantity === 'number'
-          ? Math.round(line.quantity * factor * 1000) / 1000
+          ? Math.round(line.quantity * (line.scalingRule === 'fixed' ? 1 : factor) * 1000) / 1000
           : line.quantity,
         displayUnit: line.unit,
       })),
@@ -87,12 +88,14 @@ export function hostListingAsGrocery(listing) {
   if (!listing || listing.type !== 'grocery') throw new Error('This listing is not grocery.')
   const nutrition = listing.nutrition || {}
   const keys = [['energyKcal','Energy','kcal'],['proteinG','Protein','g'],['carbohydrateG','Carbohydrate','g'],['fatG','Fat','g'],['fiberG','Fibre','g'],['sugarG','Sugar','g'],['sodiumMg','Sodium','mg']]
-  const quantityMatch = text(listing.title).match(/(?:^|[–-]\s*)(\d+(?:\.\d+)?)\s*(kg|g|ml|l)\b/i)
-  const netQuantity = quantityMatch ? { value: Number(quantityMatch[1]), unit: quantityMatch[2].toLowerCase() } : null
+  const declaredQuantity = finite(listing.packQuantity)
+  const declaredUnit = text(listing.packUnit).toLowerCase()
+  const netQuantity = declaredQuantity > 0 && ['kg', 'g', 'ml', 'l', 'piece'].includes(declaredUnit)
+    ? { value: declaredQuantity, unit: declaredUnit } : null
   const images = (listing.images || []).map((url, i) => ({ url, alt: `${text(listing.title)} image ${i+1}` })).filter(i => i.url)
   const allergens = (listing.allergens || []).map(a => ({
     allergenKey: text(typeof a === 'string' ? a : (a.key || a.name || a.allergenKey)),
-    relationType: text(typeof a === 'string' ? 'declared' : (a.status || a.relationType || a.value || 'declared')),
+    relationType: text(typeof a === 'string' ? 'unknown' : (a.relationship || a.relationType || 'unknown')),
   })).filter(a => a.allergenKey)
   return {
     isHostListing: true, hostSubmission: listing,
@@ -106,7 +109,7 @@ export function hostListingAsGrocery(listing) {
     manufacturerPacker: text(listing.manufacturerPacker), regionOfOrigin: text(listing.regionOfOrigin),
     pack: { name: netQuantity ? `${netQuantity.value} ${netQuantity.unit}` : readable(listing.packagingType), type: readable(listing.packagingType), multipackCount: finite(listing.unitsPerPack) },
     // No canonical pack or public marketplace offer is claimed by listing approval.
-    packId: null, canonicalPackId: null,
+    packId: text(listing.canonicalPackId) || null, canonicalPackId: text(listing.canonicalPackId) || null,
     manufacturerName: text(listing.manufacturerPacker), countryOfOrigin: text(listing.countryOfOrigin),
     barcode: text(listing.barcode), gtin: text(listing.barcode),
     ingredientDeclarationText: (listing.ingredients || []).map(a => text(a.name)).filter(Boolean).join(', '),

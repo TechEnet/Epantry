@@ -9,7 +9,7 @@ import { normalizeHostWorkspaceType } from '../hostWorkspace.config'
 import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
 import {
   createHostListingPacket, deleteHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
-  listHostListingPackets, checkHostListingBarcode, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
+  listHostListingPackets, listHostApprovedBrands, checkHostListingBarcode, searchHostPublishedProducts, getHostListingSellingReadiness, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
   uploadHostListingImage, uploadHostListingVideo, importHostListingRemoteImage,
 } from '../services/hostUnifiedListing.service'
 
@@ -501,9 +501,23 @@ function HostUnifiedListingEditor() {
   const [barcodeMatches, setBarcodeMatches] = useState([])
   const [barcodeChecked, setBarcodeChecked] = useState('')
   const [barcodeChecking, setBarcodeChecking] = useState(false)
+  const [publishedProductMatches, setPublishedProductMatches] = useState([])
+  const [productMatchBusy, setProductMatchBusy] = useState(false)
+  const [approvedBrands, setApprovedBrands] = useState([])
+  const [sellingReadiness, setSellingReadiness] = useState(null)
+  const [brandLoadError, setBrandLoadError] = useState('')
   const fieldRef = useRef(null)
   const editIdFromUrl = params.get('edit') || ''
   const activeListing = existing.find((item) => item.id === editingId)
+  useEffect(() => {
+    if (!editingId) { setSellingReadiness(null); return undefined }
+    let live = true
+    setSellingReadiness(null)
+    getHostListingSellingReadiness(editingId)
+      .then((result) => { if (live) setSellingReadiness(result?.readiness || null) })
+      .catch(() => { if (live) setSellingReadiness({ message: 'Selling status is unavailable. Refresh and try again.' }) })
+    return () => { live = false }
+  }, [editingId, existing])
   const selectableTypes = editingId && !allowed.some((item) => item.value === form.type)
     ? [...allowed, ...types.filter((item) => item.value === form.type)]
     : allowed
@@ -532,6 +546,16 @@ function HostUnifiedListingEditor() {
     } catch (cause) { setError(errorMessage(cause)) }
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (form.type !== 'brand_recipe') return
+    let cancelled = false
+    listHostApprovedBrands().then(result => {
+      if (!cancelled) { setApprovedBrands(result?.brands || []); setBrandLoadError('') }
+    }).catch(() => {
+      if (!cancelled) { setApprovedBrands([]); setBrandLoadError('Unable to load your approved brands. Try again.') }
+    })
+    return () => { cancelled = true }
+  }, [form.type])
   useEffect(() => {
     if (!['b2b', 'chef_restaurant', 'hybrid', 'legacy'].includes(workspace)) return
     let cancelled = false
@@ -691,7 +715,7 @@ function HostUnifiedListingEditor() {
   async function saveSectionRevision() {
     if (busy || uploading || !locked || !editingId) return
     if (activeListing?.status === 'approved' && !window.confirm(
-      'This approved listing will be temporarily hidden from customers while Super Admin reviews your updated food facts and selling details. Continue?'
+      'Your approved listing stays live while Super Admin reviews the updated food facts and selling details. Continue?'
     )) return
     setBusy(true); setError(''); setNotice('')
     try {
@@ -781,6 +805,18 @@ function HostUnifiedListingEditor() {
       setError(`${errorMessage(cause)} Nothing has been added to your draft listings. Check your Excel links or values and retry.`)
       setBulkProgress('')
     } finally { setBusy(false) }
+  }
+  async function findPublishedProduct() {
+    const search = String(form.title || '').trim()
+    if (search.length < 3 || productMatchBusy) return
+    setProductMatchBusy(true)
+    setError('')
+    try {
+      const result = await searchHostPublishedProducts(search)
+      setPublishedProductMatches(result?.products || [])
+      if (!result?.products?.length) setNotice('No approved catalog product matched this name. You can still submit it for review.')
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { setProductMatchBusy(false) }
   }
   const field = styles.field
   const section = styles.section
@@ -899,9 +935,9 @@ function HostUnifiedListingEditor() {
           <>
           {activeListing?.status === 'approved' && !revisingApproved && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#C86C42] bg-[#FFF0E7] px-4 py-3">
             <p className="text-[15px] font-semibold text-[#173F35]">Need to update this approved listing? Edit the full details and submit them for Super Admin re-approval.</p>
-            <button type="button" className={styles.button} onClick={() => { if (window.confirm('Saving this revised listing will temporarily remove it from customer discovery until Super Admin approves it again. Continue editing?')) setRevisingApproved(true) }}>Edit complete listing</button>
+            <button type="button" className={styles.button} onClick={() => { if (window.confirm('Your approved listing will remain available while these edits are reviewed. Continue editing?')) setRevisingApproved(true) }}>Edit complete listing</button>
           </div>}
-          {revisingApproved && <p role="status" className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF0E7] p-3 text-[15px] font-semibold text-[#173F35]">Editing the approved listing. Save & submit for review to publish the changes only after Super Admin approval.</p>}
+          {revisingApproved && <p role="status" className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF0E7] p-3 text-[15px] font-semibold text-[#173F35]">Your approved listing remains available. New changes appear only after Super Admin review.</p>}
           <fieldset disabled={locked || busy || loading} className="uel-form min-w-0 disabled:opacity-85">
             <section id="listing-details" className={section}>
               <h2 className="text-2xl font-bold"><span className="uel-section-number">01</span> / The essentials</h2>
@@ -919,7 +955,16 @@ function HostUnifiedListingEditor() {
                 )}
                 {workspace === 'hybrid' && form.type === 'grocery' && <EditorField title="How is it packed?"><select className={field} value={form.packagingType || ''} onChange={(event) => patch('packagingType', event.target.value)}>{packagingOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></EditorField>}
                 {workspace === 'hybrid' && <EditorField title="Food preference"><select className={field} value={form.dietary || 'not_declared'} onChange={(event) => patch('dietary', event.target.value)}>{dietaryOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></EditorField>}
-                <EditorField title="Brand name (if applicable)"><input className={field} value={form.brandName || ''} onChange={(event) => patch('brandName', event.target.value)}/></EditorField>
+                {form.type === 'brand_recipe' ? (
+                  <EditorField title="Approved brand">
+                    <select className={field} value={form.brandName || ''} onChange={(event) => patch('brandName', event.target.value)}>
+                      <option value="">Choose your approved brand</option>
+                      {approvedBrands.map((brand) => <option key={brand.id} value={brand.name}>{brand.name}</option>)}
+                    </select>
+                    {brandLoadError && <p role="alert" className="mt-1 text-sm text-red-700">{brandLoadError}</p>}
+                    {!brandLoadError && approvedBrands.length === 0 && <p className="mt-1 text-sm text-[#5D665F]">No approved brands available for this business.</p>}
+                  </EditorField>
+                ) : <EditorField title="Brand name (if applicable)"><input className={field} value={form.brandName || ''} onChange={(event) => patch('brandName', event.target.value)}/></EditorField>}
                 <EditorField title="Your SKU (if applicable)"><input className={field} value={form.sku || ''} onChange={(event) => patch('sku', event.target.value)}/></EditorField>
                 <EditorField title={isRecipe ? 'Country of origin (Host-declared)' : 'Country of origin (as on product label)'}><input className={field} value={form.countryOfOrigin || ''} maxLength={100} onChange={(event) => patch('countryOfOrigin', event.target.value)} placeholder="e.g. India"/></EditorField>
                 <EditorField title={isRecipe ? 'Region / state of origin (if known)' : 'Region / state (optional)'}><input className={field} value={form.regionOfOrigin || ''} maxLength={100} onChange={(event) => patch('regionOfOrigin', event.target.value)} placeholder="e.g. Punjab"/></EditorField>
@@ -1056,7 +1101,7 @@ function HostUnifiedListingEditor() {
             </section>}
           </fieldset>
           <fieldset disabled={busy || loading} className="uel-form uel-updatable-fields min-w-0 disabled:opacity-85">
-            {locked && <p className="uel-revision-note" role="status"><strong>Editing a previously submitted listing:</strong> Only Food facts & allergens and Selling & delivery can be changed here. Saving sends these changes to Super Admin again. If this listing is already approved, it will be temporarily hidden from customers until approved again.</p>}
+            {locked && <p className="uel-revision-note" role="status"><strong>Editing a previously submitted listing:</strong> Only Food facts & allergens and Selling & delivery can be changed here. Saving sends these changes to Super Admin again. Your last approved version remains visible until Super Admin reviews the changes.</p>}
             <section id="listing-nutrition" className={`${section} ${locked ? 'uel-locked-section' : ''}`}><h2 className="text-2xl font-bold"><span className="uel-section-number">{isRecipe ? '05' : '03'}</span> / Food facts & allergens</h2>
               <p className="mt-2 text-sm text-[#4A5850]">Only enter values you can support with evidence. Leave unknown information undeclared.</p>
               {locked && <span className="uel-editable-marker">Editable · re-approval required</span>}
@@ -1080,6 +1125,21 @@ function HostUnifiedListingEditor() {
               {locked && <span className="uel-editable-marker">Editable · re-approval required</span>}
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[['listPrice', 'List price (Rs)'], ['salePrice', 'Selling price (Rs)'], ['stockQuantity', 'Available stock'], ['packagingCost', 'Packaging cost (Rs)'], ['labourCost', 'Preparation / staff cost (₹, optional)']].map(([key, title]) => <EditorField key={key} title={title}><input type="number" min="0" step="any" className={field} value={form.selling?.[key] ?? ''} onChange={(event) => nested('selling', key, event.target.value)}/></EditorField>)}
+                {form.type !== 'grocery' && <div className="sm:col-span-2 lg:col-span-4">
+                  <span className={`${styles.label} mb-1.5 block`}>Approved product match (optional)</span>
+                  <button type="button" disabled={productMatchBusy || form.title.trim().length < 3} onClick={findPublishedProduct} className={styles.secondary}>{productMatchBusy ? 'Searching...' : 'Find approved product'}</button>
+                  {form.catalogProductVersionId && <button type="button" className={`${styles.secondary} ml-2`} onClick={() => patch('catalogProductVersionId', '')}>Clear match</button>}
+                  {publishedProductMatches.length > 0 && <div className="mt-2 border border-[#CAD8CC] p-3" role="group" aria-label="Approved catalog products">
+                    {publishedProductMatches.map((product) => <label className="flex items-start gap-2 py-1.5" key={product.id}>
+                      <input type="radio" checked={form.catalogProductVersionId === product.id} onChange={() => {
+                        setForm((current) => ({ ...current, catalogProductVersionId: product.id,
+                          selling: { ...current.selling, packQuantity: product.quantity ?? '', packUnit: product.unit || 'piece' } }))
+                      }}/>
+                      <span>{product.title} — {product.quantity ?? 'Quantity not stated'} {product.unit}</span>
+                    </label>)}
+                  </div>}
+                  <p className="mt-1 text-sm text-[#4A5850]">Use an exact existing product match for selling. A new item needs catalog approval first.</p>
+                </div>}
                 <EditorField title="Stock unit"><input className={field} value={form.selling?.stockUnit || 'piece'} onChange={(event) => nested('selling', 'stockUnit', event.target.value)}/></EditorField>
                 <EditorField title="Pack / portion quantity"><input className={field} type="number" min="0" step="any" value={form.selling?.packQuantity ?? ''} onChange={(event) => nested('selling', 'packQuantity', event.target.value)}/></EditorField>
                 <EditorField title="Pack / portion unit"><select className={field} value={form.selling?.packUnit || 'piece'} onChange={(event) => nested('selling', 'packUnit', event.target.value)}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
@@ -1094,6 +1154,17 @@ function HostUnifiedListingEditor() {
               {form.delivery?.fulfillment === 'delivery' && <EditorField title="Delivery pincodes (comma-separated)"><textarea rows={2} className={`${field} mt-3`} value={pincodeText} onChange={(event) => { pincodeEditedRef.current = true; setPincodeText(event.target.value); nested('delivery', 'postalCodes', event.target.value.split(/[\s,;]+/).filter(Boolean)) }} placeholder="110001, 110002"/>{savedPostalCodes.length > 0 && <span className="mt-1 block text-[13px] leading-5 text-[#54635B]">Your saved active Host delivery areas are prefilled on new listings. You can change the pincodes for this item.</span>}</EditorField>}
               <EditorField title="Delivery / pickup notes"><textarea rows={2} className={`${field} mt-3`} value={form.delivery?.note || ''} onChange={(event) => nested('delivery', 'note', event.target.value)}/></EditorField>
             </section>}
+            {editingId && canSell && sellingReadiness && (
+              <div className="mb-4 border-l-4 border-[#173F35] bg-[#EEF2EA] p-4" role="status">
+                <p className="font-semibold text-[#173F35]">Selling status</p>
+                <p className="mt-1 text-sm text-[#40544A]">{sellingReadiness.message}</p>
+                {sellingReadiness.marketplacePath && (
+                  <Link className={`${styles.secondary} mt-3 inline-flex items-center gap-2`} to={sellingReadiness.marketplacePath}>
+                    {sellingReadiness.hasOffer ? 'Manage price & stock' : 'Set up price & stock'} <ArrowUpRight size={16}/>
+                  </Link>
+                )}
+              </div>
+            )}
             <section className={`${section} uel-review`}><h2 className="text-xl font-bold">Ready for review?</h2>
               <p className="mt-2 text-sm text-[#4A5850]">{locked ? 'Food facts, allergens, pricing and delivery are editable. Your other details stay protected; these changes require Super Admin review before publishing.' : 'Save your progress whenever you like, or submit your completed listing to Super Admin. Approval does not automatically enable marketplace sales.'}</p>
               {locked ? (

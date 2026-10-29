@@ -6,7 +6,7 @@ import { sensitiveResponseNoStoreMiddleware } from '../../middlewares/security.m
 import { getPublicRecipe } from '../recipes/recipe.public.service.js'
 import { getPublicProductBySlug } from '../catalog/catalog.public.service.js'
 import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
-import { publicHostSlug } from '../hostOperations/hostUnifiedListing.public.js'
+import { publicHostSlug, publicHostListingFilter, publishedHostRecord } from '../hostOperations/hostUnifiedListing.public.js'
 import { CustomerBookmark } from './bookmark.model.js'
 
 const router = Router()
@@ -54,19 +54,20 @@ async function resolvePublishedItem({ kind, slug }) {
   // Legacy host--<ObjectId> links remain accepted, but drafts are never saved.
   const legacyId = /^host--([a-f0-9]{24})$/.exec(slug)?.[1]
   let listing = legacyId
-    ? await HostUnifiedListingPacket.findOne({ _id: legacyId, status: 'approved', deletedAt: null }).lean()
-    : await HostUnifiedListingPacket.findOne({ publicSlug: slug, status: 'approved', deletedAt: null }).lean()
+    ? await HostUnifiedListingPacket.findOne(publicHostListingFilter({ _id: legacyId })).lean()
+    : await HostUnifiedListingPacket.findOne(publicHostListingFilter({ publicSlug: slug })).lean()
   if (!listing && !legacyId) {
     const suffix = slug.match(/-([a-f0-9]{10})$/)?.[1]
     if (suffix) {
       const candidates = await HostUnifiedListingPacket.aggregate([
-        { $match: { status: 'approved', deletedAt: null } },
+        { $match: publicHostListingFilter() },
         { $match: { $expr: { $eq: [{ $substrBytes: [{ $toString: '$_id' }, 14, 10] }, suffix] } } },
         { $limit: 10 },
       ])
       listing = candidates.find(item => publicHostSlug(item) === slug) || null
     }
   }
+  listing = listing ? publishedHostRecord(listing) : null
   const typeMatches = listing && (
     kind === 'grocery' ? listing.type === 'grocery' : ['kitchen_recipe', 'prepared_food', 'brand_recipe'].includes(listing.type)
   )
@@ -87,11 +88,11 @@ router.get('/', wrap(async (req, res) => {
   const rows = await CustomerBookmark.find({ userId }).sort({ createdAt: -1 }).limit(300).lean()
   const hostIds = rows.filter(item => item.sourceType === 'host' && /^[a-f0-9]{24}$/i.test(item.sourceId || '')).map(item => item.sourceId)
   const approvedHosts = hostIds.length
-    ? await HostUnifiedListingPacket.find({ _id: { $in: hostIds }, status: 'approved', deletedAt: null }).select('_id').lean()
+    ? await HostUnifiedListingPacket.find(publicHostListingFilter({ _id: { $in: hostIds } })).select('_id').lean()
     : []
   const approvedIds = new Set(approvedHosts.map(item => String(item._id)))
   // Retain saved records in MongoDB but never expose a Host listing that is
-  // deleted or temporarily unpublished while being re-reviewed.
+  // deleted or never approved. Pending revisions keep the approved version visible.
   const visible = rows.filter(item => item.sourceType !== 'host' || approvedIds.has(item.sourceId))
   return respond(res, { items: visible.map(item => ({
     kind: item.kind, slug: item.slug, title: item.title,

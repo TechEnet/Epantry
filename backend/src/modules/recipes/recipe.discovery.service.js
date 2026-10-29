@@ -6,7 +6,7 @@
  */
 import { RecipeIngredient } from './recipe.models.js'
 import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
-import { publicHostSlug } from '../hostOperations/hostUnifiedListing.public.js'
+import { publicHostSlug, publicHostListingFilter, publishedHostRecord } from '../hostOperations/hostUnifiedListing.public.js'
 import { publicListing } from '../hostOperations/hostUnifiedListing.public.js'
 import { getPublicRecipe, listPublicRecipes } from './recipe.public.service.js'
 
@@ -320,7 +320,7 @@ const HOST_ISO3 = Object.freeze({
   malaysia: 'MYS', singapore: 'SGP', morocco: 'MAR', egypt: 'EGY',
   nigeria: 'NGA', peru: 'PER', argentina: 'ARG', 'south africa': 'ZAF',
 })
-const publicHostFilter = { status: 'approved', deletedAt: null }
+const publicHostFilter = publicHostListingFilter()
 function listItemFromHost(record) {
   const l = publicListing(record)
   return {
@@ -356,10 +356,10 @@ export async function getHostRecipeDiscovery(record) {
   }
   // Only fetch real published records. Host packet data is NOT a catalogue
   // recipe version, so name equality is the narrow truthful similarity test.
-  const hosts = await HostUnifiedListingPacket.find({ ...publicHostFilter,
-    type: { $in: ['kitchen_recipe', 'brand_recipe', 'prepared_food'] },
+  const hosts = (await HostUnifiedListingPacket.find({ ...publicHostFilter,
     _id: { $ne: record._id },
-  }).sort({ approvedAt: -1 }).limit(60).lean()
+  }).sort({ approvedAt: -1 }).limit(120).lean()).map(publishedHostRecord)
+    .filter(row => ['kitchen_recipe', 'brand_recipe', 'prepared_food'].includes(row.type))
   const originalNames = nameSet(packet.ingredients)
   const rankedHosts = hosts.map(other => {
     const ingredients = nameSet(other.packet?.ingredients)

@@ -9,10 +9,13 @@ import { requireHostAccess } from '../auth/authorization.middleware.js'
 import { sensitiveResponseNoStoreMiddleware } from '../../middlewares/security.middleware.js'
 import { CanonicalIngredient } from '../catalog/catalog.models.js'
 import { HostUnifiedListingPacket } from './hostUnifiedListing.models.js'
-import { ProductVersion } from '../catalog/catalog.models.js'
-import { listPublicProducts } from '../catalog/catalog.public.service.js'
+import { ProductVersion, Brand, Pack, ProductVariant, ProductFamily } from '../catalog/catalog.models.js'
+import { BrandAuthorityGrant } from '../brands/brandAuthority.models.js'
+import { MarketplaceOrganization, HostOffer } from '../marketplace/marketplace.models.js'
+import { validateOfferCanonicalPack } from '../marketplace/marketplace.host.service.js'
+import { listPublicProducts, buildPublicProductSlug } from '../catalog/catalog.public.service.js'
 import { listPublicRecipes } from '../recipes/recipe.public.service.js'
-import { publicListing, publicHostSlug } from './hostUnifiedListing.public.js'
+import { publicListing, publicHostSlug, publishedHostRecord, publicHostListingFilter } from './hostUnifiedListing.public.js'
 import { getHostRecipeDiscovery } from '../recipes/recipe.discovery.service.js'
 import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate, isValidGtin } from './hostUnifiedListing.logic.js'
 import { importHostListingRemoteImage } from './hostListingMediaImport.service.js'
@@ -37,24 +40,105 @@ function actor(req) {
 function respond(res, data, code = 200) { return res.status(code).json({ success: true, data }) }
 function context(req) { return { ownerUserId: actor(req), workspaceType: normalizeListingWorkspace(req.currentUser?.hostWorkspaceType) } }
 function problem(message, status = 400) { throw new ApiError(status, message) }
+function matchesCatalogProductIdentity(packet, version) {
+  if (!packet || !version) return false
+  const name = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  if (name(packet.title) !== name(version.displayName)) return false
+  const stated = Number(packet.selling?.packQuantity)
+  const declared = Number(version.netQuantity?.value)
+  const from = String(packet.selling?.packUnit || '').toLowerCase()
+  const to = String(version.netQuantity?.unit || '').toLowerCase()
+  if (!Number.isFinite(stated) || stated <= 0 || !Number.isFinite(declared) || declared <= 0) return false
+  const scale = { g: 1, kg: 1000, ml: 1, l: 1000 }
+  if (from === to) return Math.abs(stated - declared) < 0.00001
+  if ((from in scale) && (to in scale)) {
+    const mass = ['g', 'kg'], volume = ['ml', 'l']
+    if (!((mass.includes(from) && mass.includes(to)) || (volume.includes(from) && volume.includes(to)))) return false
+    return Math.abs(stated * scale[from] - declared * scale[to]) < 0.00001
+  }
+  return false
+}
+function isCommercialCatalogCandidate(packet) {
+  return packet?.type === 'grocery' || packet?.type === 'prepared_food' ||
+    (packet?.type === 'kitchen_recipe' && packet?.sellReadyMade === true)
+}
+// A Host's declaration can reference a catalog identity, never create one or
+// self-authorize its evidence. Only Super Admin-published versions may be linked.
 async function validateCatalogMatch(packet) {
-  if (packet.type !== 'grocery') return
-  const gtin = packet.selling?.barcode || ''
+  if (!isCommercialCatalogCandidate(packet)) return
+  const gtin = packet.type === 'grocery' ? packet.selling?.barcode || '' : ''
   const linkedId = packet.catalogProductVersionId || ''
-  if (!gtin && linkedId) problem('Enter the matching product barcode before choosing an existing catalog item.')
-  if (!gtin) return
-  if (!isValidGtin(gtin)) problem('Check the barcode printed on the product label.')
-  const matches = await ProductVersion.find({ gtin, publicationStatus: 'published' })
-    .select('_id displayName gtin').limit(8).lean()
-  if (linkedId && !matches.some(row => String(row._id) === linkedId)) {
-    problem('The selected catalog product does not match this barcode. Check the barcode again.')
+  if (gtin && !isValidGtin(gtin)) problem('Check the barcode printed on the product label.')
+  if (packet.type === 'grocery' && linkedId && !gtin) {
+    problem('Enter the matching product barcode before choosing an existing catalog item.')
   }
-  if (matches.length && !linkedId) {
-    problem('This barcode already exists in the EPANTRY catalog. Choose the matching product before submitting for review.', 409)
+  if (gtin) {
+    const matches = await ProductVersion.find({ gtin, publicationStatus: 'published' })
+      .select('_id displayName gtin netQuantity').limit(8).lean()
+    if (matches.length && !linkedId) {
+      problem('This barcode already exists in EPANTRY. Select its approved product to avoid a duplicate.', 409)
+    }
+    if (linkedId && !matches.some(row => String(row._id) === linkedId)) {
+      problem('The selected product does not match this barcode.', 409)
+    }
   }
-  if (matches.length > 1 && linkedId && !matches.some(row => String(row._id) === linkedId)) {
-    problem('Choose the correct matching catalog product.', 409)
+  if (!linkedId) return // New catalog identity follows a separate governed review.
+  if (!objectId(linkedId)) problem('Choose an approved EPANTRY product.')
+  const version = await ProductVersion.findOne({ _id: linkedId, publicationStatus: 'published' })
+    .select('_id packId gtin displayName netQuantity').lean()
+  if (!version || (gtin && version.gtin !== gtin) || !matchesCatalogProductIdentity(packet, version)) {
+    problem('Use the exact approved product name and pack / portion quantity.', 409)
   }
+  // Match is also bound to the active governed Pack, its brand and taxonomy.
+  const active = await validateOfferCanonicalPack(version.packId)
+  if (String(active.currentVersion?._id) !== String(version._id)) {
+    problem('Select the latest approved version of this product.', 409)
+  }
+}
+async function resolvePublishedCatalog(packet) {
+  const id = packet?.catalogProductVersionId
+  if (!id || !objectId(id) || !isCommercialCatalogCandidate(packet)) return null
+  const version = await ProductVersion.findOne({ _id: id, publicationStatus: 'published' })
+    .select('_id packId gtin displayName netQuantity').lean()
+  if (!version?.packId || (packet.type === 'grocery' && version.gtin !== packet.selling?.barcode) ||
+    !matchesCatalogProductIdentity(packet, version)) return null
+  try {
+    const canonical = await validateOfferCanonicalPack(version.packId)
+    if (String(canonical.currentVersion?._id) !== String(version._id)) return null
+    const [pack, variant, family] = await Promise.all([
+      Pack.findById(version.packId).select('packKey').lean(),
+      ProductVariant.findById(canonical.variant._id).select('variantKey').lean(),
+      ProductFamily.findById(canonical.family._id).select('slug').lean(),
+    ])
+    const slug = buildPublicProductSlug({ familySlug: family?.slug,
+      variantKey: variant?.variantKey, packKey: pack?.packKey })
+    return { packId: String(version.packId), productPath: slug ? `/grocery/product/${slug}` : null }
+  } catch { return null } // Unpublished/retired catalog never creates buy links.
+}
+// Brand recipes represent the brand. Only active, Super Admin-granted brand authority
+// of the Host's ACTIVE organization qualifies; a brand claim is not a grant.
+async function validateBrandAuthority(packet, ownerUserId) {
+  if (packet.type !== 'brand_recipe') return
+  if (!packet.brandName) problem('Select your approved brand before submitting a brand recipe.')
+  const name = packet.brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const brand = await Brand.findOne({ status: 'active', name: new RegExp(`^${name}$`, 'i') }).select('_id').lean()
+  if (!brand) problem('This brand is not in the approved EPANTRY catalog.', 409)
+  const organization = await MarketplaceOrganization.findOne({ ownerUserId, status: 'active' }).select('_id').lean()
+  if (!organization) problem('An active Host business is required for brand recipes.', 403)
+  const now = new Date()
+  const authority = await BrandAuthorityGrant.findOne({ organizationId: organization._id, brandId: brand._id,
+    status: 'active', scopes: 'brand_recipes', validFrom: { $lte: now },
+    $or: [{ validUntil: null }, { validUntil: { $gt: now } }],
+  }).select('_id').lean()
+  if (!authority) problem('Your business is not yet approved to publish recipes for this brand.', 403)
+}
+async function approvedPublicProjection(record) {
+  const approved = publishedHostRecord(record)
+  const catalog = await resolvePublishedCatalog(approved.packet)
+  return publicListing({ ...record,
+    verifiedPackId: catalog?.packId || null,
+    verifiedProductPath: catalog?.productPath || null,
+  })
 }
 function cleanIncoming(raw, workspace, submit = false) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) problem('Provide a listing object.')
@@ -125,7 +209,21 @@ router.get('/host/listing-packets/catalog/ingredients', ...readSecurity, wrap(as
   })) })
 }))
 
-// Read-only search against published product identity; no catalog creation or private draft exposure.
+// List only brands this Host business can represent in brand recipes.
+router.get('/host/listing-packets/catalog/approved-brands', ...readSecurity, wrap(async (req, res) => {
+  const organization = await MarketplaceOrganization.findOne({ ownerUserId: actor(req), status: 'active' }).select('_id').lean()
+  if (!organization) return respond(res, { brands: [] })
+  const now = new Date()
+  const grants = await BrandAuthorityGrant.find({ organizationId: organization._id,
+    status: 'active', scopes: 'brand_recipes', validFrom: { $lte: now },
+    $or: [{ validUntil: null }, { validUntil: { $gt: now } }],
+  }).select('brandId').lean()
+  const ids = [...new Set(grants.map(row => String(row.brandId)))].filter(objectId)
+  const brands = ids.length ? await Brand.find({ _id: { $in: ids }, status: 'active' }).select('_id name').sort({ name: 1 }).lean() : []
+  respond(res, { brands: brands.map(brand => ({ id: String(brand._id), name: brand.name })) })
+}))
+
+// Read-only lookup, never a create or approval action.
 router.get('/host/listing-packets/catalog/barcode', ...readSecurity, wrap(async (req, res) => {
   const gtin = String(req.query?.gtin || '').trim()
   if (!isValidGtin(gtin)) problem('Enter a valid product barcode to check the catalog.')
@@ -136,6 +234,29 @@ router.get('/host/listing-packets/catalog/barcode', ...readSecurity, wrap(async 
   })) })
 }))
 
+router.get('/host/listing-packets/catalog/published-products', ...readSecurity, wrap(async (req, res) => {
+  const search = String(req.query?.search || '').trim()
+  if (search.length < 3 || search.length > 120) return respond(res, { products: [] })
+  const expression = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+  const now = new Date()
+  const rows = await ProductVersion.find({ displayName: expression, publicationStatus: 'published',
+    $and: [
+      { $or: [{ effectiveFrom: null }, { effectiveFrom: { $lte: now } }] },
+      { $or: [{ effectiveTo: null }, { effectiveTo: { $gt: now } }] },
+    ],
+  }).select('_id displayName netQuantity packId').sort({ publishedAt: -1 }).limit(12).lean()
+  const available = []
+  for (const row of rows) {
+    try {
+      const canonical = await validateOfferCanonicalPack(row.packId)
+      if (String(canonical.currentVersion?._id) !== String(row._id)) continue
+      available.push({ id: String(row._id), title: row.displayName,
+        quantity: row.netQuantity?.value ?? null, unit: row.netQuantity?.unit || '' })
+    } catch { /* Not an active, purchasable catalog identity. */ }
+  }
+  respond(res, { products: available })
+}))
+
 router.get('/host/listing-packets', ...readSecurity, wrap(async (req, res) => {
   const records = await HostUnifiedListingPacket.find({ ownerUserId: actor(req), deletedAt: null }).sort({ updatedAt: -1 }).limit(100)
   respond(res, { listings: records.map(serialize) })
@@ -143,6 +264,54 @@ router.get('/host/listing-packets', ...readSecurity, wrap(async (req, res) => {
 router.get('/host/listing-packets/:id', ...readSecurity, wrap(async (req, res) => {
   respond(res, { listing: serialize(await ownedRecord(req)) })
 }))
+router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(async (req, res) => {
+  const record = await ownedRecord(req)
+  const hasPublishedVersion = record.status === 'approved' || Boolean(record.publishedPacket)
+  const approved = hasPublishedVersion ? publishedHostRecord(record.toObject()) : null
+  const readiness = {
+    approved: hasPublishedVersion, catalogLinked: false, hasOffer: false,
+    offerStatus: null, marketplacePath: null,
+    message: 'Submit this listing for Super Admin approval before setting up sales.',
+  }
+  if (!approved) return respond(res, { readiness })
+  if (!isCommercialCatalogCandidate(approved.packet)) {
+    readiness.message = 'This recipe is shared with customers and is not a sellable product.'
+    return respond(res, { readiness })
+  }
+  const catalog = await resolvePublishedCatalog(approved.packet)
+  if (!catalog) {
+    readiness.message = 'An approved catalog product is needed before Marketplace selling can be enabled.'
+    return respond(res, { readiness })
+  }
+  const packId = catalog.packId
+  readiness.catalogLinked = true
+  if (normalizeListingWorkspace(req.currentUser?.hostWorkspaceType) === 'chef_restaurant') {
+    readiness.message = 'Marketplace selling access is not configured for this workspace.'
+    return respond(res, { readiness })
+  }
+  readiness.marketplacePath = `/host/marketplace?packId=${packId}`
+  const organization = await MarketplaceOrganization.findOne({ ownerUserId: actor(req), status: 'active' })
+    .select('_id').lean()
+  if (!organization) {
+    readiness.message = 'Your business must be active before you can set prices and stock.'
+    return respond(res, { readiness })
+  }
+  const offer = await HostOffer.findOne({ organizationId: organization._id,
+    packId, status: { $in: ['draft', 'active', 'paused'] },
+  }).select('_id status').lean()
+  if (offer) {
+    readiness.hasOffer = true
+    readiness.offerStatus = offer.status
+    readiness.marketplacePath = `/host/marketplace?editOffer=${String(offer._id)}`
+    readiness.message = offer.status === 'active'
+      ? 'Your offer is active. Keep its price, stock and delivery details up to date.'
+      : 'Your offer is saved. Complete its price, stock and delivery checks to start selling.'
+  } else {
+    readiness.message = 'Your product is linked to the approved catalog. Set up an offer, price and stock to start selling.'
+  }
+  respond(res, { readiness })
+}))
+
 router.post('/host/listing-packets', ...writeSecurity, wrap(async (req, res) => {
   const { ownerUserId, workspaceType } = context(req)
   const packet = cleanIncoming(req.body?.packet, workspaceType)
@@ -152,15 +321,16 @@ router.post('/host/listing-packets', ...writeSecurity, wrap(async (req, res) => 
 router.patch('/host/listing-packets/:id', ...writeSecurity, wrap(async (req, res) => {
   const record = await ownedRecord(req)
   if (!['draft', 'changes_requested', 'approved'].includes(record.status)) problem('Submitted listings are locked until Super Admin requests corrections.', 409)
-  // Explicit Host-initiated revision. Once saved, the previously approved version
-  // is withdrawn from public queries until Super Admin approves the new submission.
+  // A Host revision never changes the last Super Admin-approved public snapshot.
   const revisingApproved = record.status === 'approved'
   const packet = cleanIncoming(req.body?.packet, record.workspaceType)
   if (revisingApproved) {
+    // Pre-snapshot approved listings are upgraded on their first edit.
+    record.publishedPacket ||= structuredClone(record.packet)
+    record.publishedTitle ||= record.title
+    record.publishedType ||= record.type
+    record.publishedRevision ||= record.reviewRevision
     record.status = 'draft'
-    record.approvedAt = null
-    record.reviewedAt = null
-    record.reviewedByUserId = null
     record.reviewNote = ''
     record.correctionSection = ''
   }
@@ -170,9 +340,8 @@ router.patch('/host/listing-packets/:id', ...writeSecurity, wrap(async (req, res
   await record.save()
   respond(res, { listing: serialize(record) })
 }))
-// Restricted Host update for previously submitted, approved or rejected listings.
-// This does not bypass Super Admin review. Approved records leave the public
-// catalog until the updated packet is reviewed and approved again.
+// Restricted Host update. Preserve the last approved public revision until
+// a Super Admin accepts the pending revision, including for legacy records.
 router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap(async (req, res) => {
   const record = await ownedRecord(req)
   if (!['submitted_for_review', 'approved', 'rejected'].includes(record.status)) {
@@ -192,15 +361,22 @@ router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap
   // Full validation makes sure the revised listing is still eligible for review.
   const normalized = cleanIncoming(updatedCandidate, record.workspaceType, true)
   await validateCatalogMatch(normalized)
+  await validateBrandAuthority(normalized, actor(req))
   // Keep all identity, photo, video, ingredient and step data EXACTLY as they were.
   const safePacket = { ...record.packet }
   for (const key of editKeys) safePacket[key] = normalized[key]
   const previousStatus = record.status
   const now = new Date()
+  if (previousStatus === 'approved') {
+    record.publishedPacket ||= structuredClone(record.packet)
+    record.publishedTitle ||= record.title
+    record.publishedType ||= record.type
+    record.publishedRevision ||= record.reviewRevision
+  }
   record.packet = safePacket
   record.status = 'submitted_for_review'
   record.submittedAt = now
-  record.approvedAt = null
+  if (!record.publishedPacket) record.approvedAt = null
   record.reviewedAt = null
   record.reviewedByUserId = null
   record.correctionSection = ''
@@ -237,6 +413,7 @@ router.post('/host/listing-packets/:id/submit', ...writeSecurity, wrap(async (re
   if (!['draft', 'changes_requested'].includes(record.status)) problem('This listing has already been submitted.', 409)
   const packet = cleanIncoming(record.packet, record.workspaceType, true)
   await validateCatalogMatch(packet)
+  await validateBrandAuthority(packet, actor(req))
   record.packet = packet
   record.status = 'submitted_for_review'
   record.submittedAt = new Date()
@@ -290,14 +467,24 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
   const now = new Date()
   // Conditional update makes a decision atomic; a second reviewer cannot silently overwrite it.
   const pendingForSlug = decision === 'approved' ? await HostUnifiedListingPacket.findOne(
-    { _id: req.params.id, status: 'submitted_for_review', deletedAt: null }).select('_id title publicSlug') : null
+    { _id: req.params.id, status: 'submitted_for_review', deletedAt: null }).select('_id title publicSlug type packet workspaceType ownerUserId') : null
   const approvedPublicSlug = pendingForSlug ? publicHostSlug(pendingForSlug) : ''
+  if (decision === 'approved') {
+    if (!pendingForSlug) problem('Only a submitted listing can be approved. Refresh the queue.', 409)
+    // A brand grant or published catalog match may have been revoked since the
+    // Host submitted this version. Review must never bypass current governance.
+    const currentPacket = cleanIncoming(pendingForSlug.packet, pendingForSlug.workspaceType, true)
+    await validateCatalogMatch(currentPacket)
+    await validateBrandAuthority(currentPacket, pendingForSlug.ownerUserId)
+  }
   const record = await HostUnifiedListingPacket.findOneAndUpdate(
     { _id: req.params.id, status: 'submitted_for_review', deletedAt: null },
     { $set: { status: decision, reviewedAt: now, reviewedByUserId: actor(req),
         reviewNote: note, correctionSection: decision === 'changes_requested' ? section : '',
-        ...(decision === 'approved' ? { approvedAt: now, publicSlug: approvedPublicSlug } : {}) },
-      $inc: { reviewRevision: 1 },
+        ...(decision === 'approved' ? { approvedAt: now, publicSlug: approvedPublicSlug,
+          publishedPacket: pendingForSlug?.packet, publishedTitle: pendingForSlug?.title,
+          publishedType: pendingForSlug?.type } : {}) },
+      $inc: { reviewRevision: 1, ...(decision === 'approved' ? { publishedRevision: 1 } : {}) },
       $push: { reviewHistory: { decision, actorUserId: actor(req), note,
         section: decision === 'changes_requested' ? section : '', at: now } } },
     { new: true, runValidators: true },
@@ -482,13 +669,17 @@ router.get('/public/country-discovery/:countryName', wrap(async (req, res) => {
   const origin = countryRegex(name)
   const [history, hostRecords, canonicalRecipes, canonicalGrocery] = await Promise.all([
     wikiFoodStory(name),
-    HostUnifiedListingPacket.find({ status: 'approved', deletedAt: null, 'packet.countryOfOrigin': origin })
-      .select('_id title publicSlug type packet.category packet.images packet.shareRecipe packet.sellReadyMade').sort({ approvedAt: -1 }).limit(250).lean(),
+    HostUnifiedListingPacket.find({ ...publicHostListingFilter(),
+      $and: [{ $or: [{ 'publishedPacket.countryOfOrigin': origin },
+        { publishedPacket: null, 'packet.countryOfOrigin': origin }] }],
+    })
+      .select('_id title publicSlug type packet publishedPacket publishedTitle publishedType').sort({ approvedAt: -1 }).limit(250).lean(),
     publicCountryRecipes(name), publicCountryGrocery(name),
   ])
   const recipes = [...canonicalRecipes]
   const grocery = [...canonicalGrocery]
-  for (const row of hostRecords) {
+  for (const entry of hostRecords) {
+    const row = publishedHostRecord(entry)
     const card = { title: String(row.title || ''),
       imageUrl: previewImage(row.packet?.images?.[0]), caption: String(row.packet?.category || '').replace(/_/g, ' '),
       sourceLabel: 'Super Admin-approved Host listing · Host-declared country' }
@@ -508,9 +699,10 @@ function ingredientIdentityKey(value) {
     .toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 async function publicListingWithIngredientIdentities(record) {
-  const published = publicListing(record)
-  if (record.type === 'grocery' || !published.ingredients?.length) return published
-  const original = (record.packet?.ingredients || []).slice(0, 100)
+  const approved = publishedHostRecord(record)
+  const published = await approvedPublicProjection(record)
+  if (approved.type === 'grocery' || !published.ingredients?.length) return published
+  const original = (approved.packet?.ingredients || []).slice(0, 100)
   const ids = [...new Set(original.map(line => String(line?.canonicalIngredientId || '').trim())
     .filter(value => objectId(value)))]
   const names = [...new Set(original.map(line => String(line?.name || '').trim())
@@ -546,28 +738,32 @@ async function publicListingWithIngredientIdentities(record) {
 router.get('/public/host-listings', wrap(async (req, res) => {
   const category = String(req.query?.category || '').trim().toLowerCase()
   const type = String(req.query?.type || '').trim().toLowerCase()
-  const filter = { status: 'approved', deletedAt: null }
-  if (category) filter['packet.category'] = category
-  if (type) filter.type = type
+  const filter = publicHostListingFilter()
+  if (category) filter.$and = [{ $or: [
+    { 'publishedPacket.category': category }, { publishedPacket: null, 'packet.category': category },
+  ] }]
+  if (type) filter.$and = [...(filter.$and || []), { $or: [
+    { publishedType: type }, { publishedPacket: null, type },
+  ] }]
   const rows = await HostUnifiedListingPacket.find(filter).sort({ approvedAt: -1 }).limit(100).lean()
   // One-time lightweight backfill for approved pre-slug submissions.
   const legacy = rows.filter(row => !row.publicSlug)
   if (legacy.length) await Promise.all(legacy.map(row =>
     HostUnifiedListingPacket.updateOne({ _id: row._id, $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] },
       { $set: { publicSlug: publicHostSlug(row) } })))
-  respond(res, { listings: rows.map(publicListing) })
+  respond(res, { listings: await Promise.all(rows.map(approvedPublicProjection)) })
 }))
 // Resolve friendly Host URLs without exposing unapproved records. Older host--id
 // links continue to work. This route is BEFORE the /:id catch-all.
 router.get('/public/host-listings/by-slug/:slug', wrap(async (req, res) => {
   const slug = String(req.params.slug || '').trim().toLowerCase()
   if (!/^[a-z0-9][a-z0-9-]{1,199}$/.test(slug)) problem('Invalid listing URL.', 404)
-  let record = await HostUnifiedListingPacket.findOne({ publicSlug: slug, status: 'approved', deletedAt: null }).lean()
+  let record = await HostUnifiedListingPacket.findOne(publicHostListingFilter({ publicSlug: slug })).lean()
   if (!record) {
     // Compatibility for the already-approved listings created before publicSlug existed.
-    const older = await HostUnifiedListingPacket.find({ status: 'approved', deletedAt: null,
-      $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] })
-      .select('_id title type publicSlug packet').sort({ approvedAt: -1 }).limit(300).lean()
+    const older = await HostUnifiedListingPacket.find({ ...publicHostListingFilter(),
+      $and: [{ $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] }] })
+      .select('_id title type publicSlug packet publishedPacket publishedTitle publishedType').sort({ approvedAt: -1 }).limit(300).lean()
     record = older.find(row => publicHostSlug(row) === slug) || null
     if (record) {
       await HostUnifiedListingPacket.updateOne({ _id: record._id, $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] },
@@ -584,14 +780,15 @@ router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
   const pincode = String(req.query?.pincode || '').trim()
   if (!/^[1-9][0-9]{5}$/.test(pincode)) problem('Enter a valid six-digit PIN code.')
-  const record = await HostUnifiedListingPacket.findOne({
-    _id: req.params.id, type: 'grocery', status: 'approved', deletedAt: null,
-  }).select('packet.selling.salePrice packet.delivery.fulfillment packet.delivery.postalCodes').lean()
+  const record = await HostUnifiedListingPacket.findOne(publicHostListingFilter({ _id: req.params.id }))
+    .select('type packet publishedPacket publishedType').lean()
   if (!record) problem('This approved grocery listing is unavailable.', 404)
-  const delivery = record.packet?.delivery || {}
+  const approved = publishedHostRecord(record)
+  if (approved.type !== 'grocery') problem('This approved grocery listing is unavailable.', 404)
+  const delivery = approved.packet?.delivery || {}
   const pickupOnly = delivery.fulfillment === 'pickup'
   const declaredCoverage = !pickupOnly && (delivery.postalCodes || []).some(code => String(code).trim() === pincode)
-  const rawPrice = record.packet?.selling?.salePrice
+  const rawPrice = approved.packet?.selling?.salePrice
   const declaredPrice = rawPrice !== null && rawPrice !== undefined && Number.isFinite(Number(rawPrice)) && Number(rawPrice) >= 0 ? Number(rawPrice) : null
   respond(res, { pincode, declaredCoverage, pickupOnly,
     declaredPrice: declaredCoverage ? declaredPrice : null,
@@ -600,13 +797,13 @@ router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
 
 router.get('/public/host-listings/:id/discovery', wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
-  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, status: 'approved', deletedAt: null }).lean()
-  if (!record || record.type === 'grocery') problem('Approved recipe not found.', 404)
-  respond(res, { discovery: await getHostRecipeDiscovery(record) })
+  const record = await HostUnifiedListingPacket.findOne(publicHostListingFilter({ _id: req.params.id })).lean()
+  if (!record || publishedHostRecord(record).type === 'grocery') problem('Approved recipe not found.', 404)
+  respond(res, { discovery: await getHostRecipeDiscovery(publishedHostRecord(record)) })
 }))
 router.get('/public/host-listings/:id', wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
-  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, status: 'approved', deletedAt: null }).lean()
+  const record = await HostUnifiedListingPacket.findOne(publicHostListingFilter({ _id: req.params.id })).lean()
   if (!record) problem('This approved listing is unavailable.', 404)
   respond(res, { listing: await publicListingWithIngredientIdentities(record) })
 }))

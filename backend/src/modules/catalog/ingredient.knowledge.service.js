@@ -5,7 +5,7 @@
  */
 import { CanonicalIngredient } from './catalog.models.js'
 import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
-import { publicHostSlug } from '../hostOperations/hostUnifiedListing.public.js'
+import { publicHostSlug, publicHostListingFilter, publishedHostRecord } from '../hostOperations/hostUnifiedListing.public.js'
 import { Dish, RecipeIngredient, RecipeVersion } from '../recipes/recipe.models.js'
 import { getPublicRecipe } from '../recipes/recipe.public.service.js'
 import { ApiError } from '../../utils/ApiError.js'
@@ -256,12 +256,16 @@ async function publishedDishesForIngredient(canonicalIngredientId) {
 
 async function approvedHostDishesForIngredient(canonicalId) {
   if (!canonicalId) return []
-  const listings = await HostUnifiedListingPacket.find({
-    status: 'approved',
-    type: { $in: ['brand_recipe', 'kitchen_recipe', 'prepared_food'] },
-    'packet.ingredients.canonicalIngredientId': String(canonicalId),
-  }).select('_id title publicSlug type packet.images packet.category packet.shareRecipe packet.countryOfOrigin packet.regionOfOrigin').sort({ approvedAt: -1 }).limit(10).lean()
-  return listings.filter(row => row.type === 'prepared_food' || row.packet?.shareRecipe).slice(0, 8).map(row => ({
+  const listings = (await HostUnifiedListingPacket.find(publicHostListingFilter({
+    $and: [{ $or: [
+      { 'publishedPacket.ingredients.canonicalIngredientId': String(canonicalId) },
+      { publishedPacket: null, 'packet.ingredients.canonicalIngredientId': String(canonicalId) },
+    ] }],
+  })).select('_id title publicSlug type packet publishedPacket publishedType publishedTitle')
+    .sort({ approvedAt: -1 }).limit(25).lean()).map(publishedHostRecord)
+  return listings.filter(row => ['brand_recipe', 'kitchen_recipe', 'prepared_food'].includes(row.type) &&
+    (row.packet?.ingredients || []).some(item => String(item.canonicalIngredientId) === String(canonicalId)) &&
+    (row.type === 'prepared_food' || row.packet?.shareRecipe)).slice(0, 8).map(row => ({
     id: String(row._id),
     name: row.title,
     imageUrl: media(row.packet?.images?.[0]),
@@ -275,14 +279,17 @@ async function approvedHostDishesForIngredient(canonicalId) {
 // exact canonical ingredient, separately labelled from verified origins.
 async function approvedDishLocations(canonicalId) {
   if (!canonicalId) return []
-  const rows = await HostUnifiedListingPacket.find({
-    status: 'approved',
-    type: { $in: ['brand_recipe', 'kitchen_recipe', 'prepared_food'] },
-    'packet.ingredients.canonicalIngredientId': String(canonicalId),
-    'packet.countryOfOrigin': { $exists: true, $ne: '' },
-  }).select('title publicSlug packet.images packet.countryOfOrigin packet.regionOfOrigin packet.shareRecipe type').limit(60).lean()
+  const rows = (await HostUnifiedListingPacket.find(publicHostListingFilter({
+    $and: [{ $or: [
+      { 'publishedPacket.ingredients.canonicalIngredientId': String(canonicalId) },
+      { publishedPacket: null, 'packet.ingredients.canonicalIngredientId': String(canonicalId) },
+    ] }],
+  })).select('title publicSlug packet publishedPacket publishedTitle publishedType type').limit(120).lean())
+    .map(publishedHostRecord)
   const seen = new Set()
-  return rows.filter(row => row.type === 'prepared_food' || row.packet?.shareRecipe).map(row => {
+  return rows.filter(row => ['brand_recipe', 'kitchen_recipe', 'prepared_food'].includes(row.type) &&
+    (row.packet?.ingredients || []).some(item => String(item.canonicalIngredientId) === String(canonicalId)) &&
+    (row.type === 'prepared_food' || row.packet?.shareRecipe)).map(row => {
     const name = safeWord(row.packet?.countryOfOrigin, 90)
     const region = safeWord(row.packet?.regionOfOrigin, 90)
     if (!name || !/^[\p{L} .,&()'-]{2,90}$/u.test(name) || (region && !/^[\p{L} .,&()'-]{2,90}$/u.test(region))) return null
@@ -302,7 +309,8 @@ async function approvedDishLocations(canonicalId) {
 
 async function approvedHostIngredientImage(canonicalId, listingId, name) {
   const findPhoto = (records) => {
-    for (const record of records) {
+    for (const candidate of records) {
+      const record = candidate ? publishedHostRecord(candidate) : null
       const matched = (record?.packet?.ingredients || []).find(item =>
         ((canonicalId && String(item.canonicalIngredientId) === String(canonicalId)) ||
           (!canonicalId && norm(item.name) === norm(name))) && media(item.imageUrl),
@@ -313,9 +321,9 @@ async function approvedHostIngredientImage(canonicalId, listingId, name) {
   }
 
   if (OBJECT_ID.test(String(listingId || ''))) {
-    const current = await HostUnifiedListingPacket.findOne({
-      _id: listingId, status: 'approved',
-    }).select('packet.ingredients').lean()
+    const current = await HostUnifiedListingPacket.findOne(publicHostListingFilter({
+      _id: listingId,
+    })).select('packet.ingredients publishedPacket').lean()
     const selectedPhoto = findPhoto([current])
     if (selectedPhoto) return selectedPhoto
   }
@@ -323,10 +331,12 @@ async function approvedHostIngredientImage(canonicalId, listingId, name) {
   // Recipe Detail opens the Atlas without a Host listingId. Look for an
   // approved photo from any Host packet linked to the SAME canonical ID.
   if (canonicalId) {
-    const approved = await HostUnifiedListingPacket.find({
-      status: 'approved',
-      'packet.ingredients.canonicalIngredientId': String(canonicalId),
-    }).select('packet.ingredients').sort({ approvedAt: -1 }).limit(12).lean()
+    const approved = await HostUnifiedListingPacket.find(publicHostListingFilter({
+      $and: [{ $or: [
+        { 'publishedPacket.ingredients.canonicalIngredientId': String(canonicalId) },
+        { publishedPacket: null, 'packet.ingredients.canonicalIngredientId': String(canonicalId) },
+      ] }],
+    })).select('packet.ingredients publishedPacket').sort({ approvedAt: -1 }).limit(12).lean()
     return findPhoto(approved)
   }
   return ''
@@ -390,18 +400,23 @@ async function approvedIngredientProducts(ingredient, varieties) {
   const exactTitle = exactNames.map(value => new RegExp(
     `^${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i',
   ))
-  const rows = await HostUnifiedListingPacket.find({
-    status: 'approved', type: 'grocery',
-    $or: [
-      { 'packet.canonicalIngredientId': { $in: linkedIds } },
-      { 'packet.ingredientId': { $in: linkedIds } },
-      { 'packet.ingredients.canonicalIngredientId': { $in: linkedIds } },
-      { title: { $in: exactTitle } },
-      { 'packet.productFamily': { $in: exactTitle } },
-    ],
-  }).select('_id title publicSlug packet.category packet.grocerySubcategory packet.images packet.brandName packet.ingredients')
-    .sort({ approvedAt: -1 }).limit(18).lean()
-  return rows.map(row => ({
+  const rows = (await HostUnifiedListingPacket.find(publicHostListingFilter({
+    $and: [{ $or: [
+      { 'publishedPacket.canonicalIngredientId': { $in: linkedIds } },
+      { 'publishedPacket.ingredientId': { $in: linkedIds } },
+      { 'publishedPacket.ingredients.canonicalIngredientId': { $in: linkedIds } },
+      { 'publishedTitle': { $in: exactTitle } },
+      { 'publishedPacket.productFamily': { $in: exactTitle } },
+      { publishedPacket: null, 'packet.canonicalIngredientId': { $in: linkedIds } },
+      { publishedPacket: null, 'packet.ingredientId': { $in: linkedIds } },
+      { publishedPacket: null, 'packet.ingredients.canonicalIngredientId': { $in: linkedIds } },
+      { publishedPacket: null, title: { $in: exactTitle } },
+      { publishedPacket: null, 'packet.productFamily': { $in: exactTitle } },
+    ] }],
+  })).select('_id title publicSlug type packet publishedPacket publishedTitle publishedType')
+    .sort({ approvedAt: -1 }).limit(50).lean()).map(publishedHostRecord)
+    .filter(row => row.type === 'grocery')
+  return rows.slice(0, 18).map(row => ({
     id: String(row._id),
     name: safeWord(row.title, 180),
     category: safeWord(row.packet?.grocerySubcategory || row.packet?.category, 80),
