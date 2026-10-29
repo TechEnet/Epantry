@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getHostListingEntryOptions, getHostWorkspaceLabel, normalizeHostWorkspaceType } from '../hostWorkspace.config'
 
-// Keep account-specific options and the original listing routes unchanged.
+// Account-specific choices all open the same listing editor.
 const unifiedTypes = {
   grocery: 'grocery',
   'brand-recipe': 'brand_recipe',
@@ -62,8 +62,7 @@ const steps = [
 export default function HostListingWorkspacePage() {
   const { currentUser } = useAuth()
   const workspaceType = normalizeHostWorkspaceType(currentUser)
-  // Only Hybrid uses the two-choice unified creator. Other Host entry registries
-  // remain account-scoped (B2B, Brand/Seller and Chef/Restaurant Hospitality).
+  // One creation entry; listing types stay account-scoped.
   const options = workspaceType === 'hybrid'
     ? [
         { id: 'grocery', label: 'Grocery & packaged products', to: '/host/listings/new?type=grocery' },
@@ -730,7 +729,6 @@ export default function HostListingWorkspacePage() {
               <span className="hls-vs-count"><strong>{String(options.length).padStart(2, '0')}</strong> choices</span>
             </div>
             <p className="hls-vs-section-description">Choose one option to open its form.</p>
-          {workspaceType === 'legacy' && <p className="hls-vs-legacy-note" role="status">This account is still classified as Legacy Host. The two-option Grocery / Recipe studio is available after the account is assigned the Hybrid workspace by Super Admin.</p>}
           </div>
 
           <div
@@ -745,35 +743,9 @@ export default function HostListingWorkspacePage() {
                 action: 'Continue',
                 icon: Boxes,
               }
-              const isChefRestaurant = workspaceType === 'chef_restaurant'
-              const isHybrid = workspaceType === 'hybrid'
-              const isRestaurantMenu = option.id === 'ready-made' && (isHybrid || isChefRestaurant)
-              const isChefKitchenRecipe = option.id === 'kitchen-recipe' && isChefRestaurant
-              const displayDetails = isRestaurantMenu
-                ? {
-                    ...details,
-                    title: 'Restaurant & menu listings',
-                    description: 'Create restaurant dishes and manage menus in Hospitality Operations.',
-                    action: 'Open Hospitality',
-                  }
-                : isChefKitchenRecipe
-                  ? {
-                      ...details,
-                      description: 'Create and manage kitchen recipes in Hospitality Operations.',
-                      action: 'Open Hospitality',
-                    }
-                  : details
+              const displayDetails = details
               const Icon = displayDetails.icon
-              // Hybrid restaurant/menu entry goes to the requested Recipes screen.
-              // Chef/Restaurant users use their dedicated Hospitality Operations workspace.
-              // All other entries keep their existing unified/marketplace destination.
-              const target = isRestaurantMenu
-                ? (isChefRestaurant ? '/host/hospitality/menus' : '/host/hospitality/recipes')
-                : isChefKitchenRecipe
-                  ? '/host/hospitality/recipes'
-                  : unifiedTypes[option.id]
-                    ? `/host/listings/new?type=${unifiedTypes[option.id]}`
-                    : option.to
+              const target = option.to
 
               return (
                 <Link to={target} className="hls-vs-option" key={option.id}>

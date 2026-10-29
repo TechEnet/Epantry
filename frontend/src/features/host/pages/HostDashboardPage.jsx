@@ -103,15 +103,9 @@ const quickAccessItems = [
   },
   {
     title: 'Create Listing',
-    description: 'Choose what to list. We will open the correct existing Host editor for your business.',
+    description: 'Choose an item type, save your details and send it for review.',
     to: '/host/listings',
     icon: Boxes,
-  },
-  {
-    title: 'Product Setup & Intake',
-    description: 'Review product details, fix product data and prepare new items before listing.',
-    to: '/host/product-intelligence',
-    icon: FileSearch,
   },
   {
     title: 'Pricing & Inventory',
@@ -136,12 +130,6 @@ const quickAccessItems = [
     description: 'Track earnings, settlement progress and finance-related actions.',
     to: '/host/finance',
     icon: WalletCards,
-  },
-  {
-    title: 'Recipe Listings',
-    description: 'Create and manage recipe listings for your Host or Brand.',
-    to: '/host/brand-recipes',
-    icon: ChefHat,
   },
   {
     title: 'Analytics',

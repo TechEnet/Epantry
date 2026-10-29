@@ -97,11 +97,6 @@ const navigationGroups = [
         icon: Barcode,
       },
       {
-        label: "Add / Edit Products",
-        to: "/host/product-intelligence",
-        icon: ScanLine,
-      },
-      {
         label: "Check Product Data",
         to: "/host/data-quality",
         icon: FileSearch,
@@ -110,11 +105,6 @@ const navigationGroups = [
         label: "Manage Brand",
         to: "/host/brands",
         icon: BadgeCheck,
-      },
-      {
-        label: "Recipe Listings",
-        to: "/host/brand-recipes",
-        icon: ChefHat,
       },
       {
         label: "Listing History",
@@ -225,14 +215,12 @@ const mobileNavigationOrder = [
   "/host/listings",
   "/host/catalog",
   "/host/scan",
-  "/host/product-intelligence",
   "/host/data-quality",
   "/host/marketplace",
   "/host/orders",
   "/host/fulfillment",
   "/host/earnings",
   "/host/finance",
-  "/host/brand-recipes",
   "/host/listing-history",
   "/host/campaigns",
   "/host/settings",

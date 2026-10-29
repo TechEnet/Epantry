@@ -3005,7 +3005,9 @@ export default function AppRoutes() {
               element={
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
                   <HostShell>
-                    <HostOperationsPage section="recipes" />
+                    {typeof window !== 'undefined' && !new URLSearchParams(window.location.search).get('editRecipe')
+                      ? <Navigate to="/host/listings/new?type=brand_recipe" replace />
+                      : <HostOperationsPage section="recipes" />}
                   </HostShell>
                 </ApplicationAccessRoute>
               }

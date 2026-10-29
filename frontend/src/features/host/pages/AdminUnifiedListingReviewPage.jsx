@@ -9,6 +9,7 @@ import AdminShell from '../../admin/components/AdminShell'
 import {
   listAdminHostListingPackets,
   reviewAdminHostListingPacket,
+  linkAdminHostListingCatalog,
 } from '../services/hostUnifiedListing.service'
 
 const correctionSections = [
@@ -155,6 +156,7 @@ export default function AdminUnifiedListingReviewPage() {
   const [selectedId, setSelectedId] = useState(focus || '')
   const [filter, setFilter] = useState('submitted_for_review')
   const [note, setNote] = useState('')
+  const [canonicalVersionId, setCanonicalVersionId] = useState('')
   const [section, setSection] = useState('details')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -195,6 +197,18 @@ export default function AdminUnifiedListingReviewPage() {
     window.addEventListener('keydown', onEscape)
     return () => window.removeEventListener('keydown', onEscape)
   }, [videoOpen])
+
+  async function attachPublishedCatalog() {
+    if (!selected || busy || !canonicalVersionId.trim()) return
+    setBusy(true); setError(''); setSuccess('')
+    try {
+      await linkAdminHostListingCatalog(selected.id, canonicalVersionId.trim())
+      setCanonicalVersionId('')
+      await load()
+      setSuccess('Published catalog product linked. The Host can set up an eligible Marketplace offer.')
+    } catch (cause) { setError(getError(cause)) }
+    finally { setBusy(false) }
+  }
 
   async function decide(decision) {
     if (!selected || busy || !awaitingDecision) return
@@ -388,6 +402,28 @@ export default function AdminUnifiedListingReviewPage() {
             </div>
           </div>
         </section>
+
+        {selected.status === 'approved' && (selected.type === 'grocery' || selected.type === 'prepared_food' || (selected.type === 'kitchen_recipe' && packet.sellReadyMade)) && (
+          <section className="border-b border-[#DDE3DB] py-5">
+            <h3 className="text-[18px] font-semibold text-[#173F35]">Catalog & selling</h3>
+            <p className="mt-2 text-[15px] text-[#52685A]">A product must be independently published in the catalog before a Host can sell it. Link only the exact approved product and pack.</p>
+            <p className="mt-2 text-[14px]">{packet.catalogProductVersionId
+              ? `Linked catalog version: ${packet.catalogProductVersionId}`
+              : 'No published catalog product linked yet.'}</p>
+            {!packet.catalogProductVersionId && <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="min-w-0 flex-1 text-[15px] font-semibold">Published product version ID
+                <input className={`${inputClass} mt-1`} value={canonicalVersionId} maxLength={24}
+                  onChange={event => setCanonicalVersionId(event.target.value.trim())}
+                  placeholder="Paste verified 24-character ID" />
+              </label>
+              <button type="button" disabled={busy || !/^[a-f0-9]{24}$/i.test(canonicalVersionId)}
+                onClick={attachPublishedCatalog}
+                className="min-h-11 rounded-lg bg-[#173F35] px-4 font-semibold text-white disabled:opacity-50">
+                Link approved product
+              </button>
+            </div>}
+          </section>
+        )}
 
         <section className="min-w-0 border-b border-[#DDE3DB] py-5 sm:py-6">
           <StepHeading number={isRecipeListing ? "06" : "04"} title="Review history" trailing={<span className="text-[15px] text-[#667769]">{selected.reviewHistory?.length || 0} events</span>} />

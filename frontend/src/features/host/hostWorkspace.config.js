@@ -71,6 +71,7 @@ const ROUTE_PREFIXES_BY_WORKSPACE = Object.freeze({
   [HOST_WORKSPACE_TYPES.CHEF_RESTAURANT]: [
     ...COMMON_HOST_PATHS,
     ...CHEF_RESTAURANT_PATHS,
+    '/host/marketplace', '/host/orders', '/host/fulfillment',
   ],
 })
 
@@ -171,39 +172,28 @@ export function isChefRestaurantWorkspace(value) {
  */
 const HOST_LISTING_ENTRY_OPTIONS = Object.freeze([
   {
-    id: 'grocery',
-    label: 'Grocery & packaged products',
-    description: 'Create or import products using your existing catalog tools.',
-    to: '/host/catalog',
+    id: 'grocery', label: 'Grocery & packaged products',
+    description: 'Add a grocery or packaged item for review.',
+    to: '/host/listings/new?type=grocery',
     enabledFor: ['b2b', 'brand_seller', 'hybrid', 'legacy'],
   },
   {
-    id: 'brand-recipe',
-    label: 'Brand recipe',
-    description: 'Create and manage an approved brand recipe listing.',
-    to: '/host/brand-recipes',
+    id: 'brand-recipe', label: 'Brand recipes',
+    description: 'Share a recipe for a brand you are approved to represent.',
+    to: '/host/listings/new?type=brand_recipe',
     enabledFor: ['brand_seller', 'hybrid', 'legacy'],
   },
   {
-    id: 'kitchen-recipe',
-    label: 'Kitchen recipe, drinks & desserts',
-    description: 'Start a kitchen recipe for the dishes or drinks you prepare.',
-    to: '/host/hospitality/recipes',
-    enabledFor: ['b2b', 'chef_restaurant', 'hybrid'],
-  },
-  {
-    id: 'ready-made',
-    label: 'Ready-made food & menu items',
-    description: 'Manage the restaurant menu and prepared-item availability.',
-    to: '/host/hospitality/menus',
+    id: 'kitchen-recipe', label: 'Recipes, drinks & desserts',
+    description: 'Share a recipe, or offer the finished dish.',
+    to: '/host/listings/new?type=kitchen_recipe',
     enabledFor: ['b2b', 'chef_restaurant', 'hybrid', 'legacy'],
   },
   {
-    id: 'offers',
-    label: 'Product price, stock & delivery',
-    description: 'Manage product offers, inventory and delivery pincodes.',
-    to: '/host/marketplace',
-    enabledFor: ['b2b', 'brand_seller', 'hybrid', 'legacy'],
+    id: 'ready-made', label: 'Ready-made food & drinks',
+    description: 'Add a ready-made dish for review and selling setup.',
+    to: '/host/listings/new?type=prepared_food',
+    enabledFor: ['b2b', 'chef_restaurant', 'hybrid', 'legacy'],
   },
 ])
 
@@ -211,6 +201,6 @@ export function getHostListingEntryOptions(value) {
   const workspaceType = normalizeHostWorkspaceType(value)
   return HOST_LISTING_ENTRY_OPTIONS.filter(
     (option) => option.enabledFor.includes(workspaceType) &&
-      isHostPathAllowed(option.to, workspaceType),
+      isHostPathAllowed(option.to.split('?')[0], workspaceType),
   )
 }

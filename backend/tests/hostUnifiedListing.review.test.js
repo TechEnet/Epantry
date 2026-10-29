@@ -91,3 +91,26 @@ test('Only a verified catalog match exposes a canonical product purchase path', 
   assert.equal(linked.marketplaceProductPath, '/grocery/product/published--variant--pack')
   assert.equal(linked.offer.purchasable, false)
 })
+
+
+test('post-approval catalog linking uses Super Admin write guards and never directly publishes a product', async () => {
+  const fs = await import('node:fs')
+  const routes = fs.readFileSync(new URL('../src/modules/hostOperations/hostUnifiedListing.routes.js', import.meta.url), 'utf8')
+  const start = routes.indexOf("router.post('/admin/host-listing-packets/:id/link-catalog'")
+  const end = routes.indexOf("router.post('/admin/host-listing-packets/:id/decision'", start)
+  assert.ok(start > 0 && end > start)
+  const code = routes.slice(start, end)
+  assert.match(code, /\.\.\.adminWrite, superAdminOnly/)
+  assert.match(code, /await validateCatalogMatch\(packet\)/)
+  assert.match(code, /publishedPacket: packet/)
+  assert.doesNotMatch(code, /publishProductVersion\(|createProductPack\(|HostOffer\.create\(/)
+})
+
+test('old Host listing data is retained during sidebar consolidation', async () => {
+  const fs = await import('node:fs')
+  const ui = fs.readFileSync(new URL('../../frontend/src/features/host/components/HostShell.jsx', import.meta.url), 'utf8')
+  const model = fs.readFileSync(new URL('../src/modules/hostOperations/hostUnifiedListing.models.js', import.meta.url), 'utf8')
+  assert.doesNotMatch(ui, /label: "Add \/ Edit Products"|label: "Recipe Listings"/)
+  assert.match(model, /collection: 'hostUnifiedListingPackets'/)
+  assert.match(model, /publishedPacket/)
+})

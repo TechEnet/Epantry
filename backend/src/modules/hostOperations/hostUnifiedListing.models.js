@@ -14,6 +14,8 @@ const listingPacketSchema = new mongoose.Schema({
   publishedTitle: { type: String, default: '' },
   publishedType: { type: String, default: '' },
   publishedRevision: { type: Number, default: 0 },
+  catalogLinkedAt: { type: Date, default: null },
+  catalogLinkedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   deletedAt: { type: Date, default: null, index: true },
   deletedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   submittedAt: { type: Date, default: null },

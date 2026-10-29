@@ -164,6 +164,7 @@ function serialize(record) {
     reviewedAt: record.reviewedAt, correctionSection: record.correctionSection,
     reviewNote: record.reviewNote, reviewRevision: record.reviewRevision,
     reviewHistory: record.reviewHistory || [],
+    catalogLinkedAt: record.catalogLinkedAt || null,
     estimate: calculateListingEstimate(record.packet) }
 }
 
@@ -285,10 +286,6 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
   }
   const packId = catalog.packId
   readiness.catalogLinked = true
-  if (normalizeListingWorkspace(req.currentUser?.hostWorkspaceType) === 'chef_restaurant') {
-    readiness.message = 'Marketplace selling access is not configured for this workspace.'
-    return respond(res, { readiness })
-  }
   readiness.marketplacePath = `/host/marketplace?packId=${packId}`
   const organization = await MarketplaceOrganization.findOne({ ownerUserId: actor(req), status: 'active' })
     .select('_id').lean()
@@ -456,6 +453,37 @@ router.get('/admin/host-listing-packets/:id', ...adminSecurity, superAdminOnly, 
   if (!record) problem('Listing not found.', 404)
   respond(res, { listing: serialize(record) })
 }))
+// Link a Super Admin-published canonical version after its separate evidence review.
+// No Product/Pack is created, no offer is activated, and no price is trusted here.
+router.post('/admin/host-listing-packets/:id/link-catalog', ...adminWrite, superAdminOnly, wrap(async (req, res) => {
+  if (!objectId(req.params.id)) problem('Invalid listing identifier.')
+  const versionId = String(req.body?.productVersionId || '').trim()
+  if (!objectId(versionId)) problem('Choose a published catalog product.')
+  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, deletedAt: null })
+  if (!record || !(record.status === 'approved' || record.publishedPacket)) problem('Approve this listing first.', 409)
+  const current = publishedHostRecord(record.toObject())
+  if (!isCommercialCatalogCandidate(current.packet)) problem('Only sellable items can be linked to a catalog product.', 409)
+  const packet = structuredClone(current.packet)
+  packet.catalogProductVersionId = versionId
+  await validateCatalogMatch(packet)
+  const previousPublishedId = String(current.packet.catalogProductVersionId || '')
+  if (previousPublishedId && previousPublishedId !== versionId) {
+    problem('A different approved product is already linked. Review the identity change as a new listing revision.', 409)
+  }
+  // A pending Host revision must not be promoted by this catalog operation.
+  const matched = await HostUnifiedListingPacket.findOneAndUpdate(
+    { _id: record._id, reviewRevision: record.reviewRevision, deletedAt: null },
+    { $set: { publishedPacket: packet,
+        // Keep an approved Host editor in sync; do not touch a pending revision.
+        ...(record.status === 'approved' ? { packet } : {}),
+        publishedTitle: current.title, publishedType: current.type,
+        catalogLinkedAt: new Date(), catalogLinkedByUserId: actor(req) } },
+    { new: true, runValidators: true },
+  )
+  if (!matched) problem('The listing changed. Refresh before linking its product.', 409)
+  respond(res, { listing: serialize(matched), catalogLinked: true })
+}))
+
 router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdminOnly, wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
   const decision = String(req.body?.decision || '')

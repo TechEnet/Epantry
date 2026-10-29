@@ -467,9 +467,9 @@ function HostUnifiedListingEditor() {
   // Category lists are determined by form.type; role controls authorized listing TYPES only.
   const usesHospitalityOperations = workspace === 'hybrid' || workspace === 'chef_restaurant'
   // Hybrid is intentionally limited to Grocery and Recipe for NEW packets.
-  // Existing legacy-type drafts remain accessible using the edit=id path.
+  // Preserve editing of previous records while permitting all account-eligible types.
   const allowed = types.filter((item) => item.allowed.includes(workspace) &&
-    (workspace !== 'hybrid' || ['grocery', 'kitchen_recipe'].includes(item.value)))
+    (workspace !== 'hybrid' || ['grocery', 'kitchen_recipe', 'brand_recipe', 'prepared_food'].includes(item.value)))
   const visibleTemplates = bulkTemplates.filter((item) => allowed.some((choice) => choice.value === item.type))
   const requestedType = params.get('type')
   const initialType = allowed.some((item) => item.value === requestedType) ? requestedType : allowed[0]?.value || 'grocery'
@@ -643,13 +643,6 @@ function HostUnifiedListingEditor() {
     finally { setBarcodeChecking(false) }
   }
   function startNew(type) {
-    if ((type === 'prepared_food' && usesHospitalityOperations) ||
-        (type === 'kitchen_recipe' && workspace === 'chef_restaurant')) {
-      navigate(workspace === 'chef_restaurant' && type === 'prepared_food'
-        ? '/host/hospitality/menus'
-        : '/host/hospitality/recipes')
-      return
-    }
     // A previously started edit fetch can still be in flight. Ignore its
     // result so it cannot replace the fresh editable form with an old listing.
     skipPendingEditLoadRef.current = true
@@ -833,7 +826,7 @@ function HostUnifiedListingEditor() {
               <button type="button" className="uel-refresh" disabled={busy || Boolean(uploading)} title="Reload saved Host Studio data. Unsaved edits will be lost." onClick={() => { if (window.confirm('Refresh Host Studio? Any unsaved changes will be lost.')) window.location.reload() }}><RefreshCw size={16} aria-hidden="true"/> Refresh page</button>
             </div>
             <h1 className="uel-hero-title">Create something<br/><em>worth sharing.</em></h1>
-            <p className="uel-hero-description">Create a grocery product or independent recipe with real photos, ingredients and selling details. Restaurant dishes and menus belong in Hospitality Operations.</p>
+            <p className="uel-hero-description">Add groceries, recipes or ready-made food with photos, ingredients and selling details.</p>
             <div className="uel-hero-foot">
               <span className="uel-status"><span className="uel-status-dot"/>{editingId ? (locked ? 'Listing under review' : 'Editing an existing listing') : 'Your new listing'}</span>
               <button type="button" className="uel-new" onClick={() => startNew(initialType)}><Plus size={20} strokeWidth={2.7} aria-hidden="true"/> Start a new listing</button>
@@ -853,13 +846,7 @@ function HostUnifiedListingEditor() {
         {error && <div role="alert" className="uel-alert border-l-4 border-red-600 bg-red-50 px-4 py-3 text-red-800">{error}</div>}
         {activeListing?.reviewNote && <div role="status" className="uel-alert border-l-4 border-[#C86C42] bg-[#F7E7DA] px-4 py-3"><strong>Super Admin note:</strong> {activeListing.reviewNote} {correctionSection && <a className="ml-2 font-semibold underline" href={`#listing-${correctionSection}`}>Go to {correctionSection}</a>}</div>}
         {notice && <div role="status" className="uel-alert flex items-center gap-2 border-l-4 border-[#173F35] bg-[#E0ECE1] px-4 py-3 text-[#173F35]"><CheckCircle2 size={18}/>{notice}</div>}
-        {usesHospitalityOperations && <div className="uel-hospitality-link">
-          <div>
-            <strong>Restaurant dishes & menus</strong>
-            <p>Use your Hospitality Operations workspace for restaurant recipes, menus and kitchen management.</p>
-          </div>
-          <Link to="/host/hospitality/recipes">Open Hospitality Recipes <ArrowLeft size={16} className="uel-hospitality-arrow" /></Link>
-        </div>}
+
         <div className="uel-mode-bar">
           <div className="uel-mode-text"><h2>How would you like to add items?</h2><p>Create one listing, or prepare several using our Excel templates.</p></div>
           <div className="uel-tabs" role="tablist" aria-label="Listing mode">
@@ -943,9 +930,9 @@ function HostUnifiedListingEditor() {
               <h2 className="text-2xl font-bold"><span className="uel-section-number">01</span> / The essentials</h2>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <EditorField title="Listing type"><select value={form.type} className={field} onChange={(event) => startNew(event.target.value)}>{selectableTypes.map((item) => <option key={item.value} value={item.value}>{workspace === 'hybrid' && item.value === 'kitchen_recipe' ? 'Recipe' : usesHospitalityOperations && item.value === 'prepared_food'
-                  ? (editingId && form.type === 'prepared_food' ? 'Ready-made food (existing listing)' : 'Restaurant & menu — open Hospitality Operations')
+                  ? 'Ready-made food / menu item' 
                   : workspace === 'chef_restaurant' && item.value === 'kitchen_recipe'
-                    ? 'Kitchen recipe — open Hospitality Operations'
+                    ? 'Kitchen recipe'
                     : item.label}</option>)}</select></EditorField>
                 <EditorField title="Item / recipe name"><input className={field} value={form.title} maxLength={180} onChange={(event) => patch('title', event.target.value)}/></EditorField>
                 {form.type === 'grocery' ? (
@@ -1235,13 +1222,5 @@ export default function HostUnifiedListingPage() {
   const isEditingExistingPacket = Boolean(params.get('edit'))
   const requestedType = params.get('type')
 
-  if (!isEditingExistingPacket && workspace === 'chef_restaurant') {
-    return <Navigate to={requestedType === 'prepared_food'
-      ? '/host/hospitality/menus'
-      : '/host/hospitality/recipes'} replace />
-  }
-  if (!isEditingExistingPacket && workspace === 'hybrid' && requestedType === 'prepared_food') {
-    return <Navigate to="/host/hospitality/recipes" replace />
-  }
   return <HostUnifiedListingEditor />
 }
