@@ -14,7 +14,7 @@ import { listPublicProducts } from '../catalog/catalog.public.service.js'
 import { listPublicRecipes } from '../recipes/recipe.public.service.js'
 import { publicListing, publicHostSlug } from './hostUnifiedListing.public.js'
 import { getHostRecipeDiscovery } from '../recipes/recipe.discovery.service.js'
-import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate } from './hostUnifiedListing.logic.js'
+import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate, isValidGtin } from './hostUnifiedListing.logic.js'
 import { importHostListingRemoteImage } from './hostListingMediaImport.service.js'
 
 const router = Router()
@@ -37,6 +37,25 @@ function actor(req) {
 function respond(res, data, code = 200) { return res.status(code).json({ success: true, data }) }
 function context(req) { return { ownerUserId: actor(req), workspaceType: normalizeListingWorkspace(req.currentUser?.hostWorkspaceType) } }
 function problem(message, status = 400) { throw new ApiError(status, message) }
+async function validateCatalogMatch(packet) {
+  if (packet.type !== 'grocery') return
+  const gtin = packet.selling?.barcode || ''
+  const linkedId = packet.catalogProductVersionId || ''
+  if (!gtin && linkedId) problem('Enter the matching product barcode before choosing an existing catalog item.')
+  if (!gtin) return
+  if (!isValidGtin(gtin)) problem('Check the barcode printed on the product label.')
+  const matches = await ProductVersion.find({ gtin, publicationStatus: 'published' })
+    .select('_id displayName gtin').limit(8).lean()
+  if (linkedId && !matches.some(row => String(row._id) === linkedId)) {
+    problem('The selected catalog product does not match this barcode. Check the barcode again.')
+  }
+  if (matches.length && !linkedId) {
+    problem('This barcode already exists in the EPANTRY catalog. Choose the matching product before submitting for review.', 409)
+  }
+  if (matches.length > 1 && linkedId && !matches.some(row => String(row._id) === linkedId)) {
+    problem('Choose the correct matching catalog product.', 409)
+  }
+}
 function cleanIncoming(raw, workspace, submit = false) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) problem('Provide a listing object.')
   if ((raw.ingredients?.length || 0) > 100 || (raw.steps?.length || 0) > 75 || (raw.images?.length || 0) > 12) problem('Too many ingredients, steps or photos in this listing.')
@@ -106,6 +125,17 @@ router.get('/host/listing-packets/catalog/ingredients', ...readSecurity, wrap(as
   })) })
 }))
 
+// Read-only search against published product identity; no catalog creation or private draft exposure.
+router.get('/host/listing-packets/catalog/barcode', ...readSecurity, wrap(async (req, res) => {
+  const gtin = String(req.query?.gtin || '').trim()
+  if (!isValidGtin(gtin)) problem('Enter a valid product barcode to check the catalog.')
+  const rows = await ProductVersion.find({ gtin, publicationStatus: 'published' })
+    .select('_id displayName gtin').sort({ version: -1 }).limit(8).lean()
+  respond(res, { matches: rows.map(row => ({
+    id: String(row._id), title: row.displayName, barcode: row.gtin,
+  })) })
+}))
+
 router.get('/host/listing-packets', ...readSecurity, wrap(async (req, res) => {
   const records = await HostUnifiedListingPacket.find({ ownerUserId: actor(req), deletedAt: null }).sort({ updatedAt: -1 }).limit(100)
   respond(res, { listings: records.map(serialize) })
@@ -161,6 +191,7 @@ router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap
   }
   // Full validation makes sure the revised listing is still eligible for review.
   const normalized = cleanIncoming(updatedCandidate, record.workspaceType, true)
+  await validateCatalogMatch(normalized)
   // Keep all identity, photo, video, ingredient and step data EXACTLY as they were.
   const safePacket = { ...record.packet }
   for (const key of editKeys) safePacket[key] = normalized[key]
@@ -205,6 +236,7 @@ router.post('/host/listing-packets/:id/submit', ...writeSecurity, wrap(async (re
   const record = await ownedRecord(req)
   if (!['draft', 'changes_requested'].includes(record.status)) problem('This listing has already been submitted.', 409)
   const packet = cleanIncoming(record.packet, record.workspaceType, true)
+  await validateCatalogMatch(packet)
   record.packet = packet
   record.status = 'submitted_for_review'
   record.submittedAt = new Date()

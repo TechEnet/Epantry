@@ -22,6 +22,17 @@ const ACCESS = Object.freeze({
 const MASS = { g: 1, kg: 1000 }
 const VOLUME = { ml: 1, l: 1000 }
 const MAX_LISTING_BYTES = 180000
+const INGREDIENT_ROLES = new Set(['main', 'optional', 'garnish'])
+const SCALING_RULES = new Set(['proportional', 'fixed'])
+// Check digits are calculated locally; no external barcode service is trusted.
+export function isValidGtin(value) {
+  const digits = String(value || '').trim()
+  if (!/^(?:[0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14})$/.test(digits)) return false
+  const sum = [...digits.slice(0, -1)].reverse().reduce((total, char, index) =>
+    total + Number(char) * (index % 2 === 0 ? 3 : 1), 0)
+  return (10 - (sum % 10)) % 10 === Number(digits.at(-1))
+}
+
 
 function text(value, max = 4000) {
   return String(value ?? '').trim().slice(0, max)
@@ -65,6 +76,9 @@ export function normalizeListingPacket(raw = {}) {
     priceQuantity: finiteNonnegative(item?.priceQuantity),
     priceUnit: ALLOWED_UNITS.has(item?.priceUnit) ? item.priceUnit : 'g',
     priceSource: 'host_declared',
+    role: INGREDIENT_ROLES.has(item?.role) ? item.role : 'main',
+    preparationState: text(item?.preparationState, 120),
+    scalingRule: SCALING_RULES.has(item?.scalingRule) ? item.scalingRule : 'proportional',
     note: text(item?.note, 500),
   })) : []
   const steps = recipeAllowed ? list(input.steps, 75).map((step) => ({
@@ -106,6 +120,15 @@ export function normalizeListingPacket(raw = {}) {
     unitsPerPack: type === 'grocery' ? finiteNonnegative(input.unitsPerPack) : null,
     servingSize: type === 'grocery' ? text(input.servingSize, 100) : '',
     sku: text(input.sku, 120),
+    catalogProductVersionId: type === 'grocery' ? text(input.catalogProductVersionId, 24) : '',
+    labelDeclaration: type === 'grocery' ? {
+      ingredients: text(input.labelDeclaration?.ingredients, 6000),
+      allergens: text(input.labelDeclaration?.allergens, 3000),
+      claims: text(input.labelDeclaration?.claims, 2500),
+    } : { ingredients: '', allergens: '', claims: '' },
+    cuisine: recipeAllowed ? text(input.cuisine, 100) : '',
+    preparationMinutes: recipeAllowed ? finiteNonnegative(input.preparationMinutes) : null,
+    cookingMinutes: recipeAllowed ? finiteNonnegative(input.cookingMinutes) : null,
     baseServings: finiteNonnegative(input.baseServings),
     difficulty: recipeAllowed && ['easy', 'medium', 'hard'].includes(String(input.difficulty || '').toLowerCase()) ? String(input.difficulty).toLowerCase() : 'not_declared',
     ingredients,
@@ -194,6 +217,15 @@ export function validateListingPacket(packet, { submit = false, workspace = 'leg
   if (!submit) return errors
   if (packet.countryOfOrigin && !/^[\p{L} .,&()'-]{2,100}$/u.test(packet.countryOfOrigin)) errors.push('Country of origin should be a country name, not a code or URL.')
   if (packet.regionOfOrigin && !packet.countryOfOrigin) errors.push('Choose a country before adding a region or state.')
+  if (packet.type === 'grocery' && packet.selling.barcode && !isValidGtin(packet.selling.barcode)) {
+    errors.push('Enter a valid 8, 12, 13 or 14 digit barcode from the product label.')
+  }
+  if (packet.catalogProductVersionId && !/^[0-9a-f]{24}$/i.test(packet.catalogProductVersionId)) {
+    errors.push('Choose a valid matched EPANTRY catalog product.')
+  }
+  if (packet.type !== 'grocery' && (packet.preparationMinutes !== null && packet.preparationMinutes > 10080 || packet.cookingMinutes !== null && packet.cookingMinutes > 10080)) {
+    errors.push('Check preparation and cooking times; each must be within seven days.')
+  }
   if (packet.unitsPerPack !== null && (!Number.isInteger(packet.unitsPerPack) || packet.unitsPerPack < 1)) errors.push('Units per pack must be a whole number greater than zero.')
   if (packet.title.length < 3) errors.push('Item name must contain at least three characters.')
   if (!LISTING_CATEGORIES.includes(packet.category)) errors.push('Choose a valid food category.')

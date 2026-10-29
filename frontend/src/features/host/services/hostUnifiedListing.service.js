@@ -23,6 +23,11 @@ export async function searchHostListingIngredients({ search, limit = 6 } = {}) {
   }))
 }
 
+export async function checkHostListingBarcode(gtin) {
+  return unwrap(await apiClient.get('/host/listing-packets/catalog/barcode', {
+    params: { gtin: String(gtin || '').trim() },
+  }))
+}
 export async function getHostListingPacket(id) {
   return unwrap(await apiClient.get(`/host/listing-packets/${encodeURIComponent(id)}`))
 }

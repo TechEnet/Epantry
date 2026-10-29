@@ -9,7 +9,7 @@ import { normalizeHostWorkspaceType } from '../hostWorkspace.config'
 import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
 import {
   createHostListingPacket, deleteHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
-  listHostListingPackets, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
+  listHostListingPackets, checkHostListingBarcode, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
   uploadHostListingImage, uploadHostListingVideo, importHostListingRemoteImage,
 } from '../services/hostUnifiedListing.service'
 
@@ -408,13 +408,13 @@ function listingUpdatedDate(value) {
   const d = new Date(value)
   return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
 }
-const emptyIngredient = () => ({ name: '', canonicalIngredientId: '', imageUrl: '', quantity: 1, unit: 'g', unitPrice: '', priceQuantity: 1, priceUnit: 'g', note: '' })
+const emptyIngredient = () => ({ name: '', canonicalIngredientId: '', imageUrl: '', quantity: 1, unit: 'g', unitPrice: '', priceQuantity: 1, priceUnit: 'g', role: 'main', preparationState: '', scalingRule: 'proportional', note: '' })
 const emptyStep = () => ({ instruction: '', timerMinutes: '', imageUrl: '' })
 function newPacket(type = 'grocery') {
   return {
     type, title: '', description: '', category: type === 'grocery' ? 'grocery' : 'other', grocerySubcategory: '', packagingType: '', images: [], imageRoles: [], videoUrl: '', videoFileName: '',
     brandName: '', sku: '', countryOfOrigin: '', regionOfOrigin: '', localRecipeName: '', localRecipeLanguage: '', englishNameReading: '',
-    productFamily: '', manufacturerPacker: '', unitsPerPack: '', servingSize: '', baseServings: 4, difficulty: 'not_declared', ingredients: [emptyIngredient()], steps: [emptyStep()],
+    productFamily: '', manufacturerPacker: '', unitsPerPack: '', servingSize: '', catalogProductVersionId: '', labelDeclaration: { ingredients: '', allergens: '', claims: '' }, cuisine: '', preparationMinutes: '', cookingMinutes: '', baseServings: 4, difficulty: 'not_declared', ingredients: [emptyIngredient()], steps: [emptyStep()],
     nutrition: { basis: 'Per serving', evidenceNote: '' }, allergens: [], dietary: 'not_declared',
     shareRecipe: type === 'brand_recipe' || type === 'kitchen_recipe', sellReadyMade: type === 'prepared_food',
     selling: { listPrice: '', salePrice: '', stockQuantity: '', stockUnit: 'piece', packQuantity: '', packUnit: 'piece', minimumOrderQuantity: 1, maximumOrderQuantity: '', barcode: '', packagingCost: '', labourCost: '', outletId: '', menuId: '' },
@@ -498,6 +498,9 @@ function HostUnifiedListingEditor() {
   const [menus, setMenus] = useState([])
   const [activeTab, setActiveTab] = useState('single')
   const [historyFilter, setHistoryFilter] = useState('all')
+  const [barcodeMatches, setBarcodeMatches] = useState([])
+  const [barcodeChecked, setBarcodeChecked] = useState('')
+  const [barcodeChecking, setBarcodeChecking] = useState(false)
   const fieldRef = useRef(null)
   const editIdFromUrl = params.get('edit') || ''
   const activeListing = existing.find((item) => item.id === editingId)
@@ -591,6 +594,7 @@ function HostUnifiedListingEditor() {
       setPincodeText((data.listing.packet.delivery?.postalCodes || []).join(', '))
       setEditingId(data.listing.id)
       setRevisingApproved(false)
+      setBarcodeMatches([]); setBarcodeChecked('')
       setActiveTab('single')
     }).catch((cause) => { if (!cancelled && !skipPendingEditLoadRef.current) setError(errorMessage(cause)) })
       .finally(() => { if (!cancelled && !skipPendingEditLoadRef.current) setLoading(false) })
@@ -602,6 +606,18 @@ function HostUnifiedListingEditor() {
     ...current, [key]: current[key].map((item, offset) => offset === index ? { ...item, ...patchValue } : item),
   }))
   const removeRow = (key, index) => setForm((current) => ({ ...current, [key]: current[key].filter((_, offset) => offset !== index) }))
+  async function checkBarcode() {
+    const gtin = String(form.selling?.barcode || '').trim()
+    setBarcodeMatches([]); setBarcodeChecked('')
+    if (!gtin) return
+    setBarcodeChecking(true)
+    try {
+      const result = await checkHostListingBarcode(gtin)
+      setBarcodeMatches(result?.matches || [])
+      setBarcodeChecked(gtin)
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { setBarcodeChecking(false) }
+  }
   function startNew(type) {
     if ((type === 'prepared_food' && usesHospitalityOperations) ||
         (type === 'kitchen_recipe' && workspace === 'chef_restaurant')) {
@@ -617,7 +633,7 @@ function HostUnifiedListingEditor() {
     const packet = newPacket(type)
     packet.delivery.postalCodes = [...savedPostalCodes]
     pincodeEditedRef.current = false
-    setShowOtherAllergen(false); setOtherAllergenName(''); setOtherAllergenStatus('')
+    setShowOtherAllergen(false); setOtherAllergenName(''); setOtherAllergenStatus(''); setBarcodeMatches([]); setBarcodeChecked('')
     setRevisingApproved(false)
     setForm(packet); setPincodeText(savedPostalCodes.join(', ')); setEditingId(''); setError(''); setNotice('')
     setParams({ type }); window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -917,8 +933,15 @@ function HostUnifiedListingEditor() {
                   <EditorField title="Units in one pack"><input className={field} type="number" min="1" step="1" value={form.unitsPerPack ?? ''} onChange={(event) => patch('unitsPerPack', event.target.value)} placeholder="e.g. 1"/></EditorField>
                   <EditorField title="Manufacturer / packer (from label)"><input className={field} maxLength={180} value={form.manufacturerPacker || ''} onChange={(event) => patch('manufacturerPacker', event.target.value)} placeholder="Use actual manufacturer name"/></EditorField>
                   <EditorField title="Serving size (from label)"><input className={field} maxLength={100} value={form.servingSize || ''} onChange={(event) => patch('servingSize', event.target.value)} placeholder="e.g. 30 g"/></EditorField>
-                  <EditorField title="Barcode / GTIN (from label, optional)"><input className={field} type="text" maxLength={100} value={form.selling?.barcode || ''} onChange={(event) => nested('selling', 'barcode', event.target.value)} placeholder="Enter the barcode printed on the pack" autoComplete="off"/></EditorField>
+                  <div className="min-w-0"><EditorField title="Barcode / GTIN (from label, optional)"><input className={field} type="text" inputMode="numeric" maxLength={14} value={form.selling?.barcode || ''} onChange={(event) => { nested('selling', 'barcode', event.target.value.replace(/[^0-9]/g, '').slice(0, 14)); patch('catalogProductVersionId', ''); setBarcodeMatches([]); setBarcodeChecked('') }} placeholder="Enter the barcode printed on the pack" autoComplete="off"/></EditorField><button type="button" disabled={barcodeChecking || !form.selling?.barcode} onClick={checkBarcode} className={`${styles.secondary} mt-2`}>{barcodeChecking ? 'Checking...' : 'Check existing products'}</button></div>
+                  {barcodeChecked === form.selling?.barcode && <div className="min-w-0 rounded-lg border border-[#CBD4C8] bg-white p-3 sm:col-span-2" aria-live="polite">
+                    {barcodeMatches.length ? <><p className="mb-2 font-semibold">This barcode is already in EPANTRY. Select the correct product:</p>{barcodeMatches.map((match) => <label key={match.id} className="flex items-start gap-2 py-2"><input type="radio" name="catalog-match" checked={form.catalogProductVersionId === match.id} onChange={() => patch('catalogProductVersionId', match.id)}/><span>{match.title}</span></label>)}</> : <p>No published product uses this barcode yet. Your listing can be reviewed as a new product.</p>}
+                  </div>}
+                  <div className="sm:col-span-2 lg:col-span-3 grid gap-3 sm:grid-cols-2"><EditorField title="Ingredients printed on label (optional)"><textarea rows={2} className={field} value={form.labelDeclaration?.ingredients || ''} onChange={(event) => nested('labelDeclaration', 'ingredients', event.target.value)} placeholder="Copy the ingredients from the package"/></EditorField><EditorField title="Allergen statement printed on label (optional)"><textarea rows={2} className={field} value={form.labelDeclaration?.allergens || ''} onChange={(event) => nested('labelDeclaration', 'allergens', event.target.value)} placeholder="Copy the exact statement from the package"/></EditorField><EditorField title="Claims printed on label (optional)"><textarea rows={2} className={field} value={form.labelDeclaration?.claims || ''} onChange={(event) => nested('labelDeclaration', 'claims', event.target.value)} placeholder="Enter only claims visible on the package"/></EditorField></div>
                 </>}
+                {isRecipe && <EditorField title="Cuisine (optional)"><input className={field} maxLength={100} value={form.cuisine || ''} onChange={(event) => patch('cuisine', event.target.value)} placeholder="e.g. Indian"/></EditorField>}
+                {isRecipe && <EditorField title="Preparation time (minutes)"><input className={field} type="number" min="0" step="1" value={form.preparationMinutes ?? ''} onChange={(event) => patch('preparationMinutes', event.target.value)}/></EditorField>}
+                {isRecipe && <EditorField title="Cooking time (minutes)"><input className={field} type="number" min="0" step="1" value={form.cookingMinutes ?? ''} onChange={(event) => patch('cookingMinutes', event.target.value)}/></EditorField>}
                 {isRecipe && <EditorField title="Servings / batch yield"><input type="number" min="1" className={field} value={form.baseServings ?? ''} onChange={(event) => patch('baseServings', event.target.value)}/></EditorField>}
                 {isRecipe && <EditorField title="How difficult is this recipe?"><select aria-label="Recipe difficulty" className={field} value={form.difficulty || 'not_declared'} onChange={(event) => patch('difficulty', event.target.value)}><option value="not_declared">Not declared</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></EditorField>}
               </div>
@@ -1011,6 +1034,9 @@ function HostUnifiedListingEditor() {
                   <EditorField title="Amount in purchased pack"><input className={field} type="number" min="0" step="any" value={item.priceQuantity ?? ''} onChange={(event) => updateRow('ingredients', index, { priceQuantity: event.target.value })}/></EditorField>
                   <EditorField title="Purchased pack unit"><select className={field} value={item.priceUnit} onChange={(event) => updateRow('ingredients', index, { priceUnit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
                   <div><EditorField title="Ingredient photo (optional)"><div className="uel-ingredient-photo-line">{item.imageUrl && <img src={item.imageUrl} alt={item.name || 'Ingredient'}/>}<label className="inline-flex min-h-[46px] cursor-pointer items-center gap-2 rounded-lg border border-[#A3B5A4] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35]"><ImagePlus size={17}/> {item.imageUrl ? 'Change photo' : 'Upload photo'}<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={Boolean(uploading)} onChange={(event) => { uploadImage(event.target.files?.[0], 'ingredients', index); event.target.value = '' }}/></label></div></EditorField></div>
+                  <EditorField title="Used as"><select className={field} value={item.role || 'main'} onChange={(event) => updateRow('ingredients', index, { role: event.target.value })}><option value="main">Main ingredient</option><option value="optional">Optional</option><option value="garnish">Garnish</option></select></EditorField>
+                  <EditorField title="Preparation (optional)"><input className={field} maxLength={120} value={item.preparationState || ''} onChange={(event) => updateRow('ingredients', index, { preparationState: event.target.value })} placeholder="e.g. Finely chopped"/></EditorField>
+                  <EditorField title="When changing servings"><select className={field} value={item.scalingRule || 'proportional'} onChange={(event) => updateRow('ingredients', index, { scalingRule: event.target.value })}><option value="proportional">Adjust quantity</option><option value="fixed">Keep quantity fixed</option></select></EditorField>
                   <div className="uel-span-full"><EditorField title="Preparation / purchasing note (optional)"><input className={field} value={item.note || ''} onChange={(event) => updateRow('ingredients', index, { note: event.target.value })} placeholder="Example: Finely chopped, or purchased from local market"/></EditorField></div>
                   <div className="uel-span-full uel-ingredient-cost"><span>Estimated cost used in this recipe</span><strong>{formatMoney(costs[index])}</strong></div>
                 </div>

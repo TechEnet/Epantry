@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   normalizeListingPacket, validateListingPacket, calculateListingEstimate,
-  allowedListingTypes, canHostListType,
+  allowedListingTypes, canHostListType, isValidGtin,
 } from '../src/modules/hostOperations/hostUnifiedListing.logic.js'
 
 const example = (type = 'kitchen_recipe') => normalizeListingPacket({
@@ -66,8 +66,43 @@ test('Unsafe URLs are not persisted as media', () => {
   assert.deepEqual(packet.images, ['https://example.com/test'])
 })
 
-test('Kitchen listings require outlet setup before approval; never after', () => {
+test('Kitchen recipes without a ready-made offer do not require an outlet', () => {
   const packet = example()
   packet.selling.outletId = ''
+  assert.deepEqual(validateListingPacket(packet, { submit: true, workspace: 'chef_restaurant' }), [])
+  packet.sellReadyMade = true
+  packet.selling.salePrice = 250
+  packet.selling.stockQuantity = 2
   assert.match(validateListingPacket(packet, { submit: true, workspace: 'chef_restaurant' }).join(' '), /kitchen outlet/)
+})
+
+test('GTIN check digits are validated before product submission', () => {
+  assert.equal(isValidGtin('4006381333931'), true)
+  assert.equal(isValidGtin('4006381333932'), false)
+  assert.equal(isValidGtin('12345'), false)
+  const product = normalizeListingPacket({
+    type: 'grocery', title: 'Packaged rice', category: 'grocery',
+    images: ['https://example.com/rice.webp'],
+    selling: { barcode: '4006381333932', packQuantity: 1, packUnit: 'kg', salePrice: 100, stockQuantity: 3 },
+    delivery: { postalCodes: ['110001'] },
+  })
+  assert.match(validateListingPacket(product, { submit: true, workspace: 'hybrid' }).join(' '), /valid 8, 12, 13 or 14 digit barcode/)
+})
+
+test('Product label evidence and recipe preparation details survive normalization', () => {
+  const product = normalizeListingPacket({
+    type: 'grocery', labelDeclaration: { ingredients: 'Rice', allergens: 'May contain wheat', claims: 'Gluten free (on label)' },
+    catalogProductVersionId: '507f1f77bcf86cd799439011',
+  })
+  assert.equal(product.labelDeclaration.allergens, 'May contain wheat')
+  assert.equal(product.catalogProductVersionId, '507f1f77bcf86cd799439011')
+  const recipe = normalizeListingPacket({
+    type: 'kitchen_recipe', cuisine: 'Indian', preparationMinutes: 12, cookingMinutes: 40,
+    ingredients: [{ name: 'Coriander', quantity: 2, unit: 'g', role: 'garnish', preparationState: 'Chopped', scalingRule: 'fixed' }],
+  })
+  assert.equal(recipe.cuisine, 'Indian')
+  assert.equal(recipe.cookingMinutes, 40)
+  assert.equal(recipe.ingredients[0].role, 'garnish')
+  assert.equal(recipe.ingredients[0].preparationState, 'Chopped')
+  assert.equal(recipe.ingredients[0].scalingRule, 'fixed')
 })

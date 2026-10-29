@@ -9,6 +9,11 @@ const listingPacketSchema = new mongoose.Schema({
   publicSlug: { type: String, default: undefined, trim: true, lowercase: true, maxlength: 200, unique: true, sparse: true },
   status: { type: String, enum: ['draft', 'submitted_for_review', 'changes_requested', 'approved', 'rejected'], default: 'draft', index: true },
   packet: { type: mongoose.Schema.Types.Mixed, required: true },
+  // Last Super Admin-approved content. Never expose a pending Host revision.
+  publishedPacket: { type: mongoose.Schema.Types.Mixed, default: null },
+  publishedTitle: { type: String, default: '' },
+  publishedType: { type: String, default: '' },
+  publishedRevision: { type: Number, default: 0 },
   deletedAt: { type: Date, default: null, index: true },
   deletedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   submittedAt: { type: Date, default: null },

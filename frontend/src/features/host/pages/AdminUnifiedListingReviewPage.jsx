@@ -278,7 +278,7 @@ export default function AdminUnifiedListingReviewPage() {
                 {selected.submittedAt && <span className="inline-flex items-center gap-1.5"><Clock3 size={14} aria-hidden="true" /> {readableDate(selected.submittedAt)}</span>}
               </p>
               <p className="mt-4 max-w-[75ch] whitespace-pre-line break-words text-[16px] leading-[1.65] text-[#465C4D]">{packet.description || 'No description provided by the Host.'}</p>
-              {(packet.countryOfOrigin || packet.regionOfOrigin || (isRecipeListing && packet.localRecipeName) || (!isRecipeListing && (packet.productFamily || packet.manufacturerPacker || packet.unitsPerPack || packet.servingSize || packet.selling?.barcode))) && (
+              {(packet.countryOfOrigin || packet.regionOfOrigin || (isRecipeListing && (packet.localRecipeName || packet.cuisine || packet.preparationMinutes || packet.cookingMinutes)) || (!isRecipeListing && (packet.productFamily || packet.manufacturerPacker || packet.unitsPerPack || packet.servingSize || packet.selling?.barcode || packet.catalogProductVersionId || packet.labelDeclaration?.ingredients || packet.labelDeclaration?.allergens || packet.labelDeclaration?.claims))) && (
                 <dl className="mt-4 grid min-w-0 gap-x-5 gap-y-2 border-t border-[#E1E7DD] pt-3 text-[15px] sm:grid-cols-2">
                   {[
                     ['Country of origin', packet.countryOfOrigin],
@@ -287,16 +287,28 @@ export default function AdminUnifiedListingReviewPage() {
                       ['Local recipe name', packet.localRecipeName],
                       ['Local language', packet.localRecipeLanguage],
                       ['English reading', packet.englishNameReading],
+                      ['Cuisine', packet.cuisine],
+                      ['Preparation time', packet.preparationMinutes == null ? '' : `${packet.preparationMinutes} min`],
+                      ['Cooking time', packet.cookingMinutes == null ? '' : `${packet.cookingMinutes} min`],
                     ] : [
                       ['Product family', packet.productFamily],
                       ['Units per pack', packet.unitsPerPack],
                       ['Manufacturer / packer', packet.manufacturerPacker],
                       ['Serving size', packet.servingSize],
                       ['Barcode / GTIN', packet.selling?.barcode],
+                      ['Matching catalog ID', packet.catalogProductVersionId],
                     ]),
                   ].filter(([,value]) => value !== null && value !== undefined && value !== '').map(([label,value]) => (
                     <div key={label} className="min-w-0"><dt className="text-[13px] text-[#6D766E]">{label}</dt><dd className="break-words font-semibold text-[#173F35]">{String(value)}</dd></div>
                   ))}
+                  {!isRecipeListing && (packet.labelDeclaration?.ingredients || packet.labelDeclaration?.allergens || packet.labelDeclaration?.claims) && <div className="col-span-full mt-2 border-t border-[#E1E7DD] pt-3">
+                    <h4 className="font-semibold text-[#173F35]">Product label details</h4>
+                    {[
+                      ['Ingredients on label', packet.labelDeclaration?.ingredients],
+                      ['Allergen statement on label', packet.labelDeclaration?.allergens],
+                      ['Claims on label', packet.labelDeclaration?.claims],
+                    ].filter(([, value]) => value).map(([label, value]) => <p key={label} className="mt-2 break-words text-[15px]"><strong>{label}:</strong> {value}</p>)}
+                  </div>}
                   <p className="col-span-full text-[13px] text-[#855C44]">Host-declared details. Verify against submitted evidence before approval.</p>
                 </dl>
               )}
@@ -314,6 +326,10 @@ export default function AdminUnifiedListingReviewPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="break-words text-[16px] font-semibold leading-5 text-[#173F35]">{item.name || 'Unnamed ingredient'}</p>
+                {(item.preparationState || item.role || item.scalingRule === 'fixed') && <p className="mt-1 break-words text-[13px] text-[#566A5B]">{[
+                  item.role && item.role !== 'main' ? item.role : '', item.preparationState,
+                  item.scalingRule === 'fixed' ? 'Quantity stays the same for all servings' : '',
+                ].filter(Boolean).join(' · ')}</p>}
                 <p className="mt-1 break-words text-[14px] leading-5 text-[#68796C]">{item.unitPrice == null ? 'Purchase price not supplied' : `${money(item.unitPrice)} per ${item.priceQuantity || ''} ${item.priceUnit || ''}`}</p>
               </div>
               <span className="shrink-0 text-right text-[16px] font-semibold tabular-nums text-[#2B5140]">{show(item.quantity)} {item.unit || ''}</span>
