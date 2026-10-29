@@ -57,15 +57,68 @@ export default function BookmarkButton({ kind, slug, title = 'this item', classN
       </button>
       {error && <span role="alert" className="absolute right-2 top-14 z-30 max-w-56 rounded-lg bg-[#F7F6F2] px-3 py-2 text-xs font-semibold text-[#A34B32] shadow-md">{error}</span>}
       {loginPrompt && createPortal(
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#122921]/65 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setLoginPrompt(false) }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="bookmark-login-title" className="relative w-full max-w-[430px] rounded-[22px] border border-[#DCE0CF] bg-[#F0F2EB] p-6 shadow-2xl sm:p-7">
-            <button type="button" aria-label="Close" onClick={() => setLoginPrompt(false)} className="focus-ring absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-[#DCE0CF] bg-white"><X size={18}/></button>
-            <span className="inline-flex size-11 items-center justify-center rounded-xl bg-[#F5DCCD] text-[#173F35]"><Bookmark size={22}/></span>
-            <h2 id="bookmark-login-title" className="mt-4 text-[25px] font-bold leading-tight text-[#173F35]">Save it for later</h2>
-            <p className="mt-2 text-[15px] leading-6 text-[#53665B]">Sign in as a Customer to bookmark {title}. Your saved recipes and groceries stay together in one place.</p>
-            <div className="mt-6 flex gap-3">
-              <button type="button" onClick={() => setLoginPrompt(false)} className="focus-ring flex-1 rounded-xl border border-[#D3D9CF] px-4 py-3 text-sm font-semibold text-[#173F35]">Not now</button>
-              <button type="button" onClick={() => { setLoginPrompt(false); navigate(`/login?returnTo=${encodeURIComponent(loginTarget)}`) }} className="focus-ring flex-1 rounded-xl bg-[#173F35] px-4 py-3 text-sm font-semibold text-white">Sign in</button>
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#102B22]/65 px-4 py-5"
+          role="presentation"
+          onMouseDown={event => { if (event.target === event.currentTarget) setLoginPrompt(false) }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bookmark-login-title"
+            aria-describedby="bookmark-login-description"
+            className="relative overflow-hidden rounded-[20px] border border-[#D6DDD3] bg-[#F4F5F0] shadow-[0_24px_70px_rgba(16,43,34,0.28)]"
+            style={{ boxSizing: 'border-box', width: '100%', maxWidth: '440px', flex: '0 1 440px' }}
+          >
+            <div className="h-[4px] bg-[#C86C42]" aria-hidden="true" />
+            <div className="relative px-5 pb-5 pt-6 sm:px-7 sm:pb-7">
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setLoginPrompt(false)}
+                className="focus-ring absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-[#D6DDD3] bg-[#F7F6F2] text-[#173F35] transition hover:bg-[#E4EAE1]"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="flex items-center gap-3 pr-10">
+                <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-[#F5D9C9] text-[#173F35]">
+                  <Bookmark size={20} strokeWidth={1.9} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <span className="block text-[12px] font-bold uppercase tracking-[0.10em] text-[#AF5637]">YOUR SAVED ITEMS</span>
+                  <div
+                    id="bookmark-login-title"
+                    role="heading"
+                    aria-level="2"
+                    className="mt-0.5 font-bold text-[#173F35]"
+                    style={{ fontSize: '24px', lineHeight: '1.24' }}
+                  >
+                    Save this {kind === 'recipe' ? 'recipe' : 'product'}
+                  </div>
+                </div>
+              </div>
+
+              <p id="bookmark-login-description" className="mt-4 text-[15px] leading-[1.6] text-[#496056]">
+                Sign in as a Customer to bookmark <strong className="font-semibold text-[#173F35]">{title}</strong> and find it anytime in Saved items.
+              </p>
+
+              <div className="mt-5 flex gap-3 border-t border-[#D7DFD6] pt-5">
+                <button
+                  type="button"
+                  onClick={() => setLoginPrompt(false)}
+                  className="focus-ring min-h-11 flex-1 rounded-[11px] border border-[#C9D5CA] bg-[#F7F6F2] px-3 py-2.5 text-[15px] font-semibold text-[#173F35] transition hover:bg-[#E5EBE2]"
+                >
+                  Not now
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLoginPrompt(false); navigate(`/login?returnTo=${encodeURIComponent(loginTarget)}`) }}
+                  className="focus-ring min-h-11 flex-1 rounded-[11px] bg-[#173F35] px-3 py-2.5 text-[15px] font-semibold text-[#F7F6F2] transition hover:bg-[#225744]"
+                >
+                  Sign in
+                </button>
+              </div>
             </div>
           </section>
         </div>, document.body,
