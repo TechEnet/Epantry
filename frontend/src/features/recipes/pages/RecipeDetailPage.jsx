@@ -37,6 +37,7 @@ import {
 
 import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
+import { publicImageProps, publicImageVariant } from '../../../lib/publicMediaDelivery'
 
 import {
   useAuth,
@@ -810,6 +811,7 @@ function RecommendedRecipeCard({
         {dish.heroImageUrl ? (
           <img
             src={dish.heroImageUrl}
+            {...publicImageProps(dish.heroImageUrl, { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, 28vw" })}
             alt={dish.name || getRecipeRecommendationName(item)}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
           />
@@ -4942,7 +4944,8 @@ export default function RecipeDetailPage() {
                   src={data.hostSubmission.videoUrl}
                   controls
                   playsInline
-                  preload="metadata"
+                  preload="none"
+                  poster={publicImageVariant(dish.heroImageUrl, 960) || undefined}
                   className="h-full w-full bg-[#173F35] object-contain"
                   aria-label={`${dish.name || 'Recipe'} preparation video`}
                 />
@@ -4965,6 +4968,7 @@ export default function RecipeDetailPage() {
                   src={
                     dish.heroImageUrl
                   }
+                  {...publicImageProps(dish.heroImageUrl, { widths: [640, 960, 1280], sizes: "(max-width: 1024px) 100vw, 85vw", priority: true })}
                   alt={
                     dish.name
                   }
@@ -5579,7 +5583,7 @@ export default function RecipeDetailPage() {
                         title={`Explore ${identity.name || 'ingredient'}`}
                       >
                         {(ingredient.imageUrl || identity.imageUrl) ? (
-                          <img src={ingredient.imageUrl || identity.imageUrl} alt={identity.name || 'Ingredient'} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover/ingredient:scale-110" />
+                          <img src={ingredient.imageUrl || identity.imageUrl} {...publicImageProps(ingredient.imageUrl || identity.imageUrl, { widths: [160, 320], sizes: "90px" })} alt={identity.name || 'Ingredient'} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover/ingredient:scale-110" />
                         ) : <Leaf size={19} aria-hidden="true" />}
                         <ArrowUpRight size={12} aria-hidden="true" className="absolute bottom-0 right-0 rounded-tl bg-white/90 text-[#C86C42]" />
                       </Link>

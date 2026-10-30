@@ -469,9 +469,58 @@ function IngredientNameInput({ ingredient, onChange, className }) {
   }, [ingredient.name, ingredient.canonicalIngredientId])
   return <div className="relative">
     <input aria-label="Ingredient name" className={className} value={ingredient.name || ''} onChange={(event) => onChange({ name: event.target.value, canonicalIngredientId: '' })} placeholder="Search an EPANTRY ingredient" autoComplete="off"/>
-    {matches.length > 0 && <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#CBD4C8] bg-white shadow-lg">{matches.map((match) => <button type="button" key={match.id} className="block w-full px-3 py-2 text-left text-sm hover:bg-[#EDF1E9]" onClick={() => { onChange({ name: match.canonicalName, canonicalIngredientId: match.id }); setMatches([]) }}>{match.canonicalName}</button>)}</div>}
+    {matches.length > 0 && <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#CBD4C8] bg-white shadow-lg">{matches.map((match) => <button type="button" key={match.id} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#EDF1E9]" onClick={() => {
+      onChange({ name: match.canonicalName, canonicalIngredientId: match.id, imageUrl: ingredient.canonicalIngredientId && ingredient.canonicalIngredientId !== match.id ? (match.imageUrl || '') : (ingredient.imageUrl || match.imageUrl || '') })
+      setMatches([])
+    }}>{match.imageUrl ? <img src={match.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" loading="lazy"/> : <span className="h-10 w-10 shrink-0 rounded-md bg-[#E8EEE6]" aria-hidden="true"/>}<span><span className="block font-semibold">{match.canonicalName}</span>{match.imageUrl && <span className="block text-xs text-[#557366]">EPANTRY photo available · no upload needed</span>}</span></button>)}</div>}
     {ingredient.canonicalIngredientId && <p className="mt-1 text-xs text-[#173F35]">Matched with EPANTRY ingredient</p>}
     {searchError && <p className="mt-1 text-xs text-[#9A4F31]">{searchError}</p>}
+  </div>
+}
+
+
+// Existing images are referenced by URL, never re-uploaded or copied.
+// A Host can always replace or remove the suggested image.
+function IngredientPhotoPicker({ ingredient, index, uploadImage, uploading, onChange }) {
+  const [suggestion, setSuggestion] = useState(null)
+  useEffect(() => {
+    const name = String(ingredient.name || '').trim()
+    if (name.length < 2) { setSuggestion(null); return undefined }
+    let active = true
+    const timer = setTimeout(async () => {
+      try {
+        const found = await searchHostListingIngredients({ search: name, limit: 12 })
+        const match = (found?.ingredients || []).find(entry =>
+          (ingredient.canonicalIngredientId && String(entry.id) === String(ingredient.canonicalIngredientId)) ||
+          String(entry.canonicalName || '').trim().toLowerCase() === name.toLowerCase() ||
+          (entry.aliases || []).some(alias => String(alias).trim().toLowerCase() === name.toLowerCase()),
+        )
+        if (active) setSuggestion(match?.imageUrl ? match : null)
+      } catch { if (active) setSuggestion(null) }
+    }, 420)
+    return () => { active = false; clearTimeout(timer) }
+  }, [ingredient.name, ingredient.canonicalIngredientId])
+  const existing = suggestion?.imageUrl || ''
+  const selected = Boolean(ingredient.imageUrl)
+  const usingSuggested = selected && Boolean(existing) && ingredient.imageUrl === existing
+  return <div className="flex min-w-0 flex-col gap-2">
+    {selected && <div className="flex items-center gap-3 rounded-lg border border-[#CBD4C8] bg-white p-2">
+      <img src={ingredient.imageUrl} alt={`${ingredient.name || 'Ingredient'} photo`} className="h-16 w-16 shrink-0 rounded-md object-cover" loading="lazy"/>
+      <span className="text-[13px] font-semibold text-[#173F35]">{usingSuggested ? 'Using EPANTRY photo — no new upload' : 'Selected ingredient photo'}</span>
+    </div>}
+    {existing && !usingSuggested && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#B9CFBE] bg-[#EDF4EB] p-2">
+      <img src={existing} alt={`${ingredient.name || 'Ingredient'} photo available in EPANTRY`} className="h-16 w-16 shrink-0 rounded-md object-cover" loading="lazy"/>
+      <div className="min-w-0 flex-1"><p className="text-[13px] font-semibold text-[#173F35]">EPANTRY photo available</p>
+        <p className="text-[12px] text-[#557366]">Use this photo without uploading it again.</p></div>
+      <button type="button" className="rounded-md border border-[#56806B] bg-white px-3 py-2 text-[13px] font-semibold text-[#173F35]" onClick={() => onChange({ imageUrl: existing, canonicalIngredientId: suggestion.id })}>Use existing photo</button>
+    </div>}
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="inline-flex min-h-[46px] cursor-pointer items-center gap-2 rounded-lg border border-[#A3B5A4] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35]">
+        <ImagePlus size={17}/> {selected ? 'Upload my own photo' : 'Upload photo'}
+        <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={Boolean(uploading)} onChange={(event) => { uploadImage(event.target.files?.[0], 'ingredients', index); event.target.value = '' }}/>
+      </label>
+      {selected && <button type="button" onClick={() => onChange({ imageUrl: '' })} className="min-h-[46px] rounded-lg border border-[#D2B6A5] bg-[#FAF0E9] px-3 py-2 text-[13px] font-semibold text-[#7C4933]">Remove photo</button>}
+    </div>
   </div>
 }
 
@@ -1382,7 +1431,7 @@ function HostUnifiedListingEditor() {
                   <EditorField title="Price paid for purchased pack (₹)"><input className={field} type="number" min="0" step="0.01" value={item.unitPrice ?? ''} onChange={(event) => updateRow('ingredients', index, { unitPrice: event.target.value })}/></EditorField>
                   <EditorField title="Amount in purchased pack"><input className={field} type="number" min="0" step="any" value={item.priceQuantity ?? ''} onChange={(event) => updateRow('ingredients', index, { priceQuantity: event.target.value })}/></EditorField>
                   <EditorField title="Purchased pack unit"><select className={field} value={item.priceUnit} onChange={(event) => updateRow('ingredients', index, { priceUnit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
-                  <div><EditorField title="Ingredient photo (optional)"><div className="uel-ingredient-photo-line">{item.imageUrl && <img src={item.imageUrl} alt={item.name || 'Ingredient'}/>}<label className="inline-flex min-h-[46px] cursor-pointer items-center gap-2 rounded-lg border border-[#A3B5A4] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35]"><ImagePlus size={17}/> {item.imageUrl ? 'Change photo' : 'Upload photo'}<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={Boolean(uploading)} onChange={(event) => { uploadImage(event.target.files?.[0], 'ingredients', index); event.target.value = '' }}/></label></div></EditorField></div>
+                  <div><EditorField title="Ingredient photo (optional)"><IngredientPhotoPicker ingredient={item} index={index} uploading={uploading} uploadImage={uploadImage} onChange={(value) => updateRow('ingredients', index, value)}/></EditorField></div>
                   <EditorField title="Used as"><select className={field} value={item.role || 'main'} onChange={(event) => updateRow('ingredients', index, { role: event.target.value })}><option value="main">Main ingredient</option><option value="optional">Optional</option><option value="garnish">Garnish</option></select></EditorField>
                   <EditorField title="Preparation (optional)"><input className={field} maxLength={120} value={item.preparationState || ''} onChange={(event) => updateRow('ingredients', index, { preparationState: event.target.value })} placeholder="e.g. Finely chopped"/></EditorField>
                   <EditorField title="When changing servings"><select className={field} value={item.scalingRule || 'proportional'} onChange={(event) => updateRow('ingredients', index, { scalingRule: event.target.value })}><option value="proportional">Adjust quantity</option><option value="fixed">Keep quantity fixed</option></select></EditorField>

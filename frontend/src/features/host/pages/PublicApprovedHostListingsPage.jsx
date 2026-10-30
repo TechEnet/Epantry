@@ -1,3 +1,4 @@
+import { publicImageProps } from '../../../lib/publicMediaDelivery'
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../auth/context/AuthContext";
@@ -154,6 +155,7 @@ export default function PublicApprovedHostListingsPage() {
                     {row.images[0] && (
                       <img
                         src={row.images[0]}
+                        {...publicImageProps(row.images[0], { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 24vw" })}
                         alt=""
                         className="aspect-[4/3] w-full object-cover"
                       />

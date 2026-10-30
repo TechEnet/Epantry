@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { publicImageProps } from '../../../lib/publicMediaDelivery'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowDown,
@@ -57,6 +58,7 @@ function GroceryTile({ product }) {
         {image ? (
           <img
             src={image}
+            {...publicImageProps(image, { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 24vw" })}
             alt={product?.image?.alt || title}
             loading="lazy"
             className="h-full w-full object-contain p-3 transition-transform duration-500 group-hover:scale-[1.035] motion-reduce:transform-none sm:p-4"
@@ -364,7 +366,7 @@ export default function GroceryPage() {
 
           {hostGroceryListings.length > 0 && !categorySlug && !brandSlug && !search && <section className="mt-6 border-y border-[#D7DDCF] py-4" aria-label="Approved Host grocery submissions">
             <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">Recently approved Host groceries</h3><Link to="/explore/host-listings?category=grocery" className="text-sm font-semibold text-[#173F35] underline">View all</Link></div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{hostGroceryListings.slice(0, 4).map((item) => <Link key={item.id} to={`/explore/host-listings?category=grocery&item=${encodeURIComponent(item.id)}`} className="overflow-hidden border border-[#D7DDCF] bg-white hover:border-[#173F35]">{item.images?.[0] && <img src={item.images[0]} alt="" className="aspect-[4/3] w-full object-cover"/>}<div className="p-3"><p className="text-sm font-semibold text-[#C86C42]">Host-approved submission</p><h4 className="mt-1 text-base font-semibold">{item.title}</h4><p className="mt-1 text-xs text-[#526257]">Not yet a verified marketplace offer</p></div></Link>)}</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{hostGroceryListings.slice(0, 4).map((item) => <Link key={item.id} to={`/explore/host-listings?category=grocery&item=${encodeURIComponent(item.id)}`} className="overflow-hidden border border-[#D7DDCF] bg-white hover:border-[#173F35]">{item.images?.[0] && <img src={item.images[0]} {...publicImageProps(item.images[0], { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 24vw" })} alt="" className="aspect-[4/3] w-full object-cover"/>}<div className="p-3"><p className="text-sm font-semibold text-[#C86C42]">Host-approved submission</p><h4 className="mt-1 text-base font-semibold">{item.title}</h4><p className="mt-1 text-xs text-[#526257]">Not yet a verified marketplace offer</p></div></Link>)}</div>
           </section>}
           {error && <div role="alert" className="mt-5 rounded-[12px] border border-[#C86C42] bg-[#F7F6F2] p-4 text-sm text-[#202421]"><CircleAlert size={18} aria-hidden="true" className="mr-2 inline" />{error}</div>}
           {loading && products.length === 0 ? (

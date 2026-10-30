@@ -1,7 +1,6 @@
 // Fetch public Drive image URLs through Cloudinary without accepting arbitrary remote hosts.
 // A Host must grant "Anyone with the link: Viewer" for each Drive image file.
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
-const ACCEPTED_FORMATS = new Set(['jpg', 'jpeg', 'png', 'webp'])
 
 function importError(message, code = 'MEDIA_IMPORT_FAILED') {
   const error = new Error(message)
@@ -50,12 +49,15 @@ async function uploadPublicImage({ cloudName, apiKey, apiSecret }, remoteUrl) {
   const form = new FormData()
   form.append('file', remoteUrl)
   form.append('folder', 'epantry/host-bulk-listings')
+  // Compress the STORED remote asset, not only the public CDN response. This
+  // matches signed Host image uploads and keeps customer delivery lightweight.
+  form.append('transformation', 'c_limit,h_2048,w_2048,q_auto:good,f_webp')
   const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')
   const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`
   const result = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Basic ${auth}` }, body: form, signal: AbortSignal.timeout(25000) })
   const json = await result.json().catch(() => ({}))
   if (!result.ok || !json.secure_url) throw importError('Image could not be fetched from Google Drive. Check that the file is an image and sharing is Anyone with the link: Viewer.')
-  if (json.resource_type !== 'image' || !ACCEPTED_FORMATS.has(String(json.format || '').toLowerCase()) || !Number.isFinite(Number(json.bytes)) || Number(json.bytes) > MAX_IMAGE_BYTES) throw importError('Only JPG, PNG and WebP images up to 8 MB are allowed.')
+  if (json.resource_type !== 'image' || String(json.format || '').toLowerCase() !== 'webp' || !Number.isFinite(Number(json.bytes)) || Number(json.bytes) <= 0 || Number(json.bytes) > MAX_IMAGE_BYTES) throw importError('Imported image could not be optimized to an allowed WebP file (8 MB maximum).')
   return json.secure_url
 }
 

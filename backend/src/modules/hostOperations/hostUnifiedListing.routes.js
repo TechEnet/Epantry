@@ -222,10 +222,104 @@ router.get('/host/listing-packets/catalog/ingredients', ...readSecurity, wrap(as
   const rows = await CanonicalIngredient.find({
     status: 'active',
     $or: [{ canonicalName: expression }, { aliases: expression }, { slug: expression }],
-  }).sort({ canonicalName: 1 }).limit(limit).select('_id canonicalName slug aliases').lean()
+  }).sort({ canonicalName: 1 }).limit(limit).select('_id canonicalName slug aliases attributes.approvedImageUrl').lean()
+
+  // Reuse only an approved catalog image or an image from an already-published
+  // Host recipe. Never suggest pictures from pending drafts or unapproved edits.
+  const approvedImage = value => {
+    try {
+      const url = new URL(String(value || ''))
+      return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''
+    } catch { return '' }
+  }
+  const imageById = new Map()
+  const unmatched = rows.filter(row => {
+    const photo = approvedImage(row.attributes?.approvedImageUrl)
+    if (photo) imageById.set(String(row._id), { imageUrl: photo, imageSource: 'EPANTRY catalog' })
+    return !photo
+  })
+  if (unmatched.length) {
+    const ids = unmatched.map(row => String(row._id))
+    const exactNames = unmatched.flatMap(row => [row.canonicalName, ...(row.aliases || [])])
+      .filter(Boolean).map(name => new RegExp(`^${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
+    const eligibleIngredient = {
+      imageUrl: { $type: 'string', $ne: '' },
+      $or: [{ canonicalIngredientId: { $in: ids } }, { name: { $in: exactNames } }],
+    }
+    const published = await HostUnifiedListingPacket.find({ deletedAt: null, $or: [
+      { publishedPacket: { $exists: true, $ne: null }, 'publishedPacket.ingredients': { $elemMatch: eligibleIngredient } },
+      { status: 'approved', 'packet.ingredients': { $elemMatch: eligibleIngredient } },
+    ] }).select('status packet.ingredients publishedPacket.ingredients approvedAt')
+      .sort({ approvedAt: -1 }).limit(60).lean()
+    for (const record of published) {
+      const ingredients = record.publishedPacket?.ingredients ||
+        (record.status === 'approved' ? record.packet?.ingredients : []) || []
+      for (const entry of ingredients) {
+        const photo = approvedImage(entry?.imageUrl)
+        if (!photo) continue
+        for (const row of unmatched) {
+          const id = String(row._id)
+          if (imageById.has(id)) continue
+          const identicalId = entry?.canonicalIngredientId && String(entry.canonicalIngredientId) === id
+          const possibleNames = [row.canonicalName, ...(row.aliases || [])]
+          const identicalName = possibleNames.some(name => String(name).trim().toLowerCase() === String(entry.name || '').trim().toLowerCase())
+          if (identicalId || identicalName) imageById.set(id, { imageUrl: photo, imageSource: 'EPANTRY approved listing' })
+        }
+      }
+    }
+    // A plain ingredient may already have a photo as an approved grocery
+    // item (for example, a grocery listing titled exactly "Garlic"). Never
+    // reuse a different packaged/brand product's picture by fuzzy matching.
+    const stillMissing = unmatched.filter(row => !imageById.has(String(row._id)))
+    if (stillMissing.length) {
+      const names = stillMissing.flatMap(row => [row.canonicalName, ...(row.aliases || [])])
+        .filter(Boolean).map(name => new RegExp(`^${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
+      const groceries = await HostUnifiedListingPacket.find({ deletedAt: null, $or: [
+        { publishedType: 'grocery', 'publishedPacket.title': { $in: names }, 'publishedPacket.images.0': { $exists: true } },
+        { status: 'approved', type: 'grocery', title: { $in: names }, 'packet.images.0': { $exists: true } },
+      ] }).select('status type title packet.images publishedPacket.images publishedPacket.title publishedType')
+        .sort({ approvedAt: -1 }).limit(40).lean()
+      for (const record of groceries) {
+        const packet = record.publishedPacket || (record.status === 'approved' ? record.packet : null)
+        const name = String(record.publishedPacket ? record.publishedPacket.title : record.title || '').trim().toLowerCase()
+        const photo = approvedImage(packet?.images?.[0])
+        if (!photo) continue
+        for (const row of stillMissing) {
+          const id = String(row._id)
+          if (!imageById.has(id) && [row.canonicalName, ...(row.aliases || [])].some(label => String(label).trim().toLowerCase() === name)) {
+            imageById.set(id, { imageUrl: photo, imageSource: 'EPANTRY approved grocery' })
+          }
+        }
+      }
+      // Include older canonical catalog items when no Host photo was found.
+      // Exact published product names only; do not mistake a branded pack of
+      // garlic seasoning for a plain garlic ingredient photograph.
+      const withoutPhoto = stillMissing.filter(row => !imageById.has(String(row._id)))
+      if (withoutPhoto.length) {
+        const canonicalNames = withoutPhoto.flatMap(row => [row.canonicalName, ...(row.aliases || [])])
+          .filter(Boolean).map(name => new RegExp(`^${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
+        const versions = await ProductVersion.find({ publicationStatus: 'published',
+          displayName: { $in: canonicalNames }, 'images.0': { $exists: true },
+        }).select('displayName images.url').limit(30).lean()
+        for (const version of versions) {
+          const image = approvedImage(version.images?.[0]?.url)
+          if (!image) continue
+          for (const row of withoutPhoto) {
+            const id = String(row._id)
+            if (!imageById.has(id) && [row.canonicalName, ...(row.aliases || [])].some(name =>
+              String(name).trim().toLowerCase() === String(version.displayName || '').trim().toLowerCase())) {
+              imageById.set(id, { imageUrl: image, imageSource: 'EPANTRY published product' })
+            }
+          }
+        }
+      }
+    }
+  }
   respond(res, { ingredients: rows.map(row => ({
     id: String(row._id), canonicalName: row.canonicalName, slug: row.slug,
     aliases: row.aliases || [],
+    imageUrl: imageById.get(String(row._id))?.imageUrl || '',
+    imageSource: imageById.get(String(row._id))?.imageSource || '',
   })) })
 }))
 

@@ -20,6 +20,7 @@ import {
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "../../../api/apiClient";
+import { publicImageProps } from "../../../lib/publicMediaDelivery";
 
 import { Link, useParams } from "react-router-dom";
 
@@ -1557,6 +1558,7 @@ function RecommendationProductCard({ product }) {
         {imageUrl ? (
           <img
             src={imageUrl}
+            {...publicImageProps(imageUrl, { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, 30vw" })}
             alt={product?.image?.alt || product?.displayName || "Product"}
             className="h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.04]"
           />
@@ -1630,6 +1632,7 @@ function CountryListingCard({ listing }) {
         {imageUrl ? (
           <img
             src={imageUrl}
+            {...publicImageProps(imageUrl, { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, 30vw" })}
             alt={title}
             className="h-full w-full object-cover"
           />
@@ -2152,7 +2155,7 @@ export default function ProductDetailPage() {
                     {item.type === "details" ? (
                       <ProductDetailsSheet product={product} />
                     ) : (
-                      <img src={item.image.url} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-5" />
+                      <img {...publicImageProps(item.image.url, { widths: [480, 720, 960], sizes: "(max-width: 640px) 88vw, 45vw" })} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-5" />
                     )}
                   </div>
                 ))}
@@ -2169,7 +2172,7 @@ export default function ProductDetailPage() {
                 onMouseLeave={() => setZoomPreview(null)}
               >
                 {selectedProductPhoto?.url ? (
-                  <img src={selectedProductPhoto.url} alt={selectedProductPhoto.alt || product.displayName} className="h-full w-full object-contain drop-shadow-[0_15px_25px_rgba(20,54,42,0.10)] transition-opacity duration-300" />
+                  <img {...publicImageProps(selectedProductPhoto.url, { widths: [640, 960, 1280], sizes: "(max-width: 1280px) 52vw, 48vw", priority: true })} alt={selectedProductPhoto.alt || product.displayName} className="h-full w-full object-contain drop-shadow-[0_15px_25px_rgba(20,54,42,0.10)] transition-opacity duration-300" />
                 ) : (
                   <span className="flex flex-col items-center gap-3 text-[#849187]"><Package size={72} strokeWidth={1.1} aria-hidden="true" /><span className="text-sm">Product image not available</span></span>
                 )}
@@ -2221,7 +2224,7 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <img src={item.image.url} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-1.5" />
+                    <img {...publicImageProps(item.image.url, { widths: [160, 320], sizes: "88px" })} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-1.5" />
                   )}
                 </button>
               ))}
@@ -2353,6 +2356,7 @@ export default function ProductDetailPage() {
                       >
                         <img
                           src={item.image.url}
+                          {...publicImageProps(item.image.url, { widths: [480, 720, 960, 1280], sizes: "(max-width: 640px) 94vw, 50vw" })}
                           alt={item.image.alt || product.displayName}
                           className="h-full w-full object-contain p-5 sm:p-8"
                         />

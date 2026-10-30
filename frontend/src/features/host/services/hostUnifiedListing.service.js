@@ -1,3 +1,4 @@
+import { optimizeUploadImage } from '../../../lib/optimizeUploadImage'
 import { apiClient } from '../../../api/apiClient'
 
 const unwrap = (response) => response?.data?.data ?? response?.data ?? null
@@ -80,20 +81,28 @@ export async function uploadHostListingVideo(file) {
 
 export async function uploadHostListingImage(file) {
   if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG or WebP image.')
+  // Keep the original 8 MB input cap and optimize before the signed upload.
+  // Evidence labels retain a readable 2048 px source and a 1.4 MB target.
+  if (file.size > 8 * 1024 * 1024) throw new Error('Image exceeds the 8 MB upload limit.')
+  const uploadFile = await optimizeUploadImage(file, { maxEdge: 2048, targetBytes: 1400 * 1024 })
   const intentResult = await write('post', '/host/listing-packets/image-upload-intent', {})
   const intent = intentResult?.uploadIntent
   if (!intent?.signature || !intent?.uploadUrl || !intent?.apiKey) throw new Error('Image upload is unavailable.')
-  if (file.size > (intent.constraints?.maxBytes || 0)) throw new Error('Image exceeds the 8 MB upload limit.')
+  if (uploadFile.size > (intent.constraints?.maxBytes || 0)) throw new Error('Image exceeds the 8 MB upload limit.')
   const data = new FormData()
-  data.append('file', file)
+  data.append('file', uploadFile)
   data.append('api_key', intent.apiKey)
   data.append('signature', intent.signature)
   Object.entries(intent.signedParameters || {}).forEach(([key, value]) => data.append(key, String(value)))
   const response = await fetch(intent.uploadUrl, { method: 'POST', body: data })
   const json = await response.json().catch(() => ({}))
   if (!response.ok || !json.secure_url) throw new Error(json?.error?.message || 'Image upload failed.')
-  if (json.resource_type !== 'image' || json.format !== 'webp') {
-    throw new Error('Image optimization did not return the expected WebP. Please retry.')
+  // Cloudinary may return the uploaded format even when its signed incoming
+  // transformation or CDN delivery will optimize the image. A valid JPG/PNG
+  // response is not an upload failure; browser-side WebP conversion is best effort.
+  const uploadedFormat = String(json.format || '').toLowerCase()
+  if (json.resource_type !== 'image' || !['jpg', 'jpeg', 'png', 'webp'].includes(uploadedFormat)) {
+    throw new Error('Image upload returned an unsupported format. Choose a JPG, PNG or WebP image.')
   }
   return json.secure_url
 }

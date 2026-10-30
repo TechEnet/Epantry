@@ -12,6 +12,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Link } from "react-router-dom";
+import { publicImageProps } from "../../../lib/publicMediaDelivery";
 import BookmarkButton from "../../bookmarks/components/BookmarkButton";
 
 import { listPublicRecipes } from "../services/recipe.service";
@@ -318,6 +319,7 @@ function RecipeTile({ item, restaurant = false }) {
         {recipeImage(item) ? (
           <img
             src={recipeImage(item)}
+            {...publicImageProps(recipeImage(item), { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 24vw" })}
             alt={title}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.035] motion-reduce:transform-none"
@@ -1324,6 +1326,7 @@ export default function RecipesPage() {
                     {item.images?.[0] && (
                       <img
                         src={item.images[0]}
+                        {...publicImageProps(item.images[0], { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 24vw" })}
                         alt=""
                         className="aspect-[4/3] w-full object-cover"
                       />
