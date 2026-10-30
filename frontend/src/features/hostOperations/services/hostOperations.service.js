@@ -358,6 +358,10 @@ export async function listHostBrandRecipeSubmissions(params = {}) {
   )
 }
 
+export async function getHostBrandRecipeSubmission(submissionId) {
+  return unwrap(await apiClient.get(`/host/operations/brand-recipes/${path(submissionId)}`))
+}
+
 export async function createHostBrandRecipeSubmission(input) {
   return mutate({
     url:

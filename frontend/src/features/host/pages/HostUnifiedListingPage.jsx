@@ -12,6 +12,7 @@ import {
 import { listHostNpiDrafts } from '../../universalProduct/services/universalProduct.service'
 import { listHostRecipeListingHistory, listHostBrandRecipeSubmissions } from '../../hostOperations/services/hostOperations.service'
 import { normalizeHostWorkspaceType } from '../hostWorkspace.config'
+import { listHospitalityRestaurantRecipes } from '../../hospitality/services/hospitality.service'
 import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
 import {
   createHostListingPacket, deleteHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
@@ -22,6 +23,7 @@ import {
 // Existing approved records keep their original governance and identifiers.
 // Management tools are mounted inside the one Host Listing Studio route until
 // their legacy records are safely migrated; no existing records are deleted.
+const LegacyListingManager = lazy(() => import('../components/LegacyListingManager'))
 const ProductEvidenceWorkspace = lazy(() => import('../../universalProduct/pages/HostNpiPage'))
 const BrandRecipeHistoryWorkspace = lazy(() => import('../../hostOperations/pages/HostOperationsPage'))
 const KitchenRecipeHistoryWorkspace = lazy(() => import('../../hospitality/pages/RestaurantRecipesPage'))
@@ -632,33 +634,53 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
 }
 
 
+// Legacy product/brand records use paginated endpoints; fetch every returned
+// page rather than silently hiding listings after the first 100 records.
+async function loadPreviousPages(fetchPage, field) {
+  const records = []
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await fetchPage(page)
+    const batch = Array.isArray(response?.[field]) ? response[field] : []
+    records.push(...batch)
+    const pages = Number(response?.pagination?.pages || response?.pagination?.totalPages || 0)
+    if (!batch.length || (pages > 0 ? page >= pages : batch.length < 100)) break
+  }
+  return { [field]: records }
+}
+
 function PreviouslyListedItems({ workspace }) {
   const [records, setRecords] = useState([])
   const [pending, setPending] = useState(true)
   const [failed, setFailed] = useState(false)
   useEffect(() => {
     let active = true
+    const canProduct = ['b2b', 'brand_seller', 'hybrid', 'legacy'].includes(workspace)
+    const canKitchen = ['b2b', 'chef_restaurant', 'hybrid', 'legacy'].includes(workspace)
+    const canBrand = ['brand_seller', 'hybrid', 'legacy'].includes(workspace)
     const requests = [
-      workspace === 'chef_restaurant' ? Promise.resolve({ drafts: [] }) : listHostNpiDrafts({ page: 1, limit: 100 }),
-      workspace === 'b2b' ? Promise.resolve({ recipes: [] }) : listHostRecipeListingHistory(),
-      workspace === 'brand_seller' || workspace === 'hybrid' || workspace === 'legacy'
-        ? listHostBrandRecipeSubmissions({ page: 1, limit: 100 }) : Promise.resolve({ submissions: [] }),
+      canProduct ? loadPreviousPages((page) => listHostNpiDrafts({ page, limit: 100 }), 'drafts') : Promise.resolve({ drafts: [] }),
+      listHostRecipeListingHistory(),
+      canBrand ? loadPreviousPages((page) => listHostBrandRecipeSubmissions({ page, limit: 100 }), 'submissions') : Promise.resolve({ submissions: [] }),
+      canKitchen ? listHospitalityRestaurantRecipes() : Promise.resolve({ restaurantRecipes: [] }),
     ]
-    Promise.allSettled(requests).then(results => {
+    Promise.allSettled(requests).then((results) => {
       if (!active) return
-      const items = []
-      if (results[0]?.status === 'fulfilled') (results[0].value?.drafts || []).forEach(record => items.push({
-        id: record.id, title: record.productName || record.canonicalName || record.name || record.barcode || 'Saved product',
-        category: 'Product', status: record.status || record.verificationStatus || 'Saved', manage: 'product-evidence',
+      const rows = []
+      if (results[0]?.status === 'fulfilled') (results[0].value?.drafts || []).forEach((record) => rows.push({
+        id: record.id, title: record.productName || record.canonicalName || record.candidateFields?.displayName?.value || record.name || record.barcode || 'Saved product',
+        category: 'Product', status: record.status || record.verificationStatus || 'Saved', source: 'product-evidence',
       }))
-      if (results[1]?.status === 'fulfilled') (results[1].value?.recipes || []).forEach(record => items.push({
-        id: record.id, title: record.title || 'Saved recipe', category: 'Recipe', status: record.status || 'Saved', manage: ['brand_seller', 'hybrid', 'legacy'].includes(workspace) ? 'brand-recipes' : '',
+      if (results[1]?.status === 'fulfilled') (results[1].value?.recipes || []).filter((record) => ['community', 'host'].includes(record.sourceType || 'community')).forEach((record) => rows.push({
+        id: record.id, title: record.title || 'Saved recipe', category: 'Recipe', status: record.status || 'Saved', source: 'host-recipe',
       }))
-      if (results[2]?.status === 'fulfilled') (results[2].value?.submissions || []).forEach(record => items.push({
-        id: record.id, title: record.title || 'Brand recipe submission', category: 'Brand recipe', status: record.status || 'Submitted', manage: 'brand-recipes',
+      if (results[2]?.status === 'fulfilled') (results[2].value?.submissions || []).forEach((record) => rows.push({
+        id: record.id, title: record.title || 'Brand recipe submission', category: 'Brand recipe', status: record.status || 'Submitted', source: 'brand-recipe',
       }))
-      setRecords(items)
-      setFailed(results.some(result => result.status === 'rejected'))
+      if (results[3]?.status === 'fulfilled') (results[3].value?.restaurantRecipes || []).forEach((record) => rows.push({
+        id: record.id || record.recipeVersionId, title: record.title || record.name || 'Restaurant recipe', category: 'Kitchen recipe', status: record.status || 'Saved', source: 'restaurant-recipe',
+      }))
+      setRecords(rows.filter((row) => row.id))
+      setFailed(results.some((result) => result.status === 'rejected'))
       setPending(false)
     })
     return () => { active = false }
@@ -667,13 +689,12 @@ function PreviouslyListedItems({ workspace }) {
   if (!records.length && !failed) return null
   return <section className="mt-5 border-t border-[#CDD9C9] pt-5" aria-label="Previously listed items">
     <h3 className="text-lg font-semibold text-[#173F35]">Previously listed items</h3>
-    <p className="mt-1 text-sm text-[#54635B]">Your existing records remain saved. Their approval and published versions are unchanged.</p>
-    {failed && <p className="mt-2 text-sm text-[#99622D]">Some older records could not be loaded. They have not been changed.</p>}
-    <div className="mt-3 divide-y divide-[#DFE7DC]">{records.map(row => <div key={`${row.category}-${row.id}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-2 text-sm">
+    {failed && <p className="mt-2 text-sm text-[#99622D]">Some older listings are temporarily unavailable. No records have been changed.</p>}
+    <div className="mt-3 divide-y divide-[#DFE7DC]">{records.map((row) => <div key={`${row.source}-${row.id}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-2 text-sm">
       <span className="min-w-0 break-words"><strong className="text-[#173F35]">{row.title}</strong> <span className="text-[#6B766C]">· {row.category}</span></span>
       <div className="flex shrink-0 items-center gap-3">
         <span className="capitalize text-[#526353]">{String(row.status).replace(/_/g, ' ')}</span>
-        {row.manage && <Link to={`/host/listings/new?manage=${row.manage}${row.manage === 'brand-recipes' && row.id ? `&editRecipe=${encodeURIComponent(row.id)}` : ''}`} className="font-semibold text-[#173F35] underline underline-offset-4">Manage</Link>}
+        <Link to={`/host/listings/new?manage=legacy&source=${row.source}&id=${encodeURIComponent(row.id)}`} className="font-semibold text-[#173F35] underline underline-offset-4">Manage</Link>
       </div>
     </div>)}</div>
   </section>
@@ -1442,7 +1463,11 @@ export default function HostUnifiedListingPage() {
   const canManageProducts = ['b2b', 'brand_seller', 'hybrid', 'legacy'].includes(workspace)
   const canManageBrandRecipes = ['brand_seller', 'hybrid', 'legacy'].includes(workspace)
   const canManageKitchenRecipes = ['chef_restaurant', 'hybrid', 'b2b', 'legacy'].includes(workspace)
-  const management = managementView === 'product-evidence' && canManageProducts
+  const legacySource = params.get('source') || ''
+  const legacyPermitted = legacySource === 'product-evidence' ? canManageProducts : legacySource === 'brand-recipe' ? canManageBrandRecipes : legacySource === 'restaurant-recipe' ? canManageKitchenRecipes : legacySource === 'host-recipe' ? true : false
+  const management = managementView === 'legacy' && legacyPermitted
+    ? <LegacyListingManager />
+    : managementView === 'product-evidence' && canManageProducts
     ? <ProductEvidenceWorkspace />
     : managementView === 'brand-recipes' && canManageBrandRecipes
       ? <BrandRecipeHistoryWorkspace section="recipes" />
