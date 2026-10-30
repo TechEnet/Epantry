@@ -116,3 +116,52 @@ test('Ready-made listings retain the governed catalog link and never self-publis
   assert.equal(packet.sellReadyMade, true)
   assert.ok(!Object.hasOwn(packet, 'purchasable'))
 })
+
+
+test('Selling submission rejects stock and order limits that Marketplace cannot fulfill', () => {
+  const base = {
+    type: 'grocery', title: 'Wholegrain flour', category: 'grocery',
+    images: ['https://example.com/flour.webp'],
+    selling: { packQuantity: 1, packUnit: 'kg', listPrice: 85, salePrice: 80,
+      stockQuantity: 3, minimumOrderQuantity: 1, maximumOrderQuantity: 5 },
+    delivery: { postalCodes: ['110001'] },
+  }
+  const badStock = normalizeListingPacket({ ...base, selling: { ...base.selling, stockQuantity: 1.5 } })
+  assert.match(validateListingPacket(badStock, { submit: true, workspace: 'b2b' }).join(' '), /whole number of sellable packs/)
+  const badMinimum = normalizeListingPacket({ ...base, selling: { ...base.selling, minimumOrderQuantity: 0.5 } })
+  assert.match(validateListingPacket(badMinimum, { submit: true, workspace: 'b2b' }).join(' '), /Minimum order quantity/)
+  const badMaximum = normalizeListingPacket({ ...base, selling: { ...base.selling, maximumOrderQuantity: 2.5 } })
+  assert.match(validateListingPacket(badMaximum, { submit: true, workspace: 'b2b' }).join(' '), /Maximum order quantity/)
+  const valid = normalizeListingPacket(base)
+  assert.deepEqual(validateListingPacket(valid, { submit: true, workspace: 'b2b' }), [])
+})
+
+test('Marketplace selling prices cannot silently round sub-paise values', () => {
+  const base = {
+    type: 'grocery', title: 'Wholegrain flour', category: 'grocery',
+    images: ['https://example.com/flour.webp'],
+    selling: { packQuantity: 1, packUnit: 'kg', listPrice: 84.995, salePrice: 80, stockQuantity: 3 },
+    delivery: { postalCodes: ['110001'] },
+  }
+  const invalid = normalizeListingPacket(base)
+  assert.match(validateListingPacket(invalid, { submit: true, workspace: 'hybrid' }).join(' '), /two decimal places/)
+  const valid = normalizeListingPacket({ ...base, selling: { ...base.selling, listPrice: 84.99, salePrice: 80.5 } })
+  assert.deepEqual(validateListingPacket(valid, { submit: true, workspace: 'hybrid' }), [])
+})
+
+test('A catalog-matched ready-made offer must state its exact portion quantity', () => {
+  const base = {
+    type: 'prepared_food', title: 'Fresh mango shake', category: 'drinks',
+    images: ['https://example.com/mango-shake.webp'],
+    shareRecipe: false, sellReadyMade: true, baseServings: 1,
+    ingredients: [{ name: 'Mango', quantity: 200, unit: 'g' }],
+    steps: [{ instruction: 'Blend and serve.' }],
+    catalogProductVersionId: '507f1f77bcf86cd799439011',
+    selling: { outletId: '507f1f77bcf86cd799439012', salePrice: 100, stockQuantity: 4 },
+    delivery: { fulfillment: 'pickup' },
+  }
+  const invalid = normalizeListingPacket(base)
+  assert.match(validateListingPacket(invalid, { submit: true, workspace: 'chef_restaurant' }).join(' '), /portion quantity/)
+  const valid = normalizeListingPacket({ ...base, selling: { ...base.selling, packQuantity: 1, packUnit: 'piece' } })
+  assert.deepEqual(validateListingPacket(valid, { submit: true, workspace: 'chef_restaurant' }), [])
+})

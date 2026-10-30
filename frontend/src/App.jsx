@@ -21,6 +21,7 @@ import AdminPrivacyOpsPage from './features/hardening/pages/AdminPrivacyOpsPage'
 import CustomerPrivacyPage from './features/hardening/pages/CustomerPrivacyPage'
 import RouteLoading from './features/system/components/RouteLoading'
 import AppRoutes from './routes/AppRoutes'
+import MfaVerificationNotice from './features/auth/components/MfaVerificationNotice'
 
 const M20_ROUTES =
   Object.freeze({
@@ -52,7 +53,7 @@ function M20ApplicationFrame({
   )
 }
 
-export default function App() {
+function AppContent() {
   const location =
     useLocation()
 
@@ -150,7 +151,8 @@ export default function App() {
     ) {
       return (
         <Navigate
-          to="/account/security/mfa"
+          to="/account/security/verify"
+          state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }}
           replace
         />
       )
@@ -188,5 +190,15 @@ export default function App() {
 
   return (
     <AppRoutes />
+  )
+}
+// Mounted once outside individual routes, so errors on any Host or Admin
+// screen can offer the same clickable verification route.
+export default function App() {
+  return (
+    <>
+      <MfaVerificationNotice />
+      <AppContent />
+    </>
   )
 }

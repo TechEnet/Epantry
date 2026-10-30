@@ -37,6 +37,9 @@ export const API_NETWORK_ISSUE_EVENT =
 export const API_NETWORK_RECOVERED_EVENT =
   'epantry:network-recovered'
 
+export const API_MFA_VERIFICATION_REQUIRED_EVENT =
+  'epantry:mfa-verification-required'
+
 let networkIssueActive =
   false
 
@@ -505,6 +508,37 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(
         new CustomEvent(
           API_CUSTOMER_ACCESS_REQUIRED_EVENT,
+          {
+            detail: {
+              returnTo:
+                `${window.location.pathname}${window.location.search}${window.location.hash}`,
+            },
+          },
+        ),
+      )
+    }
+
+    // A 428 step-up challenge must never sign the user out. Offer a
+    // secure verification link on the current screen for Host/Admin actions.
+    const mfaVerificationRequired =
+      status === 428 &&
+      (
+        normalizedError.errors.some((entry) =>
+          entry?.code === 'AUTH_MFA_REQUIRED' ||
+          entry?.code === 'AUTH_RECENT_REQUIRED'
+        ) ||
+        /recent multi-factor authentication is required/i.test(
+          normalizedError.message,
+        )
+      )
+
+    if (
+      mfaVerificationRequired &&
+      typeof window !== 'undefined'
+    ) {
+      window.dispatchEvent(
+        new CustomEvent(
+          API_MFA_VERIFICATION_REQUIRED_EVENT,
           {
             detail: {
               returnTo:

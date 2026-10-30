@@ -238,10 +238,30 @@ export function validateListingPacket(packet, { submit = false, workspace = 'leg
   }
   if ((packet.type === 'prepared_food' || (packet.type === 'kitchen_recipe' && packet.sellReadyMade)) && !packet.selling.outletId) errors.push('Choose the kitchen outlet before submitting. It cannot be supplied after approval.')
   if (packet.type === 'grocery' && (!packet.selling.packQuantity || packet.selling.packQuantity <= 0)) errors.push('Enter the packaged product quantity and unit.')
+  if ((packet.type === 'prepared_food' || packet.sellReadyMade) && packet.catalogProductVersionId && !(packet.selling.packQuantity > 0)) {
+    errors.push('Enter the portion quantity that matches the approved catalog product.')
+  }
   if (packet.type === 'grocery' || packet.type === 'prepared_food' || packet.sellReadyMade) {
     if (packet.selling.salePrice === null || packet.selling.salePrice <= 0) errors.push('Add a selling price greater than zero.')
     if (packet.selling.stockQuantity === null) errors.push('Enter available stock (zero is allowed).')
     if (packet.delivery.fulfillment === 'delivery' && packet.delivery.postalCodes.length === 0) errors.push('Enter the delivery pincodes selected by this Host.')
+  }
+  // Marketplace inventory and order limits are counted in whole sellable packs.
+  // Reject fractional values before review instead of discovering them at checkout.
+  if (packet.selling.stockQuantity !== null && !Number.isSafeInteger(packet.selling.stockQuantity)) {
+    errors.push('Available stock must be a whole number of sellable packs.')
+  }
+  if (packet.selling.minimumOrderQuantity !== null && (!Number.isSafeInteger(packet.selling.minimumOrderQuantity) || packet.selling.minimumOrderQuantity < 1)) {
+    errors.push('Minimum order quantity must be a whole number greater than zero.')
+  }
+  if (packet.selling.maximumOrderQuantity !== null && (!Number.isSafeInteger(packet.selling.maximumOrderQuantity) || packet.selling.maximumOrderQuantity < 1)) {
+    errors.push('Maximum order quantity must be a whole number greater than zero.')
+  }
+  for (const value of [packet.selling.listPrice, packet.selling.salePrice]) {
+    if (value !== null && Math.abs(value * 100 - Math.round(value * 100)) > 0.000001) {
+      errors.push('Enter selling prices in rupees and paise (up to two decimal places).')
+      break
+    }
   }
   if (packet.selling.maximumOrderQuantity !== null && packet.selling.minimumOrderQuantity !== null && packet.selling.maximumOrderQuantity < packet.selling.minimumOrderQuantity) errors.push('Maximum order quantity cannot be below minimum order quantity.')
   if (packet.selling.listPrice !== null && packet.selling.salePrice !== null && packet.selling.salePrice > packet.selling.listPrice) errors.push('Selling price cannot exceed list price.')

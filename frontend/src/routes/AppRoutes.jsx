@@ -1024,6 +1024,7 @@ const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'))
 const ForgotPasswordPage = lazy(() => import('../features/auth/pages/ForgotPasswordPage'))
 const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage'))
 const MfaEnrollmentPage = lazy(() => import('../features/auth/pages/MfaEnrollmentPage'))
+const MfaStepUpPage = lazy(() => import('../features/auth/pages/MfaStepUpPage'))
 const HouseholdPage = lazy(() => import('../features/households/pages/HouseholdPage'))
 const HouseholdInvitationPage = lazy(() => import('../features/households/pages/HouseholdInvitationPage'))
 const AccountSettingsPage = lazy(() => import('../features/account/pages/AccountSettingsPage'))
@@ -1425,6 +1426,7 @@ function ApplicationAccessRoute({
 function AdminAccessRoute({
   children,
 }) {
+  const location = useLocation()
   const {
     isAuthenticated,
     isBootstrapping,
@@ -1463,7 +1465,8 @@ function AdminAccessRoute({
   if (isAdminMfaRequired) {
     return (
       <Navigate
-        to="/account/security/mfa"
+        to="/account/security/verify"
+        state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }}
         replace
       />
     )
@@ -2621,6 +2624,15 @@ export default function AppRoutes() {
                   <CustomerWorkspacePresentation>
                     <AccountSettingsPage />
                   </CustomerWorkspacePresentation>
+                </AuthenticatedRoute>
+              }
+            />
+
+            <Route
+              path="/account/security/verify"
+              element={
+                <AuthenticatedRoute>
+                  <MfaStepUpPage />
                 </AuthenticatedRoute>
               }
             />

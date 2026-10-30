@@ -169,8 +169,8 @@ test('previous Host editor routes now open the one Studio without deleting legac
   const fs = await import('node:fs')
   const routes = fs.readFileSync(new URL('../../frontend/src/routes/AppRoutes.jsx', import.meta.url), 'utf8')
   const studio = fs.readFileSync(new URL('../../frontend/src/features/host/pages/HostUnifiedListingPage.jsx', import.meta.url), 'utf8')
-  assert.match(routes, /to="\/host\/listings\/new\?manage=product-evidence"/)
-  assert.match(routes, /to="\/host\/listings\/new\?manage=kitchen-recipes"/)
+  assert.match(routes, /path="\/host\/product-intelligence"[\s\S]*?<Navigate to="\/host\/listings\/new" replace/)
+  assert.match(routes, /path="\/host\/hospitality\/recipes"[\s\S]*?<Navigate to="\/host\/listings\/new\?type=kitchen_recipe" replace/)
   assert.match(studio, /ProductEvidenceWorkspace/)
   assert.match(studio, /BrandRecipeHistoryWorkspace/)
   assert.match(studio, /KitchenRecipeHistoryWorkspace/)
@@ -194,4 +194,76 @@ test('final Host catalog publication requires Super Admin and canonical governan
   assert.match(code, /await validateCatalogMatch\(publishedPacket\)/)
   assert.match(code, /publishedRevision: record\.publishedRevision/)
   assert.doesNotMatch(code, /HostOffer\.create|status: ['"]active['"],\s*packId/)
+})
+
+
+test('approved prepared offers publish only fulfillment mode, never private PIN coverage', () => {
+  const pickup = publicListing({ ...baseRecord, packet: {
+    ...baseRecord.packet, delivery: { fulfillment: 'pickup', postalCodes: ['110001'], note: 'Private pickup note' },
+  } })
+  assert.equal(pickup.fulfillmentType, 'pickup')
+  assert.equal(JSON.stringify(pickup).includes('110001'), false)
+  assert.equal(JSON.stringify(pickup).includes('Private pickup note'), false)
+  const delivery = publicListing(baseRecord)
+  assert.equal(delivery.fulfillmentType, 'delivery')
+})
+
+test('Studio selling updates retain reservations and verify the same public offer used by customers', async () => {
+  const fs = await import('node:fs')
+  const ui = fs.readFileSync(new URL('../../frontend/src/features/host/pages/HostUnifiedListingPage.jsx', import.meta.url), 'utf8')
+  const start = ui.indexOf('function HostListingSalesSetup(')
+  const end = ui.indexOf('// Legacy product/brand records', start)
+  assert.ok(start > 0 && end > start)
+  const code = ui.slice(start, end)
+  assert.match(code, /await getHostCurrentInventory\(offerId\)/)
+  assert.match(code, /stock < reservedQuantity/)
+  assert.match(code, /availableQuantity: stock, reservedQuantity,/)
+  assert.doesNotMatch(code, /reservedQuantity: 0/)
+  assert.match(code, /getPublicPackOffers\(\{ packId, pincode: code, fulfillmentType: mode \}\)/)
+  assert.match(code, /String\(item.id\) === String\(offerId\)/)
+})
+
+test('Customer offer lookup and direct cart keep approved prepared item pickup mode', async () => {
+  const fs = await import('node:fs')
+  const ui = fs.readFileSync(new URL('../../frontend/src/features/grocery/pages/ProductDetailPage.jsx', import.meta.url), 'utf8')
+  const start = ui.indexOf('function MarketplaceOffers(')
+  const code = ui.slice(start)
+  assert.match(code, /hostSubmission\?\.fulfillmentType === "pickup"/)
+  assert.match(code, /getPublicPackOffers\(\{/)
+  assert.match(code, /fulfillmentType,/)
+  assert.match(code, /createDirectMarketplaceCart\(\{/)
+})
+
+
+test('Host selling readiness uses the published version, not an unreviewed revised form', async () => {
+  const fs = await import('node:fs')
+  const routes = fs.readFileSync(new URL('../src/modules/hostOperations/hostUnifiedListing.routes.js', import.meta.url), 'utf8')
+  const start = routes.indexOf("router.get('/host/listing-packets/:id/selling-readiness'")
+  const end = routes.indexOf("router.post('/host/listing-packets'", start)
+  const code = routes.slice(start, end)
+  assert.match(code, /publishedHostRecord\(record\.toObject\(\)\)/)
+  assert.match(code, /readiness\.approvedSelling =/)
+  assert.match(code, /approved\.packet\?\.delivery\?\.fulfillment/)
+  assert.match(code, /MarketplaceOrganization\.findOne\(\{ ownerUserId: actor\(req\), status: 'active' \}\)/)
+})
+
+test('Single page selling updates the owned offer and respects approved fulfillment method', async () => {
+  const fs = await import('node:fs')
+  const studio = fs.readFileSync(new URL('../../frontend/src/features/host/pages/HostUnifiedListingPage.jsx', import.meta.url), 'utf8')
+  const code = studio.slice(studio.indexOf('function HostListingSalesSetup('), studio.indexOf('// Legacy product/brand records'))
+  assert.match(code, /const approvedListing = readiness\?\.approvedSelling \|\| listing/)
+  assert.match(code, /await updateHostOffer\(offerId, \{/)
+  assert.match(code, /fulfillmentTypes: \[approvedListing\?\.delivery\?\.fulfillment === 'pickup'/)
+  assert.match(code, /getPublicPackOffers\(\{ packId, pincode: code, fulfillmentType: mode \}\)/)
+})
+
+
+test('Selling editor refreshes actual active Marketplace price and inventory before editing', async () => {
+  const fs = await import('node:fs')
+  const ui = fs.readFileSync(new URL('../../frontend/src/features/host/pages/HostUnifiedListingPage.jsx', import.meta.url), 'utf8')
+  const code = ui.slice(ui.indexOf('function HostListingSalesSetup('), ui.indexOf('// Legacy product/brand records'))
+  assert.match(code, /getHostEffectivePrice\(existingOfferId\)/)
+  assert.match(code, /getHostCurrentInventory\(existingOfferId\)/)
+  assert.match(code, /rows\.length === 1/)
+  assert.match(code, /setQuantity\(String\(rows\[0\]\.availableQuantity/)
 })

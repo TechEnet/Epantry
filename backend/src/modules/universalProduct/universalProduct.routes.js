@@ -60,6 +60,7 @@ import {
   createAdminNpiFromImages,
   createHostBulkNpiBatch,
   createHostNpiFromImages,
+  reviseHostNpiDraft,
   createUniversalProductEvidenceUploadIntent,
   getAdminNpiBulkBatch,
   getHostNpiDraft,
@@ -2056,6 +2057,29 @@ hostRouter.post(
       )
     },
   ),
+)
+
+const hostNpiRevisionSchema = z.object({
+  title: z.string().trim().max(350).optional(),
+  brandName: z.string().trim().max(250).optional(),
+  barcode: z.string().trim().max(180).optional(),
+  ingredientDeclarationText: z.string().trim().max(10000).optional(),
+  allergenStatement: z.string().trim().max(3000).optional(),
+}).strict()
+
+hostRouter.post(
+  '/universal-product/npi/drafts/:id/revisions',
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(async (req, res) => {
+    const params = parseOrThrow(z.object({ id: objectIdSchema }).strict(), req.params,
+      'HOST_NPI_REVISION_ID_INVALID')
+    const input = parseOrThrow(hostNpiRevisionSchema, req.body,
+      'HOST_NPI_REVISION_INPUT_INVALID')
+    return sendSuccess(req, res, 201, await reviseHostNpiDraft({
+      draftId: params.id, input, actorUser: req.currentUser,
+    }), 'A new product review draft was created. Previous approved data was retained.')
+  }),
 )
 
 hostRouter.post(

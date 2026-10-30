@@ -495,6 +495,19 @@ export const createHospitalityRestaurantRecipe = (input) =>
     data: input,
   })
 
+export const reviseHospitalityRestaurantRecipe = (recipeVersionId, payload) =>
+  mutate({
+    method: 'post',
+    url: `/host/hospitality/restaurant-recipes/${encodeURIComponent(String(recipeVersionId || ''))}/revisions`,
+    data: payload,
+  })
+
+export const withdrawHospitalityRestaurantRecipe = (recipeVersionId) =>
+  mutate({
+    method: 'delete',
+    url: `/host/hospitality/restaurant-recipes/${encodeURIComponent(String(recipeVersionId || ''))}`,
+  })
+
 export const updateHospitalityRestaurantRecipe = (
   recipeVersionId,
   input,

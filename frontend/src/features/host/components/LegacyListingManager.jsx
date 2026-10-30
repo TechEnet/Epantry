@@ -4,13 +4,13 @@ import { ArrowLeft, ImagePlus, Plus, Save, Trash2, X } from 'lucide-react'
 import { searchHostListingIngredients } from '../services/hostUnifiedListing.service'
 import { uploadRecipeImage } from '../../recipes/services/recipe.service'
 import {
-  getHostRecipeListing, updateHostRecipeListing, deleteHostRecipeListing, getHostBrandRecipeSubmission,
+  getHostRecipeListing, updateHostRecipeListing, deleteHostRecipeListing, getHostBrandRecipeSubmission, createHostBrandRecipeSubmission,
 } from '../../hostOperations/services/hostOperations.service'
 import {
-  getHospitalityRestaurantRecipe, updateHospitalityRestaurantRecipe,
+  getHospitalityRestaurantRecipe, updateHospitalityRestaurantRecipe, reviseHospitalityRestaurantRecipe, withdrawHospitalityRestaurantRecipe,
 } from '../../hospitality/services/hospitality.service'
 import {
-  getHostNpiDraft, createHostNpiFromImages, uploadProductEvidenceBatch,
+  getHostNpiDraft, reviseHostNpiDraft, createHostNpiFromImages, uploadProductEvidenceBatch,
 } from '../../universalProduct/services/universalProduct.service'
 
 const input = 'w-full min-w-0 rounded-lg border border-[#CBD4C8] bg-white px-3 py-2.5 text-[15px] text-[#202421] focus-visible:outline-[#C86C42]'
@@ -33,6 +33,7 @@ function unpackRecipe(result, source) {
   const operational = result?.operationalRecipe || {}
   const opByIngredient = new Map(asArray(operational.ingredients).map((row) => [String(row.canonicalIngredientId), row]))
   return {
+    listingStatus: result?.listing?.status || result?.recipe?.recipeVersion?.status || '',
     outletId: result?.listing?.outletId || '',
     customerVisibility: result?.listing?.customerVisibility || 'public_candidate',
     title: version.title || dish.name || '',
@@ -61,6 +62,7 @@ function unpackRecipe(result, source) {
     // Hold the canonical detail untouched; edit only fields explicitly exposed below.
     source: { recipe, version, dish, operational, foodIntelligence: result?.foodIntelligence?.latest?.declaration || result?.foodIntelligence?.latestApproved?.declaration || null },
     sourceKind: source,
+    brandSubmission: result?.submission || null,
   }
 }
 function serializeRecipe(form, source) {
@@ -160,28 +162,39 @@ function RecipeEditor({ kind, id, onComplete }) {
   const [notice, setNotice] = useState('')
   const [policy, setPolicy] = useState({})
   const isRestaurant = kind === 'restaurant-recipe'
+  const isBrand = kind === 'brand-recipe'
   useEffect(() => {
     let live = true
     setLoading(true); setError(''); setNotice(''); setForm(null)
-    const fetch = isRestaurant ? getHospitalityRestaurantRecipe : getHostRecipeListing
+    const fetch = isRestaurant ? getHospitalityRestaurantRecipe : isBrand ? getHostBrandRecipeSubmission : getHostRecipeListing
     fetch(id).then((result) => {
       if (!live) return
       setForm(unpackRecipe(result, kind))
-      setPolicy(result.policy || { hostCanEdit: true })
+      setPolicy(isBrand ? { hostCanEdit: result?.submission?.status !== 'submitted' && result?.recipe?.recipeVersion?.status !== 'in_review', hostCanDelete: false } : isRestaurant ? { hostCanEdit: ['draft','published'].includes(result?.listing?.status), hostCanDelete: !['retired','disabled'].includes(result?.listing?.status) } : result.policy || { hostCanEdit: true })
     }).catch((cause) => { if (live) setError(errorText(cause)) }).finally(() => { if (live) setLoading(false) })
     return () => { live = false }
   }, [id, kind, isRestaurant])
   const patch = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
   const changeRow = (key, index, changes) => setForm((prev) => ({ ...prev, [key]: prev[key].map((row, i) => i === index ? { ...row, ...changes } : row) }))
-  const canSave = form && form.title.trim() && Number(form.baseServings) > 0 && form.ingredients.length > 0 && form.steps.length > 0 && form.ingredients.every((row) => Number(row.quantity) > 0 && (row.canonicalIngredientId || (!isRestaurant && row.name.trim()))) && form.steps.every((step) => step.instruction.trim()) && (!isRestaurant || form.outletId)
+  const canSave = form && (!isBrand || (form.brandSubmission?.nominationDisclosure || '').trim().length >= 10) && form.title.trim() && Number(form.baseServings) > 0 && form.ingredients.length > 0 && form.steps.length > 0 && form.ingredients.every((row) => Number(row.quantity) > 0 && (row.canonicalIngredientId || (!isRestaurant && !isBrand && row.name.trim()))) && form.steps.every((step) => step.instruction.trim()) && (!isRestaurant || form.outletId)
   async function save() {
     if (!canSave || saving || policy.hostCanEdit === false) return
     setSaving(true); setError(''); setNotice('')
     try {
       const payload = serializeRecipe(form, kind)
-      const result = isRestaurant ? await updateHospitalityRestaurantRecipe(id, payload) : await updateHostRecipeListing(id, payload)
+      const result = isBrand
+        ? await createHostBrandRecipeSubmission({
+            revisesSubmissionId: id,
+            brandId: form.brandSubmission.brandId,
+            authorityGrantId: form.brandSubmission.authorityGrantId,
+            marketCode: form.brandSubmission.marketCode || 'IN',
+            nominationDisclosure: form.brandSubmission.nominationDisclosure,
+            nominatedProductPackIds: form.brandSubmission.nominatedProductPackIds || [],
+            recipe: payload,
+          })
+        : isRestaurant ? (form.listingStatus === 'published' ? await reviseHospitalityRestaurantRecipe(id, payload) : await updateHospitalityRestaurantRecipe(id, payload)) : await updateHostRecipeListing(id, payload)
       setNotice('Changes saved and submitted for Super Admin review.')
-      const nextId = isRestaurant ? (result?.recipe?.recipeVersion?.id || result?.listing?.id) : (result?.listing?.id || result?.recipe?.recipeVersion?.id)
+      const nextId = isBrand ? result?.submission?.id : isRestaurant ? (result?.recipe?.recipeVersion?.id || result?.listing?.id) : (result?.listing?.id || result?.recipe?.recipeVersion?.id)
       if (validId(nextId) && nextId !== id) {
         navigate(`/host/listings/new?manage=legacy&source=${kind}&id=${encodeURIComponent(nextId)}`, { replace: true })
       }
@@ -197,9 +210,9 @@ function RecipeEditor({ kind, id, onComplete }) {
     finally { setUploading(false) }
   }
   async function withdraw() {
-    if (saving || isRestaurant || policy.hostCanDelete === false || !window.confirm('Withdraw this recipe? It will no longer be available for new customer discovery. Existing records and review history will be retained.')) return
+    if (saving || isBrand || policy.hostCanDelete === false || !window.confirm('Withdraw this recipe? It will no longer be available for new customer discovery. Existing records and review history will be retained.')) return
     setSaving(true); setError('')
-    try { await deleteHostRecipeListing(id); onComplete?.({ withdrawn: true }); setNotice('Recipe withdrawn. Its history has been preserved.') }
+    try { if (isRestaurant) await withdrawHospitalityRestaurantRecipe(id); else await deleteHostRecipeListing(id); onComplete?.({ withdrawn: true }); setNotice('Recipe withdrawn. Its history has been preserved.') }
     catch (cause) { setError(errorText(cause)) }
     finally { setSaving(false) }
   }
@@ -229,24 +242,84 @@ function RecipeEditor({ kind, id, onComplete }) {
     <section className="space-y-3"><div className="flex items-center justify-between gap-3"><h3 className="text-xl font-bold">Preparation steps</h3><button type="button" className={secondary} onClick={() => patch('steps', [...form.steps, createStep()])}><Plus size={16}/> Add step</button></div>
       {form.steps.map((step, index) => <div key={index} className="flex gap-2"><textarea className={input} rows={2} aria-label={`Step ${index+1}`} value={step.instruction} onChange={(e) => changeRow('steps', index, { instruction: e.target.value })}/><input className={`${input} max-w-24`} type="number" min="0" aria-label="Step minutes" placeholder="Minutes" value={step.timerMinutes} onChange={(e) => changeRow('steps', index, { timerMinutes: e.target.value })}/><button type="button" className={secondary} aria-label="Remove step" disabled={form.steps.length === 1} onClick={() => patch('steps', form.steps.filter((_, i) => i !== index))}><X size={16}/></button></div>)}
     </section>
+    {isBrand && field('Brand nomination disclosure', <textarea rows={3} className={input}
+      value={form.brandSubmission?.nominationDisclosure || ''}
+      onChange={(e) => patch('brandSubmission', { ...form.brandSubmission, nominationDisclosure: e.target.value })} />)}
     {isRestaurant && <p className="text-sm text-[#526353]">The existing restaurant outlet and preparation-cost settings remain unchanged.</p>}
     {error && <p role="alert" className="text-red-700">{error}</p>}
     {notice && <p role="status" className="text-[#196145]">{notice}</p>}
     <div className="flex flex-wrap gap-3"><button type="button" disabled={!canSave || saving || uploading || policy.hostCanEdit === false} className={action} onClick={save}><Save size={16}/> {saving ? 'Saving…' : 'Save changes for review'}</button>
-      {!isRestaurant && policy.hostCanDelete !== false && <button type="button" className={secondary} disabled={saving} onClick={withdraw}><Trash2 size={16}/> Withdraw recipe</button>}
+      {policy.hostCanDelete !== false && !['retired', 'disabled'].includes(form.listingStatus) && <button type="button" className={secondary} disabled={saving} onClick={withdraw}><Trash2 size={16}/> Withdraw recipe</button>}
     </div>
   </div>
 }
 
 function ProductEvidenceManager({ id }) {
+  const navigate = useNavigate()
   const [detail, setDetail] = useState(null)
   const [files, setFiles] = useState([])
   const [purpose, setPurpose] = useState('front_pack')
+  const [corrections, setCorrections] = useState({ title: '', brandName: '', barcode: '', ingredientDeclarationText: '', allergenStatement: '' })
+  const [correctionReady, setCorrectionReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  async function refresh() { const result = await getHostNpiDraft(id); setDetail(result) }
-  useEffect(() => { let live = true; getHostNpiDraft(id).then((data) => { if (live) setDetail(data) }).catch((e) => { if (live) setError(errorText(e)) }); return () => { live = false } }, [id])
+  function loadProduct(data) {
+    setDetail(data)
+    const fields = data?.draft?.candidateFields || {}
+    setCorrections({
+      title: String(fields.displayName?.value || fields.productName?.value || ''),
+      brandName: String(fields.brandName?.value || ''),
+      barcode: String(data?.draft?.barcode || fields.gtin?.value || ''),
+      ingredientDeclarationText: String(fields.ingredientDeclarationText?.value || ''),
+      allergenStatement: String(fields.allergens?.value?.statement || ''),
+    })
+    setCorrectionReady(true)
+  }
+  async function refresh() { const result = await getHostNpiDraft(id); loadProduct(result) }
+  useEffect(() => {
+    let live = true
+    setCorrectionReady(false)
+    getHostNpiDraft(id).then((data) => { if (live) loadProduct(data) })
+      .catch((e) => { if (live) setError(errorText(e)) })
+    return () => { live = false }
+  }, [id])
+  const cannotRevise = ['approved_for_catalog', 'rejected'].includes(detail?.draft?.status)
+  const fixedIdentity = {
+    title: Boolean(detail?.draft?.candidateFields?.displayName?.value || detail?.draft?.candidateFields?.productName?.value),
+    brandName: Boolean(detail?.draft?.candidateFields?.brandName?.value),
+    barcode: Boolean(detail?.draft?.barcode || detail?.draft?.candidateFields?.gtin?.value),
+  }
+  async function saveCorrections() {
+    if (busy || !detail?.draft || cannotRevise || !correctionReady) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const value = Object.fromEntries(Object.entries(corrections).map(([key, item]) => [key, item.trim()]))
+      await createHostNpiFromImages({
+        draftId: id, assets: [], market: detail.draft.market || 'IN',
+        hints: { title: value.title, brandName: value.brandName, barcode: value.barcode },
+        hostDeclarations: {
+          ingredientDeclarationText: value.ingredientDeclarationText,
+          allergenStatement: value.allergenStatement,
+        },
+      })
+      await refresh()
+      setNotice('Product details saved for review. Approved catalog data stays unchanged.')
+    } catch (cause) { setError(errorText(cause)) }
+    finally { setBusy(false) }
+  }
+  async function startRevision() {
+    if (busy || !cannotRevise || !correctionReady || !detail?.draft) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const input = Object.fromEntries(Object.entries(corrections).map(([key, value]) => [key, value.trim()]))
+      const created = await reviseHostNpiDraft(id, input)
+      const nextId = created?.draft?.id
+      if (!validId(nextId)) throw new Error('The new product review draft could not be opened.')
+      navigate(`/host/listings/new?manage=legacy&source=product-evidence&id=${encodeURIComponent(nextId)}`, { replace: true })
+    } catch (cause) { setError(errorText(cause)) }
+    finally { setBusy(false) }
+  }
   async function addEvidence() {
     if (busy || !files.length || !detail?.draft) return
     setBusy(true); setError(''); setNotice('')
@@ -268,9 +341,19 @@ function ProductEvidenceManager({ id }) {
     {detail?.draft ? <><p className="text-base"><strong>Product:</strong> {detail.draft.candidateFields?.displayName?.value || detail.draft.candidateFields?.productName?.value || detail.draft.title || 'Saved product'}</p>
       <p className="text-sm text-[#526353]">Review status: {String(detail.draft.status || 'saved').replace(/_/g,' ')}</p>
       <p className="text-sm text-[#526353]">Product identity and approved claims are kept under Super Admin review. Existing records are not overwritten.</p>
+      {correctionReady && <section className="grid gap-3 md:grid-cols-2" aria-label="Update product information">
+        {field('Product name', <input className={input} value={corrections.title} disabled={!cannotRevise && fixedIdentity.title} maxLength={350} onChange={e => setCorrections(v => ({ ...v, title: e.target.value }))}/>)}
+        {field('Brand name', <input className={input} value={corrections.brandName} disabled={!cannotRevise && fixedIdentity.brandName} maxLength={250} onChange={e => setCorrections(v => ({ ...v, brandName: e.target.value }))}/>)}
+        {field('Barcode', <input className={input} value={corrections.barcode} disabled={!cannotRevise && fixedIdentity.barcode} maxLength={180} onChange={e => setCorrections(v => ({ ...v, barcode: e.target.value }))}/>)}
+        {field('Ingredients on the label', <textarea rows={2} className={input} value={corrections.ingredientDeclarationText} onChange={e => setCorrections(v => ({ ...v, ingredientDeclarationText: e.target.value }))}/>)}
+        {field('Allergen statement on the label', <textarea rows={2} className={input} value={corrections.allergenStatement} onChange={e => setCorrections(v => ({ ...v, allergenStatement: e.target.value }))}/>)}
+        <div className="flex items-end"><button type="button" className={action} disabled={busy} onClick={cannotRevise ? startRevision : saveCorrections}><Save size={16}/> {cannotRevise ? "Submit updated version" : "Save details for review"}</button></div>
+        <p className="md:col-span-2 text-sm text-[#526353]">A changed product requires another review. Previous approved information stays available.</p>
+      </section>}
+      {cannotRevise && <p className="text-sm text-[#835137]">Changes will create a separate review version. Previously approved data stays unchanged.</p>}
       {detail.draft.listingType === 'packaged' && field('Photo type', <select className={input} value={purpose} onChange={(e) => setPurpose(e.target.value)}>{[['front_pack','Front of pack'],['ingredient_panel','Ingredients panel'],['allergen_statement','Allergen statement'],['nutrition_panel','Nutrition panel'],['barcode','Barcode'],['back_pack','Back / manufacturer panel'],['certification_mark','Certification mark'],['other','Other panel']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>)}
       <label className="block space-y-2"><span className="font-semibold">Add product or packaging photos</span><input type="file" accept="image/png,image/jpeg,image/webp" multiple className={input} onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 4))}/></label>
-      <div className="flex flex-wrap gap-2"><button type="button" className={action} disabled={!files.length || busy} onClick={addEvidence}><ImagePlus size={17}/> Add evidence</button><button type="button" className={secondary} disabled={busy || !detail?.draft} onClick={recheck}>Recheck saved evidence</button></div>
+      <div className="flex flex-wrap gap-2"><button type="button" className={action} disabled={!files.length || busy || cannotRevise} onClick={addEvidence}><ImagePlus size={17}/> Add evidence</button><button type="button" className={secondary} disabled={busy || !detail?.draft || cannotRevise} onClick={recheck}>Recheck saved evidence</button></div>
     </> : <p role="status">Loading existing product…</p>}
     {error && <p role="alert" className="text-red-700">{error}</p>}{notice && <p role="status" className="text-[#196145]">{notice}</p>}
   </div>
@@ -278,6 +361,7 @@ function ProductEvidenceManager({ id }) {
 
 function BrandSubmissionView({ id }) {
   const [detail, setDetail] = useState(null)
+  const [editing, setEditing] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
     let live = true
@@ -288,12 +372,18 @@ function BrandSubmissionView({ id }) {
   if (!detail) return <p role="status">Loading recipe submission…</p>
   const recipe = detail.recipe || {}
   const submission = detail.submission || {}
+  const awaitingReview = submission.status === 'submitted' || recipe.recipeVersion?.status === 'in_review'
   return <section className="space-y-3">
     <h2 className="text-xl font-semibold">{recipe.recipeVersion?.title || recipe.dish?.name || 'Brand recipe'}</h2>
     <p>Review status: {String(submission.status || 'submitted').replace(/_/g, ' ')}</p>
     {submission.reviewReason && <p className="text-[#835137]">Review note: {submission.reviewReason}</p>}
-    <p className="text-[15px] text-[#526353]">This brand submission has its own approval and version history. A new recipe submission is required for content changes; the existing version will not be overwritten.</p>
-    <Link className={secondary} to="/host/listings/new?type=brand_recipe">Create an updated brand recipe</Link>
+    {awaitingReview ? <p className="text-[15px] text-[#526353]">This recipe is awaiting review. Changes can be submitted after the review decision.</p> : <>
+      <button type="button" className={secondary} onClick={() => setEditing(!editing)}>
+        {editing ? 'Close editor' : 'Edit and submit a new version'}
+      </button>
+      {editing && <RecipeEditor key={id} kind="brand-recipe" id={id} />}
+    </>}
+    <p className="text-sm text-[#526353]">Previously approved recipes and review decisions stay in history.</p>
   </section>
 }
 

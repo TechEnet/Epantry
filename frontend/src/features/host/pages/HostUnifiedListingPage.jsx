@@ -6,8 +6,8 @@ import { useAuth } from '../../auth/context/AuthContext'
 import { listHospitalityOutlets, listHospitalityMenus } from '../../hospitality/services/hospitality.service'
 import {
   listServiceAreas, listInventoryNodes, createInventoryNode,
-  createHostOffer, createHostPriceRule, createInventorySnapshots,
-  createServiceArea, getHostOfferReadiness, activateHostOffer,
+  createHostOffer, updateHostOffer, createHostPriceRule, createInventorySnapshots,
+  createServiceArea, getHostOfferReadiness, getHostEffectivePrice, getHostCurrentInventory, getPublicPackOffers, activateHostOffer,
 } from '../../marketplace/services/marketplace.service'
 import { listHostNpiDrafts } from '../../universalProduct/services/universalProduct.service'
 import { listHostRecipeListingHistory, listHostBrandRecipeSubmissions } from '../../hostOperations/services/hostOperations.service'
@@ -493,6 +493,8 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
   const [currentOfferId, setCurrentOfferId] = useState('')
   const [offerState, setOfferState] = useState('')
   const [checks, setChecks] = useState(null)
+  const [buyerCheck, setBuyerCheck] = useState(null)
+  const approvedListing = readiness?.approvedSelling || listing
   const approved = Boolean(readiness?.approved && readiness?.catalogLinked && readiness?.packId)
   const packId = readiness?.packId || ''
   const enabled = approved && Boolean(listingId)
@@ -500,11 +502,11 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
   const fail = (cause) => cause?.response?.data?.message || cause?.message || 'Could not update selling details.'
 
   useEffect(() => {
-    setPrice(listing?.selling?.listPrice ?? '')
-    setSalePrice(listing?.selling?.salePrice ?? '')
-    setQuantity(listing?.selling?.stockQuantity ?? '')
-    setPostalCodes((listing?.delivery?.postalCodes || []).join(', '))
-    setCurrentOfferId(''); setOfferState(''); setChecks(null); setNotice(''); setError('')
+    setPrice(approvedListing?.selling?.listPrice ?? '')
+    setSalePrice(approvedListing?.selling?.salePrice ?? '')
+    setQuantity(approvedListing?.selling?.stockQuantity ?? '')
+    setPostalCodes((approvedListing?.delivery?.postalCodes || []).join(', '))
+    setCurrentOfferId(''); setOfferState(''); setChecks(null); setBuyerCheck(null); setNotice(''); setError('')
   }, [listingId])
   useEffect(() => {
     if (!enabled) return undefined
@@ -520,18 +522,67 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
     return () => { live = false }
   }, [enabled, packId])
 
+  // Load the REAL active Marketplace price and inventory, not the price/stock
+  // originally typed into the approved listing packet. Never silently replace
+  // Host-entered values when a brand-new offer is being created.
+  useEffect(() => {
+    const existingOfferId = readiness?.offerId
+    if (!enabled || !existingOfferId) return undefined
+    let live = true
+    Promise.all([getHostEffectivePrice(existingOfferId), getHostCurrentInventory(existingOfferId)])
+      .then(([effective, inventory]) => {
+        if (!live) return
+        const rule = effective?.priceRule
+        if (rule?.listPrice?.amountMinor != null) setPrice(String(rule.listPrice.amountMinor / 100))
+        if (rule) setSalePrice(rule.salePrice?.amountMinor == null ? '' : String(rule.salePrice.amountMinor / 100))
+        const rows = inventory?.inventory || []
+        if (rows.length === 1) {
+          setNodeId(String(rows[0].inventoryNodeId || ''))
+          setQuantity(String(rows[0].availableQuantity ?? ''))
+        }
+      })
+      .catch(cause => { if (live) setError(fail(cause)) })
+    return () => { live = false }
+  }, [enabled, readiness?.offerId, listingId])
+
   async function refreshChecks(id) {
     const result = await getHostOfferReadiness(id)
     setChecks(result?.readiness || result || null)
     return result
   }
 
+  // The public offer endpoint is the same verified Pack/price/stock/coverage
+  // gate Customer Product Detail uses. An active draft is NOT proof of visibility.
+  async function checkCustomerVisibility(offerId, pins) {
+    const code = pins[0]
+    if (!code) {
+      setBuyerCheck({ visible: false, message: 'Add a service PIN to check customer availability.' })
+      return false
+    }
+    try {
+      const mode = approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
+      const result = await getPublicPackOffers({ packId, pincode: code, fulfillmentType: mode })
+      const publicOffer = (result?.offers || []).find(item => String(item.id) === String(offerId))
+      const message = publicOffer
+        ? `Customers in ${code} can see your verified ${mode} offer, subject to checkout checks.`
+        : `Your offer is not available to customers in ${code}. Check stock, price, business status and service coverage.`
+      setBuyerCheck({ visible: Boolean(publicOffer), message })
+      return Boolean(publicOffer)
+    } catch {
+      setBuyerCheck({ visible: false, message: 'Customer visibility could not be verified right now. Please check again.' })
+      return false
+    }
+  }
+
   async function saveSelling() {
     setError(''); setNotice('')
     const list = Number(price), sale = salePrice === '' ? null : Number(salePrice)
-    const stock = Number(quantity)
+    const stock = quantity.trim() === '' ? NaN : Number(quantity)
     if (!Number.isFinite(list) || Math.round(list * 100) < 1 || (sale !== null && (!Number.isFinite(sale) || Math.round(sale * 100) < 1 || sale > list))) {
       setError('Enter a valid list price and a selling price no higher than the list price.'); return
+    }
+    if ([list, sale].some(value => value !== null && Math.abs(value * 100 - Math.round(value * 100)) > 0.000001)) {
+      setError('Enter prices with no more than two decimal places.'); return
     }
     if (!Number.isSafeInteger(stock) || stock < 0) { setError('Enter available stock as a whole number.'); return }
     if (!nodeId && !newNodeName.trim()) { setError('Select your stock location or enter a new one.'); return }
@@ -544,12 +595,19 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
       let offerId = activeOfferId
       // Create is always draft. Marketplace enforces unique Pack and Host ownership.
       if (!offerId) {
-        const created = await createHostOffer({ packId, fulfillmentTypes: [listing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'],
-          minimumOrderQuantity: Math.max(1, Number(listing?.selling?.minimumOrderQuantity) || 1),
-          maximumOrderQuantity: listing?.selling?.maximumOrderQuantity ? Number(listing.selling.maximumOrderQuantity) : null })
+        const created = await createHostOffer({ packId, fulfillmentTypes: [approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'],
+          minimumOrderQuantity: Math.max(1, Number(approvedListing?.selling?.minimumOrderQuantity) || 1),
+          maximumOrderQuantity: approvedListing?.selling?.maximumOrderQuantity ? Number(approvedListing.selling.maximumOrderQuantity) : null })
         offerId = String(created?.offer?.id || created?.offer?._id || '')
         if (!offerId) throw new Error('The offer was created, but the offer ID could not be read. Refresh before trying again.')
         setCurrentOfferId(offerId)
+      }
+      // Reconcile this approved listing's fulfillment method with its offer.
+      // Existing Marketplace ownership and canonical Pack checks are enforced.
+      if (activeOfferId) {
+        await updateHostOffer(offerId, {
+          fulfillmentTypes: [approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'],
+        })
       }
       let selectedNodeId = nodeId
       if (!selectedNodeId) {
@@ -558,6 +616,15 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
         if (!selectedNodeId) throw new Error('Stock location could not be confirmed. Refresh your stock locations.')
         setNodeId(selectedNodeId)
         setNodes(previous => [...previous, { id: selectedNodeId, name: newNodeName.trim(), status: 'active' }])
+      }
+      // Never reset reserved inventory to zero when updating existing stock.
+      // Marketplace snapshots represent total on-hand units and outstanding
+      // reservations. Preserve the last reservation quantity at this location.
+      const inventory = await getHostCurrentInventory(offerId)
+      const previous = (inventory?.inventory || []).find(row => String(row.inventoryNodeId) === String(selectedNodeId))
+      const reservedQuantity = Number(previous?.reservedQuantity || 0)
+      if (!Number.isSafeInteger(reservedQuantity) || reservedQuantity < 0 || stock < reservedQuantity) {
+        throw new Error(`On-hand stock cannot be lower than ${reservedQuantity} reserved units. Update your reservations before reducing stock.`)
       }
       const listMinor = Math.round(list * 100)
       const saleMinor = sale === null ? null : Math.round(sale * 100)
@@ -568,11 +635,11 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
         changeReason: 'Host updated the listing selling price',
       })
       await createInventorySnapshots([{
-        offerId, inventoryNodeId: selectedNodeId, availableQuantity: stock, reservedQuantity: 0,
+        offerId, inventoryNodeId: selectedNodeId, availableQuantity: stock, reservedQuantity,
         sourceType: 'manual', sourceReference: `listing:${listingId}`,
       }])
       {
-        const fulfillmentType = listing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
+        const fulfillmentType = approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
         const coverage = areas.find(area => area.status === 'active' &&
           (!area.inventoryNodeId || String(area.inventoryNodeId) === selectedNodeId) &&
           codes.every(code => (area.postalCodes || []).includes(code)) && (area.fulfillmentTypes || []).includes(fulfillmentType))
@@ -585,9 +652,12 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
           if (result?.serviceArea) setAreas(previous => [...previous, result.serviceArea])
         }
       }
-      await refreshChecks(offerId)
-      setNotice(readiness?.offerStatus === 'active' ? 'Price, stock and service areas updated.' : 'Price, stock and service areas saved. Activate your offer when ready.')
-      setOfferState(readiness?.offerStatus === 'active' ? 'active' : 'draft')
+      const latest = await refreshChecks(offerId)
+      const isActive = offerState === 'active' || readiness?.offerStatus === 'active'
+      if (isActive) await checkCustomerVisibility(offerId, codes)
+      else setBuyerCheck(null)
+      setNotice(isActive ? 'Selling details saved. Customer availability is checked separately.' : 'Selling details saved. Activate your offer when ready.')
+      setOfferState(isActive ? 'active' : 'draft')
       onUpdated?.()
     } catch (cause) {
       setError(`${fail(cause)} Any earlier saved changes remain in your Marketplace record. Check the status before retrying.`)
@@ -601,7 +671,9 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
       await activateHostOffer(activeOfferId)
       setOfferState('active')
       await refreshChecks(activeOfferId)
-      setNotice('Your offer is active. Customers can buy it where stock and delivery eligibility are confirmed.')
+      const codes = [...new Set(postalCodes.split(/[\s,;]+/).map(value => value.trim()).filter(Boolean))]
+      await checkCustomerVisibility(activeOfferId, codes)
+      setNotice('Your offer is active. Customer availability depends on verified stock, price and service coverage.')
       onUpdated?.()
     } catch (cause) { setError(fail(cause)) }
     finally { setBusy(false) }
@@ -626,6 +698,9 @@ function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
       {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mt-3 text-sm text-[#173F35]">{notice}</p>}
       {checks && <p className="mt-3 text-sm">{checks?.ready ? 'Ready to activate.' : 'Some selling checks still need attention.'}</p>}
+      {buyerCheck && <p role="status" className="mt-3 text-sm">{buyerCheck.message}</p>}
+      {activeOfferId && (offerState === 'active' || readiness?.offerStatus === 'active') &&
+        <button type="button" className={`${styles.secondary} mt-3`} disabled={busy} onClick={() => checkCustomerVisibility(activeOfferId, [...new Set(postalCodes.split(/[\s,;]+/).filter(Boolean))])}>Check customer availability</button>}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className={styles.secondary} disabled={busy} onClick={saveSelling}>{busy ? 'Saving…' : 'Save selling details'}</button>
         {activeOfferId && <button type="button" className={styles.button} disabled={busy || offerState === 'active' || readiness?.offerStatus === 'active'} onClick={activateSelling}>Activate selling</button>}

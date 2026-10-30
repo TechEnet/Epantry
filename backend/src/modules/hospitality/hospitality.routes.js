@@ -62,6 +62,8 @@ import {
   revokeHospitalityMemberGrant,
   submitHospitalityProductionRecipe,
   updateHospitalityRestaurantRecipe,
+  reviseHospitalityRestaurantRecipe,
+  withdrawHospitalityRestaurantRecipe,
   updateHospitalityOutlet,
   updateHospitalitySupplier,
   updateHospitalitySupplierProduct,
@@ -983,6 +985,43 @@ router.put(
       )
     },
   ),
+)
+
+router.post(
+  '/restaurant-recipes/:id/revisions',
+  requireHospitalityRecipeHostAccess,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(async (req, res) => {
+    const params = parseOrThrow(hospitalityIdParamsSchema, req.params,
+      'HOSPITALITY_RESTAURANT_RECIPE_ID_INVALID')
+    const input = parseOrThrow(updateRestaurantRecipeListingBodySchema, req.body,
+      'HOSPITALITY_RESTAURANT_RECIPE_REVISION_INVALID')
+    return send(req, res, 201, await reviseHospitalityRestaurantRecipe({
+      recipeVersionId: params.id,
+      input,
+      actorUser: actorUser(req),
+      organizationIdHint: organizationIdHint(req),
+    }), 'Changes submitted for Super Admin review.')
+  }),
+)
+
+router.delete(
+  '/restaurant-recipes/:id',
+  requireHospitalityRecipeHostAccess,
+  requireCsrfToken,
+  requireRecentMfaAuthentication,
+  wrap(async (req, res) => {
+    const params = parseOrThrow(
+      hospitalityIdParamsSchema, req.params,
+      'HOSPITALITY_RESTAURANT_RECIPE_ID_INVALID',
+    )
+    return send(req, res, 200, await withdrawHospitalityRestaurantRecipe({
+      recipeVersionId: params.id,
+      actorUser: actorUser(req),
+      organizationIdHint: organizationIdHint(req),
+    }), 'Restaurant recipe withdrawn. Previous records were retained.')
+  }),
 )
 
 /*

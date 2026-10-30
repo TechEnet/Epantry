@@ -5026,11 +5026,70 @@ export async function createBrandRecipeSubmission({
     },
   }
 
-  const created =
-    await createAdminRecipe(
-      recipeInput,
-      actorUser,
-    )
+  // Revisions reuse the existing Dish, preserving the published version and
+  // every previously reviewed submission. A new Dish would duplicate the listing.
+  let created = null
+  if (input.revisesSubmissionId) {
+    const previous = await HostBrandRecipeSubmission.findOne({
+      _id: input.revisesSubmissionId,
+      organizationId: context.organization._id,
+      brandId: brand._id,
+      authorityGrantId: authority._id,
+    }).lean()
+    if (!previous) {
+      throw new ApiError(404, 'Previous Brand Recipe submission was not found.', [
+        { code: 'HOST_BRAND_RECIPE_REVISION_SOURCE_NOT_FOUND' },
+      ])
+    }
+    if (previous.status === 'submitted') {
+      throw new ApiError(409, 'This recipe is awaiting review. Edit after a decision is made.', [
+        { code: 'HOST_BRAND_RECIPE_REVISION_PENDING_REVIEW' },
+      ])
+    }
+    const pending = await HostBrandRecipeSubmission.exists({
+      organizationId: context.organization._id,
+      dishId: previous.dishId,
+      status: 'submitted',
+    })
+    if (pending) {
+      throw new ApiError(409, 'A revision of this recipe is already awaiting review.', [
+        { code: 'HOST_BRAND_RECIPE_REVISION_ALREADY_PENDING' },
+      ])
+    }
+    const sourceVersion = await RecipeVersion.findOne({
+      _id: previous.recipeVersionId,
+      dishId: previous.dishId,
+      sourceType: 'brand',
+      sourceOrganizationId: context.organization._id,
+    }).lean()
+    if (!sourceVersion) {
+      throw new ApiError(409, 'Previous approved recipe lineage could not be verified.', [
+        { code: 'HOST_BRAND_RECIPE_REVISION_LINEAGE_INVALID' },
+      ])
+    }
+    if (sourceVersion.status === 'in_review') {
+      throw new ApiError(409, 'The existing recipe version must finish its review before a revision can be submitted.', [
+        { code: 'HOST_BRAND_RECIPE_VERSION_STILL_IN_REVIEW' },
+      ])
+    }
+    created = await createNextAdminRecipeVersion(previous.dishId, {
+      sourceRecipeVersionId: id(previous.recipeVersionId),
+      changeReason: 'Host revised a previous Brand Recipe submission.',
+    }, actorUser)
+    try {
+      await updateAdminRecipeDraft(
+        created.recipeVersion.id,
+        hostRecipeDraftPayload(input.recipe),
+        actorUser,
+      )
+    } catch (error) {
+      await RecipeVersion.updateOne({ _id: created.recipeVersion.id, status: 'draft' },
+        { $set: { status: 'disabled', changeReason: 'Brand Recipe revision failed validation.' } })
+      throw error
+    }
+  } else {
+    created = await createAdminRecipe(recipeInput, actorUser)
+  }
 
   const submittedRecipeVersion =
     await RecipeVersion.findOneAndUpdate(

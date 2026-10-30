@@ -724,6 +724,14 @@ export async function listHostNpiDrafts({
   )
 }
 
+export async function reviseHostNpiDraft(draftId, input) {
+  return csrfRequest({
+    method: 'post',
+    url: `/host/universal-product/npi/drafts/${encodePathValue(draftId)}/revisions`,
+    data: input,
+  })
+}
+
 export async function getHostNpiDraft(
   draftId,
 ) {

@@ -294,6 +294,19 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
     message: 'Submit this listing for Super Admin approval before setting up sales.',
   }
   if (!approved) return respond(res, { readiness })
+  // The published, approved packet controls live selling. Never use a Host's
+  // pending revision to silently change pickup/delivery or service coverage.
+  readiness.approvedSelling = {
+    selling: {
+      listPrice: approved.packet?.selling?.listPrice ?? null,
+      salePrice: approved.packet?.selling?.salePrice ?? null,
+      stockQuantity: approved.packet?.selling?.stockQuantity ?? null,
+    },
+    delivery: {
+      fulfillment: approved.packet?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery',
+      postalCodes: approved.packet?.delivery?.postalCodes || [],
+    },
+  }
   if (!isCommercialCatalogCandidate(approved.packet)) {
     readiness.message = 'This recipe is shared with customers and is not a sellable product.'
     return respond(res, { readiness })

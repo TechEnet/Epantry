@@ -40,6 +40,7 @@ import {
 
 import {
   createAdminRecipe,
+  createNextAdminRecipeVersion,
   getAdminRecipeVersion,
   updateAdminRecipeDraft,
 } from '../recipes/recipe.admin.service.js'
@@ -8761,6 +8762,15 @@ async function createRestaurantOperationalOverlay({
     recipeFoundationMode: 'core_recipe_linked',
     listingOutletId: outlet._id,
     customerVisibility,
+    pendingDishMetadata: {
+      name: recipeInput.name,
+      description: recipeInput.description,
+      cuisine: recipeInput.cuisine,
+      course: recipeInput.course,
+      heroImageUrl: recipeInput.heroImageUrl,
+      tags: recipeInput.tags,
+      language: recipeInput.language,
+    },
     title: recipeInput.title,
     baseYieldPortions: recipeInput.baseServings,
     productionUnit: 'portion',
@@ -9075,6 +9085,122 @@ export async function createHospitalityRestaurantRecipe({
   })
 }
 
+/** Start a reviewed revision without replacing the Customer-visible version. */
+export async function reviseHospitalityRestaurantRecipe({
+  recipeVersionId,
+  input,
+  actorUser,
+  organizationIdHint = null,
+}) {
+  const context = await resolveHospitalityContext(actorUser, organizationIdHint)
+  assertPermission(context, 'hospitality.recipes.manage')
+
+  const source = await RecipeVersion.findOne({
+    _id: recipeVersionId,
+    sourceOrganizationId: context.organization._id,
+    sourceType: 'chef',
+    status: 'published',
+  }).lean()
+  if (!source) {
+    throw new ApiError(409, 'Only an approved restaurant recipe can be revised.', [
+      { code: 'HOSPITALITY_RECIPE_REVISION_SOURCE_INVALID' },
+    ])
+  }
+  const sourceOverlay = await HospitalityProductionRecipeVersion.exists({
+    organizationId: context.organization._id,
+    sourceRecipeVersionId: source._id,
+    recipeFoundationMode: 'core_recipe_linked',
+    status: 'approved',
+  })
+  if (!sourceOverlay) {
+    throw new ApiError(409, 'Approved recipe settings are missing.', [
+      { code: 'HOSPITALITY_RECIPE_REVISION_SOURCE_OVERLAY_INVALID' },
+    ])
+  }
+  const pending = await RecipeVersion.exists({
+    dishId: source.dishId,
+    sourceOrganizationId: context.organization._id,
+    sourceType: 'chef',
+    status: 'in_review',
+  })
+  if (pending) {
+    throw new ApiError(409, 'A change to this recipe is already awaiting review.', [
+      { code: 'HOSPITALITY_RECIPE_REVISION_PENDING' },
+    ])
+  }
+
+  const outlet = await requireRestaurantOutlet({ context, outletId: input.outletId })
+  const { recipeInput, foodIntelligence } = restaurantCoreRecipeInput({ input, context, outlet })
+  await validateRestaurantOperationalIngredients({
+    context,
+    recipeInput,
+    operationalIngredients: input.operationalIngredients,
+  })
+
+  const created = await createNextAdminRecipeVersion(source.dishId, {
+    sourceRecipeVersionId: id(source._id),
+    changeReason: 'Restaurant submitted changes to an approved recipe.',
+  }, actorUser)
+  const newId = created.recipeVersion.id
+  try {
+    await updateAdminRecipeDraft(newId, recipeInput, actorUser)
+    const version = await RecipeVersion.findOneAndUpdate({
+      _id: newId,
+      sourceOrganizationId: context.organization._id,
+      sourceType: 'chef',
+      status: 'draft',
+    }, {
+      $set: {
+        status: 'in_review',
+        submittedAt: new Date(),
+        submittedByUserId: actorId(actorUser),
+        changeReason: input.kitchenNote || 'Changes submitted for review.',
+      },
+    }, { new: true })
+    if (!version) {
+      throw new ApiError(409, 'New version could not enter review.', [
+        { code: 'HOSPITALITY_RECIPE_REVISION_REVIEW_STATE_INVALID' },
+      ])
+    }
+    await createRestaurantOperationalOverlay({
+      context,
+      outlet,
+      coreRecipe: created,
+      recipeInput,
+      operationalIngredients: input.operationalIngredients,
+      customerVisibility: input.customerVisibility,
+      kitchenNote: input.kitchenNote,
+      actorUser,
+    })
+    if (foodIntelligence) {
+      await submitRecipeFoodIntelligenceDeclaration(newId, foodIntelligence, actorUser)
+    }
+    await notifyActiveSuperAdminsBestEffort({
+      triggerType: 'hospitality_approval_requested',
+      reasonCode: 'restaurant_recipe_listing_submitted',
+      explanation: `${context.organization?.displayName || 'Restaurant'} submitted changes to ${recipeInput.title}.`,
+      relatedEntityType: 'restaurant_recipe_listing',
+      relatedEntityId: id(newId),
+      sourceDomain: 'hospitality',
+      sourceVersion: 'restaurant-recipe-revision-v1',
+      dedupeScope: `restaurant-recipe-review:${id(newId)}`,
+    })
+  } catch (error) {
+    // Never change the previously published version when creating a revision fails.
+    await RecipeVersion.updateOne(
+      { _id: newId, status: { $in: ['draft', 'in_review'] } },
+      { $set: { status: 'disabled', visibility: 'organization_only',
+        changeReason: 'Recipe revision setup failed.' } },
+    )
+    throw error
+  }
+  return getHospitalityRestaurantRecipe({
+    recipeVersionId: newId,
+    actorUser,
+    organizationIdHint: id(context.organization._id),
+  })
+}
+
 export async function updateHospitalityRestaurantRecipe({
   recipeVersionId,
   input,
@@ -9165,6 +9291,15 @@ export async function updateHospitalityRestaurantRecipe({
   overlay.listingOutletId = outlet._id
   overlay.customerVisibility = input.customerVisibility
   overlay.title = recipeInput.title
+  overlay.pendingDishMetadata = {
+    name: recipeInput.name,
+    description: recipeInput.description,
+    cuisine: recipeInput.cuisine,
+    course: recipeInput.course,
+    heroImageUrl: recipeInput.heroImageUrl,
+    tags: recipeInput.tags,
+    language: recipeInput.language,
+  }
   overlay.baseYieldPortions = recipeInput.baseServings
   overlay.status = 'in_review'
   overlay.changeReason =
@@ -9228,6 +9363,77 @@ export async function updateHospitalityRestaurantRecipe({
     actorUser,
     organizationIdHint: id(context.organization._id),
   })
+}
+
+/** Retire only this Host's listing; retain the full RecipeVersion and operational audit history. */
+export async function withdrawHospitalityRestaurantRecipe({
+  recipeVersionId,
+  actorUser,
+  organizationIdHint = null,
+}) {
+  const context = await resolveHospitalityContext(actorUser, organizationIdHint)
+  assertPermission(context, 'hospitality.recipes.manage')
+
+  const session = await mongoose.startSession()
+  try {
+    await session.withTransaction(async () => {
+      const version = await RecipeVersion.findOne({
+        _id: recipeVersionId,
+        sourceOrganizationId: context.organization._id,
+        sourceType: 'chef',
+      }).session(session)
+
+      if (!version) {
+        throw new ApiError(404, 'Restaurant recipe was not found.', [
+          { code: 'HOSPITALITY_RESTAURANT_RECIPE_NOT_FOUND' },
+        ])
+      }
+      if (version.status === 'retired' || version.status === 'disabled') return
+      if (!['draft', 'in_review', 'published'].includes(version.status)) {
+        throw new ApiError(409, 'This recipe cannot be withdrawn in its current state.', [
+          { code: 'HOSPITALITY_RESTAURANT_RECIPE_WITHDRAW_INVALID' },
+        ])
+      }
+
+      const overlay = await HospitalityProductionRecipeVersion.findOne({
+        organizationId: context.organization._id,
+        sourceRecipeVersionId: version._id,
+        recipeFoundationMode: 'core_recipe_linked',
+      }).session(session)
+      if (!overlay) {
+        throw new ApiError(409, 'Recipe operations record is missing.', [
+          { code: 'HOSPITALITY_RESTAURANT_RECIPE_OVERLAY_NOT_FOUND' },
+        ])
+      }
+
+      // Both records must change atomically: no published recipe with a retired overlay.
+      const now = new Date()
+      const previousStatus = version.status
+      const previousOverlayStatus = overlay.status
+      // MongoDB transactions do not support concurrent operations on one session.
+      const versionChange = await RecipeVersion.updateOne(
+        { _id: version._id, sourceOrganizationId: context.organization._id, status: previousStatus },
+        { $set: { status: 'retired', visibility: 'organization_only',
+          changeReason: 'Withdrawn from Customer discovery by the Host.' } },
+        { session },
+      )
+      const overlayChange = await HospitalityProductionRecipeVersion.updateOne(
+        { _id: overlay._id, organizationId: context.organization._id, status: previousOverlayStatus },
+        { $set: { status: 'retired', customerVisibility: 'organization_only',
+          changeReason: 'Withdrawn by the Host.', effectiveTo: now } },
+        { session },
+      )
+      if (versionChange.modifiedCount !== 1 || overlayChange.modifiedCount !== 1) {
+        throw new ApiError(409, 'Recipe changed while it was being withdrawn. Please refresh.', [
+          { code: 'HOSPITALITY_RESTAURANT_RECIPE_WITHDRAW_CONFLICT' },
+        ])
+      }
+    })
+  } finally {
+    await session.endSession()
+  }
+  return { recipeVersionId: id(recipeVersionId), status: 'retired',
+    message: 'Recipe withdrawn. Existing records were preserved.' }
 }
 
 export async function listAdminHospitalityRestaurantRecipeApprovals() {
@@ -9410,15 +9616,16 @@ export async function reviewHospitalityRestaurantRecipeAsSuperAdmin({
     version.changeReason = input.reason
     await version.save()
 
+    // The shared Dish identity only changes after the revised version is approved.
+    // Do not expose Host-submitted name, image or categories while review is pending.
+    const dishMetadata = overlay.pendingDishMetadata || {}
+    const safeDishMetadata = Object.fromEntries([
+      'name', 'description', 'cuisine', 'course', 'heroImageUrl', 'tags', 'language',
+    ].filter((key) => Object.prototype.hasOwnProperty.call(dishMetadata, key))
+      .map((key) => [key, dishMetadata[key]]))
     await Dish.updateOne(
-      {
-        _id: version.dishId,
-      },
-      {
-        $set: {
-          status: 'active',
-        },
-      },
+      { _id: version.dishId },
+      { $set: { status: 'active', ...safeDishMetadata } },
     )
 
     overlay.status = 'approved'

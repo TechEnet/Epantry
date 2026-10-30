@@ -1134,6 +1134,13 @@ imageEvidenceSchema.index({
 const communityProductDraftSchema =
   new Schema(
     {
+      revisesDraftId: {
+        type: objectId,
+        ref: 'CommunityProductDraft',
+        default: null,
+        index: true,
+      },
+
       origin: {
         type:
           String,

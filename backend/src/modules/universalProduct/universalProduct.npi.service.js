@@ -1728,6 +1728,7 @@ export function serializeCommunityProductDraft(
 
     origin:
       item.origin,
+    revisesDraftId: item.revisesDraftId ? id(item.revisesDraftId) : null,
 
     listingType:
       item.listingType ||
@@ -4772,6 +4773,98 @@ export async function reviewAdminNpiBulkSelection({
     drafts:
       refreshed.drafts,
   }
+}
+
+/** Start a new provisional review while retaining the approved/rejected source. */
+export async function reviseHostNpiDraft({ draftId, input, actorUser }) {
+  const userId = actorId(actorUser)
+  const original = await CommunityProductDraft.findOne({
+    _id: draftId,
+    createdByUserId: userId,
+    origin: 'host_npi',
+    status: { $in: ['approved_for_catalog', 'rejected'] },
+  }).lean()
+  if (!original) {
+    throw new ApiError(404, 'A completed Host product review was not found.', [
+      { code: 'HOST_NPI_REVISION_SOURCE_INVALID' },
+    ])
+  }
+  const { organization, authority } = await hostAuthority({
+    actorUser,
+    market: original.market,
+    brandId: original.canonicalBrandId || null,
+    authorityGrantId: original.authorityGrantId || null,
+  })
+  if (id(organization._id) !== id(original.organizationId)) {
+    throw new ApiError(403, 'This product belongs to another Host.', [
+      { code: 'HOST_NPI_REVISION_ORGANIZATION_INVALID' },
+    ])
+  }
+  if (original.canonicalBrandId && !authority) {
+    throw new ApiError(403, 'An active Brand authorization is required.', [
+      { code: 'HOST_NPI_REVISION_AUTHORITY_REQUIRED' },
+    ])
+  }
+  const pending = await CommunityProductDraft.exists({
+    revisesDraftId: original._id,
+    organizationId: organization._id,
+    status: { $nin: ['approved_for_catalog', 'rejected'] },
+  })
+  if (pending) {
+    throw new ApiError(409, 'A revision of this product is already being reviewed.', [
+      { code: 'HOST_NPI_REVISION_ALREADY_PENDING' },
+    ])
+  }
+  const sourceEvidenceIds = original.sourceEvidenceIds || []
+  const evidenceCount = await ImageEvidence.countDocuments({
+    _id: { $in: sourceEvidenceIds }, ownerUserId: userId, status: 'active',
+  })
+  if (!sourceEvidenceIds.length || evidenceCount !== sourceEvidenceIds.length) {
+    throw new ApiError(409, 'Original product photos are no longer available. Add new evidence.', [
+      { code: 'HOST_NPI_REVISION_EVIDENCE_MISSING' },
+    ])
+  }
+  // Every transferred declaration is pending review, even when the old version was approved.
+  const fields = Object.fromEntries(Object.entries(original.candidateFields || {}).map(
+    ([name, entry]) => [name, entry && typeof entry === 'object' && 'value' in entry
+      ? manualField(entry.value, Boolean(entry.safetyCritical), 'host_manual') : entry],
+  ))
+  for (const [name, value, critical] of [
+    ['displayName', input.title, false],
+    ['brandName', input.brandName, false],
+    ['gtin', input.barcode, false],
+    ['ingredientDeclarationText', input.ingredientDeclarationText, true],
+  ]) {
+    if (typeof value === 'string' && value.trim()) {
+      fields[name] = manualField(value.trim(), critical, 'host_manual')
+    }
+  }
+  if (typeof input.allergenStatement === 'string') {
+    fields.allergens = manualField({
+      statement: input.allergenStatement.trim(),
+      items: Array.isArray(fields.allergens?.value?.items) ? fields.allergens.value.items : [],
+    }, true, 'host_manual')
+  }
+  const draft = await CommunityProductDraft.create({
+    origin: 'host_npi',
+    listingType: original.listingType,
+    revisesDraftId: original._id,
+    createdByUserId: userId,
+    organizationId: organization._id,
+    canonicalBrandId: original.canonicalBrandId || null,
+    authorityGrantId: authority?._id || null,
+    brandAuthorityVerified: Boolean(authority),
+    market: original.market,
+    barcode: input.barcode?.trim() || original.barcode || '',
+    status: 'provisional',
+    verificationStatus: 'unverified',
+    candidateFields: fields,
+    sourceEvidenceIds,
+    safetyReviewRequired: true,
+    readyForCatalog: false,
+    reviewSummary: 'Revised product details submitted for a new review. Previous decision remains unchanged.',
+  })
+  return { draft: serializeCommunityProductDraft(draft), revisesDraftId: id(original._id) }
 }
 
 export async function createHostNpiFromImages(

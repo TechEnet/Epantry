@@ -56,6 +56,8 @@ export function publicListing(record) {
     preparationMinutes: approved.type === 'grocery' ? null : (packet.preparationMinutes ?? null),
     cookingMinutes: approved.type === 'grocery' ? null : (packet.cookingMinutes ?? null),
     shareRecipe: Boolean(packet.shareRecipe), sellReadyMade: Boolean(packet.sellReadyMade),
+    // Only publish the fulfillment MODE, never private coverage or Host operational data.
+    fulfillmentType: commercial ? (packet.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery') : null,
     baseServings: packet.shareRecipe ? packet.baseServings : null,
     difficulty: approved.type === 'grocery' || !packet.shareRecipe ? '' : (packet.difficulty || 'not_declared'),
     // Full quantities and preparation instructions are private unless the

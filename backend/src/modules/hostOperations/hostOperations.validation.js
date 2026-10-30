@@ -877,6 +877,8 @@ export const listBrandRecipeSubmissionsQuerySchema =
 export const createBrandRecipeSubmissionSchema =
   z
     .object({
+      revisesSubmissionId: objectIdSchema.optional(),
+
       brandId:
         objectIdSchema,
 

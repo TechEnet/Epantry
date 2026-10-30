@@ -684,6 +684,10 @@ function HostListingPincodeCheck({ product }) {
 }
 
 function MarketplaceOffers({ product, onOffersResolved }) {
+  // A Host's approved prepared item can be pickup-only. Do not query delivery
+  // offers or create delivery carts for a published pickup listing.
+  const fulfillmentType = product?.isHostListing &&
+    product?.hostSubmission?.fulfillmentType === "pickup" ? "pickup" : "delivery";
   const currentLocation = useLocationStore((state) => state.currentLocation);
   const { requestCurrentLocation, status: locationStatus } = useCurrentLocation();
   // Only a complete Indian PIN is safe for an availability lookup. Never use
@@ -817,7 +821,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         fulfillmentType:
           result?.cart?.fulfillmentType ||
           floatingCart.fulfillmentType ||
-          "delivery",
+          fulfillmentType,
       });
     } catch (quantityError) {
       setError(
@@ -844,7 +848,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   useEffect(() => {
     let cancelled = false;
     const lookupPincode = pincode.trim();
-    const lookupKey = `${packId || ""}:${lookupPincode}`;
+    const lookupKey = `${packId || ""}:${lookupPincode}:${fulfillmentType}`;
 
     setOffers([]);
     setError(null);
@@ -864,7 +868,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         const result = await getPublicPackOffers({
           packId,
           pincode: lookupPincode,
-          fulfillmentType: "delivery",
+          fulfillmentType,
         });
         if (cancelled) return;
 
@@ -901,7 +905,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         setCheckedPincode(lookupKey);
         setChecked(true);
         onOffersResolved?.({ offer: null, pincode: lookupPincode });
-        setError(nextError?.message || "Unable to check delivery availability.");
+        setError(nextError?.message || "Unable to check availability.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -911,10 +915,10 @@ function MarketplaceOffers({ product, onOffersResolved }) {
     return () => { cancelled = true; };
     // Only the Pack ID and chosen PIN determine when availability is rechecked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [packId, pincode]);
+  }, [packId, pincode, fulfillmentType]);
 
   const verifiedForCurrentPin =
-    checked && checkedPincode === `${packId || ""}:${pincode.trim()}`;
+    checked && checkedPincode === `${packId || ""}:${pincode.trim()}:${fulfillmentType}`;
   const visibleOffers = verifiedForCurrentPin && !error ? offers : [];
   const needsManualPin = !pincode || manualEditorOpen;
 
@@ -952,7 +956,8 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       const existingFloatingCart = readFloatingMarketplaceCart();
 
       const result = await createDirectMarketplaceCart({
-        cartId: existingFloatingCart?.cartId || null,
+        cartId: existingFloatingCart?.fulfillmentType === fulfillmentType
+          ? (existingFloatingCart?.cartId || null) : null,
 
         packId,
 
@@ -962,7 +967,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
 
         pincode: pincode.trim(),
 
-        fulfillmentType: "delivery",
+        fulfillmentType,
 
         idempotencyKey: createCommerceIdempotencyKey("direct-product-cart"),
       });
@@ -993,7 +998,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         cartId,
         items: floatingItems,
         pincode: result?.cart?.pincode || pincode.trim(),
-        fulfillmentType: result?.cart?.fulfillmentType || "delivery",
+        fulfillmentType: result?.cart?.fulfillmentType || fulfillmentType,
       });
 
       notifyFloatingCartFly({
@@ -1040,12 +1045,12 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">
-            {pincode ? "Delivery availability" : "Check price by pincode"}
+            {pincode ? (fulfillmentType === "pickup" ? "Pickup availability" : "Delivery availability") : "Check price by pincode"}
           </h2>
           <p className="mt-0.5 text-[13px] leading-5 text-[#676E67]">
             {pincode
-              ? `Delivery PIN ${pincode}${manualPincode === null ? (isLocationApproximate ? " · Estimated location" : " · Current location") : " · Selected address"}`
-              : "Choose a delivery PIN to see prices and Add to Cart."}
+              ? `${fulfillmentType === "pickup" ? "Pickup area PIN" : "Delivery PIN"} ${pincode}${manualPincode === null ? (isLocationApproximate ? " · Estimated location" : " · Current location") : " · Selected address"}`
+              : "Choose a PIN to see prices and Add to Cart."}
           </p>
         </div>
         {pincode && !manualEditorOpen && (

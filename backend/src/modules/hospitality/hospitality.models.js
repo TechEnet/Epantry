@@ -824,6 +824,12 @@ const hospitalityProductionRecipeVersionSchema = new Schema(
       index: true,
     },
 
+    // Unpublished changes to shared Dish fields. Applied only on Super Admin approval.
+    pendingDishMetadata: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+
     customerVisibility: {
       type: String,
       enum: [
