@@ -11,6 +11,7 @@ import {
   reviewAdminHostListingPacket,
   linkAdminHostListingCatalog,
   createAdminHostListingCatalogDraft,
+  publishAdminHostListingCatalog,
 } from '../services/hostUnifiedListing.service'
 
 const correctionSections = [
@@ -218,8 +219,19 @@ export default function AdminUnifiedListingReviewPage() {
     setBusy(true); setError(''); setSuccess('')
     try {
       await createAdminHostListingCatalogDraft(selected.id, { npiDraftId, categoryName: catalogCategory.trim() })
-      setNpiDraftId(''); setCatalogCategory('')
-      setSuccess('Catalog draft created from reviewed evidence. Publish it through Catalog review before linking it for selling.')
+      setCatalogCategory('')
+      setSuccess('Catalog draft created. Submit its product version for review in Catalog; then publish it here using the same evidence ID.')
+    } catch (cause) { setError(getError(cause)) }
+    finally { setBusy(false) }
+  }
+
+  async function publishReviewedProduct() {
+    if (!selected || busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || note.trim().length < 10) return
+    setBusy(true); setError(''); setSuccess('')
+    try {
+      await publishAdminHostListingCatalog(selected.id, { npiDraftId, reason: note.trim() })
+      await load()
+      setSuccess('Approved product published and linked. The Host can set stock, price and delivery in Listing Studio.')
     } catch (cause) { setError(getError(cause)) }
     finally { setBusy(false) }
   }
@@ -436,6 +448,8 @@ export default function AdminUnifiedListingReviewPage() {
                 </label>
               </div>
               <button type="button" className="mt-3 min-h-11 rounded-lg bg-[#173F35] px-4 font-semibold text-white disabled:opacity-50" disabled={busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || catalogCategory.trim().length < 2} onClick={createCatalogDraft}>Create catalog draft</button>
+              <p className="mt-3 text-[14px] text-[#52685A]">After the product version is submitted for Catalog review, enter the same evidence ID and an approval reason in the review notes to publish it. All evidence and duplicate checks still apply.</p>
+              <button type="button" className="mt-3 min-h-11 rounded-lg border border-[#173F35] bg-[#EAF1E8] px-4 font-semibold text-[#173F35] disabled:opacity-50" disabled={busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || note.trim().length < 10} onClick={publishReviewedProduct}>Publish reviewed product & link listing</button>
             </details>}
             {!packet.catalogProductVersionId && <Link to="/admin/catalog" className="mt-3 inline-flex min-h-11 items-center text-[15px] font-semibold text-[#173F35] underline underline-offset-4">Open catalog review for a new product</Link>}
             {!packet.catalogProductVersionId && <div className="mt-3 flex flex-wrap items-end gap-3">

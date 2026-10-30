@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { rejectPrivilegedImpersonation } from '../admin/adminSafety.middleware.js'
-import { loadAdminAuthorization, requireAdminAccess } from '../admin/adminPermission.middleware.js'
+import { loadAdminAuthorization, requireAdminAccess, requireAdminPermission } from '../admin/adminPermission.middleware.js'
 import { createNotificationIntentBestEffort, notifyActiveSuperAdminsBestEffort } from '../notifications/notification.service.js'
 import { createHostListingImageUploadIntent, createHostListingVideoUploadIntent } from '../../integrations/media/cloudinary.provider.js'
 import { ApiError } from '../../utils/ApiError.js'
@@ -13,6 +13,8 @@ import { ProductVersion, Brand, Pack, ProductVariant, ProductFamily } from '../c
 import { BrandAuthorityGrant } from '../brands/brandAuthority.models.js'
 import { CommunityProductDraft } from '../universalProduct/universalProduct.models.js'
 import { materializeNpiDraftToCatalog } from '../universalProduct/universalProduct.catalogHandoff.service.js'
+import { publishProductVersion } from '../catalog/catalog.governance.service.js'
+import { findProductVersionDuplicateCandidates } from '../catalog/catalog.duplicate.service.js'
 import { MarketplaceOrganization, HostOffer } from '../marketplace/marketplace.models.js'
 import { validateOfferCanonicalPack } from '../marketplace/marketplace.host.service.js'
 import { listPublicProducts, buildPublicProductSlug } from '../catalog/catalog.public.service.js'
@@ -542,6 +544,63 @@ router.post('/admin/host-listing-packets/:id/catalog-draft', ...adminWrite, supe
   }, { $set: { catalogNpiDraftId: npiDraft._id } })
   if (!linked.matchedCount) problem('The listing changed during catalog review. Refresh and check its latest approved version.', 409)
   respond(res, { handoff: result, catalogReviewRequired: true })
+}))
+
+// Final catalog publication uses exactly the same evidence, duplicate and hierarchy
+// checks as Catalog governance. Never turn a Host's declared stock/price into an offer.
+// Only the approved public revision is eligible; private pending edits stay private.
+router.post('/admin/host-listing-packets/:id/publish-catalog', ...adminWrite, superAdminOnly, requireAdminPermission('catalog.publish'), wrap(async (req, res) => {
+  if (!objectId(req.params.id)) problem('Invalid listing identifier.')
+  const npiDraftId = String(req.body?.npiDraftId || '').trim()
+  const reason = String(req.body?.reason || '').trim()
+  if (!objectId(npiDraftId)) problem('Choose this listing’s reviewed product evidence record.')
+  if (reason.length < 10 || reason.length > 1200) problem('Describe the evidence and reason for publication (10–1200 characters).')
+  const record = await HostUnifiedListingPacket.findOne({ _id: req.params.id, deletedAt: null })
+  if (!record || !(record.status === 'approved' || record.publishedPacket)) problem('Approve this listing first.', 409)
+  const reviewed = publishedHostRecord(record.toObject())
+  if (reviewed.type !== 'grocery') problem('Only approved grocery products can be published through this catalog evidence path.', 409)
+  if (record.catalogNpiDraftId && String(record.catalogNpiDraftId) !== npiDraftId) {
+    problem('A different product evidence record is already linked. Review the identity change before publication.', 409)
+  }
+  const organization = await MarketplaceOrganization.findOne({ ownerUserId: record.ownerUserId, status: 'active' }).select('_id').lean()
+  if (!organization) problem('An active Host business is required.', 409)
+  const npiDraft = await CommunityProductDraft.findOne({
+    _id: npiDraftId, organizationId: organization._id, createdByUserId: record.ownerUserId,
+    status: 'approved_for_catalog', readyForCatalog: true,
+  }).select('barcode candidateFields catalogProductVersionId').lean()
+  if (!npiDraft || !npiDraft.catalogProductVersionId) problem('First create the catalog draft from reviewed product evidence.', 409)
+  const id = String(npiDraft.catalogProductVersionId)
+  const alreadyLinked = String(reviewed.packet?.catalogProductVersionId || '')
+  if (alreadyLinked && alreadyLinked !== id) {
+    problem('A different catalog identity is already approved. Submit an identity revision for review.', 409)
+  }
+  const version = await ProductVersion.findById(id).select('_id packId displayName gtin netQuantity publicationStatus').lean()
+  if (!version || !['in_review', 'published'].includes(version.publicationStatus)) {
+    problem('Submit the canonical product version for catalog review first.', 409)
+  }
+  const listedBarcode = String(reviewed.packet?.selling?.barcode || '').trim()
+  if ((listedBarcode && listedBarcode !== version.gtin) || !matchesCatalogProductIdentity(reviewed.packet, version)) {
+    problem('The reviewed canonical product identity does not match this Host listing.', 409)
+  }
+  if (version.publicationStatus === 'in_review') {
+    const duplicates = await findProductVersionDuplicateCandidates(id)
+    if (duplicates.candidates?.length) problem('Resolve duplicate catalog product candidates before publication.', 409)
+    await publishProductVersion({ versionId: id, reasonCode: 'catalog.governance', reasonDetails: reason,
+      actorUser: req.currentUser, adminAuthorization: req.adminAuthorization, requestId: req.requestId })
+  }
+  // Publication and Host link are separately recoverable: a retry re-links an
+  // already-published version without publishing it or charging a customer twice.
+  const publishedPacket = { ...reviewed.packet, catalogProductVersionId: id }
+  await validateCatalogMatch(publishedPacket)
+  const linked = await HostUnifiedListingPacket.findOneAndUpdate({
+    _id: record._id, publishedRevision: record.publishedRevision, deletedAt: null,
+    $or: [{ catalogNpiDraftId: null }, { catalogNpiDraftId: npiDraftId }],
+  }, { $set: { publishedPacket, publishedTitle: reviewed.title, publishedType: reviewed.type,
+      catalogNpiDraftId: npiDraftId, catalogLinkedAt: new Date(), catalogLinkedByUserId: actor(req),
+      ...(record.status === 'approved' ? { packet: publishedPacket } : {}) } }, { new: true, runValidators: true })
+  if (!linked) problem('The approved listing changed during publication. Refresh and retry linking; the catalog version is preserved.', 409)
+  respond(res, { listing: serialize(linked), catalogPublished: true, catalogLinked: true,
+    productVersionId: id, packId: String(version.packId) })
 }))
 
 router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdminOnly, wrap(async (req, res) => {
