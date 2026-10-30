@@ -27,6 +27,7 @@ const LegacyListingManager = lazy(() => import('../components/LegacyListingManag
 const ProductEvidenceWorkspace = lazy(() => import('../../universalProduct/pages/HostNpiPage'))
 const BrandRecipeHistoryWorkspace = lazy(() => import('../../hostOperations/pages/HostOperationsPage'))
 const KitchenRecipeHistoryWorkspace = lazy(() => import('../../hospitality/pages/RestaurantRecipesPage'))
+const SellingHistoryWorkspace = lazy(() => import('../../listingHistory/pages/HostListingHistoryPage'))
 
 const editorialStyles = String.raw`
 /* EPANTRY host editor: isolated design. No global host/navbar/footer overrides. */
@@ -1445,6 +1446,7 @@ function HostUnifiedListingEditor() {
             </div>}
           </div>
           <PreviouslyListedItems workspace={workspace} />
+          {['b2b', 'brand_seller', 'hybrid', 'legacy'].includes(workspace) && <Link to="/host/listings/new?manage=offers-history" className="mt-3 inline-flex text-sm font-semibold text-[#173F35] underline underline-offset-4">View earlier selling history</Link>}
         </section>
         <p className="uel-hold-note"><ClipboardList size={17} className="mt-1 shrink-0"/><span>Non-food categories, including cosmetics and clothing, are not available for listing yet.</span></p>
       </div>
@@ -1473,7 +1475,9 @@ export default function HostUnifiedListingPage() {
       ? <BrandRecipeHistoryWorkspace section="recipes" />
       : managementView === 'kitchen-recipes' && canManageKitchenRecipes
         ? <KitchenRecipeHistoryWorkspace />
-        : null
+        : managementView === 'offers-history' && canManageProducts
+          ? <SellingHistoryWorkspace />
+          : null
   if (managementView) {
     if (!management) return <Navigate to="/host/listings/new" replace />
     return <div className="min-w-0 w-full">

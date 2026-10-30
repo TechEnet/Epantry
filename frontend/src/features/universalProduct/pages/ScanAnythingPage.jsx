@@ -742,7 +742,7 @@ export default function ScanAnythingPage({ mode = "customer" }) {
       setSuccess(
         status === "ready_for_review"
           ? "Product details are ready for review."
-          : "Product review draft created. Open Add / Edit Products to continue."
+          : "Product review draft created. Open Listing Studio to continue."
       );
     } catch (requestError) {
       const holds = extractMediaPrivacyHolds(requestError);
@@ -830,7 +830,7 @@ export default function ScanAnythingPage({ mode = "customer" }) {
                 {
                   number: "4",
                   title: "Continue listing",
-                  text: "Move to Pricing & Stock or Add / Edit Products.",
+                  text: "Continue in Listing Studio to manage price and stock.",
                   tone: "border-cyan-200 bg-cyan-50",
                   numberTone: "bg-cyan-700",
                 },
@@ -1036,7 +1036,7 @@ export default function ScanAnythingPage({ mode = "customer" }) {
                   },
                   {
                     title: "Next workspace",
-                    text: "Continue in Add / Edit Products when review is needed.",
+                    text: "Continue in Listing Studio when review is needed.",
                     tone: "border-cyan-200 bg-cyan-50",
                   },
                 ].map((item) => (
@@ -1532,7 +1532,7 @@ export default function ScanAnythingPage({ mode = "customer" }) {
               {
                 number: "4",
                 title: "Send for review",
-                text: "Then continue in Add / Edit Products.",
+                text: "Then continue in Listing Studio.",
                 tone: "border-emerald-200 bg-emerald-50",
                 numberTone: "bg-emerald-700",
               },
@@ -1973,10 +1973,10 @@ export default function ScanAnythingPage({ mode = "customer" }) {
 
               {hostNpiResult ? (
                 <Link
-                  to="/host/product-intelligence"
+                  to="/host/listings/new"
                   className="focus-ring mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-[10px] font-black text-emerald-800 hover:bg-emerald-50 sm:mt-3 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
                 >
-                  Continue to Add / Edit Products
+                  Open Listing Studio
                   <ArrowRight size={16} aria-hidden="true" />
                 </Link>
               ) : null}

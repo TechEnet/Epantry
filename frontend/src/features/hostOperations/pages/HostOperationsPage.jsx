@@ -1662,7 +1662,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             {[
               ["01", "Check your catalog", "See every product EPANTRY has checked.", "bg-[#e8f1f8] border-[#d6e7f2]"],
               ["02", "Read what needs attention", "Spot missing images, nutrition or safety details.", "bg-[#e7f3ed] border-[#d4eadf]"],
-              ["03", "Complete product details", "Open Add / Edit Products and fix the missing information.", "bg-[#f0ebf8] border-[#e4daf3]"],
+              ["03", "Complete product details", "Open Listing Studio and complete the missing information.", "bg-[#f0ebf8] border-[#e4daf3]"],
               ["04", "Refresh this page", "Come back after updates to see the latest catalog health.", "bg-[#e8f4ee] border-[#d4eadf]"],
             ].map(([step, label, helper, tone]) => (
               <div
@@ -2790,16 +2790,16 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   Next step: complete the flagged product details
                 </p>
                 <p className="mt-0.5 text-[8px] font-semibold leading-[11px] text-slate-700/70 sm:mt-1 sm:text-[11px] sm:leading-4">
-                  Open Add / Edit Products, update the missing information, then return here and Refresh to check the latest result.
+                  Open Listing Studio to review and complete product details, then return here and refresh.
                 </p>
               </div>
 
               <Link
-                to="/host/product-intelligence"
+                to="/host/listings/new"
                 className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[11px] bg-[#17624f] px-3 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#124e3f] sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
               >
                 <PackageSearch className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Open Add / Edit Products
+                Open Listing Studio
               </Link>
             </div>
           </section>

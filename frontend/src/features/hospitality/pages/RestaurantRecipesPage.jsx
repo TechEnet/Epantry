@@ -735,10 +735,10 @@ export default function RestaurantRecipesPage() {
             </div>
 
             <Link
-              to="/host/hospitality/legacy-recipes"
+              to="/host/listings/new"
               className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-xs font-black text-stone-700 shadow-sm"
             >
-              View existing kitchen records
+              View previous listings
             </Link>
           </div>
         </div>

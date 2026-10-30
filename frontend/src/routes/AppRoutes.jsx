@@ -1053,7 +1053,6 @@ const HostBusinessProfilePage = lazy(() => import('../features/hostOperations/pa
 const HostFulfillmentPage = lazy(() => import('../features/hostOperations/pages/HostFulfillmentPage'))
 const HospitalityPage = lazy(() => import('../features/hospitality/pages/HospitalityPage'))
 const HostAnalyticsPage = lazy(() => import('../features/analytics/pages/HostAnalyticsPage'))
-const HostListingHistoryPage = lazy(() => import('../features/listingHistory/pages/HostListingHistoryPage'))
 
 const AdminDashboardPage = lazy(() => import('../features/admin/pages/AdminDashboardPage'))
 const AdminEarningsPage = lazy(() => import('../features/admin/pages/AdminEarningsPage'))
@@ -2999,7 +2998,7 @@ export default function AppRoutes() {
               element={
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
                   <HostShell>
-                    <Navigate to={`/host/listings/new?manage=brand-recipes${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('editRecipe') ? `&editRecipe=${encodeURIComponent(new URLSearchParams(window.location.search).get('editRecipe'))}` : ''}`} replace />
+                    <Navigate to={`/host/listings/new${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('editRecipe') ? `?manage=legacy&source=brand-recipe&id=${encodeURIComponent(new URLSearchParams(window.location.search).get('editRecipe'))}` : ''}`} replace />
                   </HostShell>
                 </ApplicationAccessRoute>
               }
@@ -3010,7 +3009,7 @@ export default function AppRoutes() {
               element={
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
                   <HostShell>
-                    <HostListingHistoryPage />
+                    <Navigate to="/host/listings/new?manage=offers-history" replace />
                   </HostShell>
                 </ApplicationAccessRoute>
               }
@@ -3065,7 +3064,7 @@ export default function AppRoutes() {
               element={
                 <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
                   <HostShell>
-                    <Navigate to="/host/listings/new?manage=product-evidence" replace />
+                    <Navigate to="/host/listings/new" replace />
                   </HostShell>
                 </ApplicationAccessRoute>
               }
@@ -3141,8 +3140,8 @@ export default function AppRoutes() {
             <Route path="/host/hospitality/outlets" element={<HospitalityRoute section="outlets" />} />
             <Route path="/host/hospitality/suppliers" element={<HospitalityRoute section="suppliers" />} />
             <Route path="/host/hospitality/products" element={<HospitalityRoute section="products" />} />
-            <Route path="/host/hospitality/recipes" element={<Navigate to="/host/listings/new?manage=kitchen-recipes" replace />} />
-            <Route path="/host/hospitality/legacy-recipes" element={<HospitalityRoute section="recipes" />} />
+            <Route path="/host/hospitality/recipes" element={<Navigate to="/host/listings/new?type=kitchen_recipe" replace />} />
+            <Route path="/host/hospitality/legacy-recipes" element={<Navigate to="/host/listings/new" replace />} />
             <Route path="/host/hospitality/menus" element={<HospitalityRoute section="menus" />} />
             <Route path="/host/hospitality/procurement" element={<HospitalityRoute section="procurement" />} />
             <Route path="/host/hospitality/costing" element={<HospitalityRoute section="costing" />} />

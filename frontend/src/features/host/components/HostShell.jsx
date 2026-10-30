@@ -11,7 +11,6 @@ import {
   ChefHat,
   Clapperboard,
   FileSearch,
-  History,
   Home,
   LayoutDashboard,
   LockKeyhole,
@@ -105,11 +104,6 @@ const navigationGroups = [
         label: "Manage Brand",
         to: "/host/brands",
         icon: BadgeCheck,
-      },
-      {
-        label: "Listing History",
-        to: "/host/listing-history",
-        icon: History,
       },
     ],
   },
@@ -221,7 +215,6 @@ const mobileNavigationOrder = [
   "/host/fulfillment",
   "/host/earnings",
   "/host/finance",
-  "/host/listing-history",
   "/host/campaigns",
   "/host/settings",
   "/host/hospitality",
@@ -436,17 +429,9 @@ export default function HostShell({ children }) {
 
   const isHostScanRoute = location.pathname === "/host/scan";
 
-  const isHostProductIntelligenceRoute =
-    location.pathname === "/host/product-intelligence";
-
   const isHostDataQualityRoute = location.pathname === "/host/data-quality";
 
   const isHostBrandsRoute = location.pathname === "/host/brands";
-
-  const isHostBrandRecipesRoute = location.pathname === "/host/brand-recipes";
-
-  const isHostListingHistoryRoute =
-    location.pathname === "/host/listing-history";
 
   const isHostMarketplaceRoute = location.pathname === "/host/marketplace";
 
@@ -514,11 +499,8 @@ export default function HostShell({ children }) {
           isHostBusinessProfileRoute ||
           isHostCatalogRoute ||
           isHostScanRoute ||
-          isHostProductIntelligenceRoute ||
           isHostDataQualityRoute ||
           isHostBrandsRoute ||
-          isHostBrandRecipesRoute ||
-          isHostListingHistoryRoute ||
           isHostMarketplaceRoute ||
           isHostOrdersRoute ||
           isHostOrderDetailRoute ||

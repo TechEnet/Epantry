@@ -377,9 +377,14 @@ export default function HostListingHistoryPage() {
   }
 
   function editRecipe(recipe) {
-    navigate(
-      `/host/brand-recipes?editRecipe=${encodeURIComponent(recipe.id)}`,
-    )
+    const sourceType = String(recipe?.sourceType || '').toLowerCase()
+    if (['host', 'community'].includes(sourceType) && recipe?.id) {
+      navigate(`/host/listings/new?manage=legacy&source=host-recipe&id=${encodeURIComponent(recipe.id)}`)
+      return
+    }
+    // Brand submissions and restaurant recipes have their own governed
+    // version identifiers in the Listing Studio's previous-listings section.
+    navigate('/host/listings/new')
   }
 
   const mobileOffers = filteredOffers.slice(0, 4)
