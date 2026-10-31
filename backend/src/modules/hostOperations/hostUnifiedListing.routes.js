@@ -18,6 +18,7 @@ import { publishProductVersion } from '../catalog/catalog.governance.service.js'
 import { findProductVersionDuplicateCandidates } from '../catalog/catalog.duplicate.service.js'
 import { MarketplaceOrganization, HostOffer } from '../marketplace/marketplace.models.js'
 import { validateOfferCanonicalPack } from '../marketplace/marketplace.host.service.js'
+import { listPublicEligibleOffers } from '../marketplace/marketplace.public.service.js'
 import { listPublicProducts, buildPublicProductSlug } from '../catalog/catalog.public.service.js'
 import { listPublicRecipes } from '../recipes/recipe.public.service.js'
 import { publicListing, publicHostSlug, publishedHostRecord, publicHostListingFilter } from './hostUnifiedListing.public.js'
@@ -1064,12 +1065,15 @@ router.get('/public/host-listings/by-slug/:slug', wrap(async (req, res) => {
 
 // Return only the match for the requested PIN, never the Host's full private
 // service-area list. Approved Host packets are not verified Marketplace offers.
+// A Host's delivery declaration is not an orderable checkout offer. Return only
+// this Host's currently eligible canonical-pack offers, already revalidated by
+// the existing Marketplace serviceability / inventory / price pipeline.
 router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
   const pincode = String(req.query?.pincode || '').trim()
   if (!/^[1-9][0-9]{5}$/.test(pincode)) problem('Enter a valid six-digit PIN code.')
   const record = await HostUnifiedListingPacket.findOne(publicHostListingFilter({ _id: req.params.id }))
-    .select('type packet publishedPacket publishedType').lean()
+    .select('ownerUserId type packet publishedPacket publishedType').lean()
   if (!record) problem('This approved sellable listing is unavailable.', 404)
   const approved = publishedHostRecord(record)
   const sellable = approved.type === 'grocery' || approved.type === 'prepared_food' || approved.packet?.sellReadyMade === true
@@ -1079,9 +1083,27 @@ router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
   const declaredCoverage = !pickupOnly && (delivery.postalCodes || []).some(code => String(code).trim() === pincode)
   const rawPrice = approved.packet?.selling?.salePrice
   const declaredPrice = rawPrice !== null && rawPrice !== undefined && Number.isFinite(Number(rawPrice)) && Number(rawPrice) >= 0 ? Number(rawPrice) : null
-  respond(res, { pincode, declaredCoverage, pickupOnly,
-    declaredPrice: declaredCoverage ? declaredPrice : null,
-    priceSource: 'host_declared_unverified', purchasable: false })
+  let offers = []
+  let packId = null
+  if (declaredCoverage) {
+    const [catalog, organization] = await Promise.all([
+      resolveRecordPublishedCatalog(record),
+      MarketplaceOrganization.findOne({ ownerUserId: record.ownerUserId, status: 'active' }).select('_id').lean(),
+    ])
+    if (catalog?.packId && organization) {
+      const ownedOffers = await HostOffer.find({ organizationId: organization._id, packId: catalog.packId, status: 'active' })
+        .select('_id').lean()
+      if (ownedOffers.length) {
+        const ownedIds = new Set(ownedOffers.map(item => String(item._id)))
+        const marketplace = await listPublicEligibleOffers({ packId: catalog.packId, pincode, fulfillmentType: 'delivery' })
+        offers = (marketplace.offers || []).filter(offer => ownedIds.has(String(offer.id)))
+          .sort((a, b) => Number(a.price?.effectiveAmountMinor ?? Infinity) - Number(b.price?.effectiveAmountMinor ?? Infinity))
+        if (offers.length) packId = catalog.packId
+      }
+    }
+  }
+  respond(res, { pincode, declaredCoverage, pickupOnly, declaredPrice: declaredCoverage ? declaredPrice : null,
+    priceSource: 'host_declared_unverified', packId, offers, purchasable: offers.length > 0 })
 }))
 
 router.get('/public/host-listings/:id/discovery', wrap(async (req, res) => {

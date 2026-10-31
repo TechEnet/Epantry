@@ -38,7 +38,6 @@ import {
 import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 import { publicImageProps, publicImageVariant } from '../../../lib/publicMediaDelivery'
-import { getPublicPackOffers } from '../../marketplace/services/marketplace.service'
 import { apiClient } from '../../../api/apiClient'
 
 import {
@@ -1218,10 +1217,9 @@ export default function RecipeDetailPage() {
   const [readyQuote, setReadyQuote] = useState(null)
   const [readyQuoteBusy, setReadyQuoteBusy] = useState(false)
   const [readyQuoteError, setReadyQuoteError] = useState('')
+  const readyQuoteRequestIdRef = useRef(0)
   const [readyPin, setReadyPin] = useState('')
   const [readyOffers, setReadyOffers] = useState([])
-  const [readyOffersBusy, setReadyOffersBusy] = useState(false)
-  const [readyOffersError, setReadyOffersError] = useState('')
   const [readyOrderBusy, setReadyOrderBusy] = useState('')
   const [readyOrderError, setReadyOrderError] = useState('')
   const [readyQuantity, setReadyQuantity] = useState(1)
@@ -1835,9 +1833,6 @@ export default function RecipeDetailPage() {
     const estimatedCost = valid ? Math.round(Number(original) * servings / ingredientBaseServings * 100) / 100 : null
     return { index, name: String(line?.name || 'Ingredient'), estimatedCost }
   })
-  const readyCostComplete = readyIngredientPriceRows.length > 0 && readyIngredientPriceRows.every(line => line.estimatedCost !== null)
-  const readyCostTotal = readyIngredientPriceRows.reduce((total, line) => total + (line.estimatedCost ?? 0), 0)
-  const readyCostKnown = readyIngredientPriceRows.filter(line => line.estimatedCost !== null).length
 
   // Use the same address source and strictly verified active offers as Grocery.
   useEffect(() => {
@@ -1846,67 +1841,78 @@ export default function RecipeDetailPage() {
     getDefaultDeliveryAddress()
       .then(result => {
         const pin = String(result?.address?.postalCode || '').replace(/\s+/g, '')
-        if (mounted && /^[1-9][0-9]{5}$/.test(pin)) { setReadyPin(pin); setReadyPinDraft(pin) }
+        if (mounted && /^[1-9][0-9]{5}$/.test(pin)) {
+          // Prefill only. A delivery check must run when the customer clicks the button.
+          setReadyPinDraft(current => current || pin)
+        }
       })
       .catch(() => {})
     return () => { mounted = false }
   }, [isReadyMade, canUseCustomerFeatures])
 
-  // Same PIN-specific public quote used by the Grocery Host listing.
-  // No Host-wide private delivery area is sent to the customer.
-  useEffect(() => {
-    let active = true
-    setReadyQuote(null)
-    setReadyQuoteError('')
-    if (!isReadyMade || !readyListing?.id || !/^[1-9][0-9]{5}$/.test(readyPin)) {
-      setReadyQuoteBusy(false)
-      return () => { active = false }
-    }
-    setReadyQuoteBusy(true)
-    apiClient.get(`/public/host-listings/${encodeURIComponent(readyListing.id)}/pincode-quote`, {
-      params: { pincode: readyPin },
-    }).then(response => {
-      if (active) setReadyQuote(response?.data?.data ?? response?.data ?? null)
-    }).catch(err => {
-      if (active) setReadyQuoteError(err?.response?.data?.message || err?.message || 'Unable to check delivery right now.')
-    }).finally(() => {
-      if (active) setReadyQuoteBusy(false)
-    })
-    return () => { active = false }
-  }, [isReadyMade, readyListing?.id, readyPin])
-
-  function checkReadyDelivery(event) {
+  // Run an explicit request for EVERY Check delivery click, even when the
+  // entered PIN equals the saved address or was checked previously. Updating
+  // readyPin alone did nothing when the value stayed unchanged.
+  async function checkReadyDelivery(event) {
     event.preventDefault()
     const pin = readyPinDraft.replace(/\D/g, '').trim()
     if (!/^[1-9][0-9]{5}$/.test(pin)) {
       setReadyQuoteError('Enter a valid six-digit delivery PIN.')
+      setReadyQuote(null)
       return
     }
+    if (!readyListing?.id) {
+      setReadyQuoteError('Delivery details are unavailable for this listing right now.')
+      setReadyQuote(null)
+      return
+    }
+
+    const requestId = ++readyQuoteRequestIdRef.current
+    setReadyQuote(null)
     setReadyQuoteError('')
-    setReadyPin(pin)
+    setReadyOrderError('')
+    setReadyOffers([])
+    setReadyQuoteBusy(true)
+    setReadyPin('') // Unselect old PIN and its seller offers while checking.
+    try {
+      const response = await apiClient.get(
+        `/public/host-listings/${encodeURIComponent(readyListing.id)}/pincode-quote`,
+        { params: { pincode: pin } },
+      )
+      if (readyQuoteRequestIdRef.current !== requestId) return
+      const result = response?.data?.data ?? response?.data
+      if (!result || typeof result.declaredCoverage !== 'boolean' || result.pincode !== pin) {
+        throw new Error('Delivery information could not be confirmed. Please try again.')
+      }
+      setReadyQuote(result)
+      setReadyOffers(Array.isArray(result.offers) ? result.offers : [])
+      setReadyPin(pin)
+    } catch (err) {
+      if (readyQuoteRequestIdRef.current !== requestId) return
+      const message = err?.response?.data?.message || err?.message || ''
+      setReadyQuoteError(
+        /this approved (?:grocery|sellable) listing is unavailable/i.test(message)
+          ? 'Delivery information for this dish is temporarily unavailable. Please try again.'
+          : message || 'Unable to check delivery right now. Please try again.',
+      )
+    } finally {
+      if (readyQuoteRequestIdRef.current === requestId) setReadyQuoteBusy(false)
+    }
   }
 
-  useEffect(() => {
-    let mounted = true
-    setReadyOffers([])
-    setReadyOffersError('')
-    setReadyOrderError('')
-    if (!isReadyMade || !readyPackId || !/^[1-9][0-9]{5}$/.test(readyPin)) {
-      setReadyOffersBusy(false)
-      return () => { mounted = false }
-    }
-    setReadyOffersBusy(true)
-    getPublicPackOffers({ packId: readyPackId, pincode: readyPin, fulfillmentType: 'delivery' })
-      .then(result => { if (mounted) setReadyOffers(Array.isArray(result?.offers) ? result.offers : []) })
-      .catch(err => { if (mounted) setReadyOffersError(getCommerceErrorMessage(err, 'Unable to check delivery and price.')) })
-      .finally(() => { if (mounted) setReadyOffersBusy(false) })
-    return () => { mounted = false }
-  }, [isReadyMade, readyPackId, readyPin])
+  // The PIN quote returns only this approved Host's eligible Marketplace offers.
+  // Never offer a different seller's pack for a Host-submitted ready-made dish.
+  const readyCheckoutOffer = readyOffers[0] || null
+  const readyCheckoutPackId = String(readyQuote?.packId || readyPackId || '').trim()
 
   async function orderVerifiedReadyFood(offer) {
     if (readyOrderBusy) return
     if (!canUseCustomerFeatures) { openCustomerAccessRequired(); return }
-    if (!readyPackId || !/^[1-9][0-9]{5}$/.test(readyPin) || !offer?.id) return
+    if (!readyQuote?.declaredCoverage || readyQuote?.purchasable !== true || !readyCheckoutPackId || !offer?.id) {
+      setReadyOrderError('This dish is not ready for online ordering. The Host must activate a verified offer with stock and delivery for this dish.')
+      return
+    }
+    if (!/^[1-9][0-9]{5}$/.test(readyPin)) return
     const min = Math.max(1, Number(offer.minimumOrderQuantity) || 1)
     const max = offer.maximumOrderQuantity == null ? 10000 : Math.max(min, Number(offer.maximumOrderQuantity) || min)
     if (readyQuantity < min || readyQuantity > max) {
@@ -1917,7 +1923,7 @@ export default function RecipeDetailPage() {
     setReadyOrderError('')
     try {
       const result = await createDirectMarketplaceCart({
-        packId: readyPackId, offerId: offer.id, quantity: readyQuantity,
+        packId: readyCheckoutPackId, offerId: offer.id, quantity: readyQuantity,
         pincode: readyPin, fulfillmentType: 'delivery',
         idempotencyKey: createCommerceIdempotencyKey('ready-made-food'),
       })
@@ -1932,9 +1938,12 @@ export default function RecipeDetailPage() {
   }
 
   useEffect(() => {
+    // Invalidate an in-flight check before switching between recipe pages.
+    readyQuoteRequestIdRef.current += 1
     setReadyPinDraft('')
     setReadyQuote(null)
     setReadyQuoteError('')
+    setReadyQuoteBusy(false)
     setReadyPin('')
     setReadyQuantity(1)
     setReadyOffers([])
@@ -5070,32 +5079,30 @@ export default function RecipeDetailPage() {
         .epantry-recipe-detail .epantry-ready-input-row { display:flex; gap:8px; min-width:0; }
         .epantry-recipe-detail .epantry-ready-input-row input { min-width:0; flex:1; width:100%; padding:11px 13px; border:1px solid #A9C8C4; border-radius:9px; background:#FFF; font-size:15px; color:#202421; }
         .epantry-recipe-detail .epantry-ready-input-row input:focus-visible { outline:2px solid #C0DBD2; outline-offset:1px; border-color:#174E49; }
-        .epantry-recipe-detail .epantry-ready-input-row button, .epantry-recipe-detail .epantry-ready-offer button, .epantry-recipe-detail .epantry-ready-ingredients-link { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:0; border-radius:9px; background:#174E49; color:white; padding:11px 15px; min-height:44px; font-size:14px; font-weight:700; }
+        .epantry-recipe-detail .epantry-ready-input-row button, .epantry-recipe-detail .epantry-ready-offer button { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:0; border-radius:9px; background:#174E49; color:white; padding:11px 15px; min-height:44px; font-size:14px; font-weight:700; }
         .epantry-recipe-detail .epantry-ready-price-label { font-size:13px; color:#607269; }
         .epantry-recipe-detail .epantry-ready-price-value { display:block; color:#173F35; font-size:clamp(22px,2.5vw,29px); line-height:1.2; font-weight:750; }
         .epantry-recipe-detail .epantry-ready-status { font-size:13px; color:#465D53; line-height:1.5; padding:9px 11px; background:#FFFFFFB8; border-left:3px solid #2F856D; margin-bottom:10px; }
         .epantry-recipe-detail .epantry-ready-error { color:#9B2525; border-left-color:#C94D4D; }
+.epantry-recipe-detail .epantry-ready-cart-result { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; padding:13px 0 4px; border-top:1px solid #C7DCD8; }
+.epantry-recipe-detail .epantry-ready-cart-message { display:flex; flex-direction:column; gap:4px; min-width:0; font-size:14px; color:#52655C; }
+.epantry-recipe-detail .epantry-ready-cart-message strong { color:#173F35; font-weight:700; font-size:15px; }
+.epantry-recipe-detail .epantry-ready-cart-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.epantry-recipe-detail .epantry-ready-cart-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:11px 18px; border:0; border-radius:9px; background:#174E49; color:#fff; font-weight:700; cursor:pointer; }
+.epantry-recipe-detail .epantry-ready-cart-button:hover:not(:disabled) { background:#103E38; }
+.epantry-recipe-detail .epantry-ready-cart-button:disabled { opacity:.7; cursor:wait; }
+.epantry-recipe-detail .epantry-ready-pack-count span { display:inline-flex; min-width:30px; justify-content:center; font-weight:700; color:#173F35; }
         .epantry-recipe-detail .epantry-ready-offer { display:flex; gap:12px; flex-wrap:wrap; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid #C7DCD8; font-size:14px; }
         .epantry-recipe-detail .epantry-ready-offer strong { font-size:16px; color:#173F35; }
         .epantry-recipe-detail .epantry-ready-pack-count { display:inline-flex; gap:5px; align-items:center; margin:8px 0; }
         .epantry-recipe-detail .epantry-ready-pack-count button { min-width:35px; min-height:35px; background:white; border:1px solid #A9C8C4; border-radius:7px; }
         .epantry-recipe-detail .epantry-ready-pack-count input { width:55px; text-align:center; border:1px solid #A9C8C4; background:#fff; padding:6px; border-radius:7px; }
-        .epantry-recipe-detail .epantry-ready-ingredient-prices { margin-top:13px; padding-top:15px; border-top:1px solid #C7DCD8; }
-        .epantry-recipe-detail .epantry-ready-ingredient-prices h3 { color:#173F35; font-size:18px; font-weight:700; margin:0 0 6px; }
-        .epantry-recipe-detail .epantry-ready-ingredient-prices p { color:#586B60; font-size:13px; line-height:1.5; margin:0 0 12px; }
-        .epantry-recipe-detail .epantry-ready-ingredient-rows { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; }
-        .epantry-recipe-detail .epantry-ready-ingredient-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #C7DCD8; font-size:14px; }
-        .epantry-recipe-detail .epantry-ready-ingredient-row span { overflow-wrap:anywhere; color:#243F33; }
-        .epantry-recipe-detail .epantry-ready-ingredient-row strong { flex:none; color:#173F35; }
-        .epantry-recipe-detail .epantry-ready-ingredient-total { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:13px 0; font-size:15px; font-weight:650; color:#173F35; }
-        .epantry-recipe-detail .epantry-ready-ingredient-total strong { font-size:22px; }
-        .epantry-recipe-detail .epantry-ready-ingredients-link { margin-top:6px; text-decoration:none; }
         @media (max-width:639px) {
           .epantry-recipe-detail .epantry-origin-layout,
           .epantry-recipe-detail .epantry-origin-layout--three { grid-template-columns:minmax(0,1fr); }
           .epantry-recipe-detail .epantry-origin-layout > div { padding:19px; }
           .epantry-recipe-detail .epantry-origin-layout > div + div { border-left:0; border-top:1px solid #CFDACA; }
-          .epantry-recipe-detail .epantry-ready-checker, .epantry-recipe-detail .epantry-ready-ingredient-rows { grid-template-columns:minmax(0,1fr); }
+          .epantry-recipe-detail .epantry-ready-checker { grid-template-columns:minmax(0,1fr); }
           .epantry-recipe-detail .epantry-ready-input-row { flex-wrap:wrap; }
           .epantry-recipe-detail .epantry-ready-input-row button { flex:1; }
           .epantry-recipe-detail .epantry-hero-story > div > h1 { font-size:34px !important; }
@@ -5519,12 +5526,12 @@ export default function RecipeDetailPage() {
         ) : null}
 
         {isReadyMade && (
-          <section className="epantry-ready-market" aria-label="Ready-made food delivery and ingredient prices">
+          <section className="epantry-ready-market" aria-label="Ready-made food delivery and price">
             <div className="epantry-ready-market-header">
               <span className="epantry-ready-market-icon"><ShoppingCart size={19} aria-hidden="true" /></span>
               <div>
                 <h2>Check price by pincode</h2>
-                <p>Check the Host's stated delivery area. Prepared dish and ingredients are priced separately.</p>
+                <p>Enter your PIN to check where this Host delivers.</p>
               </div>
             </div>
             <div className="epantry-ready-checker">
@@ -5533,80 +5540,69 @@ export default function RecipeDetailPage() {
                 <div className="epantry-ready-input-row">
                   <input id="ready-made-delivery-pin" inputMode="numeric" autoComplete="postal-code"
                     maxLength={6} pattern="[0-9]{6}" value={readyPinDraft}
-                    onChange={event => setReadyPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onChange={event => {
+                      // Never show a result for a PIN the customer is no longer entering.
+                      readyQuoteRequestIdRef.current += 1
+                      setReadyPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))
+                      setReadyQuote(null)
+                      setReadyQuoteError('')
+                      setReadyQuoteBusy(false)
+                      setReadyPin('')
+                      setReadyOffers([])
+                      setReadyOrderError('')
+                    }}
                     placeholder="Enter 6-digit pincode" aria-label="Delivery PIN code" required />
-                  <button type="submit"><MapPin size={15} /> Check delivery</button>
+                  <button type="submit" disabled={readyQuoteBusy} aria-busy={readyQuoteBusy}>
+                    <MapPin size={15} /> {readyQuoteBusy ? 'Checking…' : 'Check delivery'}
+                  </button>
                 </div>
               </form>
               <div>
-                <span className="epantry-ready-price-label">Ready-made food · fixed pack price</span>
+                <span className="epantry-ready-price-label">Listed price · per prepared pack</span>
                 <strong className="epantry-ready-price-value">{hostDeclaredMoney(declaredReadyPrice)}</strong>
-                <span className="epantry-ready-price-label">Host-declared · price per prepared pack</span>
               </div>
             </div>
-            {readyQuoteBusy && <p role="status" className="epantry-ready-status">Checking delivery to {readyPin}…</p>}
-            {!readyQuoteBusy && readyQuoteError && <p role="alert" className="epantry-ready-status epantry-ready-error">{readyQuoteError}</p>}
-            {!readyQuoteBusy && readyQuote && <p className="epantry-ready-status" role="status">
-              {readyQuote.pickupOnly ? 'Host offers pickup only.' : readyQuote.declaredCoverage
-                ? `Host lists delivery to ${readyPin}.` : `Host does not list delivery to ${readyPin}.`}
-              {readyQuote.declaredCoverage && readyQuote.declaredPrice !== null && readyQuote.declaredPrice !== undefined
-                ? ` Listed pack price: ${hostDeclaredMoney(readyQuote.declaredPrice)}.` : ''}
-            </p>}
-            {readyPackId && /^[1-9][0-9]{5}$/.test(readyPin) && readyQuote?.declaredCoverage && (
-              <div>
-                {readyOffersBusy ? <p className="epantry-ready-status">Checking verified sellers…</p> : null}
-                {readyOffersError ? <p role="alert" className="epantry-ready-status epantry-ready-error">{readyOffersError}</p> : null}
-                {readyOffers.length > 0 && <>
-                  <div className="epantry-ready-pack-count">
-                    <span className="mr-2 text-sm font-semibold text-[#173F35]">Packs</span>
-                    <button type="button" aria-label="Decrease packs" disabled={readyQuantity <= 1} onClick={() => setReadyQuantity(v => Math.max(1, v-1))}><Minus size={16}/></button>
-                    <input type="number" aria-label="Prepared food quantity" min="1" max="100" value={readyQuantity}
-                      onChange={event => setReadyQuantity(Math.min(100, Math.max(1, Math.floor(Number(event.target.value) || 1))))}/>
-                    <button type="button" aria-label="Increase packs" onClick={() => setReadyQuantity(v => Math.min(100, v+1))}><Plus size={16}/></button>
-                  </div>
-                  {readyOffers.map(offer => (
-                    <div className="epantry-ready-offer" key={offer.id}>
-                      <span>{offer.seller?.name || 'Verified seller'} · <strong>{formatMoney({ amountMinor: offer.price?.effectiveAmountMinor, currency: offer.price?.currency || 'INR' })} / pack</strong>
-                        <small className="block text-[#586B60]">{Number.isInteger(Number(offer.price?.effectiveAmountMinor)) ? formatMoney({ amountMinor: Number(offer.price.effectiveAmountMinor) * readyQuantity, currency: offer.price?.currency || 'INR' }) : 'Price unavailable'} total</small></span>
-                      <button type="button" disabled={Boolean(readyOrderBusy)} onClick={() => orderVerifiedReadyFood(offer)}><ShoppingCart size={16}/>{readyOrderBusy === String(offer.id) ? 'Adding…' : 'Add to cart'}</button>
-                    </div>
-                  ))}
-                </>}
-                {readyOrderError && <p role="alert" className="epantry-ready-status epantry-ready-error">{readyOrderError}</p>}
-              </div>
+            {readyQuoteBusy && <p role="status" className="epantry-ready-status">Checking delivery to {readyPinDraft}…</p>}
+            {!readyQuoteBusy && readyQuoteError && (
+              <p role="alert" className="epantry-ready-status epantry-ready-error">{readyQuoteError}</p>
             )}
-            {(!readyPackId || (readyQuote?.declaredCoverage && !readyOffersBusy && readyOffers.length === 0 && !readyOffersError)) && (
-              <p className="epantry-ready-status">This is the Host's listed price, not a confirmed checkout offer. Ordering becomes available once a verified seller offer with stock and delivery is active.</p>
-            )}
-            {!hostRecipeNotShared && (
-              <div className="epantry-ready-ingredient-prices">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3>Ingredient prices · {servings} serving{servings === 1 ? '' : 's'}</h3>
-                  <div className="epantry-ready-pack-count" role="group" aria-label="Choose servings for ingredient prices">
-                    <button type="button" aria-label="Decrease ingredient servings" disabled={servings <= 1} onClick={() => setServings(v => Math.max(1, v - 1))}><Minus size={16} /></button>
-                    <span className="px-2 text-sm font-bold text-[#173F35]">{servings}</span>
-                    <button type="button" aria-label="Increase ingredient servings" onClick={() => setServings(v => Math.min(1000, v + 1))}><Plus size={16} /></button>
-                  </div>
+            {!readyQuoteBusy && readyQuote && (
+              <div className="epantry-ready-cart-result" aria-live="polite">
+                <div className="epantry-ready-cart-message">
+                  <strong>{readyQuote.pickupOnly
+                    ? 'Pickup only'
+                    : readyQuote.declaredCoverage
+                      ? `Delivery available to ${readyPin}`
+                      : `Delivery unavailable to ${readyPin}`}</strong>
+                  {readyQuote.declaredCoverage && !readyQuote.pickupOnly ? (
+                    <span>{readyCheckoutOffer
+                      ? `Online price: ${formatMoney({ amountMinor: readyCheckoutOffer.price?.effectiveAmountMinor, currency: readyCheckoutOffer.price?.currency || 'INR' })} per pack.`
+                      : 'Online ordering is not active for this dish yet.'}</span>
+                  ) : (
+                    <span>{readyQuote.pickupOnly
+                      ? 'This Host currently offers collection instead of home delivery.'
+                      : 'Try another delivery PIN.'}</span>
+                  )}
                 </div>
-                <p>Host-estimated ingredient costs for the approved recipe, scaled with servings. Grocery checkout prices are separate.</p>
-                {readyIngredientPriceRows.length > 0 ? <>
-                  <div className="epantry-ready-ingredient-rows">
-                    {readyIngredientPriceRows.map(line => (
-                      <div className="epantry-ready-ingredient-row" key={`${line.index}-${line.name}`}>
-                        <span>{line.name}</span><strong>{line.estimatedCost === null ? 'Not priced' : hostDeclaredMoney(line.estimatedCost)}</strong>
+                {readyQuote.declaredCoverage && !readyQuote.pickupOnly && (
+                  <div className="epantry-ready-cart-actions">
+                    {readyCheckoutOffer && (
+                      <div className="epantry-ready-pack-count">
+                        <button type="button" aria-label="Decrease prepared food packs" disabled={readyQuantity <= 1 || Boolean(readyOrderBusy)} onClick={() => setReadyQuantity(v => Math.max(1, v-1))}><Minus size={16}/></button>
+                        <span aria-label={`${readyQuantity} prepared packs`}>{readyQuantity}</span>
+                        <button type="button" aria-label="Increase prepared food packs" disabled={readyQuantity >= 100 || Boolean(readyOrderBusy)} onClick={() => setReadyQuantity(v => Math.min(100, v+1))}><Plus size={16}/></button>
                       </div>
-                    ))}
+                    )}
+                    <button type="button" className="epantry-ready-cart-button" disabled={Boolean(readyOrderBusy)}
+                      onClick={() => orderVerifiedReadyFood(readyCheckoutOffer)}>
+                      {readyOrderBusy ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> : <ShoppingCart size={16} aria-hidden="true" />}
+                      {readyOrderBusy ? 'Adding…' : 'Add to cart'}
+                    </button>
                   </div>
-                  <div className="epantry-ready-ingredient-total">
-                    <span>{readyCostComplete ? 'Estimated ingredient total' : `Known ingredient costs (${readyCostKnown}/${readyIngredientPriceRows.length})`}</span>
-                    <strong>{readyCostKnown ? hostDeclaredMoney(Math.round(readyCostTotal * 100) / 100) : 'Not available'}</strong>
-                  </div>
-                </> : <p>Ingredient cost estimates have not been published for this recipe.</p>}
-                <button type="button" className="epantry-ready-ingredients-link" onClick={() => document.querySelector('.epantry-recipe-ingredients')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                  View ingredients &amp; shop <ArrowRight size={16} />
-                </button>
+                )}
               </div>
             )}
+            {readyOrderError && <p role="alert" className="epantry-ready-status epantry-ready-error">{readyOrderError}</p>}
           </section>
         )}
 
