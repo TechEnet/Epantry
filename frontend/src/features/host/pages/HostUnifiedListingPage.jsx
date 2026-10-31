@@ -1071,6 +1071,30 @@ function HostUnifiedListingEditor() {
       if (revisingApproved) setRevisingApproved(false)
     } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
+  async function requestSavedRecipeSharing() {
+    if (busy || uploading || !editingId || activeListing?.status !== 'approved' ||
+        form.type === 'grocery' || form.shareRecipe === true) return
+    const savedIngredients = (form.ingredients || []).filter((item) => String(item?.name || '').trim() && Number(item?.quantity) > 0)
+    const savedSteps = (form.steps || []).filter((step) => String(step?.instruction || '').trim())
+    if (!savedIngredients.length || !savedSteps.length ||
+        savedIngredients.length !== (form.ingredients || []).length ||
+        savedSteps.length !== (form.steps || []).length) {
+      setError('Your saved recipe is missing ingredient quantities or cooking steps. Select Edit complete listing to finish them first.')
+      return
+    }
+    if (!window.confirm(`Share ${savedIngredients.length} saved ingredients and ${savedSteps.length} cooking steps with customers after Super Admin approval? Your currently approved listing stays unchanged until then.`)) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      // This reuses the normal MFA-protected, Super Admin-governed section revision.
+      // No ingredients, steps, photos, pricing, or other saved values are resent.
+      const result = await submitHostListingSectionRevision(editingId, { shareRecipe: true })
+      if (result?.listing?.packet) setForm({ ...newPacket(result.listing.packet.type), ...result.listing.packet })
+      await load()
+      setNotice('Your saved recipe was sent to Super Admin for review. Once approved, ingredients and cooking steps will appear on the customer page. No details need to be entered again.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { setBusy(false) }
+  }
   async function saveSectionRevision() {
     if (busy || uploading || !locked || !editingId) return
     if (activeListing?.status === 'approved' && !window.confirm(
@@ -1286,6 +1310,16 @@ function HostUnifiedListingEditor() {
           </div>
         ) : (
           <>
+          {activeListing?.status === 'approved' && form.type !== 'grocery' && form.shareRecipe !== true && !revisingApproved &&
+            <section className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF3EB] px-4 py-4 sm:px-5" aria-label="Publish saved recipe details">
+              <h3 className="text-lg font-bold text-[#173F35]">Your cooking details are saved, but not shared</h3>
+              <p className="mt-1 text-[15px] leading-6 text-[#34453D]">This approved ready-made listing keeps its ingredient quantities and cooking steps private because <strong>Share recipe</strong> was off. You do not need to upload or type everything again.</p>
+              <p className="mt-2 text-sm font-semibold text-[#173F35]">Saved: {(form.ingredients || []).filter((item) => String(item?.name || '').trim()).length} ingredients · {(form.steps || []).filter((step) => String(step?.instruction || '').trim()).length} cooking steps</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button type="button" className={styles.button} disabled={busy || Boolean(uploading)} onClick={requestSavedRecipeSharing}>Share saved recipe · Send for approval</button>
+                <span className="text-[13px] leading-5 text-[#53635A]">Only Super Admin approval makes these details public. The current approved version stays live meanwhile.</span>
+              </div>
+            </section>}
           {activeListing?.status === 'approved' && !revisingApproved && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#C86C42] bg-[#FFF0E7] px-4 py-3">
             <p className="text-[15px] font-semibold text-[#173F35]">Need to update this approved listing? Edit the full details and submit them for Super Admin re-approval.</p>
             <button type="button" className={styles.button} onClick={() => { if (window.confirm('Your approved listing will remain available while these edits are reviewed. Continue editing?')) setRevisingApproved(true) }}>Edit complete listing</button>
@@ -1358,7 +1392,7 @@ function HostUnifiedListingEditor() {
                   </div>
                 </fieldset>
               )}
-              {workspace !== 'hybrid' && isRecipe && ['kitchen_recipe', 'prepared_food'].includes(form.type) && <div className="mt-4 flex flex-wrap gap-6 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={form.shareRecipe} onChange={(event) => patch('shareRecipe', event.target.checked)}/> Share recipe</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.sellReadyMade} disabled={form.type === 'prepared_food'} onChange={(event) => patch('sellReadyMade', event.target.checked)}/> Sell ready-made item</label></div>}
+              {workspace !== 'hybrid' && isRecipe && ['kitchen_recipe', 'prepared_food'].includes(form.type) && <div className="mt-4 space-y-2"><div className="flex flex-wrap gap-6 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={form.shareRecipe} onChange={(event) => patch('shareRecipe', event.target.checked)}/> Share recipe</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.sellReadyMade} disabled={form.type === 'prepared_food'} onChange={(event) => patch('sellReadyMade', event.target.checked)}/> Sell ready-made item</label></div>{!form.shareRecipe && <p className="text-sm leading-5 text-[#935130]">Ingredients and cooking steps will be saved for your kitchen but will stay hidden from customers. Enable Share recipe to publish them after approval.</p>}</div>}
             </section>
             <section id="listing-media" className={section}>
               <h2 className="text-2xl font-bold"><span className="uel-section-number">02</span> / Show it beautifully {isRecipe ? '— photos & video' : '— photos'}</h2>

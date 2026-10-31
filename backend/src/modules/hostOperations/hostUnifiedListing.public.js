@@ -32,6 +32,7 @@ export function publicListing(record) {
   const commercial = approved.type === 'grocery' || approved.type === 'prepared_food' || packet.sellReadyMade
   return {
     id: String(record._id), slug: publicHostSlug(record), title: approved.title, type: approved.type,
+    host: record.publicHost || null,
     category: packet.category,
     grocerySubcategory: approved.type === 'grocery' ? (packet.grocerySubcategory || '') : '',
     packagingType: approved.type === 'grocery' ? (packet.packagingType || '') : '',

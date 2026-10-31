@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { createHash } from 'node:crypto'
 import { rejectPrivilegedImpersonation } from '../admin/adminSafety.middleware.js'
 import { loadAdminAuthorization, requireAdminAccess, requireAdminPermission } from '../admin/adminPermission.middleware.js'
 import { createNotificationIntentBestEffort, notifyActiveSuperAdminsBestEffort } from '../notifications/notification.service.js'
@@ -473,12 +474,28 @@ router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap
     problem('Use Save full draft for an editable draft or changes-requested listing.', 409)
   }
   const edits = req.body?.sections
-  const editKeys = ['nutrition', 'allergens', 'dietary', 'selling', 'delivery']
+  const editKeys = ['nutrition', 'allergens', 'dietary', 'selling', 'delivery', 'shareRecipe']
   if (!edits || typeof edits !== 'object' || Array.isArray(edits) ||
       !Object.keys(edits).length || Object.keys(edits).some((key) => !editKeys.includes(key))) {
-    problem('Only Food facts & allergens and Selling & delivery can be updated here.')
+    problem('Only recipe sharing, Food facts & allergens, and Selling & delivery can be updated here.')
   }
-  if (JSON.stringify(edits).length > 40_000) problem('Food facts or selling updates exceed the permitted size.')
+  // A Host can explicitly publish SAVED recipe contents, but cannot silently
+  // expose another revision or turn recipe sharing off through this shortcut.
+  // Keep this request separate from any other section edits for clear consent.
+  const sharingSavedRecipe = Object.prototype.hasOwnProperty.call(edits, 'shareRecipe')
+  if (sharingSavedRecipe) {
+    if (Object.keys(edits).length !== 1 || edits.shareRecipe !== true || record.status !== 'approved' ||
+        record.type === 'grocery' || record.packet?.shareRecipe === true) {
+      problem('Only an approved recipe with private cooking details can request publication of its saved recipe.', 409)
+    }
+    if (!Array.isArray(record.packet?.ingredients) || !record.packet.ingredients.length ||
+        record.packet.ingredients.some((item) => !String(item?.name || '').trim() || !(Number(item?.quantity) > 0)) ||
+        !Array.isArray(record.packet?.steps) || !record.packet.steps.length ||
+        record.packet.steps.some((step) => !String(step?.instruction || '').trim())) {
+      problem('Saved ingredients or cooking steps are incomplete. Edit this listing before requesting recipe sharing.', 409)
+    }
+  }
+  if (JSON.stringify(edits).length > 40_000) problem('Updated listing details exceed the permitted size.')
   const updatedCandidate = { ...record.packet }
   for (const key of editKeys) {
     if (Object.prototype.hasOwnProperty.call(edits, key)) updatedCandidate[key] = edits[key]
@@ -508,12 +525,16 @@ router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap
   record.reviewNote = ''
   record.reviewHistory.push({
     decision: 'submitted_for_review', actorUserId: actor(req), at: now,
-    note: `Host updated food facts / selling details from ${previousStatus}.`,
+    note: sharingSavedRecipe
+      ? 'Host explicitly requested publication of saved ingredients and cooking steps.'
+      : `Host updated food facts / selling details from ${previousStatus}.`,
   })
   await record.save()
   await notifyActiveSuperAdminsBestEffort({
     triggerType: 'host_unified_listing_submitted', reasonCode: 'host_unified_listing_submission',
-    explanation: `Host updated food facts / selling details for ${record.title || 'a listing'}; Super Admin review is required.`,
+    explanation: sharingSavedRecipe
+      ? `Host requested to share the saved recipe for ${record.title || 'a listing'}; Super Admin review is required.`
+      : `Host updated food facts / selling details for ${record.title || 'a listing'}; Super Admin review is required.`,
     relatedEntityType: 'host_unified_listing', relatedEntityId: String(record.id),
     sourceDomain: 'host_operations', sourceVersion: `host-unified-v${record.reviewRevision + 1}`,
     dedupeScope: `host-unified-section-revision:${record.id}:${record.reviewHistory.length}`,
@@ -1005,7 +1026,20 @@ router.get('/public/host-listings', wrap(async (req, res) => {
   if (legacy.length) await Promise.all(legacy.map(row =>
     HostUnifiedListingPacket.updateOne({ _id: row._id, $or: [{ publicSlug: { $exists: false } }, { publicSlug: null }] },
       { $set: { publicSlug: publicHostSlug(row) } })))
-  respond(res, { listings: await Promise.all(rows.map(approvedPublicProjection)) })
+  // Group approved listings by Host without exposing private owner account IDs.
+  // Marketplace businesses are public-facing; fallback labels remain anonymous.
+  const ownerIds = [...new Set(rows.map(row => String(row.ownerUserId || '')).filter(objectId))]
+  const organizations = ownerIds.length ? await MarketplaceOrganization.find({
+    ownerUserId: { $in: ownerIds }, status: 'active',
+  }).select('ownerUserId displayName').lean() : []
+  const nameByOwner = new Map(organizations.map(org => [String(org.ownerUserId), String(org.displayName || '').trim()]))
+  const listings = await Promise.all(rows.map(async row => {
+    const ownerId = String(row.ownerUserId || '')
+    const key = createHash('sha256').update(`epantry-public-host:${ownerId}`).digest('hex').slice(0, 20)
+    const hostName = nameByOwner.get(ownerId) || `EPANTRY Host ${key.slice(0, 4).toUpperCase()}`
+    return approvedPublicProjection({ ...row, publicHost: { id: key, name: hostName } })
+  }))
+  respond(res, { listings })
 }))
 // Resolve friendly Host URLs without exposing unapproved records. Older host--id
 // links continue to work. This route is BEFORE the /:id catch-all.
