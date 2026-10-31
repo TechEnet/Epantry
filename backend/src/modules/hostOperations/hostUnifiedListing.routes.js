@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import mongoose from 'mongoose'
 import { createHash } from 'node:crypto'
 import { rejectPrivilegedImpersonation } from '../admin/adminSafety.middleware.js'
 import { loadAdminAuthorization, requireAdminAccess, requireAdminPermission } from '../admin/adminPermission.middleware.js'
@@ -25,6 +26,7 @@ import { publicListing, publicHostSlug, publishedHostRecord, publicHostListingFi
 import { getHostRecipeDiscovery } from '../recipes/recipe.discovery.service.js'
 import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate, isValidGtin } from './hostUnifiedListing.logic.js'
 import { importHostListingRemoteImage } from './hostListingMediaImport.service.js'
+import { needsCommercialPublication, publishApprovedListingForSale } from './hostUnifiedListing.autoPublish.service.js'
 
 const router = Router()
 const SECTIONS = new Set(['details', 'media', 'ingredients', 'steps', 'nutrition', 'selling', 'delivery'])
@@ -409,7 +411,7 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
   }
   const catalog = await resolveRecordPublishedCatalog(record.toObject())
   if (!catalog) {
-    readiness.message = 'An approved catalog product is needed before Marketplace selling can be enabled.'
+    readiness.message = 'This listing was approved before one-step selling. Send the saved listing to Super Admin once more; approval will publish its pack and activate selling automatically.'
     return respond(res, { readiness })
   }
   const packId = catalog.packId
@@ -431,7 +433,7 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
     readiness.offerStatus = offer.status
     readiness.marketplacePath = `/host/marketplace?editOffer=${String(offer._id)}`
     readiness.message = offer.status === 'active'
-      ? 'Your offer is active. Keep its price, stock and delivery details up to date.'
+      ? 'Approved and ready to sell. Price, stock and delivery were activated with Super Admin approval.'
       : 'Your offer is saved. Complete its price, stock and delivery checks to start selling.'
   } else {
     readiness.message = 'Your product is linked to the approved catalog. Set up an offer, price and stock to start selling.'
@@ -577,6 +579,48 @@ router.post('/host/listing-packets/:id/submit', ...writeSecurity, wrap(async (re
   })
   respond(res, { listing: serialize(record) })
 }))
+// Existing approved listings can be sent through the SAME single-step review
+// without making the Host re-enter any ingredients, media, price or stock.
+// The previously approved public snapshot remains live until this decision.
+router.post('/host/listing-packets/:id/resubmit-for-selling', ...writeSecurity, wrap(async (req, res) => {
+  const record = await ownedRecord(req)
+  if (record.status !== 'approved' || !needsCommercialPublication(record.packet)) {
+    problem('Only an approved sellable listing can be resent for one-step selling approval.', 409)
+  }
+  const packet = cleanIncoming(record.packet, record.workspaceType, true)
+  const alreadyLinked = await resolveRecordPublishedCatalog(record.toObject())
+  if (alreadyLinked?.packId) {
+    const org = await MarketplaceOrganization.findOne({ ownerUserId: actor(req), status: 'active' }).select('_id').lean()
+    const activeOffer = org ? await HostOffer.findOne({ organizationId: org._id,
+      packId: alreadyLinked.packId, status: 'active' }).select('_id').lean() : null
+    if (activeOffer) problem('This item is already active for customer selling. Submit only actual changes for review.', 409)
+  }
+  // Host resubmission never changes the submitted content, and is not approval.
+  // Existing publication is retained until the reviewer accepts the resubmission.
+  if (!record.publishedPacket) {
+    record.publishedPacket = structuredClone(record.packet)
+    record.publishedTitle = record.title
+    record.publishedType = record.type
+  }
+  record.packet = packet
+  record.status = 'submitted_for_review'
+  record.submittedAt = new Date()
+  record.reviewedAt = null
+  record.reviewNote = ''
+  record.correctionSection = ''
+  record.reviewHistory.push({ decision: 'submitted_for_review', actorUserId: actor(req),
+    at: new Date(), note: 'Resubmitted existing approved listing for one-step selling activation.' })
+  await record.save()
+  await notifyActiveSuperAdminsBestEffort({
+    triggerType: 'host_unified_listing_submitted', reasonCode: 'host_unified_listing_submission',
+    explanation: `Host requests one-step selling approval for ${record.title}.`,
+    relatedEntityType: 'host_unified_listing', relatedEntityId: String(record.id),
+    sourceDomain: 'host_operations', sourceVersion: `host-unified-v${record.reviewRevision + 1}`,
+    dedupeScope: `host-unified-one-step-selling:${record.id}:${record.reviewHistory.length}`,
+  })
+  respond(res, { listing: serialize(record) })
+}))
+
 router.post('/host/listing-packets/bulk', ...writeSecurity, wrap(async (req, res) => {
   const { ownerUserId, workspaceType } = context(req)
   const raw = req.body?.packets
@@ -741,42 +785,93 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
   if (decision !== 'approved' && note.length < 5) problem('Explain what needs changing or why this listing was rejected.')
   if (section && !SECTIONS.has(section)) problem('Choose a valid correction section.')
   const now = new Date()
-  // Conditional update makes a decision atomic; a second reviewer cannot silently overwrite it.
-  const pendingForSlug = decision === 'approved' ? await HostUnifiedListingPacket.findOne(
-    { _id: req.params.id, status: 'submitted_for_review', deletedAt: null }).select('_id title publicSlug type packet workspaceType ownerUserId') : null
-  const approvedPublicSlug = pendingForSlug ? publicHostSlug(pendingForSlug) : ''
+  const reviewerId = actor(req)
+  let record = null
+  let commercial = false
   if (decision === 'approved') {
-    if (!pendingForSlug) problem('Only a submitted listing can be approved. Refresh the queue.', 409)
-    // A brand grant or published catalog match may have been revoked since the
-    // Host submitted this version. Review must never bypass current governance.
-    const currentPacket = cleanIncoming(pendingForSlug.packet, pendingForSlug.workspaceType, true)
-    await validateCatalogMatch(currentPacket)
-    await validateBrandAuthority(currentPacket, pendingForSlug.ownerUserId)
+    // Review the exact submitted version. In particular, a Host revision must
+    // never rewrite a previously approved version without governance.
+    const candidate = await HostUnifiedListingPacket.findOne({ _id: req.params.id,
+      status: 'submitted_for_review', deletedAt: null })
+    if (!candidate) problem('Only a submitted listing can be approved. Refresh the queue.', 409)
+    const reviewedPacket = cleanIncoming(candidate.packet, candidate.workspaceType, true)
+    // The Host should not have to re-enter the same canonical identity when
+    // resubmitting an already-approved listing with a price or stock update.
+    const priorCatalogId = String(candidate.publishedPacket?.catalogProductVersionId || '')
+    if (!reviewedPacket.catalogProductVersionId && objectId(priorCatalogId)) {
+      const priorCatalog = await ProductVersion.findById(priorCatalogId)
+        .select('displayName netQuantity').lean()
+      if (priorCatalog && matchesCatalogProductIdentity(reviewedPacket, priorCatalog)) {
+        reviewedPacket.catalogProductVersionId = priorCatalogId
+      }
+    }
+    await validateCatalogMatch(reviewedPacket)
+    await validateBrandAuthority(reviewedPacket, candidate.ownerUserId)
+    commercial = needsCommercialPublication(reviewedPacket)
+    if (commercial) {
+      // One Super Admin decision does *all* governed publication and selling
+      // activation. MongoDB transactions prevent half-approved/half-orderable
+      // listings if catalog, price, stock or service coverage fails.
+      const session = await mongoose.startSession()
+      try {
+        await session.withTransaction(async () => {
+          const pending = await HostUnifiedListingPacket.findOne({ _id: candidate._id,
+            status: 'submitted_for_review', deletedAt: null }).session(session)
+          if (!pending || pending.reviewRevision !== candidate.reviewRevision) {
+            problem('Listing changed during approval. Refresh and review again.', 409)
+          }
+          const approvedPacket = cleanIncoming(pending.packet, pending.workspaceType, true)
+          // Recheck prior catalog identity within this exact submitted revision.
+          if (reviewedPacket.catalogProductVersionId) approvedPacket.catalogProductVersionId = reviewedPacket.catalogProductVersionId
+          const published = await publishApprovedListingForSale({ listing: pending,
+            packet: approvedPacket, reviewerId, now, session })
+          record = await HostUnifiedListingPacket.findOneAndUpdate({ _id: pending._id,
+            status: 'submitted_for_review', reviewRevision: pending.reviewRevision, deletedAt: null },
+          { $set: { status: 'approved', reviewedAt: now, reviewedByUserId: reviewerId,
+              reviewNote: note, correctionSection: '', approvedAt: now, publicSlug: publicHostSlug(pending),
+              packet: published.packet, publishedPacket: published.packet, publishedTitle: pending.title,
+              publishedType: pending.type, catalogLinkedAt: now, catalogLinkedByUserId: reviewerId },
+            $inc: { reviewRevision: 1, publishedRevision: 1 },
+            $push: { reviewHistory: { decision: 'approved', actorUserId: reviewerId,
+              note, section: '', at: now } } },
+          { new: true, runValidators: true, session })
+          if (!record) problem('Listing changed during approval. Refresh and retry.', 409)
+        }, { readPreference: 'primary', writeConcern: { w: 'majority' } })
+      } finally { await session.endSession() }
+    }
   }
-  const record = await HostUnifiedListingPacket.findOneAndUpdate(
-    { _id: req.params.id, status: 'submitted_for_review', deletedAt: null },
-    { $set: { status: decision, reviewedAt: now, reviewedByUserId: actor(req),
-        reviewNote: note, correctionSection: decision === 'changes_requested' ? section : '',
-        ...(decision === 'approved' ? { approvedAt: now, publicSlug: approvedPublicSlug,
-          publishedPacket: pendingForSlug?.packet, publishedTitle: pendingForSlug?.title,
-          publishedType: pendingForSlug?.type } : {}) },
-      $inc: { reviewRevision: 1, ...(decision === 'approved' ? { publishedRevision: 1 } : {}) },
-      $push: { reviewHistory: { decision, actorUserId: actor(req), note,
-        section: decision === 'changes_requested' ? section : '', at: now } } },
-    { new: true, runValidators: true },
-  )
-  if (!record) problem('Only a submitted listing can be reviewed. Refresh the queue.', 409)
+  if (!record) {
+    // Recipe-only and rejection/correction decisions keep the existing simple
+    // review path; they must never generate a commercial offer.
+    const pendingForSlug = decision === 'approved' ? await HostUnifiedListingPacket.findOne(
+      { _id: req.params.id, status: 'submitted_for_review', deletedAt: null }) : null
+    const approvedPublicSlug = pendingForSlug ? publicHostSlug(pendingForSlug) : ''
+    record = await HostUnifiedListingPacket.findOneAndUpdate(
+      { _id: req.params.id, status: 'submitted_for_review', deletedAt: null },
+      { $set: { status: decision, reviewedAt: now, reviewedByUserId: reviewerId,
+          reviewNote: note, correctionSection: decision === 'changes_requested' ? section : '',
+          ...(decision === 'approved' ? { approvedAt: now, publicSlug: approvedPublicSlug,
+            publishedPacket: pendingForSlug?.packet, publishedTitle: pendingForSlug?.title,
+            publishedType: pendingForSlug?.type } : {}) },
+        $inc: { reviewRevision: 1, ...(decision === 'approved' ? { publishedRevision: 1 } : {}) },
+        $push: { reviewHistory: { decision, actorUserId: reviewerId, note,
+          section: decision === 'changes_requested' ? section : '', at: now } } },
+      { new: true, runValidators: true },
+    )
+    if (!record) problem('Only a submitted listing can be reviewed. Refresh the queue.', 409)
+  }
   await createNotificationIntentBestEffort({
     userId: record.ownerUserId, category: 'operations', triggerType: 'host_unified_listing_review',
     reasonCode: `host_unified_listing_${decision}`,
-    explanation: decision === 'approved' ? `${record.title} was approved. ${note}`.trim() :
-      `${record.title}: ${decision === 'changes_requested' ? 'changes requested' : 'not approved'}. ${note}`,
+    explanation: decision === 'approved'
+      ? `${record.title} was approved${commercial ? ' and is ready for online selling' : ''}. ${note}`.trim()
+      : `${record.title}: ${decision === 'changes_requested' ? 'changes requested' : 'not approved'}. ${note}`,
     relatedEntityType: 'host_unified_listing', relatedEntityId: String(record.id),
     sourceDomain: 'host_operations', sourceVersion: `host-unified-review-v${record.reviewRevision}`,
     actions: ['dismiss'], requestedChannels: ['in_app'],
     dedupeKey: `host-unified-decision:${record.id}:${record.reviewRevision}`,
   })
-  respond(res, { listing: serialize(record) })
+  respond(res, { listing: serialize(record), sellingActivated: decision === 'approved' && commercial })
 }))
 
 // Country discovery is public-only and never exposes operational Host fields.

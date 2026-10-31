@@ -22,18 +22,18 @@ const ACCESS = Object.freeze({
 const MASS = { g: 1, kg: 1000 }
 const VOLUME = { ml: 1, l: 1000 }
 const MAX_LISTING_BYTES = 180000
-const INGREDIENT_ROLES = new Set(['main', 'optional', 'garnish'])
-const SCALING_RULES = new Set(['proportional', 'fixed'])
-// Check digits are calculated locally; no external barcode service is trusted.
+
+// Validate GTIN-8, UPC-A (GTIN-12), GTIN-13 and GTIN-14 check digits.
+// Product identity lookups must reject malformed or mistyped barcodes.
 export function isValidGtin(value) {
-  const digits = String(value || '').trim()
+  const digits = String(value ?? '').trim()
   if (!/^(?:[0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14})$/.test(digits)) return false
-  const sum = [...digits.slice(0, -1)].reverse().reduce((total, char, index) =>
-    total + Number(char) * (index % 2 === 0 ? 3 : 1), 0)
-  return (10 - (sum % 10)) % 10 === Number(digits.at(-1))
+  let sum = 0
+  for (let index = digits.length - 2, multiplier = 3; index >= 0; index -= 1, multiplier = multiplier === 3 ? 1 : 3) {
+    sum += Number(digits[index]) * multiplier
+  }
+  return (10 - (sum % 10)) % 10 === Number(digits[digits.length - 1])
 }
-
-
 function text(value, max = 4000) {
   return String(value ?? '').trim().slice(0, max)
 }
@@ -70,15 +70,15 @@ export function normalizeListingPacket(raw = {}) {
     name: text(item?.name, 200),
     canonicalIngredientId: text(item?.canonicalIngredientId, 80),
     imageUrl: cleanUrl(item?.imageUrl),
+    role: ['main', 'optional', 'garnish'].includes(item?.role) ? item.role : 'main',
+    preparationState: text(item?.preparationState, 120),
+    scalingRule: item?.scalingRule === 'fixed' ? 'fixed' : 'proportional',
     quantity: finiteNonnegative(item?.quantity),
     unit: ALLOWED_UNITS.has(item?.unit) ? item.unit : 'g',
     unitPrice: finiteNonnegative(item?.unitPrice),
     priceQuantity: finiteNonnegative(item?.priceQuantity),
     priceUnit: ALLOWED_UNITS.has(item?.priceUnit) ? item.priceUnit : 'g',
     priceSource: 'host_declared',
-    role: INGREDIENT_ROLES.has(item?.role) ? item.role : 'main',
-    preparationState: text(item?.preparationState, 120),
-    scalingRule: SCALING_RULES.has(item?.scalingRule) ? item.scalingRule : 'proportional',
     note: text(item?.note, 500),
   })) : []
   const steps = recipeAllowed ? list(input.steps, 75).map((step) => ({
@@ -119,13 +119,16 @@ export function normalizeListingPacket(raw = {}) {
     manufacturerPacker: type === 'grocery' ? text(input.manufacturerPacker, 180) : '',
     unitsPerPack: type === 'grocery' ? finiteNonnegative(input.unitsPerPack) : null,
     servingSize: type === 'grocery' ? text(input.servingSize, 100) : '',
+    // Preserve package-label evidence submitted in the Host's grocery form.
+    labelDeclaration: {
+      ingredients: type === 'grocery' ? text(input.labelDeclaration?.ingredients, 3000) : '',
+      allergens: type === 'grocery' ? text(input.labelDeclaration?.allergens, 3000) : '',
+      claims: type === 'grocery' ? text(input.labelDeclaration?.claims, 3000) : '',
+    },
     sku: text(input.sku, 120),
-    catalogProductVersionId: commercial ? text(input.catalogProductVersionId, 24) : '',
-    labelDeclaration: type === 'grocery' ? {
-      ingredients: text(input.labelDeclaration?.ingredients, 6000),
-      allergens: text(input.labelDeclaration?.allergens, 3000),
-      claims: text(input.labelDeclaration?.claims, 2500),
-    } : { ingredients: '', allergens: '', claims: '' },
+    // Optional exact published catalog match chosen inside the same Host form.
+    // The Super Admin approval route validates this against the live catalog.
+    catalogProductVersionId: text(input.catalogProductVersionId, 30),
     cuisine: recipeAllowed ? text(input.cuisine, 100) : '',
     preparationMinutes: recipeAllowed ? finiteNonnegative(input.preparationMinutes) : null,
     cookingMinutes: recipeAllowed ? finiteNonnegative(input.cookingMinutes) : null,
@@ -217,17 +220,9 @@ export function validateListingPacket(packet, { submit = false, workspace = 'leg
   if (!submit) return errors
   if (packet.countryOfOrigin && !/^[\p{L} .,&()'-]{2,100}$/u.test(packet.countryOfOrigin)) errors.push('Country of origin should be a country name, not a code or URL.')
   if (packet.regionOfOrigin && !packet.countryOfOrigin) errors.push('Choose a country before adding a region or state.')
-  if (packet.type === 'grocery' && packet.selling.barcode && !isValidGtin(packet.selling.barcode)) {
-    errors.push('Enter a valid 8, 12, 13 or 14 digit barcode from the product label.')
-  }
-  if (packet.catalogProductVersionId && !/^[0-9a-f]{24}$/i.test(packet.catalogProductVersionId)) {
-    errors.push('Choose a valid matched EPANTRY catalog product.')
-  }
-  if (packet.type !== 'grocery' && (packet.preparationMinutes !== null && packet.preparationMinutes > 10080 || packet.cookingMinutes !== null && packet.cookingMinutes > 10080)) {
-    errors.push('Check preparation and cooking times; each must be within seven days.')
-  }
   if (packet.unitsPerPack !== null && (!Number.isInteger(packet.unitsPerPack) || packet.unitsPerPack < 1)) errors.push('Units per pack must be a whole number greater than zero.')
   if (packet.title.length < 3) errors.push('Item name must contain at least three characters.')
+  if (packet.catalogProductVersionId && !/^[a-f\d]{24}$/i.test(packet.catalogProductVersionId)) errors.push('Select an approved catalog product or leave it blank for single-step publication.')
   if (!LISTING_CATEGORIES.includes(packet.category)) errors.push('Choose a valid food category.')
   if (!packet.images.length) errors.push('Upload at least one image for the listing.')
   if (packet.type !== 'grocery') {
@@ -237,31 +232,26 @@ export function validateListingPacket(packet, { submit = false, workspace = 'leg
     if (!packet.steps.length || packet.steps.some((step) => !step.instruction)) errors.push('Add all preparation instructions.')
   }
   if ((packet.type === 'prepared_food' || (packet.type === 'kitchen_recipe' && packet.sellReadyMade)) && !packet.selling.outletId) errors.push('Choose the kitchen outlet before submitting. It cannot be supplied after approval.')
+  if (packet.type === 'grocery' && packet.selling.barcode && !isValidGtin(packet.selling.barcode)) errors.push('Enter a valid 8, 12, 13 or 14 digit barcode.')
   if (packet.type === 'grocery' && (!packet.selling.packQuantity || packet.selling.packQuantity <= 0)) errors.push('Enter the packaged product quantity and unit.')
-  if ((packet.type === 'prepared_food' || packet.sellReadyMade) && packet.catalogProductVersionId && !(packet.selling.packQuantity > 0)) {
-    errors.push('Enter the portion quantity that matches the approved catalog product.')
-  }
   if (packet.type === 'grocery' || packet.type === 'prepared_food' || packet.sellReadyMade) {
     if (packet.selling.salePrice === null || packet.selling.salePrice <= 0) errors.push('Add a selling price greater than zero.')
     if (packet.selling.stockQuantity === null) errors.push('Enter available stock (zero is allowed).')
-    if (packet.delivery.fulfillment === 'delivery' && packet.delivery.postalCodes.length === 0) errors.push('Enter the delivery pincodes selected by this Host.')
-  }
-  // Marketplace inventory and order limits are counted in whole sellable packs.
-  // Reject fractional values before review instead of discovering them at checkout.
-  if (packet.selling.stockQuantity !== null && !Number.isSafeInteger(packet.selling.stockQuantity)) {
-    errors.push('Available stock must be a whole number of sellable packs.')
-  }
-  if (packet.selling.minimumOrderQuantity !== null && (!Number.isSafeInteger(packet.selling.minimumOrderQuantity) || packet.selling.minimumOrderQuantity < 1)) {
-    errors.push('Minimum order quantity must be a whole number greater than zero.')
-  }
-  if (packet.selling.maximumOrderQuantity !== null && (!Number.isSafeInteger(packet.selling.maximumOrderQuantity) || packet.selling.maximumOrderQuantity < 1)) {
-    errors.push('Maximum order quantity must be a whole number greater than zero.')
-  }
-  for (const value of [packet.selling.listPrice, packet.selling.salePrice]) {
-    if (value !== null && Math.abs(value * 100 - Math.round(value * 100)) > 0.000001) {
-      errors.push('Enter selling prices in rupees and paise (up to two decimal places).')
-      break
+    if (packet.selling.stockQuantity !== null && !Number.isSafeInteger(packet.selling.stockQuantity)) errors.push('Stock must be a whole number of sellable packs.')
+    if (packet.selling.minimumOrderQuantity !== null && (!Number.isSafeInteger(packet.selling.minimumOrderQuantity) || packet.selling.minimumOrderQuantity < 1)) errors.push('Minimum order quantity must be a positive whole number of packs.')
+    if (packet.selling.maximumOrderQuantity !== null && (!Number.isSafeInteger(packet.selling.maximumOrderQuantity) || packet.selling.maximumOrderQuantity < 1)) errors.push('Maximum order quantity must be a positive whole number of packs.')
+    // Marketplace prices are expressed in paise and must not be rounded silently.
+    for (const price of [packet.selling.listPrice, packet.selling.salePrice]) {
+      if (price !== null && Math.abs(price * 100 - Math.round(price * 100)) > 1e-7) {
+        errors.push('Selling prices must have no more than two decimal places.')
+        break
+      }
     }
+    if (packet.catalogProductVersionId && packet.type !== 'grocery' &&
+        (packet.selling.packQuantity === null || packet.selling.packQuantity <= 0)) {
+      errors.push('State the exact pack / portion quantity for the matched catalog product.')
+    }
+    if (packet.delivery.fulfillment === 'delivery' && packet.delivery.postalCodes.length === 0) errors.push('Enter the delivery pincodes selected by this Host.')
   }
   if (packet.selling.maximumOrderQuantity !== null && packet.selling.minimumOrderQuantity !== null && packet.selling.maximumOrderQuantity < packet.selling.minimumOrderQuantity) errors.push('Maximum order quantity cannot be below minimum order quantity.')
   if (packet.selling.listPrice !== null && packet.selling.salePrice !== null && packet.selling.salePrice > packet.selling.listPrice) errors.push('Selling price cannot exceed list price.')

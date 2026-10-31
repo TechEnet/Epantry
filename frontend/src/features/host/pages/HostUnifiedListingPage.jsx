@@ -16,6 +16,7 @@ import { listHospitalityRestaurantRecipes } from '../../hospitality/services/hos
 import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
 import {
   createHostListingPacket, deleteHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
+  resubmitApprovedHostListingForSelling,
   listHostListingPackets, listHostApprovedBrands, checkHostListingBarcode, searchHostPublishedProducts, getHostListingSellingReadiness, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
   uploadHostListingImage, uploadHostListingVideo, importHostListingRemoteImage,
 } from '../services/hostUnifiedListing.service'
@@ -1071,6 +1072,19 @@ function HostUnifiedListingEditor() {
       if (revisingApproved) setRevisingApproved(false)
     } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
+  async function resendSavedListingForSelling() {
+    if (busy || uploading || !editingId || activeListing?.status !== 'approved' ||
+        !canSell || sellingReadiness?.offerStatus === 'active') return
+    if (!window.confirm('Send this already-approved listing for one-step Super Admin selling approval? Your existing ingredients, photos, price, stock and delivery will be reused unchanged.')) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await resubmitApprovedHostListingForSelling(editingId)
+      await load()
+      setNotice('Saved listing sent to Super Admin. One approval will publish the product and enable selling; you do not need to enter the details again.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { setBusy(false) }
+  }
   async function requestSavedRecipeSharing() {
     if (busy || uploading || !editingId || activeListing?.status !== 'approved' ||
         form.type === 'grocery' || form.shareRecipe === true) return
@@ -1525,7 +1539,7 @@ function HostUnifiedListingEditor() {
                       <span>{product.title} — {product.quantity ?? 'Quantity not stated'} {product.unit}</span>
                     </label>)}
                   </div>}
-                  <p className="mt-1 text-sm text-[#4A5850]">Use an exact existing product match for selling. A new item needs catalog approval first.</p>
+                  <p className="mt-1 text-sm text-[#4A5850]">Select an existing approved match when available. For a new item, one Super Admin approval will create its product and activate selling.</p>
                 </div>}
                 <EditorField title="Stock unit"><input className={field} value={form.selling?.stockUnit || 'piece'} onChange={(event) => nested('selling', 'stockUnit', event.target.value)}/></EditorField>
                 <EditorField title="Pack / portion quantity"><input className={field} type="number" min="0" step="any" value={form.selling?.packQuantity ?? ''} onChange={(event) => nested('selling', 'packQuantity', event.target.value)}/></EditorField>
@@ -1533,7 +1547,7 @@ function HostUnifiedListingEditor() {
                 <EditorField title="Minimum order quantity"><input className={field} type="number" min="1" step="1" value={form.selling?.minimumOrderQuantity ?? ''} onChange={(event) => nested('selling', 'minimumOrderQuantity', event.target.value)}/></EditorField>
                 <EditorField title="Maximum order quantity (optional)"><input className={field} type="number" min="1" step="1" value={form.selling?.maximumOrderQuantity ?? ''} onChange={(event) => nested('selling', 'maximumOrderQuantity', event.target.value)}/></EditorField>
 
-                {isRecipe && <EditorField title="Restaurant / kitchen outlet (if available)"><select className={field} value={form.selling?.outletId || ''} onChange={(event) => setForm((current) => ({ ...current, selling: { ...current.selling, outletId: event.target.value, menuId: '' } }))}><option value="">Choose an existing kitchen outlet</option>{outlets.map((outlet) => <option key={outlet.id} value={outlet.id}>{outlet.name || outlet.outletCode}</option>)}</select></EditorField>}
+                {isRecipe && <EditorField title={canSell ? 'Kitchen outlet (required for selling)' : 'Kitchen outlet (optional)'}><select className={field} value={form.selling?.outletId || ''} onChange={(event) => setForm((current) => ({ ...current, selling: { ...current.selling, outletId: event.target.value, menuId: '' } }))}><option value="">Choose an existing kitchen outlet</option>{outlets.map((outlet) => <option key={outlet.id} value={outlet.id}>{outlet.name || outlet.outletCode}</option>)}</select></EditorField>}
                 {isRecipe && <EditorField title="Restaurant menu (if available)"><select className={field} value={form.selling?.menuId || ''} onChange={(event) => nested('selling', 'menuId', event.target.value)}><option value="">No menu selected</option>{menus.filter((menu) => !form.selling?.outletId || menu.outletId === form.selling.outletId).map((menu) => <option key={menu.id} value={menu.id}>{menu.name || menu.menuCode}</option>)}</select></EditorField>}
                 {isRecipe && <EditorField title="Fulfilment"><select className={field} value={form.delivery?.fulfillment || 'delivery'} onChange={(event) => nested('delivery', 'fulfillment', event.target.value)}><option value="delivery">Delivery</option><option value="pickup">Pickup</option></select></EditorField>}
                 {isRecipe && <EditorField title="Preparation time (minutes)"><input type="number" min="0" className={field} value={form.delivery?.preparationMinutes ?? ''} onChange={(event) => nested('delivery', 'preparationMinutes', event.target.value)}/></EditorField>}
@@ -1545,11 +1559,14 @@ function HostUnifiedListingEditor() {
               <div className="mb-4 border-l-4 border-[#173F35] bg-[#EEF2EA] p-4" role="status">
                 <p className="font-semibold text-[#173F35]">Selling status</p>
                 <p className="mt-1 text-sm text-[#40544A]">{sellingReadiness.message}</p>
-                {sellingReadiness.catalogLinked && <p className="mt-2 text-sm text-[#40544A]">Set price and stock below without leaving this page.</p>}
+                {activeListing?.status === 'approved' && sellingReadiness?.offerStatus !== 'active' &&
+                  <button type="button" disabled={busy || Boolean(uploading)} onClick={resendSavedListingForSelling}
+                    className={`${styles.button} mt-3`}><Send size={17} className="mr-2 inline" />Send saved listing for selling approval</button>}
+                {sellingReadiness?.offerStatus === 'active' && <p className="mt-2 text-sm font-semibold text-[#245A43]">Customers can order this item using the approved selling details. No extra setup required.</p>}
               </div>
             )}
             <section className={`${section} uel-review`}><h2 className="text-xl font-bold">Ready for review?</h2>
-              <p className="mt-2 text-sm text-[#4A5850]">{locked ? 'Food facts, allergens, pricing and delivery are editable. Your other details stay protected; these changes require Super Admin review before publishing.' : 'Save your progress whenever you like, or submit your completed listing to Super Admin. Approval does not automatically enable marketplace sales.'}</p>
+              <p className="mt-2 text-sm text-[#4A5850]">{locked ? 'Food facts, allergens, pricing and delivery are editable. Your other details stay protected; these changes require Super Admin review before publishing.' : 'Save your progress or submit this complete listing once. Super Admin approval publishes the item and activates its selling details together.'}</p>
               {locked ? (
                 <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={busy || Boolean(uploading)} onClick={saveSectionRevision} className={styles.button}><Send size={17} className="mr-2 inline"/>Save changes & send for review</button></div>
               ) : (
@@ -1557,7 +1574,7 @@ function HostUnifiedListingEditor() {
               )}
             </section>
           </fieldset>
-          {editingId && canSell && <HostListingSalesSetup listingId={editingId} listing={activeListing?.packet || form}
+          {editingId && canSell && sellingReadiness?.catalogLinked && sellingReadiness?.offerStatus !== 'active' && <HostListingSalesSetup listingId={editingId} listing={activeListing?.packet || form}
             readiness={sellingReadiness} onUpdated={() => { load(); getHostListingSellingReadiness(editingId).then(data => setSellingReadiness(data?.readiness || null)).catch(() => {}) }} />}
           </>
         )}

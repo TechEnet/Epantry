@@ -1,6 +1,8 @@
 import {
   ApiError,
 } from '../../utils/ApiError.js'
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+import { User } from '../users/user.model.js'
 
 import {
   Pack,
@@ -306,7 +308,7 @@ export async function listPublicEligibleOffers({
       pincode,
     )
 
-  await requirePublicCanonicalPack(
+  const canonical = await requirePublicCanonicalPack(
     packId,
     now,
   )
@@ -381,6 +383,9 @@ export async function listPublicEligibleOffers({
         'active',
     })
       .select({
+        ownerUserId:
+          1,
+
         displayName:
           1,
 
@@ -406,17 +411,37 @@ export async function listPublicEligibleOffers({
       ),
     )
 
-  const activeOffers =
-    offers.filter(
-      (
-        offer,
-      ) =>
-        organizationById.has(
-          String(
-            offer.organizationId,
-          ),
-        ),
-    )
+  // Unified Listing offers are scoped to one approved Host packet. Generic
+  // organization-wide service areas must NEVER widen that packet's PIN coverage.
+  // This guard is also used by Cart/Checkout, not only the Recipe Detail UI.
+  const unifiedRefs = offers.map((offer) =>
+    /^epantry-([a-f\d]{24})$/i.exec(String(offer.merchantSku || ''))?.[1]).filter(Boolean)
+  const linkedListings = unifiedRefs.length
+    ? await HostUnifiedListingPacket.find({ _id: { $in: unifiedRefs }, deletedAt: null })
+      .select('ownerUserId status packet publishedPacket').lean()
+    : []
+  const activeHostUsers = linkedListings.length ? await User.find({
+    _id: { $in: linkedListings.map(item => item.ownerUserId) },
+    hostEnabled: true, hostAccessStatus: 'active', accountStatus: 'active',
+  }).select('_id').lean() : []
+  const activeHostIds = new Set(activeHostUsers.map(item => String(item._id)))
+  const listingById = new Map(linkedListings.map((item) => [String(item._id), item]))
+  const activeOffers = offers.filter((offer) => {
+    const organization = organizationById.get(String(offer.organizationId))
+    if (!organization) return false
+    const match = /^epantry-([a-f\d]{24})$/i.exec(String(offer.merchantSku || ''))
+    if (!match) return true // Other Marketplace offers keep existing rules.
+    const listing = listingById.get(match[1])
+    const approved = listing?.publishedPacket || (listing?.status === 'approved' ? listing.packet : null)
+    if (!approved || !activeHostIds.has(String(listing.ownerUserId)) ||
+      String(listing.ownerUserId) !== String(organization.ownerUserId)) return false
+    if (!(approved.type === 'grocery' || approved.type === 'prepared_food' ||
+      (approved.type === 'kitchen_recipe' && approved.sellReadyMade === true))) return false
+    if (String(approved.catalogProductVersionId || '') !== String(canonical.publishedVersion._id)) return false
+    const mode = approved.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
+    if (mode === 'pickup') return fulfillmentType === 'pickup'
+    return approved.delivery?.postalCodes?.some((value) => String(value).trim() === normalizedPincode) === true
+  })
 
   if (
     activeOffers.length ===

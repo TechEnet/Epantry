@@ -246,12 +246,14 @@ export default function AdminUnifiedListingReviewPage() {
     setError('')
     setSuccess('')
     try {
-      await reviewAdminHostListingPacket(selected.id, {
+      const result = await reviewAdminHostListingPacket(selected.id, {
         decision,
         note: note.trim(),
         section: decision === 'changes_requested' ? section : '',
       })
-      setSuccess(`Decision saved for ${selected.title}. The Host will receive an in-app notification.`)
+      setSuccess(result?.sellingActivated
+        ? `${selected.title} approved and ready for customers. Its product, pack, price, stock and delivery were activated together.`
+        : `Decision saved for ${selected.title}. The Host will receive an in-app notification.`)
       setNote('')
       await load()
     } catch (cause) {
@@ -429,41 +431,13 @@ export default function AdminUnifiedListingReviewPage() {
           </div>
         </section>
 
-        {selected.status === 'approved' && (selected.type === 'grocery' || selected.type === 'prepared_food' || (selected.type === 'kitchen_recipe' && packet.sellReadyMade)) && (
+        {selected.status === 'approved' && (selected.type === 'grocery' || selected.type === 'prepared_food' ||
+          (selected.type === 'kitchen_recipe' && packet.sellReadyMade)) && (
           <section className="border-b border-[#DDE3DB] py-5">
-            <h3 className="text-[18px] font-semibold text-[#173F35]">Catalog & selling</h3>
-            <p className="mt-2 text-[15px] text-[#52685A]">A product must be independently published in the catalog before a Host can sell it. Link only the exact approved product and pack.</p>
-            <p className="mt-2 text-[14px]">{packet.catalogProductVersionId
-              ? `Linked catalog version: ${packet.catalogProductVersionId}`
-              : 'No published catalog product linked yet.'}</p>
-            {!packet.catalogProductVersionId && selected.type === 'grocery' && <details className="mt-4 rounded-lg border border-[#D9E3DB] bg-[#F5F8F4] p-4">
-              <summary className="cursor-pointer text-[16px] font-semibold text-[#173F35]">Create a catalog draft from reviewed product evidence</summary>
-              <p className="mt-2 text-[15px] text-[#52685A]">First review the Host's pack-label evidence in Product Review. Only approved evidence from this Host can create a catalog draft.</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="text-[15px] font-semibold">Approved evidence record ID
-                  <input className={`${inputClass} mt-1`} value={npiDraftId} maxLength={24} onChange={event => setNpiDraftId(event.target.value.trim())} placeholder="24-character evidence ID" />
-                </label>
-                <label className="text-[15px] font-semibold">Approved product category
-                  <input className={`${inputClass} mt-1`} value={catalogCategory} maxLength={180} onChange={event => setCatalogCategory(event.target.value)} placeholder="e.g. Groceries" />
-                </label>
-              </div>
-              <button type="button" className="mt-3 min-h-11 rounded-lg bg-[#173F35] px-4 font-semibold text-white disabled:opacity-50" disabled={busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || catalogCategory.trim().length < 2} onClick={createCatalogDraft}>Create catalog draft</button>
-              <p className="mt-3 text-[14px] text-[#52685A]">After the product version is submitted for Catalog review, enter the same evidence ID and an approval reason in the review notes to publish it. All evidence and duplicate checks still apply.</p>
-              <button type="button" className="mt-3 min-h-11 rounded-lg border border-[#173F35] bg-[#EAF1E8] px-4 font-semibold text-[#173F35] disabled:opacity-50" disabled={busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || note.trim().length < 10} onClick={publishReviewedProduct}>Publish reviewed product & link listing</button>
-            </details>}
-            {!packet.catalogProductVersionId && <Link to="/admin/catalog" className="mt-3 inline-flex min-h-11 items-center text-[15px] font-semibold text-[#173F35] underline underline-offset-4">Open catalog review for a new product</Link>}
-            {!packet.catalogProductVersionId && <div className="mt-3 flex flex-wrap items-end gap-3">
-              <label className="min-w-0 flex-1 text-[15px] font-semibold">Published product version ID
-                <input className={`${inputClass} mt-1`} value={canonicalVersionId} maxLength={24}
-                  onChange={event => setCanonicalVersionId(event.target.value.trim())}
-                  placeholder="Paste verified 24-character ID" />
-              </label>
-              <button type="button" disabled={busy || !/^[a-f0-9]{24}$/i.test(canonicalVersionId)}
-                onClick={attachPublishedCatalog}
-                className="min-h-11 rounded-lg bg-[#173F35] px-4 font-semibold text-white disabled:opacity-50">
-                Link approved product
-              </button>
-            </div>}
+            <h3 className="text-[18px] font-semibold text-[#173F35]">Customer selling</h3>
+            {packet.catalogProductVersionId
+              ? <p className="mt-2 text-[15px] text-[#245A43]">Approved product and pack linked. Price, stock and delivery were reviewed with this listing. Customers can order where stock and PIN eligibility are available.</p>
+              : <p className="mt-2 text-[15px] text-[#52685A]">This listing predates single-step selling approval. The Host can send its saved details for one final review; approving the resubmission will automatically set up online selling.</p>}
           </section>
         )}
 
@@ -490,11 +464,11 @@ export default function AdminUnifiedListingReviewPage() {
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2.5">
-            <button type="button" disabled={busy} onClick={() => decide('approved')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#165A3C] px-5 text-[16px] font-semibold text-white transition hover:bg-[#0D452D] disabled:opacity-60"><CheckCircle2 size={18} aria-hidden="true" /> Approve listing</button>
+            <button type="button" disabled={busy} onClick={() => decide('approved')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#165A3C] px-5 text-[16px] font-semibold text-white transition hover:bg-[#0D452D] disabled:opacity-60"><CheckCircle2 size={18} aria-hidden="true" /> {(selected.type === 'grocery' || selected.type === 'prepared_food' || (selected.type === 'kitchen_recipe' && packet.sellReadyMade)) ? 'Approve & enable selling' : 'Approve listing'}</button>
             <button type="button" disabled={busy} onClick={() => decide('changes_requested')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#CFA994] bg-white px-5 text-[16px] font-semibold text-[#875039] transition hover:bg-[#FFE8D8] disabled:opacity-60"><FileText size={18} aria-hidden="true" /> Request changes</button>
             <button type="button" disabled={busy} onClick={() => decide('rejected')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#E9C3C0] bg-[#FFF8F7] px-5 text-[16px] font-semibold text-[#A13F43] transition hover:bg-[#FCE6E5] disabled:opacity-60"><XCircle size={18} aria-hidden="true" /> Reject</button>
           </div>
-          <p className="mt-3 flex items-center gap-2 text-[14px] leading-5 text-[#617162]"><ShieldCheck size={16} className="shrink-0" aria-hidden="true" /> Approval publishes the listing; other marketplace permissions remain unchanged.</p>
+          <p className="mt-3 flex items-center gap-2 text-[14px] leading-5 text-[#617162]"><ShieldCheck size={16} className="shrink-0" aria-hidden="true" /> One Super Admin approval publishes the listing and activates selling when a valid pack, price, stock and delivery are supplied. Missing details block approval with a clear reason; no partial sale is enabled.</p>
         </section>}
       </div> : <div className="mt-4 flex min-h-44 flex-col items-center justify-center border border-[#D9E2D9] bg-[#FBFCF8] p-6 text-center">
         <h2 className="text-[22px] font-semibold text-[#173F35]">No submission selected</h2>
