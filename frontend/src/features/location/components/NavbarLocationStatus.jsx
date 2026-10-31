@@ -191,18 +191,13 @@ export default function NavbarLocationStatus({
     // Keep alternating the delivery ETA and location even when the browser
     // has not provided geolocation yet. Reduced motion affects the visual
     // transition, not the five-second content update.
-    if (!isDesktop || !isOrderEtaContext) {
+    if (!isDesktop || !hasDeliveryContext) {
       setShowDelivery(false)
       return undefined
     }
 
-    // Pause the rotation on whichever state is currently visible.
-    // Hovering must not force the navbar into delivery/ETA mode.
-    if (etaHovered) {
-      return undefined
-    }
-
-    // Resume the normal location <-> ETA rotation after hover ends.
+    // Always rotate while a genuine ETA exists, including on hover or
+    // when the location details panel is open. Do not pause the five-second fade.
 
     const intervalId =
       window.setInterval(
@@ -219,9 +214,8 @@ export default function NavbarLocationStatus({
         intervalId,
       )
   }, [
-    etaHovered,
     isDesktop,
-    isOrderEtaContext,
+    hasDeliveryContext,
   ])
 
   const currentLabel =
@@ -285,7 +279,7 @@ export default function NavbarLocationStatus({
 
   const activeView =
     isDesktop &&
-    isOrderEtaContext &&
+    hasDeliveryContext &&
     showDelivery
       ? 'delivery'
       : 'current'
@@ -744,7 +738,7 @@ export default function NavbarLocationStatus({
                   type="button"
                   onClick={requestCurrentLocation}
                   disabled={requesting}
-                  className="focus-ring mt-4 w-full rounded-xl bg-[#173f35] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#0f3028] disabled:cursor-wait disabled:opacity-60"
+                  className="focus-ring mt-4 w-full rounded-xl bg-[#173f35] px-4 py-2.5 text-xs font-black text-white transition hover:bg-[#245447] disabled:cursor-wait disabled:opacity-60"
                 >
                   {requesting
                     ? 'Refreshing location…'

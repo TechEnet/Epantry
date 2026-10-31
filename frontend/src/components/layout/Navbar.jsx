@@ -59,6 +59,7 @@ import {
   import {
     getOrder,
     listOrders,
+    getMarketplaceCartDeliveryEta,
   } from '../../features/commerce/services/commerce.service';
 
   import {
@@ -805,6 +806,79 @@ import {
         [],
     );
 
+    // Show a real delivery-time estimate on grocery/product pages too.
+    // Checkout and active-order ETA remain authoritative; only use the saved
+    // Marketplace cart as a fallback, never invent a delivery time.
+    useEffect(() => {
+        if (!showCustomerCart || isBootstrapping) return undefined;
+
+        let cancelled = false;
+        let requestVersion = 0;
+        const refreshCartDeliveryEta = async () => {
+            const requestId = ++requestVersion;
+            const savedCart = readSessionJson(FLOATING_MARKETPLACE_CART_KEY);
+            const cartId = savedCart?.cartId;
+            const validCart = cartId &&
+                Array.isArray(savedCart?.items) && savedCart.items.length > 0 &&
+                savedCart.fulfillmentType !== 'pickup';
+
+            if (!validCart) {
+                const previous = useLocationStore.getState().deliveryContext;
+                if (String(previous?.targetPath || '').startsWith('/cart/')) {
+                    clearDeliveryContext();
+                }
+                return;
+            }
+
+            try {
+                const eta = await getMarketplaceCartDeliveryEta(cartId);
+                if (cancelled || requestId !== requestVersion) return;
+                const minutes = Number(eta?.estimatedDeliveryMinutes);
+                const validArrival = Number.isFinite(Date.parse(eta?.estimatedArrivalAt || ''));
+                const hasEstimate = eta?.available &&
+                    (validArrival || (Number.isFinite(minutes) && minutes > 0));
+
+                // Active-order ETA takes priority over the basket estimate.
+                const previous = useLocationStore.getState().deliveryContext;
+                if (String(previous?.targetPath || '').startsWith('/orders/')) return;
+
+                if (!hasEstimate) {
+                    if (String(previous?.targetPath || '').startsWith('/cart/')) {
+                        clearDeliveryContext();
+                    }
+                    return;
+                }
+
+                setDeliveryContext({
+                    city: eta.destination?.city || '',
+                    state: eta.destination?.state || '',
+                    country: eta.destination?.country || 'India',
+                    label: eta.destination?.label ||
+                        (eta.destination?.postalCode
+                            ? `PIN ${eta.destination.postalCode}`
+                            : 'Delivery destination'),
+                    estimatedDeliveryMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : null,
+                    estimatedArrivalAt: validArrival ? eta.estimatedArrivalAt : '',
+                    estimatedRoadDistanceKm: Number(eta.estimatedRoadDistanceKm),
+                    averageSpeedKmh: Number(eta.averageSpeedKmh),
+                    targetPath: `/cart/${encodeURIComponent(String(cartId))}`,
+                    calculationMethod: eta.calculationMethod || '',
+                });
+            } catch {
+                // A missing cart ETA does not affect location or shopping.
+            }
+        };
+
+        void refreshCartDeliveryEta();
+        const intervalId = window.setInterval(refreshCartDeliveryEta, 45000);
+        window.addEventListener(FLOATING_CART_UPDATE_EVENT, refreshCartDeliveryEta);
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+            window.removeEventListener(FLOATING_CART_UPDATE_EVENT, refreshCartDeliveryEta);
+        };
+    }, [showCustomerCart, isBootstrapping, setDeliveryContext, clearDeliveryContext]);
+
     useEffect(
         () => {
             let cancelled =
@@ -902,64 +976,40 @@ import {
                         const activeOrder = deliveryOrders[0] || null;
                         setActiveTrackingOrder(activeOrder);
 
-                        if (
-                            activeOrder
-                        ) {
-                            try {
-                                const orderId =
-                                    activeOrder.id ||
-                                    activeOrder._id;
-
-                                const orderDetail =
-                                    await getOrder(
-                                        orderId,
-                                    );
-
-                                if (cancelled) {
-                                    return;
-                                }
-
-                                const eta =
-                                    orderDetail?.deliveryEta;
-
-                                if (
-                                    eta?.available
-                                ) {
+                        // An active order can have no calculable ETA (for example,
+                        // missing stock-location PIN). Check the next active order
+                        // instead of leaving the rotating delivery label empty.
+                        if (activeOrder) {
+                            for (const deliveryOrder of deliveryOrders) {
+                                try {
+                                    const orderId = deliveryOrder.id || deliveryOrder._id;
+                                    const orderDetail = await getOrder(orderId);
+                                    if (cancelled) return;
+                                    const eta = orderDetail?.deliveryEta;
+                                    const minutes = Number(eta?.estimatedDeliveryMinutes);
+                                    const validArrival = Number.isFinite(Date.parse(eta?.estimatedArrivalAt || ''));
+                                    if (!eta?.available || (!validArrival && !(Number.isFinite(minutes) && minutes > 0))) {
+                                        continue;
+                                    }
                                     setDeliveryContext({
-                                        city:
-                                            eta.destination?.city ||
-                                            '',
-                                        state:
-                                            eta.destination?.state ||
-                                            '',
-                                        country:
-                                            eta.destination?.country ||
-                                            'India',
-                                        label:
-                                            eta.destination?.label ||
+                                        city: eta.destination?.city || '',
+                                        state: eta.destination?.state || '',
+                                        country: eta.destination?.country || 'India',
+                                        label: eta.destination?.label ||
                                             (eta.destination?.postalCode
                                                 ? `PIN ${eta.destination.postalCode}`
                                                 : 'Delivery destination'),
-                                        estimatedDeliveryMinutes:
-                                            Number(eta.estimatedDeliveryMinutes),
-                                        estimatedArrivalAt:
-                                            eta.estimatedArrivalAt ||
-                                            '',
-                                        estimatedRoadDistanceKm:
-                                            Number(eta.estimatedRoadDistanceKm),
-                                        averageSpeedKmh:
-                                            Number(eta.averageSpeedKmh),
-                                        targetPath:
-                                            `/orders/${encodeURIComponent(
-                                                String(orderId),
-                                            )}`,
-                                        calculationMethod:
-                                            eta.calculationMethod ||
-                                            '',
+                                        estimatedDeliveryMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : null,
+                                        estimatedArrivalAt: validArrival ? eta.estimatedArrivalAt : '',
+                                        estimatedRoadDistanceKm: Number(eta.estimatedRoadDistanceKm),
+                                        averageSpeedKmh: Number(eta.averageSpeedKmh),
+                                        targetPath: `/orders/${encodeURIComponent(String(orderId))}`,
+                                        calculationMethod: eta.calculationMethod || '',
                                     });
+                                    break;
+                                } catch {
+                                    // Try the next active order. Tracking continues normally.
                                 }
-                            } catch {
-                                // Navbar ETA is supplementary; order tracking remains available.
                             }
                         } else if (
                             storedDeliveryContext?.targetPath
