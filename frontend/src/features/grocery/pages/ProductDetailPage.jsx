@@ -547,17 +547,33 @@ function DetailCard({
       <summary className="focus-ring flex min-h-[72px] cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-white/65 group-open:bg-[#F8FCFA] sm:gap-4 sm:px-4 [&::-webkit-details-marker]:hidden">
         <span className="flex min-w-0 items-center gap-3 sm:gap-4">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-[#BFD5CC] bg-[#F8FCFA] text-[#174E49] group-open:border-[#D6C5B8] group-open:bg-[#F7E9DF]">
-            {Icon ? <Icon size={18} strokeWidth={1.8} aria-hidden="true" /> : <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" />}
+            {Icon ? (
+              <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+            ) : (
+              <ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" />
+            )}
           </span>
           <span className="min-w-0">
-            <span className={`block text-[16px] font-semibold tracking-[-0.015em] sm:text-[17px] ${accent ? "text-[#173F35]" : "text-[#202421]"}`}>
+            <span
+              className={`block text-[16px] font-semibold tracking-[-0.015em] sm:text-[17px] ${
+                accent ? "text-[#173F35]" : "text-[#202421]"
+              }`}
+            >
               {title}
             </span>
-            {description && <span className="mt-0.5 block text-[13px] leading-5 text-[#536B64] sm:text-[14px]">{description}</span>}
+            {description && (
+              <span className="mt-0.5 block text-[13px] leading-5 text-[#536B64] sm:text-[14px]">
+                {description}
+              </span>
+            )}
           </span>
         </span>
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[#C8D5D2] bg-white text-[#174E49] transition-colors group-open:border-[#174E49] group-open:bg-[#174E49] group-open:text-white">
-          <ChevronDown size={17} className="transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+          <ChevronDown
+            size={17}
+            className="transition-transform duration-200 group-open:rotate-180"
+            aria-hidden="true"
+          />
         </span>
       </summary>
       <div className="min-w-0 bg-white/35 px-3 pb-5 pt-3 text-[15px] leading-[1.55] text-[#283E35] sm:px-5 sm:pb-6">
@@ -573,8 +589,12 @@ function DetailCard({
 // explicit Host-declared, PIN-specific public lookup instead.
 function HostListingPincodeCheck({ product }) {
   const currentLocation = useLocationStore((state) => state.currentLocation);
-  const { requestCurrentLocation, status: locationStatus } = useCurrentLocation();
-  const detectedPincode = String(currentLocation?.postcode || "").replace(/\s/g, "").match(/^\d{6}$/)?.[0] || "";
+  const { requestCurrentLocation, status: locationStatus } =
+    useCurrentLocation();
+  const detectedPincode =
+    String(currentLocation?.postcode || "")
+      .replace(/\s/g, "")
+      .match(/^\d{6}$/)?.[0] || "";
   const [manualPincode, setManualPincode] = useState(null);
   const [manualDraft, setManualDraft] = useState("");
   const [manualEditorOpen, setManualEditorOpen] = useState(false);
@@ -592,18 +612,34 @@ function HostListingPincodeCheck({ product }) {
     setError("");
     if (!/^[0-9]{6}$/.test(pin) || !/^[a-f0-9]{24}$/i.test(listingId)) {
       setChecking(false);
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }
     setChecking(true);
-    apiClient.get(`/public/host-listings/${encodeURIComponent(listingId)}/pincode-quote`, { params: { pincode: pin } })
+    apiClient
+      .get(
+        `/public/host-listings/${encodeURIComponent(listingId)}/pincode-quote`,
+        { params: { pincode: pin } }
+      )
       .then((response) => {
-        if (!cancelled) setQuote(response?.data?.data ?? response?.data ?? null);
+        if (!cancelled)
+          setQuote(response?.data?.data ?? response?.data ?? null);
       })
       .catch((cause) => {
-        if (!cancelled) setError(cause?.response?.data?.message || cause?.message || "Unable to check this PIN right now.");
+        if (!cancelled)
+          setError(
+            cause?.response?.data?.message ||
+              cause?.message ||
+              "Unable to check this PIN right now."
+          );
       })
-      .finally(() => { if (!cancelled) setChecking(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [listingId, pin]);
 
   function submitPincode(event) {
@@ -619,63 +655,157 @@ function HostListingPincodeCheck({ product }) {
   }
 
   return (
-    <section className="ep-product-offers min-w-0 border-t-[3px] border-[#214E4A] bg-[#E8F2F1] px-4 py-3 sm:px-5 sm:py-3" aria-label="Check Host listing price by PIN code">
+    <section
+      className="ep-product-offers min-w-0 border-t-[3px] border-[#214E4A] bg-[#E8F2F1] px-4 py-3 sm:px-5 sm:py-3"
+      aria-label="Check Host listing price by PIN code"
+    >
       <div className="flex flex-wrap items-center gap-2.5 border-b border-[#C7DCD8] pb-2.5 sm:flex-nowrap">
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#CFE4E1] text-[#174E49]">
           <Store size={19} aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">Check price by pincode</h2>
+          <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">
+            Check price by pincode
+          </h2>
           <p className="mt-0.5 text-[13px] leading-5 text-[#676E67]">
-            {pin ? `Delivery PIN ${pin} · Host-declared listing` : "Enter a delivery PIN to check the Host's stated service area and price."}
+            {pin
+              ? `Delivery PIN ${pin} · Host-declared listing`
+              : "Enter a delivery PIN to check the Host's stated service area and price."}
           </p>
         </div>
         {pin && !manualEditorOpen && (
-          <button type="button" onClick={() => { setManualDraft(pin); setManualEditorOpen(true); setPinEntryError(""); }} className="focus-ring ml-auto shrink-0 rounded-full border border-[#A9C8C4] bg-white px-3 py-2 text-sm font-semibold text-[#173F35] hover:border-[#173F35]">Change PIN</button>
+          <button
+            type="button"
+            onClick={() => {
+              setManualDraft(pin);
+              setManualEditorOpen(true);
+              setPinEntryError("");
+            }}
+            className="focus-ring ml-auto shrink-0 rounded-full border border-[#A9C8C4] bg-white px-3 py-2 text-sm font-semibold text-[#173F35] hover:border-[#173F35]"
+          >
+            Change PIN
+          </button>
         )}
       </div>
 
       {needsManualPin && (
         <form onSubmit={submitPincode} className="space-y-2 pb-2 pt-2.5">
-          <label htmlFor="host-product-delivery-pincode" className="block text-xs font-semibold text-stone-700">Enter your delivery PIN code</label>
+          <label
+            htmlFor="host-product-delivery-pincode"
+            className="block text-xs font-semibold text-stone-700"
+          >
+            Enter your delivery PIN code
+          </label>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <div className="relative min-w-0">
-              <MapPin size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true" />
-              <input id="host-product-delivery-pincode" required inputMode="numeric" autoComplete="postal-code" maxLength={6} pattern="[0-9]{6}"
-                value={manualDraft} onFocus={() => { if (!detectedPincode && locationStatus !== "requesting") void requestCurrentLocation(); }}
-                onChange={(event) => { setManualDraft(event.target.value.replace(/\D/g, "").slice(0, 6)); setPinEntryError(""); }}
+              <MapPin
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
+                aria-hidden="true"
+              />
+              <input
+                id="host-product-delivery-pincode"
+                required
+                inputMode="numeric"
+                autoComplete="postal-code"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                value={manualDraft}
+                onFocus={() => {
+                  if (!detectedPincode && locationStatus !== "requesting")
+                    void requestCurrentLocation();
+                }}
+                onChange={(event) => {
+                  setManualDraft(
+                    event.target.value.replace(/\D/g, "").slice(0, 6)
+                  );
+                  setPinEntryError("");
+                }}
                 className="focus-ring h-12 w-full rounded-lg border border-[#A9C8C4] bg-white pl-10 pr-3 text-[15px] font-medium text-[#202421] outline-none transition focus:border-[#174E49] focus:ring-2 focus:ring-[#CFE4E1]"
-                placeholder="Enter 6-digit pincode" />
+                placeholder="Enter 6-digit pincode"
+              />
             </div>
-            <button type="submit" className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#174E49] px-5 py-2 text-[15px] font-semibold text-white transition hover:bg-[#286C62]">
+            <button
+              type="submit"
+              className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#174E49] px-5 py-2 text-[15px] font-semibold text-white transition hover:bg-[#286C62]"
+            >
               <Search size={15} aria-hidden="true" /> Check delivery
             </button>
           </div>
           {detectedPincode && (
-            <button type="button" onClick={() => { setManualPincode(null); setManualDraft(""); setManualEditorOpen(false); setPinEntryError(""); }}
-              className="focus-ring inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">Use current-location PIN {detectedPincode}</button>
+            <button
+              type="button"
+              onClick={() => {
+                setManualPincode(null);
+                setManualDraft("");
+                setManualEditorOpen(false);
+                setPinEntryError("");
+              }}
+              className="focus-ring inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+            >
+              Use current-location PIN {detectedPincode}
+            </button>
           )}
-          {!detectedPincode && locationStatus === "requesting" && <p className="text-xs text-stone-500">Finding your location PIN...</p>}
-          {pinEntryError && <p role="alert" className="text-xs font-semibold text-rose-700">{pinEntryError}</p>}
-          {manualEditorOpen && pin && <button type="button" onClick={() => setManualEditorOpen(false)} className="text-xs font-semibold text-stone-600 underline">Cancel</button>}
+          {!detectedPincode && locationStatus === "requesting" && (
+            <p className="text-xs text-stone-500">
+              Finding your location PIN...
+            </p>
+          )}
+          {pinEntryError && (
+            <p role="alert" className="text-xs font-semibold text-rose-700">
+              {pinEntryError}
+            </p>
+          )}
+          {manualEditorOpen && pin && (
+            <button
+              type="button"
+              onClick={() => setManualEditorOpen(false)}
+              className="text-xs font-semibold text-stone-600 underline"
+            >
+              Cancel
+            </button>
+          )}
         </form>
       )}
 
       {pin && !manualEditorOpen && (
         <div className="pt-3">
           {checking ? (
-            <p role="status" className="bg-white/75 px-3 py-2 text-sm text-[#4C655D]">Checking Host-declared service area for {pin}...</p>
+            <p
+              role="status"
+              className="bg-white/75 px-3 py-2 text-sm text-[#4C655D]"
+            >
+              Checking Host-declared service area for {pin}...
+            </p>
           ) : error ? (
-            <p role="alert" className="border-l-[3px] border-rose-500 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p>
+            <p
+              role="alert"
+              className="border-l-[3px] border-rose-500 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+            >
+              {error}
+            </p>
           ) : quote ? (
             <div className="border-l-[3px] border-[#2F856D] bg-white/75 px-3 py-3">
               <p className="text-[14px] font-semibold leading-6 text-[#173F35]">
-                {quote.pickupOnly ? "This Host lists pickup only, not delivery." : quote.declaredCoverage
-                  ? `This Host has listed delivery to PIN ${pin}.` : `This Host has not listed delivery to PIN ${pin}.`}
+                {quote.pickupOnly
+                  ? "This Host lists pickup only, not delivery."
+                  : quote.declaredCoverage
+                  ? `This Host has listed delivery to PIN ${pin}.`
+                  : `This Host has not listed delivery to PIN ${pin}.`}
               </p>
-              {quote.declaredCoverage && quote.declaredPrice !== null && quote.declaredPrice !== undefined && (
-                <p className="mt-1 text-[22px] font-semibold text-[#202421]">₹{Number(quote.declaredPrice).toLocaleString("en-IN", { maximumFractionDigits: 2 })} <span className="text-[12px] font-medium text-[#647168]">Host-declared price</span></p>
-              )}
+              {quote.declaredCoverage &&
+                quote.declaredPrice !== null &&
+                quote.declaredPrice !== undefined && (
+                  <p className="mt-1 text-[22px] font-semibold text-[#202421]">
+                    ₹
+                    {Number(quote.declaredPrice).toLocaleString("en-IN", {
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    <span className="text-[12px] font-medium text-[#647168]">
+                      Host-declared price
+                    </span>
+                  </p>
+                )}
             </div>
           ) : null}
         </div>
@@ -687,22 +817,28 @@ function HostListingPincodeCheck({ product }) {
 function MarketplaceOffers({ product, onOffersResolved }) {
   // A Host's approved prepared item can be pickup-only. Do not query delivery
   // offers or create delivery carts for a published pickup listing.
-  const fulfillmentType = product?.isHostListing &&
-    product?.hostSubmission?.fulfillmentType === "pickup" ? "pickup" : "delivery";
+  const fulfillmentType =
+    product?.isHostListing &&
+    product?.hostSubmission?.fulfillmentType === "pickup"
+      ? "pickup"
+      : "delivery";
   const currentLocation = useLocationStore((state) => state.currentLocation);
-  const { requestCurrentLocation, status: locationStatus } = useCurrentLocation();
+  const { requestCurrentLocation, status: locationStatus } =
+    useCurrentLocation();
   // Only a complete Indian PIN is safe for an availability lookup. Never use
   // an approximate city name or partial postcode as proof of delivery.
-  const detectedPincode = String(currentLocation?.postcode || "")
-    .replace(/\s/g, "")
-    .match(/^\d{6}$/)?.[0] || "";
+  const detectedPincode =
+    String(currentLocation?.postcode || "")
+      .replace(/\s/g, "")
+      .match(/^\d{6}$/)?.[0] || "";
   const [manualPincode, setManualPincode] = useState(null);
   const [manualDraft, setManualDraft] = useState("");
   const [manualEditorOpen, setManualEditorOpen] = useState(false);
   const [pinEntryError, setPinEntryError] = useState("");
   const pincode = manualPincode === null ? detectedPincode : manualPincode;
   const isLocationApproximate =
-    currentLocation?.source === "network" || currentLocation?.accuracyMode === "approximate";
+    currentLocation?.source === "network" ||
+    currentLocation?.accuracyMode === "approximate";
 
   const [offers, setOffers] = useState([]);
 
@@ -859,7 +995,9 @@ function MarketplaceOffers({ product, onOffersResolved }) {
     if (!packId || !/^\d{6}$/.test(lookupPincode)) {
       setLoading(false);
       onOffersResolved?.({ offer: null, pincode: lookupPincode });
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }
 
     setLoading(true);
@@ -882,24 +1020,35 @@ function MarketplaceOffers({ product, onOffersResolved }) {
             (item) => String(item?.packId || "") === String(packId)
           );
           for (const offer of nextOffers) {
-            const minimum = Math.max(1, Number(offer?.minimumOrderQuantity || 1));
+            const minimum = Math.max(
+              1,
+              Number(offer?.minimumOrderQuantity || 1)
+            );
             const rawMax = offer?.maximumOrderQuantity;
             const maximum = Math.max(
               minimum,
-              rawMax === null || rawMax === undefined || !Number.isFinite(Number(rawMax))
-                ? 100000 : Math.floor(Number(rawMax))
+              rawMax === null ||
+                rawMax === undefined ||
+                !Number.isFinite(Number(rawMax))
+                ? 100000
+                : Math.floor(Number(rawMax))
             );
             const cartQuantity = Number(floatingItem?.quantity);
             const existing = Number.isInteger(cartQuantity)
-              ? cartQuantity : Number(current[offer.id]);
+              ? cartQuantity
+              : Number(current[offer.id]);
             next[offer.id] = Number.isInteger(existing)
-              ? Math.min(maximum, Math.max(minimum, existing)) : minimum;
+              ? Math.min(maximum, Math.max(minimum, existing))
+              : minimum;
           }
           return next;
         });
         setCheckedPincode(lookupKey);
         setChecked(true);
-        onOffersResolved?.({ offer: nextOffers[0] || null, pincode: lookupPincode });
+        onOffersResolved?.({
+          offer: nextOffers[0] || null,
+          pincode: lookupPincode,
+        });
       } catch (nextError) {
         if (cancelled) return;
         setOffers([]);
@@ -913,13 +1062,16 @@ function MarketplaceOffers({ product, onOffersResolved }) {
     }
 
     void checkDelivery();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // Only the Pack ID and chosen PIN determine when availability is rechecked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packId, pincode, fulfillmentType]);
 
   const verifiedForCurrentPin =
-    checked && checkedPincode === `${packId || ""}:${pincode.trim()}:${fulfillmentType}`;
+    checked &&
+    checkedPincode === `${packId || ""}:${pincode.trim()}:${fulfillmentType}`;
   const visibleOffers = verifiedForCurrentPin && !error ? offers : [];
   const needsManualPin = !pincode || manualEditorOpen;
 
@@ -942,8 +1094,14 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   }
 
   async function handleAddToCart(offer, sourceElement) {
-    if (!packId || !offer?.id || !/^\d{6}$/.test(pincode.trim()) ||
-        !verifiedForCurrentPin || !visibleOffers.some((item) => item.id === offer.id) || addingOfferId) {
+    if (
+      !packId ||
+      !offer?.id ||
+      !/^\d{6}$/.test(pincode.trim()) ||
+      !verifiedForCurrentPin ||
+      !visibleOffers.some((item) => item.id === offer.id) ||
+      addingOfferId
+    ) {
       return;
     }
 
@@ -957,8 +1115,10 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       const existingFloatingCart = readFloatingMarketplaceCart();
 
       const result = await createDirectMarketplaceCart({
-        cartId: existingFloatingCart?.fulfillmentType === fulfillmentType
-          ? (existingFloatingCart?.cartId || null) : null,
+        cartId:
+          existingFloatingCart?.fulfillmentType === fulfillmentType
+            ? existingFloatingCart?.cartId || null
+            : null,
 
         packId,
 
@@ -1046,11 +1206,25 @@ function MarketplaceOffers({ product, onOffersResolved }) {
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">
-            {pincode ? (fulfillmentType === "pickup" ? "Pickup availability" : "Delivery availability") : "Check price by pincode"}
+            {pincode
+              ? fulfillmentType === "pickup"
+                ? "Pickup availability"
+                : "Delivery availability"
+              : "Check price by pincode"}
           </h2>
           <p className="mt-0.5 text-[13px] leading-5 text-[#676E67]">
             {pincode
-              ? `${fulfillmentType === "pickup" ? "Pickup area PIN" : "Delivery PIN"} ${pincode}${manualPincode === null ? (isLocationApproximate ? " · Estimated location" : " · Current location") : " · Selected address"}`
+              ? `${
+                  fulfillmentType === "pickup"
+                    ? "Pickup area PIN"
+                    : "Delivery PIN"
+                } ${pincode}${
+                  manualPincode === null
+                    ? isLocationApproximate
+                      ? " · Estimated location"
+                      : " · Current location"
+                    : " · Selected address"
+                }`
               : "Choose a PIN to see prices and Add to Cart."}
           </p>
         </div>
@@ -1068,32 +1242,49 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       {pincode && !manualEditorOpen && (
         <div className="py-1.5">
           {!packId ? (
-            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+            <p
+              role="status"
+              className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900"
+            >
               Delivery details are not available for this product yet.
             </p>
           ) : loading || !verifiedForCurrentPin ? (
-            <p role="status" className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-stone-600">
+            <p
+              role="status"
+              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-stone-600"
+            >
               Checking delivery to {pincode}...
             </p>
           ) : !error && visibleOffers.length > 0 ? (
-            <p role="status" className="border-l-[3px] border-[#2F856D] bg-white/65 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-[#285E50]">
-              {visibleOffers.length} seller option{visibleOffers.length === 1 ? "" : "s"} available for PIN {pincode}.
+            <p
+              role="status"
+              className="border-l-[3px] border-[#2F856D] bg-white/65 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-[#285E50]"
+            >
+              {visibleOffers.length} seller option
+              {visibleOffers.length === 1 ? "" : "s"} available for PIN{" "}
+              {pincode}.
             </p>
           ) : !error ? (
-            <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
-              We don't deliver this product to this PIN code or location right now.
+            <p
+              role="status"
+              className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900"
+            >
+              We don't deliver this product to this PIN code or location right
+              now.
             </p>
           ) : null}
         </div>
       )}
 
       {needsManualPin && (
-        <form
-          onSubmit={handleManualPinCheck}
-          className="space-y-2 pb-2 pt-2.5"
-        >
-          <label htmlFor="product-delivery-pincode" className="block text-xs font-semibold text-stone-700">
-            {pincode ? "Check delivery to another location" : "Enter your delivery PIN code"}
+        <form onSubmit={handleManualPinCheck} className="space-y-2 pb-2 pt-2.5">
+          <label
+            htmlFor="product-delivery-pincode"
+            className="block text-xs font-semibold text-stone-700"
+          >
+            {pincode
+              ? "Check delivery to another location"
+              : "Enter your delivery PIN code"}
           </label>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <div className="relative min-w-0">
@@ -1117,7 +1308,9 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                   }
                 }}
                 onChange={(event) => {
-                  setManualDraft(event.target.value.replace(/\D/g, "").slice(0, 6));
+                  setManualDraft(
+                    event.target.value.replace(/\D/g, "").slice(0, 6)
+                  );
                   setPinEntryError("");
                 }}
                 className="focus-ring h-12 w-full rounded-lg border border-[#A9C8C4] bg-white pl-10 pr-3 text-[15px] font-medium text-[#202421] outline-none transition focus:border-[#174E49] focus:ring-2 focus:ring-[#CFE4E1]"
@@ -1147,15 +1340,22 @@ function MarketplaceOffers({ product, onOffersResolved }) {
             </button>
           )}
           {!detectedPincode && locationStatus === "requesting" && (
-            <p className="text-xs text-stone-500">Finding your location PIN...</p>
+            <p className="text-xs text-stone-500">
+              Finding your location PIN...
+            </p>
           )}
           {pinEntryError && (
-            <p role="alert" className="text-xs font-bold text-rose-700">{pinEntryError}</p>
+            <p role="alert" className="text-xs font-bold text-rose-700">
+              {pinEntryError}
+            </p>
           )}
           {pincode && manualEditorOpen && (
             <button
               type="button"
-              onClick={() => { setManualEditorOpen(false); setPinEntryError(""); }}
+              onClick={() => {
+                setManualEditorOpen(false);
+                setPinEntryError("");
+              }}
               className="text-xs font-bold text-stone-600 underline"
             >
               Cancel
@@ -1165,7 +1365,10 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       )}
 
       {error && verifiedForCurrentPin && (
-        <p role="alert" className="mb-3 border-l-[3px] border-rose-500 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+        <p
+          role="alert"
+          className="mb-3 border-l-[3px] border-rose-500 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"
+        >
           {error}
         </p>
       )}
@@ -1197,7 +1400,9 @@ function MarketplaceOffers({ product, onOffersResolved }) {
               </div>
 
               <div className="min-w-0 sm:text-right">
-                <p className="text-[12px] font-semibold text-[#66746D]">Your price</p>
+                <p className="text-[12px] font-semibold text-[#66746D]">
+                  Your price
+                </p>
                 <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:justify-end">
                   <p className="whitespace-nowrap text-[23px] font-semibold leading-tight tracking-[-0.04em] text-[#202421] sm:text-[25px]">
                     {formatMoney(
@@ -1221,7 +1426,9 @@ function MarketplaceOffers({ product, onOffersResolved }) {
 
               <div className="flex min-w-0 flex-wrap items-end gap-3 border-t border-[#E1E9E5] pt-2.5 sm:col-span-2 sm:justify-end">
                 <div className="shrink-0">
-                  <p className="mb-1 text-[12px] font-semibold text-[#66746D]">Quantity</p>
+                  <p className="mb-1 text-[12px] font-semibold text-[#66746D]">
+                    Quantity
+                  </p>
                   <div className="inline-flex items-center overflow-hidden border border-[#D4DAD2] bg-white">
                     <button
                       type="button"
@@ -1558,7 +1765,10 @@ function RecommendationProductCard({ product }) {
         {imageUrl ? (
           <img
             src={imageUrl}
-            {...publicImageProps(imageUrl, { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, 30vw" })}
+            {...publicImageProps(imageUrl, {
+              widths: [320, 480, 720],
+              sizes: "(max-width: 640px) 92vw, 30vw",
+            })}
             alt={product?.image?.alt || product?.displayName || "Product"}
             className="h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.04]"
           />
@@ -1573,7 +1783,12 @@ function RecommendationProductCard({ product }) {
         </span>
       </Link>
 
-      <BookmarkButton kind="grocery" slug={product?.slug} title={product?.displayName} className="absolute right-3 top-3" />
+      <BookmarkButton
+        kind="grocery"
+        slug={product?.slug}
+        title={product?.displayName}
+        className="absolute! right-3 top-3"
+      />
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         {product?.brand?.name ? (
           <p className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#346E60]">
@@ -1624,49 +1839,57 @@ function CountryListingCard({ listing }) {
 
   return (
     <div className="relative min-w-0">
-    <Link
-      to={path}
-      className="focus-ring group flex min-w-0 items-center gap-3 rounded-2xl border border-stone-200 bg-white p-2.5 shadow-[0_8px_24px_rgba(28,25,23,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_28px_rgba(4,120,87,0.10)] motion-reduce:transform-none"
-    >
-      <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#f3f6f1]">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            {...publicImageProps(imageUrl, { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, 30vw" })}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <Package
-            size={24}
-            className="text-emerald-700/40"
-            aria-hidden="true"
-          />
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[12px] font-black uppercase tracking-[0.12em] text-emerald-800">
-            {isRecipe ? "Recipe" : "Grocery"}
-          </span>
-          <span className="truncate text-[12px] font-bold text-stone-400">
-            {meta}
-          </span>
+      <Link
+        to={path}
+        className="focus-ring group flex min-w-0 items-center gap-3 rounded-2xl border border-stone-200 bg-white p-2.5 shadow-[0_8px_24px_rgba(28,25,23,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_12px_28px_rgba(4,120,87,0.10)] motion-reduce:transform-none"
+      >
+        <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#f3f6f1]">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              {...publicImageProps(imageUrl, {
+                widths: [320, 480, 720],
+                sizes: "(max-width: 640px) 92vw, 30vw",
+              })}
+              alt={title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Package
+              size={24}
+              className="text-emerald-700/40"
+              aria-hidden="true"
+            />
+          )}
         </div>
 
-        <p className="mt-1.5 line-clamp-2 text-xs font-black leading-4 text-stone-900">
-          {title}
-        </p>
-      </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[12px] font-black uppercase tracking-[0.12em] text-emerald-800">
+              {isRecipe ? "Recipe" : "Grocery"}
+            </span>
+            <span className="truncate text-[12px] font-bold text-stone-400">
+              {meta}
+            </span>
+          </div>
 
-      <ArrowRight
-        size={15}
-        className="shrink-0 text-stone-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-700"
-        aria-hidden="true"
+          <p className="mt-1.5 line-clamp-2 text-xs font-black leading-4 text-stone-900">
+            {title}
+          </p>
+        </div>
+
+        <ArrowRight
+          size={15}
+          className="shrink-0 text-stone-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-700"
+          aria-hidden="true"
+        />
+      </Link>
+      <BookmarkButton
+        kind={isRecipe ? "recipe" : "grocery"}
+        slug={path.split("/").pop()}
+        title={title}
+        className="absolute right-2 top-2"
       />
-    </Link>
-    <BookmarkButton kind={isRecipe ? 'recipe' : 'grocery'} slug={path.split('/').pop()} title={title} className="absolute right-2 top-2" />
     </div>
   );
 }
@@ -1762,8 +1985,15 @@ export default function ProductDetailPage() {
     const track = galleryTrackRef.current;
     if (!track) return;
     const slides = Array.from(track.children);
-    const nextIndex = Math.max(0, Math.min(slides.length - 1, gallerySlideIndex + delta));
-    slides[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    const nextIndex = Math.max(
+      0,
+      Math.min(slides.length - 1, gallerySlideIndex + delta)
+    );
+    slides[nextIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "start",
+    });
     setGallerySlideIndex(nextIndex);
   };
 
@@ -2119,7 +2349,8 @@ export default function ProductDetailPage() {
       ];
 
   const imageCount = productGalleryItems.length;
-  const selectedProductPhoto = productImages[activeProductPhoto] || productImages[0] || null;
+  const selectedProductPhoto =
+    productImages[activeProductPhoto] || productImages[0] || null;
 
   const hasClaimsOrCertifications =
     product.claims?.length > 0 || product.certifications?.length > 0;
@@ -2132,10 +2363,16 @@ export default function ProductDetailPage() {
     <main className="ep-product-page min-h-screen bg-[#FDFDFA] text-[#202421]">
       <div className="mx-auto w-full max-w-[1480px] px-5 pb-14 pt-0 sm:px-9 lg:px-14">
         <div className="flex items-center justify-between gap-4 border-b border-[#E7E9E4] py-0.5">
-          <Link to="/grocery" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9">
+          <Link
+            to="/grocery"
+            className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9"
+          >
             <ArrowLeft size={17} aria-hidden="true" /> Back to Grocery
           </Link>
-          <a href="#ep-product-facts" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9">
+          <a
+            href="#ep-product-facts"
+            className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9"
+          >
             Product information <ArrowRight size={16} aria-hidden="true" />
           </a>
         </div>
@@ -2146,16 +2383,31 @@ export default function ProductDetailPage() {
               <div className="absolute left-5 top-6 z-10 text-xs font-semibold tracking-[0.08em] text-[#5C6A60] sm:left-8 sm:top-8">
                 {product.category?.name || "EPANTRY grocery"}
               </div>
-              <div ref={mobileHeroGalleryRef} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-6 pt-16 [scrollbar-width:thin] lg:hidden" aria-label="Swipe product images and details">
+              <div
+                ref={mobileHeroGalleryRef}
+                className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-6 pt-16 [scrollbar-width:thin] lg:hidden"
+                aria-label="Swipe product images and details"
+              >
                 {productGalleryItems.map((item, index) => (
                   <div
-                    key={item.type === "details" ? "mobile-product-details-sheet" : `mobile-${item.image?.url}-${index}`}
+                    key={
+                      item.type === "details"
+                        ? "mobile-product-details-sheet"
+                        : `mobile-${item.image?.url}-${index}`
+                    }
                     className="h-[340px] w-[88%] shrink-0 snap-center overflow-hidden border border-[#E4E8E0] bg-[#fffefa] sm:h-[470px]"
                   >
                     {item.type === "details" ? (
                       <ProductDetailsSheet product={product} />
                     ) : (
-                      <img {...publicImageProps(item.image.url, { widths: [480, 720, 960], sizes: "(max-width: 640px) 88vw, 45vw" })} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-5" />
+                      <img
+                        {...publicImageProps(item.image.url, {
+                          widths: [480, 720, 960],
+                          sizes: "(max-width: 640px) 88vw, 45vw",
+                        })}
+                        alt={item.image.alt || product.displayName}
+                        className="h-full w-full object-contain p-5"
+                      />
                     )}
                   </div>
                 ))}
@@ -2165,31 +2417,74 @@ export default function ProductDetailPage() {
                 onMouseMove={(event) => {
                   if (!selectedProductPhoto?.url) return;
                   const bounds = event.currentTarget.getBoundingClientRect();
-                  const x = Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100));
-                  const y = Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100));
-                  setZoomPreview({ url: selectedProductPhoto.url, alt: selectedProductPhoto.alt || product.displayName, x, y });
+                  const x = Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      ((event.clientX - bounds.left) / bounds.width) * 100
+                    )
+                  );
+                  const y = Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      ((event.clientY - bounds.top) / bounds.height) * 100
+                    )
+                  );
+                  setZoomPreview({
+                    url: selectedProductPhoto.url,
+                    alt: selectedProductPhoto.alt || product.displayName,
+                    x,
+                    y,
+                  });
                 }}
                 onMouseLeave={() => setZoomPreview(null)}
               >
                 {selectedProductPhoto?.url ? (
-                  <img {...publicImageProps(selectedProductPhoto.url, { widths: [640, 960, 1280], sizes: "(max-width: 1280px) 52vw, 48vw", priority: true })} alt={selectedProductPhoto.alt || product.displayName} className="h-full w-full object-contain drop-shadow-[0_15px_25px_rgba(20,54,42,0.10)] transition-opacity duration-300" />
+                  <img
+                    {...publicImageProps(selectedProductPhoto.url, {
+                      widths: [640, 960, 1280],
+                      sizes: "(max-width: 1280px) 52vw, 48vw",
+                      priority: true,
+                    })}
+                    alt={selectedProductPhoto.alt || product.displayName}
+                    className="h-full w-full object-contain drop-shadow-[0_15px_25px_rgba(20,54,42,0.10)] transition-opacity duration-300"
+                  />
                 ) : (
-                  <span className="flex flex-col items-center gap-3 text-[#849187]"><Package size={72} strokeWidth={1.1} aria-hidden="true" /><span className="text-sm">Product image not available</span></span>
+                  <span className="flex flex-col items-center gap-3 text-[#849187]">
+                    <Package size={72} strokeWidth={1.1} aria-hidden="true" />
+                    <span className="text-sm">Product image not available</span>
+                  </span>
                 )}
               </div>
               {productImages.length > 1 && (
                 <span className="pointer-events-none absolute bottom-7 left-7 z-10 hidden rounded-full border border-[#D2DED4] bg-white/90 px-3 py-1.5 text-[13px] font-semibold text-[#173F35] lg:block">
-                  {String(Math.min(activeProductPhoto, productImages.length - 1) + 1).padStart(2, "0")} / {String(productImages.length).padStart(2, "0")}
+                  {String(
+                    Math.min(activeProductPhoto, productImages.length - 1) + 1
+                  ).padStart(2, "0")}{" "}
+                  / {String(productImages.length).padStart(2, "0")}
                 </span>
               )}
-              <button type="button" onClick={() => setShowAllImages(true)} className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8">
+              <button
+                type="button"
+                onClick={() => setShowAllImages(true)}
+                className="focus-ring absolute bottom-5 right-5 z-10 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#D8DED4] bg-white/95 px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#173F35] sm:bottom-8 sm:right-8"
+              >
                 <ZoomIn size={17} aria-hidden="true" /> View gallery
               </button>
             </div>
-            <div className="flex items-center gap-2.5 overflow-x-auto border-b border-[#DDE6DB] py-3 sm:gap-3 sm:py-4 lg:h-[108px] lg:flex-none lg:py-2" role="group" aria-label="Select product photos or open the product information gallery">
+            <div
+              className="flex items-center gap-2.5 overflow-x-auto border-b border-[#DDE6DB] py-3 sm:gap-3 sm:py-4 lg:h-[108px] lg:flex-none lg:py-2"
+              role="group"
+              aria-label="Select product photos or open the product information gallery"
+            >
               {productGalleryItems.map((item, index) => (
                 <button
-                  key={item.type === "details" ? "product-facts-gallery-tile" : `product-tile-${item.image?.url}-${index}`}
+                  key={
+                    item.type === "details"
+                      ? "product-facts-gallery-tile"
+                      : `product-tile-${item.image?.url}-${index}`
+                  }
                   type="button"
                   onClick={() => {
                     if (item.type === "details") {
@@ -2200,7 +2495,11 @@ export default function ProductDetailPage() {
                       setZoomPreview(null);
                       const mobileTrack = mobileHeroGalleryRef.current;
                       const mobileSlide = mobileTrack?.children[index];
-                      if (mobileTrack && mobileSlide && window.innerWidth < 1024) {
+                      if (
+                        mobileTrack &&
+                        mobileSlide &&
+                        window.innerWidth < 1024
+                      ) {
                         mobileTrack.scrollTo({
                           left: mobileSlide.offsetLeft - mobileTrack.offsetLeft,
                           behavior: "smooth",
@@ -2208,23 +2507,54 @@ export default function ProductDetailPage() {
                       }
                     }
                   }}
-                  aria-pressed={item.type === "image" ? (index === 0 ? 0 : index - 1) === activeProductPhoto : undefined}
-                  className={`focus-ring flex h-[75px] w-[75px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border bg-[#FFFEFA] text-[#173F35] transition hover:border-[#173F35] sm:h-[88px] sm:w-[88px] ${item.type === "image" && (index === 0 ? 0 : index - 1) === activeProductPhoto ? "border-[#C86C42] ring-2 ring-[#C86C42]/30" : "border-[#DBDFD7]"}`}
-                  aria-label={item.type === "details" ? "Open full product information sheet" : `Show ${item.image?.alt || "product photograph"}`}
+                  aria-pressed={
+                    item.type === "image"
+                      ? (index === 0 ? 0 : index - 1) === activeProductPhoto
+                      : undefined
+                  }
+                  className={`focus-ring flex h-[75px] w-[75px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border bg-[#FFFEFA] text-[#173F35] transition hover:border-[#173F35] sm:h-[88px] sm:w-[88px] ${
+                    item.type === "image" &&
+                    (index === 0 ? 0 : index - 1) === activeProductPhoto
+                      ? "border-[#C86C42] ring-2 ring-[#C86C42]/30"
+                      : "border-[#DBDFD7]"
+                  }`}
+                  aria-label={
+                    item.type === "details"
+                      ? "Open full product information sheet"
+                      : `Show ${item.image?.alt || "product photograph"}`
+                  }
                 >
                   {item.type === "details" ? (
-                    <div className="flex h-full w-full flex-col overflow-hidden bg-[#FFFCF7] text-left" aria-hidden="true">
-                      <div className="bg-[#DDECE6] px-2 py-1.5 text-[8px] font-semibold tracking-wide text-[#174E49]">EPANTRY</div>
+                    <div
+                      className="flex h-full w-full flex-col overflow-hidden bg-[#FFFCF7] text-left"
+                      aria-hidden="true"
+                    >
+                      <div className="bg-[#DDECE6] px-2 py-1.5 text-[8px] font-semibold tracking-wide text-[#174E49]">
+                        EPANTRY
+                      </div>
                       <div className="flex flex-1 flex-col justify-center gap-1 px-2.5">
-                        <span className="line-clamp-2 text-[9px] font-semibold leading-tight text-[#173F35]">{product.displayName}</span>
+                        <span className="line-clamp-2 text-[9px] font-semibold leading-tight text-[#173F35]">
+                          {product.displayName}
+                        </span>
                         <span className="h-px bg-[#D6DDD5]" />
-                        <span className="text-[8px] text-[#617269]">{product.brand?.name || "Product"}</span>
+                        <span className="text-[8px] text-[#617269]">
+                          {product.brand?.name || "Product"}
+                        </span>
                         <span className="h-px bg-[#D6DDD5]" />
-                        <span className="text-[8px] text-[#617269]">{formatQuantity(product.netQuantity)}</span>
+                        <span className="text-[8px] text-[#617269]">
+                          {formatQuantity(product.netQuantity)}
+                        </span>
                       </div>
                     </div>
                   ) : (
-                    <img {...publicImageProps(item.image.url, { widths: [160, 320], sizes: "88px" })} alt={item.image.alt || product.displayName} className="h-full w-full object-contain p-1.5" />
+                    <img
+                      {...publicImageProps(item.image.url, {
+                        widths: [160, 320],
+                        sizes: "88px",
+                      })}
+                      alt={item.image.alt || product.displayName}
+                      className="h-full w-full object-contain p-1.5"
+                    />
                   )}
                 </button>
               ))}
@@ -2239,38 +2569,77 @@ export default function ProductDetailPage() {
             <h1 className="mt-5 max-w-[650px] break-words text-[38px] font-medium leading-[1.09] tracking-[-0.055em] text-[#202421] sm:text-[50px] xl:text-[clamp(44px,4.4vw,66px)]">
               {product.displayName}
             </h1>
-            {product.variant?.name && product.variant.name !== product.displayName && (
-              <p className="mt-2 text-xl font-medium text-[#6E806B] sm:text-2xl">{product.variant.name}</p>
-            )}
+            {product.variant?.name &&
+              product.variant.name !== product.displayName && (
+                <p className="mt-2 text-xl font-medium text-[#6E806B] sm:text-2xl">
+                  {product.variant.name}
+                </p>
+              )}
             <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-[#E0E6DF] py-4">
               {product.category?.name && (
-                <span className="text-[14px] font-medium text-[#34685C]">{product.category.name}</span>
+                <span className="text-[14px] font-medium text-[#34685C]">
+                  {product.category.name}
+                </span>
               )}
-              {product.category?.name && <span className="h-1 w-1 rounded-full bg-[#9CAEA5]" aria-hidden="true" />}
-              <span className="text-[16px] font-semibold text-[#202421]">{formatQuantity(product.netQuantity)}</span>
+              {product.category?.name && (
+                <span
+                  className="h-1 w-1 rounded-full bg-[#9CAEA5]"
+                  aria-hidden="true"
+                />
+              )}
+              <span className="text-[16px] font-semibold text-[#202421]">
+                {formatQuantity(product.netQuantity)}
+              </span>
               {product.pack?.name &&
                 product.pack.name !== product.displayName &&
                 String(product.pack.name).replace(/\s+/g, "").toLowerCase() !==
-                  String(formatQuantity(product.netQuantity)).replace(/\s+/g, "").toLowerCase() && (
-                  <span className="text-[14px] font-medium text-[#637267]">{product.pack.name}</span>
+                  String(formatQuantity(product.netQuantity))
+                    .replace(/\s+/g, "")
+                    .toLowerCase() && (
+                  <span className="text-[14px] font-medium text-[#637267]">
+                    {product.pack.name}
+                  </span>
                 )}
             </div>
-            {product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && <p className="mt-5 max-w-xl whitespace-pre-line text-[15px] leading-[1.75] text-[#495149] sm:text-base">{product.description}</p>}
-            {(!product.description || product.description.trim() === "Created through governed M14 NPI to M04 catalog handoff.") && product.ingredientDeclarationText && (
-              <p className="mt-5 max-w-xl text-[15px] leading-[1.75] text-[#495149] sm:text-base">{product.ingredientDeclarationText}</p>
-            )}
+            {product.description &&
+              product.description.trim() !==
+                "Created through governed M14 NPI to M04 catalog handoff." && (
+                <p className="mt-5 max-w-xl whitespace-pre-line text-[15px] leading-[1.75] text-[#495149] sm:text-base">
+                  {product.description}
+                </p>
+              )}
+            {(!product.description ||
+              product.description.trim() ===
+                "Created through governed M14 NPI to M04 catalog handoff.") &&
+              product.ingredientDeclarationText && (
+                <p className="mt-5 max-w-xl text-[15px] leading-[1.75] text-[#495149] sm:text-base">
+                  {product.ingredientDeclarationText}
+                </p>
+              )}
             {product.countryOfOrigin && (
-              <button type="button" onClick={() => setCountryPanelOpen(true)} className="focus-ring mt-7 inline-flex items-center gap-2 border-b border-[#C2CDC2] pb-2 text-sm font-medium text-[#173F35] transition hover:border-[#173F35]">
-                <span aria-hidden="true">{countryMeta.flag}</span> Origin: {product.countryOfOrigin} <ArrowRight size={15} aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => setCountryPanelOpen(true)}
+                className="focus-ring mt-7 inline-flex items-center gap-2 border-b border-[#C2CDC2] pb-2 text-sm font-medium text-[#173F35] transition hover:border-[#173F35]"
+              >
+                <span aria-hidden="true">{countryMeta.flag}</span> Origin:{" "}
+                {product.countryOfOrigin}{" "}
+                <ArrowRight size={15} aria-hidden="true" />
               </button>
             )}
             <div className="mt-10 sm:mt-12">
-              {product.isHostListing && !product.canonicalPackId
-                ? <HostListingPincodeCheck product={product} />
-                : <MarketplaceOffers product={product} />}
+              {product.isHostListing && !product.canonicalPackId ? (
+                <HostListingPincodeCheck product={product} />
+              ) : (
+                <MarketplaceOffers product={product} />
+              )}
             </div>
-            <a href="#ep-product-facts" className="focus-ring mt-8 inline-flex min-h-11 items-center gap-3 border-b border-[#173F35] text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42]">
-              See complete product details <ArrowRight size={17} aria-hidden="true" />
+            <a
+              href="#ep-product-facts"
+              className="focus-ring mt-8 inline-flex min-h-11 items-center gap-3 border-b border-[#173F35] text-sm font-semibold text-[#173F35] transition hover:text-[#C86C42]"
+            >
+              See complete product details{" "}
+              <ArrowRight size={17} aria-hidden="true" />
             </a>
           </div>
           {zoomPreview && (
@@ -2315,7 +2684,9 @@ export default function ProductDetailPage() {
                   </p>
                   <h2 className="mt-1 max-w-[240px] truncate text-lg font-bold text-[#202421] sm:font-black">
                     <span className="sm:hidden">{product.displayName}</span>
-                    <span className="hidden sm:inline">All images ({imageCount})</span>
+                    <span className="hidden sm:inline">
+                      All images ({imageCount})
+                    </span>
                   </h2>
                 </div>
 
@@ -2333,10 +2704,16 @@ export default function ProductDetailPage() {
                 <div
                   ref={galleryTrackRef}
                   onScroll={(event) => {
-                    if (window.matchMedia('(min-width: 640px)').matches) return;
+                    if (window.matchMedia("(min-width: 640px)").matches) return;
                     const track = event.currentTarget;
                     const width = track.clientWidth;
-                    if (width > 0) setGallerySlideIndex(Math.min(imageCount - 1, Math.max(0, Math.round(track.scrollLeft / width))));
+                    if (width > 0)
+                      setGallerySlideIndex(
+                        Math.min(
+                          imageCount - 1,
+                          Math.max(0, Math.round(track.scrollLeft / width))
+                        )
+                      );
                   }}
                   className="max-sm:flex max-sm:h-full max-sm:snap-x max-sm:snap-mandatory max-sm:gap-0 max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden sm:grid sm:auto-rows-auto sm:items-stretch sm:gap-4 sm:grid-cols-2"
                   aria-label="Product images and details, swipe horizontally"
@@ -2356,7 +2733,10 @@ export default function ProductDetailPage() {
                       >
                         <img
                           src={item.image.url}
-                          {...publicImageProps(item.image.url, { widths: [480, 720, 960, 1280], sizes: "(max-width: 640px) 94vw, 50vw" })}
+                          {...publicImageProps(item.image.url, {
+                            widths: [480, 720, 960, 1280],
+                            sizes: "(max-width: 640px) 94vw, 50vw",
+                          })}
                           alt={item.image.alt || product.displayName}
                           className="h-full w-full object-contain p-5 sm:p-8"
                         />
@@ -2368,15 +2748,34 @@ export default function ProductDetailPage() {
               <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#D7DDCF] bg-[#F7F6F2] px-4 py-2.5 sm:hidden">
                 <div className="min-w-0">
                   <span className="text-xs font-bold tracking-[0.08em] text-[#173F35]">
-                    {String(gallerySlideIndex + 1).padStart(2, '0')} / {String(imageCount).padStart(2, '0')}
+                    {String(gallerySlideIndex + 1).padStart(2, "0")} /{" "}
+                    {String(imageCount).padStart(2, "0")}
                   </span>
                   <p className="mt-0.5 text-xs text-[#69766C]">
-                    {productGalleryItems[gallerySlideIndex]?.type === 'details' ? 'Product information' : 'Product photo'}
+                    {productGalleryItems[gallerySlideIndex]?.type === "details"
+                      ? "Product information"
+                      : "Product photo"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => moveGallerySlide(-1)} disabled={gallerySlideIndex === 0} aria-label="Previous image" className="focus-ring grid size-10 place-items-center rounded-full border border-[#D7DDCF] bg-white text-[#173F35] disabled:opacity-35"><ArrowLeft size={19} /></button>
-                  <button type="button" onClick={() => moveGallerySlide(1)} disabled={gallerySlideIndex === imageCount - 1} aria-label="Next image" className="focus-ring grid size-10 place-items-center rounded-full border border-[#D7DDCF] bg-white text-[#173F35] disabled:opacity-35"><ArrowRight size={19} /></button>
+                  <button
+                    type="button"
+                    onClick={() => moveGallerySlide(-1)}
+                    disabled={gallerySlideIndex === 0}
+                    aria-label="Previous image"
+                    className="focus-ring grid size-10 place-items-center rounded-full border border-[#D7DDCF] bg-white text-[#173F35] disabled:opacity-35"
+                  >
+                    <ArrowLeft size={19} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveGallerySlide(1)}
+                    disabled={gallerySlideIndex === imageCount - 1}
+                    aria-label="Next image"
+                    className="focus-ring grid size-10 place-items-center rounded-full border border-[#D7DDCF] bg-white text-[#173F35] disabled:opacity-35"
+                  >
+                    <ArrowRight size={19} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -2491,20 +2890,39 @@ export default function ProductDetailPage() {
           embedded
         />
 
-        <section id="ep-product-facts" className="scroll-mt-20 border-t border-[#D7DBD3] pt-10 sm:pt-14">
+        <section
+          id="ep-product-facts"
+          className="scroll-mt-20 border-t border-[#D7DBD3] pt-10 sm:pt-14"
+        >
           <div className="grid gap-0 border-b border-[#DDE0D9] lg:grid-cols-[minmax(260px,0.64fr)_minmax(0,1.36fr)]">
             <div className="bg-[#E9E3F5] px-6 py-9 sm:px-9 sm:py-11">
-              <p className="text-sm font-semibold text-[#65567B]">01 / Product information</p>
-              <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#242638] sm:text-[42px]">Everything about<br />this product.</h2>
-              <p className="mt-5 max-w-sm text-[15px] leading-7 text-[#555268]">Published product facts, clearly presented. Information that has not been supplied is marked as not declared.</p>
+              <p className="text-sm font-semibold text-[#65567B]">
+                01 / Product information
+              </p>
+              <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#242638] sm:text-[42px]">
+                Everything about
+                <br />
+                this product.
+              </h2>
+              <p className="mt-5 max-w-sm text-[15px] leading-7 text-[#555268]">
+                Published product facts, clearly presented. Information that has
+                not been supplied is marked as not declared.
+              </p>
             </div>
             <div className="min-w-0 bg-[#FFFDF9] px-6 py-7 sm:px-9 sm:py-9">
-              {!product.isHostListing && product.description && product.description.trim() !== "Created through governed M14 NPI to M04 catalog handoff." && (
-                <div className="border-b border-[#DDE0D9] pb-7">
-                  <h3 className="text-lg font-semibold text-[#173F35]">About this product</h3>
-                  <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#4C554D]">{product.description}</p>
-                </div>
-              )}
+              {!product.isHostListing &&
+                product.description &&
+                product.description.trim() !==
+                  "Created through governed M14 NPI to M04 catalog handoff." && (
+                  <div className="border-b border-[#DDE0D9] pb-7">
+                    <h3 className="text-lg font-semibold text-[#173F35]">
+                      About this product
+                    </h3>
+                    <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#4C554D]">
+                      {product.description}
+                    </p>
+                  </div>
+                )}
               <dl className="grid gap-x-10 sm:grid-cols-2">
                 {[
                   ["Brand", product.brand?.name || "Not declared"],
@@ -2512,30 +2930,69 @@ export default function ProductDetailPage() {
                   ["Variant", product.variant?.name || "Not declared"],
                   ["Category", product.category?.name || "Not declared"],
                   ["Net quantity", formatQuantity(product.netQuantity)],
-                  ["Pack", product.pack?.name || product.pack?.type || "Not declared"],
+                  [
+                    "Pack",
+                    product.pack?.name || product.pack?.type || "Not declared",
+                  ],
                   ["Pack type", product.pack?.type || "Not declared"],
-                  ["Units per pack", product.pack?.multipackCount != null ? String(product.pack.multipackCount) : "Not declared"],
-                  ["Manufacturer / packer", product.manufacturerName || "Not declared"],
-                  ["Serving size", product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : product.servingSize || "Not declared"],
+                  [
+                    "Units per pack",
+                    product.pack?.multipackCount != null
+                      ? String(product.pack.multipackCount)
+                      : "Not declared",
+                  ],
+                  [
+                    "Manufacturer / packer",
+                    product.manufacturerName || "Not declared",
+                  ],
+                  [
+                    "Serving size",
+                    product.nutrition?.servingSize
+                      ? formatQuantity(product.nutrition.servingSize)
+                      : product.servingSize || "Not declared",
+                  ],
                 ].map(([label, value]) => (
-                  <div key={label} className="min-w-0 border-b border-[#DEE4DF] py-4">
-                    <dt className="text-[13px] font-medium text-[#737970]">{label}</dt>
-                    <dd className="mt-1 break-words text-base font-semibold text-[#202421]">{value}</dd>
+                  <div
+                    key={label}
+                    className="min-w-0 border-b border-[#DEE4DF] py-4"
+                  >
+                    <dt className="text-[13px] font-medium text-[#737970]">
+                      {label}
+                    </dt>
+                    <dd className="mt-1 break-words text-base font-semibold text-[#202421]">
+                      {value}
+                    </dd>
                   </div>
                 ))}
                 <div className="min-w-0 border-b border-[#DEE4DF] py-4">
-                  <dt className="text-[13px] font-medium text-[#737970]">Country of origin</dt>
+                  <dt className="text-[13px] font-medium text-[#737970]">
+                    Country of origin
+                  </dt>
                   <dd className="mt-1">
                     {product.countryOfOrigin ? (
-                      <button type="button" onClick={() => setCountryPanelOpen(true)} className="focus-ring inline-flex items-center gap-2 text-base font-semibold text-[#173F35] hover:underline">
-                        {countryMeta.flag} {product.countryOfOrigin} <ArrowRight size={16} aria-hidden="true" />
+                      <button
+                        type="button"
+                        onClick={() => setCountryPanelOpen(true)}
+                        className="focus-ring inline-flex items-center gap-2 text-base font-semibold text-[#173F35] hover:underline"
+                      >
+                        {countryMeta.flag} {product.countryOfOrigin}{" "}
+                        <ArrowRight size={16} aria-hidden="true" />
                       </button>
-                    ) : <span className="font-semibold">Not declared</span>}
+                    ) : (
+                      <span className="font-semibold">Not declared</span>
+                    )}
                   </dd>
                 </div>
                 <div className="min-w-0 border-b border-[#DEE4DF] py-4">
-                  <dt className="text-[13px] font-medium text-[#737970]">Barcode / GTIN</dt>
-                  <dd className="mt-2 min-w-0"><ProductBarcode value={product.gtin || product.barcode} compact /></dd>
+                  <dt className="text-[13px] font-medium text-[#737970]">
+                    Barcode / GTIN
+                  </dt>
+                  <dd className="mt-2 min-w-0">
+                    <ProductBarcode
+                      value={product.gtin || product.barcode}
+                      compact
+                    />
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -2544,8 +3001,12 @@ export default function ProductDetailPage() {
 
         <section className="grid min-w-0 items-stretch gap-6 pb-0 pt-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-8 sm:pt-10">
           <div className="min-w-0 bg-[#EAF2F6] px-5 py-8 sm:px-8 sm:py-10">
-            <p className="text-sm font-semibold text-[#476B7C]">02 / Ingredients &amp; safety</p>
-            <h2 className="mb-2 mt-3 text-[29px] font-semibold tracking-[-0.045em] text-[#1C454D] sm:text-[36px]">Ingredients & safety</h2>
+            <p className="text-sm font-semibold text-[#476B7C]">
+              02 / Ingredients &amp; safety
+            </p>
+            <h2 className="mb-2 mt-3 text-[29px] font-semibold tracking-[-0.045em] text-[#1C454D] sm:text-[36px]">
+              Ingredients & safety
+            </h2>
             <p className="mb-5 max-w-lg text-sm leading-6 text-[#51666A]">
               Product details, ingredients and dietary information in one place.
             </p>
@@ -2564,10 +3025,14 @@ export default function ProductDetailPage() {
                         </span>
                         <div>
                           <p className="text-[13px] font-black uppercase tracking-[0.12em] text-emerald-700">
-                            {product.isHostListing ? "Ingredient list" : "Ingredient declaration"}
+                            {product.isHostListing
+                              ? "Ingredient list"
+                              : "Ingredient declaration"}
                           </p>
                           <p className="mt-0.5 text-[13px] text-stone-500">
-                            {product.isHostListing ? "As provided for this product" : "Published ingredient details"}
+                            {product.isHostListing
+                              ? "As provided for this product"
+                              : "Published ingredient details"}
                           </p>
                         </div>
                       </div>
@@ -2598,7 +3063,10 @@ export default function ProductDetailPage() {
                             className="rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-sm font-bold text-stone-700 shadow-sm"
                           >
                             {ingredient.displayName || "Canonical ingredient"}
-                            {ingredient.percentage !== null && ingredient.percentage !== undefined ? ` · ${ingredient.percentage}%` : ""}
+                            {ingredient.percentage !== null &&
+                            ingredient.percentage !== undefined
+                              ? ` · ${ingredient.percentage}%`
+                              : ""}
                             {ingredient.notes ? ` · ${ingredient.notes}` : ""}
                           </span>
                         ))}
@@ -2656,7 +3124,11 @@ export default function ProductDetailPage() {
                 </div>
               </DetailCard>
 
-              <DetailCard title="Published claims & certifications" icon={BadgeCheck} description="Claims and certifications listed for this product">
+              <DetailCard
+                title="Published claims & certifications"
+                icon={BadgeCheck}
+                description="Claims and certifications listed for this product"
+              >
                 {hasClaimsOrCertifications ? (
                   <div className="flex flex-wrap gap-2">
                     {product.claims?.map((claim, index) => (
@@ -2680,7 +3152,9 @@ export default function ProductDetailPage() {
                           aria-hidden="true"
                         />
                         {certification.label || certification.key}
-                        {certification.certificateReference ? ` · ${certification.certificateReference}` : ""}
+                        {certification.certificateReference
+                          ? ` · ${certification.certificateReference}`
+                          : ""}
                       </span>
                     ))}
                   </div>
@@ -2697,10 +3171,13 @@ export default function ProductDetailPage() {
                 description="Allergens listed for this product"
               >
                 <div className="space-y-4">
-                  {product.allergenStatement && !(
+                  {product.allergenStatement &&
+                  !(
                     product.isHostListing &&
                     product.allergens?.length > 0 &&
-                    /^[\w\s-]+:\s*(?:declared|contains|may contain)$/i.test(String(product.allergenStatement).trim())
+                    /^[\w\s-]+:\s*(?:declared|contains|may contain)$/i.test(
+                      String(product.allergenStatement).trim()
+                    )
                   ) ? (
                     <div className="border-l-[3px] border-[#c77b42] bg-[#FFF1DF] px-5 py-4">
                       <div className="flex items-start gap-3">
@@ -2709,7 +3186,9 @@ export default function ProductDetailPage() {
                         </span>
                         <div className="min-w-0">
                           <p className="text-[13px] font-black uppercase tracking-[0.12em] text-amber-800">
-                            {product.isHostListing ? "Allergen statement" : "Package allergen statement"}
+                            {product.isHostListing
+                              ? "Allergen statement"
+                              : "Package allergen statement"}
                           </p>
                           <p className="mt-1.5 text-sm font-bold leading-5 text-stone-900">
                             {product.allergenStatement}
@@ -2721,7 +3200,9 @@ export default function ProductDetailPage() {
 
                   {product.allergens?.length > 0 ? (
                     <div>
-                      <p className="mb-2 text-[14px] font-semibold text-[#49685F]">Allergen details</p>
+                      <p className="mb-2 text-[14px] font-semibold text-[#49685F]">
+                        Allergen details
+                      </p>
 
                       <div className="grid gap-2 sm:grid-cols-2">
                         {product.allergens.map((allergen, index) => (
@@ -2733,7 +3214,9 @@ export default function ProductDetailPage() {
                               {allergen.allergenKey}
                             </span>
                             <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[13px] font-black uppercase tracking-wide text-stone-500 shadow-sm">
-                              {String(allergen.relationType || "Declared").replaceAll("_", " ")}
+                              {String(
+                                allergen.relationType || "Declared"
+                              ).replaceAll("_", " ")}
                             </span>
                           </div>
                         ))}
@@ -2761,12 +3244,20 @@ export default function ProductDetailPage() {
                     description="Vegetarian, vegan or non-vegetarian"
                   >
                     {(() => {
-                      const declared = String(product.hostSubmission?.dietary || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+                      const declared = String(
+                        product.hostSubmission?.dietary || ""
+                      )
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[\s-]+/g, "_");
                       const choices = {
-                        vegetarian: { label: 'Vegetarian', colour: '#16803D' },
-                        vegan: { label: 'Vegan', colour: '#16803D' },
-                        non_vegetarian: { label: 'Non-vegetarian', colour: '#8B3F27' },
-                        nonveg: { label: 'Non-vegetarian', colour: '#8B3F27' },
+                        vegetarian: { label: "Vegetarian", colour: "#16803D" },
+                        vegan: { label: "Vegan", colour: "#16803D" },
+                        non_vegetarian: {
+                          label: "Non-vegetarian",
+                          colour: "#8B3F27",
+                        },
+                        nonveg: { label: "Non-vegetarian", colour: "#8B3F27" },
                       };
                       const selected = choices[declared];
                       return (
@@ -2778,13 +3269,23 @@ export default function ProductDetailPage() {
                                 className="grid h-7 w-7 shrink-0 place-items-center rounded-[3px] border-[2px]"
                                 style={{ borderColor: selected.colour }}
                               >
-                                <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: selected.colour }} />
+                                <span
+                                  className="h-3.5 w-3.5 rounded-full"
+                                  style={{ backgroundColor: selected.colour }}
+                                />
                               </span>
                             ) : (
-                              <ShieldCheck className="text-[#718078]" size={24} aria-hidden="true" />
+                              <ShieldCheck
+                                className="text-[#718078]"
+                                size={24}
+                                aria-hidden="true"
+                              />
                             )}
                             <span className="text-[16px] font-semibold text-[#173F35]">
-                              {selected?.label || (declared === 'other' ? 'Other dietary preference' : 'Not declared')}
+                              {selected?.label ||
+                                (declared === "other"
+                                  ? "Other dietary preference"
+                                  : "Not declared")}
                             </span>
                           </div>
                         </div>
@@ -2799,15 +3300,25 @@ export default function ProductDetailPage() {
                   >
                     <dl className="divide-y divide-[#D2DED9] text-[15px]">
                       <div className="grid gap-1 py-3 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4">
-                        <dt className="font-semibold text-[#173F35]">Listing source</dt>
+                        <dt className="font-semibold text-[#173F35]">
+                          Listing source
+                        </dt>
                         <dd>Seller-supplied product details</dd>
                       </div>
                       <div className="grid gap-1 py-3 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4">
-                        <dt className="font-semibold text-[#173F35]">Nutrition reference</dt>
-                        <dd>{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : 'Not specified'}</dd>
+                        <dt className="font-semibold text-[#173F35]">
+                          Nutrition reference
+                        </dt>
+                        <dd>
+                          {product.nutrition?.basis
+                            ? productDetailLabel(product.nutrition.basis)
+                            : "Not specified"}
+                        </dd>
                       </div>
                       <div className="grid gap-1 py-3 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4">
-                        <dt className="font-semibold text-[#173F35]">Allergen source</dt>
+                        <dt className="font-semibold text-[#173F35]">
+                          Allergen source
+                        </dt>
                         <dd>Product listing</dd>
                       </div>
                     </dl>
@@ -2820,15 +3331,29 @@ export default function ProductDetailPage() {
                   >
                     <dl className="divide-y divide-[#D2DED9]">
                       <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-                        <dt className="font-semibold text-[#173F35]">Nutrition</dt>
-                        <dd>{product.nutrition?.nutrients?.length ? `${product.nutrition.nutrients.length} nutrients listed` : 'No values listed'}</dd>
+                        <dt className="font-semibold text-[#173F35]">
+                          Nutrition
+                        </dt>
+                        <dd>
+                          {product.nutrition?.nutrients?.length
+                            ? `${product.nutrition.nutrients.length} nutrients listed`
+                            : "No values listed"}
+                        </dd>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-                        <dt className="font-semibold text-[#173F35]">Allergens</dt>
-                        <dd>{product.allergens?.length ? `${product.allergens.length} allergen entries` : 'No entries listed'}</dd>
+                        <dt className="font-semibold text-[#173F35]">
+                          Allergens
+                        </dt>
+                        <dd>
+                          {product.allergens?.length
+                            ? `${product.allergens.length} allergen entries`
+                            : "No entries listed"}
+                        </dd>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-                        <dt className="font-semibold text-[#173F35]">Information provided by</dt>
+                        <dt className="font-semibold text-[#173F35]">
+                          Information provided by
+                        </dt>
                         <dd>Seller</dd>
                       </div>
                     </dl>
@@ -2846,11 +3371,33 @@ export default function ProductDetailPage() {
             </div>
           </div>
           <div className="min-w-0 h-full border-t-[3px] border-[#66557B] bg-[#F0EAF7] px-5 pb-6 pt-7 sm:px-8 sm:pb-9 sm:pt-9">
-            <p className="text-sm font-semibold text-[#355F4C]">03 / Nutrition</p>
-            <h2 className="mt-3 text-[28px] font-medium tracking-[-0.045em] text-[#202421] sm:text-4xl">Nutrition facts</h2>
+            <p className="text-sm font-semibold text-[#355F4C]">
+              03 / Nutrition
+            </p>
+            <h2 className="mt-3 text-[28px] font-medium tracking-[-0.045em] text-[#202421] sm:text-4xl">
+              Nutrition facts
+            </h2>
             <dl className="mt-6 grid grid-cols-2 gap-4 border-b border-[#CDD8CD] pb-5">
-              <div><dt className="text-[13px] font-medium text-[#6B776C]">Basis</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.basis ? productDetailLabel(product.nutrition.basis) : "Not declared"}</dd></div>
-              <div><dt className="text-[13px] font-medium text-[#6B776C]">Serving size</dt><dd className="mt-1 text-[15px] font-semibold text-[#202421]">{product.nutrition?.servingSize ? formatQuantity(product.nutrition.servingSize) : product.servingSize || "Not declared"}</dd></div>
+              <div>
+                <dt className="text-[13px] font-medium text-[#6B776C]">
+                  Basis
+                </dt>
+                <dd className="mt-1 text-[15px] font-semibold text-[#202421]">
+                  {product.nutrition?.basis
+                    ? productDetailLabel(product.nutrition.basis)
+                    : "Not declared"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[13px] font-medium text-[#6B776C]">
+                  Serving size
+                </dt>
+                <dd className="mt-1 text-[15px] font-semibold text-[#202421]">
+                  {product.nutrition?.servingSize
+                    ? formatQuantity(product.nutrition.servingSize)
+                    : product.servingSize || "Not declared"}
+                </dd>
+              </div>
             </dl>
             <div className="mt-4">
               {product.nutrition?.nutrients?.length > 0 ? (
@@ -2887,30 +3434,32 @@ export default function ProductDetailPage() {
 
         <div className="space-y-6">
           {(recommendationsLoading || frequentlyBought.length > 0) && (
-          <div className="bg-[#E6F0F4] px-5 py-8 sm:px-9 sm:py-10">
-          <ProductRecommendationShelf
-            eyebrow="More for your basket"
-            title="Frequently bought"
-            items={frequentlyBought}
-            loading={recommendationsLoading}
-            viewAllTo="/grocery"
-          />
-          </div>
+            <div className="bg-[#E6F0F4] px-5 py-8 sm:px-9 sm:py-10">
+              <ProductRecommendationShelf
+                eyebrow="More for your basket"
+                title="Frequently bought"
+                items={frequentlyBought}
+                loading={recommendationsLoading}
+                viewAllTo="/grocery"
+              />
+            </div>
           )}
           {(recommendationsLoading || similarProducts.length > 0) && (
-          <div className="bg-[#FBEDD9] px-5 py-8 sm:px-9 sm:py-10">
-          <ProductRecommendationShelf
-            eyebrow="Same shelf"
-            title="Similar products"
-            items={similarProducts}
-            loading={recommendationsLoading}
-            viewAllTo={
-              similarCategorySlug
-                ? `/grocery/category/${encodeURIComponent(similarCategorySlug)}`
-                : "/grocery"
-            }
-          />
-          </div>
+            <div className="bg-[#FBEDD9] px-5 py-8 sm:px-9 sm:py-10">
+              <ProductRecommendationShelf
+                eyebrow="Same shelf"
+                title="Similar products"
+                items={similarProducts}
+                loading={recommendationsLoading}
+                viewAllTo={
+                  similarCategorySlug
+                    ? `/grocery/category/${encodeURIComponent(
+                        similarCategorySlug
+                      )}`
+                    : "/grocery"
+                }
+              />
+            </div>
           )}
         </div>
       </div>

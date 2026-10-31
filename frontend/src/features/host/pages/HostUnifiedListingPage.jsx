@@ -1,34 +1,101 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, ChevronDown, ClipboardList, Download, FileSpreadsheet, ImagePlus, Plus, RefreshCw, Save, Send, Trash2, UploadCloud, ArrowUpRight, Package, Search } from 'lucide-react'
-import { useAuth } from '../../auth/context/AuthContext'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  ClipboardList,
+  Download,
+  FileSpreadsheet,
+  ImagePlus,
+  Plus,
+  RefreshCw,
+  Save,
+  Send,
+  Trash2,
+  UploadCloud,
+  ArrowUpRight,
+  Package,
+  Search,
+} from "lucide-react";
+import { useAuth } from "../../auth/context/AuthContext";
 
-import { listHospitalityOutlets, listHospitalityMenus } from '../../hospitality/services/hospitality.service'
 import {
-  listServiceAreas, listInventoryNodes, createInventoryNode,
-  createHostOffer, updateHostOffer, createHostPriceRule, createInventorySnapshots,
-  createServiceArea, getHostOfferReadiness, getHostEffectivePrice, getHostCurrentInventory, getPublicPackOffers, activateHostOffer,
-} from '../../marketplace/services/marketplace.service'
-import { listHostNpiDrafts } from '../../universalProduct/services/universalProduct.service'
-import { listHostRecipeListingHistory, listHostBrandRecipeSubmissions } from '../../hostOperations/services/hostOperations.service'
-import { normalizeHostWorkspaceType } from '../hostWorkspace.config'
-import { listHospitalityRestaurantRecipes } from '../../hospitality/services/hospitality.service'
-import { parseHostBulkWorkbook, ingestWorkbookImages } from '../utils/hostBulkWorkbook'
+  listHospitalityOutlets,
+  listHospitalityMenus,
+} from "../../hospitality/services/hospitality.service";
 import {
-  createHostListingPacket, deleteHostListingPacket, getHostListingPacket, importHostListingPackets, searchHostListingIngredients,
+  listServiceAreas,
+  listInventoryNodes,
+  createInventoryNode,
+  createHostOffer,
+  updateHostOffer,
+  createHostPriceRule,
+  createInventorySnapshots,
+  createServiceArea,
+  getHostOfferReadiness,
+  getHostEffectivePrice,
+  getHostCurrentInventory,
+  getPublicPackOffers,
+  activateHostOffer,
+} from "../../marketplace/services/marketplace.service";
+import { listHostNpiDrafts } from "../../universalProduct/services/universalProduct.service";
+import {
+  listHostRecipeListingHistory,
+  listHostBrandRecipeSubmissions,
+} from "../../hostOperations/services/hostOperations.service";
+import { normalizeHostWorkspaceType } from "../hostWorkspace.config";
+import { listHospitalityRestaurantRecipes } from "../../hospitality/services/hospitality.service";
+import {
+  parseHostBulkWorkbook,
+  ingestWorkbookImages,
+} from "../utils/hostBulkWorkbook";
+import {
+  createHostListingPacket,
+  deleteHostListingPacket,
+  getHostListingPacket,
+  importHostListingPackets,
+  searchHostListingIngredients,
   resubmitApprovedHostListingForSelling,
-  listHostListingPackets, listHostApprovedBrands, checkHostListingBarcode, searchHostPublishedProducts, getHostListingSellingReadiness, submitHostListingPacket, submitHostListingSectionRevision, updateHostListingPacket,
-  uploadHostListingImage, uploadHostListingVideo, importHostListingRemoteImage,
-} from '../services/hostUnifiedListing.service'
+  listHostListingPackets,
+  listHostApprovedBrands,
+  checkHostListingBarcode,
+  searchHostPublishedProducts,
+  getHostListingSellingReadiness,
+  submitHostListingPacket,
+  submitHostListingSectionRevision,
+  updateHostListingPacket,
+  uploadHostListingImage,
+  uploadHostListingVideo,
+  importHostListingRemoteImage,
+} from "../services/hostUnifiedListing.service";
 
 // Existing approved records keep their original governance and identifiers.
 // Management tools are mounted inside the one Host Listing Studio route until
 // their legacy records are safely migrated; no existing records are deleted.
-const LegacyListingManager = lazy(() => import('../components/LegacyListingManager'))
-const ProductEvidenceWorkspace = lazy(() => import('../../universalProduct/pages/HostNpiPage'))
-const BrandRecipeHistoryWorkspace = lazy(() => import('../../hostOperations/pages/HostOperationsPage'))
-const KitchenRecipeHistoryWorkspace = lazy(() => import('../../hospitality/pages/RestaurantRecipesPage'))
-const SellingHistoryWorkspace = lazy(() => import('../../listingHistory/pages/HostListingHistoryPage'))
+const LegacyListingManager = lazy(() =>
+  import("../components/LegacyListingManager")
+);
+const ProductEvidenceWorkspace = lazy(() =>
+  import("../../universalProduct/pages/HostNpiPage")
+);
+const BrandRecipeHistoryWorkspace = lazy(() =>
+  import("../../hostOperations/pages/HostOperationsPage")
+);
+const KitchenRecipeHistoryWorkspace = lazy(() =>
+  import("../../hospitality/pages/RestaurantRecipesPage")
+);
+const SellingHistoryWorkspace = lazy(() =>
+  import("../../listingHistory/pages/HostListingHistoryPage")
+);
 
 const editorialStyles = String.raw`
 /* EPANTRY host editor: isolated design. No global host/navbar/footer overrides. */
@@ -343,1239 +410,4278 @@ const editorialStyles = String.raw`
 @media(max-width:400px){.uel-ingredient-fields{grid-template-columns:1fr}.uel-ingredient-fields .uel-span-two{grid-column:1}.uel-custom-allergen-row{grid-template-columns:1fr}}
 
 @media (prefers-reduced-motion:reduce){.uel-page a,.uel-page button{transition:none!important}}
-`
+`;
 
 const styles = {
-  field: 'uel-input min-w-0 w-full rounded-lg border border-[#CBD4C8] bg-white px-3 py-2.5 text-[15px] text-[#202421] focus:outline-2 focus:outline-offset-1 focus:outline-[#173F35]',
-  label: 'uel-label block text-sm font-semibold text-[#202421]',
-  section: 'uel-section border-t border-[#D7DDCF] py-6 sm:py-8',
-  button: 'uel-action rounded-lg bg-[#173F35] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50',
-  secondary: 'uel-secondary rounded-lg border border-[#BAC7B8] px-4 py-2.5 text-sm font-semibold text-[#173F35] disabled:opacity-50',
-}
-const fields = ['energyKcal', 'proteinG', 'carbohydrateG', 'fatG', 'fiberG', 'sugarG', 'sodiumMg']
-const allergenNames = ['milk', 'egg', 'peanut', 'tree_nut', 'soy', 'wheat', 'sesame', 'fish', 'shellfish']
-const units = ['g', 'kg', 'ml', 'l', 'piece', 'tsp', 'tbsp', 'cup']
+  field:
+    "uel-input min-w-0 w-full rounded-lg border border-[#CBD4C8] bg-white px-3 py-2.5 text-[15px] text-[#202421] focus:outline-2 focus:outline-offset-1 focus:outline-[#173F35]",
+  label: "uel-label block text-sm font-semibold text-[#202421]",
+  section: "uel-section border-t border-[#D7DDCF] py-6 sm:py-8",
+  button:
+    "uel-action rounded-lg bg-[#173F35] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50",
+  secondary:
+    "uel-secondary rounded-lg border border-[#BAC7B8] px-4 py-2.5 text-sm font-semibold text-[#173F35] disabled:opacity-50",
+};
+const fields = [
+  "energyKcal",
+  "proteinG",
+  "carbohydrateG",
+  "fatG",
+  "fiberG",
+  "sugarG",
+  "sodiumMg",
+];
+const allergenNames = [
+  "milk",
+  "egg",
+  "peanut",
+  "tree_nut",
+  "soy",
+  "wheat",
+  "sesame",
+  "fish",
+  "shellfish",
+];
+const units = ["g", "kg", "ml", "l", "piece", "tsp", "tbsp", "cup"];
 // These are optional packaging/label photo categories, not additional required uploads.
 const groceryPhotoRoles = [
-  ['front_of_pack', 'Front of pack'],
-  ['ingredients_panel', 'Ingredients panel'],
-  ['allergen_statement', 'Allergen statement'],
-  ['nutrition_panel', 'Nutrition panel'],
-  ['barcode', 'Barcode'],
-  ['back_manufacturer_panel', 'Back / manufacturer panel'],
-  ['certification_mark', 'Certification mark'],
-]
-const groceryPhotoRoleLabels = Object.fromEntries(groceryPhotoRoles)
+  ["front_of_pack", "Front of pack"],
+  ["ingredients_panel", "Ingredients panel"],
+  ["allergen_statement", "Allergen statement"],
+  ["nutrition_panel", "Nutrition panel"],
+  ["barcode", "Barcode"],
+  ["back_manufacturer_panel", "Back / manufacturer panel"],
+  ["certification_mark", "Certification mark"],
+];
+const groceryPhotoRoleLabels = Object.fromEntries(groceryPhotoRoles);
 
 // The backend keeps category='grocery' for grocery catalog compatibility.
 // Its finer customer-facing product category is saved separately as grocerySubcategory.
 const categoryOptions = [
-  ['grocery', 'Grocery'], ['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['dinner', 'Dinner'],
-  ['snacks', 'Snacks'], ['drinks', 'Drinks'], ['sweets', 'Sweets'], ['desserts', 'Desserts'],
-  ['bakery', 'Bakery'], ['main_course', 'Main course'], ['side_dish', 'Side dish'], ['other', 'Other food'],
-]
+  ["grocery", "Grocery"],
+  ["breakfast", "Breakfast"],
+  ["lunch", "Lunch"],
+  ["dinner", "Dinner"],
+  ["snacks", "Snacks"],
+  ["drinks", "Drinks"],
+  ["sweets", "Sweets"],
+  ["desserts", "Desserts"],
+  ["bakery", "Bakery"],
+  ["main_course", "Main course"],
+  ["side_dish", "Side dish"],
+  ["other", "Other food"],
+];
 const groceryCategories = [
-  ['', 'Choose a grocery category'], ['vegetables', 'Vegetables & greens'],
-  ['fruits', 'Fruits'], ['dairy', 'Milk, dairy & cheese'], ['eggs', 'Eggs'],
-  ['meat_poultry', 'Meat & poultry'], ['seafood', 'Fish & seafood'],
-  ['grains_rice', 'Grains, rice & cereals'], ['pulses_legumes', 'Pulses, beans & lentils'],
-  ['spices_condiments', 'Spices, sauces & condiments'], ['oils_ghee', 'Cooking oil & ghee'],
-  ['canned_jarred', 'Canned & jarred food'], ['packaged_snacks', 'Packaged snacks'],
-  ['packaged_food', 'Other packaged food'], ['frozen_food', 'Frozen food'],
-  ['beverages', 'Beverages'], ['bakery_bread', 'Bread & bakery'], ['other_grocery', 'Other groceries'],
-]
+  ["", "Choose a grocery category"],
+  ["vegetables", "Vegetables & greens"],
+  ["fruits", "Fruits"],
+  ["dairy", "Milk, dairy & cheese"],
+  ["eggs", "Eggs"],
+  ["meat_poultry", "Meat & poultry"],
+  ["seafood", "Fish & seafood"],
+  ["grains_rice", "Grains, rice & cereals"],
+  ["pulses_legumes", "Pulses, beans & lentils"],
+  ["spices_condiments", "Spices, sauces & condiments"],
+  ["oils_ghee", "Cooking oil & ghee"],
+  ["canned_jarred", "Canned & jarred food"],
+  ["packaged_snacks", "Packaged snacks"],
+  ["packaged_food", "Other packaged food"],
+  ["frozen_food", "Frozen food"],
+  ["beverages", "Beverages"],
+  ["bakery_bread", "Bread & bakery"],
+  ["other_grocery", "Other groceries"],
+];
 const packagingOptions = [
-  ['', 'Choose packaging'], ['loose', 'Loose / unpackaged'], ['packet', 'Packet / pouch'],
-  ['can', 'Can / tin'], ['jar', 'Jar'], ['bottle', 'Bottle'], ['box', 'Box / carton'],
-  ['tray', 'Tray'], ['other', 'Other'],
-]
-const recipeCategories = [['brunch', 'Brunch'], ...categoryOptions.filter(([value]) => value !== 'grocery')]
+  ["", "Choose packaging"],
+  ["loose", "Loose / unpackaged"],
+  ["packet", "Packet / pouch"],
+  ["can", "Can / tin"],
+  ["jar", "Jar"],
+  ["bottle", "Bottle"],
+  ["box", "Box / carton"],
+  ["tray", "Tray"],
+  ["other", "Other"],
+];
+const recipeCategories = [
+  ["brunch", "Brunch"],
+  ...categoryOptions.filter(([value]) => value !== "grocery"),
+];
 const dietaryOptions = [
-  ['not_declared', 'Not declared'], ['vegetarian', 'Vegetarian'], ['vegan', 'Vegan'],
-  ['non_vegetarian', 'Non-vegetarian'], ['other', 'Other / mixed'],
-]
+  ["not_declared", "Not declared"],
+  ["vegetarian", "Vegetarian"],
+  ["vegan", "Vegan"],
+  ["non_vegetarian", "Non-vegetarian"],
+  ["other", "Other / mixed"],
+];
 const types = [
-  { value: 'grocery', label: 'Grocery / packaged food', allowed: ['b2b', 'brand_seller', 'hybrid', 'legacy'] },
-  { value: 'brand_recipe', label: 'Brand recipe', allowed: ['brand_seller', 'hybrid', 'legacy'] },
-  { value: 'kitchen_recipe', label: 'Kitchen recipe / drinks / sweets', allowed: ['b2b', 'chef_restaurant', 'hybrid', 'legacy'] },
-  { value: 'prepared_food', label: 'Ready-made food / menu item', allowed: ['b2b', 'chef_restaurant', 'hybrid', 'legacy'] },
-]
+  {
+    value: "grocery",
+    label: "Grocery / packaged food",
+    allowed: ["b2b", "brand_seller", "hybrid", "legacy"],
+  },
+  {
+    value: "brand_recipe",
+    label: "Brand recipe",
+    allowed: ["brand_seller", "hybrid", "legacy"],
+  },
+  {
+    value: "kitchen_recipe",
+    label: "Kitchen recipe / drinks / sweets",
+    allowed: ["b2b", "chef_restaurant", "hybrid", "legacy"],
+  },
+  {
+    value: "prepared_food",
+    label: "Ready-made food / menu item",
+    allowed: ["b2b", "chef_restaurant", "hybrid", "legacy"],
+  },
+];
 // Each template maps to one existing permitted Host listing type; special food
 // categories reuse kitchen_recipe rather than creating parallel databases.
 const bulkTemplates = [
-  { key: 'grocery', label: 'Grocery / packaged food', type: 'grocery' },
-  { key: 'brand_recipe', label: 'Brand recipe', type: 'brand_recipe' },
-  { key: 'kitchen_recipe', label: 'Kitchen recipe', type: 'kitchen_recipe' },
-  { key: 'prepared_food', label: 'Ready-made food / menu', type: 'prepared_food' },
-  { key: 'drinks', label: 'Drinks & beverages', type: 'kitchen_recipe' },
-  { key: 'sweets', label: 'Sweets', type: 'kitchen_recipe' },
-  { key: 'desserts', label: 'Desserts', type: 'kitchen_recipe' },
-  { key: 'bakery', label: 'Bakery', type: 'kitchen_recipe' },
-]
+  { key: "grocery", label: "Grocery / packaged food", type: "grocery" },
+  { key: "brand_recipe", label: "Brand recipe", type: "brand_recipe" },
+  { key: "kitchen_recipe", label: "Kitchen recipe", type: "kitchen_recipe" },
+  {
+    key: "prepared_food",
+    label: "Ready-made food / menu",
+    type: "prepared_food",
+  },
+  { key: "drinks", label: "Drinks & beverages", type: "kitchen_recipe" },
+  { key: "sweets", label: "Sweets", type: "kitchen_recipe" },
+  { key: "desserts", label: "Desserts", type: "kitchen_recipe" },
+  { key: "bakery", label: "Bakery", type: "kitchen_recipe" },
+];
 const historyFilters = [
-  ['all', 'All'], ['draft', 'Drafts'], ['submitted_for_review', 'In review'],
-  ['approved', 'Approved'], ['needs_attention', 'Needs attention'],
-]
+  ["all", "All"],
+  ["draft", "Drafts"],
+  ["submitted_for_review", "In review"],
+  ["approved", "Approved"],
+  ["needs_attention", "Needs attention"],
+];
 function listingStatusLabel(status) {
-  return ({ draft: 'Draft', submitted_for_review: 'In review', approved: 'Approved',
-    rejected: 'Not approved', changes_requested: 'Changes requested' })[status] || String(status || 'Unknown').replaceAll('_', ' ')
+  return (
+    {
+      draft: "Draft",
+      submitted_for_review: "In review",
+      approved: "Approved",
+      rejected: "Not approved",
+      changes_requested: "Changes requested",
+    }[status] || String(status || "Unknown").replaceAll("_", " ")
+  );
 }
 function listingUpdatedDate(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
+  if (!value) return "";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(d);
 }
-const emptyIngredient = () => ({ name: '', canonicalIngredientId: '', imageUrl: '', quantity: 1, unit: 'g', unitPrice: '', priceQuantity: 1, priceUnit: 'g', role: 'main', preparationState: '', scalingRule: 'proportional', note: '' })
-const emptyStep = () => ({ instruction: '', timerMinutes: '', imageUrl: '' })
-function newPacket(type = 'grocery') {
-  return {
-    type, title: '', description: '', category: type === 'grocery' ? 'grocery' : 'other', grocerySubcategory: '', packagingType: '', images: [], imageRoles: [], videoUrl: '', videoFileName: '',
-    brandName: '', sku: '', countryOfOrigin: '', regionOfOrigin: '', localRecipeName: '', localRecipeLanguage: '', englishNameReading: '',
-    productFamily: '', manufacturerPacker: '', unitsPerPack: '', servingSize: '', catalogProductVersionId: '', labelDeclaration: { ingredients: '', allergens: '', claims: '' }, cuisine: '', preparationMinutes: '', cookingMinutes: '', baseServings: 4, difficulty: 'not_declared', ingredients: [emptyIngredient()], steps: [emptyStep()],
-    nutrition: { basis: 'Per serving', evidenceNote: '' }, allergens: [], dietary: 'not_declared',
-    shareRecipe: type === 'brand_recipe' || type === 'kitchen_recipe', sellReadyMade: type === 'prepared_food',
-    selling: { listPrice: '', salePrice: '', stockQuantity: '', stockUnit: 'piece', packQuantity: '', packUnit: 'piece', minimumOrderQuantity: 1, maximumOrderQuantity: '', barcode: '', packagingCost: '', labourCost: '', outletId: '', menuId: '' },
-    delivery: { fulfillment: 'delivery', postalCodes: [], preparationMinutes: '', note: '' }, sourceNotes: '',
+const emptyIngredient = () => ({
+  name: "",
+  canonicalIngredientId: "",
+  imageUrl: "",
+  quantity: 1,
+  unit: "g",
+  unitPrice: "",
+  priceQuantity: 1,
+  priceUnit: "g",
+  role: "main",
+  preparationState: "",
+  scalingRule: "proportional",
+  note: "",
+});
+const emptyStep = () => ({ instruction: "", timerMinutes: "", imageUrl: "" });
+// Keep the optional Host barcode field aligned with the backend's GTIN checksum check.
+// An absent barcode is allowed; a supplied GTIN must identify an actual label code.
+function isValidHostBarcode(value) {
+  const digits = String(value ?? "").trim();
+  if (!/^(?:[0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14})$/.test(digits))
+    return false;
+  let sum = 0;
+  for (
+    let index = digits.length - 2, multiplier = 3;
+    index >= 0;
+    index -= 1, multiplier = multiplier === 3 ? 1 : 3
+  ) {
+    sum += Number(digits[index]) * multiplier;
   }
+  return (10 - (sum % 10)) % 10 === Number(digits[digits.length - 1]);
 }
-function formatMoney(value) { return value === null || value === undefined ? 'Not available' : `Rs ${Number(value).toFixed(2)}` }
+function newPacket(type = "grocery") {
+  return {
+    type,
+    title: "",
+    description: "",
+    category: type === "grocery" ? "grocery" : "other",
+    grocerySubcategory: "",
+    packagingType: "",
+    images: [],
+    imageRoles: [],
+    videoUrl: "",
+    videoFileName: "",
+    brandName: "",
+    sku: "",
+    countryOfOrigin: "",
+    regionOfOrigin: "",
+    localRecipeName: "",
+    localRecipeLanguage: "",
+    englishNameReading: "",
+    productFamily: "",
+    manufacturerPacker: "",
+    unitsPerPack: "",
+    servingSize: "",
+    catalogProductVersionId: "",
+    labelDeclaration: { ingredients: "", allergens: "", claims: "" },
+    cuisine: "",
+    preparationMinutes: "",
+    cookingMinutes: "",
+    baseServings: 4,
+    difficulty: "not_declared",
+    ingredients: [emptyIngredient()],
+    steps: [emptyStep()],
+    nutrition: { basis: "Per serving", evidenceNote: "" },
+    allergens: [],
+    dietary: "not_declared",
+    shareRecipe: type === "brand_recipe" || type === "kitchen_recipe",
+    sellReadyMade: type === "prepared_food",
+    selling: {
+      listPrice: "",
+      salePrice: "",
+      stockQuantity: "",
+      stockUnit: "piece",
+      packQuantity: "",
+      packUnit: "piece",
+      minimumOrderQuantity: 1,
+      maximumOrderQuantity: "",
+      barcode: "",
+      packagingCost: "",
+      labourCost: "",
+      outletId: "",
+      menuId: "",
+    },
+    delivery: {
+      fulfillment: "delivery",
+      postalCodes: [],
+      preparationMinutes: "",
+      note: "",
+    },
+    sourceNotes: "",
+  };
+}
+function formatMoney(value) {
+  return value === null || value === undefined
+    ? "Not available"
+    : `Rs ${Number(value).toFixed(2)}`;
+}
 function estimateCost(ingredient) {
-  const mass = { g: 1, kg: 1000 }
-  const volume = { ml: 1, l: 1000 }
-  const group = mass[ingredient.unit] && mass[ingredient.priceUnit] ? mass :
-    volume[ingredient.unit] && volume[ingredient.priceUnit] ? volume : null
-  const converted = group ? Number(ingredient.quantity) * group[ingredient.unit] / group[ingredient.priceUnit] :
-    ingredient.unit === ingredient.priceUnit ? Number(ingredient.quantity) : NaN
-  if (ingredient.unitPrice === '' || ingredient.unitPrice == null || ingredient.priceQuantity === '' || ingredient.priceQuantity == null || !Number(ingredient.priceQuantity) ||
-      !Number.isFinite(converted) || Number(ingredient.unitPrice) < 0) return null
-  return Math.round(converted / Number(ingredient.priceQuantity) * Number(ingredient.unitPrice) * 100) / 100
+  const mass = { g: 1, kg: 1000 };
+  const volume = { ml: 1, l: 1000 };
+  const group =
+    mass[ingredient.unit] && mass[ingredient.priceUnit]
+      ? mass
+      : volume[ingredient.unit] && volume[ingredient.priceUnit]
+      ? volume
+      : null;
+  const converted = group
+    ? (Number(ingredient.quantity) * group[ingredient.unit]) /
+      group[ingredient.priceUnit]
+    : ingredient.unit === ingredient.priceUnit
+    ? Number(ingredient.quantity)
+    : NaN;
+  if (
+    ingredient.unitPrice === "" ||
+    ingredient.unitPrice == null ||
+    ingredient.priceQuantity === "" ||
+    ingredient.priceQuantity == null ||
+    !Number(ingredient.priceQuantity) ||
+    !Number.isFinite(converted) ||
+    Number(ingredient.unitPrice) < 0
+  )
+    return null;
+  return (
+    Math.round(
+      (converted / Number(ingredient.priceQuantity)) *
+        Number(ingredient.unitPrice) *
+        100
+    ) / 100
+  );
 }
 function EditorField({ title, children }) {
-  return <label className="block min-w-0"><span className={`${styles.label} mb-1.5`}>{title}</span>{children}</label>
+  return (
+    <label className="block min-w-0">
+      <span className={`${styles.label} mb-1.5`}>{title}</span>
+      {children}
+    </label>
+  );
 }
 function IngredientNameInput({ ingredient, onChange, className }) {
-  const [matches, setMatches] = useState([])
-  const [searchError, setSearchError] = useState('')
+  const [matches, setMatches] = useState([]);
+  const [searchError, setSearchError] = useState("");
   useEffect(() => {
-    const query = String(ingredient.name || '').trim()
-    if (query.length < 2 || ingredient.canonicalIngredientId) { setMatches([]); return undefined }
-    let alive = true
+    const query = String(ingredient.name || "").trim();
+    if (query.length < 2 || ingredient.canonicalIngredientId) {
+      setMatches([]);
+      return undefined;
+    }
+    let alive = true;
     const timer = setTimeout(async () => {
       try {
-        const result = await searchHostListingIngredients({ search: query, limit: 6 })
-        if (alive) { setMatches(result?.ingredients || []); setSearchError('') }
-      } catch { if (alive) { setMatches([]); setSearchError('Catalog search is unavailable; enter the name manually for review.') } }
-    }, 250)
-    return () => { alive = false; clearTimeout(timer) }
-  }, [ingredient.name, ingredient.canonicalIngredientId])
-  return <div className="relative">
-    <input aria-label="Ingredient name" className={className} value={ingredient.name || ''} onChange={(event) => onChange({ name: event.target.value, canonicalIngredientId: '' })} placeholder="Search an EPANTRY ingredient" autoComplete="off"/>
-    {matches.length > 0 && <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#CBD4C8] bg-white shadow-lg">{matches.map((match) => <button type="button" key={match.id} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#EDF1E9]" onClick={() => {
-      onChange({ name: match.canonicalName, canonicalIngredientId: match.id, imageUrl: ingredient.canonicalIngredientId && ingredient.canonicalIngredientId !== match.id ? (match.imageUrl || '') : (ingredient.imageUrl || match.imageUrl || '') })
-      setMatches([])
-    }}>{match.imageUrl ? <img src={match.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" loading="lazy"/> : <span className="h-10 w-10 shrink-0 rounded-md bg-[#E8EEE6]" aria-hidden="true"/>}<span><span className="block font-semibold">{match.canonicalName}</span>{match.imageUrl && <span className="block text-xs text-[#557366]">EPANTRY photo available · no upload needed</span>}</span></button>)}</div>}
-    {ingredient.canonicalIngredientId && <p className="mt-1 text-xs text-[#173F35]">Matched with EPANTRY ingredient</p>}
-    {searchError && <p className="mt-1 text-xs text-[#9A4F31]">{searchError}</p>}
-  </div>
+        const result = await searchHostListingIngredients({
+          search: query,
+          limit: 6,
+        });
+        if (alive) {
+          setMatches(result?.ingredients || []);
+          setSearchError("");
+        }
+      } catch {
+        if (alive) {
+          setMatches([]);
+          setSearchError(
+            "Catalog search is unavailable; enter the name manually for review."
+          );
+        }
+      }
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [ingredient.name, ingredient.canonicalIngredientId]);
+  return (
+    <div className="relative">
+      <input
+        aria-label="Ingredient name"
+        className={className}
+        value={ingredient.name || ""}
+        onChange={(event) =>
+          onChange({ name: event.target.value, canonicalIngredientId: "" })
+        }
+        placeholder="Search an EPANTRY ingredient"
+        autoComplete="off"
+      />
+      {matches.length > 0 && (
+        <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#CBD4C8] bg-white shadow-lg">
+          {matches.map((match) => (
+            <button
+              type="button"
+              key={match.id}
+              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#EDF1E9]"
+              onClick={() => {
+                onChange({
+                  name: match.canonicalName,
+                  canonicalIngredientId: match.id,
+                  imageUrl:
+                    ingredient.canonicalIngredientId &&
+                    ingredient.canonicalIngredientId !== match.id
+                      ? match.imageUrl || ""
+                      : ingredient.imageUrl || match.imageUrl || "",
+                });
+                setMatches([]);
+              }}
+            >
+              {match.imageUrl ? (
+                <img
+                  src={match.imageUrl}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-md object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <span
+                  className="h-10 w-10 shrink-0 rounded-md bg-[#E8EEE6]"
+                  aria-hidden="true"
+                />
+              )}
+              <span>
+                <span className="block font-semibold">
+                  {match.canonicalName}
+                </span>
+                {match.imageUrl && (
+                  <span className="block text-xs text-[#557366]">
+                    EPANTRY photo available · no upload needed
+                  </span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {ingredient.canonicalIngredientId && (
+        <p className="mt-1 text-xs text-[#173F35]">
+          Matched with EPANTRY ingredient
+        </p>
+      )}
+      {searchError && (
+        <p className="mt-1 text-xs text-[#9A4F31]">{searchError}</p>
+      )}
+    </div>
+  );
 }
-
 
 // Existing images are referenced by URL, never re-uploaded or copied.
 // A Host can always replace or remove the suggested image.
-function IngredientPhotoPicker({ ingredient, index, uploadImage, uploading, onChange }) {
-  const [suggestion, setSuggestion] = useState(null)
+function IngredientPhotoPicker({
+  ingredient,
+  index,
+  uploadImage,
+  uploading,
+  onChange,
+}) {
+  const [suggestion, setSuggestion] = useState(null);
   useEffect(() => {
-    const name = String(ingredient.name || '').trim()
-    if (name.length < 2) { setSuggestion(null); return undefined }
-    let active = true
+    const name = String(ingredient.name || "").trim();
+    if (name.length < 2) {
+      setSuggestion(null);
+      return undefined;
+    }
+    let active = true;
     const timer = setTimeout(async () => {
       try {
-        const found = await searchHostListingIngredients({ search: name, limit: 12 })
-        const match = (found?.ingredients || []).find(entry =>
-          (ingredient.canonicalIngredientId && String(entry.id) === String(ingredient.canonicalIngredientId)) ||
-          String(entry.canonicalName || '').trim().toLowerCase() === name.toLowerCase() ||
-          (entry.aliases || []).some(alias => String(alias).trim().toLowerCase() === name.toLowerCase()),
-        )
-        if (active) setSuggestion(match?.imageUrl ? match : null)
-      } catch { if (active) setSuggestion(null) }
-    }, 420)
-    return () => { active = false; clearTimeout(timer) }
-  }, [ingredient.name, ingredient.canonicalIngredientId])
-  const existing = suggestion?.imageUrl || ''
-  const selected = Boolean(ingredient.imageUrl)
-  const usingSuggested = selected && Boolean(existing) && ingredient.imageUrl === existing
-  return <div className="flex min-w-0 flex-col gap-2">
-    {selected && <div className="flex items-center gap-3 rounded-lg border border-[#CBD4C8] bg-white p-2">
-      <img src={ingredient.imageUrl} alt={`${ingredient.name || 'Ingredient'} photo`} className="h-16 w-16 shrink-0 rounded-md object-cover" loading="lazy"/>
-      <span className="text-[13px] font-semibold text-[#173F35]">{usingSuggested ? 'Using EPANTRY photo — no new upload' : 'Selected ingredient photo'}</span>
-    </div>}
-    {existing && !usingSuggested && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#B9CFBE] bg-[#EDF4EB] p-2">
-      <img src={existing} alt={`${ingredient.name || 'Ingredient'} photo available in EPANTRY`} className="h-16 w-16 shrink-0 rounded-md object-cover" loading="lazy"/>
-      <div className="min-w-0 flex-1"><p className="text-[13px] font-semibold text-[#173F35]">EPANTRY photo available</p>
-        <p className="text-[12px] text-[#557366]">Use this photo without uploading it again.</p></div>
-      <button type="button" className="rounded-md border border-[#56806B] bg-white px-3 py-2 text-[13px] font-semibold text-[#173F35]" onClick={() => onChange({ imageUrl: existing, canonicalIngredientId: suggestion.id })}>Use existing photo</button>
-    </div>}
-    <div className="flex flex-wrap items-center gap-2">
-      <label className="inline-flex min-h-[46px] cursor-pointer items-center gap-2 rounded-lg border border-[#A3B5A4] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35]">
-        <ImagePlus size={17}/> {selected ? 'Upload my own photo' : 'Upload photo'}
-        <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" disabled={Boolean(uploading)} onChange={(event) => { uploadImage(event.target.files?.[0], 'ingredients', index); event.target.value = '' }}/>
-      </label>
-      {selected && <button type="button" onClick={() => onChange({ imageUrl: '' })} className="min-h-[46px] rounded-lg border border-[#D2B6A5] bg-[#FAF0E9] px-3 py-2 text-[13px] font-semibold text-[#7C4933]">Remove photo</button>}
+        const found = await searchHostListingIngredients({
+          search: name,
+          limit: 12,
+        });
+        const match = (found?.ingredients || []).find(
+          (entry) =>
+            (ingredient.canonicalIngredientId &&
+              String(entry.id) === String(ingredient.canonicalIngredientId)) ||
+            String(entry.canonicalName || "")
+              .trim()
+              .toLowerCase() === name.toLowerCase() ||
+            (entry.aliases || []).some(
+              (alias) =>
+                String(alias).trim().toLowerCase() === name.toLowerCase()
+            )
+        );
+        if (active) setSuggestion(match?.imageUrl ? match : null);
+      } catch {
+        if (active) setSuggestion(null);
+      }
+    }, 420);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [ingredient.name, ingredient.canonicalIngredientId]);
+  const existing = suggestion?.imageUrl || "";
+  const selected = Boolean(ingredient.imageUrl);
+  const usingSuggested =
+    selected && Boolean(existing) && ingredient.imageUrl === existing;
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      {selected && (
+        <div className="flex items-center gap-3 rounded-lg border border-[#CBD4C8] bg-white p-2">
+          <img
+            src={ingredient.imageUrl}
+            alt={`${ingredient.name || "Ingredient"} photo`}
+            className="h-16 w-16 shrink-0 rounded-md object-cover"
+            loading="lazy"
+          />
+          <span className="text-[13px] font-semibold text-[#173F35]">
+            {usingSuggested
+              ? "Using EPANTRY photo — no new upload"
+              : "Selected ingredient photo"}
+          </span>
+        </div>
+      )}
+      {existing && !usingSuggested && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#B9CFBE] bg-[#EDF4EB] p-2">
+          <img
+            src={existing}
+            alt={`${
+              ingredient.name || "Ingredient"
+            } photo available in EPANTRY`}
+            className="h-16 w-16 shrink-0 rounded-md object-cover"
+            loading="lazy"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-[#173F35]">
+              EPANTRY photo available
+            </p>
+            <p className="text-[12px] text-[#557366]">
+              Use this photo without uploading it again.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-md border border-[#56806B] bg-white px-3 py-2 text-[13px] font-semibold text-[#173F35]"
+            onClick={() =>
+              onChange({
+                imageUrl: existing,
+                canonicalIngredientId: suggestion.id,
+              })
+            }
+          >
+            Use existing photo
+          </button>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex min-h-[46px] cursor-pointer items-center gap-2 rounded-lg border border-[#A3B5A4] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35]">
+          <ImagePlus size={17} />{" "}
+          {selected ? "Upload my own photo" : "Upload photo"}
+          <input
+            className="sr-only"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={Boolean(uploading)}
+            onChange={(event) => {
+              uploadImage(event.target.files?.[0], "ingredients", index);
+              event.target.value = "";
+            }}
+          />
+        </label>
+        {selected && (
+          <button
+            type="button"
+            onClick={() => onChange({ imageUrl: "" })}
+            className="min-h-[46px] rounded-lg border border-[#D2B6A5] bg-[#FAF0E9] px-3 py-2 text-[13px] font-semibold text-[#7C4933]"
+          >
+            Remove photo
+          </button>
+        )}
+      </div>
     </div>
-  </div>
+  );
 }
-
 
 // This editor uses the existing Marketplace permission and readiness checks.
 // An approved Host packet is NOT itself an active offer or a published Pack.
 function HostListingSalesSetup({ listingId, readiness, listing, onUpdated }) {
-  const [nodes, setNodes] = useState([])
-  const [areas, setAreas] = useState([])
-  const [nodeId, setNodeId] = useState('')
-  const [newNodeName, setNewNodeName] = useState('')
-  const [price, setPrice] = useState('')
-  const [salePrice, setSalePrice] = useState('')
-  const [quantity, setQuantity] = useState('')
-  const [postalCodes, setPostalCodes] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState('')
-  const [error, setError] = useState('')
-  const [currentOfferId, setCurrentOfferId] = useState('')
-  const [offerState, setOfferState] = useState('')
-  const [checks, setChecks] = useState(null)
-  const [buyerCheck, setBuyerCheck] = useState(null)
-  const approvedListing = readiness?.approvedSelling || listing
-  const approved = Boolean(readiness?.approved && readiness?.catalogLinked && readiness?.packId)
-  const packId = readiness?.packId || ''
-  const enabled = approved && Boolean(listingId)
-  const activeOfferId = currentOfferId || readiness?.offerId || ''
-  const fail = (cause) => cause?.response?.data?.message || cause?.message || 'Could not update selling details.'
+  const [nodes, setNodes] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [nodeId, setNodeId] = useState("");
+  const [newNodeName, setNewNodeName] = useState("");
+  const [price, setPrice] = useState("");
+  const [salePrice, setSalePrice] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [postalCodes, setPostalCodes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [currentOfferId, setCurrentOfferId] = useState("");
+  const [offerState, setOfferState] = useState("");
+  const [checks, setChecks] = useState(null);
+  const [buyerCheck, setBuyerCheck] = useState(null);
+  const approvedListing = readiness?.approvedSelling || listing;
+  const approved = Boolean(
+    readiness?.approved && readiness?.catalogLinked && readiness?.packId
+  );
+  const packId = readiness?.packId || "";
+  const enabled = approved && Boolean(listingId);
+  const activeOfferId = currentOfferId || readiness?.offerId || "";
+  const fail = (cause) =>
+    cause?.response?.data?.message ||
+    cause?.message ||
+    "Could not update selling details.";
 
   useEffect(() => {
-    setPrice(approvedListing?.selling?.listPrice ?? '')
-    setSalePrice(approvedListing?.selling?.salePrice ?? '')
-    setQuantity(approvedListing?.selling?.stockQuantity ?? '')
-    setPostalCodes((approvedListing?.delivery?.postalCodes || []).join(', '))
-    setCurrentOfferId(''); setOfferState(''); setChecks(null); setBuyerCheck(null); setNotice(''); setError('')
-  }, [listingId])
+    setPrice(approvedListing?.selling?.listPrice ?? "");
+    setSalePrice(approvedListing?.selling?.salePrice ?? "");
+    setQuantity(approvedListing?.selling?.stockQuantity ?? "");
+    setPostalCodes((approvedListing?.delivery?.postalCodes || []).join(", "));
+    setCurrentOfferId("");
+    setOfferState("");
+    setChecks(null);
+    setBuyerCheck(null);
+    setNotice("");
+    setError("");
+  }, [listingId]);
   useEffect(() => {
-    if (!enabled) return undefined
-    let live = true
-    Promise.all([listInventoryNodes({ status: 'active', limit: 100 }), listServiceAreas({ status: 'active', limit: 100 })])
+    if (!enabled) return undefined;
+    let live = true;
+    Promise.all([
+      listInventoryNodes({ status: "active", limit: 100 }),
+      listServiceAreas({ status: "active", limit: 100 }),
+    ])
       .then(([inventory, coverage]) => {
-        if (!live) return
-        const nodeRows = inventory?.inventoryNodes || []
-        setNodes(nodeRows)
-        setAreas(coverage?.serviceAreas || [])
-        setNodeId(current => current || (nodeRows.length === 1 ? String(nodeRows[0].id || '') : ''))
-      }).catch(cause => { if (live) setError(fail(cause)) })
-    return () => { live = false }
-  }, [enabled, packId])
+        if (!live) return;
+        const nodeRows = inventory?.inventoryNodes || [];
+        setNodes(nodeRows);
+        setAreas(coverage?.serviceAreas || []);
+        setNodeId(
+          (current) =>
+            current ||
+            (nodeRows.length === 1 ? String(nodeRows[0].id || "") : "")
+        );
+      })
+      .catch((cause) => {
+        if (live) setError(fail(cause));
+      });
+    return () => {
+      live = false;
+    };
+  }, [enabled, packId]);
 
   // Load the REAL active Marketplace price and inventory, not the price/stock
   // originally typed into the approved listing packet. Never silently replace
   // Host-entered values when a brand-new offer is being created.
   useEffect(() => {
-    const existingOfferId = readiness?.offerId
-    if (!enabled || !existingOfferId) return undefined
-    let live = true
-    Promise.all([getHostEffectivePrice(existingOfferId), getHostCurrentInventory(existingOfferId)])
+    const existingOfferId = readiness?.offerId;
+    if (!enabled || !existingOfferId) return undefined;
+    let live = true;
+    Promise.all([
+      getHostEffectivePrice(existingOfferId),
+      getHostCurrentInventory(existingOfferId),
+    ])
       .then(([effective, inventory]) => {
-        if (!live) return
-        const rule = effective?.priceRule
-        if (rule?.listPrice?.amountMinor != null) setPrice(String(rule.listPrice.amountMinor / 100))
-        if (rule) setSalePrice(rule.salePrice?.amountMinor == null ? '' : String(rule.salePrice.amountMinor / 100))
-        const rows = inventory?.inventory || []
+        if (!live) return;
+        const rule = effective?.priceRule;
+        if (rule?.listPrice?.amountMinor != null)
+          setPrice(String(rule.listPrice.amountMinor / 100));
+        if (rule)
+          setSalePrice(
+            rule.salePrice?.amountMinor == null
+              ? ""
+              : String(rule.salePrice.amountMinor / 100)
+          );
+        const rows = inventory?.inventory || [];
         if (rows.length === 1) {
-          setNodeId(String(rows[0].inventoryNodeId || ''))
-          setQuantity(String(rows[0].availableQuantity ?? ''))
+          setNodeId(String(rows[0].inventoryNodeId || ""));
+          setQuantity(String(rows[0].availableQuantity ?? ""));
         }
       })
-      .catch(cause => { if (live) setError(fail(cause)) })
-    return () => { live = false }
-  }, [enabled, readiness?.offerId, listingId])
+      .catch((cause) => {
+        if (live) setError(fail(cause));
+      });
+    return () => {
+      live = false;
+    };
+  }, [enabled, readiness?.offerId, listingId]);
 
   async function refreshChecks(id) {
-    const result = await getHostOfferReadiness(id)
-    setChecks(result?.readiness || result || null)
-    return result
+    const result = await getHostOfferReadiness(id);
+    setChecks(result?.readiness || result || null);
+    return result;
   }
 
   // The public offer endpoint is the same verified Pack/price/stock/coverage
   // gate Customer Product Detail uses. An active draft is NOT proof of visibility.
   async function checkCustomerVisibility(offerId, pins) {
-    const code = pins[0]
+    const code = pins[0];
     if (!code) {
-      setBuyerCheck({ visible: false, message: 'Add a service PIN to check customer availability.' })
-      return false
+      setBuyerCheck({
+        visible: false,
+        message: "Add a service PIN to check customer availability.",
+      });
+      return false;
     }
     try {
-      const mode = approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
-      const result = await getPublicPackOffers({ packId, pincode: code, fulfillmentType: mode })
-      const publicOffer = (result?.offers || []).find(item => String(item.id) === String(offerId))
+      const mode =
+        approvedListing?.delivery?.fulfillment === "pickup"
+          ? "pickup"
+          : "delivery";
+      const result = await getPublicPackOffers({
+        packId,
+        pincode: code,
+        fulfillmentType: mode,
+      });
+      const publicOffer = (result?.offers || []).find(
+        (item) => String(item.id) === String(offerId)
+      );
       const message = publicOffer
         ? `Customers in ${code} can see your verified ${mode} offer, subject to checkout checks.`
-        : `Your offer is not available to customers in ${code}. Check stock, price, business status and service coverage.`
-      setBuyerCheck({ visible: Boolean(publicOffer), message })
-      return Boolean(publicOffer)
+        : `Your offer is not available to customers in ${code}. Check stock, price, business status and service coverage.`;
+      setBuyerCheck({ visible: Boolean(publicOffer), message });
+      return Boolean(publicOffer);
     } catch {
-      setBuyerCheck({ visible: false, message: 'Customer visibility could not be verified right now. Please check again.' })
-      return false
+      setBuyerCheck({
+        visible: false,
+        message:
+          "Customer visibility could not be verified right now. Please check again.",
+      });
+      return false;
     }
   }
 
   async function saveSelling() {
-    setError(''); setNotice('')
-    const list = Number(price), sale = salePrice === '' ? null : Number(salePrice)
-    const stock = quantity.trim() === '' ? NaN : Number(quantity)
-    if (!Number.isFinite(list) || Math.round(list * 100) < 1 || (sale !== null && (!Number.isFinite(sale) || Math.round(sale * 100) < 1 || sale > list))) {
-      setError('Enter a valid list price and a selling price no higher than the list price.'); return
+    setError("");
+    setNotice("");
+    const list = Number(price),
+      sale = salePrice === "" ? null : Number(salePrice);
+    const stock = quantity.trim() === "" ? NaN : Number(quantity);
+    if (
+      !Number.isFinite(list) ||
+      Math.round(list * 100) < 1 ||
+      (sale !== null &&
+        (!Number.isFinite(sale) || Math.round(sale * 100) < 1 || sale > list))
+    ) {
+      setError(
+        "Enter a valid list price and a selling price no higher than the list price."
+      );
+      return;
     }
-    if ([list, sale].some(value => value !== null && Math.abs(value * 100 - Math.round(value * 100)) > 0.000001)) {
-      setError('Enter prices with no more than two decimal places.'); return
+    if (
+      [list, sale].some(
+        (value) =>
+          value !== null &&
+          Math.abs(value * 100 - Math.round(value * 100)) > 0.000001
+      )
+    ) {
+      setError("Enter prices with no more than two decimal places.");
+      return;
     }
-    if (!Number.isSafeInteger(stock) || stock < 0) { setError('Enter available stock as a whole number.'); return }
-    if (!nodeId && !newNodeName.trim()) { setError('Select your stock location or enter a new one.'); return }
-    const codes = [...new Set(postalCodes.split(/[\s,;]+/).map(value => value.trim()).filter(Boolean))]
-    if (!codes.length || codes.some(value => !/^[1-9][0-9]{5}$/.test(value))) {
-      setError('Enter the six-digit pincodes covered by this offer.'); return
+    if (!Number.isSafeInteger(stock) || stock < 0) {
+      setError("Enter available stock as a whole number.");
+      return;
     }
-    setBusy(true)
+    if (!nodeId && !newNodeName.trim()) {
+      setError("Select your stock location or enter a new one.");
+      return;
+    }
+    const codes = [
+      ...new Set(
+        postalCodes
+          .split(/[\s,;]+/)
+          .map((value) => value.trim())
+          .filter(Boolean)
+      ),
+    ];
+    if (
+      !codes.length ||
+      codes.some((value) => !/^[1-9][0-9]{5}$/.test(value))
+    ) {
+      setError("Enter the six-digit pincodes covered by this offer.");
+      return;
+    }
+    setBusy(true);
     try {
-      let offerId = activeOfferId
+      let offerId = activeOfferId;
       // Create is always draft. Marketplace enforces unique Pack and Host ownership.
       if (!offerId) {
-        const created = await createHostOffer({ packId, fulfillmentTypes: [approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'],
-          minimumOrderQuantity: Math.max(1, Number(approvedListing?.selling?.minimumOrderQuantity) || 1),
-          maximumOrderQuantity: approvedListing?.selling?.maximumOrderQuantity ? Number(approvedListing.selling.maximumOrderQuantity) : null })
-        offerId = String(created?.offer?.id || created?.offer?._id || '')
-        if (!offerId) throw new Error('The offer was created, but the offer ID could not be read. Refresh before trying again.')
-        setCurrentOfferId(offerId)
+        const created = await createHostOffer({
+          packId,
+          fulfillmentTypes: [
+            approvedListing?.delivery?.fulfillment === "pickup"
+              ? "pickup"
+              : "delivery",
+          ],
+          minimumOrderQuantity: Math.max(
+            1,
+            Number(approvedListing?.selling?.minimumOrderQuantity) || 1
+          ),
+          maximumOrderQuantity: approvedListing?.selling?.maximumOrderQuantity
+            ? Number(approvedListing.selling.maximumOrderQuantity)
+            : null,
+        });
+        offerId = String(created?.offer?.id || created?.offer?._id || "");
+        if (!offerId)
+          throw new Error(
+            "The offer was created, but the offer ID could not be read. Refresh before trying again."
+          );
+        setCurrentOfferId(offerId);
       }
       // Reconcile this approved listing's fulfillment method with its offer.
       // Existing Marketplace ownership and canonical Pack checks are enforced.
       if (activeOfferId) {
         await updateHostOffer(offerId, {
-          fulfillmentTypes: [approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'],
-        })
+          fulfillmentTypes: [
+            approvedListing?.delivery?.fulfillment === "pickup"
+              ? "pickup"
+              : "delivery",
+          ],
+        });
       }
-      let selectedNodeId = nodeId
+      let selectedNodeId = nodeId;
       if (!selectedNodeId) {
-        const newNode = await createInventoryNode({ name: newNodeName.trim(), nodeType: 'warehouse' })
-        selectedNodeId = String(newNode?.inventoryNode?.id || newNode?.inventoryNode?._id || '')
-        if (!selectedNodeId) throw new Error('Stock location could not be confirmed. Refresh your stock locations.')
-        setNodeId(selectedNodeId)
-        setNodes(previous => [...previous, { id: selectedNodeId, name: newNodeName.trim(), status: 'active' }])
+        const newNode = await createInventoryNode({
+          name: newNodeName.trim(),
+          nodeType: "warehouse",
+        });
+        selectedNodeId = String(
+          newNode?.inventoryNode?.id || newNode?.inventoryNode?._id || ""
+        );
+        if (!selectedNodeId)
+          throw new Error(
+            "Stock location could not be confirmed. Refresh your stock locations."
+          );
+        setNodeId(selectedNodeId);
+        setNodes((previous) => [
+          ...previous,
+          { id: selectedNodeId, name: newNodeName.trim(), status: "active" },
+        ]);
       }
       // Never reset reserved inventory to zero when updating existing stock.
       // Marketplace snapshots represent total on-hand units and outstanding
       // reservations. Preserve the last reservation quantity at this location.
-      const inventory = await getHostCurrentInventory(offerId)
-      const previous = (inventory?.inventory || []).find(row => String(row.inventoryNodeId) === String(selectedNodeId))
-      const reservedQuantity = Number(previous?.reservedQuantity || 0)
-      if (!Number.isSafeInteger(reservedQuantity) || reservedQuantity < 0 || stock < reservedQuantity) {
-        throw new Error(`On-hand stock cannot be lower than ${reservedQuantity} reserved units. Update your reservations before reducing stock.`)
+      const inventory = await getHostCurrentInventory(offerId);
+      const previous = (inventory?.inventory || []).find(
+        (row) => String(row.inventoryNodeId) === String(selectedNodeId)
+      );
+      const reservedQuantity = Number(previous?.reservedQuantity || 0);
+      if (
+        !Number.isSafeInteger(reservedQuantity) ||
+        reservedQuantity < 0 ||
+        stock < reservedQuantity
+      ) {
+        throw new Error(
+          `On-hand stock cannot be lower than ${reservedQuantity} reserved units. Update your reservations before reducing stock.`
+        );
       }
-      const listMinor = Math.round(list * 100)
-      const saleMinor = sale === null ? null : Math.round(sale * 100)
+      const listMinor = Math.round(list * 100);
+      const saleMinor = sale === null ? null : Math.round(sale * 100);
       await createHostPriceRule(offerId, {
-        listPrice: { amountMinor: listMinor, currency: 'INR' },
-        salePrice: saleMinor === null ? null : { amountMinor: saleMinor, currency: 'INR' },
-        effectiveFrom: new Date().toISOString(), effectiveTo: null, source: 'manual',
-        changeReason: 'Host updated the listing selling price',
-      })
-      await createInventorySnapshots([{
-        offerId, inventoryNodeId: selectedNodeId, availableQuantity: stock, reservedQuantity,
-        sourceType: 'manual', sourceReference: `listing:${listingId}`,
-      }])
+        listPrice: { amountMinor: listMinor, currency: "INR" },
+        salePrice:
+          saleMinor === null
+            ? null
+            : { amountMinor: saleMinor, currency: "INR" },
+        effectiveFrom: new Date().toISOString(),
+        effectiveTo: null,
+        source: "manual",
+        changeReason: "Host updated the listing selling price",
+      });
+      await createInventorySnapshots([
+        {
+          offerId,
+          inventoryNodeId: selectedNodeId,
+          availableQuantity: stock,
+          reservedQuantity,
+          sourceType: "manual",
+          sourceReference: `listing:${listingId}`,
+        },
+      ]);
       {
-        const fulfillmentType = approvedListing?.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
-        const coverage = areas.find(area => area.status === 'active' &&
-          (!area.inventoryNodeId || String(area.inventoryNodeId) === selectedNodeId) &&
-          codes.every(code => (area.postalCodes || []).includes(code)) && (area.fulfillmentTypes || []).includes(fulfillmentType))
+        const fulfillmentType =
+          approvedListing?.delivery?.fulfillment === "pickup"
+            ? "pickup"
+            : "delivery";
+        const coverage = areas.find(
+          (area) =>
+            area.status === "active" &&
+            (!area.inventoryNodeId ||
+              String(area.inventoryNodeId) === selectedNodeId) &&
+            codes.every((code) => (area.postalCodes || []).includes(code)) &&
+            (area.fulfillmentTypes || []).includes(fulfillmentType)
+        );
         if (!coverage) {
           // Never edit another item's delivery areas or silently widen their coverage.
           const result = await createServiceArea({
-            name: `Service for ${listingId.slice(-8)} (${selectedNodeId.slice(-6)})`,
-            inventoryNodeId: selectedNodeId, postalCodes: codes, fulfillmentTypes: [fulfillmentType],
-          })
-          if (result?.serviceArea) setAreas(previous => [...previous, result.serviceArea])
+            name: `Service for ${listingId.slice(-8)} (${selectedNodeId.slice(
+              -6
+            )})`,
+            inventoryNodeId: selectedNodeId,
+            postalCodes: codes,
+            fulfillmentTypes: [fulfillmentType],
+          });
+          if (result?.serviceArea)
+            setAreas((previous) => [...previous, result.serviceArea]);
         }
       }
-      const latest = await refreshChecks(offerId)
-      const isActive = offerState === 'active' || readiness?.offerStatus === 'active'
-      if (isActive) await checkCustomerVisibility(offerId, codes)
-      else setBuyerCheck(null)
-      setNotice(isActive ? 'Selling details saved. Customer availability is checked separately.' : 'Selling details saved. Activate your offer when ready.')
-      setOfferState(isActive ? 'active' : 'draft')
-      onUpdated?.()
+      const latest = await refreshChecks(offerId);
+      const isActive =
+        offerState === "active" || readiness?.offerStatus === "active";
+      if (isActive) await checkCustomerVisibility(offerId, codes);
+      else setBuyerCheck(null);
+      setNotice(
+        isActive
+          ? "Selling details saved. Customer availability is checked separately."
+          : "Selling details saved. Activate your offer when ready."
+      );
+      setOfferState(isActive ? "active" : "draft");
+      onUpdated?.();
     } catch (cause) {
-      setError(`${fail(cause)} Any earlier saved changes remain in your Marketplace record. Check the status before retrying.`)
-    } finally { setBusy(false) }
+      setError(
+        `${fail(
+          cause
+        )} Any earlier saved changes remain in your Marketplace record. Check the status before retrying.`
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function activateSelling() {
-    if (!activeOfferId) return
-    setBusy(true); setError(''); setNotice('')
+    if (!activeOfferId) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      await activateHostOffer(activeOfferId)
-      setOfferState('active')
-      await refreshChecks(activeOfferId)
-      const codes = [...new Set(postalCodes.split(/[\s,;]+/).map(value => value.trim()).filter(Boolean))]
-      await checkCustomerVisibility(activeOfferId, codes)
-      setNotice('Your offer is active. Customer availability depends on verified stock, price and service coverage.')
-      onUpdated?.()
-    } catch (cause) { setError(fail(cause)) }
-    finally { setBusy(false) }
+      await activateHostOffer(activeOfferId);
+      setOfferState("active");
+      await refreshChecks(activeOfferId);
+      const codes = [
+        ...new Set(
+          postalCodes
+            .split(/[\s,;]+/)
+            .map((value) => value.trim())
+            .filter(Boolean)
+        ),
+      ];
+      await checkCustomerVisibility(activeOfferId, codes);
+      setNotice(
+        "Your offer is active. Customer availability depends on verified stock, price and service coverage."
+      );
+      onUpdated?.();
+    } catch (cause) {
+      setError(fail(cause));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (!listingId || !readiness?.approved) return null
-  return <section className="mb-4 border border-[#CAD8CC] bg-[#F3F5F0] p-4" aria-label="Sell this listing">
-    <h3 className="text-lg font-semibold text-[#173F35]">Price, stock & selling</h3>
-    {!enabled ? <p className="mt-1 text-sm">{readiness?.message || 'A published catalog match is required before this item can be sold.'}</p> : <>
-      <p className="mt-1 text-sm">Manage this product here. Only an active, approved offer can be purchased.</p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <EditorField title="List price (₹)"><input className={styles.field} type="number" min="0.01" step="0.01" value={price} onChange={e => setPrice(e.target.value)}/></EditorField>
-        <EditorField title="Selling price (₹, optional)"><input className={styles.field} type="number" min="0.01" step="0.01" value={salePrice} onChange={e => setSalePrice(e.target.value)}/></EditorField>
-        <EditorField title="Available stock (units)"><input className={styles.field} type="number" min="0" step="1" value={quantity} onChange={e => setQuantity(e.target.value)}/></EditorField>
-        <EditorField title="Stock location"><select className={styles.field} value={nodeId} onChange={e => setNodeId(e.target.value)}>
-          <option value="">Add a stock location</option>
-          {nodes.filter(item => item.status === 'active').map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select></EditorField>
-        {!nodeId && <EditorField title="New stock location name"><input className={styles.field} value={newNodeName} onChange={e => setNewNodeName(e.target.value)} placeholder="Your store or kitchen"/></EditorField>}
-        <EditorField title="Service pincodes"><input className={styles.field} value={postalCodes} onChange={e => setPostalCodes(e.target.value)} placeholder="110001, 110002"/></EditorField>
-      </div>
-      {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
-      {notice && <p role="status" className="mt-3 text-sm text-[#173F35]">{notice}</p>}
-      {checks && <p className="mt-3 text-sm">{checks?.ready ? 'Ready to activate.' : 'Some selling checks still need attention.'}</p>}
-      {buyerCheck && <p role="status" className="mt-3 text-sm">{buyerCheck.message}</p>}
-      {activeOfferId && (offerState === 'active' || readiness?.offerStatus === 'active') &&
-        <button type="button" className={`${styles.secondary} mt-3`} disabled={busy} onClick={() => checkCustomerVisibility(activeOfferId, [...new Set(postalCodes.split(/[\s,;]+/).filter(Boolean))])}>Check customer availability</button>}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className={styles.secondary} disabled={busy} onClick={saveSelling}>{busy ? 'Saving…' : 'Save selling details'}</button>
-        {activeOfferId && <button type="button" className={styles.button} disabled={busy || offerState === 'active' || readiness?.offerStatus === 'active'} onClick={activateSelling}>Activate selling</button>}
-      </div>
-    </>}
-  </section>
+  if (!listingId || !readiness?.approved) return null;
+  return (
+    <section
+      className="mb-4 border border-[#CAD8CC] bg-[#F3F5F0] p-4"
+      aria-label="Sell this listing"
+    >
+      <h3 className="text-lg font-semibold text-[#173F35]">
+        Price, stock & selling
+      </h3>
+      {!enabled ? (
+        <p className="mt-1 text-sm">
+          {readiness?.message ||
+            "A published catalog match is required before this item can be sold."}
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-sm">
+            Manage this product here. Only an active, approved offer can be
+            purchased.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <EditorField title="List price (₹)">
+              <input
+                className={styles.field}
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
+            </EditorField>
+            <EditorField title="Selling price (₹, optional)">
+              <input
+                className={styles.field}
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={salePrice}
+                onChange={(e) => setSalePrice(e.target.value)}
+              />
+            </EditorField>
+            <EditorField title="Available stock (units)">
+              <input
+                className={styles.field}
+                type="number"
+                min="0"
+                step="1"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+            </EditorField>
+            <EditorField title="Stock location">
+              <select
+                className={styles.field}
+                value={nodeId}
+                onChange={(e) => setNodeId(e.target.value)}
+              >
+                <option value="">Add a stock location</option>
+                {nodes
+                  .filter((item) => item.status === "active")
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+              </select>
+            </EditorField>
+            {!nodeId && (
+              <EditorField title="New stock location name">
+                <input
+                  className={styles.field}
+                  value={newNodeName}
+                  onChange={(e) => setNewNodeName(e.target.value)}
+                  placeholder="Your store or kitchen"
+                />
+              </EditorField>
+            )}
+            <EditorField title="Service pincodes">
+              <input
+                className={styles.field}
+                value={postalCodes}
+                onChange={(e) => setPostalCodes(e.target.value)}
+                placeholder="110001, 110002"
+              />
+            </EditorField>
+          </div>
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="mt-3 text-sm text-[#173F35]">
+              {notice}
+            </p>
+          )}
+          {checks && (
+            <p className="mt-3 text-sm">
+              {checks?.ready
+                ? "Ready to activate."
+                : "Some selling checks still need attention."}
+            </p>
+          )}
+          {buyerCheck && (
+            <p role="status" className="mt-3 text-sm">
+              {buyerCheck.message}
+            </p>
+          )}
+          {activeOfferId &&
+            (offerState === "active" ||
+              readiness?.offerStatus === "active") && (
+              <button
+                type="button"
+                className={`${styles.secondary} mt-3`}
+                disabled={busy}
+                onClick={() =>
+                  checkCustomerVisibility(activeOfferId, [
+                    ...new Set(postalCodes.split(/[\s,;]+/).filter(Boolean)),
+                  ])
+                }
+              >
+                Check customer availability
+              </button>
+            )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={styles.secondary}
+              disabled={busy}
+              onClick={saveSelling}
+            >
+              {busy ? "Saving…" : "Save selling details"}
+            </button>
+            {activeOfferId && (
+              <button
+                type="button"
+                className={styles.button}
+                disabled={
+                  busy ||
+                  offerState === "active" ||
+                  readiness?.offerStatus === "active"
+                }
+                onClick={activateSelling}
+              >
+                Activate selling
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
 }
-
 
 // Legacy product/brand records use paginated endpoints; fetch every returned
 // page rather than silently hiding listings after the first 100 records.
 async function loadPreviousPages(fetchPage, field) {
-  const records = []
+  const records = [];
   for (let page = 1; page <= 100; page += 1) {
-    const response = await fetchPage(page)
-    const batch = Array.isArray(response?.[field]) ? response[field] : []
-    records.push(...batch)
-    const pages = Number(response?.pagination?.pages || response?.pagination?.totalPages || 0)
-    if (!batch.length || (pages > 0 ? page >= pages : batch.length < 100)) break
+    const response = await fetchPage(page);
+    const batch = Array.isArray(response?.[field]) ? response[field] : [];
+    records.push(...batch);
+    const pages = Number(
+      response?.pagination?.pages || response?.pagination?.totalPages || 0
+    );
+    if (!batch.length || (pages > 0 ? page >= pages : batch.length < 100))
+      break;
   }
-  return { [field]: records }
+  return { [field]: records };
 }
 
 function PreviouslyListedItems({ workspace }) {
-  const [records, setRecords] = useState([])
-  const [pending, setPending] = useState(true)
-  const [failed, setFailed] = useState(false)
+  const [records, setRecords] = useState([]);
+  const [pending, setPending] = useState(true);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    let active = true
-    const canProduct = ['b2b', 'brand_seller', 'hybrid', 'legacy'].includes(workspace)
-    const canKitchen = ['b2b', 'chef_restaurant', 'hybrid', 'legacy'].includes(workspace)
-    const canBrand = ['brand_seller', 'hybrid', 'legacy'].includes(workspace)
+    let active = true;
+    const canProduct = ["b2b", "brand_seller", "hybrid", "legacy"].includes(
+      workspace
+    );
+    const canKitchen = ["b2b", "chef_restaurant", "hybrid", "legacy"].includes(
+      workspace
+    );
+    const canBrand = ["brand_seller", "hybrid", "legacy"].includes(workspace);
     const requests = [
-      canProduct ? loadPreviousPages((page) => listHostNpiDrafts({ page, limit: 100 }), 'drafts') : Promise.resolve({ drafts: [] }),
+      canProduct
+        ? loadPreviousPages(
+            (page) => listHostNpiDrafts({ page, limit: 100 }),
+            "drafts"
+          )
+        : Promise.resolve({ drafts: [] }),
       listHostRecipeListingHistory(),
-      canBrand ? loadPreviousPages((page) => listHostBrandRecipeSubmissions({ page, limit: 100 }), 'submissions') : Promise.resolve({ submissions: [] }),
-      canKitchen ? listHospitalityRestaurantRecipes() : Promise.resolve({ restaurantRecipes: [] }),
-    ]
+      canBrand
+        ? loadPreviousPages(
+            (page) => listHostBrandRecipeSubmissions({ page, limit: 100 }),
+            "submissions"
+          )
+        : Promise.resolve({ submissions: [] }),
+      canKitchen
+        ? listHospitalityRestaurantRecipes()
+        : Promise.resolve({ restaurantRecipes: [] }),
+    ];
     Promise.allSettled(requests).then((results) => {
-      if (!active) return
-      const rows = []
-      if (results[0]?.status === 'fulfilled') (results[0].value?.drafts || []).forEach((record) => rows.push({
-        id: record.id, title: record.productName || record.canonicalName || record.candidateFields?.displayName?.value || record.name || record.barcode || 'Saved product',
-        category: 'Product', status: record.status || record.verificationStatus || 'Saved', source: 'product-evidence',
-      }))
-      if (results[1]?.status === 'fulfilled') (results[1].value?.recipes || []).filter((record) => ['community', 'host'].includes(record.sourceType || 'community')).forEach((record) => rows.push({
-        id: record.id, title: record.title || 'Saved recipe', category: 'Recipe', status: record.status || 'Saved', source: 'host-recipe',
-      }))
-      if (results[2]?.status === 'fulfilled') (results[2].value?.submissions || []).forEach((record) => rows.push({
-        id: record.id, title: record.title || 'Brand recipe submission', category: 'Brand recipe', status: record.status || 'Submitted', source: 'brand-recipe',
-      }))
-      if (results[3]?.status === 'fulfilled') (results[3].value?.restaurantRecipes || []).forEach((record) => rows.push({
-        id: record.id || record.recipeVersionId, title: record.title || record.name || 'Restaurant recipe', category: 'Kitchen recipe', status: record.status || 'Saved', source: 'restaurant-recipe',
-      }))
-      setRecords(rows.filter((row) => row.id))
-      setFailed(results.some((result) => result.status === 'rejected'))
-      setPending(false)
-    })
-    return () => { active = false }
-  }, [workspace])
-  if (pending) return <p className="mt-3 text-sm text-[#54635B]">Loading previous listings…</p>
-  if (!records.length && !failed) return null
-  return <section className="mt-5 border-t border-[#CDD9C9] pt-5" aria-label="Previously listed items">
-    <h3 className="text-lg font-semibold text-[#173F35]">Previously listed items</h3>
-    {failed && <p className="mt-2 text-sm text-[#99622D]">Some older listings are temporarily unavailable. No records have been changed.</p>}
-    <div className="mt-3 divide-y divide-[#DFE7DC]">{records.map((row) => <div key={`${row.source}-${row.id}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-2 text-sm">
-      <span className="min-w-0 break-words"><strong className="text-[#173F35]">{row.title}</strong> <span className="text-[#6B766C]">· {row.category}</span></span>
-      <div className="flex shrink-0 items-center gap-3">
-        <span className="capitalize text-[#526353]">{String(row.status).replace(/_/g, ' ')}</span>
-        <Link to={`/host/listings/new?manage=legacy&source=${row.source}&id=${encodeURIComponent(row.id)}`} className="font-semibold text-[#173F35] underline underline-offset-4">Manage</Link>
+      if (!active) return;
+      const rows = [];
+      if (results[0]?.status === "fulfilled")
+        (results[0].value?.drafts || []).forEach((record) =>
+          rows.push({
+            id: record.id,
+            title:
+              record.productName ||
+              record.canonicalName ||
+              record.candidateFields?.displayName?.value ||
+              record.name ||
+              record.barcode ||
+              "Saved product",
+            category: "Product",
+            status: record.status || record.verificationStatus || "Saved",
+            source: "product-evidence",
+          })
+        );
+      if (results[1]?.status === "fulfilled")
+        (results[1].value?.recipes || [])
+          .filter((record) =>
+            ["community", "host"].includes(record.sourceType || "community")
+          )
+          .forEach((record) =>
+            rows.push({
+              id: record.id,
+              title: record.title || "Saved recipe",
+              category: "Recipe",
+              status: record.status || "Saved",
+              source: "host-recipe",
+            })
+          );
+      if (results[2]?.status === "fulfilled")
+        (results[2].value?.submissions || []).forEach((record) =>
+          rows.push({
+            id: record.id,
+            title: record.title || "Brand recipe submission",
+            category: "Brand recipe",
+            status: record.status || "Submitted",
+            source: "brand-recipe",
+          })
+        );
+      if (results[3]?.status === "fulfilled")
+        (results[3].value?.restaurantRecipes || []).forEach((record) =>
+          rows.push({
+            id: record.id || record.recipeVersionId,
+            title: record.title || record.name || "Restaurant recipe",
+            category: "Kitchen recipe",
+            status: record.status || "Saved",
+            source: "restaurant-recipe",
+          })
+        );
+      setRecords(rows.filter((row) => row.id));
+      setFailed(results.some((result) => result.status === "rejected"));
+      setPending(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [workspace]);
+  if (pending)
+    return (
+      <p className="mt-3 text-sm text-[#54635B]">Loading previous listings…</p>
+    );
+  if (!records.length && !failed) return null;
+  return (
+    <section
+      className="mt-5 border-t border-[#CDD9C9] pt-5"
+      aria-label="Previously listed items"
+    >
+      <h3 className="text-lg font-semibold text-[#173F35]">
+        Previously listed items
+      </h3>
+      {failed && (
+        <p className="mt-2 text-sm text-[#99622D]">
+          Some older listings are temporarily unavailable. No records have been
+          changed.
+        </p>
+      )}
+      <div className="mt-3 divide-y divide-[#DFE7DC]">
+        {records.map((row) => (
+          <div
+            key={`${row.source}-${row.id}`}
+            className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-2 text-sm"
+          >
+            <span className="min-w-0 break-words">
+              <strong className="text-[#173F35]">{row.title}</strong>{" "}
+              <span className="text-[#6B766C]">· {row.category}</span>
+            </span>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="capitalize text-[#526353]">
+                {String(row.status).replace(/_/g, " ")}
+              </span>
+              <Link
+                to={`/host/listings/new?manage=legacy&source=${
+                  row.source
+                }&id=${encodeURIComponent(row.id)}`}
+                className="font-semibold text-[#173F35] underline underline-offset-4"
+              >
+                Manage
+              </Link>
+            </div>
+          </div>
+        ))}
       </div>
-    </div>)}</div>
-  </section>
+    </section>
+  );
 }
 
 function HostUnifiedListingEditor() {
-  const { currentUser } = useAuth()
-  const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const workspace = normalizeHostWorkspaceType(currentUser)
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const workspace = normalizeHostWorkspaceType(currentUser);
   // Category lists are determined by form.type; role controls authorized listing TYPES only.
-  const usesHospitalityOperations = workspace === 'hybrid' || workspace === 'chef_restaurant'
+  const usesHospitalityOperations =
+    workspace === "hybrid" || workspace === "chef_restaurant";
   // Hybrid is intentionally limited to Grocery and Recipe for NEW packets.
   // Preserve editing of previous records while permitting all account-eligible types.
-  const allowed = types.filter((item) => item.allowed.includes(workspace) &&
-    (workspace !== 'hybrid' || ['grocery', 'kitchen_recipe', 'brand_recipe', 'prepared_food'].includes(item.value)))
-  const visibleTemplates = bulkTemplates.filter((item) => allowed.some((choice) => choice.value === item.type))
-  const requestedType = params.get('type')
-  const initialType = allowed.some((item) => item.value === requestedType) ? requestedType : allowed[0]?.value || 'grocery'
-  const [form, setForm] = useState(() => newPacket(initialType))
-  const [editingId, setEditingId] = useState('')
-  const [revisingApproved, setRevisingApproved] = useState(false)
-  const [existing, setExisting] = useState([])
-  const [busy, setBusy] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [uploading, setUploading] = useState('')
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [bulkText, setBulkText] = useState('')
-  const [bulkPreview, setBulkPreview] = useState(null)
-  const [bulkFileName, setBulkFileName] = useState('')
-  const [bulkProgress, setBulkProgress] = useState('')
-  const [pincodeText, setPincodeText] = useState('')
-  const [savedPostalCodes, setSavedPostalCodes] = useState([])
-  const [selectedGroceryPhotoRole, setSelectedGroceryPhotoRole] = useState('front_of_pack')
-  const [showOtherAllergen, setShowOtherAllergen] = useState(false)
-  const [otherAllergenName, setOtherAllergenName] = useState('')
-  const [otherAllergenStatus, setOtherAllergenStatus] = useState('')
-  const pincodeEditedRef = useRef(false)
-  const skipPendingEditLoadRef = useRef(false)
-  const [outlets, setOutlets] = useState([])
-  const [menus, setMenus] = useState([])
-  const [activeTab, setActiveTab] = useState('single')
-  const [historyFilter, setHistoryFilter] = useState('all')
-  const [barcodeMatches, setBarcodeMatches] = useState([])
-  const [barcodeChecked, setBarcodeChecked] = useState('')
-  const [barcodeChecking, setBarcodeChecking] = useState(false)
-  const [publishedProductMatches, setPublishedProductMatches] = useState([])
-  const [productMatchBusy, setProductMatchBusy] = useState(false)
-  const [approvedBrands, setApprovedBrands] = useState([])
-  const [sellingReadiness, setSellingReadiness] = useState(null)
-  const [brandLoadError, setBrandLoadError] = useState('')
-  const fieldRef = useRef(null)
-  const editIdFromUrl = params.get('edit') || ''
-  const activeListing = existing.find((item) => item.id === editingId)
+  const allowed = types.filter(
+    (item) =>
+      item.allowed.includes(workspace) &&
+      (workspace !== "hybrid" ||
+        ["grocery", "kitchen_recipe", "brand_recipe", "prepared_food"].includes(
+          item.value
+        ))
+  );
+  const visibleTemplates = bulkTemplates.filter((item) =>
+    allowed.some((choice) => choice.value === item.type)
+  );
+  const requestedType = params.get("type");
+  const initialType = allowed.some((item) => item.value === requestedType)
+    ? requestedType
+    : allowed[0]?.value || "grocery";
+  const [form, setForm] = useState(() => newPacket(initialType));
+  const [editingId, setEditingId] = useState("");
+  const [revisingApproved, setRevisingApproved] = useState(false);
+  const [existing, setExisting] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkPreview, setBulkPreview] = useState(null);
+  const [bulkFileName, setBulkFileName] = useState("");
+  const [bulkProgress, setBulkProgress] = useState("");
+  const [pincodeText, setPincodeText] = useState("");
+  const [savedPostalCodes, setSavedPostalCodes] = useState([]);
+  const [selectedGroceryPhotoRole, setSelectedGroceryPhotoRole] =
+    useState("front_of_pack");
+  const [showOtherAllergen, setShowOtherAllergen] = useState(false);
+  const [otherAllergenName, setOtherAllergenName] = useState("");
+  const [otherAllergenStatus, setOtherAllergenStatus] = useState("");
+  const pincodeEditedRef = useRef(false);
+  const skipPendingEditLoadRef = useRef(false);
+  const [outlets, setOutlets] = useState([]);
+  const [menus, setMenus] = useState([]);
+  const [activeTab, setActiveTab] = useState("single");
+  const [historyFilter, setHistoryFilter] = useState("all");
+  const [barcodeMatches, setBarcodeMatches] = useState([]);
+  const [barcodeChecked, setBarcodeChecked] = useState("");
+  const [barcodeChecking, setBarcodeChecking] = useState(false);
+  const [publishedProductMatches, setPublishedProductMatches] = useState([]);
+  const [productMatchBusy, setProductMatchBusy] = useState(false);
+  const [approvedBrands, setApprovedBrands] = useState([]);
+  const [sellingReadiness, setSellingReadiness] = useState(null);
+  const [brandLoadError, setBrandLoadError] = useState("");
+  const fieldRef = useRef(null);
+  const editIdFromUrl = params.get("edit") || "";
+  const activeListing = existing.find((item) => item.id === editingId);
   useEffect(() => {
-    if (!editingId) { setSellingReadiness(null); return undefined }
-    let live = true
-    setSellingReadiness(null)
+    if (!editingId) {
+      setSellingReadiness(null);
+      return undefined;
+    }
+    let live = true;
+    setSellingReadiness(null);
     getHostListingSellingReadiness(editingId)
-      .then((result) => { if (live) setSellingReadiness(result?.readiness || null) })
-      .catch(() => { if (live) setSellingReadiness({ message: 'Selling status is unavailable. Refresh and try again.' }) })
-    return () => { live = false }
-  }, [editingId, existing])
-  const selectableTypes = editingId && !allowed.some((item) => item.value === form.type)
-    ? [...allowed, ...types.filter((item) => item.value === form.type)]
-    : allowed
-  const locked = ['submitted_for_review', 'approved', 'rejected'].includes(activeListing?.status) && !revisingApproved
-  const correctionSection = activeListing?.status === 'changes_requested' ? activeListing?.correctionSection : ''
-  const filteredHistory = existing.filter((item) => historyFilter === 'all' ||
-    (historyFilter === 'needs_attention'
-      ? ['changes_requested', 'rejected'].includes(item.status)
-      : item.status === historyFilter))
-  const historyCount = (filter) => filter === 'all' ? existing.length : existing.filter((item) =>
-    filter === 'needs_attention' ? ['changes_requested', 'rejected'].includes(item.status) : item.status === filter).length
-  const isRecipe = form.type !== 'grocery'
-  const canSell = form.type === 'grocery' || form.type === 'prepared_food' || (form.type === 'kitchen_recipe' && form.sellReadyMade)
-  const costs = useMemo(() => (isRecipe ? form.ingredients.map(estimateCost) : []), [isRecipe, form.ingredients])
-  const customAllergens = (form.allergens || []).filter((item) => !allergenNames.includes(item.key))
-  const knownCosts = costs.filter((cost) => cost !== null)
-  const costingComplete = isRecipe && costs.length > 0 && knownCosts.length === costs.length
-  const ingredientCost = knownCosts.length ? knownCosts.reduce((sum, value) => sum + value, 0) : null
-  const completeCost = costingComplete ? ingredientCost + Number(form.selling.packagingCost || 0) + Number(form.selling.labourCost || 0) : null
-  const errorMessage = (value) => value?.response?.data?.message || value?.message || 'Unable to complete this listing action.'
+      .then((result) => {
+        if (live) setSellingReadiness(result?.readiness || null);
+      })
+      .catch(() => {
+        if (live)
+          setSellingReadiness({
+            message: "Selling status is unavailable. Refresh and try again.",
+          });
+      });
+    return () => {
+      live = false;
+    };
+  }, [editingId, existing]);
+  const selectableTypes =
+    editingId && !allowed.some((item) => item.value === form.type)
+      ? [...allowed, ...types.filter((item) => item.value === form.type)]
+      : allowed;
+  const locked =
+    ["submitted_for_review", "approved", "rejected"].includes(
+      activeListing?.status
+    ) && !revisingApproved;
+  const correctionSection =
+    activeListing?.status === "changes_requested"
+      ? activeListing?.correctionSection
+      : "";
+  const filteredHistory = existing.filter(
+    (item) =>
+      historyFilter === "all" ||
+      (historyFilter === "needs_attention"
+        ? ["changes_requested", "rejected"].includes(item.status)
+        : item.status === historyFilter)
+  );
+  const historyCount = (filter) =>
+    filter === "all"
+      ? existing.length
+      : existing.filter((item) =>
+          filter === "needs_attention"
+            ? ["changes_requested", "rejected"].includes(item.status)
+            : item.status === filter
+        ).length;
+  const isRecipe = form.type !== "grocery";
+  const canSell =
+    form.type === "grocery" ||
+    form.type === "prepared_food" ||
+    (form.type === "kitchen_recipe" && form.sellReadyMade);
+  const costs = useMemo(
+    () => (isRecipe ? form.ingredients.map(estimateCost) : []),
+    [isRecipe, form.ingredients]
+  );
+  const customAllergens = (form.allergens || []).filter(
+    (item) => !allergenNames.includes(item.key)
+  );
+  const knownCosts = costs.filter((cost) => cost !== null);
+  const costingComplete =
+    isRecipe && costs.length > 0 && knownCosts.length === costs.length;
+  const ingredientCost = knownCosts.length
+    ? knownCosts.reduce((sum, value) => sum + value, 0)
+    : null;
+  const completeCost = costingComplete
+    ? ingredientCost +
+      Number(form.selling.packagingCost || 0) +
+      Number(form.selling.labourCost || 0)
+    : null;
+  const errorMessage = (value) =>
+    value?.response?.data?.message ||
+    value?.message ||
+    "Unable to complete this listing action.";
 
   const load = useCallback(async () => {
     try {
-      const response = await listHostListingPackets()
-      setExisting(response?.listings || [])
-    } catch (cause) { setError(errorMessage(cause)) }
-  }, [])
-  useEffect(() => { load() }, [load])
+      const response = await listHostListingPackets();
+      setExisting(response?.listings || []);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }, []);
   useEffect(() => {
-    if (form.type !== 'brand_recipe') return
-    let cancelled = false
-    listHostApprovedBrands().then(result => {
-      if (!cancelled) { setApprovedBrands(result?.brands || []); setBrandLoadError('') }
-    }).catch(() => {
-      if (!cancelled) { setApprovedBrands([]); setBrandLoadError('Unable to load your approved brands. Try again.') }
-    })
-    return () => { cancelled = true }
-  }, [form.type])
+    load();
+  }, [load]);
   useEffect(() => {
-    if (!['b2b', 'chef_restaurant', 'hybrid', 'legacy'].includes(workspace)) return
-    let cancelled = false
-    Promise.allSettled([listHospitalityOutlets(), listHospitalityMenus()]).then(([outletResult, menuResult]) => {
-      if (cancelled) return
-      if (outletResult.status === 'fulfilled') setOutlets(outletResult.value?.outlets || [])
-      if (menuResult.status === 'fulfilled') setMenus(menuResult.value?.menus || [])
-    })
-    return () => { cancelled = true }
-  }, [workspace])
+    if (form.type !== "brand_recipe") return;
+    let cancelled = false;
+    listHostApprovedBrands()
+      .then((result) => {
+        if (!cancelled) {
+          setApprovedBrands(result?.brands || []);
+          setBrandLoadError("");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setApprovedBrands([]);
+          setBrandLoadError("Unable to load your approved brands. Try again.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.type]);
+  useEffect(() => {
+    if (!["b2b", "chef_restaurant", "hybrid", "legacy"].includes(workspace))
+      return;
+    let cancelled = false;
+    Promise.allSettled([listHospitalityOutlets(), listHospitalityMenus()]).then(
+      ([outletResult, menuResult]) => {
+        if (cancelled) return;
+        if (outletResult.status === "fulfilled")
+          setOutlets(outletResult.value?.outlets || []);
+        if (menuResult.status === "fulfilled")
+          setMenus(menuResult.value?.menus || []);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace]);
   // Host Marketplace Service Areas are the saved delivery coverage source.
   // Apply them only to untouched NEW listings; never overwrite a saved draft or manual edit.
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     const loadSavedDeliveryCoverage = async () => {
       try {
-        const codes = new Set()
+        const codes = new Set();
         for (let page = 1; page <= 10 && codes.size < 500; page += 1) {
-          const result = await listServiceAreas({ page, limit: 100, status: 'active' })
-          if (cancelled) return
-          const areas = Array.isArray(result?.serviceAreas) ? result.serviceAreas : []
+          const result = await listServiceAreas({
+            page,
+            limit: 100,
+            status: "active",
+          });
+          if (cancelled) return;
+          const areas = Array.isArray(result?.serviceAreas)
+            ? result.serviceAreas
+            : [];
           areas.forEach((area) => {
             (area.postalCodes || []).forEach((value) => {
-              const code = String(value || '').trim()
-              if (/^[1-9][0-9]{5}$/.test(code) && codes.size < 500) codes.add(code)
-            })
-          })
-          if (areas.length < 100 || page >= Number(result?.pagination?.totalPages || page)) break
+              const code = String(value || "").trim();
+              if (/^[1-9][0-9]{5}$/.test(code) && codes.size < 500)
+                codes.add(code);
+            });
+          });
+          if (
+            areas.length < 100 ||
+            page >= Number(result?.pagination?.totalPages || page)
+          )
+            break;
         }
-        if (cancelled) return
-        setSavedPostalCodes([...codes])
+        if (cancelled) return;
+        setSavedPostalCodes([...codes]);
       } catch {
         // Some Host roles do not have a Marketplace Service Area yet.
         // The existing manual pincode entry remains fully usable.
       }
-    }
-    loadSavedDeliveryCoverage()
-    return () => { cancelled = true }
-  }, [workspace])
+    };
+    loadSavedDeliveryCoverage();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace]);
   useEffect(() => {
-    if (!savedPostalCodes.length || params.get('edit') || editingId || pincodeEditedRef.current) return
-    setForm((current) => current.delivery?.postalCodes?.length
-      ? current
-      : { ...current, delivery: { ...current.delivery, postalCodes: [...savedPostalCodes] } })
-    setPincodeText((current) => current.trim() ? current : savedPostalCodes.join(', '))
-  }, [savedPostalCodes, editingId, params])
+    if (
+      !savedPostalCodes.length ||
+      params.get("edit") ||
+      editingId ||
+      pincodeEditedRef.current
+    )
+      return;
+    setForm((current) =>
+      current.delivery?.postalCodes?.length
+        ? current
+        : {
+            ...current,
+            delivery: {
+              ...current.delivery,
+              postalCodes: [...savedPostalCodes],
+            },
+          }
+    );
+    setPincodeText((current) =>
+      current.trim() ? current : savedPostalCodes.join(", ")
+    );
+  }, [savedPostalCodes, editingId, params]);
 
   useEffect(() => {
     // Only load a saved listing when the URL's edit ID changes. Editing state
     // is not a dependency: clearing it for 'Start a new listing' must NOT
     // cause the previous approved/submitted listing to load again and lock the form.
-    if (!editIdFromUrl) return undefined
-    let cancelled = false
-    skipPendingEditLoadRef.current = false
-    setLoading(true)
-    getHostListingPacket(editIdFromUrl).then((data) => {
-      if (cancelled || skipPendingEditLoadRef.current) return
-      setForm({ ...newPacket(data.listing.packet.type), ...data.listing.packet })
-      pincodeEditedRef.current = true
-      setPincodeText((data.listing.packet.delivery?.postalCodes || []).join(', '))
-      setEditingId(data.listing.id)
-      setRevisingApproved(false)
-      setBarcodeMatches([]); setBarcodeChecked('')
-      setActiveTab('single')
-    }).catch((cause) => { if (!cancelled && !skipPendingEditLoadRef.current) setError(errorMessage(cause)) })
-      .finally(() => { if (!cancelled && !skipPendingEditLoadRef.current) setLoading(false) })
-    return () => { cancelled = true }
-  }, [editIdFromUrl])
-  const patch = (key, value) => setForm((current) => ({ ...current, [key]: value }))
-  const nested = (key, sub, value) => setForm((current) => ({ ...current, [key]: { ...current[key], [sub]: value } }))
-  const updateRow = (key, index, patchValue) => setForm((current) => ({
-    ...current, [key]: current[key].map((item, offset) => offset === index ? { ...item, ...patchValue } : item),
-  }))
-  const removeRow = (key, index) => setForm((current) => ({ ...current, [key]: current[key].filter((_, offset) => offset !== index) }))
+    if (!editIdFromUrl) return undefined;
+    let cancelled = false;
+    skipPendingEditLoadRef.current = false;
+    setLoading(true);
+    getHostListingPacket(editIdFromUrl)
+      .then((data) => {
+        if (cancelled || skipPendingEditLoadRef.current) return;
+        setForm({
+          ...newPacket(data.listing.packet.type),
+          ...data.listing.packet,
+        });
+        pincodeEditedRef.current = true;
+        setPincodeText(
+          (data.listing.packet.delivery?.postalCodes || []).join(", ")
+        );
+        setEditingId(data.listing.id);
+        setRevisingApproved(false);
+        setBarcodeMatches([]);
+        setBarcodeChecked("");
+        setActiveTab("single");
+      })
+      .catch((cause) => {
+        if (!cancelled && !skipPendingEditLoadRef.current)
+          setError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!cancelled && !skipPendingEditLoadRef.current) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editIdFromUrl]);
+  const patch = (key, value) =>
+    setForm((current) => ({ ...current, [key]: value }));
+  const nested = (key, sub, value) =>
+    setForm((current) => ({
+      ...current,
+      [key]: { ...current[key], [sub]: value },
+    }));
+  const updateRow = (key, index, patchValue) =>
+    setForm((current) => ({
+      ...current,
+      [key]: current[key].map((item, offset) =>
+        offset === index ? { ...item, ...patchValue } : item
+      ),
+    }));
+  const removeRow = (key, index) =>
+    setForm((current) => ({
+      ...current,
+      [key]: current[key].filter((_, offset) => offset !== index),
+    }));
   async function checkBarcode() {
-    const gtin = String(form.selling?.barcode || '').trim()
-    setBarcodeMatches([]); setBarcodeChecked('')
-    if (!gtin) return
-    setBarcodeChecking(true)
+    const gtin = String(form.selling?.barcode || "").trim();
+    setBarcodeMatches([]);
+    setBarcodeChecked("");
+    if (!gtin) return;
+    setBarcodeChecking(true);
     try {
-      const result = await checkHostListingBarcode(gtin)
-      setBarcodeMatches(result?.matches || [])
-      setBarcodeChecked(gtin)
-    } catch (cause) { setError(errorMessage(cause)) }
-    finally { setBarcodeChecking(false) }
+      const result = await checkHostListingBarcode(gtin);
+      setBarcodeMatches(result?.matches || []);
+      setBarcodeChecked(gtin);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBarcodeChecking(false);
+    }
   }
   function startNew(type) {
     // A previously started edit fetch can still be in flight. Ignore its
     // result so it cannot replace the fresh editable form with an old listing.
-    skipPendingEditLoadRef.current = true
-    setLoading(false)
-    const packet = newPacket(type)
-    packet.delivery.postalCodes = [...savedPostalCodes]
-    pincodeEditedRef.current = false
-    setShowOtherAllergen(false); setOtherAllergenName(''); setOtherAllergenStatus(''); setBarcodeMatches([]); setBarcodeChecked('')
-    setRevisingApproved(false)
-    setForm(packet); setPincodeText(savedPostalCodes.join(', ')); setEditingId(''); setError(''); setNotice('')
-    setParams({ type }); window.scrollTo({ top: 0, behavior: 'smooth' })
+    skipPendingEditLoadRef.current = true;
+    setLoading(false);
+    const packet = newPacket(type);
+    packet.delivery.postalCodes = [...savedPostalCodes];
+    pincodeEditedRef.current = false;
+    setShowOtherAllergen(false);
+    setOtherAllergenName("");
+    setOtherAllergenStatus("");
+    setBarcodeMatches([]);
+    setBarcodeChecked("");
+    setRevisingApproved(false);
+    setForm(packet);
+    setPincodeText(savedPostalCodes.join(", "));
+    setEditingId("");
+    setError("");
+    setNotice("");
+    setParams({ type });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  async function uploadImage(file, target, index = -1, photoRole = '') {
-    if (!file) return
-    setUploading(`${target}-${index}`); setError('')
+  async function uploadImage(file, target, index = -1, photoRole = "") {
+    if (!file) return;
+    setUploading(`${target}-${index}`);
+    setError("");
     try {
-      const url = await uploadHostListingImage(file)
-      if (target === 'images') {
+      const url = await uploadHostListingImage(file);
+      if (target === "images") {
         setForm((current) => {
-          if (current.images.length >= 12) return current
-          const images = [...current.images, url]
-          const role = current.type === 'grocery' && groceryPhotoRoleLabels[photoRole] ? photoRole : ''
+          if (current.images.length >= 12) return current;
+          const images = [...current.images, url];
+          const role =
+            current.type === "grocery" && groceryPhotoRoleLabels[photoRole]
+              ? photoRole
+              : "";
           return {
             ...current,
             images,
             imageRoles: role
               ? [...(current.imageRoles || []), { url, role }]
-              : (current.imageRoles || []),
-          }
-        })
-      } else updateRow(target, index, { imageUrl: url })
-      setNotice('Image uploaded. Save this listing to keep it.')
-    } catch (cause) { setError(errorMessage(cause)) } finally { setUploading('') }
+              : current.imageRoles || [],
+          };
+        });
+      } else updateRow(target, index, { imageUrl: url });
+      setNotice("Image uploaded. Save this listing to keep it.");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setUploading("");
+    }
   }
   async function uploadVideo(file) {
-    if (!file) return
-    setUploading('video'); setError('')
+    if (!file) return;
+    setUploading("video");
+    setError("");
     try {
-      const url = await uploadHostListingVideo(file)
-      setForm((current) => ({ ...current, videoUrl: url, videoFileName: String(file.name || 'Recipe video').slice(0, 180) }))
-      setNotice('Video uploaded. Save this listing to keep it.')
-    } catch (cause) { setError(errorMessage(cause)) } finally { setUploading('') }
+      const url = await uploadHostListingVideo(file);
+      setForm((current) => ({
+        ...current,
+        videoUrl: url,
+        videoFileName: String(file.name || "Recipe video").slice(0, 180),
+      }));
+      setNotice("Video uploaded. Save this listing to keep it.");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setUploading("");
+    }
   }
   async function save(submit = false) {
-    if (busy || locked || uploading) return
-    if (submit && workspace === 'hybrid' && form.type === 'grocery' && !form.grocerySubcategory) {
-      setError('Choose a grocery customer category before submitting.')
-      document.getElementById('listing-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return
+    if (busy || locked || uploading) return;
+    if (
+      submit &&
+      workspace === "hybrid" &&
+      form.type === "grocery" &&
+      !form.grocerySubcategory
+    ) {
+      setError("Choose a grocery customer category before submitting.");
+      document
+        .getElementById("listing-details")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
     }
-    setBusy(true); setError(''); setNotice('')
+    if (
+      submit &&
+      form.type === "grocery" &&
+      form.selling?.barcode &&
+      !isValidHostBarcode(form.selling.barcode)
+    ) {
+      setError(
+        "Check the barcode on the product label. If the item has no barcode, clear this optional field before submitting."
+      );
+      document.getElementById("host-listing-barcode")?.focus();
+      document
+        .getElementById("host-listing-barcode")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      const result = editingId ? await updateHostListingPacket(editingId, form) : await createHostListingPacket(form)
-      const id = result?.listing?.id
-      if (submit) await submitHostListingPacket(id)
-      setEditingId(id)
-      setParams({ edit: id })
-      setNotice(submit ? 'Listing submitted to Super Admin for review. You will be notified after a decision.' : 'Draft saved. You can continue editing here.')
-      await load()
-      if (revisingApproved) setRevisingApproved(false)
-    } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+      const result = editingId
+        ? await updateHostListingPacket(editingId, form)
+        : await createHostListingPacket(form);
+      const id = result?.listing?.id;
+      if (submit) await submitHostListingPacket(id);
+      setEditingId(id);
+      setParams({ edit: id });
+      setNotice(
+        submit
+          ? "Listing submitted to Super Admin for review. You will be notified after a decision."
+          : "Draft saved. You can continue editing here."
+      );
+      await load();
+      if (revisingApproved) setRevisingApproved(false);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
   }
   async function resendSavedListingForSelling() {
-    if (busy || uploading || !editingId || activeListing?.status !== 'approved' ||
-        !canSell || sellingReadiness?.offerStatus === 'active') return
-    if (!window.confirm('Send this already-approved listing for one-step Super Admin selling approval? Your existing ingredients, photos, price, stock and delivery will be reused unchanged.')) return
-    setBusy(true); setError(''); setNotice('')
+    if (
+      busy ||
+      uploading ||
+      !editingId ||
+      activeListing?.status !== "approved" ||
+      !canSell ||
+      sellingReadiness?.offerStatus === "active"
+    )
+      return;
+    if (
+      !window.confirm(
+        "Send this already-approved listing for one-step Super Admin selling approval? Your existing ingredients, photos, price, stock and delivery will be reused unchanged."
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      await resubmitApprovedHostListingForSelling(editingId)
-      await load()
-      setNotice('Saved listing sent to Super Admin. One approval will publish the product and enable selling; you do not need to enter the details again.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } catch (cause) { setError(errorMessage(cause)) }
-    finally { setBusy(false) }
+      await resubmitApprovedHostListingForSelling(editingId);
+      await load();
+      setNotice(
+        "Saved listing sent to Super Admin. One approval will publish the product and enable selling; you do not need to enter the details again."
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
   }
   async function requestSavedRecipeSharing() {
-    if (busy || uploading || !editingId || activeListing?.status !== 'approved' ||
-        form.type === 'grocery' || form.shareRecipe === true) return
-    const savedIngredients = (form.ingredients || []).filter((item) => String(item?.name || '').trim() && Number(item?.quantity) > 0)
-    const savedSteps = (form.steps || []).filter((step) => String(step?.instruction || '').trim())
-    if (!savedIngredients.length || !savedSteps.length ||
-        savedIngredients.length !== (form.ingredients || []).length ||
-        savedSteps.length !== (form.steps || []).length) {
-      setError('Your saved recipe is missing ingredient quantities or cooking steps. Select Edit complete listing to finish them first.')
-      return
+    if (
+      busy ||
+      uploading ||
+      !editingId ||
+      activeListing?.status !== "approved" ||
+      form.type === "grocery" ||
+      form.shareRecipe === true
+    )
+      return;
+    const savedIngredients = (form.ingredients || []).filter(
+      (item) => String(item?.name || "").trim() && Number(item?.quantity) > 0
+    );
+    const savedSteps = (form.steps || []).filter((step) =>
+      String(step?.instruction || "").trim()
+    );
+    if (
+      !savedIngredients.length ||
+      !savedSteps.length ||
+      savedIngredients.length !== (form.ingredients || []).length ||
+      savedSteps.length !== (form.steps || []).length
+    ) {
+      setError(
+        "Your saved recipe is missing ingredient quantities or cooking steps. Select Edit complete listing to finish them first."
+      );
+      return;
     }
-    if (!window.confirm(`Share ${savedIngredients.length} saved ingredients and ${savedSteps.length} cooking steps with customers after Super Admin approval? Your currently approved listing stays unchanged until then.`)) return
-    setBusy(true); setError(''); setNotice('')
+    if (
+      !window.confirm(
+        `Share ${savedIngredients.length} saved ingredients and ${savedSteps.length} cooking steps with customers after Super Admin approval? Your currently approved listing stays unchanged until then.`
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
       // This reuses the normal MFA-protected, Super Admin-governed section revision.
       // No ingredients, steps, photos, pricing, or other saved values are resent.
-      const result = await submitHostListingSectionRevision(editingId, { shareRecipe: true })
-      if (result?.listing?.packet) setForm({ ...newPacket(result.listing.packet.type), ...result.listing.packet })
-      await load()
-      setNotice('Your saved recipe was sent to Super Admin for review. Once approved, ingredients and cooking steps will appear on the customer page. No details need to be entered again.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } catch (cause) { setError(errorMessage(cause)) }
-    finally { setBusy(false) }
+      const result = await submitHostListingSectionRevision(editingId, {
+        shareRecipe: true,
+      });
+      if (result?.listing?.packet)
+        setForm({
+          ...newPacket(result.listing.packet.type),
+          ...result.listing.packet,
+        });
+      await load();
+      setNotice(
+        "Your saved recipe was sent to Super Admin for review. Once approved, ingredients and cooking steps will appear on the customer page. No details need to be entered again."
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
   }
   async function saveSectionRevision() {
-    if (busy || uploading || !locked || !editingId) return
-    if (activeListing?.status === 'approved' && !window.confirm(
-      'Your approved listing stays live while Super Admin reviews the updated food facts and selling details. Continue?'
-    )) return
-    setBusy(true); setError(''); setNotice('')
+    if (busy || uploading || !locked || !editingId) return;
+    if (
+      activeListing?.status === "approved" &&
+      !window.confirm(
+        "Your approved listing stays live while Super Admin reviews the updated food facts and selling details. Continue?"
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
       const sections = {
-        nutrition: form.nutrition, allergens: form.allergens, dietary: form.dietary,
+        nutrition: form.nutrition,
+        allergens: form.allergens,
+        dietary: form.dietary,
         selling: form.selling,
-        delivery: { ...form.delivery, postalCodes: pincodeText.split(/[\s,;]+/).filter(Boolean) },
-      }
-      const result = await submitHostListingSectionRevision(editingId, sections)
+        delivery: {
+          ...form.delivery,
+          postalCodes: pincodeText.split(/[\s,;]+/).filter(Boolean),
+        },
+      };
+      const result = await submitHostListingSectionRevision(
+        editingId,
+        sections
+      );
       if (result?.listing?.packet) {
-        setForm({ ...newPacket(result.listing.packet.type), ...result.listing.packet })
-        setPincodeText((result.listing.packet.delivery?.postalCodes || []).join(', '))
+        setForm({
+          ...newPacket(result.listing.packet.type),
+          ...result.listing.packet,
+        });
+        setPincodeText(
+          (result.listing.packet.delivery?.postalCodes || []).join(", ")
+        );
       }
-      await load()
-      setNotice('Food facts and selling changes sent to Super Admin for review. Other listing information was not changed.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+      await load();
+      setNotice(
+        "Food facts and selling changes sent to Super Admin for review. Other listing information was not changed."
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
   }
   function addOtherAllergen() {
-    const name = otherAllergenName.trim().replace(/\s+/g, ' ')
-    const key = name.toLowerCase().replace(/\s+/g, '_')
-    if (name.length < 2 || name.length > 70 || !/^[a-z][a-z0-9_ -]*$/i.test(name)) {
-      setError('Enter an allergen name using 2–70 letters, numbers or spaces.'); return
+    const name = otherAllergenName.trim().replace(/\s+/g, " ");
+    const key = name.toLowerCase().replace(/\s+/g, "_");
+    if (
+      name.length < 2 ||
+      name.length > 70 ||
+      !/^[a-z][a-z0-9_ -]*$/i.test(name)
+    ) {
+      setError("Enter an allergen name using 2–70 letters, numbers or spaces.");
+      return;
     }
-    if (!otherAllergenStatus) { setError('Choose how this additional allergen relates to the food.'); return }
-    if (allergenNames.includes(key) || form.allergens.some((entry) => entry.key === key)) {
-      setError('This allergen is already listed. Change its existing declaration instead.'); return
+    if (!otherAllergenStatus) {
+      setError("Choose how this additional allergen relates to the food.");
+      return;
     }
-    if (form.allergens.length >= 20) { setError('This listing has reached the allergen limit.'); return }
-    patch('allergens', [...form.allergens, { key, relationship: otherAllergenStatus }])
-    setOtherAllergenName(''); setOtherAllergenStatus(''); setError(''); setShowOtherAllergen(false)
+    if (
+      allergenNames.includes(key) ||
+      form.allergens.some((entry) => entry.key === key)
+    ) {
+      setError(
+        "This allergen is already listed. Change its existing declaration instead."
+      );
+      return;
+    }
+    if (form.allergens.length >= 20) {
+      setError("This listing has reached the allergen limit.");
+      return;
+    }
+    patch("allergens", [
+      ...form.allergens,
+      { key, relationship: otherAllergenStatus },
+    ]);
+    setOtherAllergenName("");
+    setOtherAllergenStatus("");
+    setError("");
+    setShowOtherAllergen(false);
   }
   async function deleteListing(item) {
-    if (busy || uploading || !item?.id) return
-    const approved = item.status === 'approved'
+    if (busy || uploading || !item?.id) return;
+    const approved = item.status === "approved";
     const message = approved
-      ? `Remove "${item.title || 'this listing'}" from your Host Studio and public EPANTRY? It will stop appearing to customers. Super Admin audit history will be retained.`
-      : `Remove "${item.title || 'this listing'}" from your Host Studio? The record will be hidden, while any existing review history stays available for audit.`
-    if (!window.confirm(message)) return
-    setBusy(true); setError(''); setNotice('')
+      ? `Remove "${
+          item.title || "this listing"
+        }" from your Host Studio and public EPANTRY? It will stop appearing to customers. Super Admin audit history will be retained.`
+      : `Remove "${
+          item.title || "this listing"
+        }" from your Host Studio? The record will be hidden, while any existing review history stays available for audit.`;
+    if (!window.confirm(message)) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      await deleteHostListingPacket(item.id)
-      if (editingId === item.id) startNew(initialType)
-      await load()
-      setNotice(`"${item.title || 'Listing'}" was removed from your listings.`)
-    } catch (cause) { setError(errorMessage(cause)) }
-    finally { setBusy(false) }
+      await deleteHostListingPacket(item.id);
+      if (editingId === item.id) startNew(initialType);
+      await load();
+      setNotice(`"${item.title || "Listing"}" was removed from your listings.`);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
   }
   async function bulkImport() {
-    if (busy) return
-    let packets
+    if (busy) return;
+    let packets;
     try {
-      packets = JSON.parse(bulkText)
-      if (!Array.isArray(packets)) throw new Error('Bulk file must contain an array of listings.')
-    } catch (cause) { setError(cause.message); return }
-    if (!packets.length || packets.length > 25) { setError('Import between 1 and 25 listings at once.'); return }
-    setBusy(true); setError(''); setNotice('')
+      packets = JSON.parse(bulkText);
+      if (!Array.isArray(packets))
+        throw new Error("Bulk file must contain an array of listings.");
+    } catch (cause) {
+      setError(cause.message);
+      return;
+    }
+    if (!packets.length || packets.length > 25) {
+      setError("Import between 1 and 25 listings at once.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
     try {
-      const result = await importHostListingPackets(packets)
-      setNotice(`${result?.listings?.length || 0} draft listings imported. Open each to check and submit.`)
-      setBulkText(''); await load()
-    } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+      const result = await importHostListingPackets(packets);
+      setNotice(
+        `${
+          result?.listings?.length || 0
+        } draft listings imported. Open each to check and submit.`
+      );
+      setBulkText("");
+      await load();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
   }
   async function previewExcel(file) {
-    if (!file) return
-    setError(''); setNotice(''); setBulkPreview(null); setBulkProgress('')
-    setBulkFileName(file.name)
+    if (!file) return;
+    setError("");
+    setNotice("");
+    setBulkPreview(null);
+    setBulkProgress("");
+    setBulkFileName(file.name);
     try {
-      const preview = await parseHostBulkWorkbook(file, allowed.map((type) => type.value))
-      setBulkPreview(preview)
-      setNotice(`${preview.packets.length} listings ready for review. Import creates drafts only, never public listings.`)
-    } catch (cause) { setError(cause?.message || 'Unable to read this EPANTRY Excel template.') }
+      const preview = await parseHostBulkWorkbook(
+        file,
+        allowed.map((type) => type.value)
+      );
+      setBulkPreview(preview);
+      setNotice(
+        `${preview.packets.length} listings ready for review. Import creates drafts only, never public listings.`
+      );
+    } catch (cause) {
+      setError(cause?.message || "Unable to read this EPANTRY Excel template.");
+    }
   }
   async function importExcelDrafts() {
-    if (busy || !bulkPreview?.packets?.length) return
-    setBusy(true); setError(''); setNotice(''); setBulkProgress('')
+    if (busy || !bulkPreview?.packets?.length) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setBulkProgress("");
     try {
-      const packets = await ingestWorkbookImages(bulkPreview.packets, importHostListingRemoteImage, (done, total) => {
-        setBulkProgress(`Importing real images into EPANTRY: ${done} of ${total}`)
-      })
-      setBulkProgress('Saving approved-format drafts to EPANTRY...')
-      const result = await importHostListingPackets(packets)
-      setNotice(`${result?.listings?.length || 0} listings saved as drafts. Open each item, verify details and submit for Super Admin review.`)
-      setBulkPreview(null); setBulkFileName(''); setBulkProgress('')
-      await load()
+      const packets = await ingestWorkbookImages(
+        bulkPreview.packets,
+        importHostListingRemoteImage,
+        (done, total) => {
+          setBulkProgress(
+            `Importing real images into EPANTRY: ${done} of ${total}`
+          );
+        }
+      );
+      setBulkProgress("Saving approved-format drafts to EPANTRY...");
+      const result = await importHostListingPackets(packets);
+      setNotice(
+        `${
+          result?.listings?.length || 0
+        } listings saved as drafts. Open each item, verify details and submit for Super Admin review.`
+      );
+      setBulkPreview(null);
+      setBulkFileName("");
+      setBulkProgress("");
+      await load();
     } catch (cause) {
-      setError(`${errorMessage(cause)} Nothing has been added to your draft listings. Check your Excel links or values and retry.`)
-      setBulkProgress('')
-    } finally { setBusy(false) }
+      setError(
+        `${errorMessage(
+          cause
+        )} Nothing has been added to your draft listings. Check your Excel links or values and retry.`
+      );
+      setBulkProgress("");
+    } finally {
+      setBusy(false);
+    }
   }
   async function findPublishedProduct() {
-    const search = String(form.title || '').trim()
-    if (search.length < 3 || productMatchBusy) return
-    setProductMatchBusy(true)
-    setError('')
+    const search = String(form.title || "").trim();
+    if (search.length < 3 || productMatchBusy) return;
+    setProductMatchBusy(true);
+    setError("");
     try {
-      const result = await searchHostPublishedProducts(search)
-      setPublishedProductMatches(result?.products || [])
-      if (!result?.products?.length) setNotice('No approved catalog product matched this name. You can still submit it for review.')
-    } catch (cause) { setError(errorMessage(cause)) }
-    finally { setProductMatchBusy(false) }
+      const result = await searchHostPublishedProducts(search);
+      setPublishedProductMatches(result?.products || []);
+      if (!result?.products?.length)
+        setNotice(
+          "No approved catalog product matched this name. You can still submit it for review."
+        );
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setProductMatchBusy(false);
+    }
   }
-  const field = styles.field
-  const section = styles.section
+  const barcodeValue = String(form.selling?.barcode || "").trim();
+  const barcodeValid = !barcodeValue || isValidHostBarcode(barcodeValue);
+  const barcodeLengthValid =
+    /^(?:[0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14})$/.test(barcodeValue);
+  const field = styles.field;
+  const section = styles.section;
   return (
-    <main ref={fieldRef} className="uel-page" data-workspace={workspace} data-listing-type={form.type}>
+    <main
+      ref={fieldRef}
+      className="uel-page"
+      data-workspace={workspace}
+      data-listing-type={form.type}
+    >
       <style>{editorialStyles}</style>
       <div className="uel-shell">
-        {workspace === 'legacy' && <p className="uel-legacy-notice" role="status">This account is in the Legacy Host workspace. Hybrid's Grocery / Recipe-only creator requires an approved Hybrid workspace assignment.</p>}
+        {workspace === "legacy" && (
+          <p className="uel-legacy-notice" role="status">
+            This account is in the Legacy Host workspace. Hybrid's Grocery /
+            Recipe-only creator requires an approved Hybrid workspace
+            assignment.
+          </p>
+        )}
         <header className="uel-hero">
           <div className="uel-hero-main">
-            <Link to="/host/listings" className="uel-back"><ArrowLeft size={17}/> All listing options</Link>
+            <Link to="/host/listings" className="uel-back">
+              <ArrowLeft size={17} /> All listing options
+            </Link>
             <div className="uel-studio-tools">
               <p className="uel-eyebrow">EPANTRY · Host studio</p>
-              <button type="button" className="uel-refresh" disabled={busy || Boolean(uploading)} title="Reload saved Host Studio data. Unsaved edits will be lost." onClick={() => { if (window.confirm('Refresh Host Studio? Any unsaved changes will be lost.')) window.location.reload() }}><RefreshCw size={16} aria-hidden="true"/> Refresh page</button>
+              <button
+                type="button"
+                className="uel-refresh"
+                disabled={busy || Boolean(uploading)}
+                title="Reload saved Host Studio data. Unsaved edits will be lost."
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Refresh Host Studio? Any unsaved changes will be lost."
+                    )
+                  )
+                    window.location.reload();
+                }}
+              >
+                <RefreshCw size={16} aria-hidden="true" /> Refresh page
+              </button>
             </div>
-            <h1 className="uel-hero-title">Create something<br/><em>worth sharing.</em></h1>
-            <p className="uel-hero-description">Add groceries, recipes or ready-made food with photos, ingredients and selling details.</p>
+            <h1 className="uel-hero-title">
+              Create something
+              <br />
+              <em>worth sharing.</em>
+            </h1>
+            <p className="uel-hero-description">
+              Add groceries, recipes or ready-made food with photos, ingredients
+              and selling details.
+            </p>
             <div className="uel-hero-foot">
-              <span className="uel-status"><span className="uel-status-dot"/>{editingId ? (locked ? 'Listing under review' : 'Editing an existing listing') : 'Your new listing'}</span>
-              <button type="button" className="uel-new" onClick={() => startNew(initialType)}><Plus size={20} strokeWidth={2.7} aria-hidden="true"/> Start a new listing</button>
+              <span className="uel-status">
+                <span className="uel-status-dot" />
+                {editingId
+                  ? locked
+                    ? "Listing under review"
+                    : "Editing an existing listing"
+                  : "Your new listing"}
+              </span>
+              <button
+                type="button"
+                className="uel-new"
+                onClick={() => startNew(initialType)}
+              >
+                <Plus size={20} strokeWidth={2.7} aria-hidden="true" /> Start a
+                new listing
+              </button>
             </div>
           </div>
           <aside className="uel-hero-side" aria-label="How publishing works">
             <div>
               <p className="uel-hero-side-kicker">Your path to publishing</p>
-              <h2 className="uel-hero-side-title">From idea to listing, in three clear steps.</h2>
-              <div className="uel-hero-step"><strong>01</strong><span>Add your item details</span></div>
-              <div className="uel-hero-step"><strong>02</strong><span>Save and check your draft</span></div>
-              <div className="uel-hero-step"><strong>03</strong><span>Send it to Super Admin</span></div>
+              <h2 className="uel-hero-side-title">
+                From idea to listing, in three clear steps.
+              </h2>
+              <div className="uel-hero-step">
+                <strong>01</strong>
+                <span>Add your item details</span>
+              </div>
+              <div className="uel-hero-step">
+                <strong>02</strong>
+                <span>Save and check your draft</span>
+              </div>
+              <div className="uel-hero-step">
+                <strong>03</strong>
+                <span>Send it to Super Admin</span>
+              </div>
             </div>
-            <p className="uel-hero-approval">Your listing is visible to customers only after approval. Marketplace selling rules still apply separately.</p>
+            <p className="uel-hero-approval">
+              Your listing is visible to customers only after approval.
+              Marketplace selling rules still apply separately.
+            </p>
           </aside>
         </header>
-        {error && <div role="alert" className="uel-alert border-l-4 border-red-600 bg-red-50 px-4 py-3 text-red-800">{error}</div>}
-        {activeListing?.reviewNote && <div role="status" className="uel-alert border-l-4 border-[#C86C42] bg-[#F7E7DA] px-4 py-3"><strong>Super Admin note:</strong> {activeListing.reviewNote} {correctionSection && <a className="ml-2 font-semibold underline" href={`#listing-${correctionSection}`}>Go to {correctionSection}</a>}</div>}
-        {notice && <div role="status" className="uel-alert flex items-center gap-2 border-l-4 border-[#173F35] bg-[#E0ECE1] px-4 py-3 text-[#173F35]"><CheckCircle2 size={18}/>{notice}</div>}
+        {error && (
+          <div
+            role="alert"
+            className="uel-alert border-l-4 border-red-600 bg-red-50 px-4 py-3 text-red-800"
+          >
+            {error}
+          </div>
+        )}
+        {activeListing?.reviewNote && (
+          <div
+            role="status"
+            className="uel-alert border-l-4 border-[#C86C42] bg-[#F7E7DA] px-4 py-3"
+          >
+            <strong>Super Admin note:</strong> {activeListing.reviewNote}{" "}
+            {correctionSection && (
+              <a
+                className="ml-2 font-semibold underline"
+                href={`#listing-${correctionSection}`}
+              >
+                Go to {correctionSection}
+              </a>
+            )}
+          </div>
+        )}
+        {notice && (
+          <div
+            role="status"
+            className="uel-alert flex items-center gap-2 border-l-4 border-[#173F35] bg-[#E0ECE1] px-4 py-3 text-[#173F35]"
+          >
+            <CheckCircle2 size={18} />
+            {notice}
+          </div>
+        )}
 
         <div className="uel-mode-bar">
-          <div className="uel-mode-text"><h2>How would you like to add items?</h2><p>Create one listing, or prepare several using our Excel templates.</p></div>
+          <div className="uel-mode-text">
+            <h2>How would you like to add items?</h2>
+            <p>
+              Create one listing, or prepare several using our Excel templates.
+            </p>
+          </div>
           <div className="uel-tabs" role="tablist" aria-label="Listing mode">
-            <button role="tab" aria-selected={activeTab === 'single'} data-active={activeTab === 'single'} className="uel-tab" type="button" onClick={() => setActiveTab('single')}>Single listing</button>
-            <button role="tab" aria-selected={activeTab === 'bulk'} data-active={activeTab === 'bulk'} className="uel-tab" type="button" onClick={() => setActiveTab('bulk')}>Bulk listing</button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "single"}
+              data-active={activeTab === "single"}
+              className="uel-tab"
+              type="button"
+              onClick={() => setActiveTab("single")}
+            >
+              Single listing
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "bulk"}
+              data-active={activeTab === "bulk"}
+              className="uel-tab"
+              type="button"
+              onClick={() => setActiveTab("bulk")}
+            >
+              Bulk listing
+            </button>
           </div>
         </div>
-        {activeTab === 'single' && <nav className="uel-jumpbar" aria-label="Jump to listing section">
-          <span>GO TO</span>
-          <a href="#listing-details"><b>01</b> Details</a>
-          <a href="#listing-media"><b>02</b> Photos</a>
-          {isRecipe && <a href="#listing-ingredients"><b>03</b> Ingredients</a>}
-          {isRecipe && <a href="#listing-steps"><b>04</b> Steps</a>}
-          <a href="#listing-nutrition"><b>{isRecipe ? '05' : '03'}</b> Food information</a>
-          {canSell && <a href="#listing-selling"><b>{isRecipe ? '06' : '04'}</b> Selling</a>}
-        </nav>}
-        {activeTab === 'bulk' ? (
+        {activeTab === "single" && (
+          <nav className="uel-jumpbar" aria-label="Jump to listing section">
+            <span>GO TO</span>
+            <a href="#listing-details">
+              <b>01</b> Details
+            </a>
+            <a href="#listing-media">
+              <b>02</b> Photos
+            </a>
+            {isRecipe && (
+              <a href="#listing-ingredients">
+                <b>03</b> Ingredients
+              </a>
+            )}
+            {isRecipe && (
+              <a href="#listing-steps">
+                <b>04</b> Steps
+              </a>
+            )}
+            <a href="#listing-nutrition">
+              <b>{isRecipe ? "05" : "03"}</b> Food information
+            </a>
+            {canSell && (
+              <a href="#listing-selling">
+                <b>{isRecipe ? "06" : "04"}</b> Selling
+              </a>
+            )}
+          </nav>
+        )}
+        {activeTab === "bulk" ? (
           <div className="mt-6 space-y-5">
             <section className="uel-bulk-section">
-              <h2 className="text-2xl font-bold"><span className="uel-section-number">01</span> / Download your Excel template</h2>
-              <p className="mt-2 text-sm text-[#4A5850]">Choose the template for your listing. Grocery uses product details and photos only; recipe and drink templates also include individual ingredients, their photos, preparation steps and costing.</p>
+              <h2 className="text-2xl font-bold">
+                <span className="uel-section-number">01</span> / Download your
+                Excel template
+              </h2>
+              <p className="mt-2 text-sm text-[#4A5850]">
+                Choose the template for your listing. Grocery uses product
+                details and photos only; recipe and drink templates also include
+                individual ingredients, their photos, preparation steps and
+                costing.
+              </p>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {visibleTemplates.map((item) => (
-                  <a key={item.key} href={`/templates/EPANTRY_Bulk_${item.key}.xlsx`} download className="uel-template flex items-center justify-between gap-3 font-semibold text-[#173F35] focus-visible:outline-2 focus-visible:outline-[#C86C42]">
-                    <span className="flex items-center gap-2"><FileSpreadsheet size={17}/>{item.label}</span><Download size={16}/>
+                  <a
+                    key={item.key}
+                    href={`/templates/EPANTRY_Bulk_${item.key}.xlsx`}
+                    download
+                    className="uel-template flex items-center justify-between gap-3 font-semibold text-[#173F35] focus-visible:outline-2 focus-visible:outline-[#C86C42]"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileSpreadsheet size={17} />
+                      {item.label}
+                    </span>
+                    <Download size={16} />
                   </a>
                 ))}
               </div>
             </section>
             <section className="uel-bulk-section grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div>
-                <h2 className="text-2xl font-bold"><span className="uel-section-number">02</span> / Fill the sheets and upload</h2>
-                <p className="mt-2 text-sm leading-6 text-[#4A5850]">Open the Excel file and follow <strong>Start Here</strong>. Give each listing a unique <strong>listing_key</strong>. Use the same key in Photos, Ingredients, Steps and Allergens so every photo and detail attaches to the correct item. The sample sheet is for guidance only.</p>
-                <label htmlFor="epantry-bulk-excel" className="mt-4 block text-sm font-semibold">Choose your completed Excel (.xlsx)</label>
-                <input id="epantry-bulk-excel" type="file" disabled={busy} accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="mt-2 block w-full rounded-lg border border-[#CBD4C8] bg-white p-3 text-sm" onChange={async (event) => {
-                  const file = event.target.files?.[0]
-                  if (file) await previewExcel(file)
-                  event.target.value = ''
-                }}/>
-                {bulkFileName && <p className="mt-2 text-sm text-[#173F35]">Selected: {bulkFileName}</p>}
-                {bulkPreview && <div className="mt-5 border border-[#B7C6B8] bg-[#F0F4ED] p-4">
-                  <h3 className="font-bold"><span className="uel-section-number">03</span> / Review before importing</h3>
-                  <p className="mt-1 text-sm">{bulkPreview.packets.length} draft listings · {bulkPreview.mediaCount} unique images · {bulkPreview.template.replaceAll('_', ' ')} template</p>
-                  <div className="mt-3 max-h-72 overflow-auto border-t border-[#CBD4C8]">
-                    {bulkPreview.packets.map((packet, index) => <div key={index} className="flex flex-wrap justify-between gap-2 border-b border-[#CBD4C8] py-2 text-sm"><span><strong>{index + 1}. {packet.title}</strong><br/>{packet.category.replaceAll('_', ' ')}</span><span className="text-[#53635B]">{packet.images.length} photos · {packet.ingredients.length} ingredients · {packet.steps.length} steps</span></div>)}
+                <h2 className="text-2xl font-bold">
+                  <span className="uel-section-number">02</span> / Fill the
+                  sheets and upload
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#4A5850]">
+                  Open the Excel file and follow <strong>Start Here</strong>.
+                  Give each listing a unique <strong>listing_key</strong>. Use
+                  the same key in Photos, Ingredients, Steps and Allergens so
+                  every photo and detail attaches to the correct item. The
+                  sample sheet is for guidance only.
+                </p>
+                <label
+                  htmlFor="epantry-bulk-excel"
+                  className="mt-4 block text-sm font-semibold"
+                >
+                  Choose your completed Excel (.xlsx)
+                </label>
+                <input
+                  id="epantry-bulk-excel"
+                  type="file"
+                  disabled={busy}
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="mt-2 block w-full rounded-lg border border-[#CBD4C8] bg-white p-3 text-sm"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (file) await previewExcel(file);
+                    event.target.value = "";
+                  }}
+                />
+                {bulkFileName && (
+                  <p className="mt-2 text-sm text-[#173F35]">
+                    Selected: {bulkFileName}
+                  </p>
+                )}
+                {bulkPreview && (
+                  <div className="mt-5 border border-[#B7C6B8] bg-[#F0F4ED] p-4">
+                    <h3 className="font-bold">
+                      <span className="uel-section-number">03</span> / Review
+                      before importing
+                    </h3>
+                    <p className="mt-1 text-sm">
+                      {bulkPreview.packets.length} draft listings ·{" "}
+                      {bulkPreview.mediaCount} unique images ·{" "}
+                      {bulkPreview.template.replaceAll("_", " ")} template
+                    </p>
+                    <div className="mt-3 max-h-72 overflow-auto border-t border-[#CBD4C8]">
+                      {bulkPreview.packets.map((packet, index) => (
+                        <div
+                          key={index}
+                          className="flex flex-wrap justify-between gap-2 border-b border-[#CBD4C8] py-2 text-sm"
+                        >
+                          <span>
+                            <strong>
+                              {index + 1}. {packet.title}
+                            </strong>
+                            <br />
+                            {packet.category.replaceAll("_", " ")}
+                          </span>
+                          <span className="text-[#53635B]">
+                            {packet.images.length} photos ·{" "}
+                            {packet.ingredients.length} ingredients ·{" "}
+                            {packet.steps.length} steps
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {bulkPreview.issues.length > 0 && (
+                      <div className="mt-3 border-l-4 border-[#C86C42] bg-[#FFF1E8] p-3 text-sm">
+                        <strong>
+                          Complete these fields before final submission:
+                        </strong>
+                        <ul className="mt-1 list-disc space-y-1 pl-4">
+                          {bulkPreview.issues
+                            .slice(0, 15)
+                            .map((issue, index) => (
+                              <li key={index}>
+                                {issue.key}: {issue.message}
+                              </li>
+                            ))}
+                        </ul>
+                        {bulkPreview.issues.length > 15 && (
+                          <p>
+                            And {bulkPreview.issues.length - 15} more notices.
+                            All records will remain drafts.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {bulkProgress && (
+                      <p
+                        role="status"
+                        className="mt-3 text-sm font-semibold text-[#173F35]"
+                      >
+                        {bulkProgress}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={importExcelDrafts}
+                      className={`${styles.button} mt-4`}
+                    >
+                      <UploadCloud size={16} className="mr-2 inline" />
+                      {busy
+                        ? "Importing..."
+                        : "Import images & save draft listings"}
+                    </button>
                   </div>
-                  {bulkPreview.issues.length > 0 && <div className="mt-3 border-l-4 border-[#C86C42] bg-[#FFF1E8] p-3 text-sm"><strong>Complete these fields before final submission:</strong><ul className="mt-1 list-disc space-y-1 pl-4">{bulkPreview.issues.slice(0, 15).map((issue, index) => <li key={index}>{issue.key}: {issue.message}</li>)}</ul>{bulkPreview.issues.length > 15 && <p>And {bulkPreview.issues.length - 15} more notices. All records will remain drafts.</p>}</div>}
-                  {bulkProgress && <p role="status" className="mt-3 text-sm font-semibold text-[#173F35]">{bulkProgress}</p>}
-                  <button type="button" disabled={busy} onClick={importExcelDrafts} className={`${styles.button} mt-4`}><UploadCloud size={16} className="mr-2 inline"/>{busy ? 'Importing...' : 'Import images & save draft listings'}</button>
-                </div>}
+                )}
               </div>
               <aside className="uel-bulk-help">
                 <h3 className="font-bold">Public Google Drive images</h3>
-                <p className="mt-2">Upload each image as a <strong>file</strong> to Google Drive → Share → General access → <strong>Anyone with the link</strong> → Viewer. Paste the copied <strong>file link</strong> into Excel. Folder links and private files will fail.</p>
-                <p className="mt-3">During import, EPANTRY attempts to copy each accessible JPG, PNG or WebP into its own Cloudinary storage. The real uploaded photo is then attached to the corresponding item/ingredient, not a random placeholder.</p>
-                <p className="mt-3 font-semibold">Up to 25 listings and 120 different images per workbook. Uploaded records remain drafts for review; delivery pincodes, stock and selling prices are never auto-published.</p>
+                <p className="mt-2">
+                  Upload each image as a <strong>file</strong> to Google Drive →
+                  Share → General access → <strong>Anyone with the link</strong>{" "}
+                  → Viewer. Paste the copied <strong>file link</strong> into
+                  Excel. Folder links and private files will fail.
+                </p>
+                <p className="mt-3">
+                  During import, EPANTRY attempts to copy each accessible JPG,
+                  PNG or WebP into its own Cloudinary storage. The real uploaded
+                  photo is then attached to the corresponding item/ingredient,
+                  not a random placeholder.
+                </p>
+                <p className="mt-3 font-semibold">
+                  Up to 25 listings and 120 different images per workbook.
+                  Uploaded records remain drafts for review; delivery pincodes,
+                  stock and selling prices are never auto-published.
+                </p>
               </aside>
             </section>
             <details className="border-t border-[#D7DDCF] pt-4">
-              <summary className="cursor-pointer text-sm font-semibold text-[#173F35]">Advanced: import existing JSON bulk file (unchanged)</summary>
-              <p className="mt-2 text-sm leading-6 text-[#4A5850]">Existing JSON import stays available for automated Host workflows. For normal bulk listing, use the Excel template above.</p>
-              <input type="file" accept=".json,application/json" className="mt-3 block w-full text-sm" onChange={async (event) => {
-                const file = event.target.files?.[0]
-                if (!file) return
-                if (file.size > 1000000) { setError('Bulk JSON file must be under 1 MB.'); return }
-                setBulkText(await file.text())
-              }}/>
-              <textarea rows={5} value={bulkText} onChange={(event) => setBulkText(event.target.value)} className={`${field} mt-3 font-mono text-xs`} placeholder={'[\n  { "type": "grocery", "title": "Example product", "category": "grocery", "images": [] }\n]'}/>
-              <button type="button" disabled={busy || !bulkText.trim()} onClick={bulkImport} className={`${styles.secondary} mt-3`}>Import JSON as drafts</button>
+              <summary className="cursor-pointer text-sm font-semibold text-[#173F35]">
+                Advanced: import existing JSON bulk file (unchanged)
+              </summary>
+              <p className="mt-2 text-sm leading-6 text-[#4A5850]">
+                Existing JSON import stays available for automated Host
+                workflows. For normal bulk listing, use the Excel template
+                above.
+              </p>
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="mt-3 block w-full text-sm"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 1000000) {
+                    setError("Bulk JSON file must be under 1 MB.");
+                    return;
+                  }
+                  setBulkText(await file.text());
+                }}
+              />
+              <textarea
+                rows={5}
+                value={bulkText}
+                onChange={(event) => setBulkText(event.target.value)}
+                className={`${field} mt-3 font-mono text-xs`}
+                placeholder={
+                  '[\n  { "type": "grocery", "title": "Example product", "category": "grocery", "images": [] }\n]'
+                }
+              />
+              <button
+                type="button"
+                disabled={busy || !bulkText.trim()}
+                onClick={bulkImport}
+                className={`${styles.secondary} mt-3`}
+              >
+                Import JSON as drafts
+              </button>
             </details>
           </div>
         ) : (
           <>
-          {activeListing?.status === 'approved' && form.type !== 'grocery' && form.shareRecipe !== true && !revisingApproved &&
-            <section className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF3EB] px-4 py-4 sm:px-5" aria-label="Publish saved recipe details">
-              <h3 className="text-lg font-bold text-[#173F35]">Your cooking details are saved, but not shared</h3>
-              <p className="mt-1 text-[15px] leading-6 text-[#34453D]">This approved ready-made listing keeps its ingredient quantities and cooking steps private because <strong>Share recipe</strong> was off. You do not need to upload or type everything again.</p>
-              <p className="mt-2 text-sm font-semibold text-[#173F35]">Saved: {(form.ingredients || []).filter((item) => String(item?.name || '').trim()).length} ingredients · {(form.steps || []).filter((step) => String(step?.instruction || '').trim()).length} cooking steps</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button type="button" className={styles.button} disabled={busy || Boolean(uploading)} onClick={requestSavedRecipeSharing}>Share saved recipe · Send for approval</button>
-                <span className="text-[13px] leading-5 text-[#53635A]">Only Super Admin approval makes these details public. The current approved version stays live meanwhile.</span>
-              </div>
-            </section>}
-          {activeListing?.status === 'approved' && !revisingApproved && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#C86C42] bg-[#FFF0E7] px-4 py-3">
-            <p className="text-[15px] font-semibold text-[#173F35]">Need to update this approved listing? Edit the full details and submit them for Super Admin re-approval.</p>
-            <button type="button" className={styles.button} onClick={() => { if (window.confirm('Your approved listing will remain available while these edits are reviewed. Continue editing?')) setRevisingApproved(true) }}>Edit complete listing</button>
-          </div>}
-          {revisingApproved && <p role="status" className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF0E7] p-3 text-[15px] font-semibold text-[#173F35]">Your approved listing remains available. New changes appear only after Super Admin review.</p>}
-          <fieldset disabled={locked || busy || loading} className="uel-form min-w-0 disabled:opacity-85">
-            <section id="listing-details" className={section}>
-              <h2 className="text-2xl font-bold"><span className="uel-section-number">01</span> / The essentials</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <EditorField title="Listing type"><select value={form.type} className={field} onChange={(event) => startNew(event.target.value)}>{selectableTypes.map((item) => <option key={item.value} value={item.value}>{workspace === 'hybrid' && item.value === 'kitchen_recipe' ? 'Recipe' : usesHospitalityOperations && item.value === 'prepared_food'
-                  ? 'Ready-made food / menu item' 
-                  : workspace === 'chef_restaurant' && item.value === 'kitchen_recipe'
-                    ? 'Kitchen recipe'
-                    : item.label}</option>)}</select></EditorField>
-                <EditorField title="Item / recipe name"><input className={field} value={form.title} maxLength={180} onChange={(event) => patch('title', event.target.value)}/></EditorField>
-                {form.type === 'grocery' ? (
-                  <EditorField title="Customer category · Grocery"><select aria-label="Grocery product category" className={field} value={form.grocerySubcategory || ''} onChange={(event) => setForm((current) => ({ ...current, category: 'grocery', grocerySubcategory: event.target.value }))}>{groceryCategories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></EditorField>
-                ) : (
-                  <EditorField title="Customer category · Recipe"><select aria-label="Recipe food category" className={field} value={form.category === 'grocery' ? 'other' : form.category} onChange={(event) => patch('category', event.target.value)}>{recipeCategories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></EditorField>
-                )}
-                {workspace === 'hybrid' && form.type === 'grocery' && <EditorField title="How is it packed?"><select className={field} value={form.packagingType || ''} onChange={(event) => patch('packagingType', event.target.value)}>{packagingOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></EditorField>}
-                {workspace === 'hybrid' && <EditorField title="Food preference"><select className={field} value={form.dietary || 'not_declared'} onChange={(event) => patch('dietary', event.target.value)}>{dietaryOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></EditorField>}
-                {form.type === 'brand_recipe' ? (
-                  <EditorField title="Approved brand">
-                    <select className={field} value={form.brandName || ''} onChange={(event) => patch('brandName', event.target.value)}>
-                      <option value="">Choose your approved brand</option>
-                      {approvedBrands.map((brand) => <option key={brand.id} value={brand.name}>{brand.name}</option>)}
-                    </select>
-                    {brandLoadError && <p role="alert" className="mt-1 text-sm text-red-700">{brandLoadError}</p>}
-                    {!brandLoadError && approvedBrands.length === 0 && <p className="mt-1 text-sm text-[#5D665F]">No approved brands available for this business.</p>}
-                  </EditorField>
-                ) : <EditorField title="Brand name (if applicable)"><input className={field} value={form.brandName || ''} onChange={(event) => patch('brandName', event.target.value)}/></EditorField>}
-                <EditorField title="Your SKU (if applicable)"><input className={field} value={form.sku || ''} onChange={(event) => patch('sku', event.target.value)}/></EditorField>
-                <EditorField title={isRecipe ? 'Country of origin (Host-declared)' : 'Country of origin (as on product label)'}><input className={field} value={form.countryOfOrigin || ''} maxLength={100} onChange={(event) => patch('countryOfOrigin', event.target.value)} placeholder="e.g. India"/></EditorField>
-                <EditorField title={isRecipe ? 'Region / state of origin (if known)' : 'Region / state (optional)'}><input className={field} value={form.regionOfOrigin || ''} maxLength={100} onChange={(event) => patch('regionOfOrigin', event.target.value)} placeholder="e.g. Punjab"/></EditorField>
-                {isRecipe && <>
-                  <EditorField title="Recipe name in its local language (optional)"><input className={field} value={form.localRecipeName || ''} maxLength={200} onChange={(event) => patch('localRecipeName', event.target.value)} placeholder="Use the authentic written name, if known"/></EditorField>
-                  <EditorField title="Language of local name (optional)"><input className={field} value={form.localRecipeLanguage || ''} maxLength={80} onChange={(event) => patch('localRecipeLanguage', event.target.value)} placeholder="e.g. Hindi"/></EditorField>
-                  <EditorField title="English pronunciation / reading (optional)"><input className={field} value={form.englishNameReading || ''} maxLength={200} onChange={(event) => patch('englishNameReading', event.target.value)} placeholder="Use only when documented"/></EditorField>
-                </>}
-                {form.type === 'grocery' && <>
-                  <EditorField title="Product family"><input className={field} maxLength={160} value={form.productFamily || ''} onChange={(event) => patch('productFamily', event.target.value)} placeholder="e.g. Cooking oil"/></EditorField>
-                  <EditorField title="Units in one pack"><input className={field} type="number" min="1" step="1" value={form.unitsPerPack ?? ''} onChange={(event) => patch('unitsPerPack', event.target.value)} placeholder="e.g. 1"/></EditorField>
-                  <EditorField title="Manufacturer / packer (from label)"><input className={field} maxLength={180} value={form.manufacturerPacker || ''} onChange={(event) => patch('manufacturerPacker', event.target.value)} placeholder="Use actual manufacturer name"/></EditorField>
-                  <EditorField title="Serving size (from label)"><input className={field} maxLength={100} value={form.servingSize || ''} onChange={(event) => patch('servingSize', event.target.value)} placeholder="e.g. 30 g"/></EditorField>
-                  <div className="min-w-0"><EditorField title="Barcode / GTIN (from label, optional)"><input className={field} type="text" inputMode="numeric" maxLength={14} value={form.selling?.barcode || ''} onChange={(event) => { nested('selling', 'barcode', event.target.value.replace(/[^0-9]/g, '').slice(0, 14)); patch('catalogProductVersionId', ''); setBarcodeMatches([]); setBarcodeChecked('') }} placeholder="Enter the barcode printed on the pack" autoComplete="off"/></EditorField><button type="button" disabled={barcodeChecking || !form.selling?.barcode} onClick={checkBarcode} className={`${styles.secondary} mt-2`}>{barcodeChecking ? 'Checking...' : 'Check existing products'}</button></div>
-                  {barcodeChecked === form.selling?.barcode && <div className="min-w-0 rounded-lg border border-[#CBD4C8] bg-white p-3 sm:col-span-2" aria-live="polite">
-                    {barcodeMatches.length ? <><p className="mb-2 font-semibold">This barcode is already in EPANTRY. Select the correct product:</p>{barcodeMatches.map((match) => <label key={match.id} className="flex items-start gap-2 py-2"><input type="radio" name="catalog-match" checked={form.catalogProductVersionId === match.id} onChange={() => patch('catalogProductVersionId', match.id)}/><span>{match.title}</span></label>)}</> : <p>No published product uses this barcode yet. Your listing can be reviewed as a new product.</p>}
-                  </div>}
-                  <div className="sm:col-span-2 lg:col-span-3 grid gap-3 sm:grid-cols-2"><EditorField title="Ingredients printed on label (optional)"><textarea rows={2} className={field} value={form.labelDeclaration?.ingredients || ''} onChange={(event) => nested('labelDeclaration', 'ingredients', event.target.value)} placeholder="Copy the ingredients from the package"/></EditorField><EditorField title="Allergen statement printed on label (optional)"><textarea rows={2} className={field} value={form.labelDeclaration?.allergens || ''} onChange={(event) => nested('labelDeclaration', 'allergens', event.target.value)} placeholder="Copy the exact statement from the package"/></EditorField><EditorField title="Claims printed on label (optional)"><textarea rows={2} className={field} value={form.labelDeclaration?.claims || ''} onChange={(event) => nested('labelDeclaration', 'claims', event.target.value)} placeholder="Enter only claims visible on the package"/></EditorField></div>
-                </>}
-                {isRecipe && <EditorField title="Cuisine (optional)"><input className={field} maxLength={100} value={form.cuisine || ''} onChange={(event) => patch('cuisine', event.target.value)} placeholder="e.g. Indian"/></EditorField>}
-                {isRecipe && <EditorField title="Preparation time (minutes)"><input className={field} type="number" min="0" step="1" value={form.preparationMinutes ?? ''} onChange={(event) => patch('preparationMinutes', event.target.value)}/></EditorField>}
-                {isRecipe && <EditorField title="Cooking time (minutes)"><input className={field} type="number" min="0" step="1" value={form.cookingMinutes ?? ''} onChange={(event) => patch('cookingMinutes', event.target.value)}/></EditorField>}
-                {isRecipe && <EditorField title="Servings / batch yield"><input type="number" min="1" className={field} value={form.baseServings ?? ''} onChange={(event) => patch('baseServings', event.target.value)}/></EditorField>}
-                {isRecipe && <EditorField title="How difficult is this recipe?"><select aria-label="Recipe difficulty" className={field} value={form.difficulty || 'not_declared'} onChange={(event) => patch('difficulty', event.target.value)}><option value="not_declared">Not declared</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></EditorField>}
-              </div>
-              <EditorField title="Description"><textarea rows={2} maxLength={3000} className={`${field} mt-4`} value={form.description} onChange={(event) => patch('description', event.target.value)}/></EditorField>
-              {workspace === 'hybrid' && form.type === 'kitchen_recipe' && (
-                <fieldset className="uel-hybrid-recipe-choice mt-5" aria-label="Recipe publishing choice">
-                  <legend className="font-bold text-[#173F35]">What would you like to do with this recipe?</legend>
-                  <p className="mt-1 text-sm text-[#4A5850]">A recipe can be shared without a price. Choose the second option only if you will prepare and sell the finished food.</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <button type="button" aria-pressed={!form.sellReadyMade} className="uel-hybrid-choice" data-selected={!form.sellReadyMade} onClick={() => setForm((current) => ({ ...current, shareRecipe: true, sellReadyMade: false }))}>
-                      <strong>Share recipe only</strong><span>Ingredients, steps, photos and food information. No selling price or stock required.</span>
+            {activeListing?.status === "approved" &&
+              form.type !== "grocery" &&
+              form.shareRecipe !== true &&
+              !revisingApproved && (
+                <section
+                  className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF3EB] px-4 py-4 sm:px-5"
+                  aria-label="Publish saved recipe details"
+                >
+                  <h3 className="text-lg font-bold text-[#173F35]">
+                    Your cooking details are saved, but not shared
+                  </h3>
+                  <p className="mt-1 text-[15px] leading-6 text-[#34453D]">
+                    This approved ready-made listing keeps its ingredient
+                    quantities and cooking steps private because{" "}
+                    <strong>Share recipe</strong> was off. You do not need to
+                    upload or type everything again.
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-[#173F35]">
+                    Saved:{" "}
+                    {
+                      (form.ingredients || []).filter((item) =>
+                        String(item?.name || "").trim()
+                      ).length
+                    }{" "}
+                    ingredients ·{" "}
+                    {
+                      (form.steps || []).filter((step) =>
+                        String(step?.instruction || "").trim()
+                      ).length
+                    }{" "}
+                    cooking steps
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      className={styles.button}
+                      disabled={busy || Boolean(uploading)}
+                      onClick={requestSavedRecipeSharing}
+                    >
+                      Share saved recipe · Send for approval
                     </button>
-                    <button type="button" aria-pressed={Boolean(form.sellReadyMade)} className="uel-hybrid-choice" data-selected={Boolean(form.sellReadyMade)} onClick={() => setForm((current) => ({ ...current, shareRecipe: true, sellReadyMade: true }))}>
-                      <strong>Share & sell the finished dish</strong><span>Add price, stock, delivery coverage and a kitchen outlet for review.</span>
-                    </button>
+                    <span className="text-[13px] leading-5 text-[#53635A]">
+                      Only Super Admin approval makes these details public. The
+                      current approved version stays live meanwhile.
+                    </span>
                   </div>
-                </fieldset>
+                </section>
               )}
-              {workspace !== 'hybrid' && isRecipe && ['kitchen_recipe', 'prepared_food'].includes(form.type) && <div className="mt-4 space-y-2"><div className="flex flex-wrap gap-6 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={form.shareRecipe} onChange={(event) => patch('shareRecipe', event.target.checked)}/> Share recipe</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.sellReadyMade} disabled={form.type === 'prepared_food'} onChange={(event) => patch('sellReadyMade', event.target.checked)}/> Sell ready-made item</label></div>{!form.shareRecipe && <p className="text-sm leading-5 text-[#935130]">Ingredients and cooking steps will be saved for your kitchen but will stay hidden from customers. Enable Share recipe to publish them after approval.</p>}</div>}
-            </section>
-            <section id="listing-media" className={section}>
-              <h2 className="text-2xl font-bold"><span className="uel-section-number">02</span> / Show it beautifully {isRecipe ? '— photos & video' : '— photos'}</h2>
-              <p className="mt-1 text-sm text-[#4A5850]">Show customers what they will get. Add clear, real photos; for recipes, you can also include a cooking video and ingredient photos.</p>
-              <div className="mt-4 flex flex-wrap gap-3">{form.images.map((url, index) => {
-                const role = (form.imageRoles || []).find((item) => item.url === url)?.role
-                return <div key={`${url}-${index}`} className="relative">
-                  <img alt={`Listing photo ${index + 1}`} src={url} className="h-24 w-28 rounded-lg object-cover"/>
-                  {role && <span className="mt-1 block max-w-28 text-[13px] font-semibold leading-5 text-[#173F35]">{groceryPhotoRoleLabels[role] || ''}</span>}
-                  <button type="button" className="absolute right-1 top-1 rounded bg-white p-1" aria-label={`Remove photo ${index + 1}`} onClick={() => setForm((current) => ({
-                    ...current,
-                    images: current.images.filter((_, i) => i !== index),
-                    imageRoles: (current.imageRoles || []).filter((item) => item.url !== url),
-                  }))}><Trash2 size={15}/></button>
-                </div>
-              })}</div>
-              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#173F35] px-4 py-3 text-sm font-semibold text-[#173F35]"><ImagePlus size={18}/>{uploading.startsWith('images') ? 'Uploading...' : 'Upload listing photo'}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={Boolean(uploading) || form.images.length >= 12} onChange={(event) => { uploadImage(event.target.files?.[0], 'images'); event.target.value = '' }}/></label>
-              {form.type === 'grocery' && <details className="uel-packaging-details">
-                <summary className="uel-packaging-toggle" aria-label="Expand optional packaging and label photo uploads">
-                  <span className="uel-packaging-symbol"><ImagePlus size={22} aria-hidden="true"/></span>
-                  <span className="uel-packaging-caption"><strong>Add packaging & label photos</strong><small>7 photo types · Click to choose and upload</small></span>
-                  <span className="uel-packaging-optional">OPTIONAL</span>
-                  <ChevronDown size={21} className="uel-packaging-arrow" aria-hidden="true"/>
-                </summary>
-                <div className="uel-packaging-body">
-                  <p className="text-[15px] leading-6 text-[#465A4F]">Have photos of the ingredients, nutrition label, barcode or other packaging details? Add only what is relevant. None of these seven photos is required.</p>
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="min-w-0 flex-1"><EditorField title="Packaging photo type">
-                      <select aria-label="Optional packaging photo type" className={field} value={selectedGroceryPhotoRole} onChange={(event) => setSelectedGroceryPhotoRole(event.target.value)}>
-                        {groceryPhotoRoles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                      </select>
-                    </EditorField></div>
-                    <label className="uel-packaging-upload inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 text-[15px]">
-                      <ImagePlus size={18} aria-hidden="true"/>{uploading.startsWith('images') ? 'Uploading...' : 'Upload this photo'}
-                      <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={Boolean(uploading) || form.images.length >= 12} onChange={(event) => { uploadImage(event.target.files?.[0], 'images', -1, selectedGroceryPhotoRole); event.target.value = '' }}/>
-                    </label>
-                  </div>
-                  <p className="mt-3 text-[14px] text-[#54635B]">{form.images.length}/12 total listing photos uploaded. You can skip all extra packaging photos.</p>
-                </div>
-              </details>}
-              {isRecipe && <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <div className="min-w-0">
-                  <p className="uel-label mb-2 block">Recipe video (optional)</p>
-                  {form.videoUrl && form.videoFileName ? (
-                    <div className="uel-video-uploaded">
-                      <div className="min-w-0"><span className="text-[13px] text-[#557366]">Uploaded from your device</span><strong className="uel-video-filename">{form.videoFileName}</strong></div>
-                      <a className="uel-video-link" href={form.videoUrl} target="_blank" rel="noopener noreferrer">Preview video <ArrowUpRight size={15} className="inline"/></a>
-                    </div>
-                  ) : <input aria-label="Recipe video HTTPS link" className={field} type="url" value={form.videoUrl || ''} onChange={(event) => setForm((current) => ({ ...current, videoUrl: event.target.value, videoFileName: '' }))} placeholder="Paste an HTTPS video link (optional)"/>}
-                  {form.videoUrl && form.videoFileName && <button type="button" className="mt-2 text-[13px] font-semibold text-[#315A4A] underline underline-offset-2" onClick={() => patch('videoFileName', '')}>Edit video URL manually</button>}
-                </div>
-                <label className="inline-flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#173F35] bg-[#F7F6F2] px-4 py-3 text-[15px] font-semibold text-[#173F35]"><UploadCloud size={18}/>{uploading === 'video' ? 'Uploading...' : form.videoUrl ? 'Replace video' : 'Upload video (50 MB max)'}<input className="sr-only" type="file" accept="video/mp4,video/webm" disabled={Boolean(uploading)} onChange={(event) => { uploadVideo(event.target.files?.[0]); event.target.value = '' }}/></label>
-              </div>}
-            </section>
-            {isRecipe && <section id="listing-ingredients" className={`${section} uel-ingredient-editor`}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-2xl font-bold"><span className="uel-section-number">03</span> / Ingredients & costing</h2>
-                <button className={styles.secondary} type="button" onClick={() => patch('ingredients', [...form.ingredients, emptyIngredient()])}><Plus size={16} className="mr-1 inline"/> Add ingredient</button>
-              </div>
-              <p className="uel-ingredient-intro">List what goes into this recipe. For costs, enter what you paid for the full purchased pack and how much of it you use. We'll calculate the ingredient cost automatically.</p>
-              <div className="uel-ingredient-list">{form.ingredients.map((item, index) => <div key={index} className="uel-ingredient-row">
-                <div className="uel-ingredient-heading">
-                  <h3>Ingredient {String(index + 1).padStart(2, '0')}{item.name ? <span className="ml-2 text-[14px] font-medium text-[#617565]">· {item.name}</span> : null}</h3>
-                  <button type="button" className="uel-row-delete" disabled={form.ingredients.length === 1} onClick={() => removeRow('ingredients', index)} aria-label={`Remove ingredient ${index + 1}`}><Trash2 size={16}/> Remove</button>
-                </div>
-                <div className="uel-ingredient-fields">
-                  <div className="uel-span-two"><EditorField title="Ingredient name"><IngredientNameInput className={field} ingredient={item} onChange={(value) => updateRow('ingredients', index, value)}/></EditorField></div>
-                  <EditorField title="Quantity used in recipe"><input className={field} type="number" min="0" step="any" value={item.quantity ?? ''} onChange={(event) => updateRow('ingredients', index, { quantity: event.target.value })}/></EditorField>
-                  <EditorField title="Unit used"><select className={field} value={item.unit} onChange={(event) => updateRow('ingredients', index, { unit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
-                  <EditorField title="Price paid for purchased pack (₹)"><input className={field} type="number" min="0" step="0.01" value={item.unitPrice ?? ''} onChange={(event) => updateRow('ingredients', index, { unitPrice: event.target.value })}/></EditorField>
-                  <EditorField title="Amount in purchased pack"><input className={field} type="number" min="0" step="any" value={item.priceQuantity ?? ''} onChange={(event) => updateRow('ingredients', index, { priceQuantity: event.target.value })}/></EditorField>
-                  <EditorField title="Purchased pack unit"><select className={field} value={item.priceUnit} onChange={(event) => updateRow('ingredients', index, { priceUnit: event.target.value })}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
-                  <div><EditorField title="Ingredient photo (optional)"><IngredientPhotoPicker ingredient={item} index={index} uploading={uploading} uploadImage={uploadImage} onChange={(value) => updateRow('ingredients', index, value)}/></EditorField></div>
-                  <EditorField title="Used as"><select className={field} value={item.role || 'main'} onChange={(event) => updateRow('ingredients', index, { role: event.target.value })}><option value="main">Main ingredient</option><option value="optional">Optional</option><option value="garnish">Garnish</option></select></EditorField>
-                  <EditorField title="Preparation (optional)"><input className={field} maxLength={120} value={item.preparationState || ''} onChange={(event) => updateRow('ingredients', index, { preparationState: event.target.value })} placeholder="e.g. Finely chopped"/></EditorField>
-                  <EditorField title="When changing servings"><select className={field} value={item.scalingRule || 'proportional'} onChange={(event) => updateRow('ingredients', index, { scalingRule: event.target.value })}><option value="proportional">Adjust quantity</option><option value="fixed">Keep quantity fixed</option></select></EditorField>
-                  <div className="uel-span-full"><EditorField title="Preparation / purchasing note (optional)"><input className={field} value={item.note || ''} onChange={(event) => updateRow('ingredients', index, { note: event.target.value })} placeholder="Example: Finely chopped, or purchased from local market"/></EditorField></div>
-                  <div className="uel-span-full uel-ingredient-cost"><span>Estimated cost used in this recipe</span><strong>{formatMoney(costs[index])}</strong></div>
-                </div>
-              </div>)}</div>
-              <div className="uel-cost-total" aria-live="polite"><span><strong>Ingredient total:</strong> {formatMoney(ingredientCost)}</span><span><strong>Complete cost:</strong> {formatMoney(completeCost)}</span><span><strong>Per serving:</strong> {completeCost !== null && Number(form.baseServings) > 0 ? formatMoney(completeCost / Number(form.baseServings)) : 'Not available'}</span><span className="uel-cost-note">{costingComplete ? 'All ingredient prices have been entered.' : 'Add purchased-pack prices and quantities to complete the estimate.'} Estimated from Host-entered prices.</span></div>
-            </section>}
-            {isRecipe && <section id="listing-steps" className={`${section} uel-steps-editor`}>
-              <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-bold"><span className="uel-section-number">04</span> / How to make it</h2></div>
-              <p className="uel-step-intro">Write each action in the order it happens. Add an approximate time only when useful; customers can follow these instructions step by step.</p>
-              <div className="uel-step-list">{form.steps.map((step, index) => <div key={index} className="uel-step-row">
-                <span className="uel-step-index" aria-label={`Step ${index + 1}`}>{String(index + 1).padStart(2, '0')}</span>
-                <div className="uel-step-text"><EditorField title={`Step ${index + 1} · What to do`}><textarea className={field} rows={2} value={step.instruction || ''} onChange={(event) => updateRow('steps', index, { instruction: event.target.value })} placeholder="Example: Heat oil and add cumin seeds."/></EditorField></div>
-                <div className="uel-step-time"><EditorField title="Time (minutes, optional)"><input className={field} type="number" min="0" value={step.timerMinutes ?? ''} onChange={(event) => updateRow('steps', index, { timerMinutes: event.target.value })} placeholder="e.g. 5"/></EditorField></div>
-                <button type="button" className="uel-row-delete uel-step-remove" title={`Remove step ${index + 1}`} aria-label={`Remove step ${index + 1}`} disabled={form.steps.length === 1} onClick={() => removeRow('steps', index)}><Trash2 size={17}/></button>
-              </div>)}</div>
-              <button type="button" className={`${styles.secondary} uel-step-add-bottom`} onClick={() => patch('steps', [...form.steps, emptyStep()])}><Plus size={17} className="mr-1 inline"/> Add step</button>
-            </section>}
-          </fieldset>
-          <fieldset disabled={busy || loading} className="uel-form uel-updatable-fields min-w-0 disabled:opacity-85">
-            {locked && <p className="uel-revision-note" role="status"><strong>Editing a previously submitted listing:</strong> Only Food facts & allergens and Selling & delivery can be changed here. Saving sends these changes to Super Admin again. Your last approved version remains visible until Super Admin reviews the changes.</p>}
-            <section id="listing-nutrition" className={`${section} ${locked ? 'uel-locked-section' : ''}`}><h2 className="text-2xl font-bold"><span className="uel-section-number">{isRecipe ? '05' : '03'}</span> / Food facts & allergens</h2>
-              <p className="mt-2 text-sm text-[#4A5850]">Only enter values you can support with evidence. Leave unknown information undeclared.</p>
-              {locked && <span className="uel-editable-marker">Editable · re-approval required</span>}
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><EditorField title="Nutrition basis"><input className={field} value={form.nutrition?.basis || ''} onChange={(event) => nested('nutrition', 'basis', event.target.value)}/></EditorField>
-                {fields.map((item) => <EditorField key={item} title={item.replace(/([A-Z])/g, ' $1')}><input type="number" min="0" step="any" className={field} value={form.nutrition?.[item] ?? ''} onChange={(event) => nested('nutrition', item, event.target.value)}/></EditorField>)}
-                {workspace !== 'hybrid' && <EditorField title="Dietary declaration"><select value={form.dietary} className={field} onChange={(event) => patch('dietary', event.target.value)}>{['not_declared', 'vegetarian', 'vegan', 'non_vegetarian', 'other'].map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></EditorField>}</div>
-              <h3 className="mt-5 text-lg font-semibold">Allergen information</h3>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{allergenNames.map((key) => <EditorField key={key} title={key.replaceAll('_', ' ')}><select className={field} value={form.allergens.find((item) => item.key === key)?.relationship || ''} onChange={(event) => patch('allergens', [...form.allergens.filter((item) => item.key !== key), ...(event.target.value ? [{ key, relationship: event.target.value }] : [])])}><option value="">Not declared</option><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="does_not_contain">Does not contain</option><option value="unknown">Unknown / not verified</option></select></EditorField>)}</div>
-              <div className="uel-other-allergen">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div><h4 className="text-[16px] font-bold text-[#173F35]">Another allergen to declare?</h4><p className="mt-1 text-[14px] text-[#52665A]">Only add one if relevant. Additional allergens are optional.</p></div>
-                  <button type="button" className="uel-other-allergen-button" aria-expanded={showOtherAllergen} onClick={() => setShowOtherAllergen((current) => !current)}><Plus size={17}/> Other allergen</button>
-                </div>
-                {customAllergens.length > 0 && <div className="uel-custom-allergen-list">{customAllergens.map((entry) => <div className="uel-custom-allergen-item" key={entry.key}><strong>{entry.key.replaceAll('_', ' ')}</strong><select className={field} aria-label={`Declaration for ${entry.key.replaceAll('_', ' ')}`} value={entry.relationship} onChange={(event) => patch('allergens', form.allergens.map((item) => item.key === entry.key ? { ...item, relationship: event.target.value } : item))}><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="does_not_contain">Does not contain</option><option value="unknown">Unknown / not verified</option></select><button type="button" className="uel-row-delete" onClick={() => patch('allergens', form.allergens.filter((item) => item.key !== entry.key))}><Trash2 size={15}/> Remove</button></div>)}</div>}
-                {showOtherAllergen && <div className="uel-custom-allergen-row"><EditorField title="Allergen name"><input className={field} value={otherAllergenName} maxLength={70} onChange={(event) => setOtherAllergenName(event.target.value)} placeholder="e.g. Mustard"/></EditorField><EditorField title="Declaration"><select className={field} value={otherAllergenStatus} onChange={(event) => setOtherAllergenStatus(event.target.value)}><option value="">Choose</option><option value="contains">Contains</option><option value="may_contain">May contain</option><option value="does_not_contain">Does not contain</option><option value="unknown">Unknown / not verified</option></select></EditorField><button type="button" className={styles.secondary} onClick={addOtherAllergen}>Add allergen</button></div>}
-              </div>
-              <EditorField title="Evidence / calculation note"><textarea rows={2} className={`${field} mt-4`} value={form.nutrition?.evidenceNote || ''} onChange={(event) => nested('nutrition', 'evidenceNote', event.target.value)}/></EditorField>
-            </section>
-            {canSell && <section id="listing-selling" className={`${section} ${locked ? 'uel-locked-section' : ''}`}><span id="listing-delivery" /><h2 className="text-2xl font-bold"><span className="uel-section-number">{isRecipe ? '06' : '04'}</span> / Selling & delivery</h2>
-              <p className="mt-1 text-sm text-[#4A5850]">Set your pricing, available stock and delivery coverage. These details are reviewed here; your existing selling and delivery settings still control live orders.</p>
-              {locked && <span className="uel-editable-marker">Editable · re-approval required</span>}
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {[['listPrice', 'List price (Rs)'], ['salePrice', 'Selling price (Rs)'], ['stockQuantity', 'Available stock'], ['packagingCost', 'Packaging cost (Rs)'], ['labourCost', 'Preparation / staff cost (₹, optional)']].map(([key, title]) => <EditorField key={key} title={title}><input type="number" min="0" step="any" className={field} value={form.selling?.[key] ?? ''} onChange={(event) => nested('selling', key, event.target.value)}/></EditorField>)}
-                {form.type !== 'grocery' && <div className="sm:col-span-2 lg:col-span-4">
-                  <span className={`${styles.label} mb-1.5 block`}>Approved product match (optional)</span>
-                  <button type="button" disabled={productMatchBusy || form.title.trim().length < 3} onClick={findPublishedProduct} className={styles.secondary}>{productMatchBusy ? 'Searching...' : 'Find approved product'}</button>
-                  {form.catalogProductVersionId && <button type="button" className={`${styles.secondary} ml-2`} onClick={() => patch('catalogProductVersionId', '')}>Clear match</button>}
-                  {publishedProductMatches.length > 0 && <div className="mt-2 border border-[#CAD8CC] p-3" role="group" aria-label="Approved catalog products">
-                    {publishedProductMatches.map((product) => <label className="flex items-start gap-2 py-1.5" key={product.id}>
-                      <input type="radio" checked={form.catalogProductVersionId === product.id} onChange={() => {
-                        setForm((current) => ({ ...current, catalogProductVersionId: product.id,
-                          selling: { ...current.selling, packQuantity: product.quantity ?? '', packUnit: product.unit || 'piece' } }))
-                      }}/>
-                      <span>{product.title} — {product.quantity ?? 'Quantity not stated'} {product.unit}</span>
-                    </label>)}
-                  </div>}
-                  <p className="mt-1 text-sm text-[#4A5850]">Select an existing approved match when available. For a new item, one Super Admin approval will create its product and activate selling.</p>
-                </div>}
-                <EditorField title="Stock unit"><input className={field} value={form.selling?.stockUnit || 'piece'} onChange={(event) => nested('selling', 'stockUnit', event.target.value)}/></EditorField>
-                <EditorField title="Pack / portion quantity"><input className={field} type="number" min="0" step="any" value={form.selling?.packQuantity ?? ''} onChange={(event) => nested('selling', 'packQuantity', event.target.value)}/></EditorField>
-                <EditorField title="Pack / portion unit"><select className={field} value={form.selling?.packUnit || 'piece'} onChange={(event) => nested('selling', 'packUnit', event.target.value)}>{units.map((unit) => <option key={unit}>{unit}</option>)}</select></EditorField>
-                <EditorField title="Minimum order quantity"><input className={field} type="number" min="1" step="1" value={form.selling?.minimumOrderQuantity ?? ''} onChange={(event) => nested('selling', 'minimumOrderQuantity', event.target.value)}/></EditorField>
-                <EditorField title="Maximum order quantity (optional)"><input className={field} type="number" min="1" step="1" value={form.selling?.maximumOrderQuantity ?? ''} onChange={(event) => nested('selling', 'maximumOrderQuantity', event.target.value)}/></EditorField>
-
-                {isRecipe && <EditorField title={canSell ? 'Kitchen outlet (required for selling)' : 'Kitchen outlet (optional)'}><select className={field} value={form.selling?.outletId || ''} onChange={(event) => setForm((current) => ({ ...current, selling: { ...current.selling, outletId: event.target.value, menuId: '' } }))}><option value="">Choose an existing kitchen outlet</option>{outlets.map((outlet) => <option key={outlet.id} value={outlet.id}>{outlet.name || outlet.outletCode}</option>)}</select></EditorField>}
-                {isRecipe && <EditorField title="Restaurant menu (if available)"><select className={field} value={form.selling?.menuId || ''} onChange={(event) => nested('selling', 'menuId', event.target.value)}><option value="">No menu selected</option>{menus.filter((menu) => !form.selling?.outletId || menu.outletId === form.selling.outletId).map((menu) => <option key={menu.id} value={menu.id}>{menu.name || menu.menuCode}</option>)}</select></EditorField>}
-                {isRecipe && <EditorField title="Fulfilment"><select className={field} value={form.delivery?.fulfillment || 'delivery'} onChange={(event) => nested('delivery', 'fulfillment', event.target.value)}><option value="delivery">Delivery</option><option value="pickup">Pickup</option></select></EditorField>}
-                {isRecipe && <EditorField title="Preparation time (minutes)"><input type="number" min="0" className={field} value={form.delivery?.preparationMinutes ?? ''} onChange={(event) => nested('delivery', 'preparationMinutes', event.target.value)}/></EditorField>}
-              </div>
-              {form.delivery?.fulfillment === 'delivery' && <EditorField title="Delivery pincodes (comma-separated)"><textarea rows={2} className={`${field} mt-3`} value={pincodeText} onChange={(event) => { pincodeEditedRef.current = true; setPincodeText(event.target.value); nested('delivery', 'postalCodes', event.target.value.split(/[\s,;]+/).filter(Boolean)) }} placeholder="110001, 110002"/>{savedPostalCodes.length > 0 && <span className="mt-1 block text-[13px] leading-5 text-[#54635B]">Your saved active Host delivery areas are prefilled on new listings. You can change the pincodes for this item.</span>}</EditorField>}
-              <EditorField title="Delivery / pickup notes"><textarea rows={2} className={`${field} mt-3`} value={form.delivery?.note || ''} onChange={(event) => nested('delivery', 'note', event.target.value)}/></EditorField>
-            </section>}
-            {editingId && canSell && sellingReadiness && (
-              <div className="mb-4 border-l-4 border-[#173F35] bg-[#EEF2EA] p-4" role="status">
-                <p className="font-semibold text-[#173F35]">Selling status</p>
-                <p className="mt-1 text-sm text-[#40544A]">{sellingReadiness.message}</p>
-                {activeListing?.status === 'approved' && sellingReadiness?.offerStatus !== 'active' &&
-                  <button type="button" disabled={busy || Boolean(uploading)} onClick={resendSavedListingForSelling}
-                    className={`${styles.button} mt-3`}><Send size={17} className="mr-2 inline" />Send saved listing for selling approval</button>}
-                {sellingReadiness?.offerStatus === 'active' && <p className="mt-2 text-sm font-semibold text-[#245A43]">Customers can order this item using the approved selling details. No extra setup required.</p>}
+            {activeListing?.status === "approved" && !revisingApproved && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#C86C42] bg-[#FFF0E7] px-4 py-3">
+                <p className="text-[15px] font-semibold text-[#173F35]">
+                  Need to update this approved listing? Edit the full details
+                  and submit them for Super Admin re-approval.
+                </p>
+                <button
+                  type="button"
+                  className={styles.button}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Your approved listing will remain available while these edits are reviewed. Continue editing?"
+                      )
+                    )
+                      setRevisingApproved(true);
+                  }}
+                >
+                  Edit complete listing
+                </button>
               </div>
             )}
-            <section className={`${section} uel-review`}><h2 className="text-xl font-bold">Ready for review?</h2>
-              <p className="mt-2 text-sm text-[#4A5850]">{locked ? 'Food facts, allergens, pricing and delivery are editable. Your other details stay protected; these changes require Super Admin review before publishing.' : 'Save your progress or submit this complete listing once. Super Admin approval publishes the item and activates its selling details together.'}</p>
-              {locked ? (
-                <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={busy || Boolean(uploading)} onClick={saveSectionRevision} className={styles.button}><Send size={17} className="mr-2 inline"/>Save changes & send for review</button></div>
-              ) : (
-                <div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={busy || Boolean(uploading)} onClick={() => save(false)} className={styles.secondary}><Save size={17} className="mr-2 inline"/>Save full draft</button><button type="button" disabled={busy || Boolean(uploading)} onClick={() => save(true)} className={styles.button}><Send size={17} className="mr-2 inline"/>Save & submit for review</button></div>
+            {revisingApproved && (
+              <p
+                role="status"
+                className="mb-4 border-l-4 border-[#C86C42] bg-[#FFF0E7] p-3 text-[15px] font-semibold text-[#173F35]"
+              >
+                Your approved listing remains available. New changes appear only
+                after Super Admin review.
+              </p>
+            )}
+            <fieldset
+              disabled={locked || busy || loading}
+              className="uel-form min-w-0 disabled:opacity-85"
+            >
+              <section id="listing-details" className={section}>
+                <h2 className="text-2xl font-bold">
+                  <span className="uel-section-number">01</span> / The
+                  essentials
+                </h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <EditorField title="Listing type">
+                    <select
+                      value={form.type}
+                      className={field}
+                      onChange={(event) => startNew(event.target.value)}
+                    >
+                      {selectableTypes.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {workspace === "hybrid" &&
+                          item.value === "kitchen_recipe"
+                            ? "Recipe"
+                            : usesHospitalityOperations &&
+                              item.value === "prepared_food"
+                            ? "Ready-made food / menu item"
+                            : workspace === "chef_restaurant" &&
+                              item.value === "kitchen_recipe"
+                            ? "Kitchen recipe"
+                            : item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </EditorField>
+                  <EditorField title="Item / recipe name">
+                    <input
+                      className={field}
+                      value={form.title}
+                      maxLength={180}
+                      onChange={(event) => patch("title", event.target.value)}
+                    />
+                  </EditorField>
+                  {form.type === "grocery" ? (
+                    <EditorField title="Customer category · Grocery">
+                      <select
+                        aria-label="Grocery product category"
+                        className={field}
+                        value={form.grocerySubcategory || ""}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            category: "grocery",
+                            grocerySubcategory: event.target.value,
+                          }))
+                        }
+                      >
+                        {groceryCategories.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </EditorField>
+                  ) : (
+                    <EditorField title="Customer category · Recipe">
+                      <select
+                        aria-label="Recipe food category"
+                        className={field}
+                        value={
+                          form.category === "grocery" ? "other" : form.category
+                        }
+                        onChange={(event) =>
+                          patch("category", event.target.value)
+                        }
+                      >
+                        {recipeCategories.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </EditorField>
+                  )}
+                  {workspace === "hybrid" && form.type === "grocery" && (
+                    <EditorField title="How is it packed?">
+                      <select
+                        className={field}
+                        value={form.packagingType || ""}
+                        onChange={(event) =>
+                          patch("packagingType", event.target.value)
+                        }
+                      >
+                        {packagingOptions.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </EditorField>
+                  )}
+                  {workspace === "hybrid" && (
+                    <EditorField title="Food preference">
+                      <select
+                        className={field}
+                        value={form.dietary || "not_declared"}
+                        onChange={(event) =>
+                          patch("dietary", event.target.value)
+                        }
+                      >
+                        {dietaryOptions.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </EditorField>
+                  )}
+                  {form.type === "brand_recipe" ? (
+                    <EditorField title="Approved brand">
+                      <select
+                        className={field}
+                        value={form.brandName || ""}
+                        onChange={(event) =>
+                          patch("brandName", event.target.value)
+                        }
+                      >
+                        <option value="">Choose your approved brand</option>
+                        {approvedBrands.map((brand) => (
+                          <option key={brand.id} value={brand.name}>
+                            {brand.name}
+                          </option>
+                        ))}
+                      </select>
+                      {brandLoadError && (
+                        <p role="alert" className="mt-1 text-sm text-red-700">
+                          {brandLoadError}
+                        </p>
+                      )}
+                      {!brandLoadError && approvedBrands.length === 0 && (
+                        <p className="mt-1 text-sm text-[#5D665F]">
+                          No approved brands available for this business.
+                        </p>
+                      )}
+                    </EditorField>
+                  ) : (
+                    <EditorField title="Brand name (if applicable)">
+                      <input
+                        className={field}
+                        value={form.brandName || ""}
+                        onChange={(event) =>
+                          patch("brandName", event.target.value)
+                        }
+                      />
+                    </EditorField>
+                  )}
+                  <EditorField title="Your SKU (if applicable)">
+                    <input
+                      className={field}
+                      value={form.sku || ""}
+                      onChange={(event) => patch("sku", event.target.value)}
+                    />
+                  </EditorField>
+                  <EditorField
+                    title={
+                      isRecipe
+                        ? "Country of origin (Host-declared)"
+                        : "Country of origin (as on product label)"
+                    }
+                  >
+                    <input
+                      className={field}
+                      value={form.countryOfOrigin || ""}
+                      maxLength={100}
+                      onChange={(event) =>
+                        patch("countryOfOrigin", event.target.value)
+                      }
+                      placeholder="e.g. India"
+                    />
+                  </EditorField>
+                  <EditorField
+                    title={
+                      isRecipe
+                        ? "Region / state of origin (if known)"
+                        : "Region / state (optional)"
+                    }
+                  >
+                    <input
+                      className={field}
+                      value={form.regionOfOrigin || ""}
+                      maxLength={100}
+                      onChange={(event) =>
+                        patch("regionOfOrigin", event.target.value)
+                      }
+                      placeholder="e.g. Punjab"
+                    />
+                  </EditorField>
+                  {isRecipe && (
+                    <>
+                      <EditorField title="Recipe name in its local language (optional)">
+                        <input
+                          className={field}
+                          value={form.localRecipeName || ""}
+                          maxLength={200}
+                          onChange={(event) =>
+                            patch("localRecipeName", event.target.value)
+                          }
+                          placeholder="Use the authentic written name, if known"
+                        />
+                      </EditorField>
+                      <EditorField title="Language of local name (optional)">
+                        <input
+                          className={field}
+                          value={form.localRecipeLanguage || ""}
+                          maxLength={80}
+                          onChange={(event) =>
+                            patch("localRecipeLanguage", event.target.value)
+                          }
+                          placeholder="e.g. Hindi"
+                        />
+                      </EditorField>
+                      <EditorField title="English pronunciation / reading (optional)">
+                        <input
+                          className={field}
+                          value={form.englishNameReading || ""}
+                          maxLength={200}
+                          onChange={(event) =>
+                            patch("englishNameReading", event.target.value)
+                          }
+                          placeholder="Use only when documented"
+                        />
+                      </EditorField>
+                    </>
+                  )}
+                  {form.type === "grocery" && (
+                    <>
+                      <EditorField title="Product family">
+                        <input
+                          className={field}
+                          maxLength={160}
+                          value={form.productFamily || ""}
+                          onChange={(event) =>
+                            patch("productFamily", event.target.value)
+                          }
+                          placeholder="e.g. Cooking oil"
+                        />
+                      </EditorField>
+                      <EditorField title="Units in one pack">
+                        <input
+                          className={field}
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={form.unitsPerPack ?? ""}
+                          onChange={(event) =>
+                            patch("unitsPerPack", event.target.value)
+                          }
+                          placeholder="e.g. 1"
+                        />
+                      </EditorField>
+                      <EditorField title="Manufacturer / packer (from label)">
+                        <input
+                          className={field}
+                          maxLength={180}
+                          value={form.manufacturerPacker || ""}
+                          onChange={(event) =>
+                            patch("manufacturerPacker", event.target.value)
+                          }
+                          placeholder="Use actual manufacturer name"
+                        />
+                      </EditorField>
+                      <EditorField title="Serving size (from label)">
+                        <input
+                          className={field}
+                          maxLength={100}
+                          value={form.servingSize || ""}
+                          onChange={(event) =>
+                            patch("servingSize", event.target.value)
+                          }
+                          placeholder="e.g. 30 g"
+                        />
+                      </EditorField>
+                      <div className="min-w-0">
+                        <EditorField title="Barcode / GTIN (from label, optional)">
+                          <input
+                            id="host-listing-barcode"
+                            className={field}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={14}
+                            value={form.selling?.barcode || ""}
+                            aria-invalid={
+                              Boolean(barcodeValue) && !barcodeValid
+                            }
+                            aria-describedby="host-listing-barcode-help"
+                            onChange={(event) => {
+                              nested(
+                                "selling",
+                                "barcode",
+                                event.target.value
+                                  .replace(/[^0-9]/g, "")
+                                  .slice(0, 14)
+                              );
+                              patch("catalogProductVersionId", "");
+                              setBarcodeMatches([]);
+                              setBarcodeChecked("");
+                              setError((previous) =>
+                                /barcode|GTIN/i.test(previous) ? "" : previous
+                              );
+                            }}
+                            placeholder="Enter the barcode printed on the pack"
+                            autoComplete="off"
+                          />
+                        </EditorField>
+                        <p
+                          id="host-listing-barcode-help"
+                          className={`mt-1 text-sm leading-5 ${
+                            !barcodeValid ? "text-red-700" : "text-[#465A4F]"
+                          }`}
+                        >
+                          {!barcodeValue
+                            ? "No barcode on this item? Leave this optional field empty."
+                            : !barcodeLengthValid
+                            ? "Use 8, 12, 13 or 14 digits from the product label, or clear the field if there is no barcode."
+                            : !barcodeValid
+                            ? "The check digit does not match. Recheck the number on the label, or clear it if there is no barcode."
+                            : "Barcode format and check digit are valid."}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={
+                              barcodeChecking || !barcodeValue || !barcodeValid
+                            }
+                            onClick={checkBarcode}
+                            className={styles.secondary}
+                          >
+                            {barcodeChecking
+                              ? "Checking..."
+                              : "Check existing products"}
+                          </button>
+                          {barcodeValue && (
+                            <button
+                              type="button"
+                              className={styles.secondary}
+                              onClick={() => {
+                                nested("selling", "barcode", "");
+                                patch("catalogProductVersionId", "");
+                                setBarcodeMatches([]);
+                                setBarcodeChecked("");
+                                setError((previous) =>
+                                  /barcode|GTIN/i.test(previous) ? "" : previous
+                                );
+                              }}
+                            >
+                              Clear barcode
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {barcodeChecked === form.selling?.barcode && (
+                        <div
+                          className="min-w-0 rounded-lg border border-[#CBD4C8] bg-white p-3 sm:col-span-2"
+                          aria-live="polite"
+                        >
+                          {barcodeMatches.length ? (
+                            <>
+                              <p className="mb-2 font-semibold">
+                                This barcode is already in EPANTRY. Select the
+                                correct product:
+                              </p>
+                              {barcodeMatches.map((match) => (
+                                <label
+                                  key={match.id}
+                                  className="flex items-start gap-2 py-2"
+                                >
+                                  <input
+                                    type="radio"
+                                    name="catalog-match"
+                                    checked={
+                                      form.catalogProductVersionId === match.id
+                                    }
+                                    onChange={() =>
+                                      patch("catalogProductVersionId", match.id)
+                                    }
+                                  />
+                                  <span>{match.title}</span>
+                                </label>
+                              ))}
+                            </>
+                          ) : (
+                            <p>
+                              No published product uses this barcode yet. Your
+                              listing can be reviewed as a new product.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <div className="sm:col-span-2 lg:col-span-3 grid gap-3 sm:grid-cols-2">
+                        <EditorField title="Ingredients printed on label (optional)">
+                          <textarea
+                            rows={2}
+                            className={field}
+                            value={form.labelDeclaration?.ingredients || ""}
+                            onChange={(event) =>
+                              nested(
+                                "labelDeclaration",
+                                "ingredients",
+                                event.target.value
+                              )
+                            }
+                            placeholder="Copy the ingredients from the package"
+                          />
+                        </EditorField>
+                        <EditorField title="Allergen statement printed on label (optional)">
+                          <textarea
+                            rows={2}
+                            className={field}
+                            value={form.labelDeclaration?.allergens || ""}
+                            onChange={(event) =>
+                              nested(
+                                "labelDeclaration",
+                                "allergens",
+                                event.target.value
+                              )
+                            }
+                            placeholder="Copy the exact statement from the package"
+                          />
+                        </EditorField>
+                        <EditorField title="Claims printed on label (optional)">
+                          <textarea
+                            rows={2}
+                            className={field}
+                            value={form.labelDeclaration?.claims || ""}
+                            onChange={(event) =>
+                              nested(
+                                "labelDeclaration",
+                                "claims",
+                                event.target.value
+                              )
+                            }
+                            placeholder="Enter only claims visible on the package"
+                          />
+                        </EditorField>
+                      </div>
+                    </>
+                  )}
+                  {isRecipe && (
+                    <EditorField title="Cuisine (optional)">
+                      <input
+                        className={field}
+                        maxLength={100}
+                        value={form.cuisine || ""}
+                        onChange={(event) =>
+                          patch("cuisine", event.target.value)
+                        }
+                        placeholder="e.g. Indian"
+                      />
+                    </EditorField>
+                  )}
+                  {isRecipe && (
+                    <EditorField title="Preparation time (minutes)">
+                      <input
+                        className={field}
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={form.preparationMinutes ?? ""}
+                        onChange={(event) =>
+                          patch("preparationMinutes", event.target.value)
+                        }
+                      />
+                    </EditorField>
+                  )}
+                  {isRecipe && (
+                    <EditorField title="Cooking time (minutes)">
+                      <input
+                        className={field}
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={form.cookingMinutes ?? ""}
+                        onChange={(event) =>
+                          patch("cookingMinutes", event.target.value)
+                        }
+                      />
+                    </EditorField>
+                  )}
+                  {isRecipe && (
+                    <EditorField title="Servings / batch yield">
+                      <input
+                        type="number"
+                        min="1"
+                        className={field}
+                        value={form.baseServings ?? ""}
+                        onChange={(event) =>
+                          patch("baseServings", event.target.value)
+                        }
+                      />
+                    </EditorField>
+                  )}
+                  {isRecipe && (
+                    <EditorField title="How difficult is this recipe?">
+                      <select
+                        aria-label="Recipe difficulty"
+                        className={field}
+                        value={form.difficulty || "not_declared"}
+                        onChange={(event) =>
+                          patch("difficulty", event.target.value)
+                        }
+                      >
+                        <option value="not_declared">Not declared</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+                    </EditorField>
+                  )}
+                </div>
+                <EditorField title="Description">
+                  <textarea
+                    rows={2}
+                    maxLength={3000}
+                    className={`${field} mt-4`}
+                    value={form.description}
+                    onChange={(event) =>
+                      patch("description", event.target.value)
+                    }
+                  />
+                </EditorField>
+                {workspace === "hybrid" && form.type === "kitchen_recipe" && (
+                  <fieldset
+                    className="uel-hybrid-recipe-choice mt-5"
+                    aria-label="Recipe publishing choice"
+                  >
+                    <legend className="font-bold text-[#173F35]">
+                      What would you like to do with this recipe?
+                    </legend>
+                    <p className="mt-1 text-sm text-[#4A5850]">
+                      A recipe can be shared without a price. Choose the second
+                      option only if you will prepare and sell the finished
+                      food.
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        aria-pressed={!form.sellReadyMade}
+                        className="uel-hybrid-choice"
+                        data-selected={!form.sellReadyMade}
+                        onClick={() =>
+                          setForm((current) => ({
+                            ...current,
+                            shareRecipe: true,
+                            sellReadyMade: false,
+                          }))
+                        }
+                      >
+                        <strong>Share recipe only</strong>
+                        <span>
+                          Ingredients, steps, photos and food information. No
+                          selling price or stock required.
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={Boolean(form.sellReadyMade)}
+                        className="uel-hybrid-choice"
+                        data-selected={Boolean(form.sellReadyMade)}
+                        onClick={() =>
+                          setForm((current) => ({
+                            ...current,
+                            shareRecipe: true,
+                            sellReadyMade: true,
+                          }))
+                        }
+                      >
+                        <strong>Share & sell the finished dish</strong>
+                        <span>
+                          Add price, stock, delivery coverage and a kitchen
+                          outlet for review.
+                        </span>
+                      </button>
+                    </div>
+                  </fieldset>
+                )}
+                {workspace !== "hybrid" &&
+                  isRecipe &&
+                  ["kitchen_recipe", "prepared_food"].includes(form.type) && (
+                    <div className="mt-4 space-y-2">
+                      <div className="flex flex-wrap gap-6 text-sm">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={form.shareRecipe}
+                            onChange={(event) =>
+                              patch("shareRecipe", event.target.checked)
+                            }
+                          />{" "}
+                          Share recipe
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={form.sellReadyMade}
+                            disabled={form.type === "prepared_food"}
+                            onChange={(event) =>
+                              patch("sellReadyMade", event.target.checked)
+                            }
+                          />{" "}
+                          Sell ready-made item
+                        </label>
+                      </div>
+                      {!form.shareRecipe && (
+                        <p className="text-sm leading-5 text-[#935130]">
+                          Ingredients and cooking steps will be saved for your
+                          kitchen but will stay hidden from customers. Enable
+                          Share recipe to publish them after approval.
+                        </p>
+                      )}
+                    </div>
+                  )}
+              </section>
+              <section id="listing-media" className={section}>
+                <h2 className="text-2xl font-bold">
+                  <span className="uel-section-number">02</span> / Show it
+                  beautifully {isRecipe ? "— photos & video" : "— photos"}
+                </h2>
+                <p className="mt-1 text-sm text-[#4A5850]">
+                  Show customers what they will get. Add clear, real photos; for
+                  recipes, you can also include a cooking video and ingredient
+                  photos.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {form.images.map((url, index) => {
+                    const role = (form.imageRoles || []).find(
+                      (item) => item.url === url
+                    )?.role;
+                    return (
+                      <div key={`${url}-${index}`} className="relative">
+                        <img
+                          alt={`Listing photo ${index + 1}`}
+                          src={url}
+                          className="h-24 w-28 rounded-lg object-cover"
+                        />
+                        {role && (
+                          <span className="mt-1 block max-w-28 text-[13px] font-semibold leading-5 text-[#173F35]">
+                            {groceryPhotoRoleLabels[role] || ""}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="absolute right-1 top-1 rounded bg-white p-1"
+                          aria-label={`Remove photo ${index + 1}`}
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              images: current.images.filter(
+                                (_, i) => i !== index
+                              ),
+                              imageRoles: (current.imageRoles || []).filter(
+                                (item) => item.url !== url
+                              ),
+                            }))
+                          }
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#173F35] px-4 py-3 text-sm font-semibold text-[#173F35]">
+                  <ImagePlus size={18} />
+                  {uploading.startsWith("images")
+                    ? "Uploading..."
+                    : "Upload listing photo"}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    disabled={Boolean(uploading) || form.images.length >= 12}
+                    onChange={(event) => {
+                      uploadImage(event.target.files?.[0], "images");
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                {form.type === "grocery" && (
+                  <details className="uel-packaging-details">
+                    <summary
+                      className="uel-packaging-toggle"
+                      aria-label="Expand optional packaging and label photo uploads"
+                    >
+                      <span className="uel-packaging-symbol">
+                        <ImagePlus size={22} aria-hidden="true" />
+                      </span>
+                      <span className="uel-packaging-caption">
+                        <strong>Add packaging & label photos</strong>
+                        <small>
+                          7 photo types · Click to choose and upload
+                        </small>
+                      </span>
+                      <span className="uel-packaging-optional">OPTIONAL</span>
+                      <ChevronDown
+                        size={21}
+                        className="uel-packaging-arrow"
+                        aria-hidden="true"
+                      />
+                    </summary>
+                    <div className="uel-packaging-body">
+                      <p className="text-[15px] leading-6 text-[#465A4F]">
+                        Have photos of the ingredients, nutrition label, barcode
+                        or other packaging details? Add only what is relevant.
+                        None of these seven photos is required.
+                      </p>
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="min-w-0 flex-1">
+                          <EditorField title="Packaging photo type">
+                            <select
+                              aria-label="Optional packaging photo type"
+                              className={field}
+                              value={selectedGroceryPhotoRole}
+                              onChange={(event) =>
+                                setSelectedGroceryPhotoRole(event.target.value)
+                              }
+                            >
+                              {groceryPhotoRoles.map(([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          </EditorField>
+                        </div>
+                        <label className="uel-packaging-upload inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 text-[15px]">
+                          <ImagePlus size={18} aria-hidden="true" />
+                          {uploading.startsWith("images")
+                            ? "Uploading..."
+                            : "Upload this photo"}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="sr-only"
+                            disabled={
+                              Boolean(uploading) || form.images.length >= 12
+                            }
+                            onChange={(event) => {
+                              uploadImage(
+                                event.target.files?.[0],
+                                "images",
+                                -1,
+                                selectedGroceryPhotoRole
+                              );
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <p className="mt-3 text-[14px] text-[#54635B]">
+                        {form.images.length}/12 total listing photos uploaded.
+                        You can skip all extra packaging photos.
+                      </p>
+                    </div>
+                  </details>
+                )}
+                {isRecipe && (
+                  <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <div className="min-w-0">
+                      <p className="uel-label mb-2 block">
+                        Recipe video (optional)
+                      </p>
+                      {form.videoUrl && form.videoFileName ? (
+                        <div className="uel-video-uploaded">
+                          <div className="min-w-0">
+                            <span className="text-[13px] text-[#557366]">
+                              Uploaded from your device
+                            </span>
+                            <strong className="uel-video-filename">
+                              {form.videoFileName}
+                            </strong>
+                          </div>
+                          <a
+                            className="uel-video-link"
+                            href={form.videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Preview video{" "}
+                            <ArrowUpRight size={15} className="inline" />
+                          </a>
+                        </div>
+                      ) : (
+                        <input
+                          aria-label="Recipe video HTTPS link"
+                          className={field}
+                          type="url"
+                          value={form.videoUrl || ""}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              videoUrl: event.target.value,
+                              videoFileName: "",
+                            }))
+                          }
+                          placeholder="Paste an HTTPS video link (optional)"
+                        />
+                      )}
+                      {form.videoUrl && form.videoFileName && (
+                        <button
+                          type="button"
+                          className="mt-2 text-[13px] font-semibold text-[#315A4A] underline underline-offset-2"
+                          onClick={() => patch("videoFileName", "")}
+                        >
+                          Edit video URL manually
+                        </button>
+                      )}
+                    </div>
+                    <label className="inline-flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#173F35] bg-[#F7F6F2] px-4 py-3 text-[15px] font-semibold text-[#173F35]">
+                      <UploadCloud size={18} />
+                      {uploading === "video"
+                        ? "Uploading..."
+                        : form.videoUrl
+                        ? "Replace video"
+                        : "Upload video (50 MB max)"}
+                      <input
+                        className="sr-only"
+                        type="file"
+                        accept="video/mp4,video/webm"
+                        disabled={Boolean(uploading)}
+                        onChange={(event) => {
+                          uploadVideo(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+              </section>
+              {isRecipe && (
+                <section
+                  id="listing-ingredients"
+                  className={`${section} uel-ingredient-editor`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-2xl font-bold">
+                      <span className="uel-section-number">03</span> /
+                      Ingredients & costing
+                    </h2>
+                    <button
+                      className={styles.secondary}
+                      type="button"
+                      onClick={() =>
+                        patch("ingredients", [
+                          ...form.ingredients,
+                          emptyIngredient(),
+                        ])
+                      }
+                    >
+                      <Plus size={16} className="mr-1 inline" /> Add ingredient
+                    </button>
+                  </div>
+                  <p className="uel-ingredient-intro">
+                    List what goes into this recipe. For costs, enter what you
+                    paid for the full purchased pack and how much of it you use.
+                    We'll calculate the ingredient cost automatically.
+                  </p>
+                  <div className="uel-ingredient-list">
+                    {form.ingredients.map((item, index) => (
+                      <div key={index} className="uel-ingredient-row">
+                        <div className="uel-ingredient-heading">
+                          <h3>
+                            Ingredient {String(index + 1).padStart(2, "0")}
+                            {item.name ? (
+                              <span className="ml-2 text-[14px] font-medium text-[#617565]">
+                                · {item.name}
+                              </span>
+                            ) : null}
+                          </h3>
+                          <button
+                            type="button"
+                            className="uel-row-delete"
+                            disabled={form.ingredients.length === 1}
+                            onClick={() => removeRow("ingredients", index)}
+                            aria-label={`Remove ingredient ${index + 1}`}
+                          >
+                            <Trash2 size={16} /> Remove
+                          </button>
+                        </div>
+                        <div className="uel-ingredient-fields">
+                          <div className="uel-span-two">
+                            <EditorField title="Ingredient name">
+                              <IngredientNameInput
+                                className={field}
+                                ingredient={item}
+                                onChange={(value) =>
+                                  updateRow("ingredients", index, value)
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                          <EditorField title="Quantity used in recipe">
+                            <input
+                              className={field}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={item.quantity ?? ""}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  quantity: event.target.value,
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField title="Unit used">
+                            <select
+                              className={field}
+                              value={item.unit}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  unit: event.target.value,
+                                })
+                              }
+                            >
+                              {units.map((unit) => (
+                                <option key={unit}>{unit}</option>
+                              ))}
+                            </select>
+                          </EditorField>
+                          <EditorField title="Price paid for purchased pack (₹)">
+                            <input
+                              className={field}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.unitPrice ?? ""}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  unitPrice: event.target.value,
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField title="Amount in purchased pack">
+                            <input
+                              className={field}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={item.priceQuantity ?? ""}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  priceQuantity: event.target.value,
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField title="Purchased pack unit">
+                            <select
+                              className={field}
+                              value={item.priceUnit}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  priceUnit: event.target.value,
+                                })
+                              }
+                            >
+                              {units.map((unit) => (
+                                <option key={unit}>{unit}</option>
+                              ))}
+                            </select>
+                          </EditorField>
+                          <div>
+                            <EditorField title="Ingredient photo (optional)">
+                              <IngredientPhotoPicker
+                                ingredient={item}
+                                index={index}
+                                uploading={uploading}
+                                uploadImage={uploadImage}
+                                onChange={(value) =>
+                                  updateRow("ingredients", index, value)
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                          <EditorField title="Used as">
+                            <select
+                              className={field}
+                              value={item.role || "main"}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  role: event.target.value,
+                                })
+                              }
+                            >
+                              <option value="main">Main ingredient</option>
+                              <option value="optional">Optional</option>
+                              <option value="garnish">Garnish</option>
+                            </select>
+                          </EditorField>
+                          <EditorField title="Preparation (optional)">
+                            <input
+                              className={field}
+                              maxLength={120}
+                              value={item.preparationState || ""}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  preparationState: event.target.value,
+                                })
+                              }
+                              placeholder="e.g. Finely chopped"
+                            />
+                          </EditorField>
+                          <EditorField title="When changing servings">
+                            <select
+                              className={field}
+                              value={item.scalingRule || "proportional"}
+                              onChange={(event) =>
+                                updateRow("ingredients", index, {
+                                  scalingRule: event.target.value,
+                                })
+                              }
+                            >
+                              <option value="proportional">
+                                Adjust quantity
+                              </option>
+                              <option value="fixed">Keep quantity fixed</option>
+                            </select>
+                          </EditorField>
+                          <div className="uel-span-full">
+                            <EditorField title="Preparation / purchasing note (optional)">
+                              <input
+                                className={field}
+                                value={item.note || ""}
+                                onChange={(event) =>
+                                  updateRow("ingredients", index, {
+                                    note: event.target.value,
+                                  })
+                                }
+                                placeholder="Example: Finely chopped, or purchased from local market"
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="uel-span-full uel-ingredient-cost">
+                            <span>Estimated cost used in this recipe</span>
+                            <strong>{formatMoney(costs[index])}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="uel-cost-total" aria-live="polite">
+                    <span>
+                      <strong>Ingredient total:</strong>{" "}
+                      {formatMoney(ingredientCost)}
+                    </span>
+                    <span>
+                      <strong>Complete cost:</strong>{" "}
+                      {formatMoney(completeCost)}
+                    </span>
+                    <span>
+                      <strong>Per serving:</strong>{" "}
+                      {completeCost !== null && Number(form.baseServings) > 0
+                        ? formatMoney(completeCost / Number(form.baseServings))
+                        : "Not available"}
+                    </span>
+                    <span className="uel-cost-note">
+                      {costingComplete
+                        ? "All ingredient prices have been entered."
+                        : "Add purchased-pack prices and quantities to complete the estimate."}{" "}
+                      Estimated from Host-entered prices.
+                    </span>
+                  </div>
+                </section>
               )}
-            </section>
-          </fieldset>
-          {editingId && canSell && sellingReadiness?.catalogLinked && sellingReadiness?.offerStatus !== 'active' && <HostListingSalesSetup listingId={editingId} listing={activeListing?.packet || form}
-            readiness={sellingReadiness} onUpdated={() => { load(); getHostListingSellingReadiness(editingId).then(data => setSellingReadiness(data?.readiness || null)).catch(() => {}) }} />}
+              {isRecipe && (
+                <section
+                  id="listing-steps"
+                  className={`${section} uel-steps-editor`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-2xl font-bold">
+                      <span className="uel-section-number">04</span> / How to
+                      make it
+                    </h2>
+                  </div>
+                  <p className="uel-step-intro">
+                    Write each action in the order it happens. Add an
+                    approximate time only when useful; customers can follow
+                    these instructions step by step.
+                  </p>
+                  <div className="uel-step-list">
+                    {form.steps.map((step, index) => (
+                      <div key={index} className="uel-step-row">
+                        <span
+                          className="uel-step-index"
+                          aria-label={`Step ${index + 1}`}
+                        >
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <div className="uel-step-text">
+                          <EditorField title={`Step ${index + 1} · What to do`}>
+                            <textarea
+                              className={field}
+                              rows={2}
+                              value={step.instruction || ""}
+                              onChange={(event) =>
+                                updateRow("steps", index, {
+                                  instruction: event.target.value,
+                                })
+                              }
+                              placeholder="Example: Heat oil and add cumin seeds."
+                            />
+                          </EditorField>
+                        </div>
+                        <div className="uel-step-time">
+                          <EditorField title="Time (minutes, optional)">
+                            <input
+                              className={field}
+                              type="number"
+                              min="0"
+                              value={step.timerMinutes ?? ""}
+                              onChange={(event) =>
+                                updateRow("steps", index, {
+                                  timerMinutes: event.target.value,
+                                })
+                              }
+                              placeholder="e.g. 5"
+                            />
+                          </EditorField>
+                        </div>
+                        <button
+                          type="button"
+                          className="uel-row-delete uel-step-remove"
+                          title={`Remove step ${index + 1}`}
+                          aria-label={`Remove step ${index + 1}`}
+                          disabled={form.steps.length === 1}
+                          onClick={() => removeRow("steps", index)}
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className={`${styles.secondary} uel-step-add-bottom`}
+                    onClick={() => patch("steps", [...form.steps, emptyStep()])}
+                  >
+                    <Plus size={17} className="mr-1 inline" /> Add step
+                  </button>
+                </section>
+              )}
+            </fieldset>
+            <fieldset
+              disabled={busy || loading}
+              className="uel-form uel-updatable-fields min-w-0 disabled:opacity-85"
+            >
+              {locked && (
+                <p className="uel-revision-note" role="status">
+                  <strong>Editing a previously submitted listing:</strong> Only
+                  Food facts & allergens and Selling & delivery can be changed
+                  here. Saving sends these changes to Super Admin again. Your
+                  last approved version remains visible until Super Admin
+                  reviews the changes.
+                </p>
+              )}
+              <section
+                id="listing-nutrition"
+                className={`${section} ${locked ? "uel-locked-section" : ""}`}
+              >
+                <h2 className="text-2xl font-bold">
+                  <span className="uel-section-number">
+                    {isRecipe ? "05" : "03"}
+                  </span>{" "}
+                  / Food facts & allergens
+                </h2>
+                <p className="mt-2 text-sm text-[#4A5850]">
+                  Only enter values you can support with evidence. Leave unknown
+                  information undeclared.
+                </p>
+                {locked && (
+                  <span className="uel-editable-marker">
+                    Editable · re-approval required
+                  </span>
+                )}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <EditorField title="Nutrition basis">
+                    <input
+                      className={field}
+                      value={form.nutrition?.basis || ""}
+                      onChange={(event) =>
+                        nested("nutrition", "basis", event.target.value)
+                      }
+                    />
+                  </EditorField>
+                  {fields.map((item) => (
+                    <EditorField
+                      key={item}
+                      title={item.replace(/([A-Z])/g, " $1")}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        className={field}
+                        value={form.nutrition?.[item] ?? ""}
+                        onChange={(event) =>
+                          nested("nutrition", item, event.target.value)
+                        }
+                      />
+                    </EditorField>
+                  ))}
+                  {workspace !== "hybrid" && (
+                    <EditorField title="Dietary declaration">
+                      <select
+                        value={form.dietary}
+                        className={field}
+                        onChange={(event) =>
+                          patch("dietary", event.target.value)
+                        }
+                      >
+                        {[
+                          "not_declared",
+                          "vegetarian",
+                          "vegan",
+                          "non_vegetarian",
+                          "other",
+                        ].map((item) => (
+                          <option key={item} value={item}>
+                            {item.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </EditorField>
+                  )}
+                </div>
+                <h3 className="mt-5 text-lg font-semibold">
+                  Allergen information
+                </h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {allergenNames.map((key) => (
+                    <EditorField key={key} title={key.replaceAll("_", " ")}>
+                      <select
+                        className={field}
+                        value={
+                          form.allergens.find((item) => item.key === key)
+                            ?.relationship || ""
+                        }
+                        onChange={(event) =>
+                          patch("allergens", [
+                            ...form.allergens.filter(
+                              (item) => item.key !== key
+                            ),
+                            ...(event.target.value
+                              ? [{ key, relationship: event.target.value }]
+                              : []),
+                          ])
+                        }
+                      >
+                        <option value="">Not declared</option>
+                        <option value="contains">Contains</option>
+                        <option value="may_contain">May contain</option>
+                        <option value="does_not_contain">
+                          Does not contain
+                        </option>
+                        <option value="unknown">Unknown / not verified</option>
+                      </select>
+                    </EditorField>
+                  ))}
+                </div>
+                <div className="uel-other-allergen">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-[16px] font-bold text-[#173F35]">
+                        Another allergen to declare?
+                      </h4>
+                      <p className="mt-1 text-[14px] text-[#52665A]">
+                        Only add one if relevant. Additional allergens are
+                        optional.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="uel-other-allergen-button"
+                      aria-expanded={showOtherAllergen}
+                      onClick={() =>
+                        setShowOtherAllergen((current) => !current)
+                      }
+                    >
+                      <Plus size={17} /> Other allergen
+                    </button>
+                  </div>
+                  {customAllergens.length > 0 && (
+                    <div className="uel-custom-allergen-list">
+                      {customAllergens.map((entry) => (
+                        <div
+                          className="uel-custom-allergen-item"
+                          key={entry.key}
+                        >
+                          <strong>{entry.key.replaceAll("_", " ")}</strong>
+                          <select
+                            className={field}
+                            aria-label={`Declaration for ${entry.key.replaceAll(
+                              "_",
+                              " "
+                            )}`}
+                            value={entry.relationship}
+                            onChange={(event) =>
+                              patch(
+                                "allergens",
+                                form.allergens.map((item) =>
+                                  item.key === entry.key
+                                    ? {
+                                        ...item,
+                                        relationship: event.target.value,
+                                      }
+                                    : item
+                                )
+                              )
+                            }
+                          >
+                            <option value="contains">Contains</option>
+                            <option value="may_contain">May contain</option>
+                            <option value="does_not_contain">
+                              Does not contain
+                            </option>
+                            <option value="unknown">
+                              Unknown / not verified
+                            </option>
+                          </select>
+                          <button
+                            type="button"
+                            className="uel-row-delete"
+                            onClick={() =>
+                              patch(
+                                "allergens",
+                                form.allergens.filter(
+                                  (item) => item.key !== entry.key
+                                )
+                              )
+                            }
+                          >
+                            <Trash2 size={15} /> Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showOtherAllergen && (
+                    <div className="uel-custom-allergen-row">
+                      <EditorField title="Allergen name">
+                        <input
+                          className={field}
+                          value={otherAllergenName}
+                          maxLength={70}
+                          onChange={(event) =>
+                            setOtherAllergenName(event.target.value)
+                          }
+                          placeholder="e.g. Mustard"
+                        />
+                      </EditorField>
+                      <EditorField title="Declaration">
+                        <select
+                          className={field}
+                          value={otherAllergenStatus}
+                          onChange={(event) =>
+                            setOtherAllergenStatus(event.target.value)
+                          }
+                        >
+                          <option value="">Choose</option>
+                          <option value="contains">Contains</option>
+                          <option value="may_contain">May contain</option>
+                          <option value="does_not_contain">
+                            Does not contain
+                          </option>
+                          <option value="unknown">
+                            Unknown / not verified
+                          </option>
+                        </select>
+                      </EditorField>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={addOtherAllergen}
+                      >
+                        Add allergen
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <EditorField title="Evidence / calculation note">
+                  <textarea
+                    rows={2}
+                    className={`${field} mt-4`}
+                    value={form.nutrition?.evidenceNote || ""}
+                    onChange={(event) =>
+                      nested("nutrition", "evidenceNote", event.target.value)
+                    }
+                  />
+                </EditorField>
+              </section>
+              {canSell && (
+                <section
+                  id="listing-selling"
+                  className={`${section} ${locked ? "uel-locked-section" : ""}`}
+                >
+                  <span id="listing-delivery" />
+                  <h2 className="text-2xl font-bold">
+                    <span className="uel-section-number">
+                      {isRecipe ? "06" : "04"}
+                    </span>{" "}
+                    / Selling & delivery
+                  </h2>
+                  <p className="mt-1 text-sm text-[#4A5850]">
+                    Set your pricing, available stock and delivery coverage.
+                    These details are reviewed here; your existing selling and
+                    delivery settings still control live orders.
+                  </p>
+                  {locked && (
+                    <span className="uel-editable-marker">
+                      Editable · re-approval required
+                    </span>
+                  )}
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {[
+                      ["listPrice", "List price (Rs)"],
+                      ["salePrice", "Selling price (Rs)"],
+                      ["stockQuantity", "Available stock"],
+                      ["packagingCost", "Packaging cost (Rs)"],
+                      ["labourCost", "Preparation / staff cost (₹, optional)"],
+                    ].map(([key, title]) => (
+                      <EditorField key={key} title={title}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          className={field}
+                          value={form.selling?.[key] ?? ""}
+                          onChange={(event) =>
+                            nested("selling", key, event.target.value)
+                          }
+                        />
+                      </EditorField>
+                    ))}
+                    {form.type !== "grocery" && (
+                      <div className="sm:col-span-2 lg:col-span-4">
+                        <span className={`${styles.label} mb-1.5 block`}>
+                          Approved product match (optional)
+                        </span>
+                        <button
+                          type="button"
+                          disabled={
+                            productMatchBusy || form.title.trim().length < 3
+                          }
+                          onClick={findPublishedProduct}
+                          className={styles.secondary}
+                        >
+                          {productMatchBusy
+                            ? "Searching..."
+                            : "Find approved product"}
+                        </button>
+                        {form.catalogProductVersionId && (
+                          <button
+                            type="button"
+                            className={`${styles.secondary} ml-2`}
+                            onClick={() => patch("catalogProductVersionId", "")}
+                          >
+                            Clear match
+                          </button>
+                        )}
+                        {publishedProductMatches.length > 0 && (
+                          <div
+                            className="mt-2 border border-[#CAD8CC] p-3"
+                            role="group"
+                            aria-label="Approved catalog products"
+                          >
+                            {publishedProductMatches.map((product) => (
+                              <label
+                                className="flex items-start gap-2 py-1.5"
+                                key={product.id}
+                              >
+                                <input
+                                  type="radio"
+                                  checked={
+                                    form.catalogProductVersionId === product.id
+                                  }
+                                  onChange={() => {
+                                    setForm((current) => ({
+                                      ...current,
+                                      catalogProductVersionId: product.id,
+                                      selling: {
+                                        ...current.selling,
+                                        packQuantity: product.quantity ?? "",
+                                        packUnit: product.unit || "piece",
+                                      },
+                                    }));
+                                  }}
+                                />
+                                <span>
+                                  {product.title} —{" "}
+                                  {product.quantity ?? "Quantity not stated"}{" "}
+                                  {product.unit}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        <p className="mt-1 text-sm text-[#4A5850]">
+                          Select an existing approved match when available. For
+                          a new item, one Super Admin approval will create its
+                          product and activate selling.
+                        </p>
+                      </div>
+                    )}
+                    <EditorField title="Stock unit">
+                      <input
+                        className={field}
+                        value={form.selling?.stockUnit || "piece"}
+                        onChange={(event) =>
+                          nested("selling", "stockUnit", event.target.value)
+                        }
+                      />
+                    </EditorField>
+                    <EditorField title="Pack / portion quantity">
+                      <input
+                        className={field}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={form.selling?.packQuantity ?? ""}
+                        onChange={(event) =>
+                          nested("selling", "packQuantity", event.target.value)
+                        }
+                      />
+                    </EditorField>
+                    <EditorField title="Pack / portion unit">
+                      <select
+                        className={field}
+                        value={form.selling?.packUnit || "piece"}
+                        onChange={(event) =>
+                          nested("selling", "packUnit", event.target.value)
+                        }
+                      >
+                        {units.map((unit) => (
+                          <option key={unit}>{unit}</option>
+                        ))}
+                      </select>
+                    </EditorField>
+                    <EditorField title="Minimum order quantity">
+                      <input
+                        className={field}
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.selling?.minimumOrderQuantity ?? ""}
+                        onChange={(event) =>
+                          nested(
+                            "selling",
+                            "minimumOrderQuantity",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </EditorField>
+                    <EditorField title="Maximum order quantity (optional)">
+                      <input
+                        className={field}
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.selling?.maximumOrderQuantity ?? ""}
+                        onChange={(event) =>
+                          nested(
+                            "selling",
+                            "maximumOrderQuantity",
+                            event.target.value
+                          )
+                        }
+                      />
+                    </EditorField>
+
+                    {isRecipe && (
+                      <EditorField
+                        title={
+                          canSell
+                            ? "Kitchen outlet (required for selling)"
+                            : "Kitchen outlet (optional)"
+                        }
+                      >
+                        <select
+                          className={field}
+                          value={form.selling?.outletId || ""}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              selling: {
+                                ...current.selling,
+                                outletId: event.target.value,
+                                menuId: "",
+                              },
+                            }))
+                          }
+                        >
+                          <option value="">
+                            Choose an existing kitchen outlet
+                          </option>
+                          {outlets.map((outlet) => (
+                            <option key={outlet.id} value={outlet.id}>
+                              {outlet.name || outlet.outletCode}
+                            </option>
+                          ))}
+                        </select>
+                      </EditorField>
+                    )}
+                    {isRecipe && (
+                      <EditorField title="Restaurant menu (if available)">
+                        <select
+                          className={field}
+                          value={form.selling?.menuId || ""}
+                          onChange={(event) =>
+                            nested("selling", "menuId", event.target.value)
+                          }
+                        >
+                          <option value="">No menu selected</option>
+                          {menus
+                            .filter(
+                              (menu) =>
+                                !form.selling?.outletId ||
+                                menu.outletId === form.selling.outletId
+                            )
+                            .map((menu) => (
+                              <option key={menu.id} value={menu.id}>
+                                {menu.name || menu.menuCode}
+                              </option>
+                            ))}
+                        </select>
+                      </EditorField>
+                    )}
+                    {isRecipe && (
+                      <EditorField title="Fulfilment">
+                        <select
+                          className={field}
+                          value={form.delivery?.fulfillment || "delivery"}
+                          onChange={(event) =>
+                            nested(
+                              "delivery",
+                              "fulfillment",
+                              event.target.value
+                            )
+                          }
+                        >
+                          <option value="delivery">Delivery</option>
+                          <option value="pickup">Pickup</option>
+                        </select>
+                      </EditorField>
+                    )}
+                    {isRecipe && (
+                      <EditorField title="Preparation time (minutes)">
+                        <input
+                          type="number"
+                          min="0"
+                          className={field}
+                          value={form.delivery?.preparationMinutes ?? ""}
+                          onChange={(event) =>
+                            nested(
+                              "delivery",
+                              "preparationMinutes",
+                              event.target.value
+                            )
+                          }
+                        />
+                      </EditorField>
+                    )}
+                  </div>
+                  {form.delivery?.fulfillment === "delivery" && (
+                    <EditorField title="Delivery pincodes (comma-separated)">
+                      <textarea
+                        rows={2}
+                        className={`${field} mt-3`}
+                        value={pincodeText}
+                        onChange={(event) => {
+                          pincodeEditedRef.current = true;
+                          setPincodeText(event.target.value);
+                          nested(
+                            "delivery",
+                            "postalCodes",
+                            event.target.value.split(/[\s,;]+/).filter(Boolean)
+                          );
+                        }}
+                        placeholder="110001, 110002"
+                      />
+                      {savedPostalCodes.length > 0 && (
+                        <span className="mt-1 block text-[13px] leading-5 text-[#54635B]">
+                          Your saved active Host delivery areas are prefilled on
+                          new listings. You can change the pincodes for this
+                          item.
+                        </span>
+                      )}
+                    </EditorField>
+                  )}
+                  <EditorField title="Delivery / pickup notes">
+                    <textarea
+                      rows={2}
+                      className={`${field} mt-3`}
+                      value={form.delivery?.note || ""}
+                      onChange={(event) =>
+                        nested("delivery", "note", event.target.value)
+                      }
+                    />
+                  </EditorField>
+                </section>
+              )}
+              {editingId && canSell && sellingReadiness && (
+                <div
+                  className="mb-4 border-l-4 border-[#173F35] bg-[#EEF2EA] p-4"
+                  role="status"
+                >
+                  <p className="font-semibold text-[#173F35]">Selling status</p>
+                  <p className="mt-1 text-sm text-[#40544A]">
+                    {sellingReadiness.message}
+                  </p>
+                  {activeListing?.status === "approved" &&
+                    sellingReadiness?.offerStatus !== "active" && (
+                      <button
+                        type="button"
+                        disabled={busy || Boolean(uploading)}
+                        onClick={resendSavedListingForSelling}
+                        className={`${styles.button} mt-3`}
+                      >
+                        <Send size={17} className="mr-2 inline" />
+                        Send saved listing for selling approval
+                      </button>
+                    )}
+                  {sellingReadiness?.offerStatus === "active" && (
+                    <p className="mt-2 text-sm font-semibold text-[#245A43]">
+                      Customers can order this item using the approved selling
+                      details. No extra setup required.
+                    </p>
+                  )}
+                </div>
+              )}
+              <section className={`${section} uel-review`}>
+                <h2 className="text-xl font-bold">Ready for review?</h2>
+                <p className="mt-2 text-sm text-[#4A5850]">
+                  {locked
+                    ? "Food facts, allergens, pricing and delivery are editable. Your other details stay protected; these changes require Super Admin review before publishing."
+                    : "Save your progress or submit this complete listing once. Super Admin approval publishes the item and activates its selling details together."}
+                </p>
+                {locked ? (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      disabled={
+                        busy ||
+                        Boolean(uploading) ||
+                        activeListing?.status === "submitted_for_review"
+                      }
+                      onClick={saveSectionRevision}
+                      className={styles.button}
+                    >
+                      {activeListing?.status === "submitted_for_review" ? (
+                        <>
+                          <CheckCircle2 size={17} className="mr-2 inline" />
+                          Submitted for review
+                        </>
+                      ) : (
+                        <>
+                          <Send size={17} className="mr-2 inline" />
+                          Save changes & send for review
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      disabled={busy || Boolean(uploading)}
+                      onClick={() => save(false)}
+                      className={styles.secondary}
+                    >
+                      <Save size={17} className="mr-2 inline" />
+                      Save full draft
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || Boolean(uploading)}
+                      onClick={() => save(true)}
+                      className={styles.button}
+                    >
+                      <Send size={17} className="mr-2 inline" />
+                      Save & submit for review
+                    </button>
+                  </div>
+                )}
+              </section>
+            </fieldset>
+            {editingId &&
+              canSell &&
+              sellingReadiness?.catalogLinked &&
+              sellingReadiness?.offerStatus !== "active" && (
+                <HostListingSalesSetup
+                  listingId={editingId}
+                  listing={activeListing?.packet || form}
+                  readiness={sellingReadiness}
+                  onUpdated={() => {
+                    load();
+                    getHostListingSellingReadiness(editingId)
+                      .then((data) =>
+                        setSellingReadiness(data?.readiness || null)
+                      )
+                      .catch(() => {});
+                  }}
+                />
+              )}
           </>
         )}
         <section className="uel-history" aria-labelledby="uel-history-title">
@@ -1583,82 +4689,208 @@ function HostUnifiedListingEditor() {
             <div>
               <p className="uel-eyebrow">Your work, all in one place</p>
               <h2 id="uel-history-title">Your listings & drafts</h2>
-              <p className="mt-2">A clear view of everything you've saved, submitted or published.</p>
+              <p className="mt-2">
+                A clear view of everything you've saved, submitted or published.
+              </p>
             </div>
-            <span className="uel-history-count">{existing.length} {existing.length === 1 ? 'listing' : 'listings'} in total</span>
+            <span className="uel-history-count">
+              {existing.length} {existing.length === 1 ? "listing" : "listings"}{" "}
+              in total
+            </span>
           </div>
-          <div className="uel-history-filters" role="group" aria-label="Filter saved listings by status">
+          <div
+            className="uel-history-filters"
+            role="group"
+            aria-label="Filter saved listings by status"
+          >
             {historyFilters.map(([key, label]) => (
-              <button key={key} type="button" className="uel-history-filter" data-active={historyFilter === key}
-                aria-pressed={historyFilter === key} onClick={() => setHistoryFilter(key)}>
+              <button
+                key={key}
+                type="button"
+                className="uel-history-filter"
+                data-active={historyFilter === key}
+                aria-pressed={historyFilter === key}
+                onClick={() => setHistoryFilter(key)}
+              >
                 {label} <b>{historyCount(key)}</b>
               </button>
             ))}
           </div>
           <div className="uel-packet-list">
-            {filteredHistory.length ? filteredHistory.map((item) => (
-              <div key={item.id} className="uel-packet-row">
-                <div className="uel-packet-main">
-                  <div className="uel-packet-photo">
-                    {item.packet?.images?.[0] ? <img src={item.packet.images[0]} alt="" loading="lazy"/> : <Package size={24} strokeWidth={1.6} aria-hidden="true"/>}
+            {filteredHistory.length ? (
+              filteredHistory.map((item) => (
+                <div key={item.id} className="uel-packet-row">
+                  <div className="uel-packet-main">
+                    <div className="uel-packet-photo">
+                      {item.packet?.images?.[0] ? (
+                        <img
+                          src={item.packet.images[0]}
+                          alt=""
+                          loading="lazy"
+                        />
+                      ) : (
+                        <Package
+                          size={24}
+                          strokeWidth={1.6}
+                          aria-hidden="true"
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="uel-packet-title">
+                        {item.title || "Untitled draft"}
+                      </p>
+                      <p className="uel-packet-meta">
+                        {item.type.replaceAll("_", " ")}
+                        {listingUpdatedDate(item.updatedAt)
+                          ? ` · Updated ${listingUpdatedDate(item.updatedAt)}`
+                          : ""}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="uel-packet-title">{item.title || 'Untitled draft'}</p>
-                    <p className="uel-packet-meta">{item.type.replaceAll('_', ' ')}{listingUpdatedDate(item.updatedAt) ? ` · Updated ${listingUpdatedDate(item.updatedAt)}` : ''}</p>
+                  <span className="uel-packet-status" data-status={item.status}>
+                    {listingStatusLabel(item.status)}
+                  </span>
+                  <div className="uel-packet-controls">
+                    <button
+                      type="button"
+                      className={`${styles.secondary} uel-packet-action`}
+                      onClick={() => {
+                        // Reopen in view mode so the original Edit complete listing prompt is shown.
+                        setRevisingApproved(false);
+                        setParams({ edit: item.id });
+                        setActiveTab("single");
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      {[
+                        "submitted_for_review",
+                        "approved",
+                        "rejected",
+                      ].includes(item.status)
+                        ? "View listing"
+                        : "Continue editing"}{" "}
+                      <ArrowUpRight size={16} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="uel-packet-delete"
+                      disabled={busy || Boolean(uploading)}
+                      aria-label={`Delete ${item.title || "listing"}`}
+                      onClick={() => deleteListing(item)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" /> Delete
+                    </button>
                   </div>
                 </div>
-                <span className="uel-packet-status" data-status={item.status}>{listingStatusLabel(item.status)}</span>
-                <div className="uel-packet-controls">
-                  <button type="button" className={`${styles.secondary} uel-packet-action`} onClick={() => {
-                    setParams({ edit: item.id }); setActiveTab('single'); window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}>{['submitted_for_review', 'approved', 'rejected'].includes(item.status) ? 'View listing' : 'Continue editing'} <ArrowUpRight size={16} aria-hidden="true"/></button>
-                  <button type="button" className="uel-packet-delete" disabled={busy || Boolean(uploading)} aria-label={`Delete ${item.title || 'listing'}`} onClick={() => deleteListing(item)}><Trash2 size={16} aria-hidden="true"/> Delete</button>
-                </div>
+              ))
+            ) : (
+              <div className="uel-history-empty">
+                {existing.length
+                  ? "No listings match this status."
+                  : "No listings yet. Save your first draft to see it here."}
+                {existing.length > 0 && (
+                  <button
+                    type="button"
+                    className="ml-3 font-bold underline underline-offset-4 text-[#173F35]"
+                    onClick={() => setHistoryFilter("all")}
+                  >
+                    Show all
+                  </button>
+                )}
               </div>
-            )) : <div className="uel-history-empty">
-              {existing.length ? 'No listings match this status.' : 'No listings yet. Save your first draft to see it here.'}
-              {existing.length > 0 && <button type="button" className="ml-3 font-bold underline underline-offset-4 text-[#173F35]" onClick={() => setHistoryFilter('all')}>Show all</button>}
-            </div>}
+            )}
           </div>
           <PreviouslyListedItems workspace={workspace} />
-          {['b2b', 'brand_seller', 'hybrid', 'legacy'].includes(workspace) && <Link to="/host/listings/new?manage=offers-history" className="mt-3 inline-flex text-sm font-semibold text-[#173F35] underline underline-offset-4">View earlier selling history</Link>}
+          {["b2b", "brand_seller", "hybrid", "legacy"].includes(workspace) && (
+            <Link
+              to="/host/listings/new?manage=offers-history"
+              className="mt-3 inline-flex text-sm font-semibold text-[#173F35] underline underline-offset-4"
+            >
+              View earlier selling history
+            </Link>
+          )}
         </section>
-        <p className="uel-hold-note"><ClipboardList size={17} className="mt-1 shrink-0"/><span>Non-food categories, including cosmetics and clothing, are not available for listing yet.</span></p>
+        <p className="uel-hold-note">
+          <ClipboardList size={17} className="mt-1 shrink-0" />
+          <span>
+            Non-food categories, including cosmetics and clothing, are not
+            available for listing yet.
+          </span>
+        </p>
       </div>
     </main>
-  )
+  );
 }
-
 
 // Restaurant/menu creation has one canonical place. Existing packets (edit=id)
 // deliberately remain editable here to preserve existing Host drafts and history.
 export default function HostUnifiedListingPage() {
-  const { currentUser } = useAuth()
-  const [params] = useSearchParams()
-  const workspace = normalizeHostWorkspaceType(currentUser)
-  const managementView = params.get('manage') || ''
-  const canManageProducts = ['b2b', 'brand_seller', 'hybrid', 'legacy'].includes(workspace)
-  const canManageBrandRecipes = ['brand_seller', 'hybrid', 'legacy'].includes(workspace)
-  const canManageKitchenRecipes = ['chef_restaurant', 'hybrid', 'b2b', 'legacy'].includes(workspace)
-  const legacySource = params.get('source') || ''
-  const legacyPermitted = legacySource === 'product-evidence' ? canManageProducts : legacySource === 'brand-recipe' ? canManageBrandRecipes : legacySource === 'restaurant-recipe' ? canManageKitchenRecipes : legacySource === 'host-recipe' ? true : false
-  const management = managementView === 'legacy' && legacyPermitted
-    ? <LegacyListingManager />
-    : managementView === 'product-evidence' && canManageProducts
-    ? <ProductEvidenceWorkspace />
-    : managementView === 'brand-recipes' && canManageBrandRecipes
-      ? <BrandRecipeHistoryWorkspace section="recipes" />
-      : managementView === 'kitchen-recipes' && canManageKitchenRecipes
-        ? <KitchenRecipeHistoryWorkspace />
-        : managementView === 'offers-history' && canManageProducts
-          ? <SellingHistoryWorkspace />
-          : null
+  const { currentUser } = useAuth();
+  const [params] = useSearchParams();
+  const workspace = normalizeHostWorkspaceType(currentUser);
+  const managementView = params.get("manage") || "";
+  const canManageProducts = [
+    "b2b",
+    "brand_seller",
+    "hybrid",
+    "legacy",
+  ].includes(workspace);
+  const canManageBrandRecipes = ["brand_seller", "hybrid", "legacy"].includes(
+    workspace
+  );
+  const canManageKitchenRecipes = [
+    "chef_restaurant",
+    "hybrid",
+    "b2b",
+    "legacy",
+  ].includes(workspace);
+  const legacySource = params.get("source") || "";
+  const legacyPermitted =
+    legacySource === "product-evidence"
+      ? canManageProducts
+      : legacySource === "brand-recipe"
+      ? canManageBrandRecipes
+      : legacySource === "restaurant-recipe"
+      ? canManageKitchenRecipes
+      : legacySource === "host-recipe"
+      ? true
+      : false;
+  const management =
+    managementView === "legacy" && legacyPermitted ? (
+      <LegacyListingManager />
+    ) : managementView === "product-evidence" && canManageProducts ? (
+      <ProductEvidenceWorkspace />
+    ) : managementView === "brand-recipes" && canManageBrandRecipes ? (
+      <BrandRecipeHistoryWorkspace section="recipes" />
+    ) : managementView === "kitchen-recipes" && canManageKitchenRecipes ? (
+      <KitchenRecipeHistoryWorkspace />
+    ) : managementView === "offers-history" && canManageProducts ? (
+      <SellingHistoryWorkspace />
+    ) : null;
   if (managementView) {
-    if (!management) return <Navigate to="/host/listings/new" replace />
-    return <div className="min-w-0 w-full">
-      <div className="px-4 pt-5 sm:px-7"><Link to="/host/listings/new" className="inline-flex items-center gap-2 text-base font-semibold text-[#173F35]"><ArrowLeft size={18} /> Back to Listing Studio</Link></div>
-      <Suspense fallback={<p className="p-6 text-base" role="status">Loading your listings…</p>}>{management}</Suspense>
-    </div>
+    if (!management) return <Navigate to="/host/listings/new" replace />;
+    return (
+      <div className="min-w-0 w-full">
+        <div className="px-4 pt-5 sm:px-7">
+          <Link
+            to="/host/listings/new"
+            className="inline-flex items-center gap-2 text-base font-semibold text-[#173F35]"
+          >
+            <ArrowLeft size={18} /> Back to Listing Studio
+          </Link>
+        </div>
+        <Suspense
+          fallback={
+            <p className="p-6 text-base" role="status">
+              Loading your listings…
+            </p>
+          }
+        >
+          {management}
+        </Suspense>
+      </div>
+    );
   }
-  return <HostUnifiedListingEditor />
+  return <HostUnifiedListingEditor />;
 }

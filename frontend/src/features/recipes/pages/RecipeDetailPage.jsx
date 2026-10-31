@@ -880,7 +880,7 @@ function RecommendedRecipeCard({
         </span>
       </div>
     </Link>
-    <BookmarkButton kind="recipe" slug={getRecipeRecommendationPath(item).split('/').pop()} title={getRecipeRecommendationName(item)} className="absolute right-2 top-2" />
+    <BookmarkButton kind="recipe" slug={getRecipeRecommendationPath(item).split('/').pop()} title={getRecipeRecommendationName(item)} className="absolute! right-2 top-2" />
     </div>
   )
 }
