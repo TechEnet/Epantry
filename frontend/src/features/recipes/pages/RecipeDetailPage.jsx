@@ -389,7 +389,7 @@ function resolveRecipeDietaryBadge(foodIntelligence) {
 function RecipeLocalNames({ origin }) {
   if (!origin?.localName && !origin?.englishName) return null
   return (
-    <div className="mt-3 min-w-0 space-y-2 break-words" aria-label="Documented recipe names">
+    <div className="epantry-recipe-local-names mt-3 min-w-0 space-y-2 break-words" aria-label="Documented recipe names">
       {origin.localName ? (
         <p className="block whitespace-normal break-words text-[18px] font-medium leading-[1.5] text-[#173F35] sm:text-[21px]" lang="und">
           {origin.localName}
@@ -1742,6 +1742,12 @@ export default function RecipeDetailPage() {
   const dish =
     data?.dish ||
     {}
+
+  // Approved ready-made listings may intentionally withhold their recipe.
+  // Never infer missing published ingredients/steps from private Host data.
+  const hostRecipeNotShared = Boolean(
+    hostListingMode && data?.hostSubmission && data.hostSubmission.shareRecipe !== true,
+  )
 
   useEffect(() => {
     if (hostListingMode) {
@@ -4091,27 +4097,47 @@ export default function RecipeDetailPage() {
       `}</style>
 
       <style>{`
-        /* Targeted refinement: only the hero's three intro text nodes move.
-           Metrics, version link, photo and layout retain their positions. */
-        @media (min-width: 1024px) and (min-height: 720px) {
-          .epantry-recipe-detail .epantry-recipe-desktop-info > .recipe-edition-eyebrow,
-          .epantry-recipe-detail .epantry-recipe-desktop-info > h1,
-          .epantry-recipe-detail .epantry-recipe-desktop-info > p:not(.recipe-edition-eyebrow) {
-            transform: translateY(clamp(-88px, -8svh, -48px));
-          }
+        /* Keep multilingual names between the title and description in normal
+           document flow. Previously only the title/description were moved with
+           transforms, making local names visually overlap both. */
+        .epantry-recipe-detail .epantry-recipe-desktop-info > .recipe-edition-eyebrow,
+        .epantry-recipe-detail .epantry-recipe-desktop-info > h1,
+        .epantry-recipe-detail .epantry-recipe-desktop-info > p:not(.recipe-edition-eyebrow) {
+          transform: none !important;
         }
-        @media (min-width: 1024px) and (max-height: 719px) {
-          .epantry-recipe-detail .epantry-recipe-desktop-info > .recipe-edition-eyebrow,
-          .epantry-recipe-detail .epantry-recipe-desktop-info > h1,
-          .epantry-recipe-detail .epantry-recipe-desktop-info > p:not(.recipe-edition-eyebrow) {
-            transform: translateY(-20px);
-          }
+        .epantry-recipe-detail .epantry-recipe-local-names {
+          position: relative;
+          width: 100%;
+          max-width: 100%;
+          flex: 0 0 auto;
+          overflow-wrap: anywhere;
+          word-break: normal;
+          line-height: 1.5;
         }
-        @media (min-width: 640px) and (max-width: 1023px) {
-          .epantry-recipe-detail .epantry-recipe-desktop-info > .recipe-edition-eyebrow,
-          .epantry-recipe-detail .epantry-recipe-desktop-info > h1,
+        .epantry-recipe-detail .epantry-recipe-local-names > p {
+          margin: 0;
+          max-width: 100%;
+          line-height: 1.5 !important;
+        }
+        @media (min-width: 640px) {
+          .epantry-recipe-detail .epantry-recipe-desktop-info {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            min-width: 0;
+          }
+          .epantry-recipe-detail .epantry-recipe-desktop-info h1 {
+            margin-top: clamp(12px, 1.6vw, 24px) !important;
+            font-size: clamp(34px, 4.1vw, 62px) !important;
+            line-height: 1.1 !important;
+            overflow-wrap: anywhere;
+          }
           .epantry-recipe-detail .epantry-recipe-desktop-info > p:not(.recipe-edition-eyebrow) {
-            transform: translateY(-12px);
+            margin-top: 16px !important;
+            line-height: 1.55 !important;
+            overflow-wrap: anywhere;
+          }
+          .epantry-recipe-detail .epantry-recipe-desktop-info .epantry-recipe-metrics {
+            margin-top: clamp(18px, 3vh, 36px) !important;
           }
         }
 
@@ -5017,8 +5043,8 @@ export default function RecipeDetailPage() {
 
               <div className="epantry-recipe-metrics mt-5 grid grid-cols-3 gap-x-3 gap-y-2">
                 {[
-                  ['Base servings', recipe.baseServings || '—'],
-                  ['Cook time', `${Number(recipe.cookingTimeMinutes || 0)} min`],
+                  ['Base servings', hostRecipeNotShared ? 'Not shared' : (recipe.baseServings || '—')],
+                  ['Cook time', hostRecipeNotShared ? 'Not shared' : `${Number(recipe.cookingTimeMinutes || 0)} min`],
                   ['Difficulty', recipe.difficulty || '—'],
                   ['Cuisine', dish.cuisine || '—'],
                   ['Course', dish.course || '—'],
@@ -5075,8 +5101,8 @@ export default function RecipeDetailPage() {
 
               <div className="epantry-recipe-metrics mt-7 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
                 {[
-                  ['Base servings', recipe.baseServings || '—'],
-                  ['Cook time', `${Number(recipe.cookingTimeMinutes || 0)} min`],
+                  ['Base servings', hostRecipeNotShared ? 'Not shared' : (recipe.baseServings || '—')],
+                  ['Cook time', hostRecipeNotShared ? 'Not shared' : `${Number(recipe.cookingTimeMinutes || 0)} min`],
                   ['Difficulty', recipe.difficulty || '—'],
                   ['Cuisine', dish.cuisine || '—'],
                   ['Course', dish.course || '—'],
@@ -5325,13 +5351,13 @@ export default function RecipeDetailPage() {
                     size={13}
                     aria-hidden="true"
                   />
-                  <span className="sm:hidden">Ingredients · Living Pantry</span>
-                  <span className="hidden sm:inline">01 / Ingredients + your Living Pantry</span>
+                  <span className="sm:hidden">{hostRecipeNotShared ? 'Ready-made food' : 'Ingredients · Living Pantry'}</span>
+                  <span className="hidden sm:inline">{hostRecipeNotShared ? '01 / Ready-made food details' : '01 / Ingredients + your Living Pantry'}</span>
                 </div>
 
                 <h2 className="mt-2 text-[24px] font-semibold leading-[1.25] tracking-[-0.03em] text-[#173F35] sm:text-[32px] sm:font-semibold sm:tracking-tight">
-                  <span className="sm:hidden">Can I cook this at home?</span>
-                  <span className="hidden sm:inline">Ingredients & Can I cook this from home?</span>
+                  <span className="sm:hidden">{hostRecipeNotShared ? 'Recipe not shared' : 'Can I cook this at home?'}</span>
+                  <span className="hidden sm:inline">{hostRecipeNotShared ? 'Recipe details not yet shared' : 'Ingredients & Can I cook this from home?'}</span>
                 </h2>
 
 
@@ -5339,7 +5365,7 @@ export default function RecipeDetailPage() {
 
               <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">
 
-                {showCustomerActionControls && (
+                {showCustomerActionControls && !hostRecipeNotShared && (
                   <>
                     {!hostListingMode && <button
                       type="button"
@@ -5379,7 +5405,7 @@ export default function RecipeDetailPage() {
                 )}
 
                 <span className="whitespace-nowrap sm:whitespace-normal rounded-full bg-[#DCE0CF]/50 px-1.5 py-1 text-[13px] font-semibold text-[#202421]/80 sm:px-3 sm:py-1.5 sm:text-sm sm:font-bold">
-                  {ingredientRows.length} items
+                  {hostRecipeNotShared ? 'Not shared' : `${ingredientRows.length} items`}
                 </span>
 
               </div>
@@ -5402,10 +5428,21 @@ export default function RecipeDetailPage() {
               <div className="epantry-prep-list-heading">
                 <div>
                   <p>Prep list</p>
-                  <h3>Your ingredients</h3>
+                  <h3>{hostRecipeNotShared ? 'Recipe disclosure' : 'Your ingredients'}</h3>
                 </div>
-                <span>{ingredientRows.length} ingredients</span>
+                <span>{hostRecipeNotShared ? 'Recipe not shared' : `${ingredientRows.length} ingredients`}</span>
               </div>
+            {hostRecipeNotShared ? (
+              <div className="mt-5 border-l-[3px] border-[#C86C42] bg-[#FFF1E9] px-4 py-4 text-[#173F35]">
+                <p className="text-[16px] font-semibold leading-6">This ready-made dish has no shared recipe yet.</p>
+                <p className="mt-2 text-[14px] leading-6 text-[#4B5B51]">
+                  The Host has not published ingredient quantities or cooking instructions.
+                  To show them here, the Host must enable <strong>Share recipe</strong> in the listing,
+                  submit the updated listing and receive Super Admin approval.
+                </p>
+              </div>
+            ) : (
+              <>
             <div className="epantry-recipe-servings mt-4 flex shrink-0 items-center justify-between gap-2 rounded-xl border border-[#DCE0CF] bg-[#DCE0CF]/65 px-3 py-3 sm:mt-5 sm:gap-4 sm:px-4">
               <div>
                 <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#173F35] sm:text-[13px] sm:font-semibold sm:tracking-[0.14em]">
@@ -5735,6 +5772,8 @@ export default function RecipeDetailPage() {
               )}
             </div>
             </div>
+              </>
+            )}
             </div>
 
           </section>
@@ -5760,6 +5799,13 @@ export default function RecipeDetailPage() {
 
               <div className="border-t border-[#DCE0CF] bg-[#F7F6F2] px-3 py-1.5 sm:px-5 sm:py-2">
                 <ol className="divide-y divide-[#DCE0CF]">
+                  {!(data?.steps || []).length && (
+                    <li className="py-4 text-[14px] leading-6 text-[#4B5B51]">
+                      {hostRecipeNotShared
+                        ? 'Cooking instructions are not shared for this ready-made item. The Host can publish them by enabling Share recipe and obtaining approval.'
+                        : 'Cooking steps have not been published for this recipe.'}
+                    </li>
+                  )}
                   {(data?.steps || []).map((step) => (
                     <li
                       key={step.id || step.stepNumber}
@@ -5828,7 +5874,9 @@ export default function RecipeDetailPage() {
                   </div>
                 ) : (
                   <p className="text-[14px] font-medium text-[#202421]/70 sm:text-sm sm:font-semibold">
-                    Ingredient details are not currently published.
+                    {hostRecipeNotShared
+                      ? 'The Host has not published ingredient quantities for this recipe. The listing must be updated and approved before they appear.'
+                      : 'Ingredient details are not currently published.'}
                   </p>
                 )}
               </div>
