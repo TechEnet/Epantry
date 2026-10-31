@@ -39,6 +39,7 @@ import { countryFlag, countryExplorePath } from '../../countries/utils/country.u
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 import { publicImageProps, publicImageVariant } from '../../../lib/publicMediaDelivery'
 import { getPublicPackOffers } from '../../marketplace/services/marketplace.service'
+import { apiClient } from '../../../api/apiClient'
 
 import {
   useAuth,
@@ -1213,8 +1214,10 @@ export default function RecipeDetailPage() {
     useState(
       false,
     )
-  // Personal planning calculator, never represented as a verified selling price.
-  const [ingredientBudgetAtBase, setIngredientBudgetAtBase] = useState('')
+  const [readyPinDraft, setReadyPinDraft] = useState('')
+  const [readyQuote, setReadyQuote] = useState(null)
+  const [readyQuoteBusy, setReadyQuoteBusy] = useState(false)
+  const [readyQuoteError, setReadyQuoteError] = useState('')
   const [readyPin, setReadyPin] = useState('')
   const [readyOffers, setReadyOffers] = useState([])
   const [readyOffersBusy, setReadyOffersBusy] = useState(false)
@@ -1821,22 +1824,67 @@ export default function RecipeDetailPage() {
   const readyPackId = String(readyListing?.canonicalPackId || '').trim()
   const declaredReadyPrice = readyListing?.offer?.declaredPrice ?? null
   const ingredientBaseServings = Math.max(1, Number(recipe.baseServings) || 1)
-  const numericIngredientBudget = ingredientBudgetAtBase.trim() === '' ? null : Number(ingredientBudgetAtBase)
-  const scaledIngredientBudget = numericIngredientBudget !== null && Number.isFinite(numericIngredientBudget) && numericIngredientBudget >= 0
-    ? Math.round(numericIngredientBudget * servings / ingredientBaseServings * 100) / 100 : null
+  // Cost of the approved recipe quantities, NOT an offer to sell ingredients.
+  // Missing source prices remain unknown; never treat them as zero.
+  const pricedIngredients = Array.isArray(readyListing?.ingredients) && readyListing?.shareRecipe === true
+    ? readyListing.ingredients : []
+  const readyIngredientPriceRows = pricedIngredients.map((line, index) => {
+    const original = line?.estimatedIngredientCost
+    const valid = original !== null && original !== undefined && original !== '' &&
+      Number.isFinite(Number(original)) && Number(original) >= 0
+    const estimatedCost = valid ? Math.round(Number(original) * servings / ingredientBaseServings * 100) / 100 : null
+    return { index, name: String(line?.name || 'Ingredient'), estimatedCost }
+  })
+  const readyCostComplete = readyIngredientPriceRows.length > 0 && readyIngredientPriceRows.every(line => line.estimatedCost !== null)
+  const readyCostTotal = readyIngredientPriceRows.reduce((total, line) => total + (line.estimatedCost ?? 0), 0)
+  const readyCostKnown = readyIngredientPriceRows.filter(line => line.estimatedCost !== null).length
 
   // Use the same address source and strictly verified active offers as Grocery.
   useEffect(() => {
-    if (!isReadyMade || !canUseCustomerFeatures || !readyPackId) return undefined
+    if (!isReadyMade || !canUseCustomerFeatures) return undefined
     let mounted = true
     getDefaultDeliveryAddress()
       .then(result => {
         const pin = String(result?.address?.postalCode || '').replace(/\s+/g, '')
-        if (mounted && /^[1-9][0-9]{5}$/.test(pin)) setReadyPin(pin)
+        if (mounted && /^[1-9][0-9]{5}$/.test(pin)) { setReadyPin(pin); setReadyPinDraft(pin) }
       })
       .catch(() => {})
     return () => { mounted = false }
-  }, [isReadyMade, canUseCustomerFeatures, readyPackId])
+  }, [isReadyMade, canUseCustomerFeatures])
+
+  // Same PIN-specific public quote used by the Grocery Host listing.
+  // No Host-wide private delivery area is sent to the customer.
+  useEffect(() => {
+    let active = true
+    setReadyQuote(null)
+    setReadyQuoteError('')
+    if (!isReadyMade || !readyListing?.id || !/^[1-9][0-9]{5}$/.test(readyPin)) {
+      setReadyQuoteBusy(false)
+      return () => { active = false }
+    }
+    setReadyQuoteBusy(true)
+    apiClient.get(`/public/host-listings/${encodeURIComponent(readyListing.id)}/pincode-quote`, {
+      params: { pincode: readyPin },
+    }).then(response => {
+      if (active) setReadyQuote(response?.data?.data ?? response?.data ?? null)
+    }).catch(err => {
+      if (active) setReadyQuoteError(err?.response?.data?.message || err?.message || 'Unable to check delivery right now.')
+    }).finally(() => {
+      if (active) setReadyQuoteBusy(false)
+    })
+    return () => { active = false }
+  }, [isReadyMade, readyListing?.id, readyPin])
+
+  function checkReadyDelivery(event) {
+    event.preventDefault()
+    const pin = readyPinDraft.replace(/\D/g, '').trim()
+    if (!/^[1-9][0-9]{5}$/.test(pin)) {
+      setReadyQuoteError('Enter a valid six-digit delivery PIN.')
+      return
+    }
+    setReadyQuoteError('')
+    setReadyPin(pin)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -1884,7 +1932,9 @@ export default function RecipeDetailPage() {
   }
 
   useEffect(() => {
-    setIngredientBudgetAtBase('')
+    setReadyPinDraft('')
+    setReadyQuote(null)
+    setReadyQuoteError('')
     setReadyPin('')
     setReadyQuantity(1)
     setReadyOffers([])
@@ -5009,48 +5059,45 @@ export default function RecipeDetailPage() {
         .epantry-recipe-detail .epantry-pantry-intro { border-bottom:1px solid #CBD5C8 !important; padding-bottom:16px !important; }
         .epantry-recipe-detail .epantry-pantry-intro h2 { font-size:clamp(26px,3vw,40px) !important; line-height:1.15 !important; max-width:17ch; margin:12px 0 6px !important; }
         .epantry-recipe-detail .epantry-pantry-subtitle { font-size:14px; font-weight:400; line-height:1.6; color:#50655A; max-width:38ch; margin:9px 0 0; }
-        .epantry-recipe-detail .epantry-ready-made-market { border:1px solid #D8D0C7; background:#F7F6F2; overflow:hidden; }
-        .epantry-recipe-detail .epantry-ready-made-heading { display:flex; align-items:start; justify-content:space-between; gap:18px; background:#E9EEE5; border-bottom:1px solid #C9D5C7; padding:23px clamp(17px,3vw,36px); }
-        .epantry-recipe-detail .epantry-ready-made-heading h2 { font-size:clamp(23px,2.8vw,36px); line-height:1.16; color:#173F35; margin:0 0 8px; }
-        .epantry-recipe-detail .epantry-ready-made-heading p:last-child { font-size:14px; line-height:1.6; color:#516458; max-width:68ch; }
-        .epantry-recipe-detail .epantry-ready-made-type { border:1px solid #C86C42; padding:7px 10px; color:#9C4E2B; font-weight:700; font-size:12px; white-space:nowrap; }
-        .epantry-recipe-detail .epantry-ready-made-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
-        .epantry-recipe-detail .epantry-ready-option { min-width:0; padding:23px clamp(18px,2.5vw,35px); }
-        .epantry-recipe-detail .epantry-ready-option + .epantry-ready-option { border-left:1px solid #DFDCD3; background:#F1F1E9; }
-        .epantry-recipe-detail .epantry-ready-option h3 { color:#173F35; font-size:clamp(20px,2vw,27px); line-height:1.2; margin:0 0 12px; }
-        .epantry-recipe-detail .epantry-ready-price-row { display:flex; flex-wrap:wrap; align-items:end; gap:15px; padding:14px 0; border-block:1px solid #D5DACC; }
-        .epantry-recipe-detail .epantry-ready-price-row > div { display:grid; gap:3px; }
-        .epantry-recipe-detail .epantry-ready-price-row span, .epantry-recipe-detail .epantry-ready-price-row small { font-size:12px; color:#586B60; }
-        .epantry-recipe-detail .epantry-ready-price-row strong { font-size:26px; line-height:1.1; color:#173F35; }
-        .epantry-recipe-detail .epantry-ready-explainer { font-size:13px; line-height:1.65; color:#56685D; margin:13px 0; }
-        .epantry-recipe-detail .epantry-ready-order-panel { display:grid; gap:9px; margin-top:12px; }
-        .epantry-recipe-detail .epantry-ready-order-panel label, .epantry-recipe-detail .epantry-budget-form label { font-size:13px; font-weight:700; line-height:1.5; color:#173F35; }
-        .epantry-recipe-detail .epantry-ready-order-panel > input, .epantry-recipe-detail .epantry-budget-form input { width:100%; min-height:42px; border:1px solid #BDCDBD; border-radius:6px; background:#fff; padding:8px 12px; font-size:15px; color:#202421; outline-offset:2px; }
-        .epantry-recipe-detail .epantry-ready-order-panel > input:focus-visible, .epantry-recipe-detail .epantry-budget-form input:focus-visible { outline:2px solid #2D6E54; }
-        .epantry-recipe-detail .epantry-ready-verified-list { display:grid; gap:9px; padding-top:6px; }
-        .epantry-recipe-detail .epantry-ready-qty { display:flex; align-items:center; gap:6px; width:fit-content; }
-        .epantry-recipe-detail .epantry-ready-qty input { width:65px; padding:7px; border:1px solid #BACAB7; text-align:center; }
-        .epantry-recipe-detail .epantry-ready-qty button { padding:8px; border:1px solid #BACAB7; background:#fff; }
-        .epantry-recipe-detail .epantry-ready-seller { display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; border:1px solid #C5D4C4; padding:12px; background:#fff; }
-        .epantry-recipe-detail .epantry-ready-seller span { display:grid; font-size:13px; line-height:1.6; color:#173F35; }
-        .epantry-recipe-detail .epantry-ready-seller span small { color:#607267; }
-        .epantry-recipe-detail .epantry-ready-seller strong { font-size:17px; color:#173F35; }
-        .epantry-recipe-detail .epantry-ready-total { font-size:12px; color:#56665C; font-weight:700; }
-        .epantry-recipe-detail .epantry-ready-seller button, .epantry-recipe-detail .epantry-ready-ingredients-link { min-height:40px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:9px 14px; border-radius:7px; background:#173F35; color:#fff; font-size:13px; font-weight:700; }
-        .epantry-recipe-detail .epantry-ready-seller button:disabled { opacity:.5; }
-        .epantry-recipe-detail .epantry-ready-error { color:#A42828; font-size:13px; }
-        .epantry-recipe-detail .epantry-ready-unavailable { border-left:3px solid #C86C42; background:#F8E8DC; color:#775038; font-size:13px; padding:12px; line-height:1.6; }
-        .epantry-recipe-detail .epantry-budget-form { display:grid; gap:8px; padding:12px 0; border-block:1px solid #D0D9CC; }
-        .epantry-recipe-detail .epantry-budget-total { font-size:22px; font-weight:700; color:#173F35; }
-        .epantry-recipe-detail .epantry-budget-total span { font-size:12px; font-weight:500; color:#68786A; }
+        /* Small Grocery-style delivery / price section, not a new hero. */
+        .epantry-recipe-detail .epantry-ready-market { border-top:3px solid #214E4A; background:#E8F2F1; padding:18px clamp(16px,3vw,32px); margin-top:22px; }
+        .epantry-recipe-detail .epantry-ready-market-header { display:flex; align-items:center; gap:12px; padding-bottom:13px; border-bottom:1px solid #C7DCD8; }
+        .epantry-recipe-detail .epantry-ready-market-icon { flex:none; width:38px; height:38px; display:grid; place-items:center; border-radius:9px; background:#CFE4E1; color:#174E49; }
+        .epantry-recipe-detail .epantry-ready-market-header h2 { margin:0; color:#173F35; font-size:clamp(19px,2vw,24px); font-weight:700; line-height:1.3; }
+        .epantry-recipe-detail .epantry-ready-market-header p { margin:3px 0 0; font-size:13px; color:#586E65; }
+        .epantry-recipe-detail .epantry-ready-checker { display:grid; grid-template-columns:minmax(0,1fr) minmax(195px,.48fr); align-items:end; gap:14px; padding:14px 0; }
+        .epantry-recipe-detail .epantry-ready-checker label { display:block; margin-bottom:7px; font-size:13px; font-weight:650; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-input-row { display:flex; gap:8px; min-width:0; }
+        .epantry-recipe-detail .epantry-ready-input-row input { min-width:0; flex:1; width:100%; padding:11px 13px; border:1px solid #A9C8C4; border-radius:9px; background:#FFF; font-size:15px; color:#202421; }
+        .epantry-recipe-detail .epantry-ready-input-row input:focus-visible { outline:2px solid #C0DBD2; outline-offset:1px; border-color:#174E49; }
+        .epantry-recipe-detail .epantry-ready-input-row button, .epantry-recipe-detail .epantry-ready-offer button, .epantry-recipe-detail .epantry-ready-ingredients-link { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:0; border-radius:9px; background:#174E49; color:white; padding:11px 15px; min-height:44px; font-size:14px; font-weight:700; }
+        .epantry-recipe-detail .epantry-ready-price-label { font-size:13px; color:#607269; }
+        .epantry-recipe-detail .epantry-ready-price-value { display:block; color:#173F35; font-size:clamp(22px,2.5vw,29px); line-height:1.2; font-weight:750; }
+        .epantry-recipe-detail .epantry-ready-status { font-size:13px; color:#465D53; line-height:1.5; padding:9px 11px; background:#FFFFFFB8; border-left:3px solid #2F856D; margin-bottom:10px; }
+        .epantry-recipe-detail .epantry-ready-error { color:#9B2525; border-left-color:#C94D4D; }
+        .epantry-recipe-detail .epantry-ready-offer { display:flex; gap:12px; flex-wrap:wrap; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid #C7DCD8; font-size:14px; }
+        .epantry-recipe-detail .epantry-ready-offer strong { font-size:16px; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-pack-count { display:inline-flex; gap:5px; align-items:center; margin:8px 0; }
+        .epantry-recipe-detail .epantry-ready-pack-count button { min-width:35px; min-height:35px; background:white; border:1px solid #A9C8C4; border-radius:7px; }
+        .epantry-recipe-detail .epantry-ready-pack-count input { width:55px; text-align:center; border:1px solid #A9C8C4; background:#fff; padding:6px; border-radius:7px; }
+        .epantry-recipe-detail .epantry-ready-ingredient-prices { margin-top:13px; padding-top:15px; border-top:1px solid #C7DCD8; }
+        .epantry-recipe-detail .epantry-ready-ingredient-prices h3 { color:#173F35; font-size:18px; font-weight:700; margin:0 0 6px; }
+        .epantry-recipe-detail .epantry-ready-ingredient-prices p { color:#586B60; font-size:13px; line-height:1.5; margin:0 0 12px; }
+        .epantry-recipe-detail .epantry-ready-ingredient-rows { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; }
+        .epantry-recipe-detail .epantry-ready-ingredient-row { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #C7DCD8; font-size:14px; }
+        .epantry-recipe-detail .epantry-ready-ingredient-row span { overflow-wrap:anywhere; color:#243F33; }
+        .epantry-recipe-detail .epantry-ready-ingredient-row strong { flex:none; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-ingredient-total { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:13px 0; font-size:15px; font-weight:650; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-ingredient-total strong { font-size:22px; }
+        .epantry-recipe-detail .epantry-ready-ingredients-link { margin-top:6px; text-decoration:none; }
         @media (max-width:639px) {
           .epantry-recipe-detail .epantry-origin-layout,
-          .epantry-recipe-detail .epantry-origin-layout--three,
-          .epantry-recipe-detail .epantry-ready-made-options { grid-template-columns:minmax(0,1fr); }
+          .epantry-recipe-detail .epantry-origin-layout--three { grid-template-columns:minmax(0,1fr); }
           .epantry-recipe-detail .epantry-origin-layout > div { padding:19px; }
-          .epantry-recipe-detail .epantry-origin-layout > div + div,
-          .epantry-recipe-detail .epantry-ready-option + .epantry-ready-option { border-left:0; border-top:1px solid #CFDACA; }
-          .epantry-recipe-detail .epantry-ready-made-heading { flex-wrap:wrap; }
+          .epantry-recipe-detail .epantry-origin-layout > div + div { border-left:0; border-top:1px solid #CFDACA; }
+          .epantry-recipe-detail .epantry-ready-checker, .epantry-recipe-detail .epantry-ready-ingredient-rows { grid-template-columns:minmax(0,1fr); }
+          .epantry-recipe-detail .epantry-ready-input-row { flex-wrap:wrap; }
+          .epantry-recipe-detail .epantry-ready-input-row button { flex:1; }
           .epantry-recipe-detail .epantry-hero-story > div > h1 { font-size:34px !important; }
           .epantry-recipe-detail .epantry-recipe-ingredients > .epantry-pantry-intro { max-height:none !important; overflow:visible !important; }
         }
@@ -5472,72 +5519,94 @@ export default function RecipeDetailPage() {
         ) : null}
 
         {isReadyMade && (
-          <section className="epantry-ready-made-market mt-7" aria-label="Order this ready-made dish">
-            <div className="epantry-ready-made-heading">
+          <section className="epantry-ready-market" aria-label="Ready-made food delivery and ingredient prices">
+            <div className="epantry-ready-market-header">
+              <span className="epantry-ready-market-icon"><ShoppingCart size={19} aria-hidden="true" /></span>
               <div>
-                <p className="epantry-story-kicker">Two ways to enjoy</p>
-                <h2>Ready to eat, or make it yourself.</h2>
-                <p>Buy the complete prepared dish at its pack price, or shop ingredients separately for your chosen servings.</p>
+                <h2>Check price by pincode</h2>
+                <p>Check the Host's stated delivery area. Prepared dish and ingredients are priced separately.</p>
               </div>
-              <span className="epantry-ready-made-type">Ready-made food</span>
             </div>
-            <div className="epantry-ready-made-options">
-              <div className="epantry-ready-option">
-                <p className="epantry-story-kicker">01 / Complete prepared dish</p>
-                <h3>Order the finished dish</h3>
-                <div className="epantry-ready-price-row">
-                  <div><span>Host-listed pack price</span><strong>{hostDeclaredMoney(declaredReadyPrice)}</strong></div>
-                  <small>Fixed per prepared pack · independent of ingredient servings</small>
+            <div className="epantry-ready-checker">
+              <form onSubmit={checkReadyDelivery}>
+                <label htmlFor="ready-made-delivery-pin">Delivery PIN code</label>
+                <div className="epantry-ready-input-row">
+                  <input id="ready-made-delivery-pin" inputMode="numeric" autoComplete="postal-code"
+                    maxLength={6} pattern="[0-9]{6}" value={readyPinDraft}
+                    onChange={event => setReadyPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit pincode" aria-label="Delivery PIN code" required />
+                  <button type="submit"><MapPin size={15} /> Check delivery</button>
                 </div>
-                <p className="epantry-ready-explainer">Pay only a verified Marketplace offer price at checkout. Stock and delivery are checked for your PIN.</p>
-                {readyPackId ? (
-                  <div className="epantry-ready-order-panel">
-                    <label htmlFor="ready-made-delivery-pin">Delivery PIN</label>
-                    <input id="ready-made-delivery-pin" inputMode="numeric" autoComplete="postal-code" maxLength={6}
-                      value={readyPin} onChange={event => setReadyPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="6-digit PIN" aria-label="PIN code for prepared dish delivery" />
-                    {readyOffersBusy ? <p role="status">Checking live offers…</p> : null}
-                    {readyOffersError ? <p role="alert" className="epantry-ready-error">{readyOffersError}</p> : null}
-                    {!readyOffersBusy && /^[1-9][0-9]{5}$/.test(readyPin) && !readyOffersError && !readyOffers.length ? <p>No verified seller is delivering this prepared pack to this PIN right now.</p> : null}
-                    {readyOffers.length > 0 && (
-                      <div className="epantry-ready-verified-list">
-                        <label htmlFor="ready-made-quantity">Prepared packs</label>
-                        <div className="epantry-ready-qty">
-                          <button type="button" onClick={() => setReadyQuantity(v => Math.max(1, v-1))} disabled={readyQuantity <= 1} aria-label="Decrease prepared packs"><Minus size={14}/></button>
-                          <input id="ready-made-quantity" inputMode="numeric" type="number" min="1" max="100" value={readyQuantity} onChange={event => setReadyQuantity(Math.min(100, Math.max(1, Math.floor(Number(event.target.value) || 1))))}/>
-                          <button type="button" onClick={() => setReadyQuantity(v => Math.min(100, v+1))} aria-label="Increase prepared packs"><Plus size={14}/></button>
-                        </div>
-                        {readyOffers.map(offer => (
-                          <div className="epantry-ready-seller" key={offer.id}>
-                            <span><b>{offer.seller?.name || 'Verified seller'}</b><small>Live selling price</small></span>
-                            <strong>{formatMoney({ amountMinor: offer.price?.effectiveAmountMinor, currency: offer.price?.currency || 'INR' })} / pack</strong>
-                            <small className="epantry-ready-total">{offer.price?.effectiveAmountMinor !== null && offer.price?.effectiveAmountMinor !== undefined && Number.isInteger(Number(offer.price.effectiveAmountMinor)) ? formatMoney({ amountMinor: Number(offer.price.effectiveAmountMinor) * readyQuantity, currency: offer.price?.currency || 'INR' }) : 'Price unavailable'} for {readyQuantity} pack{readyQuantity === 1 ? '' : 's'}</small>
-                            <button type="button" disabled={Boolean(readyOrderBusy)} onClick={() => orderVerifiedReadyFood(offer)}><ShoppingCart size={16}/>{readyOrderBusy === String(offer.id) ? 'Adding…' : 'Buy this pack'}</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {readyOrderError ? <p role="alert" className="epantry-ready-error">{readyOrderError}</p> : null}
-                  </div>
-                ) : (
-                  <p className="epantry-ready-unavailable" role="status">Ordering will open once the Host links this approved dish to a published product and activates a verified Marketplace offer with stock and delivery. The listed price alone cannot be charged.</p>
-                )}
-              </div>
-              <div className="epantry-ready-option epantry-ready-option--ingredients">
-                <p className="epantry-story-kicker">02 / Ingredients for home cooking</p>
-                <h3>Make it for {servings}</h3>
-                <p className="epantry-ready-explainer">Ingredient quantities below automatically adjust with servings. Your ingredient basket is purchased separately from the complete prepared dish.</p>
-                {hostRecipeNotShared ? <p className="epantry-ready-unavailable">The Host has not shared ingredient quantities for this approved listing.</p> : <>
-                  <div className="epantry-budget-form">
-                    <label htmlFor="ingredient-budget-base">Your estimated ingredient budget for {ingredientBaseServings} serving{ingredientBaseServings === 1 ? '' : 's'} (₹)</label>
-                    <input id="ingredient-budget-base" type="number" min="0" step="0.01" inputMode="decimal" value={ingredientBudgetAtBase} onChange={event => setIngredientBudgetAtBase(event.target.value)} placeholder="Enter an estimated amount" />
-                    <p className="epantry-budget-total">{scaledIngredientBudget === null ? 'Set a budget to compare servings' : hostDeclaredMoney(scaledIngredientBudget)} <span>for {servings} serving{servings === 1 ? '' : 's'}</span></p>
-                  </div>
-                  <p className="epantry-ready-explainer">Budget is your own proportional estimate, not a live seller quote. Example: ₹10 for 4 servings becomes ₹15 for 6. Actual ingredient prices depend on available pack offers at checkout.</p>
-                  <button type="button" onClick={() => document.querySelector('.epantry-recipe-ingredients')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="epantry-ready-ingredients-link">View ingredients &amp; shop <ArrowRight size={17}/></button>
-                </>}
+              </form>
+              <div>
+                <span className="epantry-ready-price-label">Ready-made food · fixed pack price</span>
+                <strong className="epantry-ready-price-value">{hostDeclaredMoney(declaredReadyPrice)}</strong>
+                <span className="epantry-ready-price-label">Host-declared · price per prepared pack</span>
               </div>
             </div>
+            {readyQuoteBusy && <p role="status" className="epantry-ready-status">Checking delivery to {readyPin}…</p>}
+            {!readyQuoteBusy && readyQuoteError && <p role="alert" className="epantry-ready-status epantry-ready-error">{readyQuoteError}</p>}
+            {!readyQuoteBusy && readyQuote && <p className="epantry-ready-status" role="status">
+              {readyQuote.pickupOnly ? 'Host offers pickup only.' : readyQuote.declaredCoverage
+                ? `Host lists delivery to ${readyPin}.` : `Host does not list delivery to ${readyPin}.`}
+              {readyQuote.declaredCoverage && readyQuote.declaredPrice !== null && readyQuote.declaredPrice !== undefined
+                ? ` Listed pack price: ${hostDeclaredMoney(readyQuote.declaredPrice)}.` : ''}
+            </p>}
+            {readyPackId && /^[1-9][0-9]{5}$/.test(readyPin) && readyQuote?.declaredCoverage && (
+              <div>
+                {readyOffersBusy ? <p className="epantry-ready-status">Checking verified sellers…</p> : null}
+                {readyOffersError ? <p role="alert" className="epantry-ready-status epantry-ready-error">{readyOffersError}</p> : null}
+                {readyOffers.length > 0 && <>
+                  <div className="epantry-ready-pack-count">
+                    <span className="mr-2 text-sm font-semibold text-[#173F35]">Packs</span>
+                    <button type="button" aria-label="Decrease packs" disabled={readyQuantity <= 1} onClick={() => setReadyQuantity(v => Math.max(1, v-1))}><Minus size={16}/></button>
+                    <input type="number" aria-label="Prepared food quantity" min="1" max="100" value={readyQuantity}
+                      onChange={event => setReadyQuantity(Math.min(100, Math.max(1, Math.floor(Number(event.target.value) || 1))))}/>
+                    <button type="button" aria-label="Increase packs" onClick={() => setReadyQuantity(v => Math.min(100, v+1))}><Plus size={16}/></button>
+                  </div>
+                  {readyOffers.map(offer => (
+                    <div className="epantry-ready-offer" key={offer.id}>
+                      <span>{offer.seller?.name || 'Verified seller'} · <strong>{formatMoney({ amountMinor: offer.price?.effectiveAmountMinor, currency: offer.price?.currency || 'INR' })} / pack</strong>
+                        <small className="block text-[#586B60]">{Number.isInteger(Number(offer.price?.effectiveAmountMinor)) ? formatMoney({ amountMinor: Number(offer.price.effectiveAmountMinor) * readyQuantity, currency: offer.price?.currency || 'INR' }) : 'Price unavailable'} total</small></span>
+                      <button type="button" disabled={Boolean(readyOrderBusy)} onClick={() => orderVerifiedReadyFood(offer)}><ShoppingCart size={16}/>{readyOrderBusy === String(offer.id) ? 'Adding…' : 'Add to cart'}</button>
+                    </div>
+                  ))}
+                </>}
+                {readyOrderError && <p role="alert" className="epantry-ready-status epantry-ready-error">{readyOrderError}</p>}
+              </div>
+            )}
+            {(!readyPackId || (readyQuote?.declaredCoverage && !readyOffersBusy && readyOffers.length === 0 && !readyOffersError)) && (
+              <p className="epantry-ready-status">This is the Host's listed price, not a confirmed checkout offer. Ordering becomes available once a verified seller offer with stock and delivery is active.</p>
+            )}
+            {!hostRecipeNotShared && (
+              <div className="epantry-ready-ingredient-prices">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3>Ingredient prices · {servings} serving{servings === 1 ? '' : 's'}</h3>
+                  <div className="epantry-ready-pack-count" role="group" aria-label="Choose servings for ingredient prices">
+                    <button type="button" aria-label="Decrease ingredient servings" disabled={servings <= 1} onClick={() => setServings(v => Math.max(1, v - 1))}><Minus size={16} /></button>
+                    <span className="px-2 text-sm font-bold text-[#173F35]">{servings}</span>
+                    <button type="button" aria-label="Increase ingredient servings" onClick={() => setServings(v => Math.min(1000, v + 1))}><Plus size={16} /></button>
+                  </div>
+                </div>
+                <p>Host-estimated ingredient costs for the approved recipe, scaled with servings. Grocery checkout prices are separate.</p>
+                {readyIngredientPriceRows.length > 0 ? <>
+                  <div className="epantry-ready-ingredient-rows">
+                    {readyIngredientPriceRows.map(line => (
+                      <div className="epantry-ready-ingredient-row" key={`${line.index}-${line.name}`}>
+                        <span>{line.name}</span><strong>{line.estimatedCost === null ? 'Not priced' : hostDeclaredMoney(line.estimatedCost)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="epantry-ready-ingredient-total">
+                    <span>{readyCostComplete ? 'Estimated ingredient total' : `Known ingredient costs (${readyCostKnown}/${readyIngredientPriceRows.length})`}</span>
+                    <strong>{readyCostKnown ? hostDeclaredMoney(Math.round(readyCostTotal * 100) / 100) : 'Not available'}</strong>
+                  </div>
+                </> : <p>Ingredient cost estimates have not been published for this recipe.</p>}
+                <button type="button" className="epantry-ready-ingredients-link" onClick={() => document.querySelector('.epantry-recipe-ingredients')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                  View ingredients &amp; shop <ArrowRight size={16} />
+                </button>
+              </div>
+            )}
           </section>
         )}
 
@@ -5895,6 +5964,12 @@ export default function RecipeDetailPage() {
                       </div>
 
                       <div className="col-start-2 flex flex-wrap items-center justify-end justify-self-end gap-1.5 sm:col-start-auto sm:gap-2 sm:justify-self-auto">
+                        {isReadyMade && readyIngredientPriceRows[Number(ingredient.lineNumber) - 1]?.estimatedCost !== null &&
+                          readyIngredientPriceRows[Number(ingredient.lineNumber) - 1]?.estimatedCost !== undefined && (
+                            <span className="rounded-md bg-[#E8F2F1] px-2 py-1.5 text-[13px] font-semibold text-[#173F35]" title="Host-estimated ingredient cost for the selected servings; not a seller checkout price">
+                              Est. {hostDeclaredMoney(readyIngredientPriceRows[Number(ingredient.lineNumber) - 1].estimatedCost)}
+                            </span>
+                          )}
                         <span className="whitespace-nowrap sm:whitespace-normal rounded-full bg-[#DCE0CF]/50 px-2 py-1.5 text-xs font-semibold text-[#202421] sm:px-3 sm:py-2 sm:text-sm">
                           {formatQuantity(
                             ingredient.displayQuantity,

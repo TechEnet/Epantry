@@ -1070,9 +1070,10 @@ router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
   if (!/^[1-9][0-9]{5}$/.test(pincode)) problem('Enter a valid six-digit PIN code.')
   const record = await HostUnifiedListingPacket.findOne(publicHostListingFilter({ _id: req.params.id }))
     .select('type packet publishedPacket publishedType').lean()
-  if (!record) problem('This approved grocery listing is unavailable.', 404)
+  if (!record) problem('This approved sellable listing is unavailable.', 404)
   const approved = publishedHostRecord(record)
-  if (approved.type !== 'grocery') problem('This approved grocery listing is unavailable.', 404)
+  const sellable = approved.type === 'grocery' || approved.type === 'prepared_food' || approved.packet?.sellReadyMade === true
+  if (!sellable) problem('This approved sellable listing is unavailable.', 404)
   const delivery = approved.packet?.delivery || {}
   const pickupOnly = delivery.fulfillment === 'pickup'
   const declaredCoverage = !pickupOnly && (delivery.postalCodes || []).some(code => String(code).trim() === pincode)

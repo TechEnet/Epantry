@@ -1,3 +1,4 @@
+import { calculateListingEstimate } from './hostUnifiedListing.logic.js'
 // A Host packet keeps its own governed identity while sharing customer detail routes.
 // Suffix prevents same-name Host listings colliding with each other or catalog slugs.
 export function publicHostSlug(record) {
@@ -30,6 +31,7 @@ export function publicListing(record) {
   const approved = publishedHostRecord(record)
   const packet = approved.packet || {}
   const commercial = approved.type === 'grocery' || approved.type === 'prepared_food' || packet.sellReadyMade
+  const approvedIngredientCosts = packet.shareRecipe ? calculateListingEstimate(packet).ingredientLines : []
   return {
     id: String(record._id), slug: publicHostSlug(record), title: approved.title, type: approved.type,
     host: record.publicHost || null,
@@ -63,10 +65,14 @@ export function publicListing(record) {
     difficulty: approved.type === 'grocery' || !packet.shareRecipe ? '' : (packet.difficulty || 'not_declared'),
     // Full quantities and preparation instructions are private unless the
     // Host has explicitly chosen to share the approved recipe.
-    ingredients: (packet.shareRecipe ? packet.ingredients : [])?.map((item) => ({
+    ingredients: (packet.shareRecipe ? packet.ingredients : [])?.map((item, index) => ({
       name: item.name, quantity: item.quantity, unit: item.unit, imageUrl: item.imageUrl,
       role: item.role || 'main', preparationState: item.preparationState || '',
       scalingRule: item.scalingRule || 'proportional',
+      // Publish ONLY the cost of the ingredient quantity used in the approved,
+      // explicitly shared recipe. Never reveal the Host's purchased-pack price,
+      // pack quantity, supplier or any unapproved revision.
+      estimatedIngredientCost: approvedIngredientCosts[index]?.estimatedCost ?? null,
     })) || [],
     steps: packet.shareRecipe ? packet.steps?.map((item) => ({ instruction: item.instruction, timerMinutes: item.timerMinutes, imageUrl: item.imageUrl })) || [] : [],
     nutrition: packet.nutrition ? {
