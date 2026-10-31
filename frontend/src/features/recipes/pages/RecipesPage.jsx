@@ -300,9 +300,9 @@ function recipeImage(item) {
   return item?.dish?.heroImageUrl || item?.recipe?.heroImageUrl || "";
 }
 
-// One visual system for approved Host items and established EPANTRY recipes.
-// The BookmarkButton is deliberately outside the Link, preserving its Customer
-// login prompt and allowing the icon to sit at the top-left on every card.
+// Shared editorial card for approved Host items and established EPANTRY recipes.
+// BookmarkButton stays outside the Link, preserving its login prompt and
+// keeping the bookmark independently clickable in the top-right corner.
 function RecipeTile({ item, restaurant = false, host = false }) {
   const title = host ? String(item.title || "Recipe") : recipeName(item);
   const url = host ? hostDetailPath(item) : recipePath(item);
@@ -321,30 +321,39 @@ function RecipeTile({ item, restaurant = false, host = false }) {
     : restaurant ? "Restaurant pick" : course;
 
   return (
-    <article className="relative flex h-full min-w-0 flex-col overflow-hidden rounded-[12px] border border-[#D8DDD4] bg-[#F7F6F2] transition-[border-color,box-shadow] duration-200 hover:border-[#C86C42] hover:shadow-[0_10px_30px_rgba(23,63,53,0.09)]">
+    <article className="relative isolate flex h-full min-w-0 flex-col rounded-[18px] border border-[#D9DFD5] bg-[#FFFCF8] p-2 shadow-[0_2px_12px_rgba(23,63,53,0.045)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:border-[#AFC5B4] hover:shadow-[0_14px_32px_rgba(23,63,53,0.12)] focus-within:border-[#173F35]">
       <Link to={url} className="focus-ring group flex h-full min-w-0 flex-col" aria-label={`Open ${title}`}>
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#E6E9DF]">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-[12px] bg-[#E6E9DF]">
           {imageUrl ? (
             <img
               src={imageUrl}
               {...publicImageProps(imageUrl, { widths: [240, 360, 560, 760], sizes: "(max-width: 640px) 47vw, (max-width: 1024px) 32vw, 24vw" })}
               alt={title}
               loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.045] motion-reduce:transform-none"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.055] motion-reduce:transform-none"
             />
           ) : (
             <div className="grid h-full w-full place-items-center bg-[#E2E8DE] text-[#173F35]"><ChefHat size={34} aria-label="No image" /></div>
           )}
-          <span className="absolute bottom-2 right-2 max-w-[80%] truncate rounded-[5px] bg-[#F7F6F2]/95 px-2.5 py-1 text-[12px] font-semibold capitalize text-[#173F35]">
+          <span className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-[6px] bg-[#FFFCF8] px-2.5 py-1 text-[12px] font-semibold capitalize leading-5 text-[#173F35] shadow-[0_2px_10px_rgba(23,63,53,0.1)]">
             {sourceLabel}
           </span>
         </div>
-        <div className="flex min-h-[105px] flex-1 flex-col border-t-[3px] border-[#C86C42] px-3 py-3 sm:px-3.5">
-          <p className="line-clamp-1 text-[13px] font-medium text-[#5A6B61]">{subtitle}</p>
-          <h3 className="mt-1 line-clamp-2 text-[16px] font-bold leading-[1.28] tracking-[-0.02em] text-[#173F35] sm:text-[17px]">{title}</h3>
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
-            <span className="line-clamp-1 text-[12px] font-medium capitalize text-[#6A726B]">{price ? `${price} / serving` : course}</span>
-            <ArrowUpRight size={17} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+        <div className="flex min-h-[128px] flex-1 flex-col px-2 pb-2 pt-3 sm:px-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="size-1.5 shrink-0 rounded-full bg-[#C86C42]" aria-hidden="true" />
+            <p className="line-clamp-1 min-w-0 text-[12px] font-semibold leading-[1.4] text-[#5C7263] sm:text-[13px]">{subtitle}</p>
+          </div>
+          <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-[1.3] tracking-[-0.025em] text-[#173F35] sm:text-[18px]">
+            {title}
+          </h3>
+          <div className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-[#E6EAE2] pt-3">
+            <span className="line-clamp-1 min-w-0 text-[12px] font-medium capitalize leading-[1.4] text-[#5F6C62] sm:text-[13px]">
+              {price ? `${price} / serving` : course}
+            </span>
+            <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[#C7DACB] bg-[#E6F0E7] text-[#173F35] transition-colors duration-200 group-hover:border-[#173F35] group-hover:bg-[#173F35] group-hover:text-[#FFFCF8]">
+              <ArrowUpRight size={17} aria-hidden="true" />
+            </span>
           </div>
         </div>
       </Link>
@@ -352,7 +361,7 @@ function RecipeTile({ item, restaurant = false, host = false }) {
         kind="recipe"
         slug={url.split("/").pop()}
         title={title}
-        className="absolute left-2 top-2 !size-9 !bg-[#F7F6F2] sm:left-3 sm:top-3"
+        className="!absolute !left-auto !right-4 !top-4 !z-20 !size-9 !border-[#E1E6DC] !bg-[#FFFCF8] !shadow-[0_4px_15px_rgba(23,63,53,0.16)]"
       />
     </article>
   );
@@ -1205,7 +1214,7 @@ export default function RecipesPage() {
 
       <section
         ref={browseRef}
-        className="scroll-mt-[70px] border-t border-[#DCE0CF] bg-[#F7F6F2] py-10 sm:py-14"
+        className="scroll-mt-[110px] border-t border-[#DCE0CF] bg-[#F7F6F2] py-10 sm:scroll-mt-[120px] sm:py-14"
         aria-label="Explore recipes by type"
       >
         <div className="page-shell">
@@ -1221,11 +1230,16 @@ export default function RecipesPage() {
           {/* Meal/collection selection. The first line stays one row. All other
               types live in a native keyboard-accessible dropdown. */}
           <div className="mt-7 rounded-[16px] border border-[#DCE0CF] bg-[#DCE0CF]/45 p-3 sm:p-4">
-            <div className="mb-3 flex items-center gap-2 text-[#173F35]">
-              <SlidersHorizontal size={18} aria-hidden="true" />
-              <h3 className="text-[15px] font-bold uppercase tracking-[0.08em]">
+            <div className="mb-3 flex min-h-[36px] items-center gap-2.5 overflow-visible py-1 text-[#173F35]">
+              <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-[#E7EEE5]" aria-hidden="true">
+                <SlidersHorizontal size={18} />
+              </span>
+              <span
+                className="block min-w-0 py-0.5 font-bold text-[#173F35]"
+                style={{ fontSize: "17px", lineHeight: "1.4", letterSpacing: "-0.02em", textTransform: "none" }}
+              >
                 Explore by type
-              </h3>
+              </span>
             </div>
             <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-2">
               {recipeTabs
