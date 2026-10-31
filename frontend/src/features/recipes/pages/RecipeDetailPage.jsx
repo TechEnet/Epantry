@@ -38,6 +38,7 @@ import {
 import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 import { publicImageProps, publicImageVariant } from '../../../lib/publicMediaDelivery'
+import { getPublicPackOffers } from '../../marketplace/services/marketplace.service'
 
 import {
   useAuth,
@@ -54,6 +55,7 @@ import {
 import {
   createCommerceIdempotencyKey,
   createRestaurantRecipeMarketplaceCart,
+  createDirectMarketplaceCart,
   getCommerceErrorMessage,
 } from '../../commerce/services/commerce.service'
 
@@ -146,6 +148,17 @@ function formatMoney(
     amountMinor /
       100,
   )
+}
+
+// Host-declared selling prices are rupee amounts, not minor-unit Market prices.
+// The final charge must come from the active, serviceable Marketplace offer.
+function hostDeclaredMoney(value) {
+  if (value === null || value === undefined || value === '') return 'Not set'
+  const amount = Number(value)
+  if (!Number.isFinite(amount) || amount < 0) return 'Not set'
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency', currency: 'INR', maximumFractionDigits: 2,
+  }).format(amount)
 }
 
 function toDateInputValue(
@@ -1200,6 +1213,15 @@ export default function RecipeDetailPage() {
     useState(
       false,
     )
+  // Personal planning calculator, never represented as a verified selling price.
+  const [ingredientBudgetAtBase, setIngredientBudgetAtBase] = useState('')
+  const [readyPin, setReadyPin] = useState('')
+  const [readyOffers, setReadyOffers] = useState([])
+  const [readyOffersBusy, setReadyOffersBusy] = useState(false)
+  const [readyOffersError, setReadyOffersError] = useState('')
+  const [readyOrderBusy, setReadyOrderBusy] = useState('')
+  const [readyOrderError, setReadyOrderError] = useState('')
+  const [readyQuantity, setReadyQuantity] = useState(1)
 
   const [
     restaurantOrderError,
@@ -1794,6 +1816,80 @@ export default function RecipeDetailPage() {
       )
 
   const recipeDietaryBadge = resolveRecipeDietaryBadge(detailsFoodIntelligence)
+  const readyListing = data?.hostSubmission || null
+  const isReadyMade = Boolean(readyListing?.sellReadyMade)
+  const readyPackId = String(readyListing?.canonicalPackId || '').trim()
+  const declaredReadyPrice = readyListing?.offer?.declaredPrice ?? null
+  const ingredientBaseServings = Math.max(1, Number(recipe.baseServings) || 1)
+  const numericIngredientBudget = ingredientBudgetAtBase.trim() === '' ? null : Number(ingredientBudgetAtBase)
+  const scaledIngredientBudget = numericIngredientBudget !== null && Number.isFinite(numericIngredientBudget) && numericIngredientBudget >= 0
+    ? Math.round(numericIngredientBudget * servings / ingredientBaseServings * 100) / 100 : null
+
+  // Use the same address source and strictly verified active offers as Grocery.
+  useEffect(() => {
+    if (!isReadyMade || !canUseCustomerFeatures || !readyPackId) return undefined
+    let mounted = true
+    getDefaultDeliveryAddress()
+      .then(result => {
+        const pin = String(result?.address?.postalCode || '').replace(/\s+/g, '')
+        if (mounted && /^[1-9][0-9]{5}$/.test(pin)) setReadyPin(pin)
+      })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [isReadyMade, canUseCustomerFeatures, readyPackId])
+
+  useEffect(() => {
+    let mounted = true
+    setReadyOffers([])
+    setReadyOffersError('')
+    setReadyOrderError('')
+    if (!isReadyMade || !readyPackId || !/^[1-9][0-9]{5}$/.test(readyPin)) {
+      setReadyOffersBusy(false)
+      return () => { mounted = false }
+    }
+    setReadyOffersBusy(true)
+    getPublicPackOffers({ packId: readyPackId, pincode: readyPin, fulfillmentType: 'delivery' })
+      .then(result => { if (mounted) setReadyOffers(Array.isArray(result?.offers) ? result.offers : []) })
+      .catch(err => { if (mounted) setReadyOffersError(getCommerceErrorMessage(err, 'Unable to check delivery and price.')) })
+      .finally(() => { if (mounted) setReadyOffersBusy(false) })
+    return () => { mounted = false }
+  }, [isReadyMade, readyPackId, readyPin])
+
+  async function orderVerifiedReadyFood(offer) {
+    if (readyOrderBusy) return
+    if (!canUseCustomerFeatures) { openCustomerAccessRequired(); return }
+    if (!readyPackId || !/^[1-9][0-9]{5}$/.test(readyPin) || !offer?.id) return
+    const min = Math.max(1, Number(offer.minimumOrderQuantity) || 1)
+    const max = offer.maximumOrderQuantity == null ? 10000 : Math.max(min, Number(offer.maximumOrderQuantity) || min)
+    if (readyQuantity < min || readyQuantity > max) {
+      setReadyOrderError(`Choose ${min} to ${max} prepared pack${max === 1 ? '' : 's'}.`)
+      return
+    }
+    setReadyOrderBusy(String(offer.id))
+    setReadyOrderError('')
+    try {
+      const result = await createDirectMarketplaceCart({
+        packId: readyPackId, offerId: offer.id, quantity: readyQuantity,
+        pincode: readyPin, fulfillmentType: 'delivery',
+        idempotencyKey: createCommerceIdempotencyKey('ready-made-food'),
+      })
+      const cartId = result?.cart?.id
+      if (!cartId) throw new Error('The verified cart was not returned.')
+      navigate(`/cart/${cartId}`)
+    } catch (err) {
+      setReadyOrderError(getCommerceErrorMessage(err, 'Unable to add this prepared food to cart.'))
+    } finally {
+      setReadyOrderBusy('')
+    }
+  }
+
+  useEffect(() => {
+    setIngredientBudgetAtBase('')
+    setReadyPin('')
+    setReadyQuantity(1)
+    setReadyOffers([])
+    setReadyOrderError('')
+  }, [slug])
 
   useEffect(() => {
     if (!data?.recipe?.id || typeof MutationObserver === 'undefined') return undefined
@@ -4880,6 +4976,84 @@ export default function RecipeDetailPage() {
             overflow: clip !important;
           }
         }
+
+        /* Explicit editorial overrides for the three user-selected panels. */
+        .epantry-recipe-detail .epantry-hero-story { gap: 0 !important; padding-block: clamp(22px,3vw,45px) !important; }
+        .epantry-recipe-detail .epantry-hero-story > .recipe-edition-eyebrow { font-size:12px !important; line-height:1.5 !important; letter-spacing:.12em; color:#A65D3C; margin-bottom:13px !important; }
+        .epantry-recipe-detail .epantry-hero-story > h1,
+        .epantry-recipe-detail .epantry-hero-story > div > h1 { transform:none !important; margin:0 !important; max-width:18ch; font-size:clamp(30px,3.45vw,54px) !important; line-height:1.13 !important; color:#173F35 !important; overflow-wrap:break-word; }
+        .epantry-recipe-detail .epantry-hero-story .epantry-recipe-local-names { transform:none !important; margin:12px 0 0 !important; padding:10px 0 !important; border-top:1px solid #DCE0CF; border-bottom:1px solid #DCE0CF; line-height:1.4; }
+        .epantry-recipe-detail .epantry-hero-story .epantry-recipe-local-names p { font-size:13px !important; line-height:1.45 !important; margin:0 !important; }
+        .epantry-recipe-detail .epantry-hero-story .epantry-hero-description { transform:none !important; background:#F0EAE2; border-left:3px solid #C86C42; margin:16px 0 0 !important; padding:12px 14px; }
+        .epantry-recipe-detail .epantry-hero-description > p { transform:none !important; margin:0 !important; font-size:14px !important; line-height:1.65 !important; letter-spacing:0 !important; font-weight:400 !important; color:#40544A !important; }
+        .epantry-recipe-detail .epantry-hero-description .epantry-hero-description-label { font-size:11px !important; line-height:1.5 !important; color:#9A5639 !important; text-transform:uppercase; font-weight:750 !important; letter-spacing:.1em !important; margin-bottom:5px !important; }
+        .epantry-recipe-detail .epantry-hero-story .epantry-recipe-metrics { transform:none !important; margin:17px 0 0 !important; gap:8px 14px !important; padding-top:12px; border-top:1px solid #C8D5C6; }
+        .epantry-recipe-detail .epantry-hero-story .epantry-recipe-metric { border:0 !important; padding:4px 0 !important; }
+        .epantry-recipe-detail .epantry-hero-story .epantry-recipe-metric p:first-child { font-size:11px !important; white-space:normal !important; }
+        .epantry-recipe-detail .epantry-hero-story .epantry-recipe-metric p:last-child { font-size:14px !important; white-space:normal !important; overflow-wrap:anywhere; }
+        .epantry-recipe-detail .epantry-origin-story { background:#EAF1E6 !important; border:1px solid #C9D6C8 !important; overflow:hidden; }
+        .epantry-recipe-detail .epantry-origin-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0; }
+        .epantry-recipe-detail .epantry-origin-layout--three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+        .epantry-recipe-detail .epantry-origin-layout > div { min-width:0; padding:25px clamp(16px,2.4vw,32px); }
+        .epantry-recipe-detail .epantry-origin-layout > div + div { border-left:1px solid #CFDACA; }
+        .epantry-recipe-detail .epantry-story-kicker { font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#AE5E39; line-height:1.6; margin:0 0 7px; }
+        .epantry-recipe-detail .epantry-origin-lead { border-top:3px solid #C86C42; }
+        .epantry-recipe-detail .epantry-origin-lead h2 { font-size:clamp(23px,2.45vw,33px); line-height:1.17; font-weight:650; color:#173F35; margin:0 0 8px; }
+        .epantry-recipe-detail .epantry-origin-lead > p:last-child,
+        .epantry-recipe-detail .epantry-origin-note,
+        .epantry-recipe-detail .epantry-origin-extra > p:last-child { font-size:13px; line-height:1.6; color:#56665C; }
+        .epantry-recipe-detail .epantry-origin-country-link { display:inline-flex; align-items:center; gap:10px; font-weight:700; font-size:clamp(17px,2vw,24px); line-height:1.3; color:#173F35; overflow-wrap:anywhere; }
+        .epantry-recipe-detail .epantry-origin-country-link:hover { color:#A85938; }
+        .epantry-recipe-detail .epantry-origin-flag { width:37px; height:37px; display:grid; place-items:center; background:#F7F6F2; border-radius:50%; flex-shrink:0; }
+        .epantry-recipe-detail .epantry-origin-extra h3 { font-size:clamp(18px,2vw,26px); line-height:1.3; color:#173F35; margin:0 0 5px; }
+        .epantry-recipe-detail .epantry-pantry-intro { border-bottom:1px solid #CBD5C8 !important; padding-bottom:16px !important; }
+        .epantry-recipe-detail .epantry-pantry-intro h2 { font-size:clamp(26px,3vw,40px) !important; line-height:1.15 !important; max-width:17ch; margin:12px 0 6px !important; }
+        .epantry-recipe-detail .epantry-pantry-subtitle { font-size:14px; font-weight:400; line-height:1.6; color:#50655A; max-width:38ch; margin:9px 0 0; }
+        .epantry-recipe-detail .epantry-ready-made-market { border:1px solid #D8D0C7; background:#F7F6F2; overflow:hidden; }
+        .epantry-recipe-detail .epantry-ready-made-heading { display:flex; align-items:start; justify-content:space-between; gap:18px; background:#E9EEE5; border-bottom:1px solid #C9D5C7; padding:23px clamp(17px,3vw,36px); }
+        .epantry-recipe-detail .epantry-ready-made-heading h2 { font-size:clamp(23px,2.8vw,36px); line-height:1.16; color:#173F35; margin:0 0 8px; }
+        .epantry-recipe-detail .epantry-ready-made-heading p:last-child { font-size:14px; line-height:1.6; color:#516458; max-width:68ch; }
+        .epantry-recipe-detail .epantry-ready-made-type { border:1px solid #C86C42; padding:7px 10px; color:#9C4E2B; font-weight:700; font-size:12px; white-space:nowrap; }
+        .epantry-recipe-detail .epantry-ready-made-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .epantry-recipe-detail .epantry-ready-option { min-width:0; padding:23px clamp(18px,2.5vw,35px); }
+        .epantry-recipe-detail .epantry-ready-option + .epantry-ready-option { border-left:1px solid #DFDCD3; background:#F1F1E9; }
+        .epantry-recipe-detail .epantry-ready-option h3 { color:#173F35; font-size:clamp(20px,2vw,27px); line-height:1.2; margin:0 0 12px; }
+        .epantry-recipe-detail .epantry-ready-price-row { display:flex; flex-wrap:wrap; align-items:end; gap:15px; padding:14px 0; border-block:1px solid #D5DACC; }
+        .epantry-recipe-detail .epantry-ready-price-row > div { display:grid; gap:3px; }
+        .epantry-recipe-detail .epantry-ready-price-row span, .epantry-recipe-detail .epantry-ready-price-row small { font-size:12px; color:#586B60; }
+        .epantry-recipe-detail .epantry-ready-price-row strong { font-size:26px; line-height:1.1; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-explainer { font-size:13px; line-height:1.65; color:#56685D; margin:13px 0; }
+        .epantry-recipe-detail .epantry-ready-order-panel { display:grid; gap:9px; margin-top:12px; }
+        .epantry-recipe-detail .epantry-ready-order-panel label, .epantry-recipe-detail .epantry-budget-form label { font-size:13px; font-weight:700; line-height:1.5; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-order-panel > input, .epantry-recipe-detail .epantry-budget-form input { width:100%; min-height:42px; border:1px solid #BDCDBD; border-radius:6px; background:#fff; padding:8px 12px; font-size:15px; color:#202421; outline-offset:2px; }
+        .epantry-recipe-detail .epantry-ready-order-panel > input:focus-visible, .epantry-recipe-detail .epantry-budget-form input:focus-visible { outline:2px solid #2D6E54; }
+        .epantry-recipe-detail .epantry-ready-verified-list { display:grid; gap:9px; padding-top:6px; }
+        .epantry-recipe-detail .epantry-ready-qty { display:flex; align-items:center; gap:6px; width:fit-content; }
+        .epantry-recipe-detail .epantry-ready-qty input { width:65px; padding:7px; border:1px solid #BACAB7; text-align:center; }
+        .epantry-recipe-detail .epantry-ready-qty button { padding:8px; border:1px solid #BACAB7; background:#fff; }
+        .epantry-recipe-detail .epantry-ready-seller { display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; border:1px solid #C5D4C4; padding:12px; background:#fff; }
+        .epantry-recipe-detail .epantry-ready-seller span { display:grid; font-size:13px; line-height:1.6; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-seller span small { color:#607267; }
+        .epantry-recipe-detail .epantry-ready-seller strong { font-size:17px; color:#173F35; }
+        .epantry-recipe-detail .epantry-ready-total { font-size:12px; color:#56665C; font-weight:700; }
+        .epantry-recipe-detail .epantry-ready-seller button, .epantry-recipe-detail .epantry-ready-ingredients-link { min-height:40px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:9px 14px; border-radius:7px; background:#173F35; color:#fff; font-size:13px; font-weight:700; }
+        .epantry-recipe-detail .epantry-ready-seller button:disabled { opacity:.5; }
+        .epantry-recipe-detail .epantry-ready-error { color:#A42828; font-size:13px; }
+        .epantry-recipe-detail .epantry-ready-unavailable { border-left:3px solid #C86C42; background:#F8E8DC; color:#775038; font-size:13px; padding:12px; line-height:1.6; }
+        .epantry-recipe-detail .epantry-budget-form { display:grid; gap:8px; padding:12px 0; border-block:1px solid #D0D9CC; }
+        .epantry-recipe-detail .epantry-budget-total { font-size:22px; font-weight:700; color:#173F35; }
+        .epantry-recipe-detail .epantry-budget-total span { font-size:12px; font-weight:500; color:#68786A; }
+        @media (max-width:639px) {
+          .epantry-recipe-detail .epantry-origin-layout,
+          .epantry-recipe-detail .epantry-origin-layout--three,
+          .epantry-recipe-detail .epantry-ready-made-options { grid-template-columns:minmax(0,1fr); }
+          .epantry-recipe-detail .epantry-origin-layout > div { padding:19px; }
+          .epantry-recipe-detail .epantry-origin-layout > div + div,
+          .epantry-recipe-detail .epantry-ready-option + .epantry-ready-option { border-left:0; border-top:1px solid #CFDACA; }
+          .epantry-recipe-detail .epantry-ready-made-heading { flex-wrap:wrap; }
+          .epantry-recipe-detail .epantry-hero-story > div > h1 { font-size:34px !important; }
+          .epantry-recipe-detail .epantry-recipe-ingredients > .epantry-pantry-intro { max-height:none !important; overflow:visible !important; }
+        }
       `}</style>
 
       <div className="page-shell pb-10 pt-5 sm:pb-16 sm:pt-7">
@@ -5015,7 +5189,7 @@ export default function RecipeDetailPage() {
 
             </div>
 
-            <div className="epantry-recipe-mobile-info px-5 pb-6 pt-5 sm:hidden">
+            <div className="epantry-recipe-mobile-info epantry-hero-story px-5 pb-6 pt-5 sm:hidden">
 
               <p className="recipe-edition-eyebrow mb-3">
                 {dish.cuisine || 'EPANTRY Recipe'}
@@ -5063,13 +5237,9 @@ export default function RecipeDetailPage() {
                 ))}
               </div>
 
-              <div className="mt-5 border-l-[3px] border-[#C86C42] bg-[#DCE0CF]/40 px-4 py-3">
-                <p className="text-[14px] font-semibold text-[#173F35]">
-                  About this recipe
-                </p>
-                <p className="mt-1.5 text-[14px] font-medium leading-[1.55] text-[#202421]/80">
-                  {recipe.description || dish.description}
-                </p>
+              <div className="epantry-hero-description mt-4">
+                <p className="epantry-hero-description-label">About the dish</p>
+                <p>{recipe.description || dish.description || 'Discover its ingredients and cooking story below.'}</p>
               </div>
 
               {!hostListingMode && <Link
@@ -5085,7 +5255,7 @@ export default function RecipeDetailPage() {
 
             </div>
 
-            <div className="epantry-recipe-desktop-info hidden flex-col justify-center bg-[#DCE0CF] px-6 py-8 sm:flex lg:px-9 lg:py-10">
+            <div className="epantry-recipe-desktop-info epantry-hero-story hidden flex-col justify-center bg-[#DCE0CF] px-6 py-8 sm:flex lg:px-9 lg:py-10">
 
               <p className="recipe-edition-eyebrow">
                 {dish.cuisine || 'EPANTRY Recipe'}
@@ -5095,9 +5265,10 @@ export default function RecipeDetailPage() {
               </h1>
               <RecipeLocalNames origin={recipeDiscovery?.origin} />
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#202421]/80 sm:mt-3 sm:text-base sm:leading-7">
-                {recipe.description || dish.description}
-              </p>
+              <div className="epantry-hero-description mt-4">
+                <p className="epantry-hero-description-label">About the dish</p>
+                <p>{recipe.description || dish.description || 'Discover its ingredients and cooking story below.'}</p>
+              </div>
 
               <div className="epantry-recipe-metrics mt-7 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
                 {[
@@ -5300,41 +5471,113 @@ export default function RecipeDetailPage() {
           </section>
         ) : null}
 
-        {data?.hostSubmission?.sellReadyMade === true && data?.hostSubmission?.marketplaceProductPath ? (
-          <section className="border-y border-[#C7D8CA] bg-[#EDF4EB] p-5 sm:p-7" aria-label="Buy this prepared food">
-            <h2 className="text-xl font-semibold text-[#173F35]">Want it ready-made?</h2>
-            <p className="mt-2 text-sm text-[#40544A]">Check available sellers, actual prices and delivery for your area.</p>
-            <Link to={data.hostSubmission.marketplaceProductPath} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#173F35] px-4 py-2 font-semibold text-white">
-              View verified offers <ArrowUpRight size={17} aria-hidden="true"/>
-            </Link>
-          </section>
-        ) : null}
-        {recipeDiscovery?.origin?.country ? (
-          <section className="epantry-origin-chapter mt-7 border-y border-[#C8D9CB] bg-[#EAF2EA]" aria-label="Recipe origin and tradition">
-            <div className="grid gap-5 px-5 py-6 sm:px-9 sm:py-8 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-10">
-              <div className="min-w-0 border-l-[3px] border-[#C86C42] pl-4 sm:pl-5">
-                <p className="text-[13px] font-bold uppercase tracking-[.12em] text-[#A65836]">From its roots</p>
-                <h2 className="mt-2 text-[27px] font-semibold tracking-[-.035em] text-[#173F35] sm:text-[33px]">Origin & tradition</h2>
-                <p className="mt-1 text-[15px] leading-6 text-[#4D6255]">{recipeDiscovery.origin.region?.name ? `${recipeDiscovery.origin.region.name}, ${recipeDiscovery.origin.country.name}` : recipeDiscovery.origin.country.name}</p>
+        {isReadyMade && (
+          <section className="epantry-ready-made-market mt-7" aria-label="Order this ready-made dish">
+            <div className="epantry-ready-made-heading">
+              <div>
+                <p className="epantry-story-kicker">Two ways to enjoy</p>
+                <h2>Ready to eat, or make it yourself.</h2>
+                <p>Buy the complete prepared dish at its pack price, or shop ingredients separately for your chosen servings.</p>
               </div>
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 border-t border-[#CAD9CC] pt-4 sm:gap-6 lg:border-l lg:border-t-0 lg:py-1 lg:pl-8">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-bold uppercase tracking-[.1em] text-[#A65836]">Country</p>
-                  <Link to={countryExplorePath(recipeDiscovery.origin.country.name)} aria-label={`Explore food from ${recipeDiscovery.origin.country.name}`} title={`Discover food from ${recipeDiscovery.origin.country.name}`} className="mt-1 inline-flex min-h-10 items-center gap-0.5 text-[29px] transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C86C42]">
-                    {countryFlag(recipeDiscovery.origin.country.name) ? <span role="img" aria-label={`${recipeDiscovery.origin.country.name} flag`}>{countryFlag(recipeDiscovery.origin.country.name)}</span> : <Globe2 size={28} strokeWidth={1.6} aria-hidden="true" />}
-                    <ArrowUpRight size={11} className="self-start mt-1 text-[#A65836]" aria-hidden="true" />
-                  </Link>
+              <span className="epantry-ready-made-type">Ready-made food</span>
+            </div>
+            <div className="epantry-ready-made-options">
+              <div className="epantry-ready-option">
+                <p className="epantry-story-kicker">01 / Complete prepared dish</p>
+                <h3>Order the finished dish</h3>
+                <div className="epantry-ready-price-row">
+                  <div><span>Host-listed pack price</span><strong>{hostDeclaredMoney(declaredReadyPrice)}</strong></div>
+                  <small>Fixed per prepared pack · independent of ingredient servings</small>
                 </div>
-                {recipeDiscovery.origin.region?.name ? (
-                  <div className="min-w-0 border-l border-[#CAD9CC] pl-4 sm:pl-6">
-                    <p className="text-[13px] font-bold uppercase tracking-[.1em] text-[#A65836]">Region / state</p>
-                    <p className="mt-2 break-words text-[23px] font-semibold leading-tight text-[#173F35] sm:text-[26px]">{recipeDiscovery.origin.region.name}</p>
+                <p className="epantry-ready-explainer">Pay only a verified Marketplace offer price at checkout. Stock and delivery are checked for your PIN.</p>
+                {readyPackId ? (
+                  <div className="epantry-ready-order-panel">
+                    <label htmlFor="ready-made-delivery-pin">Delivery PIN</label>
+                    <input id="ready-made-delivery-pin" inputMode="numeric" autoComplete="postal-code" maxLength={6}
+                      value={readyPin} onChange={event => setReadyPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="6-digit PIN" aria-label="PIN code for prepared dish delivery" />
+                    {readyOffersBusy ? <p role="status">Checking live offers…</p> : null}
+                    {readyOffersError ? <p role="alert" className="epantry-ready-error">{readyOffersError}</p> : null}
+                    {!readyOffersBusy && /^[1-9][0-9]{5}$/.test(readyPin) && !readyOffersError && !readyOffers.length ? <p>No verified seller is delivering this prepared pack to this PIN right now.</p> : null}
+                    {readyOffers.length > 0 && (
+                      <div className="epantry-ready-verified-list">
+                        <label htmlFor="ready-made-quantity">Prepared packs</label>
+                        <div className="epantry-ready-qty">
+                          <button type="button" onClick={() => setReadyQuantity(v => Math.max(1, v-1))} disabled={readyQuantity <= 1} aria-label="Decrease prepared packs"><Minus size={14}/></button>
+                          <input id="ready-made-quantity" inputMode="numeric" type="number" min="1" max="100" value={readyQuantity} onChange={event => setReadyQuantity(Math.min(100, Math.max(1, Math.floor(Number(event.target.value) || 1))))}/>
+                          <button type="button" onClick={() => setReadyQuantity(v => Math.min(100, v+1))} aria-label="Increase prepared packs"><Plus size={14}/></button>
+                        </div>
+                        {readyOffers.map(offer => (
+                          <div className="epantry-ready-seller" key={offer.id}>
+                            <span><b>{offer.seller?.name || 'Verified seller'}</b><small>Live selling price</small></span>
+                            <strong>{formatMoney({ amountMinor: offer.price?.effectiveAmountMinor, currency: offer.price?.currency || 'INR' })} / pack</strong>
+                            <small className="epantry-ready-total">{offer.price?.effectiveAmountMinor !== null && offer.price?.effectiveAmountMinor !== undefined && Number.isInteger(Number(offer.price.effectiveAmountMinor)) ? formatMoney({ amountMinor: Number(offer.price.effectiveAmountMinor) * readyQuantity, currency: offer.price?.currency || 'INR' }) : 'Price unavailable'} for {readyQuantity} pack{readyQuantity === 1 ? '' : 's'}</small>
+                            <button type="button" disabled={Boolean(readyOrderBusy)} onClick={() => orderVerifiedReadyFood(offer)}><ShoppingCart size={16}/>{readyOrderBusy === String(offer.id) ? 'Adding…' : 'Buy this pack'}</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {readyOrderError ? <p role="alert" className="epantry-ready-error">{readyOrderError}</p> : null}
                   </div>
-                ) : null}
+                ) : (
+                  <p className="epantry-ready-unavailable" role="status">Ordering will open once the Host links this approved dish to a published product and activates a verified Marketplace offer with stock and delivery. The listed price alone cannot be charged.</p>
+                )}
+              </div>
+              <div className="epantry-ready-option epantry-ready-option--ingredients">
+                <p className="epantry-story-kicker">02 / Ingredients for home cooking</p>
+                <h3>Make it for {servings}</h3>
+                <p className="epantry-ready-explainer">Ingredient quantities below automatically adjust with servings. Your ingredient basket is purchased separately from the complete prepared dish.</p>
+                {hostRecipeNotShared ? <p className="epantry-ready-unavailable">The Host has not shared ingredient quantities for this approved listing.</p> : <>
+                  <div className="epantry-budget-form">
+                    <label htmlFor="ingredient-budget-base">Your estimated ingredient budget for {ingredientBaseServings} serving{ingredientBaseServings === 1 ? '' : 's'} (₹)</label>
+                    <input id="ingredient-budget-base" type="number" min="0" step="0.01" inputMode="decimal" value={ingredientBudgetAtBase} onChange={event => setIngredientBudgetAtBase(event.target.value)} placeholder="Enter an estimated amount" />
+                    <p className="epantry-budget-total">{scaledIngredientBudget === null ? 'Set a budget to compare servings' : hostDeclaredMoney(scaledIngredientBudget)} <span>for {servings} serving{servings === 1 ? '' : 's'}</span></p>
+                  </div>
+                  <p className="epantry-ready-explainer">Budget is your own proportional estimate, not a live seller quote. Example: ₹10 for 4 servings becomes ₹15 for 6. Actual ingredient prices depend on available pack offers at checkout.</p>
+                  <button type="button" onClick={() => document.querySelector('.epantry-recipe-ingredients')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="epantry-ready-ingredients-link">View ingredients &amp; shop <ArrowRight size={17}/></button>
+                </>}
               </div>
             </div>
           </section>
-        ) : null}
+        )}
+
+        {recipeDiscovery?.origin?.country ? (() => {
+          const origin = recipeDiscovery.origin
+          // For Host-submitted origin, only Host-provided fields can create
+          // the third column. Wikidata enrichment must not fabricate it.
+          const region = String(hostListingMode ? (readyListing?.regionOfOrigin || '') : (origin.region?.name || '')).trim()
+          const localName = String(hostListingMode ? (readyListing?.localRecipeName || '') : (origin.localName || '')).trim()
+          const reading = String(hostListingMode ? (readyListing?.englishNameReading || '') : (origin.reading || '')).trim()
+          const third = region || localName || reading
+          return (
+            <section className="epantry-origin-chapter epantry-origin-story mt-7" aria-label="Recipe origin and tradition">
+              <div className={`epantry-origin-layout ${third ? 'epantry-origin-layout--three' : 'epantry-origin-layout--two'}`}>
+                <div className="epantry-origin-lead min-w-0">
+                  <p className="epantry-story-kicker">From its roots</p>
+                  <h2>Origin &amp; tradition</h2>
+                  <p>A little context behind what is on your plate.</p>
+                </div>
+                <div className="epantry-origin-country min-w-0">
+                  <p className="epantry-story-kicker">Country</p>
+                  <Link to={countryExplorePath(origin.country.name)} className="epantry-origin-country-link" aria-label={`Explore food from ${origin.country.name}`}>
+                    <span role="img" aria-label={`${origin.country.name} flag`} className="epantry-origin-flag">{countryFlag(origin.country.name) || <Globe2 size={26} strokeWidth={1.6} aria-hidden="true" />}</span>
+                    <span>{origin.country.name}</span>
+                    <ArrowUpRight size={17} aria-hidden="true" />
+                  </Link>
+                  <p className="epantry-origin-note">Explore recipes from this country</p>
+                </div>
+                {third ? (
+                  <div className="epantry-origin-extra min-w-0">
+                    <p className="epantry-story-kicker">{region ? 'Region / state' : localName ? 'Local name' : 'English reading'}</p>
+                    <h3>{third}</h3>
+                    {region && localName && <p>{localName}</p>}
+                    {reading && (region || localName) && <p>Pronunciation: {reading}</p>}
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          )
+        })() : null}
 
         <div className="epantry-recipe-workspace mt-8 flex flex-col gap-8">
 
@@ -5342,7 +5585,7 @@ export default function RecipeDetailPage() {
             className="epantry-recipe-ingredients relative order-1 min-w-0 rounded-[16px] border border-[#DCE0CF] bg-[#F7F6F2] p-4 sm:p-6 lg:flex lg:flex-col"
           >
 
-            <div className="epantry-recipe-ingredients-intro flex shrink-0 flex-col gap-2 border-b border-[#DCE0CF] pb-2 sm:gap-3 sm:pb-3 xl:flex-row xl:items-start xl:justify-between">
+            <div className="epantry-recipe-ingredients-intro epantry-pantry-intro flex shrink-0 flex-col gap-2 border-b border-[#DCE0CF] pb-2 sm:gap-3 sm:pb-3 xl:flex-row xl:items-start xl:justify-between">
 
               <div className="max-w-xl">
 
@@ -5356,11 +5599,9 @@ export default function RecipeDetailPage() {
                 </div>
 
                 <h2 className="mt-2 text-[24px] font-semibold leading-[1.25] tracking-[-0.03em] text-[#173F35] sm:text-[32px] sm:font-semibold sm:tracking-tight">
-                  <span className="sm:hidden">{hostRecipeNotShared ? 'Recipe not shared' : 'Can I cook this at home?'}</span>
-                  <span className="hidden sm:inline">{hostRecipeNotShared ? 'Recipe details not yet shared' : 'Ingredients & Can I cook this from home?'}</span>
+                  <span>{hostRecipeNotShared ? 'Recipe details not yet shared' : 'Cook it your way'}</span>
                 </h2>
-
-
+                {!hostRecipeNotShared && <p className="epantry-pantry-subtitle">See what you have, find what is missing, or shop the ingredients to make it at home.</p>}
               </div>
 
               <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap sm:gap-2">

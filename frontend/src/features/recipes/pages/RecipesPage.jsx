@@ -300,18 +300,66 @@ function recipeImage(item) {
   return item?.dish?.heroImageUrl || item?.recipe?.heroImageUrl || "";
 }
 
+// Display the country of origin, not the Host's account name. Only map an
+// explicitly stated national cuisine when the listing has no country field.
+function recipeCountry(item, host = false) {
+  const declared = host
+    ? item?.countryOfOrigin || item?.country
+    : item?.dish?.countryOfOrigin || item?.dish?.originCountry ||
+      item?.dish?.origin?.country || item?.dish?.country ||
+      item?.recipe?.countryOfOrigin || item?.recipe?.originCountry ||
+      item?.recipe?.origin?.country || item?.recipe?.country;
+  const country = String(declared || "").trim();
+  const codes = { IN: "India", JP: "Japan", MX: "Mexico", IT: "Italy", TH: "Thailand", TR: "Türkiye", KR: "South Korea", CN: "China", FR: "France", ES: "Spain", US: "United States", GB: "United Kingdom" };
+  if (country) return codes[country.toUpperCase()] || country;
+
+  const cuisine = String(host ? item?.cuisine : recipeCuisine(item)).trim().toLowerCase();
+  const countryByCuisine = [
+    [/^(indian|india)(?:$|[\s-])/, "India"],
+    [/^(japanese|japan)(?:$|[\s-])/, "Japan"],
+    [/^(mexican|mexico)(?:$|[\s-])/, "Mexico"],
+    [/^(italian|italy)(?:$|[\s-])/, "Italy"],
+    [/^(thai|thailand)(?:$|[\s-])/, "Thailand"],
+    [/^(turkish|türkiye|turkey)(?:$|[\s-])/, "Türkiye"],
+    [/^(korean|korea)(?:$|[\s-])/, "South Korea"],
+    [/^(chinese|china)(?:$|[\s-])/, "China"],
+    [/^(french|france)(?:$|[\s-])/, "France"],
+    [/^(spanish|spain)(?:$|[\s-])/, "Spain"],
+  ];
+  return countryByCuisine.find(([pattern]) => pattern.test(cuisine))?.[1] || "Country not listed";
+}
+
+// FSSAI-style symbols: green circle in a square for Veg, brown triangle for
+// Non-Veg. No icon for unknown/undeclared diet; never infer it from a title.
+function RecipeDietaryMark({ kind }) {
+  if (kind === "veg") {
+    return (
+      <span title="Vegetarian" aria-label="Vegetarian" role="img" className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-[2px] border-[1.5px] border-[#188348] bg-[#FFFCF8]">
+        <span className="size-[9px] rounded-full bg-[#188348]" aria-hidden="true" />
+      </span>
+    );
+  }
+  if (kind === "nonveg") {
+    return (
+      <span title="Non-vegetarian" aria-label="Non-vegetarian" role="img" className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-[2px] border-[1.5px] border-[#944529] bg-[#FFFCF8]">
+        <span className="size-[11px] bg-[#944529]" style={{ clipPath: "polygon(50% 7%, 94% 91%, 6% 91%)" }} aria-hidden="true" />
+      </span>
+    );
+  }
+  return null;
+}
+
 // Shared editorial card for approved Host items and established EPANTRY recipes.
 // BookmarkButton stays outside the Link, preserving its login prompt and
 // keeping the bookmark independently clickable in the top-right corner.
-function RecipeTile({ item, restaurant = false, host = false }) {
+function RecipeTile({ item, restaurant = false, host = false, foodIntelligence = null }) {
   const title = host ? String(item.title || "Recipe") : recipeName(item);
   const url = host ? hostDetailPath(item) : recipePath(item);
   const imageUrl = host ? (item.images?.[0] || "") : recipeImage(item);
-  const subtitle = host
-    ? String(item.host?.name || item.countryOfOrigin || "EPANTRY Host")
-    : restaurant
-    ? item?.restaurant?.restaurantName || "Restaurant pick"
-    : recipeCuisine(item) || "EPANTRY recipe";
+  const country = recipeCountry(item, host);
+  const dietaryKind = host
+    ? hostDietaryKind(item)
+    : recipeDietaryKind(item, foodIntelligence);
   const course = host
     ? String(item.category || "Recipe").replaceAll("_", " ")
     : recipeCourse(item);
@@ -341,8 +389,8 @@ function RecipeTile({ item, restaurant = false, host = false }) {
         </div>
         <div className="flex min-h-[128px] flex-1 flex-col px-2 pb-2 pt-3 sm:px-2.5">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="size-1.5 shrink-0 rounded-full bg-[#C86C42]" aria-hidden="true" />
-            <p className="line-clamp-1 min-w-0 text-[12px] font-semibold leading-[1.4] text-[#5C7263] sm:text-[13px]">{subtitle}</p>
+            <RecipeDietaryMark kind={dietaryKind} />
+            <p className="line-clamp-1 min-w-0 text-[12px] font-semibold leading-[1.4] text-[#5C7263] sm:text-[13px]" title={country}>{country}</p>
           </div>
           <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-[1.3] tracking-[-0.025em] text-[#173F35] sm:text-[18px]">
             {title}
@@ -681,7 +729,7 @@ export default function RecipesPage() {
       ? MOBILE_REVEAL_SIZE
       : DESKTOP_REVEAL_SIZE
   );
-  const [gallery, setGallery] = useState(null); // "all" or { id, name } for one Host
+  const [gallery, setGallery] = useState(null); // Host-only gallery; the main collection expands in-page.
   const browseRef = useRef(null);
   const requestGenerationRef = useRef(0);
   const loadMoreInFlightRef = useRef(false);
@@ -696,6 +744,14 @@ export default function RecipesPage() {
     query.addEventListener?.("change", apply);
     return () => query.removeEventListener?.("change", apply);
   }, []);
+
+  // Changing a filter/search starts the matching collection at its first
+  // desktop (12) or mobile (6) batch again.
+  useEffect(() => {
+    const mobile = typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 767px)").matches;
+    setRevealSize(mobile ? MOBILE_REVEAL_SIZE : DESKTOP_REVEAL_SIZE);
+  }, [selectedCollection, selectedDiet, collectionQuery]);
 
   // Approved unified Host listings are a separate governed read model; they
   // never pretend to be canonical recipe records or sellable marketplace offers.
@@ -956,6 +1012,51 @@ export default function RecipesPage() {
       selectedDiet, modalDietaryByRecipeId, standardHasMore, matchingHostListings]);
 
   const visibleRecipes = matchedRecipes.slice(0, revealSize);
+
+  // The legacy recipe catalogue does not include approved Food Intelligence in
+  // its browse response. Resolve it for the legacy cards currently on screen,
+  // including the default All Recipes view, so their real Veg/Non-Veg markers
+  // do not disappear. Keep unknown/unapproved classifications unmarked.
+  const visibleLegacyDietaryIds = [...new Set(
+    visibleRecipes
+      .filter(({ item, host }) => !host && recipeDietaryKind(item) === "unknown")
+      .map(({ item }) => String(item?.recipe?.id || "").trim())
+      .filter(Boolean)
+  )].join("|");
+
+  useEffect(() => {
+    // The dietary-filter flow above already fetches the required evidence.
+    if (selectedDiet !== "all" || !visibleLegacyDietaryIds) return undefined;
+
+    const missingIds = visibleLegacyDietaryIds
+      .split("|")
+      .filter((id) => !Object.hasOwn(modalDietaryByRecipeId, id));
+    if (!missingIds.length) return undefined;
+
+    let cancelled = false;
+    const loadVisibleDietary = async () => {
+      const resultsById = {};
+      // Small batches avoid a burst of requests as more cards are revealed.
+      for (let index = 0; index < missingIds.length; index += 3) {
+        if (cancelled) return;
+        const ids = missingIds.slice(index, index + 3);
+        const results = await Promise.allSettled(
+          ids.map((id) => getRecipeFoodIntelligence(id))
+        );
+        if (cancelled) return;
+        results.forEach((result, offset) => {
+          resultsById[ids[offset]] =
+            result.status === "fulfilled" ? result.value : null;
+        });
+      }
+      if (!cancelled) {
+        setModalDietaryByRecipeId((current) => ({ ...resultsById, ...current }));
+      }
+    };
+    void loadVisibleDietary();
+    return () => { cancelled = true; };
+  }, [selectedDiet, visibleLegacyDietaryIds, modalDietaryByRecipeId]);
+
   const galleryItems = gallery && gallery !== "all"
     ? matchingHostGroups.find(group => group.id === gallery.id)?.items.map(item => ({ item, host: true })) || []
     : matchedRecipes;
@@ -1012,8 +1113,8 @@ export default function RecipesPage() {
       : "");
 
   async function handleViewMore() {
-    if (loadingMore || loading) return;
-    if (!moreFromServer) return;
+    if (loadingMore || loading) return false;
+    if (!moreFromServer) return false;
     // Load only the next real API page on demand, never create placeholder duplicates.
     const useRestaurant =
       selectedCollection === "restaurant" ||
@@ -1021,7 +1122,7 @@ export default function RecipesPage() {
     const nextPage = useRestaurant ? restaurantPage + 1 : standardPage + 1;
     const limit = useRestaurant ? RESTAURANT_PAGE_SIZE : STANDARD_PAGE_SIZE;
     const sourceScope = useRestaurant ? "restaurant" : "standard";
-    if (loadMoreInFlightRef.current) return;
+    if (loadMoreInFlightRef.current) return false;
     loadMoreInFlightRef.current = true;
     setLoadingMore(true);
     const generation = requestGenerationRef.current;
@@ -1043,6 +1144,7 @@ export default function RecipesPage() {
         setStandardPage(nextPage);
         setStandardHasMore(hasNextPage(payload, rows, nextPage, limit));
       }
+      return true;
     } catch (loadError) {
       if (generation === requestGenerationRef.current) {
         if (useRestaurant)
@@ -1051,10 +1153,24 @@ export default function RecipesPage() {
           );
         else setError(loadError?.message || "Unable to load more recipes.");
       }
+      return false;
     } finally {
       if (generation === requestGenerationRef.current) setLoadingMore(false);
       loadMoreInFlightRef.current = false;
     }
+  }
+
+  async function handleRevealMore() {
+    if (loading || loadingMore || !canViewMore) return;
+    // Existing items always reveal first; only request another real API page
+    // when the currently loaded results are exhausted.
+    if (matchedRecipes.length <= revealSize && moreFromServer) {
+      const loaded = await handleViewMore();
+      if (!loaded) return;
+    }
+    const mobile = typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 767px)").matches;
+    setRevealSize((count) => count + (mobile ? MOBILE_REVEAL_SIZE : DESKTOP_REVEAL_SIZE));
   }
 
   function handleSearch(event) {
@@ -1137,7 +1253,7 @@ export default function RecipesPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-[#F7F6F2] text-[#202421]">
+    <main className="min-h-screen bg-[#D7DDCF] text-[#202421]">
       <section
         className="relative flex h-[100svh] min-h-0 items-center overflow-hidden bg-[#F7F6F2] bg-center bg-cover bg-no-repeat"
         style={{ backgroundImage: "url('/hero/recipe.png')" }}
@@ -1214,7 +1330,7 @@ export default function RecipesPage() {
 
       <section
         ref={browseRef}
-        className="scroll-mt-[110px] border-t border-[#DCE0CF] bg-[#F7F6F2] py-10 sm:scroll-mt-[120px] sm:py-14"
+        className="scroll-mt-[110px] border-t border-[#BCC8B7] bg-[#D7DDCF] py-10 sm:scroll-mt-[120px] sm:py-14"
         aria-label="Explore recipes by type"
       >
         <div className="page-shell">
@@ -1321,7 +1437,7 @@ export default function RecipesPage() {
 
           {/* Category-aware search; query and diet filter the same results. */}
           <div className="mt-4">
-            <label className="flex min-h-[54px] items-center gap-3 rounded-[14px] border border-[#DCE0CF] bg-[#F7F6F2] px-4 transition-colors focus-within:border-[#173F35] focus-within:ring-2 focus-within:ring-[#173F35]/15">
+            <label className="flex min-h-[54px] items-center gap-3 rounded-[14px] border border-[#DCE0CF] bg-[#F7F6F2] px-4 transition-[border-color,box-shadow] focus-within:border-[#A2B8A7] focus-within:shadow-[0_0_0_3px_rgba(23,63,53,0.08)]">
               <Search
                 size={21}
                 className="shrink-0 text-[#173F35]"
@@ -1336,7 +1452,8 @@ export default function RecipesPage() {
                 onBlur={() => setSearchFocused(false)}
                 maxLength={160}
                 placeholder={hint || `Search ${searchScope.toLowerCase()}...`}
-                className="focus-ring h-[52px] w-full min-w-0 flex-1 bg-transparent text-base text-[#202421] outline-none placeholder:text-[#202421]/60"
+                className="h-[52px] w-full min-w-0 flex-1 border-0 bg-transparent text-base text-[#202421] outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 placeholder:text-[#202421]/60"
+                style={{ outline: "none", boxShadow: "none" }}
               />
               {collectionQuery && (
                 <button
@@ -1374,7 +1491,7 @@ export default function RecipesPage() {
           )}
           {loading ? (
             <div
-              className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 lg:gap-5"
+              className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5"
               role="status"
               aria-label="Loading recipes"
             >
@@ -1391,13 +1508,14 @@ export default function RecipesPage() {
                 <h2 className="text-[22px] font-bold text-[#173F35] sm:text-[26px]">Explore recipes</h2>
                 <span className="text-[13px] font-medium text-[#66766C]">Host & EPANTRY favourites</span>
               </div>
-              <div className="mt-4 grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+              <div className="mt-4 grid grid-cols-2 items-stretch gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
                 {visibleRecipes.map(({ item, restaurant, host }, index) => (
                   <RecipeTile
                     key={host ? `host-${item.id}` : `${restaurant ? "restaurant" : "standard"}-${recipeKey(item, index)}`}
                     item={item}
                     restaurant={restaurant}
                     host={host}
+                    foodIntelligence={host ? null : modalDietaryByRecipeId[String(item?.recipe?.id || "")] || null}
                   />
                 ))}
               </div>
@@ -1426,10 +1544,12 @@ export default function RecipesPage() {
             <div className="mt-8 flex flex-col items-center gap-2 border-t border-[#DCE0CF] pt-7">
               <button
                 type="button"
-                onClick={() => setGallery("all")}
-                className="focus-ring inline-flex min-h-[48px] items-center gap-2 rounded-full bg-[#173F35] px-8 text-[15px] font-bold text-[#F7F6F2] transition hover:bg-[#202421]"
+                onClick={handleRevealMore}
+                disabled={loadingMore}
+                aria-label={`Show the next ${typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches ? 6 : 12} recipes on this page`}
+                className="focus-ring inline-flex min-h-[48px] items-center gap-2 rounded-full bg-[#173F35] px-8 text-[15px] font-bold text-[#F7F6F2] transition hover:bg-[#202421] disabled:cursor-wait disabled:opacity-60"
               >
-                View all recipes{" "}
+                {loadingMore ? "Loading recipes…" : "View all recipes"}{" "}
                 <ChevronRight size={19} aria-hidden="true" />
               </button>
             </div>
@@ -1442,7 +1562,7 @@ export default function RecipesPage() {
             />
           )}
           {showHostRows && matchingHostGroups.length > 0 && (
-            <section aria-label="Browse recipes by Host" className="mt-12 border-t-[3px] border-[#C86C42] bg-[#F7F6F2] pt-7">
+            <section aria-label="Browse recipes by Host" className="mt-12 border-t-[3px] border-[#C86C42] bg-[#D7DDCF] pt-7">
               <p className="text-[13px] font-semibold uppercase tracking-[0.10em] text-[#B75F3E]">Meet the Hosts</p>
               <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
                 <h2 className="text-[27px] font-bold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[34px]">Discover food by Host</h2>
