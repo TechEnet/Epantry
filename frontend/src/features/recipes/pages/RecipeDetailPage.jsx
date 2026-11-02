@@ -252,12 +252,41 @@ function getPantryLineIngredientId(
 function getRecipeIngredientCanonicalId(
   ingredient,
 ) {
-  return String(
+  // A scaled recipe's ingredientId identifies the recipe LINE, not the
+  // canonical food. Never send that line ID to the Living Pantry API.
+  const id = String(
     ingredient?.canonicalIngredientId ||
       ingredient?.ingredient?.id ||
-      ingredient?.ingredientId ||
+      (ingredient?.scaledQuantity === undefined ? ingredient?.ingredientId : '') ||
       '',
   ).trim()
+  return /^[a-f0-9]{24}$/i.test(id) ? id : ''
+}
+
+function getRecipeIngredientName(ingredient) {
+  return String(
+    ingredient?.ingredient?.name ||
+    ingredient?.ingredientName ||
+    ingredient?.name ||
+    '',
+  ).trim()
+}
+
+function catalogNameKey(value) {
+  return String(value || '').toLocaleLowerCase('en').replace(/\s+/g, ' ').trim()
+}
+
+function catalogLookupTerms(value) {
+  const raw = String(value || '').trim()
+  const outer = raw.replace(/\([^)]*\)/g, '').trim()
+  const inner = [...raw.matchAll(/\(([^)]+)\)/g)].map((match) => match[1].trim())
+  return [...new Set([raw, outer, ...inner].map(catalogNameKey).filter(Boolean))]
+}
+
+function ingredientMatchSearchTerm(value) {
+  const outer = String(value || '').replace(/\([^)]*\)/g, '').trim()
+  const parts = outer.split(/\s+/).filter(Boolean)
+  return parts.length > 1 ? parts[parts.length - 1] : outer
 }
 
 function getPantryLineStatus(
@@ -1181,6 +1210,31 @@ export default function RecipeDetailPage() {
       '',
     )
 
+  // Recover an existing canonical ID when older recipe rows omit the linkage.
+  // No catalog item is created and no approximate/fuzzy match is accepted.
+  const [catalogRecoveredIds, setCatalogRecoveredIds] = useState({})
+  const ingredientLookupCacheRef = useRef(new Map())
+  const [confirmedIngredientIds, setConfirmedIngredientIds] = useState({})
+  const [matchingIngredient, setMatchingIngredient] = useState(null)
+  const [matchSearch, setMatchSearch] = useState('')
+  const [matchOptions, setMatchOptions] = useState([])
+  const [matchLoading, setMatchLoading] = useState(false)
+  const [matchError, setMatchError] = useState('')
+  // Customer-confirmed name-to-catalog choices survive a refresh without
+  // altering the published recipe or assigning IDs to unrelated ingredients.
+  const ingredientMatchStorageKey = `epantry:recipe-ingredient-match:${String(user?.id || user?._id || user?.uid || 'guest')}:${slug}`
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(ingredientMatchStorageKey) || '{}')
+      setConfirmedIngredientIds(
+        saved && typeof saved === 'object' && !Array.isArray(saved)
+          ? Object.fromEntries(Object.entries(saved).filter(([, id]) => /^[a-f0-9]{24}$/i.test(String(id))))
+          : {},
+      )
+    } catch {
+      setConfirmedIngredientIds({})
+    }
+  }, [ingredientMatchStorageKey])
   const [resolvedIngredientIds, setResolvedIngredientIds] = useState(() => new Set())
   const [pantrySetupItem, setPantrySetupItem] = useState(null)
   const [setupQuantity, setSetupQuantity] = useState('')
@@ -1617,7 +1671,7 @@ export default function RecipeDetailPage() {
     ],
   )
 
-  const ingredientRows =
+  const rawIngredientRows =
     useMemo(
       () => {
         const scaled =
@@ -1657,6 +1711,116 @@ export default function RecipeDetailPage() {
       ],
     )
 
+  // Recover missing canonical IDs using the existing customer catalog lookup.
+  // No fuzzy guess is automatically accepted; only one unique exact name/alias
+  // match (including an explicitly written parenthetical ingredient name).
+  useEffect(() => {
+    if (!canUseCustomerFeatures) return undefined
+    let active = true
+    const names = [...new Set(rawIngredientRows
+      .filter((ingredient) => !getRecipeIngredientCanonicalId(ingredient))
+      .map(getRecipeIngredientName)
+      .filter((name) => name.length >= 2 && name.length <= 100))]
+    if (!names.length) return undefined
+
+    Promise.all(names.map(async (name) => {
+      const key = catalogNameKey(name)
+      let request = ingredientLookupCacheRef.current.get(key)
+      if (!request) {
+        request = (async () => {
+          const terms = catalogLookupTerms(name)
+          const matches = new Map()
+          for (const term of terms) {
+            try {
+              const response = await apiClient.get('/community/ingredients', {
+                params: { search: term, limit: 30 },
+              })
+              for (const item of response?.data?.data?.ingredients || []) {
+                const names = [item.canonicalName, ...(item.aliases || [])]
+                  .map(catalogNameKey)
+                const id = String(item.id || '')
+                if (/^[a-f0-9]{24}$/i.test(id) && names.includes(term)) {
+                  matches.set(id, item)
+                }
+              }
+            } catch {
+              // Customer catalog search can be temporarily unavailable.
+            }
+          }
+          return matches.size === 1 ? [...matches.keys()][0] : ''
+        })()
+        ingredientLookupCacheRef.current.set(key, request)
+      }
+      return [key, await request]
+    })).then((matches) => {
+      if (!active) return
+      const recovered = Object.fromEntries(matches.filter(([, id]) => Boolean(id)))
+      if (Object.keys(recovered).length) {
+        setCatalogRecoveredIds((previous) => ({ ...previous, ...recovered }))
+      }
+    })
+    return () => { active = false }
+  }, [rawIngredientRows, canUseCustomerFeatures])
+
+  const ingredientRows = useMemo(() => rawIngredientRows.map((ingredient) => {
+    if (getRecipeIngredientCanonicalId(ingredient)) return ingredient
+    const key = catalogNameKey(getRecipeIngredientName(ingredient))
+    const canonicalIngredientId = confirmedIngredientIds[key] || catalogRecoveredIds[key]
+    return canonicalIngredientId ? { ...ingredient, canonicalIngredientId } : ingredient
+  }), [rawIngredientRows, confirmedIngredientIds, catalogRecoveredIds])
+
+  // For names that have no unambiguous automatic match, the customer can
+  // choose the correct EXISTING catalog ingredient once, directly from I have.
+  useEffect(() => {
+    if (!matchingIngredient || !canUseCustomerFeatures) return undefined
+    const term = matchSearch.trim()
+    if (term.length < 2) {
+      setMatchOptions([])
+      setMatchLoading(false)
+      return undefined
+    }
+    let active = true
+    setMatchLoading(true)
+    setMatchError('')
+    const timer = setTimeout(async () => {
+      try {
+        const response = await apiClient.get('/community/ingredients', {
+          params: { search: term, limit: 20 },
+        })
+        if (active) setMatchOptions(response?.data?.data?.ingredients || [])
+      } catch {
+        if (active) {
+          setMatchOptions([])
+          setMatchError('Ingredient catalog is unavailable. Try again.')
+        }
+      } finally {
+        if (active) setMatchLoading(false)
+      }
+    }, 250)
+    return () => { active = false; clearTimeout(timer) }
+  }, [matchingIngredient, matchSearch, canUseCustomerFeatures])
+
+  function openIngredientMatcher(ingredient) {
+    const name = getRecipeIngredientName(ingredient)
+    setMatchingIngredient(ingredient)
+    setMatchSearch(ingredientMatchSearchTerm(name))
+    setMatchOptions([])
+    setMatchError('')
+  }
+
+  function confirmIngredientMatch(item) {
+    if (!matchingIngredient || !/^[a-f0-9]{24}$/i.test(String(item?.id || ''))) return
+    const key = catalogNameKey(getRecipeIngredientName(matchingIngredient))
+    if (!key) return
+    const next = { ...confirmedIngredientIds, [key]: String(item.id) }
+    setConfirmedIngredientIds(next)
+    try { window.localStorage.setItem(ingredientMatchStorageKey, JSON.stringify(next)) } catch {}
+    const selected = { ...matchingIngredient, canonicalIngredientId: String(item.id) }
+    setMatchingIngredient(null)
+    setMatchOptions([])
+    handleIHaveIngredient(selected)
+  }
+
   const loadPantryReconciliation =
     useCallback(
       async () => {
@@ -1679,15 +1843,32 @@ export default function RecipeDetailPage() {
 
         try {
           const result = hostListingMode
-            ? await reconcileHostRecipeIngredientsWithPantry(data?.ingredients || [])
+            ? await reconcileHostRecipeIngredientsWithPantry(ingredientRows)
             : await getRecipePantry(
                 slug,
                 { targetServings: servings },
               )
 
-          setPantryReconciliation(
-            result,
-          )
+          // The recipe reconciliation API cannot know about recovered IDs
+          // that are missing from a legacy RecipeIngredient record. Merge
+          // their REAL saved Pantry states without changing the recipe data.
+          const recovered = ingredientRows.filter((ingredient) => {
+            const key = catalogNameKey(getRecipeIngredientName(ingredient))
+            return Boolean(catalogRecoveredIds[key] || confirmedIngredientIds[key])
+          })
+          const supplemented = !hostListingMode && recovered.length
+            ? await reconcileHostRecipeIngredientsWithPantry(recovered)
+            : null
+          setPantryReconciliation(supplemented
+            ? {
+                ...result,
+                requirements: [
+                  ...getPantryRequirementLines(result),
+                  ...(supplemented.ingredients || []),
+                ],
+              }
+            : result)
+
         } catch (
           pantryLoadError
         ) {
@@ -1708,7 +1889,9 @@ export default function RecipeDetailPage() {
         servings,
         slug,
         hostListingMode,
-        data?.ingredients,
+        ingredientRows,
+        catalogRecoveredIds,
+        confirmedIngredientIds,
       ],
     )
 
@@ -2051,15 +2234,11 @@ export default function RecipeDetailPage() {
 
     const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
 
-    if (
-      !canonicalIngredientId ||
-      ingredientDecisionLockRef.current.has(canonicalIngredientId)
-    ) {
-      if (!canonicalIngredientId) {
-        setPantryError('This Recipe line is not linked to a canonical ingredient yet.')
-      }
+    if (!canonicalIngredientId) {
+      openIngredientMatcher(ingredient)
       return
     }
+    if (ingredientDecisionLockRef.current.has(canonicalIngredientId)) return
 
     const identity = ingredient?.ingredient || {}
 
@@ -5910,7 +6089,7 @@ export default function RecipeDetailPage() {
                         ingredient.id ||
                         `${ingredient.lineNumber}-${ingredient.canonicalIngredientId}`
                       }
-                      className={`epantry-prep-row--${prepIndexTone} grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 bg-white px-2.5 py-1.5 transition hover:bg-[#fffaf1] sm:flex sm:flex-row sm:items-center sm:gap-2 sm:px-3 sm:py-2.5`}
+                      className={`epantry-prep-row--${prepIndexTone} grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 bg-white px-2.5 py-1.5 transition hover:bg-[#fffaf1] sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-3 sm:py-2.5`}
                     >
 
                       <div className={`epantry-prep-index--${prepIndexTone} grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[13px] font-semibold sm:h-8 sm:w-8 sm:text-[14px]`}>
@@ -6011,13 +6190,12 @@ export default function RecipeDetailPage() {
                               ingredient,
                             )
                           }
-                          title={!canonicalIngredientId ? 'This ingredient needs to be matched to the EPANTRY catalog before Pantry and Cart actions are available.' : undefined}
+                          title={!canonicalIngredientId ? 'Choose the matching EPANTRY ingredient to add it to your Living Pantry.' : undefined}
                           disabled={
                             decisionLocked ||
                             Boolean(
                               pantryActionKey,
                             ) ||
-                            !canonicalIngredientId ||
                             (
                               !canUseCustomerFeatures &&
                               !customerContextBlocked
@@ -6048,7 +6226,43 @@ export default function RecipeDetailPage() {
                           I have
                         </button>
                       </div>
-
+                      {matchingIngredient &&
+                        catalogNameKey(getRecipeIngredientName(matchingIngredient)) === catalogNameKey(getRecipeIngredientName(ingredient)) && (
+                          <div className="col-span-2 mt-2 w-full rounded-lg border border-[#C7D6C9] bg-white p-3 sm:basis-full" role="group" aria-label="Match ingredient for Living Pantry">
+                            <p className="text-sm font-semibold text-[#173F35]">Choose the matching EPANTRY ingredient</p>
+                            <p className="mt-1 text-xs text-[#52635A]">Select the correct catalog item for {getRecipeIngredientName(ingredient)}. No recipe relisting is needed.</p>
+                            <input
+                              type="search"
+                              aria-label="Search matching ingredient"
+                              className="mt-2 w-full rounded-lg border border-[#C7D6C9] px-3 py-2 text-sm"
+                              value={matchSearch}
+                              onChange={(event) => { setMatchSearch(event.target.value); setMatchOptions([]) }}
+                              placeholder="Search e.g. Poha"
+                              autoFocus
+                            />
+                            {matchLoading && <p className="mt-2 text-xs text-[#52635A]">Searching catalog...</p>}
+                            {matchError && <p className="mt-2 text-xs text-red-700" role="alert">{matchError}</p>}
+                            {!matchLoading && !matchError && matchSearch.trim().length >= 2 && !matchOptions.length && (
+                              <p className="mt-2 text-xs text-[#52635A]">No catalog match found. Try a simpler ingredient name.</p>
+                            )}
+                            {matchOptions.length > 0 && (
+                              <div className="mt-2 max-h-48 overflow-y-auto divide-y divide-[#E0E8DF]">
+                                {matchOptions.map((item) => (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    className="flex w-full items-center justify-between gap-2 py-2 text-left text-sm text-[#173F35] hover:bg-[#EFF4EE]"
+                                    onClick={() => confirmIngredientMatch(item)}
+                                  >
+                                    <span>{item.canonicalName}</span>
+                                    <span className="shrink-0 text-xs font-semibold">Select</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <button type="button" className="mt-2 text-xs font-semibold text-[#52635A] underline" onClick={() => setMatchingIngredient(null)}>Cancel</button>
+                          </div>
+                        )}
                     </div>
                   )
                 },
