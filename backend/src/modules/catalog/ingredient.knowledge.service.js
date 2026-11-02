@@ -274,39 +274,6 @@ async function approvedHostDishesForIngredient(canonicalId) {
   }))
 }
 
-// Cooking locations are NOT assertions about an ingredient's botanical origin.
-// Expose only Host-declared places on approved public recipes that use this
-// exact canonical ingredient, separately labelled from verified origins.
-async function approvedDishLocations(canonicalId) {
-  if (!canonicalId) return []
-  const rows = (await HostUnifiedListingPacket.find(publicHostListingFilter({
-    $and: [{ $or: [
-      { 'publishedPacket.ingredients.canonicalIngredientId': String(canonicalId) },
-      { publishedPacket: null, 'packet.ingredients.canonicalIngredientId': String(canonicalId) },
-    ] }],
-  })).select('title publicSlug packet publishedPacket publishedTitle publishedType type').limit(120).lean())
-    .map(publishedHostRecord)
-  const seen = new Set()
-  return rows.filter(row => ['brand_recipe', 'kitchen_recipe', 'prepared_food'].includes(row.type) &&
-    (row.packet?.ingredients || []).some(item => String(item.canonicalIngredientId) === String(canonicalId)) &&
-    (row.type === 'prepared_food' || row.packet?.shareRecipe)).map(row => {
-    const name = safeWord(row.packet?.countryOfOrigin, 90)
-    const region = safeWord(row.packet?.regionOfOrigin, 90)
-    if (!name || !/^[\p{L} .,&()'-]{2,90}$/u.test(name) || (region && !/^[\p{L} .,&()'-]{2,90}$/u.test(region))) return null
-    return {
-      name, iso3: '', region, imageUrl: media(row.packet?.images?.[0]),
-      description: `Location of an EPANTRY-published dish`,
-      sourceUrl: '',
-    }
-  }).filter(place => {
-    if (!place) return false
-    const key = `${norm(place.name)}:${norm(place.region)}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  }).slice(0, 8)
-}
-
 async function approvedHostIngredientImage(canonicalId, listingId, name) {
   const findPhoto = (records) => {
     for (const candidate of records) {
@@ -359,6 +326,89 @@ function verifiedCatalogPlace(attributes = {}) {
     description: 'Verified EPANTRY catalog origin',
     sourceUrl: media(geo.sourceUrl),
   }
+}
+
+// Public, source-backed production geography for common food ingredients.
+// This is NOT recipe-country data, nor proof of a specific shop's supply chain.
+// Only explicitly named commodities are mapped; never guess a country from a
+// recipe cuisine, an unrelated product, or a fuzzy name match.
+// To extend coverage, add independently verifiable producer data here or
+// approve an ingredient's evidence-backed geography in the canonical catalog.
+const PRODUCTION_EVIDENCE = [
+  {
+    names: ['salt', 'table salt', 'sea salt', 'rock salt', 'sodium chloride'],
+    description: 'Documented salt production',
+    sourceUrl: 'https://www.world-mining-data.info/wmd/downloads/PDF/WMD%202025.pdf#page=187',
+    places: [
+      ['China', 'CHN'], ['United States', 'USA'], ['India', 'IND'],
+      ['Germany', 'DEU'], ['Australia', 'AUS'],
+    ],
+  },
+  {
+    names: ['salt', 'table salt', 'sea salt'],
+    description: 'Major salt-producing state in India',
+    sourceUrl: 'https://www.saltcomindia.gov.in/MS_ByRail.aspx',
+    places: [
+      ['India', 'IND', 'Gujarat'],
+      ['India', 'IND', 'Tamil Nadu'],
+      ['India', 'IND', 'Rajasthan'],
+    ],
+  },
+  {
+    names: ['rice', 'rice grain', 'white rice', 'brown rice', 'basmati rice', 'poha', 'flattened rice', 'thick poha', 'rice flakes'],
+    description: 'Rice-producing country (source crop for rice products)',
+    sourceUrl: 'https://fas.usda.gov/data/production/commodity/0422110',
+    places: [['India', 'IND'], ['China', 'CHN'], ['Bangladesh', 'BGD'], ['Indonesia', 'IDN'], ['Vietnam', 'VNM']],
+  },
+  {
+    names: ['wheat', 'wheat grain', 'wheat flour', 'whole wheat flour', 'atta', 'whole wheat atta'],
+    description: 'Wheat-producing country (source crop)',
+    sourceUrl: 'https://fas.usda.gov/data/production/commodity/0410000',
+    places: [['China', 'CHN'], ['India', 'IND'], ['Russia', 'RUS'], ['United States', 'USA'], ['Canada', 'CAN']],
+  },
+  {
+    names: ['potato', 'potatoes', 'aloo'],
+    description: 'Documented potato-growing country',
+    sourceUrl: 'https://agriculture.canada.ca/en/sector/horticulture/reports/potato-market-information-review-2024-2025',
+    places: [['China', 'CHN'], ['India', 'IND'], ['Ukraine', 'UKR'], ['United States', 'USA'], ['Russia', 'RUS']],
+  },
+  {
+    names: ['peanut', 'peanuts', 'groundnut', 'groundnuts', 'raw peanuts'],
+    description: 'Documented groundnut-growing country',
+    sourceUrl: 'https://onlinelibrary.wiley.com/doi/full/10.1002/fes3.70311',
+    places: [['China', 'CHN'], ['India', 'IND'], ['Nigeria', 'NGA'], ['United States', 'USA'], ['Myanmar', 'MMR']],
+  },
+  {
+    names: ['onion', 'onions', 'red onion', 'white onion', 'yellow onion'],
+    description: 'Documented dry-onion growing country',
+    sourceUrl: 'https://terra-cultiva.com/en/rankings/onions-and-shallots-dry-excluding-dehydrated/production/',
+    places: [['India', 'IND'], ['China', 'CHN'], ['United States', 'USA'], ['Egypt', 'EGY'], ['Bangladesh', 'BGD']],
+  },
+  {
+    names: ['tomato', 'tomatoes', 'fresh tomato', 'fresh tomatoes'],
+    description: 'Documented tomato-growing country',
+    sourceUrl: 'https://commodityorigins.com/commodities/tomatoes/',
+    places: [['China', 'CHN'], ['India', 'IND'], ['Turkey', 'TUR'], ['United States', 'USA'], ['Egypt', 'EGY']],
+  },
+  {
+    names: ['olive oil', 'extra virgin olive oil', 'virgin olive oil'],
+    description: 'Documented olive-oil producing country',
+    sourceUrl: 'https://www.internationaloliveoil.org/olive-sector-statistics-december-2025-and-forecasts/',
+    places: [['Spain', 'ESP'], ['Italy', 'ITA'], ['Greece', 'GRC'], ['Tunisia', 'TUN'], ['Portugal', 'PRT']],
+  },
+]
+
+function sourcedProductionLocations(name, aliases = []) {
+  const searchNames = new Set([name, ...aliases].map(norm).filter(Boolean))
+  return PRODUCTION_EVIDENCE.filter(entry => entry.names.some(value => searchNames.has(norm(value))))
+    .flatMap(entry => entry.places.map(([country, iso3, region = '']) => ({
+      name: country,
+      iso3,
+      region,
+      imageUrl: '',
+      description: entry.description,
+      sourceUrl: entry.sourceUrl,
+    })))
 }
 
 function uniqueLocations(origin, varieties, ingredientPlace) {
@@ -447,14 +497,13 @@ export async function getIngredientKnowledge(rawKey, { listingId = '' } = {}) {
     }
     return null
   }
-  const [facts, relatedRecipes, relatedHostDishes, varieties, hostImage, dishLocations] = await Promise.all([
+  const [facts, relatedRecipes, relatedHostDishes, varieties, hostImage] = await Promise.all([
     lookupFacts(),
     ingredient ? publishedDishesForIngredient(ingredient._id) : Promise.resolve([]),
     ingredient ? approvedHostDishesForIngredient(ingredient._id) : Promise.resolve([]),
     ingredient ? CanonicalIngredient.find({ parentId: ingredient._id, status: 'active' })
       .select('_id slug canonicalName attributes').sort({ canonicalName: 1 }).limit(24).lean() : Promise.resolve([]),
     approvedHostIngredientImage(ingredient?._id, listingId, name),
-    approvedDishLocations(ingredient?._id),
   ])
   const origin = facts?.origin || null
   const topProducts = await approvedIngredientProducts(ingredient, varieties)
@@ -467,14 +516,18 @@ export async function getIngredientKnowledge(rawKey, { listingId = '' } = {}) {
       place,
     }
   })
+  // Geography must describe this INGREDIENT, not a country declared on a recipe.
+  // Put documented growing/production areas first, followed by independently
+  // verified origin evidence from the canonical catalog and Wikidata.
   const documentedLocations = uniqueLocations(origin, varietyRows, verifiedCatalogPlace(ingredient?.attributes))
-  const seenLocations = new Set(documentedLocations.map(place => `${norm(place.name)}:${norm(place.region)}`))
-  const topLocations = [...documentedLocations, ...dishLocations.filter(place => {
-    const key = `${norm(place.name)}:${norm(place.region)}`
+  const sourcedLocations = sourcedProductionLocations(name, ingredient?.aliases || [])
+  const seenLocations = new Set()
+  const topLocations = [...sourcedLocations, ...documentedLocations].filter(place => {
+    const key = `${place.iso3 || norm(place.name)}:${norm(place.region)}`
     if (seenLocations.has(key)) return false
     seenLocations.add(key)
     return true
-  })].slice(0, 12)
+  }).slice(0, 12)
   // Existing canonical approved media may be reused; never manufacture a photo.
   const canonicalImage = media(ingredient?.attributes?.approvedImageUrl)
   const commonsImage = facts?.image || null
@@ -501,6 +554,6 @@ export async function getIngredientKnowledge(rawKey, { listingId = '' } = {}) {
     relatedRecipes,
     relatedHostDishes,
     sources: [facts?.source, facts?.article].filter(Boolean),
-    dataNotice: 'Geography and descriptions are shown only where documented. EPANTRY recipes are published records, not worldwide rankings.',
+    dataNotice: 'Top Locations shows sourced ingredient production or verified origin evidence, not recipe countries or a claim about the supply chain of any specific product.',
   }
 }

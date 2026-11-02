@@ -5,7 +5,7 @@ import {
   Globe2, Leaf, MapPin, Search, ShoppingBag, SlidersHorizontal, Sprout,
 } from 'lucide-react'
 import { getIngredientKnowledge } from '../services/ingredientKnowledge.service'
-import { countryFlag, countryExplorePath } from '../../countries/utils/country.utils'
+import { countryFlag } from '../../countries/utils/country.utils'
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 
 const C = {
@@ -70,33 +70,42 @@ function MediaFrame({ imageUrl, alt, icon: Icon = Leaf, tone = 'sage' }) {
 }
 
 function LocationTile({ place, number, featured = false }) {
-  const flag = countryFlag(place.name)
+  const flag = countryFlag(place.name) || ({
+    TUR: String.fromCodePoint(0x1F1F9, 0x1F1F7),
+    MMR: String.fromCodePoint(0x1F1F2, 0x1F1F2),
+  }[place.iso3] || '')
+  const Tile = place.sourceUrl ? 'a' : 'article'
   return (
-    <article className={`group min-w-0 ${featured ? 'sm:flex sm:items-stretch sm:gap-5' : ''}`}>
+    <Tile
+      href={place.sourceUrl || undefined}
+      target={place.sourceUrl ? '_blank' : undefined}
+      rel={place.sourceUrl ? 'noopener noreferrer' : undefined}
+      aria-label={place.sourceUrl ? `Open location source for ${place.name}${place.region ? `, ${place.region}` : ''}` : undefined}
+      className={`group block min-w-0 rounded-[10px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F35] ${featured ? 'sm:flex sm:items-stretch sm:gap-5' : ''} ${place.sourceUrl ? 'cursor-pointer transition-[background-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-1 hover:bg-[#D6E9E5] hover:shadow-[0_10px_24px_rgba(23,63,53,0.13)] hover:ring-2 hover:ring-[#77A69A] focus-visible:bg-[#D6E9E5] focus-visible:ring-2 focus-visible:ring-[#77A69A] motion-reduce:transform-none motion-reduce:transition-none' : ''}`}
+    >
       <div className={`relative ${featured ? 'sm:w-[47%] sm:shrink-0' : ''}`}>
-        <MediaFrame imageUrl={place.imageUrl} alt={place.name} icon={Globe2} tone="blue" />
+        {flag ? (
+          <div className={`flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[10px] bg-[#E1ECF2] ${place.sourceUrl ? 'transition-colors duration-200 group-hover:bg-[#BEDAD5] group-focus-visible:bg-[#BEDAD5] motion-reduce:transition-none' : ''}`} aria-hidden="true">
+            <span className="text-[76px] leading-none sm:text-[84px]">{flag}</span>
+          </div>
+        ) : (
+          <MediaFrame imageUrl={place.imageUrl} alt={place.name} icon={Globe2} tone="blue" />
+        )}
         <span className="absolute left-3 top-3 rounded-md bg-[#F7F6F1] px-2.5 py-1 text-[13px] font-bold text-[#173F35] shadow-sm">{String(number).padStart(2, '0')}</span>
+        {place.sourceUrl ? (
+          <span className="pointer-events-none absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-[#173F35] text-white opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" aria-hidden="true">
+            <ArrowUpRight size={18} />
+          </span>
+        ) : null}
       </div>
       <div className={`${featured ? 'flex flex-1 flex-col justify-center pt-3 sm:py-2' : 'pt-3'}`}>
-        <h3 className="text-[18px] font-bold leading-[1.3] text-[#173F35]">
-          {flag ? <span aria-hidden="true" className="mr-2">{flag}</span> : null}{place.name}
+        <h3 className={`text-[18px] font-bold leading-[1.3] text-[#173F35] ${place.sourceUrl ? 'group-hover:text-[#A54A30] group-hover:underline group-hover:underline-offset-4 group-focus-visible:underline' : ''}`}>
+          {place.name}
         </h3>
         {place.region ? <p className="mt-1 flex items-center gap-1.5 text-[14px] text-[#526A5F]"><MapPin size={15} aria-hidden="true" />{place.region}</p> : null}
         {place.description ? <p className="mt-2 text-[14px] leading-[1.55] text-[#617369]">{place.description}</p> : null}
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
-          {flag ? (
-            <Link to={countryExplorePath(place.name)} style={{ color: C.ink, WebkitTextFillColor: C.ink }} className="inline-flex items-center gap-1.5 text-[14px] font-bold underline decoration-[#C38467] underline-offset-4 hover:decoration-2">
-              Explore foods <ArrowUpRight size={15} aria-hidden="true" />
-            </Link>
-          ) : null}
-          {place.sourceUrl ? (
-            <a href={place.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: C.clay, WebkitTextFillColor: C.clay }} className="inline-flex items-center gap-1 text-[13px] font-semibold underline underline-offset-4">
-              View source <ArrowUpRight size={14} aria-hidden="true" />
-            </a>
-          ) : null}
-        </div>
       </div>
-    </article>
+    </Tile>
   )
 }
 
@@ -207,14 +216,18 @@ export default function IngredientKnowledgePage() {
     return varietySort === 'az' ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows
   }, [varieties, varietySearch, varietySort])
 
-  const countryLocations = [...new Map(locations.map(place => [place.iso3 || place.name, place])).values()]
+  const countryLocations = [...locations.reduce((map, place) => {
+    const key = place.iso3 || place.name
+    if (!map.has(key)) map.set(key, place)
+    return map
+  }, new Map()).values()]
   const regionLocations = locations.filter(place => Boolean(place.region))
   const locationRows = locationView === 'regions' ? regionLocations : countryLocations
-  const visibleLocations = locationRows.slice(locationIndex, locationIndex + 4)
+  const visibleLocations = locationRows.slice(locationIndex, locationIndex + 5)
   const sources = (data?.sources || []).filter(source => Boolean(source?.url))
   let sectionCounter = 0
   const indexes = {
-    locations: locations.length ? ++sectionCounter : null,
+    locations: ++sectionCounter,
     varieties: varieties.length ? ++sectionCounter : null,
     products: products.length ? ++sectionCounter : null,
     dishes: ++sectionCounter,
@@ -292,31 +305,36 @@ export default function IngredientKnowledgePage() {
               {!ingredient.catalogMatched ? <div className="border-t border-[#E6D1C4] bg-[#FFF0E5] px-5 py-3 text-[14px] text-[#805844] sm:px-8">This ingredient is not yet matched to an active EPANTRY catalog item.</div> : null}
             </header>
 
-            {/* Location data remains real; a single place uses an editorial feature rather than an isolated tile. */}
-            {locations.length ? (
-              <section className="mt-8 rounded-[14px] border border-[#D8E3E6] bg-[#EDF4F5] px-5 py-7 sm:mt-9 sm:px-8 sm:py-8" aria-label="Ingredient geography and dishes">
+            {/* Only independently sourced ingredient production or origin locations appear here. */}
+            <section className="mt-8 rounded-[14px] border border-[#D8E3E6] bg-[#EDF4F5] px-5 py-7 sm:mt-9 sm:px-8 sm:py-8" aria-label="Ingredient geography and dishes">
                 <SectionHeading
                   index={indexes.locations}
-                  eyebrow="Places & cooking traditions"
+                  eyebrow="Where it grows or is produced"
                   title="Top Locations"
-                  count={locations.length}
-                  note="Explore places connected to published EPANTRY dishes and documented ingredient origins."
-                  end={locationRows.length > 4 ? (
+                  count={locationRows.length}
+                  end={locationRows.length > 5 ? (
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={() => setLocationIndex(index => Math.max(0, index - 1))} disabled={locationIndex === 0} className="grid h-10 w-10 place-items-center rounded-full border border-[#B8CDD0] bg-white text-[#173F35] disabled:opacity-40" aria-label="Previous locations"><ChevronLeft size={18} /></button>
-                      <button type="button" onClick={() => setLocationIndex(index => Math.min(locationRows.length - 4, index + 1))} disabled={locationIndex >= locationRows.length - 4} className="grid h-10 w-10 place-items-center rounded-full border border-[#B8CDD0] bg-white text-[#173F35] disabled:opacity-40" aria-label="Next locations"><ChevronRight size={18} /></button>
+                      <button type="button" onClick={() => setLocationIndex(index => Math.min(locationRows.length - 5, index + 1))} disabled={locationIndex >= locationRows.length - 5} className="grid h-10 w-10 place-items-center rounded-full border border-[#B8CDD0] bg-white text-[#173F35] disabled:opacity-40" aria-label="Next locations"><ChevronRight size={18} /></button>
                     </div>
                   ) : null}
                 />
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <FilterTab selected={locationView === 'countries'} onClick={() => { setLocationView('countries'); setLocationIndex(0) }}>Countries ({countryLocations.length})</FilterTab>
-                  {regionLocations.length > 0 ? <FilterTab selected={locationView === 'regions'} onClick={() => { setLocationView('regions'); setLocationIndex(0) }}>Regions ({regionLocations.length})</FilterTab> : null}
-                </div>
-                <div className={visibleLocations.length === 1 ? 'mt-5 max-w-[850px] rounded-[12px] bg-[#FFFCF8] p-3 sm:p-4' : 'mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4'}>
-                  {visibleLocations.map((place, index) => <LocationTile key={`${place.name}-${place.region || ''}`} place={place} number={locationIndex + index + 1} featured={visibleLocations.length === 1} />)}
-                </div>
+                {locations.length ? (
+                  <>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <FilterTab selected={locationView === 'countries'} onClick={() => { setLocationView('countries'); setLocationIndex(0) }}>Countries ({countryLocations.length})</FilterTab>
+                      {regionLocations.length > 0 ? <FilterTab selected={locationView === 'regions'} onClick={() => { setLocationView('regions'); setLocationIndex(0) }}>Regions ({regionLocations.length})</FilterTab> : null}
+                    </div>
+                    <div className={visibleLocations.length === 1 ? 'mt-5 max-w-[850px] rounded-[12px] bg-[#FFFCF8] p-3 sm:p-4' : 'mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5'}>
+                      {visibleLocations.map((place, index) => <LocationTile key={`${place.name}-${place.region || ''}`} place={place} number={locationIndex + index + 1} featured={visibleLocations.length === 1} />)}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-5 rounded-[10px] bg-[#FFFCF8] px-4 py-4 text-[15px] leading-6 text-[#526A5F]">
+                    No production locations available yet.
+                  </p>
+                )}
               </section>
-            ) : null}
 
             {varieties.length ? (
               <section className="mt-8 rounded-[14px] border border-[#EFDFD3] bg-[#FFF1E8] px-5 py-7 sm:mt-9 sm:px-8 sm:py-8" aria-label="Ingredient types">
