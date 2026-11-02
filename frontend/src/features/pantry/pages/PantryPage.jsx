@@ -10,6 +10,7 @@ import AdvancedPantryPanel from "../../advancedExpansion/components/AdvancedPant
 
 import { getPantryStatePresentation } from "../components/PantryStateBadge";
 import { getCatalogProducts } from "../../grocery/services/catalog.service";
+import { getIngredientKnowledge } from "../../ingredients/services/ingredientKnowledge.service";
 
 import {
   getPantry,
@@ -274,7 +275,7 @@ function PantryItemVisual({ item, catalogImage = null, small = false }) {
 
 const PANTRY_STYLES = `
 /* Living Pantry — EPANTRY editorial inventory, no shelf or 3D effects. */
-.pk-page {--pk-porcelain:#F7F6F2;--pk-forest:#173F35;--pk-charcoal:#202421;--pk-sage:#D7DDCF;--pk-clay:#C56C42;--pk-line:rgba(23,63,53,.15);--pk-muted:#58645B;width:100%;max-width:none;min-width:0;margin:0;color:var(--pk-charcoal);background:var(--pk-porcelain);font:400 16px/1.55 'Plus Jakarta Sans',Inter,system-ui,sans-serif;}
+.pk-page {--pk-porcelain:#F7F6F2;--pk-forest:#173F35;--pk-charcoal:#202421;--pk-sage:#D7DDCF;--pk-clay:#C86C42;--pk-line:rgba(23,63,53,.15);--pk-muted:#58645B;width:100%;max-width:none;min-width:0;margin:0;color:var(--pk-charcoal);background:var(--pk-porcelain);font:400 16px/1.55 'Plus Jakarta Sans',Inter,system-ui,sans-serif;}
 .pk-page.page-shell {width:100%!important;max-width:none!important;margin:0!important;padding:0!important;}
 .pk-page *, .pk-page *::before,.pk-page *::after {box-sizing:border-box;}
 .pk-page button,.pk-page input {font:inherit;}
@@ -508,6 +509,65 @@ const PANTRY_STYLES = `
 
 }
 @media (prefers-reduced-motion:reduce) {.pk-page *, .pk-page *::before,.pk-page *::after {transition:none!important;animation:none!important;}}
+
+/* Pantry-only Balanced Japandi polish: porcelain, forest, restrained clay. */
+.pk-header {background:linear-gradient(115deg,#FFF5ED 0%,#FAF5EF 53%,#E8F0E7 100%);border-bottom:1px solid #DBDCD1;}
+.pk-kicker {color:#B55934;font-size:13px;letter-spacing:.045em;}
+.pk-kicker::before {width:27px;height:2px;background:var(--pk-clay);}
+.pk-page .pk-title {font-weight:700!important;font-size:clamp(36px,4vw,56px)!important;}
+.pk-page .pk-heading__title {font-size:clamp(29px,2.65vw,36px)!important;font-weight:750!important;color:var(--pk-forest);}
+.pk-lead,.pk-heading__desc {color:#4F6056;line-height:1.6;}
+.pk-btn {font-size:15px;border-radius:9px;}
+.pk-btn--line:hover {border-color:var(--pk-clay);background:#FBEAE1;color:var(--pk-forest);}
+.pk-overview {border-top:4px solid var(--pk-clay);border-left:0;background:#173F35;color:#F7F6F2;box-shadow:0 12px 32px rgba(23,63,53,.12);}
+.pk-overview__eyebrow {color:#F1B18C;font-size:13px;letter-spacing:.04em;}
+.pk-overview__count {border-bottom-color:rgba(255,255,255,.2);}
+.pk-overview__count strong {font-weight:750;color:#FFCEAF;}
+.pk-overview__count span {color:#EDF3E9;}
+.pk-overview__stat strong {color:#FFF9F2;}
+.pk-overview__stat span {color:#DCE9E0;}
+.pk-overview__stat + .pk-overview__stat {border-left-color:rgba(255,255,255,.19);}
+.pk-overview__stat--warn strong {color:#FFA879;}
+.pk-workspace {background:#F5F5F0;}
+.pk-field-label {font-size:14px;}
+.pk-search input {border-radius:9px;background:#FFFFFF;}
+.pk-search input:focus {border-color:var(--pk-clay);box-shadow:0 0 0 3px rgba(200,108,66,.12);outline:none;}
+.pk-browse__heading strong {color:var(--pk-forest);font-size:15px;}
+.pk-browse {background:#EAF0E8;border:1px solid #D7E0D3;border-left:4px solid var(--pk-clay);padding:0 19px;margin-bottom:23px;border-radius:9px;}
+.pk-browse__heading {padding-top:13px;}
+.pk-tabs {gap:clamp(14px,2vw,27px);}
+.pk-tab:hover {color:#A84E2D;}
+.pk-list-head {background:var(--pk-forest);color:#F7F6F2;font-size:13px;letter-spacing:.03em;border-top:3px solid var(--pk-clay);}
+.pk-list {background:#FFFEFB;}
+.pk-item {background:#FFFEFB;min-height:103px;}
+.pk-item:nth-child(even) {background:#EDF3EF;}
+.pk-item:hover {background:#FFF0E6;box-shadow:inset 4px 0 0 var(--pk-clay);}
+.pk-visual {border:1px solid #E8D0C1;background:#F9E7DA;border-radius:11px;}
+.pk-visual--photo {background:#FFFFFF;}
+.pk-page .pk-item__name {color:var(--pk-forest);font-weight:750!important;}
+.pk-item__minor {font-size:13px;color:#657369;}
+.pk-item__time {font-size:13.5px;}
+.pk-status {font-size:12.5px;}
+.pk-item__action-link {font-size:14px;}
+.pk-item__action-link:hover {color:#A84E2D;}
+.pk-bottom-row {border-top:2px solid #E4C2B0;}
+.pk-next {background:linear-gradient(112deg,#F9E9DC 0%,#F6EDE5 48%,#E4EFE6 100%);border-top:3px solid var(--pk-clay);}
+.pk-next__link:hover {color:#A84E2D;}
+.pk-next__link:hover svg {transform:translateX(4px);}
+.pk-next__link svg {transition:transform .18s ease;}
+@media (max-width:600px) {
+ .pk-page .pk-title {font-size:clamp(30px,8vw,36px)!important;}
+ .pk-overview__eyebrow {font-size:12.5px;}
+ .pk-overview__stat span {font-size:12.5px;}
+ .pk-page .pk-item__name {font-size:16px!important;}
+ .pk-item__minor {font-size:12.5px;}
+ .pk-status {font-size:12.5px;}
+ .pk-item__quantity,.pk-item__time,.pk-item__action-link,.pk-item__remove {font-size:12.5px;}
+ .pk-item__quantity::before,.pk-item__time::before {font-size:12px;}
+ .pk-actions .pk-btn {min-height:44px;font-size:clamp(12.5px,3.3vw,14px);white-space:normal;}
+ .pk-heading__desc {white-space:normal;letter-spacing:normal;}
+ .pk-mobile-status label {font-size:12.5px;}
+}
 `;
 
 export default function PantryPage() {
@@ -597,10 +657,11 @@ export default function PantryPage() {
     [filteredItems]
   );
 
-  // Match publicly listed Grocery photos by pack identity or exact canonical
-  // food name. Public catalog uses privacy-cleared, signed images only.
-  // Results are optional and do not affect loading or actions in the Pantry.
+  // Use already-approved ingredient imagery (including uploaded Host ingredient
+  // photos), then the existing exact-match Grocery product photo fallback.
+  // Never infer a photo from a loosely related product or change Pantry records.
   useEffect(() => {
+    let active = true;
     const photoCandidates = showAllItems ? items : visibleItems;
     const missing = photoCandidates.filter((item) => {
       const name = normalizedFoodName(getItemTitle(item));
@@ -613,27 +674,55 @@ export default function PantryPage() {
       checkedCatalogNames.current.add(name);
       return true;
     });
-    if (!missing.length) return;
+    if (!missing.length) return undefined;
+    const completedNames = new Set();
+
     async function findApprovedPhotos() {
       for (const item of missing) {
+        if (!active) break;
         const key = normalizedFoodName(getItemTitle(item));
-        try {
-          const result = await getCatalogProducts({
-            search: getItemTitle(item),
-            page: 1,
-            limit: 24,
-            listedOnly: true,
-          });
-          const photo = getMatchingCatalogPhoto(item, result.products);
-          if (photo)
-            setCatalogPhotos((previous) => ({ ...previous, [key]: photo }));
-        } catch {
-          // An unavailable catalog must never hide Pantry inventory or display
-          // a potentially unrelated picture.
+        let photo = null;
+        const canonicalId = String(
+          item?.canonicalIngredientId || item?.canonicalIngredient?.id || ""
+        ).trim();
+        if (canonicalId) {
+          try {
+            const knowledge = await getIngredientKnowledge(canonicalId);
+            if (String(knowledge?.identity?.id || "") === canonicalId) {
+              photo = knowledge?.identity?.imageUrl || null;
+            }
+          } catch {
+            // Continue to the exact-name published Grocery fallback.
+          }
         }
+        if (!photo) {
+          try {
+            const result = await getCatalogProducts({
+              search: getItemTitle(item),
+              page: 1,
+              limit: 24,
+              listedOnly: true,
+            });
+            photo = getMatchingCatalogPhoto(item, result.products);
+          } catch {
+            // Keep an honest text fallback if no approved image is available.
+          }
+        }
+        if (active && typeof photo === "string" && /^(https?:\/\/|\/)/i.test(photo)) {
+          setCatalogPhotos((previous) => ({ ...previous, [key]: photo }));
+        }
+        completedNames.add(key);
       }
     }
     findApprovedPhotos();
+    return () => {
+      active = false;
+      // A filter change must not permanently skip images still being fetched.
+      for (const item of missing) {
+        const key = normalizedFoodName(getItemTitle(item));
+        if (!completedNames.has(key)) checkedCatalogNames.current.delete(key);
+      }
+    };
   }, [visibleItems, items, showAllItems]);
 
   const pantryCounts = useMemo(() => {

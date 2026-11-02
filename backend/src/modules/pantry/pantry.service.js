@@ -9,6 +9,8 @@ import {
   Pack,
 } from '../catalog/catalog.models.js'
 
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+
 import {
   Household,
 } from '../households/household.model.js'
@@ -133,6 +135,133 @@ function referenceId(
   )
 }
 
+async function resolveApprovedPantryPackPhotos(packIds = []) {
+  const images = new Map()
+  if (!packIds.length) return images
+  const approvedPackets = await HostUnifiedListingPacket.find({
+    deletedAt: null,
+    verifiedPackId: { $in: packIds },
+    $or: [
+      { status: 'approved' },
+      { publishedPacket: { $exists: true, $ne: null } },
+    ],
+  }).select('verifiedPackId status packet.images publishedPacket.images approvedAt')
+    .sort({ approvedAt: -1 }).limit(200).lean()
+  for (const record of approvedPackets) {
+    const id = record.verifiedPackId ? String(record.verifiedPackId) : ''
+    if (!id || images.has(id)) continue
+    const approvedImages = record.publishedPacket
+      ? record.publishedPacket.images
+      : record.status === 'approved' ? record.packet?.images : []
+    for (const value of Array.isArray(approvedImages) ? approvedImages : []) {
+      const imageUrl = pantryPhotoUrl(value)
+      if (imageUrl) { images.set(id, imageUrl); break }
+    }
+  }
+  return images
+}
+
+// No public Wiki requests, invented photographs, or unapproved Host drafts.
+// Media is read from the last Super Admin-approved listing snapshot only.
+function pantryPhotoUrl(value) {
+  const url = String(value || '').trim()
+  if (!url || url.length > 2048) return ''
+  try {
+    return new URL(url).protocol === 'https:' ? url : ''
+  } catch {
+    return ''
+  }
+}
+
+function pantryIngredientName(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function escapePantryRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function resolveApprovedPantryIngredientPhotos(ingredients = []) {
+  const images = new Map()
+  if (!ingredients.length) return images
+
+  const namesToIds = new Map()
+  const names = new Set()
+  const ingredientIds = []
+  for (const ingredient of ingredients) {
+    const id = String(ingredient._id)
+    ingredientIds.push(id)
+    const catalogPhoto = pantryPhotoUrl(ingredient.attributes?.approvedImageUrl)
+    if (catalogPhoto) images.set(id, catalogPhoto)
+    for (const rawName of [ingredient.canonicalName, ...(ingredient.aliases || [])]) {
+      const name = pantryIngredientName(rawName)
+      if (!name || name.length > 150) continue
+      names.add(String(rawName).trim())
+      if (!namesToIds.has(name)) namesToIds.set(name, new Set())
+      namesToIds.get(name).add(id)
+    }
+  }
+
+  const namePatterns = [...names].slice(0, 140).map(name =>
+    new RegExp(`^\\s*${escapePantryRegex(name)}\\s*$`, 'i')
+  )
+  const matchConditions = [
+    { 'publishedPacket.ingredients.canonicalIngredientId': { $in: ingredientIds } },
+    { status: 'approved', publishedPacket: null,
+      'packet.ingredients.canonicalIngredientId': { $in: ingredientIds } },
+  ]
+  if (namePatterns.length) {
+    matchConditions.push(
+      { 'publishedPacket.ingredients.name': { $in: namePatterns } },
+      { status: 'approved', publishedPacket: null,
+        'packet.ingredients.name': { $in: namePatterns } },
+    )
+  }
+  const approvedPackets = await HostUnifiedListingPacket.find({
+    deletedAt: null,
+    $or: matchConditions,
+  }).select('status packet.ingredients publishedPacket.ingredients approvedAt')
+    .sort({ approvedAt: -1 }).limit(250).lean()
+
+  const exactIdPhotos = new Map()
+  const exactNamePhotos = new Map()
+  for (const record of approvedPackets) {
+    // An unapproved revision cannot replace the published ingredient image.
+    const published = record.publishedPacket
+      ? record.publishedPacket.ingredients
+      : record.status === 'approved' ? record.packet?.ingredients : []
+    for (const entry of Array.isArray(published) ? published : []) {
+      const url = pantryPhotoUrl(entry?.imageUrl)
+      if (!url) continue
+      const linkedId = entry?.canonicalIngredientId
+        ? String(entry.canonicalIngredientId) : ''
+      if (linkedId) {
+        if (ingredientIds.includes(linkedId) && !exactIdPhotos.has(linkedId)) {
+          exactIdPhotos.set(linkedId, url)
+        }
+        continue
+      }
+      const candidateIds = namesToIds.get(pantryIngredientName(entry?.name))
+      if (candidateIds?.size !== 1) continue
+      const id = [...candidateIds][0]
+      if (!exactNamePhotos.has(id)) exactNamePhotos.set(id, url)
+    }
+  }
+
+  // A canonical-ID Host match is strongest; the exact-name fallback supports
+  // older recipe listings with no saved canonicalIngredientId.
+  for (const id of ingredientIds) {
+    const photo = exactIdPhotos.get(id) || exactNamePhotos.get(id)
+    if (photo) images.set(id, photo)
+  }
+  return images
+}
+
 async function resolvePantryIdentityMetadata(
   items = [],
 ) {
@@ -194,6 +323,12 @@ async function resolvePantryIdentityMetadata(
 
               canonicalName:
                 1,
+
+              aliases:
+                1,
+
+              'attributes.approvedImageUrl':
+                1,
             })
             .lean()
         : [],
@@ -240,6 +375,16 @@ async function resolvePantryIdentityMetadata(
         ],
       ),
     )
+
+  // Enrich read-only Pantry identity metadata with approved Host-uploaded
+  // ingredient photos. Do not copy images or change a household Pantry record.
+  // Match a canonical ID first; for older Host recipes without linked IDs,
+  // accept only an unambiguous exact catalog name/alias match.
+  const approvedIngredientPhotos =
+    await resolveApprovedPantryIngredientPhotos(ingredients)
+
+  const approvedPackPhotos =
+    await resolveApprovedPantryPackPhotos(packIds)
 
   const metadataByItemId =
     new Map()
@@ -299,6 +444,9 @@ async function resolvePantryIdentityMetadata(
 
                 canonicalName:
                   ingredient.canonicalName,
+
+                imageUrl:
+                  approvedIngredientPhotos.get(ingredientId) || null,
               }
             : null,
 
@@ -310,6 +458,9 @@ async function resolvePantryIdentityMetadata(
 
                 displayName:
                   pack.displayName,
+
+                imageUrl:
+                  approvedPackPhotos.get(packId) || null,
               }
             : null,
       },
