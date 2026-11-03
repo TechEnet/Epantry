@@ -1699,6 +1699,14 @@ function HostUnifiedListingEditor() {
   const fieldRef = useRef(null);
   const editIdFromUrl = params.get("edit") || "";
   const activeListing = existing.find((item) => item.id === editingId);
+  const hasLegacyDeliveryCoverage = Boolean(
+    editingId && activeListing && (
+      ["submitted_for_review", "approved", "changes_requested", "rejected"].includes(activeListing.status) ||
+      (activeListing.status === "draft" && (activeListing.packet?.delivery?.postalCodes || []).some(
+        (pin) => !savedPostalCodes.includes(String(pin))
+      ))
+    )
+  );
   useEffect(() => {
     if (!editingId) {
       setSellingReadiness(null);
@@ -1823,41 +1831,30 @@ function HostUnifiedListingEditor() {
       cancelled = true;
     };
   }, [workspace]);
-  // Host Marketplace Service Areas are the saved delivery coverage source.
-  // Apply them only to untouched NEW listings; never overwrite a saved draft or manual edit.
+  // Only the business-wide service area supplies NEW listing coverage.
+  // Historical listing packets keep their saved delivery PINs unchanged.
   useEffect(() => {
     let cancelled = false;
     const loadSavedDeliveryCoverage = async () => {
       try {
-        const codes = new Set();
-        for (let page = 1; page <= 10 && codes.size < 500; page += 1) {
-          const result = await listServiceAreas({
-            page,
-            limit: 100,
-            status: "active",
-          });
-          if (cancelled) return;
-          const areas = Array.isArray(result?.serviceAreas)
-            ? result.serviceAreas
-            : [];
-          areas.forEach((area) => {
-            (area.postalCodes || []).forEach((value) => {
-              const code = String(value || "").trim();
-              if (/^[1-9][0-9]{5}$/.test(code) && codes.size < 500)
-                codes.add(code);
-            });
-          });
-          if (
-            areas.length < 100 ||
-            page >= Number(result?.pagination?.totalPages || page)
-          )
-            break;
-        }
+        const result = await listServiceAreas({
+          page: 1,
+          limit: 10,
+          status: "active",
+          search: "host-default-delivery",
+        });
         if (cancelled) return;
-        setSavedPostalCodes([...codes]);
+        const shared = (result?.serviceAreas || []).find(
+          (area) => area.serviceAreaKey === "host-default-delivery"
+        );
+        const pins = [...new Set((shared?.postalCodes || []).map(String).filter(
+          (value) => /^[1-9][0-9]{5}$/.test(value)
+        ))];
+        setSavedPostalCodes(pins);
       } catch {
-        // Some Host roles do not have a Marketplace Service Area yet.
-        // The existing manual pincode entry remains fully usable.
+        // Missing or unavailable shared coverage is not replaced with
+        // unrelated product-specific areas.
+        if (!cancelled) setSavedPostalCodes([]);
       }
     };
     loadSavedDeliveryCoverage();
@@ -4542,7 +4539,8 @@ function HostUnifiedListingEditor() {
                     )}
                   </div>
                   {form.delivery?.fulfillment === "delivery" && (
-                    <EditorField title="Delivery pincodes (comma-separated)">
+                  hasLegacyDeliveryCoverage ? (
+                    <EditorField title="Delivery pincodes (saved listing)">
                       <textarea
                         rows={2}
                         className={`${field} mt-3`}
@@ -4558,16 +4556,19 @@ function HostUnifiedListingEditor() {
                         }}
                         placeholder="110001, 110002"
                       />
-                      {savedPostalCodes.length > 0 && (
-                        <span className="mt-1 block text-[13px] leading-5 text-[#54635B]">
-                          Your saved active Host delivery areas are prefilled on
-                          new listings. You can change the pincodes for this
-                          item.
-                        </span>
-                      )}
                     </EditorField>
-                  )}
-                  <EditorField title="Delivery / pickup notes">
+                  ) : (
+                    <div className="mt-3 rounded-xl border border-[#C9D5C9] bg-[#EFF3EC] px-4 py-3 text-[15px] text-[#173F35]">
+                      {savedPostalCodes.length
+                        ? `Business delivery coverage: ${savedPostalCodes.length} saved PIN codes.`
+                        : "Add business delivery coverage in Operations Center before submitting a delivery listing."}
+                      <Link className="ml-2 font-semibold underline underline-offset-2" to="/host/operations-center">
+                        Manage coverage
+                      </Link>
+                    </div>
+                  )
+                )}
+                <EditorField title="Delivery / pickup notes">
                     <textarea
                       rows={2}
                       className={`${field} mt-3`}
@@ -4619,11 +4620,7 @@ function HostUnifiedListingEditor() {
                   <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       type="button"
-                      disabled={
-                        busy ||
-                        Boolean(uploading) ||
-                        activeListing?.status === "submitted_for_review"
-                      }
+                      disabled={busy || Boolean(uploading) || activeListing?.status === "submitted_for_review"}
                       onClick={saveSectionRevision}
                       className={styles.button}
                     >

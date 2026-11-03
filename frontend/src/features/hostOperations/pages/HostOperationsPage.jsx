@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -75,6 +75,181 @@ import {
   updateHostOperationalProfile,
   updateHostRecipeListing,
 } from "../services/hostOperations.service";
+
+const hostProductCatalogCss = String.raw`
+/* Host Product Catalog: scoped editorial design. Other Host pages unaffected. */
+.hpc-root{--hpc-forest:#173F35;--hpc-deep:#10352D;--hpc-clay:#C86C42;--hpc-ink:#202421;--hpc-sage:#E6EDE4;--hpc-porcelain:#F7F6F2;min-width:0;width:100%;color:var(--hpc-ink);background:var(--hpc-porcelain);font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.55}
+.hpc-root *,.hpc-root *::before,.hpc-root *::after{box-sizing:border-box}
+.hpc-root .hpc-hero{position:relative;isolation:isolate;overflow:hidden;min-width:0;background:linear-gradient(110deg,#173F35 0%,#163F34 67%,#255647 100%);color:#FDFBF6;border:0;border-radius:17px 17px 0 0;padding:clamp(22px,2.3vw,34px)!important;box-shadow:none}
+.hpc-root .hpc-hero:after{content:'';position:absolute;z-index:-1;right:-8%;top:-110%;width:39%;min-width:250px;aspect-ratio:1;border:1px solid rgba(255,255,255,.14);border-radius:50%;box-shadow:0 0 0 50px rgba(255,255,255,.028),0 0 0 95px rgba(255,255,255,.02);pointer-events:none}
+.hpc-root .hpc-hero-label{color:#F5B393!important;letter-spacing:.12em!important;text-transform:uppercase;font-size:13px!important;line-height:1.3!important;font-weight:800!important}
+.hpc-root .hpc-hero-title{color:#FCFAF5!important;font-size:clamp(29px,3vw,43px)!important;line-height:1.12!important;letter-spacing:-.045em!important;font-weight:800!important;margin:7px 0 0!important}
+.hpc-root .hpc-hero-meta{font-size:14px!important;line-height:1.55!important;color:#DCE9DE!important;margin-top:10px!important;font-weight:500!important}
+.hpc-root .hpc-refresh{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;justify-content:center;min-height:43px;padding:9px 15px;background:#FBFAF5!important;border:1px solid #FBFAF5!important;color:#173F35!important;font-size:14px!important;font-weight:750!important;border-radius:9px;cursor:pointer}
+.hpc-root .hpc-refresh:hover{background:#F1D9C9!important;border-color:#F1D9C9!important}
+.hpc-root .hpc-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin-top:22px;border-top:1px solid rgba(251,250,245,.24);padding-top:17px}
+.hpc-root .hpc-step{min-width:0;display:flex;align-items:flex-start;gap:11px;padding:0 15px 0 16px;border-left:1px solid rgba(255,255,255,.19)}
+.hpc-root .hpc-step:first-child{border-left:0;padding-left:0}
+.hpc-root .hpc-step-index{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#E8A17B;color:#173F35;font-size:13px;font-weight:850}
+.hpc-root .hpc-step-name{font-size:15px!important;line-height:1.3!important;font-weight:750!important;color:#FFFDF7!important}
+.hpc-root .hpc-step-detail{font-size:13px!important;line-height:1.35!important;color:#D8E7DD!important;margin-top:4px!important}
+.hpc-root .hpc-content{margin-top:0;display:grid;gap:26px}
+.hpc-root .hpc-upload-section{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(285px,.65fr);border:1px solid #D9E4D8;border-top:4px solid #C86C42;background:#EEF2EB;min-width:0}
+.hpc-root .hpc-upload-main{min-width:0;padding:clamp(20px,2.25vw,33px)}
+.hpc-root .hpc-section-head{display:flex;align-items:flex-start;gap:13px;min-width:0}
+.hpc-root .hpc-icon-box{flex:none;display:grid;place-items:center;width:44px;height:44px;background:#173F35;color:white;border-radius:11px}
+.hpc-root .hpc-kicker{font-size:13px!important;line-height:1.35!important;font-weight:800!important;text-transform:uppercase;letter-spacing:.09em!important;color:#AF5632!important}
+.hpc-root .hpc-section-title{font-size:clamp(23px,2.1vw,29px)!important;line-height:1.2!important;letter-spacing:-.035em!important;color:#173F35!important;font-weight:800!important;margin:4px 0 0!important}
+.hpc-root .hpc-section-description{font-size:15px!important;line-height:1.55!important;color:#4E6256!important;margin-top:8px!important;max-width:650px}
+.hpc-root .hpc-dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:177px;margin-top:23px;border:2px dashed #91B4A1;background:#FFFEFA;color:#173F35;border-radius:13px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s,background-color .2s,transform .2s}
+.hpc-root .hpc-dropzone:hover,.hpc-root .hpc-dropzone:focus-within{background:#F8EDE6;border-color:#C86C42}
+.hpc-root .hpc-drop-icon{display:grid;place-items:center;width:48px;height:48px;background:#DDEADF;color:#173F35;border-radius:12px}
+.hpc-root .hpc-drop-title{font-size:17px!important;line-height:1.35!important;font-weight:800!important;color:#173F35!important}
+.hpc-root .hpc-drop-sub{font-size:14px!important;line-height:1.5!important;color:#536D5F!important}
+.hpc-root .hpc-upload-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:15px;margin-top:18px}
+.hpc-root .hpc-file-status{min-width:0;flex:1;display:flex;align-items:center;gap:12px}
+.hpc-root .hpc-status-dot{flex:none;width:11px;height:11px;background:#CF8F70;border-radius:50%}
+.hpc-root .hpc-file-status[data-ready=true] .hpc-status-dot{background:#317A55}
+.hpc-root .hpc-file-name{font-size:15px!important;line-height:1.35!important;font-weight:750!important;color:#203F33!important;overflow-wrap:anywhere}
+.hpc-root .hpc-file-helper{font-size:13px!important;line-height:1.45!important;color:#52675B!important;margin-top:2px!important}
+.hpc-root .hpc-check-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:48px;padding:12px 22px;border:1px solid #173F35;background:#173F35;color:#fff;border-radius:10px;font-size:15px!important;font-weight:750!important;cursor:pointer;transition:background .2s,transform .2s}
+.hpc-root .hpc-check-button:hover:not(:disabled){background:#255D4C;transform:translateY(-1px)}
+.hpc-root .hpc-check-button:disabled{cursor:not-allowed;background:#D3DCD1!important;color:#65786B!important;border-color:#D3DCD1!important;opacity:1!important}
+.hpc-root .hpc-format{min-width:0;padding:clamp(20px,2.1vw,30px);background:#F6E8DF;border-left:1px solid #E1CEBF}
+.hpc-root .hpc-format-head{font-size:20px!important;line-height:1.3!important;color:#173F35!important;font-weight:800!important;margin:5px 0 15px!important;letter-spacing:-.02em!important}
+.hpc-root .hpc-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;row-gap:0;border-top:1px solid #D6BEAE}
+.hpc-root .hpc-columns code{display:block;min-width:0;padding:11px 0;border-bottom:1px solid #D6BEAE;font-size:13px!important;font-weight:700!important;color:#244A3A!important;white-space:normal!important;overflow-wrap:anywhere}
+.hpc-root .hpc-format-note{display:flex;gap:9px;margin-top:20px;padding-top:13px;border-top:2px solid #C86C42;font-size:14px!important;line-height:1.5!important;color:#5F4839!important}
+.hpc-root .hpc-results{min-width:0;border-top:3px solid #173F35;background:#FFFEFA;padding:clamp(20px,2.4vw,34px);border-bottom:1px solid #D6DED2}
+.hpc-root .hpc-results-head{display:flex;justify-content:space-between;align-items:end;gap:14px;flex-wrap:wrap;padding-bottom:17px;border-bottom:1px solid #D8E2D7}
+.hpc-root .hpc-results-count{font-size:14px!important;font-weight:800!important;color:#173F35!important;padding:7px 12px;border-radius:7px;background:#E4ECE1}
+.hpc-root .hpc-check-list{display:grid;gap:0}
+.hpc-root .hpc-check-row{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px 26px;align-items:center;padding:22px 0;border-bottom:1px solid #DFE5DA}
+.hpc-root .hpc-check-row:last-child{border-bottom:0}
+.hpc-root .hpc-check-name{font-size:17px!important;font-weight:800!important;line-height:1.35!important;color:#173F35!important}
+.hpc-root .hpc-check-meta{font-size:14px!important;line-height:1.5!important;color:#5C6E63!important;margin-top:6px!important}
+.hpc-root .hpc-data-score{display:inline-block;margin-top:12px;padding:5px 10px;border-left:3px solid #C86C42;background:#F6E7DE;color:#86442B;font-size:13px!important;font-weight:750!important}
+.hpc-root .hpc-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;background:#E8EEE6;border:1px solid #D1DFD0;border-radius:10px;min-width:0;overflow:hidden}
+.hpc-root .hpc-stat{min-width:0;padding:15px 11px;text-align:center;border-left:1px solid #CCD8CC}
+.hpc-root .hpc-stat:first-child{border-left:0}
+.hpc-root .hpc-stat-value{font-size:27px!important;line-height:1.1!important;font-weight:850!important;color:#173F35!important}
+.hpc-root .hpc-stat-caption{font-size:13px!important;line-height:1.3!important;font-weight:700!important;color:#425C4E!important;margin-top:6px!important}
+.hpc-root .hpc-stat[data-state=review]{background:#FAEEE6}
+.hpc-root .hpc-stat[data-state=review] .hpc-stat-value{color:#A85736!important}
+.hpc-root .hpc-stat[data-state=fix]{background:#F9EEEE}
+.hpc-root .hpc-stat[data-state=fix] .hpc-stat-value{color:#AD4A40!important}
+.hpc-root .hpc-no-results{padding:39px 16px;text-align:center;color:#50675A;font-size:15px!important;line-height:1.6!important}
+.hpc-root .hpc-no-results strong{display:block;font-size:18px!important;color:#173F35!important;margin-bottom:5px}
+.hpc-root :is(a,button,label,input):focus-visible{outline:3px solid #C86C42!important;outline-offset:3px}
+@media(max-width:1000px){.hpc-root .hpc-upload-section{grid-template-columns:minmax(0,1fr)}.hpc-root .hpc-format{border-left:0;border-top:1px solid #DFCBBB}.hpc-root .hpc-check-row{grid-template-columns:1fr}}
+@media(max-width:700px){.hpc-root{padding:12px!important;font-size:15px}.hpc-root .hpc-hero{padding:22px 17px!important;border-radius:13px 13px 0 0}.hpc-root .hpc-hero-title{font-size:28px!important}.hpc-root .hpc-hero-meta{font-size:13px!important}.hpc-root .hpc-steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 0;padding-top:14px;margin-top:18px}.hpc-root .hpc-step{padding:0 8px;gap:7px}.hpc-root .hpc-step:nth-child(odd){padding-left:0;border-left:0}.hpc-root .hpc-step-name{font-size:13px!important}.hpc-root .hpc-step-detail{font-size:12.5px!important}.hpc-root .hpc-step-index{width:25px;height:25px;font-size:12px}.hpc-root .hpc-content{gap:19px}.hpc-root .hpc-upload-main,.hpc-root .hpc-format,.hpc-root .hpc-results{padding:19px 16px}.hpc-root .hpc-icon-box{width:39px;height:39px}.hpc-root .hpc-section-title{font-size:23px!important}.hpc-root .hpc-section-description{font-size:14px!important}.hpc-root .hpc-dropzone{min-height:145px;padding:16px;margin-top:17px}.hpc-root .hpc-upload-footer{align-items:stretch}.hpc-root .hpc-check-button{width:100%}.hpc-root .hpc-check-row{padding:17px 0}.hpc-root .hpc-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.hpc-root .hpc-stat{padding:13px 5px}.hpc-root .hpc-stat-value{font-size:23px!important}.hpc-root .hpc-stat-caption{font-size:12.5px!important}}
+@media(max-width:380px){.hpc-root .hpc-columns{grid-template-columns:1fr}.hpc-root .hpc-steps{column-gap:5px}.hpc-root .hpc-hero-label{font-size:12px!important}.hpc-root .hpc-refresh{padding:8px 10px;font-size:13px!important}}
+@media(prefers-reduced-motion:reduce){.hpc-root *{transition:none!important}}
+`;
+
+const hostOperationsDashboardCss = String.raw`
+.hops-root{--hops-forest:#173F35;--hops-clay:#C86C42;--hops-porcelain:#F7F6F2;--hops-sage:#DFE6D9;--hops-ink:#202421;color:var(--hops-ink);background:#F7F6F2;font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,sans-serif}
+.hops-root *, .hops-root *::before, .hops-root *::after{box-sizing:border-box}
+.hops-root .hops-hero{position:relative;overflow:hidden;border:0;background:linear-gradient(111deg,#173F35 0%,#12392F 69%,#225647 100%);border-radius:18px;padding:clamp(22px,2.7vw,38px);box-shadow:0 16px 30px rgba(18,57,47,.12)}
+.hops-root .hops-hero:after{content:'';position:absolute;right:-74px;top:-148px;width:440px;height:440px;border:1px solid rgba(255,255,255,.13);border-radius:50%;box-shadow:0 0 0 48px rgba(255,255,255,.035),0 0 0 105px rgba(255,255,255,.025);pointer-events:none}
+.hops-root .hops-hero h1{font-size:clamp(28px,3vw,42px)!important;line-height:1.12!important;color:#FFFDF8!important;letter-spacing:-.045em;white-space:normal!important}
+.hops-root .hops-hero p{color:#D9E8DE!important;font-size:14px!important;line-height:1.55!important}
+.hops-root .hops-hero p:first-child{color:#FFB38B!important;font-size:12px!important;letter-spacing:.11em!important}
+.hops-root .hops-hero button{position:relative;z-index:1;border:1px solid rgba(255,255,255,.28)!important;background:#FFFDF8!important;color:#173F35!important;min-height:43px;font-size:14px!important;padding:10px 16px!important;border-radius:10px!important;transition:background .2s, transform .2s}
+.hops-root .hops-hero button:hover{background:#F5D9C7!important;transform:translateY(-1px)}
+.hops-root .hops-body{margin-top:24px!important;display:grid;gap:24px!important}
+.hops-root .hops-readiness,.hops-root .hops-profile,.hops-root .hops-delivery,.hops-root .hops-kyb{border-radius:17px!important;box-shadow:none!important;padding:clamp(18px,2.3vw,32px)!important;min-width:0}
+.hops-root .hops-readiness{border:1px solid #C6D6CA!important;border-top:4px solid #173F35!important;background:#EDF2EB!important}
+.hops-root .hops-profile{border:1px solid #DEE1D9!important;border-top:4px solid #C86C42!important;background:#FFFEFA!important}
+.hops-root .hops-delivery{border:1px solid #C7DACC!important;border-top:4px solid #367763!important;background:#E7F0E8!important}
+.hops-root .hops-kyb{border:1px solid #DAD0E9!important;border-top:4px solid #8675A7!important;background:#F1EDF7!important}
+.hops-root .hops-readiness>div:first-child,.hops-root .hops-profile>div:first-child,.hops-root .hops-delivery>div:first-child,.hops-root .hops-kyb>div:first-child{padding-bottom:14px;border-bottom:1px solid rgba(23,63,53,.14)}
+.hops-root .hops-readiness h2,.hops-root .hops-profile h2,.hops-root .hops-delivery h2,.hops-root .hops-kyb h2{font-size:clamp(21px,2vw,27px)!important;line-height:1.2!important;font-weight:800!important;letter-spacing:-.035em;white-space:normal!important;color:#173F35!important}
+.hops-root .hops-readiness>div:first-child p,.hops-root .hops-profile>div:first-child p,.hops-root .hops-delivery>div:first-child p,.hops-root .hops-kyb>div:first-child p{font-size:14px!important;line-height:1.5!important;color:#4E6358!important}
+.hops-root .hops-profile form,.hops-root .hops-kyb form{column-gap:20px!important;row-gap:17px!important}
+.hops-root .hops-profile label>span:first-child,.hops-root .hops-delivery label>span:first-child,.hops-root .hops-kyb label>span:first-child{font-size:13px!important;line-height:1.4!important;font-weight:750!important;color:#38564A!important;letter-spacing:0!important;text-transform:none!important;min-height:0!important}
+.hops-root .hops-profile input,.hops-root .hops-profile select,.hops-root .hops-profile textarea,.hops-root .hops-delivery textarea,.hops-root .hops-kyb input,.hops-root .hops-kyb select{height:auto!important;min-height:46px;font-size:15px!important;line-height:1.45!important;padding:11px 13px!important;border:1px solid #C8D1C6!important;border-radius:10px!important;background:#fff!important;color:#202421!important;letter-spacing:0!important;max-width:100%}
+.hops-root .hops-profile textarea,.hops-root .hops-kyb textarea,.hops-root .hops-delivery textarea{min-height:84px!important;resize:vertical}
+.hops-root .hops-profile button,.hops-root .hops-delivery button,.hops-root .hops-kyb button,.hops-root .hops-readiness button{font-size:14px!important;min-height:44px!important;line-height:1.35!important;white-space:normal!important}
+.hops-root .hops-profile button[type=submit],.hops-root .hops-delivery button[type=submit],.hops-root .hops-kyb button[type=submit],.hops-root .hops-readiness button{background:#173F35!important;color:#fff!important;border-color:#173F35!important}
+.hops-root .hops-profile button:disabled,.hops-root .hops-delivery button:disabled,.hops-root .hops-kyb button:disabled{opacity:.55;cursor:not-allowed}
+.hops-root .hops-check-top{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:22px;margin:18px 0 22px;padding:17px 20px;border-radius:13px;background:#173F35;color:#fff}
+.hops-root .hops-check-top strong{display:block;font-size:31px;line-height:1;font-weight:850;letter-spacing:-.04em;color:#fff}
+.hops-root .hops-check-top strong small{font-size:16px;color:#BFD4C7}
+.hops-root .hops-check-top >div:first-child>span{display:block;margin-top:6px;color:#D4E1D7;font-size:13px}
+.hops-root .hops-check-meter{height:8px;overflow:hidden;border-radius:10px;background:rgba(255,255,255,.19)}
+.hops-root .hops-check-meter span{display:block;height:100%;margin:0;background:#E7A17B;transition:width .3s ease}
+.hops-root .hops-readiness-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 20px}
+.hops-root .hops-check-item{display:flex;align-items:center;gap:11px;padding:13px 3px;border-bottom:1px solid #D2DFD2;min-width:0}
+.hops-root .hops-check-item span{font-size:14px!important;line-height:1.45!important;font-weight:650;color:#27473A}
+.hops-root .hops-check-item[data-passed=false] span{color:#655843}
+.hops-root .hops-check-icon{flex-shrink:0;width:27px;height:27px;padding:5px;background:#CFE2D1;color:#236044;border-radius:8px}
+.hops-root .hops-check-item[data-passed=false] .hops-check-icon{background:#F4DDCF;color:#B75C36}
+.hops-root .hops-coverage-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(240px,.6fr);gap:22px;margin-top:18px}
+.hops-root .hops-coverage-form{display:flex;flex-direction:column;gap:12px;min-width:0}
+.hops-root .hops-coverage-form button{align-self:flex-start;padding:11px 22px!important;border-radius:10px!important;font-weight:750!important}
+.hops-root .hops-coverage-summary{padding:20px;border:1px solid #C7D7C8;background:#F9FBF7;border-radius:13px;min-width:0}
+.hops-root .hops-coverage-summary strong{font-size:34px;line-height:1.12;color:#173F35;letter-spacing:-.05em}
+.hops-root .hops-coverage-summary p{font-size:14px;line-height:1.5;color:#54665C}
+.hops-root .hops-pins{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+.hops-root .hops-pins span{padding:5px 9px;border-radius:6px;background:#E5EDE2;color:#224E3D;font-size:13px;font-weight:700}
+.hops-root .hops-section-error{color:#A3352D!important;font-weight:700;font-size:14px!important;line-height:1.5!important}
+.hops-root .hops-kyb p,.hops-root .hops-profile p,.hops-root .hops-readiness p{line-height:1.5}
+.hops-root .hops-kyb .text-\[9px\],.hops-root .hops-kyb .text-\[10px\],.hops-root .hops-kyb .text-\[11px\]{font-size:13px!important;line-height:1.45!important}
+.hops-root .hops-kyb .text-xs,.hops-root .hops-profile .text-xs{font-size:13px!important}
+.hops-root .hops-kyb button:not([type=submit]):not(.bg-emerald-700){border:1px solid #B7B0C9!important;background:#FFFDF9!important;color:#173F35!important}
+@media(max-width:900px){.hops-root .hops-readiness-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hops-root .hops-coverage-layout{grid-template-columns:1fr}}
+@media(max-width:600px){.hops-root{padding:14px!important}.hops-root .hops-hero{padding:22px 18px!important}.hops-root .hops-hero button{min-height:41px;padding:9px 11px!important}.hops-root .hops-body{gap:20px!important}.hops-root .hops-readiness-grid{grid-template-columns:1fr}.hops-root .hops-check-top{padding:15px;gap:14px}.hops-root .hops-readiness,.hops-root .hops-profile,.hops-root .hops-delivery,.hops-root .hops-kyb{padding:18px 16px!important}.hops-root .hops-profile form,.hops-root .hops-kyb form{gap:13px!important;grid-template-columns:minmax(0,1fr)!important}.hops-root .hops-profile form>.col-span-2,.hops-root .hops-kyb form>.col-span-2{grid-column:1/-1!important}.hops-root .hops-coverage-summary{padding:16px}.hops-root .hops-kyb form>div:not(.grid){min-width:0}}
+
+/* Readable Host operations typography. Scoped to dashboard; other Host pages are untouched. */
+.hops-root{font-size:16px;line-height:1.55}
+.hops-root .hops-hero p{font-size:15px!important;line-height:1.6!important}
+.hops-root .hops-hero p:first-child{font-size:13px!important}
+.hops-root .hops-hero button{font-size:15px!important;min-height:46px!important}
+.hops-root .hops-readiness h2,.hops-root .hops-profile h2,.hops-root .hops-delivery h2,.hops-root .hops-kyb h2{font-size:clamp(23px,2.15vw,29px)!important;line-height:1.25!important;font-weight:750!important;letter-spacing:-.03em!important}
+.hops-root .hops-readiness>div:first-child p,.hops-root .hops-profile>div:first-child p,.hops-root .hops-delivery>div:first-child p,.hops-root .hops-kyb>div:first-child p{font-size:15px!important;line-height:1.55!important}
+.hops-root .hops-body :is(.text-\[8px\],.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs){font-size:14px!important;line-height:1.5!important;letter-spacing:normal!important}
+.hops-root .hops-body .text-sm{font-size:15px!important;line-height:1.5!important}
+.hops-root .hops-body h3{font-size:19px!important;line-height:1.3!important;letter-spacing:-.02em}
+.hops-root .hops-readiness-grid .hops-check-item span{font-size:15px!important;line-height:1.5!important}
+.hops-root .hops-check-top>div:first-child>span{font-size:14px!important}
+.hops-root .hops-profile label>span:first-child,.hops-root .hops-delivery label>span:first-child,.hops-root .hops-kyb label>span:first-child{font-size:15px!important;line-height:1.5!important;font-weight:700!important}
+.hops-root .hops-profile input,.hops-root .hops-profile select,.hops-root .hops-profile textarea,.hops-root .hops-delivery textarea,.hops-root .hops-kyb input,.hops-root .hops-kyb select{font-size:16px!important;line-height:1.5!important;min-height:48px!important;padding:12px 15px!important}
+.hops-root .hops-profile button,.hops-root .hops-delivery button,.hops-root .hops-kyb button,.hops-root .hops-readiness button{font-size:15px!important;min-height:46px!important;font-weight:700!important}
+/* Full-width, actual editable PIN input: no narrow native textarea width. */
+.hops-root .hops-coverage-layout{grid-template-columns:minmax(0,1.65fr) minmax(290px,.65fr);gap:24px}
+.hops-root .hops-coverage-form,.hops-root .hops-coverage-form label{display:block;width:100%;min-width:0;max-width:none}
+.hops-root .hops-coverage-form label>span:first-child{display:block}
+.hops-root .hops-coverage-form textarea{display:block;width:100%!important;min-width:0!important;max-width:100%!important;min-height:112px!important;resize:vertical!important;white-space:pre-wrap;overflow-wrap:anywhere}
+.hops-root .hops-coverage-form button{margin-top:14px}
+.hops-root .hops-coverage-summary p{font-size:15px!important;line-height:1.55!important}
+.hops-root .hops-pins span{font-size:14px!important}
+.hops-root .hops-coverage-note{margin-top:13px;font-size:14px!important;line-height:1.5!important;color:#425D50}
+.hops-root :is(button,input,select,textarea):focus-visible{outline:3px solid #C86C42!important;outline-offset:2px}
+@media(max-width:900px){.hops-root .hops-coverage-layout{grid-template-columns:minmax(0,1fr);gap:16px}}
+@media(max-width:600px){.hops-root{font-size:15px}.hops-root .hops-readiness h2,.hops-root .hops-profile h2,.hops-root .hops-delivery h2,.hops-root .hops-kyb h2{font-size:23px!important}.hops-root .hops-body :is(.text-\[8px\],.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs){font-size:13px!important}.hops-root .hops-coverage-form textarea{min-height:120px!important}.hops-root .hops-coverage-form button{width:100%;justify-content:center}}
+@media(prefers-reduced-motion:reduce){.hops-root *, .hops-root *::before,.hops-root *::after{transition:none!important}}
+`;
+
+const SHARED_DELIVERY_AREA_KEY = "host-default-delivery";
+
+
+// Active legacy coverage still holds Host PIN codes. Read every page before
+// offering those existing values as the new editable business-wide default.
+async function loadActiveHostServiceAreas() {
+  const serviceAreas = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await listServiceAreas({ page, limit: 100, status: "active" });
+    const rows = Array.isArray(response?.serviceAreas) ? response.serviceAreas : [];
+    serviceAreas.push(...rows);
+    const totalPages = Number(response?.pagination?.pages || response?.pagination?.totalPages || 0);
+    if (!rows.length || (totalPages > 0 ? page >= totalPages : rows.length < 100)) {
+      return { serviceAreas };
+    }
+  }
+  // Do not pretend coverage is complete when an unusually large result truncates.
+  throw new Error("Delivery area results exceed the supported page limit.");
+}
 
 const inputClass =
   "focus-ring w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none";
@@ -153,6 +328,7 @@ function Section({
   children,
   actions = null,
   tone = "plain",
+  className = "",
 }) {
   const toneStyles = {
     readiness: {
@@ -211,7 +387,7 @@ function Section({
         : `rounded-[26px] border ${activeTone.section} p-5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:p-6`;
 
   return (
-    <section className={sectionClass}>
+    <section className={`${sectionClass} ${className}`}>
       <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3" : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"}>
         <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex min-w-0 items-start gap-2 sm:gap-3" : "flex items-start gap-3"}>
           <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone
@@ -826,6 +1002,12 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   const [serviceAreas, setServiceAreas] = useState([]);
 
+  const [sharedDeliveryArea, setSharedDeliveryArea] = useState(null);
+  const [previousDeliveryPins, setPreviousDeliveryPins] = useState([]);
+  const deliveryAreaEditedRef = useRef(false);
+
+  const [sharedDeliveryLoadError, setSharedDeliveryLoadError] = useState("");
+
   const [quality, setQuality] = useState(null);
 
   const [imports, setImports] = useState([]);
@@ -889,12 +1071,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
   const [savedProfileForm, setSavedProfileForm] = useState(null);
 
   const [deliveryAreaForm, setDeliveryAreaForm] = useState({
-    name: "",
-
     postalCodes: "",
   });
-
-  const [editingDeliveryAreaId, setEditingDeliveryAreaId] = useState("");
 
   const [kybForm, setKybForm] = useState({
     legalEntityName: "",
@@ -1034,13 +1212,18 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
           getHostKyb(),
 
-          listServiceAreas({
-            page: 1,
-            limit: 100,
-            status: "active",
-          }),
+          loadActiveHostServiceAreas(),
 
           getHostCommercialProfile(),
+
+          // Load the one organization-wide coverage record independently of old
+          // product-specific areas (which must remain untouched).
+          listServiceAreas({
+            page: 1,
+            limit: 10,
+            status: "all",
+            search: SHARED_DELIVERY_AREA_KEY,
+          }),
         ]);
 
         const value = (index) =>
@@ -1072,7 +1255,38 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
         setAuthorities(value(12)?.authorities || []);
 
-        setServiceAreas(value(14)?.serviceAreas || []);
+        const activeAreas = value(14)?.serviceAreas || [];
+        setServiceAreas(activeAreas);
+
+        const sharedCoverageResult = value(16);
+        const exactSharedArea = (sharedCoverageResult?.serviceAreas || []).find(
+          (area) => area.serviceAreaKey === SHARED_DELIVERY_AREA_KEY
+        ) || null;
+        const originalPins = [...new Set(
+          activeAreas
+            .filter((area) =>
+              area.status === "active" &&
+              area.serviceAreaKey !== SHARED_DELIVERY_AREA_KEY &&
+              (area.fulfillmentTypes || []).includes("delivery")
+            )
+            .flatMap((area) => area.postalCodes || [])
+            .map((pin) => String(pin).trim())
+            .filter((pin) => /^[1-9][0-9]{5}$/.test(pin))
+        )].sort();
+        setPreviousDeliveryPins(originalPins);
+        setSharedDeliveryArea(exactSharedArea);
+        const coverageError = results[14]?.status === "fulfilled" && results[16]?.status === "fulfilled"
+          ? ""
+          : "Existing delivery coverage could not be loaded completely. Refresh before saving.";
+        setSharedDeliveryLoadError(coverageError);
+        if (!deliveryAreaEditedRef.current && !coverageError) {
+          // An existing business default takes priority. Until one is saved,
+          // restore all unique PINs from legacy per-product coverage for editing.
+          const pins = exactSharedArea?.postalCodes?.length
+            ? exactSharedArea.postalCodes
+            : originalPins;
+          setDeliveryAreaForm({ postalCodes: pins.join(", ") });
+        }
 
         setCommercialProfileRequest(value(15)?.latestRequest || null);
 
@@ -1163,6 +1377,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
     return JSON.stringify(profileForm) !== JSON.stringify(savedProfileForm);
   }, [profileForm, savedProfileForm]);
+
+  const displayedDeliveryPins = sharedDeliveryArea?.postalCodes?.length
+    ? sharedDeliveryArea.postalCodes
+    : previousDeliveryPins;
 
   async function run(action, successMessage = "") {
     setBusy(true);
@@ -1494,9 +1712,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
     <main
       className={
         section === "dashboard"
-          ? "min-h-screen bg-[#f7f5ef] p-3 sm:p-7"
+          ? "hops-root min-h-screen w-full min-w-0 bg-[#f7f5ef] p-3 sm:p-7"
           : section === "catalog"
-            ? "min-h-screen bg-[#f7f5ef] p-3 sm:p-7"
+            ? "hpc-root min-h-screen bg-[#f7f6f2] p-3 sm:p-7"
             : section === "quality"
               ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
               : section === "recipes"
@@ -1508,12 +1726,14 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     : "min-h-screen bg-[#f7f5ef] p-5 sm:p-7"
       }
     >
+      {section === "dashboard" ? <style>{hostOperationsDashboardCss}</style> : null}
+      {section === "catalog" ? <style>{hostProductCatalogCss}</style> : null}
       <section
         className={
           section === "catalog"
-            ? "overflow-hidden rounded-[22px] border border-sky-900/10 bg-gradient-to-br from-slate-950 via-sky-950 to-cyan-900 p-4 text-white shadow-lg sm:rounded-[28px] sm:p-6"
+            ? "hpc-hero"
             : section === "dashboard"
-              ? "rounded-[20px] border border-emerald-300 bg-emerald-100/75 p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-6"
+              ? "hops-hero rounded-[20px] border border-emerald-300 bg-emerald-100/75 p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-6"
               : section === "quality"
                 ? "overflow-hidden rounded-[18px] border border-emerald-100 bg-gradient-to-br from-[#e8f4ee] via-[#edf6f3] to-[#e9f1f7] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
                 : section === "recipes"
@@ -1552,7 +1772,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             <p
               className={
                 section === "catalog"
-                  ? "text-[9px] font-black uppercase tracking-[0.12em] text-cyan-300 sm:text-xs sm:tracking-[0.14em]"
+                  ? "hpc-hero-label"
                   : section === "dashboard"
                     ? "text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs sm:tracking-[0.14em]"
                     : section === "quality"
@@ -1582,7 +1802,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             <h1
               className={
                 section === "catalog"
-                  ? "mt-1 text-[20px] font-black leading-6 text-white sm:mt-2 sm:text-3xl sm:leading-normal"
+                  ? "hpc-hero-title"
                   : section === "dashboard"
                     ? "mt-1 whitespace-nowrap text-[18px] font-black leading-5 text-stone-950 sm:mt-2 sm:text-3xl sm:leading-normal"
                     : section === "quality"
@@ -1602,7 +1822,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             <p
               className={
                 section === "catalog"
-                  ? "mt-1 text-[10px] font-semibold leading-4 text-sky-100/80 sm:mt-2 sm:text-sm sm:leading-normal"
+                  ? "hpc-hero-meta"
                   : section === "dashboard"
                     ? "mt-1 text-[9px] font-semibold leading-3 text-stone-500 sm:mt-2 sm:text-sm sm:font-normal sm:leading-normal"
                     : section === "quality"
@@ -1638,7 +1858,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             onClick={load}
             className={
               section === "catalog"
-                ? "focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-[10px] font-black text-white transition hover:bg-white/20 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
+                ? "hpc-refresh focus-ring"
                 : section === "dashboard"
                   ? "focus-ring ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-200 bg-sky-100 px-2 py-1.5 text-[10px] font-black text-sky-800 sm:ml-0 sm:gap-2 sm:rounded-xl sm:border-stone-200 sm:bg-transparent sm:px-4 sm:py-2.5 sm:text-sm sm:text-stone-950"
                   : section === "quality"
@@ -1794,27 +2014,18 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         ) : null}
 
         {section === "catalog" ? (
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+          <div className="hpc-steps" aria-label="Catalog checking stages">
             {[
-              ["01", "Choose CSV", "Select your product file"],
-              ["02", "Check products", "Match products with EPANTRY"],
-              ["03", "Review results", "See matched or flagged items"],
-              ["04", "Finish listings", "Add offer, price and stock"],
+              ["01", "Choose CSV", "Select a product file"],
+              ["02", "Check products", "Match with EPANTRY"],
+              ["03", "Review results", "See match status"],
+              ["04", "Finish listings", "Set price and stock"],
             ].map(([step, label, helper]) => (
-              <div
-                key={step}
-                className="rounded-xl border border-white/10 bg-white/10 px-2.5 py-2 backdrop-blur-sm sm:rounded-2xl sm:px-4 sm:py-3"
-              >
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cyan-300 text-[9px] font-black text-slate-950 sm:h-8 sm:w-8 sm:text-xs">
-                    {step}
-                  </span>
-                  <div>
-                    <p className="text-[10px] font-black leading-3 text-white sm:text-sm sm:leading-normal">{label}</p>
-                    <p className="mt-0.5 text-[8px] font-semibold leading-[11px] text-sky-100/70 sm:text-[11px] sm:leading-normal">
-                      {helper}
-                    </p>
-                  </div>
+              <div className="hpc-step" key={step}>
+                <span className="hpc-step-index">{step}</span>
+                <div className="min-w-0">
+                  <p className="hpc-step-name">{label}</p>
+                  <p className="hpc-step-detail">{helper}</p>
                 </div>
               </div>
             ))}
@@ -1853,29 +2064,42 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "dashboard" ? (
-        <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
+        <div className="hops-body mt-3 space-y-3 sm:mt-5 sm:space-y-5">
           <Section
             title="Operational readiness"
-            description="Complete each readiness check before launch approval."
+            description="Your business checks, in one view."
             icon={ShieldCheck}
             tone="readiness"
+            className="hops-readiness"
           >
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
-              {Object.entries(readiness?.checks || {}).map(([key, value]) => (
-                <div
-                  key={key}
-                  className="flex min-w-0 items-center gap-1.5 rounded-xl border border-emerald-200 bg-white/78 p-2 sm:gap-2 sm:rounded-2xl sm:p-3"
-                >
-                  <CheckCircle2
-                    className={`h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${value ? "text-emerald-700" : "text-stone-300"}`}
-                  />
-
-                  <span className="text-[9px] font-bold leading-3 text-stone-700 sm:text-xs sm:leading-normal">
-                    {readinessLabel(key)}
-                  </span>
+            {readiness?.checks ? (
+              <>
+                <div className="hops-check-top">
+                  <div>
+                    <strong>
+                      {Object.values(readiness.checks).filter(Boolean).length}
+                      <small> / {Object.keys(readiness.checks).length}</small>
+                    </strong>
+                    <span>Readiness checks passed</span>
+                  </div>
+                  <div className="hops-check-meter" aria-label="Readiness progress">
+                    <span style={{ width: `${Math.round(100 * Object.values(readiness.checks).filter(Boolean).length / Math.max(1, Object.keys(readiness.checks).length))}%` }} />
+                  </div>
                 </div>
-              ))}
-            </div>
+                <div className="hops-readiness-grid">
+                  {Object.entries(readiness.checks).map(([key, value]) => (
+                    <div className="hops-check-item" data-passed={Boolean(value)} key={key}>
+                      {value
+                        ? <CheckCircle2 className="hops-check-icon" aria-hidden="true" />
+                        : <CircleAlert className="hops-check-icon" aria-hidden="true" />}
+                      <span>{readinessLabel(key)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="hops-section-error" role="status">Readiness data is unavailable. Refresh to try again.</p>
+            )}
 
             {activationState === "active" ? (
               <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-200/60 p-2.5 text-[10px] font-bold leading-4 text-emerald-900 sm:mt-4 sm:gap-2 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
@@ -1915,12 +2139,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
           <Section
             title="Commercial profile"
-            description={<>
-              <span className="sm:hidden">Keep core business details accurate. Pricing, offers and delivery coverage are checked separately.</span>
-              <span className="hidden sm:inline">Keep the business details customers and operations rely on accurate before launch. Pricing, offers and delivery coverage are checked separately.</span>
-            </>}
+            description="The details customers and business partners rely on."
             icon={Building2}
             tone="profile"
+            className="hops-profile"
           >
             <form
               className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3"
@@ -2104,6 +2326,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </div>
 
               <button
+                type="submit"
                 disabled={busy || !profileHasUnsavedChanges}
                 className={`${buttonClass} col-span-2 ${
                   !profileHasUnsavedChanges
@@ -2118,193 +2341,93 @@ export default function HostOperationsPage({ section = "dashboard" }) {
           </Section>
 
           <Section
-            title="Delivery Areas"
-            description={<>
-              <span className="sm:hidden">Choose the customer pincodes you deliver to. These stay separate from your business postcode.</span>
-              <span className="hidden sm:inline">Choose the customer pincodes your business can deliver to. These are separate from your registered business postcode.</span>
-            </>}
+            title="Business delivery coverage"
+            description="One saved coverage area for new Grocery and Recipe listings."
             icon={MapPinned}
             tone="delivery"
+            className="hops-delivery"
           >
-            <form
-              className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)_auto] sm:gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-
-                const postalCodes = deliveryAreaForm.postalCodes
-                  .split(/[\s,]+/)
-                  .map((value) => value.trim())
-                  .filter(Boolean);
-
-                const payload = {
-                  name: deliveryAreaForm.name.trim(),
-
-                  inventoryNodeId: null,
-
-                  postalCodes,
-
-                  fulfillmentTypes: ["delivery"],
-                };
-
-                const normalizedKey = deliveryAreaForm.name
-                  .trim()
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, "-")
-                  .replace(/^-+|-+$/g, "");
-
-                const matchingArea = serviceAreas.find(
-                  (area) => area.serviceAreaKey === normalizedKey
-                );
-
-                const targetAreaId =
-                  editingDeliveryAreaId || matchingArea?.id || "";
-
-                run(
-                  () =>
-                    targetAreaId
-                      ? updateServiceArea(targetAreaId, payload)
-                      : createServiceArea(payload),
-                  targetAreaId
-                    ? "Delivery area updated."
-                    : "Delivery area saved."
-                ).then((result) => {
-                  if (result) {
-                    setDeliveryAreaForm({
-                      name: "",
-
-                      postalCodes: "",
-                    });
-
-                    setEditingDeliveryAreaId("");
+            <div className="hops-coverage-layout">
+              <form
+                className="hops-coverage-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (busy || sharedDeliveryLoadError) return;
+                  const rawPins = deliveryAreaForm.postalCodes
+                    .split(/[\s,;]+/)
+                    .map((value) => value.trim())
+                    .filter(Boolean);
+                  const postalCodes = [...new Set(rawPins)];
+                  if (!postalCodes.length || postalCodes.some((pin) => !/^[1-9][0-9]{5}$/.test(pin))) {
+                    setError("Enter valid six-digit Indian delivery PIN codes.");
+                    return;
                   }
-                });
-              }}
-            >
-              <Field compactMobile label="Delivery area name">
-                <input
-                  required
-                  className={`${inputClass} h-9 px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
-                  value={deliveryAreaForm.name}
-                  onChange={(event) =>
-                    setDeliveryAreaForm((current) => ({
-                      ...current,
-
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Delhi Central"
-                />
-              </Field>
-
-              <Field compactMobile label="Delivery postal codes">
-                <textarea
-                  required
-                  rows={2}
-                  className={`${inputClass} h-9 resize-none px-2.5 py-2 text-[11px] sm:h-auto sm:px-3.5 sm:py-2.5 sm:text-sm`}
-                  value={deliveryAreaForm.postalCodes}
-                  onChange={(event) =>
-                    setDeliveryAreaForm((current) => ({
-                      ...current,
-
-                      postalCodes: event.target.value,
-                    }))
-                  }
-                  placeholder="110001, 110002, 110003"
-                />
-              </Field>
-
-              <div className="col-span-2 flex items-end gap-2 sm:col-span-1">
-                <button
-                  disabled={busy}
-                  className={`${buttonClass} w-full whitespace-nowrap sm:w-auto`}
-                >
-                  <MapPinned size={15} />
-                  {editingDeliveryAreaId
-                    ? "Update delivery area"
-                    : "Save delivery area"}
-                </button>
-
-                {editingDeliveryAreaId ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      setEditingDeliveryAreaId("");
-                      setDeliveryAreaForm({
-                        name: "",
-                        postalCodes: "",
-                      });
+                  const payload = {
+                    name: "Business delivery coverage",
+                    inventoryNodeId: null,
+                    postalCodes,
+                    fulfillmentTypes: ["delivery"],
+                  };
+                  run(
+                    async () => {
+                      const result = sharedDeliveryArea
+                        ? await updateServiceArea(sharedDeliveryArea.id, { ...payload, status: "active" })
+                        : await createServiceArea({ ...payload, serviceAreaKey: SHARED_DELIVERY_AREA_KEY });
+                      // Only clear the edit flag after the API confirms a save.
+                      deliveryAreaEditedRef.current = false;
+                      return result;
+                    },
+                    sharedDeliveryArea ? "Business coverage updated." : "Business coverage saved."
+                  );
+                }}
+              >
+                <label className="block min-w-0">
+                  <span className="mb-2 block text-sm font-bold">Delivery PIN codes</span>
+                  <textarea
+                    required
+                    rows={4}
+                    value={deliveryAreaForm.postalCodes}
+                    onChange={(event) => {
+                      deliveryAreaEditedRef.current = true;
+                      setDeliveryAreaForm({ postalCodes: event.target.value });
                     }}
-                    className="focus-ring rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-black text-stone-700"
-                  >
-                    Cancel
-                  </button>
+                    className="hops-coverage-pins-input"
+                    placeholder="110001, 110002, 110003"
+                    aria-label="Business delivery PIN codes"
+                  />
+                </label>
+                {sharedDeliveryLoadError ? (
+                  <p role="alert" className="hops-section-error">{sharedDeliveryLoadError}</p>
                 ) : null}
-              </div>
-            </form>
-
-            <p className="mt-1.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-2 sm:text-xs sm:leading-5">
-              <span className="sm:hidden">Add 6-digit delivery pincodes so customers can see where you deliver.</span>
-              <span className="hidden sm:inline">Add the 6-digit pincodes where you can deliver. Customers will see availability based on these service areas.</span>
-            </p>
-
-            {serviceAreas.length ? (
-              <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
-                {serviceAreas.map((area) => (
-                  <div
-                    key={area.id}
-                    className="rounded-xl border border-cyan-200 bg-white/80 p-2.5 sm:rounded-2xl sm:p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-black text-cyan-950 sm:text-sm">
-                          {area.name}
-                        </p>
-
-                        <p className="mt-1 text-[9px] font-semibold leading-3 text-cyan-800 sm:text-xs sm:leading-5">
-                          {(area.postalCodes || []).join(", ")}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingDeliveryAreaId(area.id);
-                            setDeliveryAreaForm({
-                              name: area.name || "",
-                              postalCodes: (area.postalCodes || []).join(", "),
-                            });
-                          }}
-                          className="focus-ring rounded-lg bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-cyan-800 shadow-sm hover:bg-cyan-100"
-                        >
-                          Edit
-                        </button>
-
-                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-cyan-700">
-                          {area.status || "active"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 rounded-xl bg-white/70 p-2.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-4 sm:rounded-2xl sm:bg-stone-50 sm:p-4 sm:text-sm sm:leading-normal">
-                <span className="sm:hidden">No delivery areas yet. Add pincodes where customers can receive orders.</span>
-                <span className="hidden sm:inline">No delivery area added yet. Add the pincodes where customers should be able to receive orders.</span>
-              </div>
-            )}
+                <button type="submit" disabled={busy || Boolean(sharedDeliveryLoadError)} className={buttonClass}>
+                  <Save size={17} /> {sharedDeliveryArea ? "Update delivery coverage" : "Save delivery coverage"}
+                </button>
+              </form>
+              <aside className="hops-coverage-summary" aria-live="polite">
+                <strong>{displayedDeliveryPins.length}</strong>
+                <p>{sharedDeliveryArea ? "Saved business PIN codes" : "Existing delivery PIN codes"}</p>
+                <div className="hops-pins">
+                  {displayedDeliveryPins.slice(0, 12).map((pin) => <span key={pin}>{pin}</span>)}
+                  {displayedDeliveryPins.length > 12 ? (
+                    <span>+{displayedDeliveryPins.length - 12} more</span>
+                  ) : null}
+                </div>
+                {!sharedDeliveryArea && !sharedDeliveryLoadError && displayedDeliveryPins.length ? (
+                  <p className="hops-coverage-note">Previous delivery PINs are restored in the form. Save to make them the business default.</p>
+                ) : null}
+                {!sharedDeliveryArea && !sharedDeliveryLoadError && !displayedDeliveryPins.length ? (
+                  <p className="hops-coverage-note">No delivery PIN codes have been saved yet.</p>
+                ) : null}
+              </aside>
+            </div>
           </Section>
 
           <Section
             title="Business verification (KYB)"
-            description={<>
-              <span className="sm:hidden">Your tax number stays protected. After saving, EPANTRY shows only the last 4 digits.</span>
-              <span className="hidden sm:inline">Your full tax registration number stays protected. After saving, EPANTRY only shows the last 4 digits.</span>
-            </>}
+            description="Business identity and tax details for approval."
             icon={FileCheck2}
             tone="kyb"
+            className="hops-kyb"
           >
             {kybStatus ? (
               <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-violet-200 bg-white/80 px-3.5 py-3">
@@ -2426,7 +2549,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </Field>
 
               <div className="grid grid-cols-2 items-end gap-1.5 sm:flex sm:gap-2">
-                <button disabled={busy} className={`${buttonClass} h-9 w-full gap-1 px-1.5 py-0 text-[9px] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm`}>
+                <button type="submit" disabled={busy} className={`${buttonClass} h-9 w-full gap-1 px-1.5 py-0 text-[9px] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm`}>
                   <Save className="h-3.5 w-3.5 sm:h-[15px] sm:w-[15px]" />
                   Save KYB
                 </button>
@@ -2462,252 +2585,118 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "catalog" ? (
-        <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
-          <section className="overflow-hidden rounded-[22px] border border-sky-200 bg-sky-100 shadow-sm sm:rounded-[30px]">
-            <div className="grid gap-0 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-              <div className="p-3.5 sm:p-7">
-                <div className="flex items-start gap-2.5 sm:gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-700 text-white shadow-md sm:h-12 sm:w-12 sm:rounded-2xl">
-                    <Upload size={20} />
-                  </div>
+        <div className="hpc-content">
+          <section className="hpc-upload-section" aria-labelledby="hpc-upload-heading">
+            <div className="hpc-upload-main">
+              <div className="hpc-section-head">
+                <span className="hpc-icon-box" aria-hidden="true"><Upload size={21} /></span>
+                <div className="min-w-0">
+                  <p className="hpc-kicker">01 / Product upload</p>
+                  <h2 id="hpc-upload-heading" className="hpc-section-title">Upload your product CSV</h2>
+                  <p className="hpc-section-description">Check multiple products against the EPANTRY catalog.</p>
+                </div>
+              </div>
 
-                  <div>
-                    <p className="text-[8px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-[10px] sm:tracking-[0.14em]">
-                      Upload products
-                    </p>
-                    <h2 className="mt-0.5 text-[15px] font-black leading-5 text-sky-950 sm:mt-1 sm:text-xl sm:leading-normal">
-                      Upload your product CSV
-                    </h2>
-                    <p className="mt-0.5 max-w-2xl text-[9px] font-semibold leading-[13px] text-sky-900/70 sm:mt-1 sm:text-xs sm:leading-5">
-                      <span className="sm:hidden">Upload the products you sell. EPANTRY checks matches and flags anything that needs review.</span>
-                      <span className="hidden sm:inline">Add the products you sell. EPANTRY checks each row, matches known products and flags anything that needs review before listing.</span>
+              <input
+                id="host-catalog-csv-input"
+                type="file"
+                accept=".csv,text/csv"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setCsvName(file.name);
+                  setCsvRows(parseCsv(await file.text()));
+                }}
+                className="sr-only"
+              />
+              <label htmlFor="host-catalog-csv-input" className="hpc-dropzone focus-ring">
+                <span className="hpc-drop-icon" aria-hidden="true"><Upload size={23} /></span>
+                <span className="hpc-drop-title">{csvRows.length ? "Choose a different CSV" : "Choose product CSV"}</span>
+                <span className="hpc-drop-sub">Select a .csv file from your device</span>
+              </label>
+
+              <div className="hpc-upload-footer">
+                <div className="hpc-file-status" data-ready={Boolean(csvRows.length)} aria-live="polite">
+                  <span className="hpc-status-dot" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="hpc-file-name">{csvRows.length ? csvName : "No file selected"}</p>
+                    <p className="hpc-file-helper">
+                      {csvRows.length ? `${csvRows.length} products ready to check` : "Choose a CSV to begin"}
                     </p>
                   </div>
                 </div>
-
-                <input
-                  id="host-catalog-csv-input"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-
-                    if (!file) {
-                      return;
-                    }
-
-                    setCsvName(file.name);
-                    setCsvRows(parseCsv(await file.text()));
-                  }}
-                  className="sr-only"
-                />
-
-                <label
-                  htmlFor="host-catalog-csv-input"
-                  className="focus-ring group mt-3 flex min-h-[118px] cursor-pointer flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-sky-400 bg-white/80 px-4 py-4 text-center shadow-inner transition hover:border-sky-600 hover:bg-white sm:mt-6 sm:min-h-[190px] sm:rounded-[26px] sm:px-6 sm:py-8"
-                >
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-700 text-white shadow-md transition group-hover:-translate-y-0.5 group-hover:bg-sky-800 sm:h-14 sm:w-14 sm:rounded-2xl">
-                    <Upload size={22} />
-                  </span>
-                  <span className="mt-2 text-[11px] font-black text-sky-950 sm:mt-4 sm:text-base">
-                    {csvRows.length ? "Choose a different CSV" : "Choose product CSV"}
-                  </span>
-                  <span className="mt-0.5 text-[9px] font-semibold text-sky-800/65 sm:mt-1 sm:text-xs">
-                    Browse your device for a .csv file
-                  </span>
-                </label>
-
-                <div
-                  className={`mt-3 rounded-xl border p-3 sm:mt-4 sm:rounded-2xl sm:p-4 ${
-                    csvRows.length
-                      ? "border-emerald-200 bg-emerald-50"
-                      : "border-sky-200 bg-sky-50"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p
-                        className={`text-[11px] font-black sm:text-sm ${
-                          csvRows.length ? "text-emerald-950" : "text-sky-950"
-                        }`}
-                      >
-                        {csvRows.length ? csvName : "No file selected"}
-                      </p>
-                      <p
-                        className={`mt-0.5 text-[9px] font-semibold sm:mt-1 sm:text-xs ${
-                          csvRows.length ? "text-emerald-800" : "text-sky-800/65"
-                        }`}
-                      >
-                        {csvRows.length
-                          ? `${csvRows.length} products are ready to check.`
-                          : "Choose a CSV to start checking your products."}
-                      </p>
-                    </div>
-
-                    <span
-                      className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.1em] ${
-                        csvRows.length
-                          ? "bg-emerald-700 text-white"
-                          : "bg-sky-200 text-sky-800"
-                      }`}
-                    >
-                      {csvRows.length ? "Ready" : "Waiting"}
-                    </span>
-                  </div>
-                </div>
-
                 <button
                   type="button"
                   disabled={busy || !csvRows.length}
                   onClick={() =>
                     run(
-                      () =>
-                        createHostCatalogImport({
-                          sourceType: "csv_normalized",
-
-                          rows: csvRows,
-                        }),
+                      () => createHostCatalogImport({ sourceType: "csv_normalized", rows: csvRows }),
                       "Catalog checked. Review the results below before continuing your listings."
                     )
                   }
-                  className="focus-ring mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2.5 text-[10px] font-black text-white shadow-md transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none sm:mt-4 sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3.5 sm:text-sm"
+                  className="hpc-check-button focus-ring"
                 >
-                  <PackageSearch size={17} />
-                  Check products
+                  <PackageSearch size={18} aria-hidden="true" /> Check products
                 </button>
               </div>
-
-              <aside className="border-t border-sky-200 bg-sky-950 p-3.5 text-white sm:p-7 xl:border-l xl:border-t-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cyan-300">
-                  CSV format
-                </p>
-                <h3 className="mt-1 text-[14px] font-black sm:mt-2 sm:text-lg">Use these column headings</h3>
-                <p className="mt-1 text-[9px] font-semibold leading-[13px] text-sky-100/70 sm:mt-2 sm:text-xs sm:leading-5">
-                  Keep these names exactly as shown so EPANTRY can read every product in your CSV.
-                </p>
-
-                <div className="mt-3 grid grid-cols-2 gap-1.5 sm:mt-5 sm:block sm:space-y-2">
-                  {[
-                    "merchantSku",
-                    "gtin",
-                    "packId",
-                    "displayName",
-                    "brandName",
-                    "netQuantityText",
-                    "priceMinor",
-                    "inventoryQuantity",
-                  ].map((header) => (
-                    <div
-                      key={header}
-                      className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-[9px] font-bold text-sky-50 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs"
-                    >
-                      {header}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 sm:mt-5 sm:rounded-2xl sm:p-4">
-                  <p className="text-[9px] font-black text-amber-200 sm:text-xs">
-                    Checking products does not publish them.
-                  </p>
-                  <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-amber-100/75 sm:mt-1 sm:text-xs sm:leading-5">
-                    After a match, add the offer, price and stock before customers can buy.
-                  </p>
-                </div>
-              </aside>
             </div>
+
+            <aside className="hpc-format" aria-label="CSV column format">
+              <p className="hpc-kicker">CSV format</p>
+              <h3 className="hpc-format-head">Use these column headings</h3>
+              <div className="hpc-columns">
+                {[
+                  "merchantSku", "gtin", "packId", "displayName",
+                  "brandName", "netQuantityText", "priceMinor", "inventoryQuantity",
+                ].map((header) => <code key={header}>{header}</code>)}
+              </div>
+              <p className="hpc-format-note">
+                <CircleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+                Catalog checks do not publish products.
+              </p>
+            </aside>
           </section>
 
-          <section className="overflow-hidden rounded-[22px] border border-violet-200 bg-violet-100 shadow-sm sm:rounded-[30px]">
-            <div className="flex items-start justify-between gap-2 border-b border-violet-200 bg-violet-700 p-3.5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              <div className="flex items-start gap-3">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 text-white sm:h-11 sm:w-11 sm:rounded-2xl">
-                  <Boxes size={19} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-200">
-                    Product check results
-                  </p>
-                  <h2 className="mt-0.5 text-[14px] font-black sm:mt-1 sm:text-lg">Catalog checks</h2>
-                  <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-violet-100/80 sm:mt-1 sm:text-xs sm:leading-normal">
-                    See what matched, what needs review and what needs fixing.
-                  </p>
-                </div>
+          <section className="hpc-results" aria-labelledby="hpc-results-heading">
+            <div className="hpc-results-head">
+              <div>
+                <p className="hpc-kicker">02 / Check results</p>
+                <h2 id="hpc-results-heading" className="hpc-section-title">Catalog checks</h2>
               </div>
-
-              <span className="w-fit shrink-0 rounded-full bg-white/15 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-white sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-[0.1em]">
-                {imports.length} checks
-              </span>
+              <span className="hpc-results-count">{imports.length} {imports.length === 1 ? "check" : "checks"}</span>
             </div>
-
-            <div className="p-3.5 sm:p-6">
-              {imports.length ? (
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {imports.map((job) => (
-                    <div
-                      key={job.id}
-                      className="rounded-xl border border-violet-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[11px] font-black text-violet-950 sm:text-sm">
-                            CSV catalog check
-                          </p>
-                          <p className="mt-0.5 text-[9px] font-semibold text-violet-800/65 sm:mt-1 sm:text-xs">
-                            {job.rowCount} products checked
-                          </p>
-                        </div>
-
-                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-black text-emerald-800 sm:px-3 sm:py-1.5 sm:text-xs">
-                          Data quality {job.averageDataQualityScore}/100
-                        </span>
+            {imports.length ? (
+              <div className="hpc-check-list">
+                {imports.map((job) => (
+                  <div className="hpc-check-row" key={job.id}>
+                    <div className="min-w-0">
+                      <p className="hpc-check-name">CSV catalog check</p>
+                      <p className="hpc-check-meta">{job.rowCount} products checked</p>
+                      <span className="hpc-data-score">Data quality: {job.averageDataQualityScore}/100</span>
+                    </div>
+                    <div className="hpc-stats" aria-label="Catalog check summary">
+                      <div className="hpc-stat" data-state="matched">
+                        <strong className="hpc-stat-value">{job.matchedCount}</strong>
+                        <p className="hpc-stat-caption">Matched</p>
                       </div>
-
-                      <div className="mt-2 grid grid-cols-3 gap-1.5 sm:mt-4 sm:gap-2">
-                        <div className="rounded-xl bg-emerald-50 p-2 text-center sm:p-3">
-                          <p className="text-lg font-black text-emerald-800">
-                            {job.matchedCount}
-                          </p>
-                          <p className="text-[9px] font-black uppercase tracking-[0.08em] text-emerald-700">
-                            Matched
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-amber-50 p-2 text-center sm:p-3">
-                          <p className="text-lg font-black text-amber-800">
-                            {job.npiRequiredCount}
-                          </p>
-                          <p className="text-[9px] font-black uppercase tracking-[0.08em] text-amber-700">
-                            Needs review
-                          </p>
-                        </div>
-                        <div className="rounded-xl bg-rose-50 p-2 text-center sm:p-3">
-                          <p className="text-lg font-black text-rose-700">
-                            {job.invalidCount}
-                          </p>
-                          <p className="text-[9px] font-black uppercase tracking-[0.08em] text-rose-600">
-                            Needs fixing
-                          </p>
-                        </div>
+                      <div className="hpc-stat" data-state="review">
+                        <strong className="hpc-stat-value">{job.npiRequiredCount}</strong>
+                        <p className="hpc-stat-caption">Needs review</p>
+                      </div>
+                      <div className="hpc-stat" data-state="fix">
+                        <strong className="hpc-stat-value">{job.invalidCount}</strong>
+                        <p className="hpc-stat-caption">Needs fixing</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid min-h-[110px] place-items-center rounded-[18px] border-2 border-dashed border-violet-300 bg-white/70 p-4 text-center sm:min-h-[170px] sm:rounded-[24px] sm:p-6">
-                  <div>
-                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-violet-200 text-violet-800">
-                      <Boxes size={20} />
-                    </div>
-                    <p className="mt-2 text-[11px] font-black text-violet-950 sm:mt-3 sm:text-sm">
-                      No catalog checks yet
-                    </p>
-                    <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-violet-800/60 sm:mt-1 sm:text-xs sm:leading-normal">
-                      Completed CSV checks will appear here with matched and review counts.
-                    </p>
                   </div>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="hpc-no-results" role="status">
+                <strong>No checks yet</strong>
+                Your completed CSV checks will appear here.
+              </div>
+            )}
           </section>
         </div>
       ) : null}

@@ -26,6 +26,46 @@ import {
   transitionPurchaseOrder,
 } from '../services/executionScale.service'
 
+const executionScaleDashboardCss = String.raw`
+.exs-root{color:#202421;font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,sans-serif}
+.exs-root *,.exs-root *::before,.exs-root *::after{box-sizing:border-box}
+.exs-root .exs-head{background:#173F35!important;border:0!important;border-left:5px solid #C86C42!important;border-radius:17px!important;padding:clamp(20px,2.3vw,32px)!important;box-shadow:none!important}
+.exs-root .exs-head h2{font-size:clamp(23px,2.4vw,31px)!important;line-height:1.23!important;letter-spacing:-.04em!important;color:#fff!important}
+.exs-root .exs-head p{font-size:14px!important;line-height:1.55!important;color:#DFE8DE!important}
+.exs-root .exs-head p:first-child{color:#E6A17A!important;font-size:12px!important;letter-spacing:.12em!important}
+.exs-root .exs-head button{background:#FFFDF8!important;color:#173F35!important;border:1px solid #C9D7C8!important;border-radius:10px!important;min-height:42px;font-size:14px!important}
+.exs-root .exs-head .text-red-700{color:#FFC7C0!important}
+.exs-root .exs-groups{gap:20px!important}
+.exs-root .exs-partners,.exs-root .exs-purchases,.exs-root .exs-finance,.exs-root .exs-integrity{box-shadow:none!important;border-radius:16px!important;padding:clamp(18px,2.2vw,30px)!important}
+.exs-root .exs-partners{border:1px solid #D7E0D7!important;border-top:4px solid #C86C42!important;background:#FFFEFA!important}
+.exs-root .exs-purchases{border:1px solid #D3DDE8!important;border-top:4px solid #5E8CA5!important;background:#EEF3F5!important}
+.exs-root .exs-finance{border:1px solid #BFD7D1!important;border-top:4px solid #173F35!important;background:#E6F0EC!important}
+.exs-root .exs-integrity{border:1px solid #DADDD5!important;background:#F0F0E9!important}
+.exs-root h3{font-size:clamp(20px,1.9vw,25px)!important;line-height:1.25!important;letter-spacing:-.035em!important;color:#173F35!important;white-space:normal!important}
+.exs-root .exs-partners>div:first-child p,.exs-root .exs-purchases>div:first-child p,.exs-root .exs-finance>div:first-child p,.exs-root .exs-integrity>div:first-child p{font-size:14px!important;line-height:1.5!important;color:#4B5D53!important}
+.exs-root input,.exs-root textarea,.exs-root select{font-size:14px!important;min-height:43px!important;line-height:1.4!important;padding:10px 12px!important;border:1px solid #CBD3C9!important;background:#fff!important;border-radius:9px!important;max-width:100%}
+.exs-root label span{font-size:12.5px!important;line-height:1.4!important}
+.exs-root button{font-size:14px!important;min-height:40px;white-space:normal!important;line-height:1.3!important}
+.exs-root .exs-partners button,.exs-root .exs-purchases button{border-radius:9px!important}
+.exs-root .exs-partners button:not(:disabled):hover,.exs-root .exs-purchases button:not(:disabled):hover{filter:brightness(.94)}
+.exs-root .exs-finance article,.exs-root .exs-purchases article{border-radius:10px!important;border:1px solid #D5DFD6!important;background:#FFFEFB!important}
+.exs-root .text-\[9px\],.exs-root .text-\[10px\],.exs-root .text-\[11px\]{font-size:13px!important;line-height:1.5!important}
+@media(max-width:680px){.exs-root{margin-top:20px!important}.exs-root .exs-head,.exs-root .exs-partners,.exs-root .exs-purchases,.exs-root .exs-finance,.exs-root .exs-integrity{padding:17px 15px!important}.exs-root .exs-purchases>div:nth-child(2),.exs-root .exs-partners>div:nth-child(2){grid-template-columns:minmax(0,1fr)!important}.exs-root .exs-purchases>div:nth-child(2)>*,.exs-root .exs-partners>div:nth-child(2)>*{grid-column:1/-1!important}.exs-root .exs-head h2{font-size:23px!important}.exs-root h3{font-size:20px!important}}
+
+/* Match the Host Operations typography without touching its workflows. */
+.exs-root{font-size:16px;line-height:1.55}
+.exs-root .exs-head p,.exs-root .exs-partners>div:first-child p,.exs-root .exs-purchases>div:first-child p,.exs-root .exs-finance>div:first-child p,.exs-root .exs-integrity>div:first-child p{font-size:15px!important;line-height:1.55!important}
+.exs-root .exs-head p:first-child{font-size:13px!important}
+.exs-root :is(.text-\[8px\],.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs){font-size:14px!important;line-height:1.5!important;letter-spacing:normal!important}
+.exs-root .text-sm{font-size:15px!important;line-height:1.5!important}
+.exs-root label span{font-size:14px!important;line-height:1.5!important}
+.exs-root input,.exs-root textarea,.exs-root select{font-size:16px!important;line-height:1.5!important;min-height:48px!important}
+.exs-root button{font-size:15px!important;min-height:44px!important;font-weight:700!important}
+.exs-root :is(button,input,select,textarea):focus-visible{outline:3px solid #C86C42!important;outline-offset:2px}
+@media(max-width:680px){.exs-root{font-size:15px}.exs-root :is(.text-\[8px\],.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs){font-size:13px!important}.exs-root input,.exs-root select,.exs-root textarea{font-size:16px!important}}
+@media(prefers-reduced-motion:reduce){.exs-root *{transition:none!important}}
+`;
+
 const inputClass =
   'focus-ring w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-900 outline-none sm:px-3.5 sm:py-2.5 sm:text-sm'
 
@@ -517,8 +557,9 @@ export default function ExecutionScalePanel() {
   }
 
   return (
-    <section className="mt-4 space-y-3 sm:mt-7 sm:space-y-6">
-      <div className="rounded-[20px] border border-emerald-300 bg-emerald-100/70 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+    <section className="exs-root mt-4 space-y-3 sm:mt-7 sm:space-y-6">
+      <style>{executionScaleDashboardCss}</style>
+      <div className="exs-head rounded-[20px] border border-emerald-300 bg-emerald-100/70 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
         <div className="flex items-start justify-between gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
@@ -526,13 +567,11 @@ export default function ExecutionScalePanel() {
             </p>
 
             <h2 className="mt-1 text-[14px] font-black leading-[17px] tracking-tight text-stone-950 sm:mt-2 sm:text-2xl sm:leading-normal">
-              <span className="sm:hidden">Partner operations & finance</span>
-              <span className="hidden sm:inline">Partner connections, purchase orders & finance tracking</span>
+              Partner operations & finance
             </h2>
 
             <p className="mt-1 max-w-4xl text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
-              <span className="sm:hidden">Connect partners, prepare purchase orders and track payouts without changing core marketplace records.</span>
-              <span className="hidden sm:inline">Connect approved partners, prepare purchase orders from reviewed plans, and monitor payout progress without changing your core marketplace or settlement records.</span>
+              Manage partner connections, purchase orders and payout progress.
             </p>
           </div>
 
@@ -577,8 +616,8 @@ export default function ExecutionScalePanel() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:gap-6 xl:grid-cols-2">
-        <section className="rounded-[20px] border border-sky-300 bg-sky-100/70 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+      <div className="exs-groups grid gap-3 sm:gap-6 xl:grid-cols-2">
+        <section className="exs-partners rounded-[20px] border border-sky-300 bg-sky-100/70 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
           <div className="flex items-start gap-2 sm:gap-3">
             <PlugZap
               className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 sm:h-[22px] sm:w-[22px]"
@@ -1094,7 +1133,7 @@ export default function ExecutionScalePanel() {
           </p>
         </section>
 
-        <section className="rounded-[20px] border border-indigo-300 bg-indigo-100/65 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+        <section className="exs-purchases rounded-[20px] border border-indigo-300 bg-indigo-100/65 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
           <div className="flex items-start gap-2 sm:gap-3">
             <Truck
               className="mt-0.5 h-4 w-4 shrink-0 text-indigo-700 sm:h-[22px] sm:w-[22px]"
@@ -1432,7 +1471,7 @@ export default function ExecutionScalePanel() {
         </section>
       </div>
 
-      <section className="rounded-[20px] border border-cyan-300 bg-cyan-100/65 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+      <section className="exs-finance rounded-[20px] border border-cyan-300 bg-cyan-100/65 p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
         <div className="flex items-start gap-2 sm:gap-3">
           <WalletCards
             className="mt-0.5 h-4 w-4 shrink-0 text-cyan-700 sm:h-[22px] sm:w-[22px]"
@@ -1509,7 +1548,7 @@ export default function ExecutionScalePanel() {
         </div>
       </section>
 
-      <section className="rounded-[20px] border border-slate-300 bg-slate-100/85 p-3.5 text-stone-900 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
+      <section className="exs-integrity rounded-[20px] border border-slate-300 bg-slate-100/85 p-3.5 text-stone-900 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-7">
         <div className="flex items-start gap-2 sm:gap-3">
           <ShieldCheck
             className="mt-0.5 h-4 w-4 shrink-0 text-slate-600 sm:h-[22px] sm:w-[22px]"

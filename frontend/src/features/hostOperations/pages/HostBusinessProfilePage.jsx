@@ -28,63 +28,32 @@ const PROFILE_TYPES = [
   {
     value: 'seller',
     label: 'Seller',
-    description: 'Sell products directly to customers through EPANTRY.',
+    description: 'Sell products directly to customers.',
   },
   {
     value: 'b2b',
     label: 'B2B / Hospitality',
-    description: 'Supply businesses, kitchens or hospitality teams through EPANTRY.',
+    description: 'Supply businesses, kitchens and hospitality teams.',
   },
   {
     value: 'brand',
     label: 'Brand',
-    description: 'Manage a brand presence and products. Brand approval is handled separately.',
+    description: 'Manage branded products and your brand presence.',
   },
   {
     value: 'restaurant',
     label: 'Restaurant',
-    description: 'Run a restaurant or food outlet with dishes, recipes and hospitality operations.',
+    description: 'Operate a restaurant or food outlet.',
   },
   {
     value: 'chef',
     label: 'Chef',
-    description: 'Publish chef-led recipes, food expertise and supported culinary offerings.',
+    description: 'Share recipes and chef-led food experiences.',
   },
   {
     value: 'hybrid',
     label: 'Hybrid',
-    description: 'Use more than one model — Seller, Brand, B2B, Restaurant or Chef — under one Host account.',
-  },
-]
-
-const PROFILE_STEPS = [
-  {
-    number: '1',
-    title: 'Choose your business type',
-    description: 'Pick the option that best matches how you operate.',
-    className: 'border-sky-200 bg-sky-100/80',
-    badgeClassName: 'bg-sky-600 text-white',
-  },
-  {
-    number: '2',
-    title: 'Add context if needed',
-    description: 'Use the note only when EPANTRY needs extra business context.',
-    className: 'border-cyan-200 bg-cyan-100/80',
-    badgeClassName: 'bg-cyan-700 text-white',
-  },
-  {
-    number: '3',
-    title: 'Save your profile',
-    description: 'EPANTRY records the choice and shares it with the operations team.',
-    className: 'border-violet-200 bg-violet-100/80',
-    badgeClassName: 'bg-violet-600 text-white',
-  },
-  {
-    number: '4',
-    title: 'Next: Operations Center',
-    description: 'Review readiness, delivery coverage, KYB and launch setup next.',
-    className: 'border-emerald-200 bg-emerald-100/80',
-    badgeClassName: 'bg-emerald-700 text-white',
+    description: 'Combine more than one business model in one account.',
   },
 ]
 
@@ -95,6 +64,324 @@ function titleize(value) {
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(' ')
 }
+
+// Page-scoped styles keep the shared Host sidebar, navbar and footer unchanged.
+const businessProfileStyles = String.raw`
+.hbp-page {
+  --hbp-forest: #173F35;
+  --hbp-deep: #10372F;
+  --hbp-clay: #C86C42;
+  --hbp-sage: #E4EAE0;
+  --hbp-porcelain: #F7F6F2;
+  --hbp-ink: #202421;
+  --hbp-muted: #53645B;
+  width: 100%;
+  min-width: 0;
+  padding: clamp(17px, 2vw, 32px) clamp(13px, 2.25vw, 36px) 42px;
+  background: var(--hbp-porcelain);
+  color: var(--hbp-ink);
+  font-family: 'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.hbp-page *, .hbp-page *::before, .hbp-page *::after {box-sizing: border-box;}
+.hbp-page button, .hbp-page input, .hbp-page textarea {font: inherit;}
+.hbp-page button:focus-visible, .hbp-page a:focus-visible,
+.hbp-page input:focus-visible, .hbp-page textarea:focus-visible,
+.hbp-page label:focus-within {outline: 3px solid var(--hbp-clay);outline-offset: 3px;}
+.hbp-intro {display:grid;grid-template-columns:minmax(0,1.65fr) minmax(245px,.65fr);overflow:hidden;border-radius:18px;background:var(--hbp-forest);}
+.hbp-intro-main {padding:clamp(25px,3.2vw,45px);position:relative;min-width:0;}
+.hbp-eyebrow {display:flex;align-items:center;gap:10px;margin:0;color:var(--hbp-clay);font-size:13px;font-weight:800;letter-spacing:.065em;text-transform:uppercase;}
+.hbp-eyebrow::before {content:'';display:block;width:23px;height:2px;background:currentColor;flex:none;}
+.hbp-intro-main .hbp-eyebrow {color:#F3B79A;}
+.hbp-title {margin:14px 0 0!important;color:#FFFDF8!important;font-size:clamp(29px,3vw,43px)!important;font-weight:800!important;line-height:1.14!important;letter-spacing:-.045em!important;}
+.hbp-intro-copy {max-width:590px;margin:13px 0 0!important;color:#DBE6DF!important;font-size:16px!important;line-height:1.6!important;}
+.hbp-intro-aside {display:flex;flex-direction:column;justify-content:center;gap:10px;padding:clamp(22px,2.5vw,34px);background:#E4EAE0;border-left:4px solid var(--hbp-clay);}
+.hbp-aside-kicker {margin:0!important;font-size:13px!important;font-weight:800;color:#AD5633!important;letter-spacing:.065em;text-transform:uppercase;}
+.hbp-org-name {display:flex;align-items:center;gap:11px;min-width:0;margin:0!important;color:var(--hbp-forest)!important;font-size:clamp(18px,1.7vw,24px)!important;font-weight:800!important;overflow-wrap:anywhere;line-height:1.27!important;letter-spacing:-.025em;}
+.hbp-org-icon {display:grid;place-items:center;width:40px;height:40px;flex:none;color:#fff;background:var(--hbp-forest);border-radius:11px;}
+.hbp-org-caption {margin:0!important;color:#516359!important;font-size:14px!important;line-height:1.5!important;}
+.hbp-content {display:grid;grid-template-columns:minmax(0,1fr) minmax(245px,295px);align-items:start;gap:clamp(18px,2.2vw,31px);margin-top:30px;}
+.hbp-editor {min-width:0;border-top:3px solid var(--hbp-clay);background:#FFFEFC;padding:clamp(21px,2.8vw,36px);}
+.hbp-section-heading {margin:9px 0 0!important;color:var(--hbp-forest)!important;font-size:clamp(23px,2.2vw,30px)!important;font-weight:800!important;line-height:1.2!important;letter-spacing:-.035em;}
+.hbp-section-copy {margin:9px 0 0!important;color:var(--hbp-muted)!important;font-size:15px!important;line-height:1.6!important;max-width:650px;}
+.hbp-choices {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin-top:24px;border-top:1px solid #DDE4DA;}
+.hbp-choice {min-width:0;display:flex;align-items:flex-start;gap:13px;cursor:pointer;border-bottom:1px solid #DDE4DA;border-left:3px solid transparent;padding:19px 14px 18px 12px;transition:background .18s ease,border-color .18s ease;}
+.hbp-choice:hover {background:#F1F5EF;}
+.hbp-choice[data-active='true'] {background:#E7EFE7;border-left-color:var(--hbp-clay);}
+.hbp-choice input[type='radio'] {flex:none;width:19px;height:19px;margin:3px 0 0;accent-color:var(--hbp-forest);cursor:pointer;}
+.hbp-choice-copy {display:block;min-width:0;flex:1;}
+.hbp-choice-name {display:block;color:#203D33;font-size:17px;font-weight:800;line-height:1.35;}
+.hbp-choice-description {display:block;margin-top:5px;color:#53635A;font-size:14px;line-height:1.55;}
+.hbp-choice-check {flex:none;color:#1E5948;margin-top:2px;}
+.hbp-note-area {margin-top:28px;padding-top:24px;border-top:1px solid #DBE3D9;}
+.hbp-note-label {display:block;color:var(--hbp-forest);font-size:16px;font-weight:750;}
+.hbp-optional {color:#728177;font-size:13px;font-weight:500;}
+.hbp-textarea {display:block;margin-top:10px;width:100%;min-height:108px;padding:14px 16px;border:1px solid #C8D5CA;background:#fff;border-radius:10px;color:var(--hbp-ink);font-size:16px!important;line-height:1.55;resize:vertical;}
+.hbp-textarea::placeholder {color:#79877C;}
+.hbp-submit-bar {display:flex;align-items:center;justify-content:flex-end;margin-top:20px;gap:12px;}
+.hbp-save-button {display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;border:1px solid var(--hbp-forest);border-radius:9px;background:var(--hbp-forest);color:#fff;padding:12px 21px;font-size:15px;font-weight:800;cursor:pointer;transition:background .17s ease,transform .17s ease;}
+.hbp-save-button:hover:not(:disabled) {background:#255D4D;transform:translateY(-1px);}
+.hbp-save-button:disabled {opacity:.6;cursor:not-allowed;}
+.hbp-summary {min-width:0;background:var(--hbp-sage);border-top:3px solid var(--hbp-forest);padding:clamp(21px,2vw,29px);}
+.hbp-summary-title {margin:9px 0 0!important;font-size:22px!important;font-weight:800!important;color:var(--hbp-forest)!important;letter-spacing:-.025em;line-height:1.25!important;}
+.hbp-summary-block {margin-top:22px;padding-top:20px;border-top:1px solid #C9D4CA;}
+.hbp-summary-label {margin:0!important;font-size:13px!important;font-weight:750;color:#65766B!important;letter-spacing:.04em;text-transform:uppercase;}
+.hbp-summary-value {margin:7px 0 0!important;color:var(--hbp-forest)!important;font-size:21px!important;line-height:1.35!important;font-weight:800!important;overflow-wrap:anywhere;}
+.hbp-summary-value-compact {font-size:17px!important;}
+.hbp-summary-detail {margin:6px 0 0!important;font-size:14px!important;color:#52635A!important;line-height:1.55!important;}
+.hbp-summary-time {margin:9px 0 0!important;color:#6D7B70!important;font-size:13px!important;}
+.hbp-alert {display:flex;align-items:flex-start;gap:11px;margin-top:20px;border-left:4px solid;padding:14px 18px;font-size:15px;line-height:1.55;}
+.hbp-alert-error {border-color:#BF4E40;background:#FFF0EB;color:#813B31;}
+.hbp-alert-success {border-color:#2C7758;background:#E7F2E9;color:#173F35;}
+.hbp-loading {display:flex;align-items:center;justify-content:center;gap:11px;min-height:170px;margin-top:24px;background:#E8EEE7;color:var(--hbp-forest);font-size:16px;font-weight:700;}
+.hbp-onboarding {margin-top:26px;background:#F8EDE5;border-top:3px solid var(--hbp-clay);padding:clamp(22px,2.8vw,36px);}
+.hbp-onboarding-icon {color:#AE542D;}
+.hbp-onboarding-title {margin:13px 0 0!important;color:var(--hbp-forest)!important;font-size:24px!important;font-weight:800!important;}
+.hbp-onboarding-copy {max-width:720px;color:#53635A;font-size:15px;line-height:1.6;margin:9px 0 20px;}
+@media(max-width:920px) {
+  .hbp-intro {grid-template-columns:1fr;}
+  .hbp-intro-aside {border-left:0;border-top:3px solid var(--hbp-clay);padding:20px 27px;}
+  .hbp-content {grid-template-columns:1fr;}
+  .hbp-summary {display:grid;grid-template-columns:1fr 1fr;gap:0 20px;}
+  .hbp-summary-head {grid-column:1/-1;}
+}
+/* Dedicated small-screen composition. Desktop and tablet rules above remain unchanged. */
+@media (max-width:600px) {
+  .hbp-page {
+    padding:10px 10px 28px;
+    background:#F7F6F2;
+    font-size:15px;
+  }
+
+  /* Compact two-tone introduction instead of the desktop feature block. */
+  .hbp-intro {
+    display:flex;
+    flex-direction:column;
+    overflow:visible;
+    border-radius:0;
+    background:transparent;
+  }
+  .hbp-intro-main {
+    padding:19px 18px 18px;
+    border-radius:14px 14px 0 0;
+    border-bottom:3px solid #C86C42;
+    background:#173F35;
+  }
+  .hbp-intro-main .hbp-eyebrow {
+    font-size:12.5px;
+    letter-spacing:.045em;
+  }
+  .hbp-title {
+    margin-top:9px!important;
+    font-size:27px!important;
+    line-height:1.13!important;
+    letter-spacing:-.04em!important;
+  }
+  .hbp-intro-copy {
+    margin-top:8px!important;
+    font-size:14px!important;
+    line-height:1.5!important;
+  }
+  .hbp-intro-aside {
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    min-width:0;
+    padding:11px 15px;
+    border:0;
+    border-radius:0 0 14px 14px;
+    background:#E4EAE0;
+  }
+  .hbp-aside-kicker {
+    flex:none;
+    margin:0!important;
+    font-size:12.5px!important;
+    letter-spacing:.025em;
+  }
+  .hbp-org-name {
+    justify-content:flex-end;
+    gap:8px;
+    font-size:16px!important;
+    line-height:1.25!important;
+    text-align:right;
+  }
+  .hbp-org-icon {
+    width:32px;
+    height:32px;
+    border-radius:9px;
+  }
+  .hbp-org-icon svg {width:17px;height:17px;}
+
+  /* Open editorial content: no nested desktop panel or oversized empty padding. */
+  .hbp-content {
+    display:flex;
+    flex-direction:column;
+    gap:0;
+    margin-top:20px;
+  }
+  .hbp-editor {
+    border:0;
+    background:transparent;
+    padding:0 3px;
+  }
+  .hbp-editor > .hbp-eyebrow {
+    color:#AC5430;
+    font-size:12.5px;
+  }
+  .hbp-section-heading {
+    margin-top:6px!important;
+    font-size:23px!important;
+    line-height:1.18!important;
+  }
+  .hbp-section-copy {
+    margin-top:7px!important;
+    font-size:14px!important;
+    line-height:1.5!important;
+  }
+
+  /* Mobile-specific 2-column choice board; every option remains readable/tappable. */
+  .hbp-choices {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+    margin-top:17px;
+    border:0;
+  }
+  .hbp-choice {
+    display:grid;
+    grid-template-columns:19px minmax(0,1fr) 17px;
+    align-items:start;
+    column-gap:7px;
+    row-gap:0;
+    min-height:115px;
+    padding:13px 11px 12px;
+    border:1px solid #D7DFD5;
+    border-radius:12px;
+    background:#FFFDF9;
+    box-shadow:0 2px 7px rgba(23,63,53,.035);
+    transition:border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .hbp-choice:nth-child(4n+2),
+  .hbp-choice:nth-child(4n+3) {background:#EEF2EB;}
+  .hbp-choice:hover {background:#E8EFE7;}
+  .hbp-choice[data-active='true'] {
+    border:1.5px solid #C86C42;
+    background:#E0EADF;
+    box-shadow:inset 0 3px 0 #C86C42,0 3px 10px rgba(23,63,53,.08);
+  }
+  .hbp-choice input[type='radio'] {
+    grid-column:1;
+    grid-row:1;
+    width:18px;
+    height:18px;
+    margin:1px 0 0;
+    accent-color:#173F35;
+  }
+  .hbp-choice-copy {
+    grid-column:2 / 4;
+    grid-row:1;
+    padding-right:0;
+  }
+  .hbp-choice-name {
+    padding-right:4px;
+    font-size:15px;
+    font-weight:800;
+    line-height:1.34;
+    overflow-wrap:break-word;
+  }
+  .hbp-choice-description {
+    display:block;
+    margin-top:5px;
+    font-size:13px;
+    line-height:1.45;
+    color:#516158;
+  }
+  .hbp-choice-check {display:none;}
+
+  /* Form action follows the choices naturally without an extra card. */
+  .hbp-note-area {
+    margin-top:22px;
+    padding-top:17px;
+    border-top:1px solid #D6DED4;
+  }
+  .hbp-note-label {font-size:15px;}
+  .hbp-optional {font-size:13px;}
+  .hbp-textarea {
+    min-height:86px;
+    padding:12px 13px;
+    border-radius:10px;
+    font-size:15px!important;
+    line-height:1.5;
+  }
+  .hbp-submit-bar {justify-content:stretch;margin-top:14px;}
+  .hbp-save-button {
+    width:100%;
+    min-height:49px;
+    border-radius:10px;
+    font-size:15px;
+  }
+
+  /* Compact, visually separate saved-profile strip rather than a tall side card. */
+  .hbp-summary {
+    order:-1;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    align-items:stretch;
+    gap:10px;
+    margin:0 0 17px;
+    padding:16px 0 0;
+    border-top:3px solid #173F35;
+    background:transparent;
+  }
+  .hbp-summary-head {grid-column:1 / -1;}
+  .hbp-summary-head .hbp-eyebrow {display:none;}
+  .hbp-summary-title {
+    margin:0!important;
+    font-size:21px!important;
+  }
+  .hbp-summary-block {
+    min-width:0;
+    margin:0;
+    padding:14px 13px;
+    border:0;
+    border-radius:10px;
+    background:#E4EAE0;
+  }
+  .hbp-summary-block:last-child {background:#F5E8DF;}
+  .hbp-summary-label {
+    font-size:12.5px!important;
+    letter-spacing:0;
+    line-height:1.35;
+  }
+  .hbp-summary-value {
+    margin-top:7px!important;
+    font-size:18px!important;
+    line-height:1.3!important;
+  }
+  .hbp-summary-value-compact {font-size:15px!important;}
+  .hbp-summary-detail {
+    font-size:13px!important;
+    line-height:1.5!important;
+  }
+  .hbp-summary-time {font-size:12.5px!important;}
+  .hbp-alert {margin-top:13px;padding:12px 13px;font-size:14px;}
+  .hbp-loading {min-height:125px;margin-top:17px;}
+  .hbp-onboarding {margin-top:18px;padding:20px 17px;}
+  .hbp-onboarding-title {font-size:22px!important;}
+}
+@media (max-width:340px) {
+  .hbp-choice {padding:11px 9px;column-gap:6px;}
+  .hbp-choice-name {font-size:14px;}
+  .hbp-choice-description {font-size:12.5px;}
+  .hbp-intro-aside {padding-inline:11px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  .hbp-choice,.hbp-save-button {transition:none!important;}
+}
+`
 
 export default function HostBusinessProfilePage() {
   const [organization, setOrganization] = useState(null)
@@ -175,195 +462,155 @@ export default function HostBusinessProfilePage() {
   }
 
   return (
-    <div className="px-2.5 pb-3 pt-0 sm:px-5 sm:pb-6 lg:px-6 lg:pb-7">
-      <header className="rounded-[22px] border border-emerald-200 bg-emerald-100/85 p-4 shadow-sm sm:rounded-[28px] sm:p-7">
-        <div className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white sm:text-[10px]">
-          <Store size={13} aria-hidden="true" />
-          Host Business Setup
+    <div className="hbp-page">
+      <style>{businessProfileStyles}</style>
+
+      <header className="hbp-intro">
+        <div className="hbp-intro-main">
+          <p className="hbp-eyebrow">Host business setup</p>
+          <h1 className="hbp-title">Choose your business type.</h1>
+          <p className="hbp-intro-copy">
+            Set up the right workspace for the way you run your business.
+          </p>
         </div>
-        <h1 className="mt-3 text-[21px] font-black tracking-tight text-emerald-950 sm:mt-4 sm:text-3xl">
-          <span className="sm:hidden">Choose your business setup</span>
-          <span className="hidden sm:inline">Tell EPANTRY how your business operates</span>
-        </h1>
-        <p className="mt-1.5 max-w-3xl text-[11px] font-semibold leading-[17px] text-emerald-900/75 sm:mt-2 sm:text-sm sm:leading-6">
-          <span className="sm:hidden">Pick what best fits your business. EPANTRY will organize the right Host tools for you.</span>
-          <span className="hidden sm:inline">Choose the setup that best matches your business. EPANTRY uses it to organize the right Host tools and share your selection with the operations team.</span>
-        </p>
+        <div className="hbp-intro-aside">
+          <p className="hbp-aside-kicker">Your business</p>
+          <p className="hbp-org-name">
+            <span className="hbp-org-icon"><Store size={19} aria-hidden="true" /></span>
+            {organization?.displayName || 'Host workspace'}
+          </p>
+        </div>
       </header>
 
-      <section className="mt-3 rounded-[22px] border border-violet-200 bg-violet-100/70 p-2.5 shadow-sm sm:mt-4 sm:rounded-[26px] sm:p-4">
-        <p className="px-0.5 text-[9px] font-black uppercase tracking-[0.13em] text-violet-700 sm:text-[10px]">
-          How this page works
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:grid-cols-4 sm:gap-3">
-          {PROFILE_STEPS.map((step) => (
-            <div
-              key={step.number}
-              className={`rounded-[16px] border p-2.5 sm:rounded-[18px] sm:p-3.5 ${step.className}`}
-            >
-              <div className="flex items-start gap-2">
-                <span className={`grid size-5 shrink-0 place-items-center rounded-full text-[9px] font-black sm:size-6 sm:text-[10px] ${step.badgeClassName}`}>
-                  {step.number}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black leading-[13px] text-stone-950 sm:text-xs sm:leading-4">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-semibold leading-[13px] text-stone-600 sm:text-[11px] sm:leading-4">
-                    {step.description}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {error ? (
-        <div className="mt-3 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-[11px] font-semibold text-red-800 sm:mt-4 sm:p-4 sm:text-sm">
-          <CircleAlert size={18} className="mt-0.5 shrink-0" />
+        <div className="hbp-alert hbp-alert-error" role="alert">
+          <CircleAlert size={20} className="shrink-0" aria-hidden="true" />
           {error}
         </div>
       ) : null}
 
       {notice ? (
-        <div className="mt-3 flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] font-semibold text-emerald-800 sm:mt-4 sm:p-4 sm:text-sm">
-          <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+        <div className="hbp-alert hbp-alert-success" role="status">
+          <CheckCircle2 size={20} className="shrink-0" aria-hidden="true" />
           {notice}
         </div>
       ) : null}
 
       {loading ? (
-        <div className="mt-4 grid min-h-56 place-items-center rounded-[22px] border border-sky-200 bg-sky-50 sm:mt-5 sm:min-h-72 sm:rounded-[24px]">
-          <LoaderCircle className="animate-spin text-emerald-700" />
+        <div className="hbp-loading" role="status">
+          <LoaderCircle size={21} className="animate-spin" aria-hidden="true" />
+          Loading business profile…
         </div>
       ) : onboardingRequired ? (
-        <section className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 p-4 sm:mt-5 sm:rounded-[24px] sm:p-6">
-          <Building2 className="text-amber-700" />
-          <h2 className="mt-3 text-base font-black text-amber-950 sm:text-lg">
-            Set up your Host workspace first
-          </h2>
-          <p className="mt-2 text-[11px] font-semibold leading-5 text-amber-800 sm:text-sm sm:leading-6">
-            Your business profile is linked to your Host workspace. Complete the initial Host setup, then come back here to choose your business type.
+        <section className="hbp-onboarding">
+          <Building2 size={26} className="hbp-onboarding-icon" aria-hidden="true" />
+          <h2 className="hbp-onboarding-title">Complete your Host setup first</h2>
+          <p className="hbp-onboarding-copy">
+            Your business profile belongs to your Host workspace. Finish the initial setup before choosing a business type.
           </p>
-          <Link
-            to="/host/operations"
-            className="focus-ring mt-4 inline-flex rounded-xl bg-amber-900 px-4 py-2.5 text-xs font-black text-white"
-          >
-            Open Host Dashboard
+          <Link to="/host/operations" className="hbp-save-button">
+            Open Operations Center
           </Link>
         </section>
       ) : (
-        <div className="mt-4 grid gap-3 sm:mt-5 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="rounded-[22px] border border-sky-200 bg-sky-100/70 p-3.5 shadow-sm sm:rounded-[24px] sm:p-6">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 sm:text-xs">
-                {organization?.displayName || 'Host organization'}
-              </p>
-              <h2 className="mt-1 text-base font-black text-stone-950 sm:mt-2 sm:text-xl">
-                How do you operate?
-              </h2>
-              <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-600 sm:text-sm">
-                Choose the closest match. Seller, Brand, B2B, Restaurant and Chef are all supported; use Hybrid when more than one applies.
-              </p>
-            </div>
+        <div className="hbp-content">
+          <section className="hbp-editor" aria-labelledby="hbp-business-title">
+            <p className="hbp-eyebrow">Business setup</p>
+            <h2 id="hbp-business-title" className="hbp-section-heading">How do you operate?</h2>
+            <p className="hbp-section-copy">
+              Choose one type. Select Hybrid if more than one applies to your business.
+            </p>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
+            <div className="hbp-choices" role="radiogroup" aria-label="Business type">
               {PROFILE_TYPES.map((item) => (
                 <label
                   key={item.value}
-                  className={[
-                    'cursor-pointer rounded-[16px] border p-2.5 transition sm:rounded-[20px] sm:p-4',
-                    organizationType === item.value
-                      ? 'border-emerald-400 bg-emerald-100/90'
-                      : 'border-sky-200 bg-white/85 hover:border-sky-300',
-                  ].join(' ')}
+                  className="hbp-choice"
+                  data-active={organizationType === item.value}
                 >
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <input
-                      type="radio"
-                      name="organizationType"
-                      value={item.value}
-                      checked={organizationType === item.value}
-                      onChange={() => setOrganizationType(item.value)}
-                      className="mt-0.5 accent-emerald-700 sm:mt-1"
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-[10px] font-black leading-4 text-stone-950 sm:text-sm">
-                        {item.label}
-                      </span>
-                      <span className="mt-0.5 block text-[9px] font-semibold leading-[13px] text-stone-600 sm:mt-1 sm:text-xs sm:leading-5">
-                        {item.description}
-                      </span>
-                    </span>
-                  </div>
+                  <input
+                    type="radio"
+                    name="organizationType"
+                    value={item.value}
+                    checked={organizationType === item.value}
+                    onChange={() => setOrganizationType(item.value)}
+                  />
+                  <span className="hbp-choice-copy">
+                    <span className="hbp-choice-name">{item.label}</span>
+                    <span className="hbp-choice-description">{item.description}</span>
+                  </span>
+                  {organizationType === item.value ? (
+                    <CheckCircle2 className="hbp-choice-check" size={19} aria-hidden="true" />
+                  ) : null}
                 </label>
               ))}
             </div>
 
-            <label className="mt-3 block sm:mt-5">
-              <span className="text-[10px] font-black text-stone-700 sm:text-xs">
-                Anything we should know? <span className="font-semibold text-stone-500">(optional)</span>
-              </span>
+            <div className="hbp-note-area">
+              <label htmlFor="hbp-business-note" className="hbp-note-label">
+                Business note <span className="hbp-optional">(optional)</span>
+              </label>
               <textarea
+                id="hbp-business-note"
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
-                rows={4}
+                rows={3}
                 maxLength={1200}
-                placeholder="Example: We run a restaurant in Delhi NCR and also publish chef-led recipes on EPANTRY."
-                className="focus-ring mt-1.5 h-20 w-full resize-y rounded-[14px] border border-sky-200 bg-white/90 px-3 py-2.5 text-[10px] font-semibold text-stone-900 outline-none sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                placeholder="Add any details the operations team should know."
+                className="hbp-textarea"
               />
-            </label>
+            </div>
 
-            <button
-              type="button"
-              onClick={submit}
-              disabled={busy}
-              className="focus-ring ml-auto mt-3 flex w-fit items-center gap-2 rounded-xl bg-emerald-700 px-3.5 py-2.5 text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 sm:ml-0 sm:mt-5 sm:inline-flex sm:px-4 sm:py-3 sm:text-xs"
-            >
-              {busy ? (
-                <LoaderCircle size={15} className="animate-spin" />
-              ) : (
-                <Send size={15} />
-              )}
-              {busy ? 'Saving profile' : 'Save business profile'}
-            </button>
+            <div className="hbp-submit-bar">
+              <button
+                type="button"
+                onClick={submit}
+                disabled={busy}
+                className="hbp-save-button"
+              >
+                {busy ? (
+                  <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Send size={18} aria-hidden="true" />
+                )}
+                {busy ? 'Saving profile…' : 'Save business profile'}
+              </button>
+            </div>
           </section>
 
-          <aside className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-1">
-            <section className="rounded-[18px] border border-violet-200 bg-violet-100/75 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
-              <p className="text-[8px] font-black uppercase tracking-[0.12em] text-violet-600 sm:text-[10px] sm:tracking-[0.14em]">
-                Current business type
+          <aside className="hbp-summary" aria-label="Saved business profile">
+            <div className="hbp-summary-head">
+              <p className="hbp-eyebrow">On record</p>
+              <h2 className="hbp-summary-title">Your profile</h2>
+            </div>
+            <div className="hbp-summary-block">
+              <p className="hbp-summary-label">Current business type</p>
+              <p className="hbp-summary-value">
+                {organization?.organizationType
+                  ? titleize(organization.organizationType)
+                  : 'Not set'}
               </p>
-              <p className="mt-1.5 text-sm font-black text-stone-950 sm:mt-2 sm:text-xl">
-                {titleize(organization?.organizationType)}
-              </p>
-            </section>
-
-            <section className="rounded-[18px] border border-cyan-200 bg-cyan-100/75 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
-              <p className="text-[8px] font-black uppercase tracking-[0.12em] text-cyan-700 sm:text-[10px] sm:tracking-[0.14em]">
-                Latest profile update
-              </p>
+            </div>
+            <div className="hbp-summary-block">
+              <p className="hbp-summary-label">Latest update</p>
               {latestRequest ? (
                 <>
-                  <p className="mt-1.5 text-[10px] font-black leading-4 text-stone-950 sm:mt-2 sm:text-sm">
-                    {titleize(latestRequest.organizationType)} profile submitted
+                  <p className="hbp-summary-value hbp-summary-value-compact">
+                    {titleize(latestRequest.organizationType)} submitted
                   </p>
-                  <p className="mt-1 text-[9px] font-semibold leading-[13px] text-stone-600 sm:mt-2 sm:text-xs sm:leading-5">
-                    Shared with {latestRequest.notifiedAdminCount} EPANTRY operations admin account(s).
+                  <p className="hbp-summary-detail">
+                    Shared with {latestRequest.notifiedAdminCount} operations admin account(s).
                   </p>
-                  <p className="mt-1 text-[8px] text-stone-500 sm:mt-2 sm:text-[11px]">
+                  <p className="hbp-summary-time">
                     {latestRequest.createdAt
                       ? new Date(latestRequest.createdAt).toLocaleString()
                       : '—'}
                   </p>
                 </>
               ) : (
-                <p className="mt-1.5 text-[9px] font-semibold leading-[13px] text-stone-600 sm:mt-2 sm:text-xs sm:leading-5">
-                  No business profile update has been submitted yet.
-                </p>
+                <p className="hbp-summary-detail">No profile updates submitted yet.</p>
               )}
-            </section>
+            </div>
           </aside>
         </div>
       )}
