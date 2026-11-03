@@ -471,6 +471,141 @@ const hostProductCatalogCss = String.raw`
 }
 `;
 
+const hostDataQualityCss = String.raw`
+/* Host Data Quality only: shared EPANTRY Forest, Sage, Clay and Porcelain system. */
+.hdq-root {
+  --hdq-forest:#173F35; --hdq-deep:#10352D; --hdq-clay:#C86C42;
+  --hdq-sage:#E7EDE4; --hdq-porcelain:#F7F6F2;
+  --hdq-ink:#202421; --hdq-muted:#526359; --hdq-line:#D7DED4;
+  width:100%;min-width:0;padding:clamp(16px,2.4vw,35px) !important;
+  background:var(--hdq-porcelain);color:var(--hdq-ink);
+  font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,sans-serif;
+  font-size:16px;line-height:1.55;
+}
+.hdq-root *, .hdq-root *::before, .hdq-root *::after {box-sizing:border-box}
+.hdq-root :is(button,a):focus-visible {outline:3px solid var(--hdq-clay)!important;outline-offset:3px}
+.hdq-root .hdq-hero {
+  background:var(--hdq-forest);color:white;border-top:4px solid var(--hdq-clay);
+  border-radius:15px; padding:clamp(22px,2.8vw,37px) clamp(23px,3vw,42px);
+  min-width:0;box-shadow:0 12px 25px rgba(15,50,38,.075);
+}
+.hdq-root .hdq-hero-row {display:flex;align-items:flex-start;justify-content:space-between;gap:20px;min-width:0}
+.hdq-root .hdq-eyebrow {
+  display:flex;align-items:center;gap:10px;color:#F4BA9C!important;
+  font-size:13px!important;font-weight:800!important;letter-spacing:.075em;
+  line-height:1.3!important;text-transform:uppercase;margin:0!important;
+}
+.hdq-root .hdq-eyebrow::before {content:'';width:25px;height:2px;flex:none;background:var(--hdq-clay)}
+.hdq-root .hdq-title {margin:10px 0 0!important;color:#FCFDF8!important;
+  font-size:clamp(29px,3vw,38px)!important;line-height:1.15!important;font-weight:800!important;letter-spacing:-.045em}
+.hdq-root .hdq-description {margin:9px 0 0!important;max-width:650px;
+  color:#DCEBE1!important;font-size:16px!important;line-height:1.55!important}
+.hdq-root .hdq-refresh {
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  flex:none;min-height:45px;padding:10px 16px;border-radius:9px;
+  background:#FFFEFA!important;color:var(--hdq-forest)!important;
+  border:1px solid #F3EEE6!important;font-weight:800!important;font-size:14px!important;
+  cursor:pointer;transition:background .16s ease,transform .16s ease;
+}
+.hdq-root .hdq-refresh:hover:not(:disabled) {background:#FBE5D7!important;transform:translateY(-1px)}
+.hdq-root .hdq-content {display:grid;gap:25px;margin-top:25px;min-width:0}
+.hdq-root .hdq-overview {
+  min-width:0;background:#FFFEFB;border:1px solid var(--hdq-line);border-top:3px solid var(--hdq-clay);
+  padding:clamp(23px,2.5vw,34px);border-radius:0 0 13px 13px;
+}
+.hdq-root .hdq-section-kicker {color:#AF5632!important;margin:0!important;font-size:13px!important;
+  text-transform:uppercase;letter-spacing:.06em;font-weight:800!important;line-height:1.4}
+.hdq-root .hdq-section-heading {color:var(--hdq-forest)!important;font-weight:800!important;
+  letter-spacing:-.035em!important;font-size:clamp(23px,2vw,29px)!important;line-height:1.2!important;margin:5px 0 0!important}
+.hdq-root .hdq-metrics {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  margin-top:21px;border-top:1px solid var(--hdq-line);border-bottom:1px solid var(--hdq-line)}
+.hdq-root .hdq-metric {padding:22px clamp(12px,1.55vw,24px);min-width:0;display:flex;flex-direction:column;gap:7px}
+.hdq-root .hdq-metric:first-child {padding-left:0}
+.hdq-root .hdq-metric:not(:first-child) {border-left:1px solid var(--hdq-line)}
+.hdq-root .hdq-metric-number {font-size:clamp(31px,3vw,41px)!important;
+  letter-spacing:-.055em!important;color:var(--hdq-forest)!important;font-weight:800!important;line-height:1!important;font-variant-numeric:tabular-nums}
+.hdq-root .hdq-metric:nth-child(3) .hdq-metric-number {color:#AF5A37!important}
+.hdq-root .hdq-metric-name {color:#45594D!important;font-size:15px!important;font-weight:700!important;line-height:1.38!important}
+.hdq-root .hdq-health {display:grid;grid-template-columns:minmax(250px,.72fr) minmax(0,1.28fr);
+  border:1px solid #CEDBD0;overflow:hidden;border-radius:13px;min-width:0}
+.hdq-root .hdq-score {background:var(--hdq-forest);padding:clamp(25px,2.7vw,37px);color:#F8F8F1;min-width:0}
+.hdq-root .hdq-score-label {color:#D8E7DC!important;font-size:15px!important;font-weight:750!important;line-height:1.4}
+.hdq-root .hdq-score-value {display:flex;align-items:baseline;gap:4px;margin-top:17px;
+  color:#FFFEFA!important;font-weight:800!important;font-size:clamp(49px,5vw,68px)!important;line-height:1!important;letter-spacing:-.055em!important;font-variant-numeric:tabular-nums}
+.hdq-root .hdq-score-value span {color:#C7DDCF!important;font-size:24px!important;letter-spacing:-.03em}
+.hdq-root .hdq-score-bar {display:block;overflow:hidden;height:8px;border-radius:99px;
+  background:rgba(255,255,255,.2);margin-top:24px}
+.hdq-root .hdq-score-bar span {display:block;height:100%;border-radius:99px;background:#E39A74;transition:width .2s ease}
+.hdq-root .hdq-score-note {margin:13px 0 0!important;color:#D4E6DA!important;
+  font-size:14px!important;line-height:1.5!important}
+.hdq-root .hdq-issues-panel {background:#E7EDE4;min-width:0;padding:clamp(23px,2.6vw,35px)}
+.hdq-root .hdq-issues-heading {color:var(--hdq-forest)!important;font-size:clamp(21px,1.85vw,26px)!important;
+  font-weight:800!important;line-height:1.2!important;margin:0!important;letter-spacing:-.035em}
+.hdq-root .hdq-issues-list {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0 19px;margin-top:18px;border-top:1px solid #C8D5C7}
+.hdq-root .hdq-issue {display:flex;justify-content:space-between;gap:12px;align-items:center;
+  min-width:0;padding:14px 0;border-bottom:1px solid #C8D5C7}
+.hdq-root .hdq-issue span {font-size:15px!important;color:#334E3E!important;font-weight:650!important;line-height:1.4!important;overflow-wrap:anywhere}
+.hdq-root .hdq-issue strong {flex:none;min-width:31px;text-align:center;padding:4px 7px;
+  border-radius:7px;background:#F9E5D8;color:#9D4E2C;font-size:14px!important;font-weight:800!important}
+.hdq-root .hdq-issues-empty {margin-top:16px;color:var(--hdq-forest)!important;font-size:15px!important}
+.hdq-root .hdq-action-bar {display:flex;justify-content:space-between;gap:18px;align-items:center;
+  background:#F5EAE1;border:1px solid #ECD4C3;border-left:4px solid var(--hdq-clay);
+  border-radius:11px;padding:17px clamp(18px,2.2vw,27px)}
+.hdq-root .hdq-action-title {color:var(--hdq-forest)!important;font-size:17px!important;font-weight:800!important;
+  line-height:1.4!important;margin:0!important}
+.hdq-root .hdq-action-description {color:#536458!important;font-size:14px!important;line-height:1.45!important;margin:3px 0 0!important}
+.hdq-root .hdq-cta {display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  min-height:47px;border:1px solid var(--hdq-forest);border-radius:9px;
+  background:var(--hdq-forest);color:#FFFDF8!important;padding:11px 18px;
+  font-size:15px!important;font-weight:800!important;text-decoration:none;white-space:nowrap;
+  transition:background .18s ease,transform .18s ease}
+.hdq-root .hdq-cta:hover {background:#275F4F;transform:translateY(-1px)}
+@media(max-width:950px) {
+  .hdq-root .hdq-health {grid-template-columns:minmax(225px,.78fr) minmax(0,1.22fr)}
+  .hdq-root .hdq-issues-list {grid-template-columns:1fr}
+}
+@media(max-width:680px) {
+  .hdq-root {padding:13px 12px 29px!important;font-size:15px}
+  .hdq-root .hdq-hero {padding:21px 18px;border-radius:12px}
+  .hdq-root .hdq-hero-row {gap:13px;align-items:flex-start}
+  .hdq-root .hdq-eyebrow {font-size:12.5px!important}
+  .hdq-root .hdq-title {font-size:28px!important;margin-top:9px!important}
+  .hdq-root .hdq-description {font-size:14px!important;margin-top:7px!important}
+  .hdq-root .hdq-refresh {padding:8px 10px;min-height:39px;font-size:13px!important}
+  .hdq-root .hdq-refresh svg {width:14px;height:14px}
+  .hdq-root .hdq-content {margin-top:20px;gap:20px}
+  .hdq-root .hdq-overview {padding:19px 17px}
+  .hdq-root .hdq-section-heading {font-size:23px!important}
+  .hdq-root .hdq-metrics {grid-template-columns:repeat(2,minmax(0,1fr));margin-top:15px}
+  .hdq-root .hdq-metric {padding:16px 9px!important;gap:5px}
+  .hdq-root .hdq-metric:nth-child(odd) {padding-left:0!important;border-left:0}
+  .hdq-root .hdq-metric:nth-child(even) {padding-left:14px!important;border-left:1px solid var(--hdq-line)}
+  .hdq-root .hdq-metric:nth-child(n+3) {border-top:1px solid var(--hdq-line)}
+  .hdq-root .hdq-metric-number {font-size:32px!important}
+  .hdq-root .hdq-metric-name {font-size:14px!important}
+  .hdq-root .hdq-health {grid-template-columns:1fr}
+  .hdq-root .hdq-score {padding:23px 20px}
+  .hdq-root .hdq-score-value {font-size:53px!important;margin-top:11px}
+  .hdq-root .hdq-score-bar {margin-top:15px}
+  .hdq-root .hdq-issues-panel {padding:23px 19px}
+  .hdq-root .hdq-issues-heading {font-size:22px!important}
+  .hdq-root .hdq-issues-list {margin-top:12px}
+  .hdq-root .hdq-issue {padding:12px 0}
+  .hdq-root .hdq-issue span {font-size:14px!important}
+  .hdq-root .hdq-action-bar {flex-direction:column;align-items:stretch;padding:17px 18px;gap:13px}
+  .hdq-root .hdq-action-title {font-size:16px!important}
+  .hdq-root .hdq-cta {width:100%;min-height:45px;font-size:14px!important}
+}
+@media(max-width:360px) {
+  .hdq-root .hdq-hero-row {flex-wrap:wrap}
+  .hdq-root .hdq-refresh {margin-top:2px}
+}
+@media(prefers-reduced-motion:reduce) {
+  .hdq-root .hdq-cta,.hdq-root .hdq-refresh,.hdq-root .hdq-score-bar span {transition:none}
+}
+`;
+
 const hostOperationsDashboardCss = String.raw`
 .hops-root{--hops-forest:#173F35;--hops-clay:#C86C42;--hops-porcelain:#F7F6F2;--hops-sage:#DFE6D9;--hops-ink:#202421;color:var(--hops-ink);background:#F7F6F2;font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,sans-serif}
 .hops-root *, .hops-root *::before, .hops-root *::after{box-sizing:border-box}
@@ -557,27 +692,17 @@ const hostOperationsDashboardCss = String.raw`
 
 const SHARED_DELIVERY_AREA_KEY = "host-default-delivery";
 
+
 // Active legacy coverage still holds Host PIN codes. Read every page before
 // offering those existing values as the new editable business-wide default.
 async function loadActiveHostServiceAreas() {
   const serviceAreas = [];
   for (let page = 1; page <= 100; page += 1) {
-    const response = await listServiceAreas({
-      page,
-      limit: 100,
-      status: "active",
-    });
-    const rows = Array.isArray(response?.serviceAreas)
-      ? response.serviceAreas
-      : [];
+    const response = await listServiceAreas({ page, limit: 100, status: "active" });
+    const rows = Array.isArray(response?.serviceAreas) ? response.serviceAreas : [];
     serviceAreas.push(...rows);
-    const totalPages = Number(
-      response?.pagination?.pages || response?.pagination?.totalPages || 0
-    );
-    if (
-      !rows.length ||
-      (totalPages > 0 ? page >= totalPages : rows.length < 100)
-    ) {
+    const totalPages = Number(response?.pagination?.pages || response?.pagination?.totalPages || 0);
+    if (!rows.length || (totalPages > 0 ? page >= totalPages : rows.length < 100)) {
       return { serviceAreas };
     }
   }
@@ -708,115 +833,45 @@ function Section({
   };
 
   const activeTone = toneStyles[tone] || toneStyles.plain;
-  const compactDashboardTone = [
-    "readiness",
-    "profile",
-    "delivery",
-    "kyb",
-  ].includes(tone);
+  const compactDashboardTone = ["readiness", "profile", "delivery", "kyb"].includes(tone);
   const compactRecipeTone = tone === "recipe";
   const compactFinanceTone = tone === "finance";
-  const compactSettingsTone = [
-    "settingsMint",
-    "settingsBlue",
-    "settingsLavender",
-  ].includes(tone);
+  const compactSettingsTone = ["settingsMint", "settingsBlue", "settingsLavender"].includes(tone);
   const sectionClass = compactDashboardTone
     ? `rounded-[20px] border ${activeTone.section} p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[26px] sm:p-6`
     : compactSettingsTone
-    ? `rounded-[20px] border ${activeTone.section} p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
-    : compactRecipeTone || compactFinanceTone
-    ? `rounded-[18px] border ${activeTone.section} p-3 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
-    : `rounded-[26px] border ${activeTone.section} p-5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:p-6`;
+      ? `rounded-[20px] border ${activeTone.section} p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
+      : compactRecipeTone || compactFinanceTone
+        ? `rounded-[18px] border ${activeTone.section} p-3 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
+        : `rounded-[26px] border ${activeTone.section} p-5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:p-6`;
 
   return (
     <section className={`${sectionClass} ${className}`}>
-      <div
-        className={
-          compactDashboardTone ||
-          compactRecipeTone ||
-          compactFinanceTone ||
-          compactSettingsTone
-            ? "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3"
-            : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
-        }
-      >
-        <div
-          className={
-            compactDashboardTone ||
-            compactRecipeTone ||
-            compactFinanceTone ||
-            compactSettingsTone
-              ? "flex min-w-0 items-start gap-2 sm:gap-3"
-              : "flex items-start gap-3"
-          }
-        >
-          <div
-            className={
-              compactDashboardTone ||
-              compactRecipeTone ||
-              compactFinanceTone ||
-              compactSettingsTone
-                ? `grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${activeTone.icon}`
-                : `grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${activeTone.icon}`
-            }
-          >
-            <Icon
-              className={
-                compactDashboardTone ||
-                compactRecipeTone ||
-                compactFinanceTone ||
-                compactSettingsTone
-                  ? "h-4 w-4 sm:h-[18px] sm:w-[18px]"
-                  : "h-[18px] w-[18px]"
-              }
-            />
+      <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3" : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"}>
+        <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex min-w-0 items-start gap-2 sm:gap-3" : "flex items-start gap-3"}>
+          <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone
+            ? `grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${activeTone.icon}`
+            : `grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${activeTone.icon}`}>
+            <Icon className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "h-4 w-4 sm:h-[18px] sm:w-[18px]" : "h-[18px] w-[18px]"} />
           </div>
 
-          <div
-            className={
-              compactDashboardTone ||
-              compactRecipeTone ||
-              compactFinanceTone ||
-              compactSettingsTone
-                ? "min-w-0 flex-1"
-                : ""
-            }
-          >
-            <h2
-              className={
-                compactDashboardTone
-                  ? `${
-                      [
-                        "Commercial profile",
-                        "Delivery Areas",
-                        "Business verification (KYB)",
-                      ].includes(title)
-                        ? "text-[12px] leading-[14px]"
-                        : "text-[14px] leading-4"
-                    } whitespace-nowrap font-black text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal`
-                  : compactSettingsTone
-                  ? "text-[14px] font-black leading-[18px] text-stone-950 sm:text-[17px] sm:leading-5"
-                  : compactRecipeTone || compactFinanceTone
+          <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "min-w-0 flex-1" : ""}>
+            <h2 className={compactDashboardTone
+              ? `${["Commercial profile", "Delivery Areas", "Business verification (KYB)"].includes(title) ? "text-[12px] leading-[14px]" : "text-[14px] leading-4"} whitespace-nowrap font-black text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal`
+              : compactSettingsTone
+                ? "text-[14px] font-black leading-[18px] text-stone-950 sm:text-[17px] sm:leading-5"
+                : compactRecipeTone || compactFinanceTone
                   ? "text-[13px] font-black leading-4 text-stone-950 sm:text-[17px] sm:leading-5"
-                  : "text-lg font-black text-stone-950"
-              }
-            >
-              {title}
-            </h2>
+                : "text-lg font-black text-stone-950"}>{title}</h2>
 
             {description ? (
-              <p
-                className={
-                  compactDashboardTone
-                    ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5"
-                    : compactSettingsTone
-                    ? "mt-1 max-w-3xl text-[10px] font-semibold leading-[15px] text-stone-600 sm:text-[11px] sm:font-medium sm:leading-4"
-                    : compactRecipeTone || compactFinanceTone
+              <p className={compactDashboardTone
+                ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5"
+                : compactSettingsTone
+                  ? "mt-1 max-w-3xl text-[10px] font-semibold leading-[15px] text-stone-600 sm:text-[11px] sm:font-medium sm:leading-4"
+                  : compactRecipeTone || compactFinanceTone
                     ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-[11px] sm:font-medium sm:leading-4"
-                    : "mt-1 max-w-3xl text-xs leading-5 text-stone-500"
-                }
-              >
+                  : "mt-1 max-w-3xl text-xs leading-5 text-stone-500"}>
                 {description}
               </p>
             ) : null}
@@ -826,17 +881,7 @@ function Section({
         {actions}
       </div>
 
-      <div
-        className={
-          compactSettingsTone
-            ? "mt-4 sm:mt-4"
-            : compactDashboardTone || compactRecipeTone || compactFinanceTone
-            ? "mt-3 sm:mt-4"
-            : "mt-5"
-        }
-      >
-        {children}
-      </div>
+      <div className={compactSettingsTone ? "mt-4 sm:mt-4" : compactDashboardTone || compactRecipeTone || compactFinanceTone ? "mt-3 sm:mt-4" : "mt-5"}>{children}</div>
     </section>
   );
 }
@@ -920,10 +965,8 @@ function newRecipeFoodIntelligence() {
       RECIPE_FOOD_ALLERGENS.map((field) => [field.key, ""])
     ),
     dietaryClassification: "not_declared",
-    basis:
-      "Per serving. Host declaration from the submitted Recipe formulation.",
-    reason:
-      "Host-provided Recipe Food Intelligence declaration for Super Admin review.",
+    basis: "Per serving. Host declaration from the submitted Recipe formulation.",
+    reason: "Host-provided Recipe Food Intelligence declaration for Super Admin review.",
   };
 }
 
@@ -1000,7 +1043,8 @@ function buildHostFoodIntelligencePayload(form) {
       : null;
   }).filter(Boolean);
 
-  const dietaryClassification = source.dietaryClassification || "not_declared";
+  const dietaryClassification =
+    source.dietaryClassification || "not_declared";
 
   const hasDeclaration =
     nutrition.length > 0 ||
@@ -1054,7 +1098,8 @@ function hostFoodIntelligenceFromDetail(result) {
   return {
     nutrition,
     allergens,
-    dietaryClassification: declaration.dietaryClassification || "not_declared",
+    dietaryClassification:
+      declaration.dietaryClassification || "not_declared",
     basis: declaration.basis || initial.basis,
     reason:
       "Host-provided Recipe Food Intelligence declaration for Super Admin review.",
@@ -1290,8 +1335,7 @@ function HostRecipeIngredientRow({
             ingredient.ingredientQuery.trim().length >= 2 &&
             !ingredient.canonicalIngredientId ? (
             <div className="absolute z-20 mt-1 w-full rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-[10px] font-semibold leading-4 text-sky-800 shadow-lg sm:p-3 sm:text-xs">
-              EPANTRY could not match this ingredient yet. It will be included
-              with the Recipe for review.
+              EPANTRY could not match this ingredient yet. It will be included with the Recipe for review.
             </div>
           ) : null}
         </div>
@@ -1505,8 +1549,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   const [kybStatus, setKybStatus] = useState("");
 
-  const [commercialProfileRequest, setCommercialProfileRequest] =
-    useState(null);
+  const [commercialProfileRequest, setCommercialProfileRequest] = useState(null);
 
   const [documentForm, setDocumentForm] = useState({
     documentType: "food_license",
@@ -1538,7 +1581,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   const [csvName, setCsvName] = useState("");
 
-  const [hostRecipeForm, setHostRecipeForm] = useState(newHostRecipeForm);
+  const [hostRecipeForm, setHostRecipeForm] = useState(
+    newHostRecipeForm
+  );
 
   const [editingHostRecipeId, setEditingHostRecipeId] = useState("");
 
@@ -1673,31 +1718,25 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         setServiceAreas(activeAreas);
 
         const sharedCoverageResult = value(16);
-        const exactSharedArea =
-          (sharedCoverageResult?.serviceAreas || []).find(
-            (area) => area.serviceAreaKey === SHARED_DELIVERY_AREA_KEY
-          ) || null;
-        const originalPins = [
-          ...new Set(
-            activeAreas
-              .filter(
-                (area) =>
-                  area.status === "active" &&
-                  area.serviceAreaKey !== SHARED_DELIVERY_AREA_KEY &&
-                  (area.fulfillmentTypes || []).includes("delivery")
-              )
-              .flatMap((area) => area.postalCodes || [])
-              .map((pin) => String(pin).trim())
-              .filter((pin) => /^[1-9][0-9]{5}$/.test(pin))
-          ),
-        ].sort();
+        const exactSharedArea = (sharedCoverageResult?.serviceAreas || []).find(
+          (area) => area.serviceAreaKey === SHARED_DELIVERY_AREA_KEY
+        ) || null;
+        const originalPins = [...new Set(
+          activeAreas
+            .filter((area) =>
+              area.status === "active" &&
+              area.serviceAreaKey !== SHARED_DELIVERY_AREA_KEY &&
+              (area.fulfillmentTypes || []).includes("delivery")
+            )
+            .flatMap((area) => area.postalCodes || [])
+            .map((pin) => String(pin).trim())
+            .filter((pin) => /^[1-9][0-9]{5}$/.test(pin))
+        )].sort();
         setPreviousDeliveryPins(originalPins);
         setSharedDeliveryArea(exactSharedArea);
-        const coverageError =
-          results[14]?.status === "fulfilled" &&
-          results[16]?.status === "fulfilled"
-            ? ""
-            : "Existing delivery coverage could not be loaded completely. Refresh before saving.";
+        const coverageError = results[14]?.status === "fulfilled" && results[16]?.status === "fulfilled"
+          ? ""
+          : "Existing delivery coverage could not be loaded completely. Refresh before saving.";
         setSharedDeliveryLoadError(coverageError);
         if (!deliveryAreaEditedRef.current && !coverageError) {
           // An existing business default takes priority. Until one is saved,
@@ -1837,7 +1876,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   async function startEditHostRecipe(itemOrId) {
     const recipeVersionId =
-      typeof itemOrId === "string" ? itemOrId : itemOrId?.id || "";
+      typeof itemOrId === "string"
+        ? itemOrId
+        : itemOrId?.id || "";
 
     if (!recipeVersionId || busy || loadingHostRecipeId) {
       return;
@@ -1855,11 +1896,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       const detail = await getHostRecipeListing(recipeVersionId);
 
       if (detail?.policy?.hostCanEdit === false) {
-        throw new Error("This historical Recipe lifecycle state is read-only.");
+        throw new Error(
+          "This historical Recipe lifecycle state is read-only."
+        );
       }
 
       const listingStatus =
-        detail?.listing?.status || itemOrId?.status || "draft";
+        detail?.listing?.status ||
+        itemOrId?.status ||
+        "draft";
 
       setHostRecipeForm(hostRecipeFormFromDetail(detail));
       setEditingHostRecipeId(recipeVersionId);
@@ -1950,6 +1995,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
     clearRecipeEditQuery();
   }
 
+
   const pageTitle =
     {
       dashboard: "Host Operations Center",
@@ -1990,8 +2036,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
           </h1>
 
           <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-500">
-            Manage the people who help run your business and keep important
-            business records together in your Host workspace.
+            Manage the people who help run your business and keep important business records together in your Host workspace.
           </p>
         </section>
 
@@ -2002,9 +2047,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             icon={Users}
           >
             <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-900">
-              Team management becomes available after the business workspace is
-              initialized. Your existing Host access stays separate from staff
-              assignments.
+              Team management becomes available after the business workspace is initialized. Your existing Host access stays separate from staff assignments.
             </div>
           </Section>
 
@@ -2014,9 +2057,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             icon={FileCheck2}
           >
             <div className="rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-6 text-sky-900">
-              Business registration, tax records, food licences, bank proof and
-              authorization documents can be managed here once setup is
-              complete.
+              Business registration, tax records, food licences, bank proof and authorization documents can be managed here once setup is complete.
             </div>
           </Section>
         </div>
@@ -2029,9 +2070,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </h2>
 
               <p className="mt-1 max-w-2xl text-sm leading-6 text-amber-800">
-                Team and document records belong to your Host organization, so
-                Business Operations needs to be initialized before these tools
-                can be used.
+                Team and document records belong to your Host organization, so Business Operations needs to be initialized before these tools can be used.
               </p>
             </div>
 
@@ -2134,37 +2173,36 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         section === "dashboard"
           ? "hops-root min-h-screen w-full min-w-0 bg-[#f7f5ef] p-3 sm:p-7"
           : section === "catalog"
-          ? "hpc-root bg-[#f7f6f2] p-3 sm:p-7"
-          : section === "quality"
-          ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
-          : section === "recipes"
-          ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
-          : section === "finance"
-          ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
-          : section === "settings"
-          ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
-          : "min-h-screen bg-[#f7f5ef] p-5 sm:p-7"
+            ? "hpc-root bg-[#f7f6f2] p-3 sm:p-7"
+            : section === "quality"
+              ? "hdq-root"
+              : section === "recipes"
+                ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+                : section === "finance"
+                  ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+                  : section === "settings"
+                    ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+                    : "min-h-screen bg-[#f7f5ef] p-5 sm:p-7"
       }
     >
-      {section === "dashboard" ? (
-        <style>{hostOperationsDashboardCss}</style>
-      ) : null}
+      {section === "dashboard" ? <style>{hostOperationsDashboardCss}</style> : null}
       {section === "catalog" ? <style>{hostProductCatalogCss}</style> : null}
+      {section === "quality" ? <style>{hostDataQualityCss}</style> : null}
       <section
         className={
           section === "catalog"
             ? "hpc-hero"
             : section === "dashboard"
-            ? "hops-hero rounded-[20px] border border-emerald-300 bg-emerald-100/75 p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-6"
-            : section === "quality"
-            ? "overflow-hidden rounded-[18px] border border-emerald-100 bg-gradient-to-br from-[#e8f4ee] via-[#edf6f3] to-[#e9f1f7] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
-            : section === "recipes"
-            ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
-            : section === "finance"
-            ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
-            : section === "settings"
-            ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#eef5f8] to-[#f0ebf8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
-            : "rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm"
+              ? "hops-hero rounded-[20px] border border-emerald-300 bg-emerald-100/75 p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-6"
+              : section === "quality"
+                ? "hdq-hero"
+                : section === "recipes"
+                  ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                  : section === "finance"
+                    ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                    : section === "settings"
+                      ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#eef5f8] to-[#f0ebf8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                      : "rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm"
         }
       >
         <div
@@ -2172,26 +2210,21 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             section === "dashboard"
               ? "flex items-start justify-between gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
               : section === "catalog"
-              ? "flex items-start justify-between gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-              : section === "quality"
-              ? "flex items-start justify-between gap-2 sm:gap-4"
-              : section === "recipes"
-              ? "flex items-start justify-between gap-2 sm:gap-4"
-              : section === "finance"
-              ? "flex items-start justify-between gap-2 sm:gap-4"
-              : section === "settings"
-              ? "flex items-start justify-between gap-2 sm:gap-4"
-              : "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                ? "flex items-start justify-between gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                : section === "quality"
+                  ? "hdq-hero-row"
+                  : section === "recipes"
+                    ? "flex items-start justify-between gap-2 sm:gap-4"
+                    : section === "finance"
+                      ? "flex items-start justify-between gap-2 sm:gap-4"
+                      : section === "settings"
+                        ? "flex items-start justify-between gap-2 sm:gap-4"
+                        : "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
           }
         >
           <div
             className={
-              section === "dashboard" ||
-              section === "catalog" ||
-              section === "quality" ||
-              section === "recipes" ||
-              section === "finance" ||
-              section === "settings"
+              section === "dashboard" || section === "catalog" || section === "quality" || section === "recipes" || section === "finance" || section === "settings"
                 ? "min-w-0 flex-1"
                 : ""
             }
@@ -2201,29 +2234,29 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 section === "catalog"
                   ? "hpc-hero-label"
                   : section === "dashboard"
-                  ? "text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs sm:tracking-[0.14em]"
-                  : section === "quality"
-                  ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
-                  : section === "recipes"
-                  ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
-                  : section === "finance"
-                  ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
-                  : section === "settings"
-                  ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
-                  : "text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
+                    ? "text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs sm:tracking-[0.14em]"
+                    : section === "quality"
+                      ? "hdq-eyebrow"
+                      : section === "recipes"
+                        ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                        : section === "finance"
+                          ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                          : section === "settings"
+                            ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                            : "text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
               }
             >
               {section === "settings"
                 ? "Business setup"
                 : section === "catalog"
-                ? "Product catalog"
-                : section === "quality"
-                ? "Catalog health"
-                : section === "recipes"
-                ? "Recipe workspace"
-                : section === "finance"
-                ? "Earnings & settlements"
-                : "HOST OPERATIONS"}
+                  ? "Product catalog"
+                  : section === "quality"
+                    ? "Catalog health"
+                    : section === "recipes"
+                      ? "Recipe workspace"
+                      : section === "finance"
+                        ? "Earnings & settlements"
+                        : "HOST OPERATIONS"}
             </p>
 
             <h1
@@ -2231,16 +2264,16 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 section === "catalog"
                   ? "hpc-hero-title"
                   : section === "dashboard"
-                  ? "mt-1 whitespace-nowrap text-[18px] font-black leading-5 text-stone-950 sm:mt-2 sm:text-3xl sm:leading-normal"
-                  : section === "quality"
-                  ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
-                  : section === "recipes"
-                  ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
-                  : section === "finance"
-                  ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
-                  : section === "settings"
-                  ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
-                  : "mt-2 text-3xl font-black text-stone-950"
+                    ? "mt-1 whitespace-nowrap text-[18px] font-black leading-5 text-stone-950 sm:mt-2 sm:text-3xl sm:leading-normal"
+                    : section === "quality"
+                      ? "hdq-title"
+                      : section === "recipes"
+                        ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                        : section === "finance"
+                          ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                          : section === "settings"
+                            ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                            : "mt-2 text-3xl font-black text-stone-950"
               }
             >
               {pageTitle}
@@ -2251,45 +2284,30 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 section === "catalog"
                   ? "hpc-hero-meta"
                   : section === "dashboard"
-                  ? "mt-1 text-[9px] font-semibold leading-3 text-stone-500 sm:mt-2 sm:text-sm sm:font-normal sm:leading-normal"
-                  : section === "quality"
-                  ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
-                  : section === "recipes"
-                  ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
-                  : section === "finance"
-                  ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
-                  : section === "settings"
-                  ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
-                  : "mt-2 text-sm text-stone-500"
+                    ? "mt-1 text-[9px] font-semibold leading-3 text-stone-500 sm:mt-2 sm:text-sm sm:font-normal sm:leading-normal"
+                    : section === "quality"
+                      ? "hdq-description"
+                      : section === "recipes"
+                        ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                        : section === "finance"
+                          ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                          : section === "settings"
+                            ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                            : "mt-2 text-sm text-stone-500"
               }
             >
               {section === "quality" ? (
-                <>
-                  See what is ready, what still needs attention, and exactly
-                  where to continue.
-                </>
+                <>Review product completeness and outstanding details.</>
               ) : section === "recipes" ? (
-                <>
-                  Create a complete Recipe, send it for review, then track its
-                  publishing status in Listing History.
-                </>
+                <>Create a complete Recipe, send it for review, then track its publishing status in Listing History.</>
               ) : section === "finance" ? (
-                <>
-                  See delivered-order earnings, money waiting to settle, and
-                  payout history in one place.
-                </>
+                <>See delivered-order earnings, money waiting to settle, and payout history in one place.</>
               ) : section === "settings" ? (
-                <>
-                  Manage business records, team members and connections to other
-                  tools in one place.
-                </>
+                <>Manage business records, team members and connections to other tools in one place.</>
               ) : (
                 <>
-                  {organizationData.organization.displayName} ·{" "}
-                  {section === "catalog" ? "Host status" : "Operational state"}:{" "}
-                  {titleize(
-                    organizationData.operationalProfile?.activationState
-                  )}
+                  {organizationData.organization.displayName} · {section === "catalog" ? "Host status" : "Operational state"}:{" "}
+                  {titleize(organizationData.operationalProfile?.activationState)}
                 </>
               )}
             </p>
@@ -2302,16 +2320,16 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               section === "catalog"
                 ? "hpc-refresh focus-ring"
                 : section === "dashboard"
-                ? "focus-ring ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-200 bg-sky-100 px-2 py-1.5 text-[10px] font-black text-sky-800 sm:ml-0 sm:gap-2 sm:rounded-xl sm:border-stone-200 sm:bg-transparent sm:px-4 sm:py-2.5 sm:text-sm sm:text-stone-950"
-                : section === "quality"
-                ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
-                : section === "recipes"
-                ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
-                : section === "finance"
-                ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
-                : section === "settings"
-                ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
-                : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-black"
+                  ? "focus-ring ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-200 bg-sky-100 px-2 py-1.5 text-[10px] font-black text-sky-800 sm:ml-0 sm:gap-2 sm:rounded-xl sm:border-stone-200 sm:bg-transparent sm:px-4 sm:py-2.5 sm:text-sm sm:text-stone-950"
+                  : section === "quality"
+                    ? "hdq-refresh"
+                    : section === "recipes"
+                      ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                      : section === "finance"
+                        ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                        : section === "settings"
+                          ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                          : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-black"
             }
           >
             <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -2319,83 +2337,13 @@ export default function HostOperationsPage({ section = "dashboard" }) {
           </button>
         </div>
 
-        {section === "quality" ? (
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
-            {[
-              [
-                "01",
-                "Check your catalog",
-                "See every product EPANTRY has checked.",
-                "bg-[#e8f1f8] border-[#d6e7f2]",
-              ],
-              [
-                "02",
-                "Read what needs attention",
-                "Spot missing images, nutrition or safety details.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-              ],
-              [
-                "03",
-                "Complete product details",
-                "Open Listing Studio and complete the missing information.",
-                "bg-[#f0ebf8] border-[#e4daf3]",
-              ],
-              [
-                "04",
-                "Refresh this page",
-                "Come back after updates to see the latest catalog health.",
-                "bg-[#e8f4ee] border-[#d4eadf]",
-              ],
-            ].map(([step, label, helper, tone]) => (
-              <div
-                key={step}
-                className={`min-w-0 rounded-[14px] border p-2.5 shadow-[0_5px_14px_rgba(28,25,23,0.04)] sm:rounded-[20px] sm:p-4 ${tone}`}
-              >
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:h-8 sm:w-8 sm:text-[10px]">
-                    {step}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">
-                      {helper}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
         {section === "recipes" ? (
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
             {[
-              [
-                "01",
-                "Add Recipe basics",
-                "Title, servings, timing and image.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-              ],
-              [
-                "02",
-                "Build the Recipe",
-                "Add ingredients and cooking steps.",
-                "bg-[#e8f1f8] border-[#d6e7f2]",
-              ],
-              [
-                "03",
-                "Add food details",
-                "Fill only nutrition and allergen details you can support.",
-                "bg-[#f0ebf8] border-[#e4daf3]",
-              ],
-              [
-                "04",
-                "Send for review",
-                "Submit, then track approval in Listing History.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-              ],
+              ["01", "Add Recipe basics", "Title, servings, timing and image.", "bg-[#e7f3ed] border-[#d4eadf]"],
+              ["02", "Build the Recipe", "Add ingredients and cooking steps.", "bg-[#e8f1f8] border-[#d6e7f2]"],
+              ["03", "Add food details", "Fill only nutrition and allergen details you can support.", "bg-[#f0ebf8] border-[#e4daf3]"],
+              ["04", "Send for review", "Submit, then track approval in Listing History.", "bg-[#e7f3ed] border-[#d4eadf]"],
             ].map(([step, label, helper, tone]) => (
               <div
                 key={step}
@@ -2406,12 +2354,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     {step}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">
-                      {helper}
-                    </p>
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">{label}</p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">{helper}</p>
                   </div>
                 </div>
               </div>
@@ -2422,34 +2366,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         {section === "finance" ? (
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
             {[
-              [
-                "01",
-                "Check delivered sales",
-                "See orders that have reached customers.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-                "",
-              ],
-              [
-                "02",
-                "See money waiting",
-                "Know what is delivered but not settled yet.",
-                "bg-[#e8f1f8] border-[#d6e7f2]",
-                "",
-              ],
-              [
-                "03",
-                "Review payouts",
-                "Track each recorded settlement and amount.",
-                "bg-[#f0ebf8] border-[#e4daf3]",
-                "",
-              ],
-              [
-                "04",
-                "Manage active orders",
-                "Open Orders for work still in progress.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-                "/host/orders",
-              ],
+              ["01", "Check delivered sales", "See orders that have reached customers.", "bg-[#e7f3ed] border-[#d4eadf]", ""],
+              ["02", "See money waiting", "Know what is delivered but not settled yet.", "bg-[#e8f1f8] border-[#d6e7f2]", ""],
+              ["03", "Review payouts", "Track each recorded settlement and amount.", "bg-[#f0ebf8] border-[#e4daf3]", ""],
+              ["04", "Manage active orders", "Open Orders for work still in progress.", "bg-[#e7f3ed] border-[#d4eadf]", "/host/orders"],
             ].map(([step, label, helper, tone, to]) => {
               const card = (
                 <div className="flex items-start gap-2 sm:gap-3">
@@ -2457,12 +2377,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     {step}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">
-                      {helper}
-                    </p>
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">{label}</p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">{helper}</p>
                   </div>
                 </div>
               );
@@ -2490,34 +2406,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         {section === "settings" ? (
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
             {[
-              [
-                "01",
-                "Save business records",
-                "Keep licences and other important records together.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-                "",
-              ],
-              [
-                "02",
-                "Add your team",
-                "Choose who can work on this business.",
-                "bg-[#e8f1f8] border-[#d6e7f2]",
-                "",
-              ],
-              [
-                "03",
-                "Connect other tools",
-                "Only if another app needs EPANTRY data or updates.",
-                "bg-[#f0ebf8] border-[#e4daf3]",
-                "",
-              ],
-              [
-                "04",
-                "Back to operations",
-                "Return to day-to-day business management.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-                "/host/operations-center",
-              ],
+              ["01", "Save business records", "Keep licences and other important records together.", "bg-[#e7f3ed] border-[#d4eadf]", ""],
+              ["02", "Add your team", "Choose who can work on this business.", "bg-[#e8f1f8] border-[#d6e7f2]", ""],
+              ["03", "Connect other tools", "Only if another app needs EPANTRY data or updates.", "bg-[#f0ebf8] border-[#e4daf3]", ""],
+              ["04", "Back to operations", "Return to day-to-day business management.", "bg-[#e7f3ed] border-[#d4eadf]", "/host/operations-center"],
             ].map(([step, label, helper, tone, to]) => {
               const card = (
                 <div className="flex items-start gap-2 sm:gap-3">
@@ -2525,12 +2417,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     {step}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">
-                      {helper}
-                    </p>
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">{label}</p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">{helper}</p>
                   </div>
                 </div>
               );
@@ -2623,62 +2511,30 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     </strong>
                     <span>Readiness checks passed</span>
                   </div>
-                  <div
-                    className="hops-check-meter"
-                    aria-label="Readiness progress"
-                  >
-                    <span
-                      style={{
-                        width: `${Math.round(
-                          (100 *
-                            Object.values(readiness.checks).filter(Boolean)
-                              .length) /
-                            Math.max(1, Object.keys(readiness.checks).length)
-                        )}%`,
-                      }}
-                    />
+                  <div className="hops-check-meter" aria-label="Readiness progress">
+                    <span style={{ width: `${Math.round(100 * Object.values(readiness.checks).filter(Boolean).length / Math.max(1, Object.keys(readiness.checks).length))}%` }} />
                   </div>
                 </div>
                 <div className="hops-readiness-grid">
                   {Object.entries(readiness.checks).map(([key, value]) => (
-                    <div
-                      className="hops-check-item"
-                      data-passed={Boolean(value)}
-                      key={key}
-                    >
-                      {value ? (
-                        <CheckCircle2
-                          className="hops-check-icon"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <CircleAlert
-                          className="hops-check-icon"
-                          aria-hidden="true"
-                        />
-                      )}
+                    <div className="hops-check-item" data-passed={Boolean(value)} key={key}>
+                      {value
+                        ? <CheckCircle2 className="hops-check-icon" aria-hidden="true" />
+                        : <CircleAlert className="hops-check-icon" aria-hidden="true" />}
                       <span>{readinessLabel(key)}</span>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <p className="hops-section-error" role="status">
-                Readiness data is unavailable. Refresh to try again.
-              </p>
+              <p className="hops-section-error" role="status">Readiness data is unavailable. Refresh to try again.</p>
             )}
 
             {activationState === "active" ? (
               <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-200/60 p-2.5 text-[10px] font-bold leading-4 text-emerald-900 sm:mt-4 sm:gap-2 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
                 <ShieldCheck className="h-4 w-4 shrink-0 sm:h-[17px] sm:w-[17px]" />
-                <span className="sm:hidden">
-                  Your Host business is live and ready. No further launch review
-                  is needed.
-                </span>
-                <span className="hidden sm:inline">
-                  Your Host business is live and ready to operate. No further
-                  launch review is needed.
-                </span>
+                <span className="sm:hidden">Your Host business is live and ready. No further launch review is needed.</span>
+                <span className="hidden sm:inline">Your Host business is live and ready to operate. No further launch review is needed.</span>
               </div>
             ) : activationState === "pending_review" ? (
               <div className="mt-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
@@ -2687,8 +2543,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </div>
             ) : activationState === "suspended" ? (
               <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
-                Host operations are suspended. Super Admin review is required
-                before commerce can resume.
+                Host operations are suspended. Super Admin review is required before commerce can resume.
               </div>
             ) : (
               <button
@@ -2932,13 +2787,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     .map((value) => value.trim())
                     .filter(Boolean);
                   const postalCodes = [...new Set(rawPins)];
-                  if (
-                    !postalCodes.length ||
-                    postalCodes.some((pin) => !/^[1-9][0-9]{5}$/.test(pin))
-                  ) {
-                    setError(
-                      "Enter valid six-digit Indian delivery PIN codes."
-                    );
+                  if (!postalCodes.length || postalCodes.some((pin) => !/^[1-9][0-9]{5}$/.test(pin))) {
+                    setError("Enter valid six-digit Indian delivery PIN codes.");
                     return;
                   }
                   const payload = {
@@ -2950,28 +2800,18 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   run(
                     async () => {
                       const result = sharedDeliveryArea
-                        ? await updateServiceArea(sharedDeliveryArea.id, {
-                            ...payload,
-                            status: "active",
-                          })
-                        : await createServiceArea({
-                            ...payload,
-                            serviceAreaKey: SHARED_DELIVERY_AREA_KEY,
-                          });
+                        ? await updateServiceArea(sharedDeliveryArea.id, { ...payload, status: "active" })
+                        : await createServiceArea({ ...payload, serviceAreaKey: SHARED_DELIVERY_AREA_KEY });
                       // Only clear the edit flag after the API confirms a save.
                       deliveryAreaEditedRef.current = false;
                       return result;
                     },
-                    sharedDeliveryArea
-                      ? "Business coverage updated."
-                      : "Business coverage saved."
+                    sharedDeliveryArea ? "Business coverage updated." : "Business coverage saved."
                   );
                 }}
               >
                 <label className="block min-w-0">
-                  <span className="mb-2 block text-sm font-bold">
-                    Delivery PIN codes
-                  </span>
+                  <span className="mb-2 block text-sm font-bold">Delivery PIN codes</span>
                   <textarea
                     required
                     rows={4}
@@ -2986,50 +2826,26 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   />
                 </label>
                 {sharedDeliveryLoadError ? (
-                  <p role="alert" className="hops-section-error">
-                    {sharedDeliveryLoadError}
-                  </p>
+                  <p role="alert" className="hops-section-error">{sharedDeliveryLoadError}</p>
                 ) : null}
-                <button
-                  type="submit"
-                  disabled={busy || Boolean(sharedDeliveryLoadError)}
-                  className={buttonClass}
-                >
-                  <Save size={17} />{" "}
-                  {sharedDeliveryArea
-                    ? "Update delivery coverage"
-                    : "Save delivery coverage"}
+                <button type="submit" disabled={busy || Boolean(sharedDeliveryLoadError)} className={buttonClass}>
+                  <Save size={17} /> {sharedDeliveryArea ? "Update delivery coverage" : "Save delivery coverage"}
                 </button>
               </form>
               <aside className="hops-coverage-summary" aria-live="polite">
                 <strong>{displayedDeliveryPins.length}</strong>
-                <p>
-                  {sharedDeliveryArea
-                    ? "Saved business PIN codes"
-                    : "Existing delivery PIN codes"}
-                </p>
+                <p>{sharedDeliveryArea ? "Saved business PIN codes" : "Existing delivery PIN codes"}</p>
                 <div className="hops-pins">
-                  {displayedDeliveryPins.slice(0, 12).map((pin) => (
-                    <span key={pin}>{pin}</span>
-                  ))}
+                  {displayedDeliveryPins.slice(0, 12).map((pin) => <span key={pin}>{pin}</span>)}
                   {displayedDeliveryPins.length > 12 ? (
                     <span>+{displayedDeliveryPins.length - 12} more</span>
                   ) : null}
                 </div>
-                {!sharedDeliveryArea &&
-                !sharedDeliveryLoadError &&
-                displayedDeliveryPins.length ? (
-                  <p className="hops-coverage-note">
-                    Previous delivery PINs are restored in the form. Save to
-                    make them the business default.
-                  </p>
+                {!sharedDeliveryArea && !sharedDeliveryLoadError && displayedDeliveryPins.length ? (
+                  <p className="hops-coverage-note">Previous delivery PINs are restored in the form. Save to make them the business default.</p>
                 ) : null}
-                {!sharedDeliveryArea &&
-                !sharedDeliveryLoadError &&
-                !displayedDeliveryPins.length ? (
-                  <p className="hops-coverage-note">
-                    No delivery PIN codes have been saved yet.
-                  </p>
+                {!sharedDeliveryArea && !sharedDeliveryLoadError && !displayedDeliveryPins.length ? (
+                  <p className="hops-coverage-note">No delivery PIN codes have been saved yet.</p>
                 ) : null}
               </aside>
             </div>
@@ -3054,13 +2870,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
                 {kybStatus === "draft" ? (
                   <span className="text-xs font-semibold text-amber-700">
-                    Draft is saved, but it will not appear in the Super Admin
-                    governance queue until Submit succeeds.
+                    Draft is saved, but it will not appear in the Super Admin governance queue until Submit succeeds.
                   </span>
                 ) : kybStatus === "submitted" ? (
                   <span className="text-xs font-semibold text-emerald-700">
-                    Submitted successfully. This case is now eligible for Super
-                    Admin review.
+                    Submitted successfully. This case is now eligible for Super Admin review.
                   </span>
                 ) : null}
               </div>
@@ -3073,10 +2887,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     Business Profile is already complete. Submit KYB next.
                   </p>
                   <p className="mt-1 text-xs font-semibold leading-5 text-emerald-800">
-                    Your commercial profile has already been saved and Super
-                    Admin was notified. Click Submit below to send this KYB for
-                    governance review. After submission, wait for Super Admin
-                    approval.
+                    Your commercial profile has already been saved and Super Admin was notified. Click Submit below to send this KYB for governance review. After submission, wait for Super Admin approval.
                   </p>
                 </div>
               ) : (
@@ -3087,9 +2898,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         KYB saved. Complete your Business Profile next.
                       </p>
                       <p className="mt-1 text-xs font-semibold leading-5 text-sky-800">
-                        Open Business Profile, complete that step and notify
-                        Super Admin. Then return here and Submit KYB. After
-                        submission, wait for Super Admin review.
+                        Open Business Profile, complete that step and notify Super Admin. Then return here and Submit KYB. After submission, wait for Super Admin review.
                       </p>
                     </div>
 
@@ -3169,11 +2978,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </Field>
 
               <div className="grid grid-cols-2 items-end gap-1.5 sm:flex sm:gap-2">
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className={`${buttonClass} h-9 w-full gap-1 px-1.5 py-0 text-[9px] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm`}
-                >
+                <button type="submit" disabled={busy} className={`${buttonClass} h-9 w-full gap-1 px-1.5 py-0 text-[9px] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm`}>
                   <Save className="h-3.5 w-3.5 sm:h-[15px] sm:w-[15px]" />
                   Save KYB
                 </button>
@@ -3182,18 +2987,21 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   type="button"
                   disabled={busy}
                   onClick={() =>
-                    run(async () => {
-                      await saveHostKyb({
-                        ...kybForm,
+                    run(
+                      async () => {
+                        await saveHostKyb({
+                          ...kybForm,
 
-                        documentIds: kybForm.documentIds
-                          .split(",")
-                          .map((value) => value.trim())
-                          .filter(Boolean),
-                      });
+                          documentIds: kybForm.documentIds
+                            .split(",")
+                            .map((value) => value.trim())
+                            .filter(Boolean),
+                        });
 
-                      return submitHostKyb();
-                    }, "KYB submitted for governance review.")
+                        return submitHostKyb();
+                      },
+                      "KYB submitted for governance review."
+                    )
                   }
                   className="focus-ring h-9 w-full rounded-xl border border-stone-300 px-1.5 py-0 text-[9px] font-black sm:h-auto sm:w-auto sm:px-4 sm:py-2.5 sm:text-sm"
                 >
@@ -3207,23 +3015,14 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
       {section === "catalog" ? (
         <div className="hpc-content">
-          <section
-            className="hpc-upload-section"
-            aria-labelledby="hpc-upload-heading"
-          >
+          <section className="hpc-upload-section" aria-labelledby="hpc-upload-heading">
             <div className="hpc-upload-main">
               <div className="hpc-section-head">
-                <span className="hpc-icon-box" aria-hidden="true">
-                  <Upload size={21} />
-                </span>
+                <span className="hpc-icon-box" aria-hidden="true"><Upload size={21} /></span>
                 <div className="min-w-0">
                   <p className="hpc-kicker">01 / CSV upload</p>
-                  <h2 id="hpc-upload-heading" className="hpc-section-title">
-                    Check your product file
-                  </h2>
-                  <p className="hpc-section-description">
-                    Upload your CSV to match products with EPANTRY.
-                  </p>
+                  <h2 id="hpc-upload-heading" className="hpc-section-title">Check your product file</h2>
+                  <p className="hpc-section-description">Upload your CSV to match products with EPANTRY.</p>
                 </div>
               </div>
 
@@ -3240,44 +3039,23 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   }}
                   className="sr-only"
                 />
-                <label
-                  htmlFor="host-catalog-csv-input"
-                  className="hpc-dropzone focus-ring"
-                >
-                  <span className="hpc-drop-icon" aria-hidden="true">
-                    <Upload size={24} />
-                  </span>
+                <label htmlFor="host-catalog-csv-input" className="hpc-dropzone focus-ring">
+                  <span className="hpc-drop-icon" aria-hidden="true"><Upload size={24} /></span>
                   <span className="hpc-drop-copy">
-                    <span className="hpc-drop-title">
-                      {csvRows.length
-                        ? "Choose a different CSV"
-                        : "Select a CSV file"}
-                    </span>
-                    <span className="hpc-drop-sub">
-                      Your product data stays in review until you check it.
-                    </span>
+                    <span className="hpc-drop-title">{csvRows.length ? "Choose a different CSV" : "Select a CSV file"}</span>
+                    <span className="hpc-drop-sub">Your product data stays in review until you check it.</span>
                   </span>
-                  <span className="hpc-drop-action" aria-hidden="true">
-                    Browse CSV
-                  </span>
+                  <span className="hpc-drop-action" aria-hidden="true">Browse CSV</span>
                 </label>
               </div>
 
               <div className="hpc-upload-footer">
-                <div
-                  className="hpc-file-status"
-                  data-ready={Boolean(csvRows.length)}
-                  aria-live="polite"
-                >
+                <div className="hpc-file-status" data-ready={Boolean(csvRows.length)} aria-live="polite">
                   <span className="hpc-status-dot" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="hpc-file-name">
-                      {csvRows.length ? csvName : "No file selected"}
-                    </p>
+                    <p className="hpc-file-name">{csvRows.length ? csvName : "No file selected"}</p>
                     <p className="hpc-file-helper">
-                      {csvRows.length
-                        ? `${csvRows.length} products ready for checking`
-                        : "CSV files only"}
+                      {csvRows.length ? `${csvRows.length} products ready for checking` : "CSV files only"}
                     </p>
                   </div>
                 </div>
@@ -3286,11 +3064,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   disabled={busy || !csvRows.length}
                   onClick={() =>
                     run(
-                      () =>
-                        createHostCatalogImport({
-                          sourceType: "csv_normalized",
-                          rows: csvRows,
-                        }),
+                      () => createHostCatalogImport({ sourceType: "csv_normalized", rows: csvRows }),
                       "Catalog checked. Review the results below before continuing your listings."
                     )
                   }
@@ -3304,116 +3078,59 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             <aside className="hpc-format" aria-label="CSV column format">
               <p className="hpc-kicker">File reference</p>
               <h3 className="hpc-format-head">CSV columns</h3>
-              <p className="hpc-format-description">
-                Use these exact column names in your file.
-              </p>
+              <p className="hpc-format-description">Use these exact column names in your file.</p>
               <div className="hpc-columns">
                 {[
-                  "merchantSku",
-                  "gtin",
-                  "packId",
-                  "displayName",
-                  "brandName",
-                  "netQuantityText",
-                  "priceMinor",
-                  "inventoryQuantity",
-                ].map((header) => (
-                  <code key={header}>{header}</code>
-                ))}
+                  "merchantSku", "gtin", "packId", "displayName",
+                  "brandName", "netQuantityText", "priceMinor", "inventoryQuantity",
+                ].map((header) => <code key={header}>{header}</code>)}
               </div>
               <p className="hpc-format-note">
-                <CircleAlert
-                  size={17}
-                  className="mt-0.5 shrink-0"
-                  aria-hidden="true"
-                />
+                <CircleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
                 Checking a CSV does not publish products.
               </p>
             </aside>
           </section>
 
-          <section
-            className="hpc-results"
-            aria-labelledby="hpc-results-heading"
-          >
+          <section className="hpc-results" aria-labelledby="hpc-results-heading">
             <div className="hpc-results-head">
               <div>
                 <p className="hpc-kicker">02 / Results</p>
-                <h2 id="hpc-results-heading" className="hpc-section-title">
-                  Previous catalog checks
-                </h2>
+                <h2 id="hpc-results-heading" className="hpc-section-title">Previous catalog checks</h2>
               </div>
-              <span className="hpc-results-count">
-                {imports.length} {imports.length === 1 ? "check" : "checks"}
-              </span>
+              <span className="hpc-results-count">{imports.length} {imports.length === 1 ? "check" : "checks"}</span>
             </div>
             {imports.length ? (
               <>
                 <div className="hpc-table-head" aria-hidden="true">
-                  <span>File check</span>
-                  <span>Matched</span>
-                  <span>Needs review</span>
-                  <span>Needs fixing</span>
-                  <span>Data quality</span>
+                  <span>File check</span><span>Matched</span><span>Needs review</span><span>Needs fixing</span><span>Data quality</span>
                 </div>
-                <div
-                  className="hpc-check-list"
-                  aria-label="Catalog check results"
-                >
+                <div className="hpc-check-list" aria-label="Catalog check results">
                   {imports.map((job, index) => (
                     <div className="hpc-check-row" key={job.id}>
                       <div className="hpc-check-ident">
-                        <span className="hpc-check-index" aria-hidden="true">
-                          <FileCheck2 size={19} />
-                        </span>
+                        <span className="hpc-check-index" aria-hidden="true"><FileCheck2 size={19} /></span>
                         <div className="min-w-0">
-                          <p className="hpc-check-name">
-                            CSV check{" "}
-                            {String(imports.length - index).padStart(2, "0")}
-                          </p>
-                          <p className="hpc-check-meta">
-                            {job.rowCount} products checked
-                          </p>
+                          <p className="hpc-check-name">CSV check {String(imports.length - index).padStart(2, "0")}</p>
+                          <p className="hpc-check-meta">{job.rowCount} products checked</p>
                         </div>
                       </div>
                       <div className="hpc-stat" data-state="matched">
-                        <strong className="hpc-stat-value">
-                          {job.matchedCount}
-                        </strong>
+                        <strong className="hpc-stat-value">{job.matchedCount}</strong>
                         <span className="hpc-stat-caption">Matched</span>
                       </div>
                       <div className="hpc-stat" data-state="review">
-                        <strong className="hpc-stat-value">
-                          {job.npiRequiredCount}
-                        </strong>
+                        <strong className="hpc-stat-value">{job.npiRequiredCount}</strong>
                         <span className="hpc-stat-caption">Needs review</span>
                       </div>
                       <div className="hpc-stat" data-state="fix">
-                        <strong className="hpc-stat-value">
-                          {job.invalidCount}
-                        </strong>
+                        <strong className="hpc-stat-value">{job.invalidCount}</strong>
                         <span className="hpc-stat-caption">Needs fixing</span>
                       </div>
-                      <div
-                        className="hpc-data-score"
-                        aria-label={`Data quality ${job.averageDataQualityScore} out of 100`}
-                      >
-                        <strong className="hpc-score-number">
-                          {job.averageDataQualityScore}/100
-                        </strong>
+                      <div className="hpc-data-score" aria-label={`Data quality ${job.averageDataQualityScore} out of 100`}>
+                        <strong className="hpc-score-number">{job.averageDataQualityScore}/100</strong>
                         <span className="hpc-quality-track" aria-hidden="true">
-                          <span
-                            className="hpc-quality-fill"
-                            style={{
-                              width: `${Math.max(
-                                0,
-                                Math.min(
-                                  100,
-                                  Number(job.averageDataQualityScore) || 0
-                                )
-                              )}%`,
-                            }}
-                          />
+                          <span className="hpc-quality-fill" style={{ width: `${Math.max(0, Math.min(100, Number(job.averageDataQualityScore) || 0))}%` }} />
                         </span>
                       </div>
                     </div>
@@ -3431,125 +3148,70 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "quality" ? (
-        <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
-          <section className="rounded-[20px] border border-[#d7e7e0] bg-[#eef6f2] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.05)] sm:rounded-[28px] sm:p-5">
-            <div className="flex items-start gap-2.5 sm:gap-3">
-              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[12px] bg-[#d9ece3] text-[#245c4d] sm:h-10 sm:w-10 sm:rounded-2xl">
-                <BadgeCheck className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-              </div>
-
-              <div className="min-w-0">
-                <h2 className="text-[14px] font-black leading-4 text-slate-950 sm:text-lg sm:leading-normal">
-                  Your catalog health
-                </h2>
-                <p className="mt-1 max-w-3xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:text-xs sm:leading-5">
-                  Use this page to quickly see which products are ready and
-                  which product details should be completed next.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
+        <div className="hdq-content">
+          <section className="hdq-overview" aria-labelledby="hdq-overview-title">
+            <p className="hdq-section-kicker">01 / Overview</p>
+            <h2 className="hdq-section-heading" id="hdq-overview-title">Catalog overview</h2>
+            <div className="hdq-metrics" aria-label="Product catalog quality summary">
               {[
-                [
-                  "Products checked",
-                  quality?.productsObserved || 0,
-                  "bg-[#e8f1f8] border-[#d6e7f2]",
-                  "text-[#315d74]",
-                ],
-                [
-                  "Ready matches",
-                  quality?.canonicalMatches || 0,
-                  "bg-[#e7f3ed] border-[#d4eadf]",
-                  "text-[#245c4d]",
-                ],
-                [
-                  "Need details",
-                  quality?.npiRequired || 0,
-                  "bg-[#f0ebf8] border-[#e4daf3]",
-                  "text-[#5d4a73]",
-                ],
-                [
-                  "Recipe-ready",
-                  quality?.recipeEligible || 0,
-                  "bg-[#e8f4ee] border-[#d4eadf]",
-                  "text-[#245c4d]",
-                ],
-              ].map(([label, value, tone, textTone]) => (
-                <div
-                  key={label}
-                  className={`rounded-[14px] border p-2.5 sm:rounded-[20px] sm:p-4 ${tone}`}
-                >
-                  <p
-                    className={`text-xl font-black leading-none sm:text-2xl ${textTone}`}
-                  >
-                    {value}
-                  </p>
-                  <p
-                    className={`mt-1.5 text-[8px] font-black uppercase leading-[10px] tracking-[0.06em] sm:mt-2 sm:text-[10px] sm:leading-normal ${textTone}`}
-                  >
-                    {label}
-                  </p>
+                ["Products checked", quality?.productsObserved ?? 0],
+                ["Ready matches", quality?.canonicalMatches ?? 0],
+                ["Need details", quality?.npiRequired ?? 0],
+                ["Recipe-ready", quality?.recipeEligible ?? 0],
+              ].map(([label, value]) => (
+                <div className="hdq-metric" key={label}>
+                  <strong className="hdq-metric-number">{value}</strong>
+                  <span className="hdq-metric-name">{label}</span>
                 </div>
               ))}
             </div>
+          </section>
 
-            <div className="mt-3 rounded-[16px] border border-[#d8e6ed] bg-[#edf4f8] p-3 sm:mt-4 sm:rounded-[22px] sm:p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#35695b] sm:text-[10px]">
-                    Catalog completeness
-                  </p>
-                  <p className="mt-0.5 text-[18px] font-black leading-5 text-slate-950 sm:mt-1 sm:text-2xl sm:leading-normal">
-                    {quality?.averageDataQualityScore || 0}/100
-                  </p>
-                </div>
-                <p className="max-w-[210px] text-right text-[8px] font-semibold leading-[11px] text-slate-600 sm:max-w-sm sm:text-[11px] sm:leading-4">
-                  Higher completeness means more product information is ready
-                  for catalog and recipe use.
-                </p>
+          <section className="hdq-health" aria-label="Catalog completeness and issues">
+            <div className="hdq-score">
+              <p className="hdq-score-label">Catalog completeness</p>
+              <div className="hdq-score-value">
+                {quality?.averageDataQualityScore ?? 0}<span>/100</span>
               </div>
-
+              <div
+                className="hdq-score-bar"
+                role="progressbar"
+                aria-label="Catalog completeness"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.max(0, Math.min(100, Number(quality?.averageDataQualityScore) || 0))}
+              >
+                <span style={{width: `${Math.max(0, Math.min(100, Number(quality?.averageDataQualityScore) || 0))}%`}} />
+              </div>
+              <p className="hdq-score-note">Average score across checked products.</p>
+            </div>
+            <div className="hdq-issues-panel">
+              <h2 className="hdq-issues-heading">Information to review</h2>
               {Object.keys(quality?.issueCounts || {}).length ? (
-                <div className="mt-2.5 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
-                  {Object.entries(quality?.issueCounts || {}).map(
-                    ([key, value]) => (
-                      <span
-                        key={key}
-                        className="rounded-full border border-[#dbe7e2] bg-white/85 px-2 py-1 text-[8px] font-black leading-3 text-[#46635b] sm:px-3 sm:text-[10px]"
-                      >
-                        {qualityIssueLabel(key)} · {value}
-                      </span>
-                    )
-                  )}
+                <div className="hdq-issues-list">
+                  {Object.entries(quality?.issueCounts || {}).map(([key, value]) => (
+                    <div className="hdq-issue" key={key}>
+                      <span>{qualityIssueLabel(key)}</span>
+                      <strong aria-label={`${value} products`}>{value}</strong>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <p className="mt-2.5 rounded-xl bg-white/70 px-3 py-2 text-[9px] font-bold text-emerald-800 sm:mt-3 sm:text-xs">
-                  No product-detail issues are showing right now.
-                </p>
+                <p className="hdq-issues-empty">No product-detail issues are showing right now.</p>
               )}
             </div>
-
-            <div className="mt-3 flex flex-col gap-2 rounded-[16px] border border-[#d4eadf] bg-[#e8f4ee] p-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:rounded-[22px] sm:p-4">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black text-[#173f35] sm:text-sm">
-                  Next step: complete the flagged product details
-                </p>
-                <p className="mt-0.5 text-[8px] font-semibold leading-[11px] text-slate-700/70 sm:mt-1 sm:text-[11px] sm:leading-4">
-                  Open Listing Studio to review and complete product details,
-                  then return here and refresh.
-                </p>
-              </div>
-
-              <Link
-                to="/host/listings/new"
-                className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[11px] bg-[#17624f] px-3 py-2 text-[9px] font-black text-white shadow-sm transition hover:bg-[#124e3f] sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
-              >
-                <PackageSearch className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Open Listing Studio
-              </Link>
-            </div>
           </section>
+
+          <div className="hdq-action-bar">
+            <div>
+              <p className="hdq-action-title">Complete missing product details</p>
+              <p className="hdq-action-description">Update listings, then refresh your catalog scores.</p>
+            </div>
+            <Link to="/host/listings/new" className="hdq-cta focus-ring">
+              <PackageSearch size={18} aria-hidden="true" />
+              Open Listing Studio
+            </Link>
+          </div>
         </div>
       ) : null}
 
@@ -3563,34 +3225,16 @@ export default function HostOperationsPage({ section = "dashboard" }) {
           >
             <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
               {[
-                [
-                  "Delivered orders",
-                  finance?.deliveredOrders || 0,
-                  "bg-white/85 border-[#dce7e3]",
-                ],
-                [
-                  "Awaiting settlement",
-                  finance?.unsettledDeliveredOrders || 0,
-                  "bg-[#e7f3ed] border-[#d4eadf]",
-                ],
-                [
-                  "Payouts in progress",
-                  finance?.pendingSettlements || 0,
-                  "bg-[#f0ebf8] border-[#e4daf3]",
-                ],
-                [
-                  "Paid to you",
-                  money(finance?.paidNetMinor || 0),
-                  "bg-[#e8f1f8] border-[#d6e7f2]",
-                ],
+                ["Delivered orders", finance?.deliveredOrders || 0, "bg-white/85 border-[#dce7e3]"],
+                ["Awaiting settlement", finance?.unsettledDeliveredOrders || 0, "bg-[#e7f3ed] border-[#d4eadf]"],
+                ["Payouts in progress", finance?.pendingSettlements || 0, "bg-[#f0ebf8] border-[#e4daf3]"],
+                ["Paid to you", money(finance?.paidNetMinor || 0), "bg-[#e8f1f8] border-[#d6e7f2]"],
               ].map(([label, value, tone]) => (
                 <div
                   key={label}
                   className={`min-w-0 rounded-[14px] border p-2.5 shadow-[0_5px_14px_rgba(28,25,23,0.03)] sm:rounded-[20px] sm:p-4 ${tone}`}
                 >
-                  <p className="text-[18px] font-black leading-5 text-stone-950 sm:text-xl">
-                    {value}
-                  </p>
+                  <p className="text-[18px] font-black leading-5 text-stone-950 sm:text-xl">{value}</p>
                   <p className="mt-1 text-[8px] font-black uppercase leading-[11px] tracking-[0.06em] text-stone-500 sm:text-[10px] sm:leading-4">
                     {label}
                   </p>
@@ -3600,9 +3244,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
             <div className="mt-3 rounded-[14px] border border-[#d6e7e1] bg-[#e7f3ed] px-3 py-2.5 sm:mt-4 sm:rounded-[18px] sm:px-4 sm:py-3">
               <p className="text-[9px] font-semibold leading-[13px] text-[#35564d] sm:text-xs sm:leading-5">
-                For now, EPANTRY shows the merchandise amount from delivered
-                orders. Any future platform fees or tax deductions will appear
-                here once they are configured.
+                For now, EPANTRY shows the merchandise amount from delivered orders. Any future platform fees or tax deductions will appear here once they are configured.
               </p>
             </div>
           </Section>
@@ -3623,18 +3265,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     <div className="flex items-start justify-between gap-2 sm:gap-3">
                       <div className="min-w-0">
                         <p className="text-[11px] font-black leading-4 text-stone-950 sm:text-sm">
-                          {new Date(
-                            settlement.periodStart
-                          ).toLocaleDateString()}{" "}
-                          –{" "}
-                          {new Date(settlement.periodEnd).toLocaleDateString()}
+                          {new Date(settlement.periodStart).toLocaleDateString()} – {new Date(settlement.periodEnd).toLocaleDateString()}
                         </p>
                         <p className="mt-1 text-[9px] font-semibold leading-[13px] text-stone-500 sm:text-xs sm:leading-5">
-                          {settlement.lineCount} entries · Amount{" "}
-                          {money(
-                            settlement.totals?.netPayableMinor,
-                            settlement.currency
-                          )}
+                          {settlement.lineCount} entries · Amount {money(settlement.totals?.netPayableMinor, settlement.currency)}
                         </p>
                       </div>
 
@@ -3646,12 +3280,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 ))
               ) : (
                 <div className="rounded-[14px] border border-[#d8e4ec] bg-[#e8f1f8] px-3 py-3 sm:rounded-[18px] sm:px-4 sm:py-4">
-                  <p className="text-[10px] font-black text-[#2b6078] sm:text-sm">
-                    No payouts recorded yet
-                  </p>
+                  <p className="text-[10px] font-black text-[#2b6078] sm:text-sm">No payouts recorded yet</p>
                   <p className="mt-1 text-[9px] font-semibold leading-[13px] text-slate-600 sm:text-xs sm:leading-5">
-                    After delivered orders are grouped into a settlement, the
-                    payout period and amount will appear here.
+                    After delivered orders are grouped into a settlement, the payout period and amount will appear here.
                   </p>
                 </div>
               )}
@@ -3830,8 +3461,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
                       <div className="flex-1">
                         <p className="text-[9px] font-semibold leading-[13px] text-stone-500 sm:text-xs sm:font-normal sm:leading-5">
-                          Add a clear Recipe photo (JPEG, PNG or WebP, up to 8
-                          MB). You can replace it later while editing.
+                          Add a clear Recipe photo (JPEG, PNG or WebP, up to 8 MB). You can replace it later while editing.
                         </p>
 
                         <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
@@ -3892,8 +3522,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   Ingredients
                 </h3>
                 <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5">
-                  Search each ingredient by name. If EPANTRY cannot find it,
-                  your entry is included for review.
+                  Search each ingredient by name. If EPANTRY cannot find it, your entry is included for review.
                 </p>
               </div>
 
@@ -4039,9 +3668,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     Nutrition, allergens & dietary information
                   </h3>
                   <p className="mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-600 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5">
-                    Add only information you can support from your Recipe or
-                    source records. Leave anything you cannot confirm blank;
-                    these details are reviewed before publishing.
+                    Add only information you can support from your Recipe or source records. Leave anything you cannot confirm blank; these details are reviewed before publishing.
                   </p>
                 </div>
 
@@ -4106,8 +3733,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   Allergen information
                 </p>
                 <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-[11px] sm:font-normal sm:leading-5">
-                  Choose an option only when your Recipe or source records
-                  support it. Blank means not declared.
+                  Choose an option only when your Recipe or source records support it. Blank means not declared.
                 </p>
 
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-3 lg:grid-cols-3">
@@ -4153,8 +3779,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   <select
                     className={recipeInputClass}
                     value={
-                      hostRecipeForm.foodIntelligence?.dietaryClassification ||
-                      "not_declared"
+                      hostRecipeForm.foodIntelligence
+                        ?.dietaryClassification || "not_declared"
                     }
                     onChange={(event) =>
                       setHostRecipeForm((current) => ({
@@ -4222,11 +3848,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 hostRecipeForm.baseServings < 1 ||
                 hostRecipeForm.ingredients.some(
                   (ingredient) =>
-                    (!ingredient.canonicalIngredientId &&
-                      !ingredient.ingredientQuery.trim()) ||
+                    (
+                      !ingredient.canonicalIngredientId &&
+                      !ingredient.ingredientQuery.trim()
+                    ) ||
                     !(Number(ingredient.quantity) > 0)
                 ) ||
-                hostRecipeForm.steps.some((step) => !step.instruction.trim())
+                hostRecipeForm.steps.some(
+                  (step) => !step.instruction.trim()
+                )
               }
               onClick={async () => {
                 const payload = buildHostRecipePayload(hostRecipeForm);
@@ -4249,12 +3879,17 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               }}
               className={`${buttonClass} mt-3 w-full text-[11px] sm:mt-5 sm:w-auto sm:text-sm`}
             >
-              {editingHostRecipeId ? <Save size={15} /> : <Send size={15} />}
+              {editingHostRecipeId ? (
+                <Save size={15} />
+              ) : (
+                <Send size={15} />
+              )}
               {editingHostRecipeId
                 ? "Save Recipe Changes"
                 : "Submit Recipe for Review"}
             </button>
           </Section>
+
         </div>
       ) : null}
 
@@ -4556,13 +4191,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     key={document.id}
                     className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 text-[10px] font-semibold text-stone-700 sm:rounded-xl sm:text-xs"
                   >
-                    <span className="font-black text-stone-950">
-                      {document.label}
-                    </span>
-                    <span className="text-stone-500">
-                      {" "}
-                      · {titleize(document.status)}
-                    </span>
+                    <span className="font-black text-stone-950">{document.label}</span>
+                    <span className="text-stone-500"> · {titleize(document.status)}</span>
                   </div>
                 ))
               ) : (
@@ -4668,9 +4298,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                       {member.roleLabel || "Team member"}
                     </p>
                     <p className="mt-0.5 text-[9px] font-semibold leading-3 text-stone-500 sm:text-[11px] sm:leading-4">
-                      {titleize(member.status)} ·{" "}
-                      {(member.permissionKeys || []).join(", ") ||
-                        "No extra permissions"}
+                      {titleize(member.status)} · {(member.permissionKeys || []).join(", ") || "No extra permissions"}
                     </p>
                   </div>
                 ))
@@ -4757,10 +4385,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 </Field>
               </div>
 
-              <button
-                disabled={busy}
-                className={`${settingsButtonClass} sm:col-span-2`}
-              >
+              <button disabled={busy} className={`${settingsButtonClass} sm:col-span-2`}>
                 <KeyRound size={14} />
                 Connect app
               </button>
@@ -4774,12 +4399,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     className="flex min-w-0 flex-col items-stretch gap-2 rounded-[14px] border border-white/80 bg-white/85 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:py-2"
                   >
                     <div className="min-w-0">
-                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">
-                        {account.name}
-                      </p>
+                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">{account.name}</p>
                       <p className="mt-1 break-words text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-0.5 sm:truncate sm:text-[11px] sm:leading-normal">
-                        {titleize(account.status)} ·{" "}
-                        {(account.scopes || []).join(", ") || "No permissions"}
+                        {titleize(account.status)} · {(account.scopes || []).join(", ") || "No permissions"}
                       </p>
                     </div>
 
@@ -4883,10 +4505,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 </Field>
               </div>
 
-              <button
-                disabled={busy}
-                className={`${settingsButtonClass} sm:col-span-2`}
-              >
+              <button disabled={busy} className={`${settingsButtonClass} sm:col-span-2`}>
                 <Webhook size={14} />
                 Start sending updates
               </button>
@@ -4900,9 +4519,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     className="flex min-w-0 flex-col items-stretch gap-2 rounded-[14px] border border-white/80 bg-white/85 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:py-2"
                   >
                     <div className="min-w-0">
-                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">
-                        {webhook.name}
-                      </p>
+                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">{webhook.name}</p>
                       <p className="mt-1 break-all text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-0.5 sm:truncate sm:text-[11px] sm:leading-normal">
                         {webhook.endpointUrl}
                       </p>
@@ -4946,13 +4563,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                       key={event.id}
                       className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 sm:rounded-xl"
                     >
-                      <p className="text-[10px] font-black text-stone-950 sm:text-xs">
-                        {titleize(event.action)}
-                      </p>
+                      <p className="text-[10px] font-black text-stone-950 sm:text-xs">{titleize(event.action)}</p>
 
                       <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-[11px]">
-                        {titleize(event.entityType)} ·{" "}
-                        {new Date(event.occurredAt).toLocaleString()}
+                        {titleize(event.entityType)} · {new Date(event.occurredAt).toLocaleString()}
                       </p>
                     </div>
                   ))

@@ -32,6 +32,81 @@ import {
   uploadProductEvidenceBatch,
 } from "../services/universalProduct.service";
 
+const hostScanStyles = String.raw`
+/* HOST PRODUCT SCAN ONLY. Customer barcode scanner stays unchanged. */
+.ep-host-scan-page{--es-forest:#173F35;--es-clay:#C86C42;--es-porcelain:#F7F6F2;--es-sage:#DCE0CF;--es-charcoal:#202421;min-width:0;width:100%;background:#F7F6F2;color:#202421;font-family:'Plus Jakarta Sans',Inter,system-ui,sans-serif;padding:14px clamp(14px,2.2vw,36px) 40px}
+.ep-host-scan-page *{box-sizing:border-box}
+.ep-host-scan-page .ehs-frame{width:100%;min-width:0}
+.ep-host-scan-page .ehs-hero{background:#173F35;color:#FFFDF8;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);align-items:stretch;border-radius:18px 18px 0 0;overflow:hidden}
+.ep-host-scan-page .ehs-intro{padding:clamp(24px,3vw,42px);min-width:0}
+.ep-host-scan-page .ehs-kicker{display:flex;align-items:center;gap:10px;color:#F4B69A;font-size:13px;font-weight:750;line-height:1.45;letter-spacing:.07em;text-transform:uppercase}
+.ep-host-scan-page .ehs-kicker:before{content:'';width:24px;height:2px;background:#C86C42;flex:none}
+.ep-host-scan-page .ehs-title{font-size:clamp(30px,3vw,43px);line-height:1.14;letter-spacing:-.045em;font-weight:750;color:#FFFDF8;margin:12px 0 0}
+.ep-host-scan-page .ehs-summary{color:#DCE8DE;font-size:16px;line-height:1.6;margin:12px 0 0;max-width:590px}
+.ep-host-scan-page .ehs-progress{background:#DCE0CF;display:flex;flex-direction:column;justify-content:center;padding:25px clamp(20px,2.8vw,40px);gap:0;border-left:3px solid #C86C42;color:#173F35}
+.ep-host-scan-page .ehs-progress-caption{font-size:13px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;color:#99502C;margin:0 0 8px}
+.ep-host-scan-page .ehs-progress-row{display:grid;grid-template-columns:33px minmax(0,1fr);align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(23,63,53,.16)}
+.ep-host-scan-page .ehs-progress-row:last-child{border-bottom:0}
+.ep-host-scan-page .ehs-progress-num{display:grid;place-items:center;width:30px;height:30px;background:#F7F6F2;border-radius:8px;color:#A65735;font-size:13px;font-weight:800}
+.ep-host-scan-page .ehs-progress-row strong{color:#173F35;font-size:15px;font-weight:750;line-height:1.35}
+.ep-host-scan-page .ehs-workspace{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(310px,.65fr);border:1px solid #D3DCD0;border-top:0;background:white;border-radius:0 0 18px 18px;overflow:hidden}
+.ep-host-scan-page .ehs-editor{padding:clamp(24px,3vw,42px);min-width:0}
+.ep-host-scan-page .ehs-number{font-size:13px;font-weight:750;color:#B65E38;letter-spacing:.055em;text-transform:uppercase}
+.ep-host-scan-page .ehs-heading{font-size:clamp(23px,2.1vw,29px);line-height:1.22;font-weight:750;letter-spacing:-.035em;color:#173F35;margin:7px 0 0}
+.ep-host-scan-page .ehs-form{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:15px;margin-top:25px;align-items:end}
+.ep-host-scan-page .ehs-field{display:block;min-width:0}
+.ep-host-scan-page .ehs-label{display:block;color:#344C40;font-size:15px;font-weight:700;margin:0 0 8px;line-height:1.45}
+.ep-host-scan-page .ehs-control{display:flex;align-items:center;min-width:0;min-height:53px;background:#F9FAF7;border:1px solid #BBC8BD;border-radius:10px;color:#597067;transition:border-color .15s,box-shadow .15s}
+.ep-host-scan-page .ehs-control:focus-within{border-color:#C86C42;box-shadow:0 0 0 3px rgba(200,108,66,.16)}
+.ep-host-scan-page .ehs-control-icon{margin:0 12px;flex:none;color:#607A6B}
+.ep-host-scan-page .ehs-control input{background:transparent;border:0;outline:0;min-width:0;width:100%;min-height:51px;padding:11px 12px 11px 0;color:#202421;font-size:16px;font-weight:550}
+.ep-host-scan-page .ehs-market{height:53px;width:100%;min-width:0;border:1px solid #BBC8BD;border-radius:10px;padding:10px;background:#F9FAF7;color:#173F35;text-align:center;font-size:16px;font-weight:700}
+.ep-host-scan-page .ehs-market:focus-visible{outline:3px solid rgba(200,108,66,.35);border-color:#C86C42;outline-offset:1px}
+.ep-host-scan-page .ehs-actions{display:flex;flex-wrap:wrap;gap:11px;margin-top:20px}
+.ep-host-scan-page .ehs-action{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:49px;padding:12px 20px;border-radius:9px;border:1px solid transparent;font-size:15px;font-weight:750;line-height:1.3;cursor:pointer;transition:background-color .15s,border-color .15s,transform .15s}
+.ep-host-scan-page .ehs-action:hover:not(:disabled){transform:translateY(-1px)}
+.ep-host-scan-page .ehs-action-primary{background:#173F35;color:#FFFDF8}
+.ep-host-scan-page .ehs-action-primary:hover:not(:disabled){background:#245746}
+.ep-host-scan-page .ehs-action-secondary{background:#FFFDF8;color:#173F35;border-color:#B3C4B5}
+.ep-host-scan-page .ehs-action-secondary:hover:not(:disabled){background:#EAF1E7;border-color:#173F35}
+.ep-host-scan-page button:disabled{cursor:not-allowed;opacity:.58}
+.ep-host-scan-page button:focus-visible,.ep-host-scan-page a:focus-visible{outline:3px solid #C86C42;outline-offset:3px}
+.ep-host-scan-page .ehs-camera{margin-top:20px;border-radius:12px;background:#202421;padding:8px;overflow:hidden}
+.ep-host-scan-page .ehs-camera video{width:100%;max-height:360px;aspect-ratio:16/9;object-fit:cover;border-radius:7px}
+.ep-host-scan-page .ehs-notice{font-size:14px;line-height:1.55;margin:14px 0 0;color:#59675F}
+.ep-host-scan-page .ehs-message{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.55;margin:14px 0 0;padding:13px 15px;border-left:4px solid}
+.ep-host-scan-page .ehs-message-error{background:#FFF2EE;border-color:#B94D37;color:#8F392D}
+.ep-host-scan-page .ehs-message-success{background:#E8F1E7;border-color:#173F35;color:#173F35}
+.ep-host-scan-page .ehs-next{background:#E9EFE6;border-left:1px solid #D2DBD0;padding:clamp(24px,3vw,39px);min-width:0}
+.ep-host-scan-page .ehs-next h2{font-size:clamp(22px,2vw,27px);font-weight:750;line-height:1.25;letter-spacing:-.035em;color:#173F35;margin:7px 0 20px}
+.ep-host-scan-page .ehs-outcome{padding:18px 0;border-top:1px solid #C5D0C3;display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px}
+.ep-host-scan-page .ehs-outcome:last-child{border-bottom:1px solid #C5D0C3}
+.ep-host-scan-page .ehs-outcome-marker{display:grid;place-items:center;width:29px;height:29px;border-radius:8px;background:#173F35;color:#fff}
+.ep-host-scan-page .ehs-outcome strong{font-size:17px;color:#173F35;line-height:1.3;font-weight:750}
+.ep-host-scan-page .ehs-outcome p{font-size:15px;color:#56665C;line-height:1.55;margin-top:5px}
+/* Existing product matches and the new-product form stay functional; only Host presentation is refined. */
+.ep-host-scan-page .ehs-conditional-section{border-radius:13px!important;border-color:#D1DACE!important;background:#FFFFFF!important;box-shadow:none!important;padding:clamp(20px,2.5vw,32px)!important;margin-top:24px!important}
+.ep-host-scan-page .ehs-new-product{background:#F4F5F0!important;border-top:3px solid #C86C42!important}
+.ep-host-scan-page .ehs-new-product .ehs-new-intro{color:#173F35}
+.ep-host-scan-page .ehs-new-product .ehs-new-steps{display:flex;flex-wrap:wrap;gap:9px 20px;border-top:1px solid #D4DDD0;border-bottom:1px solid #D4DDD0;padding:13px 0;margin-top:19px}
+.ep-host-scan-page .ehs-new-product .ehs-new-step{display:flex;align-items:center;gap:9px;min-width:0;padding:3px 0;color:#173F35}
+.ep-host-scan-page .ehs-new-product .ehs-new-step b{font-size:13px;font-weight:800;color:#A85535}
+.ep-host-scan-page .ehs-new-product .ehs-new-step span{font-size:14px;font-weight:650}
+.ep-host-scan-page .ehs-new-product .ehs-upload-panel{background:#E7EEE4!important;border:1px solid #CEDACB!important;border-radius:13px!important}
+.ep-host-scan-page .ehs-new-product .ehs-details-panel{background:#FFFFFF!important;border:1px solid #D6DED4!important;border-radius:13px!important}
+.ep-host-scan-page .ehs-new-product label input:not([type=checkbox]):not([type=file]),.ep-host-scan-page .ehs-new-product label select,.ep-host-scan-page .ehs-new-product label textarea{font-size:15px!important;line-height:1.45!important;min-height:45px!important;border-radius:9px!important;border-color:#BFCBBB!important;color:#202421!important;background:white!important}
+.ep-host-scan-page .ehs-new-product label span:not(.sr-only),.ep-host-scan-page .ehs-new-product label p{font-size:14px!important;line-height:1.45!important}
+.ep-host-scan-page .ehs-new-product p[class*='text-[8'],.ep-host-scan-page .ehs-new-product p[class*='text-[9'],.ep-host-scan-page .ehs-new-product p[class*='text-[10'],.ep-host-scan-page .ehs-new-product p[class*='text-[11']{font-size:14px!important;line-height:1.5!important}
+.ep-host-scan-page .ehs-new-product p[class*='text-[12']{font-size:16px!important;line-height:1.4!important}
+.ep-host-scan-page .ehs-new-product h2{font-size:clamp(23px,2.2vw,29px)!important;line-height:1.23!important;color:#173F35!important}
+.ep-host-scan-page .ehs-new-product input:focus-visible,.ep-host-scan-page .ehs-new-product select:focus-visible,.ep-host-scan-page .ehs-new-product textarea:focus-visible{outline:3px solid rgba(200,108,66,.35)!important;outline-offset:1px}
+.ep-host-scan-page .ehs-new-product button{min-height:43px;font-size:14px!important}
+@media(max-width:1100px){.ep-host-scan-page .ehs-hero{grid-template-columns:1fr}.ep-host-scan-page .ehs-progress{border-left:0;border-top:2px solid #C86C42;flex-direction:row;gap:12px;justify-content:space-between;padding:14px 22px;flex-wrap:wrap}.ep-host-scan-page .ehs-progress-caption{display:none}.ep-host-scan-page .ehs-progress-row{border:0;flex:1;min-width:130px;padding:2px 0}.ep-host-scan-page .ehs-workspace{grid-template-columns:1fr}.ep-host-scan-page .ehs-next{border-left:0;border-top:1px solid #D2DBD0}}
+@media(max-width:640px){.ep-host-scan-page{padding:10px 12px 28px}.ep-host-scan-page .ehs-hero{border-radius:13px 13px 0 0}.ep-host-scan-page .ehs-intro{padding:22px 18px}.ep-host-scan-page .ehs-title{font-size:30px;line-height:1.14}.ep-host-scan-page .ehs-summary{font-size:15px;line-height:1.5}.ep-host-scan-page .ehs-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px 13px}.ep-host-scan-page .ehs-progress-row{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}.ep-host-scan-page .ehs-progress-row strong{font-size:12.5px;line-height:1.27}.ep-host-scan-page .ehs-progress-num{width:27px;height:27px;font-size:12px}.ep-host-scan-page .ehs-workspace{border-radius:0 0 13px 13px}.ep-host-scan-page .ehs-editor{padding:21px 17px}.ep-host-scan-page .ehs-heading{font-size:23px}.ep-host-scan-page .ehs-form{grid-template-columns:minmax(0,1fr) 76px;gap:9px;margin-top:20px}.ep-host-scan-page .ehs-label{font-size:14px}.ep-host-scan-page .ehs-control{min-height:49px}.ep-host-scan-page .ehs-control input{min-height:47px;font-size:15px}.ep-host-scan-page .ehs-control-icon{margin:0 8px}.ep-host-scan-page .ehs-market{height:49px;font-size:15px}.ep-host-scan-page .ehs-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ep-host-scan-page .ehs-action{min-height:46px;font-size:14px;padding:10px 8px;gap:6px}.ep-host-scan-page .ehs-next{padding:22px 17px}.ep-host-scan-page .ehs-next h2{font-size:23px}.ep-host-scan-page .ehs-outcome{padding:14px 0}.ep-host-scan-page .ehs-conditional-section{padding:18px 14px!important;margin-top:17px!important}.ep-host-scan-page .ehs-new-product .ehs-new-steps{gap:9px 14px}.ep-host-scan-page .ehs-new-product .ehs-new-step span{font-size:13px}}
+@media(max-width:350px){.ep-host-scan-page .ehs-form{grid-template-columns:minmax(0,1fr) 66px}.ep-host-scan-page .ehs-progress-row strong{font-size:12px}.ep-host-scan-page .ehs-action{font-size:13px}}
+@media(prefers-reduced-motion:reduce){.ep-host-scan-page .ehs-action{transition:none}.ep-host-scan-page .ehs-action:hover{transform:none}}
+`;
+
 const EVIDENCE_PURPOSES = [
   {
     value: "front_pack",
@@ -765,300 +840,108 @@ export default function ScanAnythingPage({ mode = "customer" }) {
     <div
       className={
         hostMode
-          ? "relative left-1/2 w-screen -translate-x-1/2 overflow-x-hidden bg-[#F7FBFF] px-5 pb-0 pt-0 sm:left-auto sm:w-auto sm:translate-x-0 sm:overflow-visible sm:bg-transparent sm:px-7 sm:pb-7 sm:pt-0 lg:px-8 lg:pb-8 lg:pt-0"
+          ? "ep-host-scan-page"
           : "ep-scan-page w-full min-w-0 pb-8"
       }
     >
+      {hostMode && <style>{hostScanStyles}</style>}
       {hostMode ? (
-        <section className="overflow-hidden rounded-[22px] border border-emerald-200 bg-[#F4FBF8] shadow-[0_18px_45px_-32px_rgba(5,150,105,0.28)] sm:rounded-[28px]">
-          <div className="border-b border-emerald-200 bg-[linear-gradient(135deg,#DDF8EC_0%,#E8F5FF_52%,#F1EDFF_100%)] p-3 sm:p-6 lg:p-7">
-            <div className="flex items-start gap-3 sm:gap-4">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm sm:h-12 sm:w-12 sm:rounded-2xl">
-                <Store
-                  size={23}
-                  className="h-5 w-5 sm:h-[23px] sm:w-[23px]"
-                  aria-hidden="true"
-                />
-              </div>
-
-              <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-[0.15em] text-emerald-700 sm:text-[11px] sm:tracking-[0.17em]">
-                  PRODUCT SCAN
-                </p>
-
-                <h1 className="mt-0.5 text-[21px] font-black leading-6 tracking-tight text-stone-950 sm:mt-1 sm:text-3xl sm:leading-tight">
-                  Scan a product to list
-                </h1>
-
-                <p className="mt-1.5 max-w-3xl text-[10.5px] font-semibold leading-[15px] text-stone-600 sm:mt-3 sm:text-sm sm:font-medium sm:leading-6">
-                  <span className="sm:hidden">
-                    Scan the barcode to find a match. New products need pack
-                    photos before review.
-                  </span>
-                  <span className="hidden sm:inline">
-                    Scan the pack barcode. Existing EPANTRY products can move to
-                    pricing and stock; new products will ask for pack photos
-                    before review.
-                  </span>
-                </p>
-              </div>
+        <section className="ehs-frame" aria-labelledby="ehs-scan-title">
+          <header className="ehs-hero">
+            <div className="ehs-intro">
+              <div className="ehs-kicker">Product scan</div>
+              <h1 id="ehs-scan-title" className="ehs-title">Scan a product to list</h1>
+              <p className="ehs-summary">
+                Enter the product barcode or scan it with your camera. EPANTRY checks for an existing match.
+              </p>
             </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
-              {[
-                {
-                  number: "1",
-                  title: "Scan barcode",
-                  text: "Enter the code or use your camera.",
-                  tone: "border-emerald-200 bg-emerald-50",
-                  numberTone: "bg-emerald-600",
-                },
-                {
-                  number: "2",
-                  title: "Check match",
-                  text: "EPANTRY looks for an existing product.",
-                  tone: "border-sky-200 bg-sky-50",
-                  numberTone: "bg-sky-600",
-                },
-                {
-                  number: "3",
-                  title: "Review if new",
-                  text: "Add clear pack photos for a new product.",
-                  tone: "border-violet-200 bg-violet-50",
-                  numberTone: "bg-violet-600",
-                },
-                {
-                  number: "4",
-                  title: "Continue listing",
-                  text: "Continue in Listing Studio to manage price and stock.",
-                  tone: "border-cyan-200 bg-cyan-50",
-                  numberTone: "bg-cyan-700",
-                },
-              ].map((step) => (
-                <div
-                  key={step.number}
-                  className={`rounded-xl border p-2 sm:rounded-2xl sm:p-3 ${step.tone}`}
-                >
-                  <div className="flex items-start gap-2">
-                    <span
-                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[9px] font-black text-white sm:h-6 sm:w-6 sm:text-[10px] ${step.numberTone}`}
-                    >
-                      {step.number}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black leading-3 text-stone-900 sm:text-xs sm:leading-4">
-                        {step.title}
-                      </p>
-                      <p className="mt-0.5 text-[8.5px] font-semibold leading-[12px] text-stone-500 sm:mt-1 sm:text-[11px] sm:leading-4">
-                        {step.text}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="ehs-progress" aria-label="Product listing steps">
+              <p className="ehs-progress-caption">From scan to listing</p>
+              <div className="ehs-progress-row"><span className="ehs-progress-num">01</span><strong>Scan barcode</strong></div>
+              <div className="ehs-progress-row"><span className="ehs-progress-num">02</span><strong>Check product</strong></div>
+              <div className="ehs-progress-row"><span className="ehs-progress-num">03</span><strong>Continue listing</strong></div>
             </div>
-          </div>
+          </header>
 
-          <div className="mt-2 grid gap-2 sm:mt-0 sm:gap-0 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-            <div className="bg-[#EAF6FF] p-3 sm:p-7 lg:p-8">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-sky-700 sm:text-[10px]">
-                    BARCODE CHECK
-                  </p>
-                  <h2 className="mt-0.5 text-sm font-black text-stone-950 sm:text-lg">
-                    Find the product
-                  </h2>
-                </div>
-                <div className="rounded-xl border border-sky-200 bg-white/80 px-2.5 py-1.5 text-[9px] font-black text-sky-700 sm:rounded-2xl sm:px-3 sm:py-2 sm:text-[10px]">
-                  Host listing
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_72px] gap-2 sm:mt-5 sm:grid-cols-[minmax(0,1fr)_100px] sm:gap-4">
-                <label className="block min-w-0">
-                  <span className="text-[8px] font-black uppercase tracking-[0.11em] text-stone-500 sm:text-xs sm:tracking-[0.12em]">
-                    Barcode number
-                  </span>
-
-                  <div className="mt-1 flex min-h-10 rounded-xl border border-sky-200 bg-white/90 p-1 focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100 sm:mt-2 sm:min-h-0 sm:rounded-2xl sm:p-1.5 sm:focus-within:ring-4">
-                    <div className="grid w-8 shrink-0 place-items-center text-stone-400 sm:w-11">
-                      <Barcode size={17} aria-hidden="true" />
-                    </div>
-
+          <div className="ehs-workspace">
+            <section className="ehs-editor" aria-labelledby="ehs-lookup-title">
+              <p className="ehs-number">01 / Barcode check</p>
+              <h2 id="ehs-lookup-title" className="ehs-heading">Find the product</h2>
+              <div className="ehs-form">
+                <label className="ehs-field">
+                  <span className="ehs-label">Barcode number</span>
+                  <div className="ehs-control">
+                    <Barcode className="ehs-control-icon" size={20} aria-hidden="true" />
                     <input
                       value={barcodeInput}
                       onChange={(event) => setBarcodeInput(event.target.value)}
                       inputMode="numeric"
-                      placeholder="8901234567890"
-                      className="min-w-0 flex-1 bg-transparent px-0.5 py-1.5 text-[11px] font-bold outline-none sm:px-1 sm:py-2.5 sm:text-sm"
+                      placeholder="Enter the product barcode"
                     />
                   </div>
                 </label>
-
-                <label className="block">
-                  <span className="text-[8px] font-black uppercase tracking-[0.11em] text-stone-500 sm:text-xs sm:tracking-[0.12em]">
-                    Market
-                  </span>
-
+                <label className="ehs-field">
+                  <span className="ehs-label">Market</span>
                   <input
+                    className="ehs-market"
                     value={market}
-                    onChange={(event) =>
-                      setMarket(event.target.value.toUpperCase().slice(0, 10))
-                    }
-                    className="mt-1 h-10 w-full rounded-xl border border-sky-200 bg-white/90 px-2 text-center text-[11px] font-black outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 sm:mt-2 sm:h-auto sm:rounded-2xl sm:px-4 sm:py-3.5 sm:text-sm sm:focus:ring-4"
+                    onChange={(event) => setMarket(event.target.value.toUpperCase().slice(0, 10))}
                   />
                 </label>
               </div>
-
-              <div className="mt-2.5 grid grid-cols-2 gap-2 sm:mt-4 sm:flex sm:flex-wrap sm:gap-3">
+              <div className="ehs-actions">
                 <button
                   type="button"
                   disabled={isResolvingBarcode}
                   onClick={() => resolveCode(barcodeInput, "manual")}
-                  className="focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2.5 py-2 text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
+                  className="ehs-action ehs-action-primary"
                 >
                   {isResolvingBarcode ? (
-                    <LoaderCircle
-                      size={15}
-                      className="animate-spin"
-                      aria-hidden="true"
-                    />
+                    <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />
                   ) : (
-                    <FileSearch size={15} aria-hidden="true" />
+                    <FileSearch size={17} aria-hidden="true" />
                   )}
                   Check barcode
                 </button>
-
                 <button
                   type="button"
                   onClick={isCameraRunning ? stopCamera : startCamera}
-                  className="focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-2.5 py-2 text-[10px] font-black text-violet-800 transition hover:border-violet-300 hover:bg-violet-100 sm:min-h-0 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
+                  className="ehs-action ehs-action-secondary"
                 >
-                  <Camera size={15} aria-hidden="true" />
-
+                  <Camera size={17} aria-hidden="true" />
                   {isCameraRunning ? "Stop camera" : "Use camera"}
                 </button>
               </div>
-
-              <div
-                className={[
-                  "mt-3 overflow-hidden rounded-xl bg-stone-950 sm:mt-5 sm:rounded-[24px]",
-                  isCameraRunning ? "block" : "hidden",
-                ].join(" ")}
-              >
-                <video
-                  ref={videoRef}
-                  muted
-                  playsInline
-                  className="h-[180px] w-full object-cover sm:h-auto sm:aspect-video"
-                />
+              <div className={`ehs-camera ${isCameraRunning ? "block" : "hidden"}`}>
+                <video ref={videoRef} muted playsInline />
               </div>
-
-              {cameraNotice ? (
-                <p className="mt-2 text-[9px] font-semibold leading-4 text-stone-500 sm:mt-3 sm:text-xs sm:leading-5">
-                  {cameraNotice}
-                </p>
-              ) : null}
-
-              {error ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 p-2.5 text-[10px] font-semibold leading-4 text-red-700 sm:mt-5 sm:gap-3 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
-                  <CircleAlert
-                    size={16}
-                    className="mt-0.5 shrink-0"
-                    aria-hidden="true"
-                  />
+              {cameraNotice && <p className="ehs-notice" role="status">{cameraNotice}</p>}
+              {error && (
+                <div role="alert" className="ehs-message ehs-message-error">
+                  <CircleAlert size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>{error}</span>
                 </div>
-              ) : null}
-
-              {success ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 p-2.5 text-[10px] font-semibold leading-4 text-emerald-800 sm:mt-5 sm:gap-3 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
-                  <CheckCircle2
-                    size={16}
-                    className="mt-0.5 shrink-0"
-                    aria-hidden="true"
-                  />
+              )}
+              {success && (
+                <div role="status" className="ehs-message ehs-message-success">
+                  <CheckCircle2 size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>{success}</span>
                 </div>
-              ) : null}
-
-              {privacyHolds.length ? (
-                <div className="mt-3 sm:mt-5">
-                  <MediaPrivacyHoldPanel holds={privacyHolds} scope="host" />
-                </div>
-              ) : null}
-            </div>
-
-            <aside className="border-t border-violet-200 bg-[#F1EDFF] p-3 sm:p-6 xl:border-l xl:border-t-0 xl:p-7">
-              <div className="flex items-center gap-2 text-stone-950">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-600 text-white sm:h-10 sm:w-10 sm:rounded-2xl">
-                  <ShieldCheck size={17} aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-violet-700 sm:text-[10px]">
-                    AFTER THE SCAN
-                  </p>
-                  <h2 className="text-sm font-black text-stone-950 sm:text-base">
-                    What happens next
-                  </h2>
-                </div>
+              )}
+              {privacyHolds.length > 0 && (
+                <div className="mt-4"><MediaPrivacyHoldPanel holds={privacyHolds} scope="host" /></div>
+              )}
+            </section>
+            <aside className="ehs-next" aria-labelledby="ehs-next-title">
+              <p className="ehs-number">02 / Next step</p>
+              <h2 id="ehs-next-title">After the barcode check</h2>
+              <div className="ehs-outcome">
+                <span className="ehs-outcome-marker"><CheckCircle2 size={17} aria-hidden="true" /></span>
+                <div><strong>Product found</strong><p>Continue to pricing and stock.</p></div>
               </div>
-
-              <p className="mt-2 text-[9.5px] font-semibold leading-[14px] text-stone-600 sm:mt-3 sm:text-sm sm:font-medium sm:leading-6">
-                <span className="sm:hidden">
-                  EPANTRY checks the barcode first. New products need clear pack
-                  photos before listing.
-                </span>
-                <span className="hidden sm:inline">
-                  EPANTRY checks whether the barcode already matches a product.
-                  New products need clear pack photos and review before they can
-                  be listed.
-                </span>
-              </p>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 xl:grid-cols-1 xl:gap-3">
-                {[
-                  {
-                    title: "Existing product",
-                    text: "Continue to Pricing & Stock.",
-                    tone: "border-emerald-200 bg-emerald-50",
-                  },
-                  {
-                    title: "New product",
-                    text: "Add clear product and pack photos.",
-                    tone: "border-sky-200 bg-sky-50",
-                  },
-                  {
-                    title: "Product review",
-                    text: "EPANTRY checks new product details before listing.",
-                    tone: "border-violet-200 bg-violet-50",
-                  },
-                  {
-                    title: "Next workspace",
-                    text: "Continue in Listing Studio when review is needed.",
-                    tone: "border-cyan-200 bg-cyan-50",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.title}
-                    className={`flex gap-2 rounded-xl border p-2 sm:gap-3 sm:rounded-2xl sm:p-3 ${item.tone}`}
-                  >
-                    <CheckCircle2
-                      size={14}
-                      className="mt-0.5 shrink-0 text-emerald-700 sm:h-[17px] sm:w-[17px]"
-                      aria-hidden="true"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-[9.5px] font-black leading-3 text-stone-900 sm:text-xs sm:leading-4">
-                        {item.title}
-                      </p>
-                      <p className="mt-0.5 text-[8.5px] font-semibold leading-[12px] text-stone-500 sm:mt-1 sm:text-[11px] sm:leading-4">
-                        {item.text}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="ehs-outcome">
+                <span className="ehs-outcome-marker"><ImagePlus size={17} aria-hidden="true" /></span>
+                <div><strong>New product</strong><p>Add pack photos and details for review, then continue in Listing Studio.</p></div>
               </div>
             </aside>
           </div>
@@ -1362,7 +1245,7 @@ export default function ScanAnythingPage({ mode = "customer" }) {
 
       {barcodeResolution ? (
         <section
-          className={`mt-3 rounded-[20px] border p-3 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-7 ${
+          className={`mt-3 rounded-[20px] border p-3 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-7 ${hostMode ? "ehs-conditional-section" : ""} ${
             !hostMode ? "ep-scan-result" : ""
           } ${
             hostMode && !canonicalProduct
@@ -1484,13 +1367,13 @@ export default function ScanAnythingPage({ mode = "customer" }) {
       ) : null}
 
       {hostMode && barcodeResolution && !canonicalProduct ? (
-        <section className="mt-3 rounded-[20px] border border-emerald-200 bg-[#EAFBF3] p-3 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-7">
+        <section className="ehs-conditional-section ehs-new-product mt-3 rounded-[20px] border border-emerald-200 bg-[#EAFBF3] p-3 shadow-sm sm:mt-5 sm:rounded-[28px] sm:p-7">
           <div className="flex items-start gap-2.5 sm:gap-3">
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white sm:h-10 sm:w-10 sm:rounded-2xl">
               <ImagePlus size={18} aria-hidden="true" />
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 ehs-new-intro">
               <p className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs">
                 COMPLETE NEW PRODUCT
               </p>
@@ -1506,62 +1389,15 @@ export default function ScanAnythingPage({ mode = "customer" }) {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
-            {[
-              {
-                number: "1",
-                title: "Add photos",
-                text: "Upload clear pack and label photos.",
-                tone: "border-sky-200 bg-sky-50",
-                numberTone: "bg-sky-600",
-              },
-              {
-                number: "2",
-                title: "Check details",
-                text: "Confirm the name, pack and label facts.",
-                tone: "border-violet-200 bg-violet-50",
-                numberTone: "bg-violet-600",
-              },
-              {
-                number: "3",
-                title: "Add food info",
-                text: "Fill nutrition, allergens and Veg / Non-veg.",
-                tone: "border-cyan-200 bg-cyan-50",
-                numberTone: "bg-cyan-700",
-              },
-              {
-                number: "4",
-                title: "Send for review",
-                text: "Then continue in Listing Studio.",
-                tone: "border-emerald-200 bg-emerald-50",
-                numberTone: "bg-emerald-700",
-              },
-            ].map((step) => (
-              <div
-                key={step.number}
-                className={`rounded-xl border p-2 sm:rounded-2xl sm:p-3 ${step.tone}`}
-              >
-                <div className="flex items-start gap-2">
-                  <span
-                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[9px] font-black text-white sm:h-6 sm:w-6 sm:text-[10px] ${step.numberTone}`}
-                  >
-                    {step.number}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[14px] text-stone-900 sm:text-xs sm:leading-4">
-                      {step.title}
-                    </p>
-                    <p className="mt-0.5 text-[8.5px] font-semibold leading-3 text-stone-500 sm:mt-1 sm:text-[11px] sm:leading-4">
-                      {step.text}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="ehs-new-steps" aria-label="New product review steps">
+            <div className="ehs-new-step"><b>01</b><span>Add photos</span></div>
+            <div className="ehs-new-step"><b>02</b><span>Check details</span></div>
+            <div className="ehs-new-step"><b>03</b><span>Food information</span></div>
+            <div className="ehs-new-step"><b>04</b><span>Send for review</span></div>
           </div>
 
           <div className="mt-3 grid gap-3 xl:mt-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] xl:gap-5">
-            <div className="rounded-[18px] border border-sky-200 bg-[#EAF5FF] p-3 sm:rounded-[24px] sm:p-5">
+            <div className="ehs-upload-panel rounded-[18px] border border-sky-200 bg-[#EAF5FF] p-3 sm:rounded-[24px] sm:p-5">
               <p className="text-[12px] font-black text-stone-950 sm:text-sm">
                 Product photos
               </p>
@@ -1635,7 +1471,7 @@ export default function ScanAnythingPage({ mode = "customer" }) {
               ) : null}
             </div>
 
-            <div className="rounded-[18px] border border-violet-200 bg-[#F2EEFF] p-3 sm:rounded-[24px] sm:p-5">
+            <div className="ehs-details-panel rounded-[18px] border border-violet-200 bg-[#F2EEFF] p-3 sm:rounded-[24px] sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-[12px] font-black text-stone-950 sm:text-sm">
