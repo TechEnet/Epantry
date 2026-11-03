@@ -79,7 +79,7 @@ const orderStyles = String.raw`
 .eho-order-row{display:grid;grid-template-columns:74px minmax(0,1fr) auto;align-items:center;gap:16px;min-height:126px;padding:18px 5px 18px 0;color:var(--eho-charcoal);text-decoration:none;border-bottom:1px solid #E2E7E0;position:relative;transition:background-color .17s,transform .17s}
 /* The list itself scrolls after four real rows; the section heading stays visible. */
 .eho-list-viewport{position:relative;min-width:0}
-.eho-list-viewport[data-scroll='true']{overflow-y:auto;overscroll-behavior-y:contain;max-height:504px;scrollbar-width:thin;scrollbar-color:#8DA99A #F1F4EE;scrollbar-gutter:stable}
+.eho-list-viewport[data-scroll='true']{overflow-y:auto;overscroll-behavior-y:auto;max-height:504px;scrollbar-width:thin;scrollbar-color:#8DA99A #F1F4EE;scrollbar-gutter:stable}
 .eho-list-viewport[data-scroll='true']::-webkit-scrollbar{width:7px}
 .eho-list-viewport[data-scroll='true']::-webkit-scrollbar-track{background:#F1F4EE}
 .eho-list-viewport[data-scroll='true']::-webkit-scrollbar-thumb{background:#9EB8A9;border-radius:8px}
@@ -92,6 +92,9 @@ const orderStyles = String.raw`
 .eho-order-content{min-width:0;display:flex;flex-direction:column;gap:7px}
 .eho-order-name{font-size:17px;line-height:1.35;font-weight:820;letter-spacing:-.02em;color:#1F362C;overflow-wrap:anywhere}
 .eho-row-reference{color:#7A877C;font-size:12px;line-height:1.35;font-weight:650;letter-spacing:.02em}
+.eho-order-meta-line{display:contents}
+.eho-order-content>.eho-order-bottom{order:1}
+.eho-order-meta-line>.eho-status{order:2}
 .eho-order-bottom{display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px;color:#637168;font-size:13px}
 .eho-status{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;padding:4px 9px;border-radius:999px;font-size:11px;line-height:1.4;letter-spacing:.01em;font-weight:800;background:#E7ECE7;color:#476254}
 .eho-status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
@@ -129,6 +132,87 @@ const orderStyles = String.raw`
 @media(max-width:860px){.eho-top{grid-template-columns:1fr}.eho-top-aside{border-left:0;border-top:3px solid #C56B45;flex-direction:row;align-items:center;padding:21px 26px}.eho-aside-count{font-size:36px}.eho-aside-foot{border:0;padding:0}.eho-aside-foot span{display:none}.eho-section{grid-template-columns:1fr}.eho-section-intro{border-right:0;border-bottom:1px solid #D8E0D5;padding:22px 26px}.eho-section-sub{max-width:none}.eho-big-count{padding-top:12px}.eho-section-list{padding:4px 25px}.eho-section-title{margin-top:7px}}
 @media(max-width:640px){.eho-page{padding:12px 11px 34px}.eho-top{border-radius:13px 13px 0 0}.eho-top-main{padding:22px 21px 24px}.eho-top h1{font-size:38px!important}.eho-kicker{font-size:11px;margin-bottom:11px}.eho-top-lead{font-size:14px;line-height:1.55;margin-top:10px}.eho-top-actions{margin-top:19px;gap:8px}.eho-primary-link,.eho-outline-link{font-size:13px;padding:9px 12px;min-height:40px}.eho-top-aside{padding:13px 19px;gap:10px}.eho-aside-eyebrow{font-size:10px}.eho-aside-label{font-size:12px;margin:5px 0 0}.eho-aside-count{font-size:31px}.eho-refresh{font-size:13px;min-height:38px;padding:8px 10px}.eho-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.eho-stat{padding:12px 9px;gap:6px;flex-direction:column;align-items:flex-start}.eho-stat-num{font-size:26px}.eho-stat-text strong{font-size:12px;line-height:1.3}.eho-stat-text small{display:none}.eho-stat-arrow{position:absolute;top:14px;right:7px;width:12px}.eho-orders{gap:22px;margin-top:22px}.eho-section{border-radius:9px}.eho-section-intro{padding:18px 16px;gap:0}.eho-section-number{font-size:11px}.eho-section-title{font-size:26px!important;margin:7px 0 0}.eho-section-sub{font-size:14px;line-height:1.5;margin-top:5px}.eho-big-count{padding-top:5px}.eho-big-count strong{font-size:21px}.eho-big-count span{font-size:12px}.eho-section-list{padding:4px 13px}.eho-order-row{grid-template-columns:59px minmax(0,1fr);gap:11px;padding:14px 0;min-height:102px}.eho-photo{width:59px;height:64px}.eho-order-content{gap:5px}.eho-order-name{font-size:15px;line-height:1.32}.eho-row-reference{font-size:11px}.eho-order-bottom{font-size:12px;gap:3px 10px}.eho-order-side{grid-column:2;align-items:center;justify-content:space-between;flex-direction:row;gap:9px;min-width:0;text-align:left}.eho-order-total{font-size:14px}.eho-order-open{font-size:11px}.eho-status{font-size:10px;padding:3px 7px}.eho-list-viewport[data-scroll='true']{max-height:604px}.eho-view-all{font-size:13px}.eho-empty{padding:22px 0;font-size:14px}.eho-modal-header{padding:17px}.eho-modal-header h2{font-size:23px}.eho-modal-list{padding:2px 14px 20px}.eho-checkout{margin-top:26px}.eho-checkout-intro{padding:19px}.eho-checkout-intro h2{font-size:24px;margin:9px 0}.eho-checkout-intro p{font-size:14px}.eho-checkout-form{padding:18px}.eho-form-grid{grid-template-columns:1fr 1fr;gap:14px}.eho-form-grid .eho-field:first-child{grid-column:1/-1}.eho-form-texts{grid-template-columns:1fr;gap:14px;margin-top:17px;padding-top:17px}.eho-field{font-size:13px}.eho-field :is(input,textarea){font-size:15px;min-height:46px;padding:11px 12px}.eho-form-footer{margin-top:18px}.eho-save{width:100%}}
 @media(max-width:350px){.eho-page{padding-inline:8px}.eho-top-actions{flex-direction:column;align-items:stretch}.eho-top-actions a{justify-content:center}.eho-top-aside{align-items:flex-start}.eho-form-grid{grid-template-columns:1fr}.eho-form-grid .eho-field:first-child{grid-column:auto}}
+
+/* Mobile-only refinement: desktop, data, order actions and scroll handoff stay intact. */
+.eho-mobile-copy{display:none}
+@media(max-width:640px){
+  .eho-page{padding:11px 9px 29px;font-size:15px}
+  .eho-desktop-copy{display:none}
+  .eho-mobile-copy{display:inline}
+  .eho-top{border-radius:12px 12px 0 0}
+  .eho-top-main{padding:19px 16px 18px}
+  .eho-kicker{font-size:11px;letter-spacing:.075em;margin-bottom:8px}
+  .eho-top h1{font-size:32px!important;letter-spacing:-.04em!important}
+  .eho-top-lead{margin-top:8px;font-size:14px;line-height:1.45}
+  .eho-top-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:15px}
+  .eho-primary-link,.eho-outline-link{justify-content:center;min-width:0;gap:5px;padding:10px 6px;min-height:43px;font-size:12.5px;line-height:1.25;text-align:center}
+  .eho-primary-link svg,.eho-outline-link svg{width:15px;flex:none}
+  .eho-top-aside{padding:12px 16px;flex-direction:row;align-items:center;gap:10px}
+  .eho-aside-eyebrow,.eho-aside-foot>span{display:none}
+  .eho-aside-label{font-size:13px;line-height:1.3;margin:0 0 2px;color:#3D5749}
+  .eho-aside-count{font-size:29px;line-height:1}
+  .eho-refresh{font-size:13px;min-height:38px;padding:8px 10px}
+  .eho-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .eho-stat{padding:12px 9px 11px;gap:3px;min-height:79px}
+  .eho-stat-num{font-size:27px;line-height:1}
+  .eho-stat-text strong{font-size:12.5px;line-height:1.3}
+  .eho-stat-arrow{width:13px;right:6px;top:9px}
+  .eho-orders{margin-top:19px;gap:22px}
+  .eho-section{border-radius:11px;background:#FFFEFB}
+  .eho-section-intro{padding:15px 14px 13px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center;gap:5px 12px}
+  .eho-section-number{grid-column:1/-1;font-size:11px;letter-spacing:.06em}
+  .eho-section-title{grid-column:1;grid-row:2;margin:0;font-size:23px!important;line-height:1.18!important}
+  .eho-section-sub{display:none}
+  .eho-big-count{grid-column:2;grid-row:2;align-self:center;margin:0;padding:6px 9px;gap:5px;border:1px solid #D8DED3;border-radius:8px;background:rgba(255,255,255,.67)}
+  .eho-big-count strong{font-size:19px;line-height:1.1}
+  .eho-big-count span{font-size:12px}
+  .eho-section-list{padding:1px 12px 10px}
+  .eho-order-row{grid-template-columns:54px minmax(0,1fr);grid-template-rows:auto auto;align-items:start;column-gap:10px;row-gap:4px;min-height:0;padding:13px 0 12px}
+  .eho-photo{grid-column:1;grid-row:1/span 2;width:54px;height:60px;align-self:start;border-radius:8px}
+  .eho-order-content{grid-column:2;grid-row:1;gap:5px}
+  .eho-order-name{font-size:15.5px;line-height:1.32;letter-spacing:-.015em}
+  .eho-order-meta-line{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px}
+  .eho-reference-prefix{display:none}
+  .eho-row-reference{font-size:12.5px;line-height:1.35;letter-spacing:0;white-space:nowrap}
+  .eho-status{font-size:11px;line-height:1.3;padding:3px 7px;letter-spacing:0}
+  .eho-order-bottom{font-size:12.5px;line-height:1.35;gap:3px 9px;color:#617067}
+  .eho-order-side{grid-column:2;grid-row:2;display:flex;justify-content:space-between;align-items:center;flex-direction:row;gap:8px;min-width:0;margin-top:3px;padding-top:8px;border-top:1px solid #E5E9E1;text-align:left}
+  .eho-order-total{font-size:15px;line-height:1.25;white-space:nowrap}
+  .eho-order-open{font-size:12.5px;gap:4px;white-space:nowrap;color:#A65031}
+  .eho-order-open svg{width:14px}
+  .eho-list-viewport[data-scroll='true']{overscroll-behavior-y:auto;scrollbar-gutter:auto;-webkit-overflow-scrolling:touch}
+  .eho-view-wrap{padding-top:3px}
+  .eho-view-all{min-height:40px;margin:8px 0 3px;padding:9px 13px;font-size:13px}
+  .eho-modal{width:100%;max-height:88dvh;border-radius:12px}
+  .eho-modal-header{padding:15px 16px}.eho-modal-header h2{font-size:22px}
+  .eho-modal-list{padding:3px 13px 17px}
+  .eho-checkout{margin-top:25px;border-radius:11px 11px 0 0}
+  .eho-checkout-intro{padding:17px 15px 14px}
+  .eho-checkout-intro h2{font-size:23px;margin:5px 0 0}
+  .eho-checkout-intro p{font-size:13.5px;line-height:1.45;margin-top:6px}
+  .eho-checkout-form{padding:17px 14px 18px}
+  .eho-form-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+  .eho-form-grid .eho-field:first-child{grid-column:1/-1}
+  .eho-field{font-size:13px;line-height:1.35;font-weight:750}
+  .eho-field :is(input,textarea){font-size:15px;line-height:1.4;margin-top:7px;padding:11px 12px}
+  .eho-field input{min-height:45px}
+  .eho-field textarea{min-height:92px}
+  .eho-form-help{margin-top:7px;font-size:12.5px}
+  .eho-form-texts{grid-template-columns:1fr;gap:14px;padding-top:15px;margin-top:15px}
+  .eho-form-footer{margin-top:16px;padding-top:15px}
+  .eho-save{min-height:46px;font-size:14px}
+}
+@media(max-width:360px){
+  .eho-page{padding-inline:8px}
+  .eho-top-actions{grid-template-columns:1fr 1fr}
+  .eho-section-list{padding-inline:10px}
+  .eho-order-row{grid-template-columns:49px minmax(0,1fr);column-gap:9px}
+  .eho-photo{width:49px;height:57px}
+  .eho-order-name{font-size:15px}
+  .eho-order-open{font-size:12px}
+  .eho-form-grid{grid-template-columns:1fr}
+  .eho-form-grid .eho-field:first-child{grid-column:auto}
+}
 @media(prefers-reduced-motion:reduce){.eho-page :is(a,button,img){transition:none!important}}
 `;
 
@@ -358,16 +442,18 @@ function OrderRow({ order, itemImages, eager = false }) {
       <OrderPhoto name={primaryName} imageUrl={imageUrl} count={order.itemCount || names.length || 1} eager={eager} />
       <span className="eho-order-content">
         <strong className="eho-order-name">{orderDisplayName(order)}</strong>
-        <span className="eho-row-reference">Order #{shortOrderId(order.id)}</span>
+        <span className="eho-order-meta-line">
+          <span className="eho-row-reference"><span className="eho-reference-prefix">Order </span>#{shortOrderId(order.id)}</span>
+          <span className="eho-status" data-tone={tone}>{badge}</span>
+        </span>
         <span className="eho-order-bottom">
           <span>{order.itemCount || 0} {order.itemCount === 1 ? 'item' : 'items'}</span>
           <span>{formatDateTime(order.createdAt)}</span>
         </span>
-        <span className="eho-status" data-tone={tone}>{badge}</span>
       </span>
       <span className="eho-order-side">
         {total && <strong className="eho-order-total">{total}</strong>}
-        <span className="eho-order-open">View order <ArrowRight size={16} aria-hidden="true" /></span>
+        <span className="eho-order-open"><span className="eho-desktop-copy">View order</span><span className="eho-mobile-copy">Open order</span> <ArrowRight size={16} aria-hidden="true" /></span>
       </span>
     </Link>
   )
@@ -877,7 +963,7 @@ export default function HostOrdersPage() {
           <div className="eho-top-main">
             <p className="eho-kicker">EPANTRY / HOST WORKSPACE</p>
             <h1>Your orders<em>.</em></h1>
-            <p className="eho-top-lead">From new requests to completed deliveries, everything you need to manage customer orders.</p>
+            <p className="eho-top-lead"><span className="eho-desktop-copy">From new requests to completed deliveries, everything you need to manage customer orders.</span><span className="eho-mobile-copy">Review, prepare and track orders.</span></p>
             <div className="eho-top-actions">
               <a className="eho-primary-link" href="#new-orders">Review new orders <ArrowRight size={17} aria-hidden="true" /></a>
               <Link className="eho-outline-link" to="/host/fulfillment">Open Fulfillment <ArrowRight size={17} aria-hidden="true" /></Link>
@@ -886,7 +972,7 @@ export default function HostOrdersPage() {
           <div className="eho-top-aside">
             <div>
               <span className="eho-aside-eyebrow">YOUR ORDER DESK</span>
-              <p className="eho-aside-label">Waiting for review</p>
+              <p className="eho-aside-label"><span className="eho-desktop-copy">Waiting for review</span><span className="eho-mobile-copy">Need review</span></p>
               <div className="eho-aside-count" aria-live="polite">{groupedOrders.newOrders.length}</div>
             </div>
             <div className="eho-aside-foot">
@@ -936,22 +1022,22 @@ export default function HostOrdersPage() {
       <form onSubmit={handlePolicySave} className="eho-checkout">
         <div className="eho-checkout-intro">
           <span className="eho-section-number">04 / CHECKOUT</span>
-          <h2>Delivery &amp; customer policies</h2>
-          <p>Manage the delivery fee and policy messages shown to customers at checkout.</p>
+          <h2><span className="eho-desktop-copy">Delivery &amp; customer policies</span><span className="eho-mobile-copy">Checkout settings</span></h2>
+          <p><span className="eho-desktop-copy">Manage the delivery fee and policy messages shown to customers at checkout.</span><span className="eho-mobile-copy">Set delivery charges and checkout policies.</span></p>
         </div>
         <div className="eho-checkout-form">
           <div className="eho-form-grid">
             <label className="eho-field">Currency
               <input value={policy.currency} maxLength="3" onChange={(event) => setPolicy((current) => ({...current, currency: event.target.value.toUpperCase()}))} />
             </label>
-            <label className="eho-field">Delivery fee (minor units)
+            <label className="eho-field"><span className="eho-desktop-copy">Delivery fee (minor units)</span><span className="eho-mobile-copy">Delivery fee</span>
               <input type="number" min="0" step="1" value={policy.deliveryFeeMinor} onChange={(event) => setPolicy((current) => ({...current, deliveryFeeMinor: event.target.value}))} />
             </label>
-            <label className="eho-field">Free delivery from (minor units)
+            <label className="eho-field"><span className="eho-desktop-copy">Free delivery from (minor units)</span><span className="eho-mobile-copy">Free delivery above</span>
               <input type="number" min="0" step="1" value={policy.freeDeliveryThresholdMinor} onChange={(event) => setPolicy((current) => ({...current, freeDeliveryThresholdMinor: event.target.value}))} />
             </label>
           </div>
-          <p className="eho-form-help">For INR, 100 minor units = ₹1.</p>
+          <p className="eho-form-help"><span className="eho-desktop-copy">For INR, 100 minor units = ₹1.</span><span className="eho-mobile-copy">INR: 100 units = ₹1.</span></p>
           <div className="eho-form-texts">
             <label className="eho-field">Cancellation message
               <textarea rows="3" value={policy.cancellationPolicySummary} onChange={(event) => setPolicy((current) => ({...current, cancellationPolicySummary: event.target.value}))} />
