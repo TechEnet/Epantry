@@ -1,6 +1,15 @@
+import crypto from 'crypto'
+
 import {
   recordAnalyticsEventBestEffort,
 } from '../modules/analytics/analytics.service.js'
+
+import {
+  organizationForPublicListingPath,
+  organizationForPublishedRecipe,
+  organizationsForSavedCart,
+  safeHostAttribution,
+} from '../modules/analytics/analytics.hostAttribution.service.js'
 
 import {
   resolveHostOrganization,
@@ -166,6 +175,37 @@ function notificationSafeSpecs(
     ]
   }
 
+  // A real successful read of a Super Admin-approved Host listing.
+  // This is a non-paid content view, not an invented search impression.
+  if (method === 'GET' && (
+    /^\/api\/v1\/public\/host-listings\/[a-f\d]{24}$/i.test(pathname) ||
+    /^\/api\/v1\/public\/host-listings\/by-slug\/[^/]+$/.test(pathname)
+  )) {
+    return [{
+      eventName: 'discovery.listing_viewed',
+      sourceDomain: 'host_listings',
+      entities: [],
+      decisionContext: 'organic',
+      payload: { surface: 'public_listing_detail' },
+    }]
+  }
+
+  // A completed cooking action is already committed by Pantry and is
+  // idempotent at the domain boundary. This event is analytics-only.
+  if (method === 'POST' &&
+      /^\/api\/v1\/recipes\/[^/]+\/cooked$/.test(pathname)) {
+    const servings = Number(body.targetServings)
+    return [{
+      eventName: 'recipe.cooked',
+      sourceDomain: 'recipes',
+      entities: [],
+      payload: {
+        portions: Number.isFinite(servings) && servings > 0 ? servings : 1,
+        completionSource: 'customer_cooked_action',
+      },
+    }]
+  }
+
   if (
     method ===
       'GET' &&
@@ -205,7 +245,7 @@ function notificationSafeSpecs(
         sourceDomain:
           'outcomes',
         entities:
-          [],
+          recipeEntityFromPath(pathname.replace(/\/outcome-plan$/, '')),
         payload: {
           source:
             'outcome_plan',
@@ -649,9 +689,14 @@ export function analyticsInstrumentationMiddleware(
       req,
     )
 
+  const savedCartAction = req.method === 'POST' && [
+    '/api/v1/cart',
+    '/api/v1/cart/direct',
+    '/api/v1/cart/restaurant-recipe',
+  ].includes(pathname)
+
   if (
-    specs.length ===
-    0
+    specs.length === 0 && !savedCartAction
   ) {
     return next()
   }
@@ -670,59 +715,130 @@ export function analyticsInstrumentationMiddleware(
 
       void (
         async () => {
-          const organizationId =
-            await organizationIdForRequest(
-              req,
-              pathname,
-            )
+          const recipeMatch = pathname.match(
+            /^\/api\/v1\/recipes\/([^/]+)(?:\/(?:outcome-plan|cooked))?$/,
+          )
+          const recipeAttribution = recipeMatch && specs.some((item) =>
+            item.eventName.startsWith('recipe.'))
+            ? await safeHostAttribution(() =>
+                organizationForPublishedRecipe(decodeURIComponent(recipeMatch[1])))
+            : null
+          const listingAttribution = specs.some((item) =>
+            item.eventName === 'discovery.listing_viewed')
+            ? await safeHostAttribution(() => organizationForPublicListingPath(pathname))
+            : null
+          const hostOrganizationId = await organizationIdForRequest(req, pathname)
+          const ownerOrganizationId = recipeAttribution?.organizationId ||
+            listingAttribution?.organizationId || hostOrganizationId || null
 
-          for (
-            const spec of
-            specs
-          ) {
+          for (const spec of specs) {
+            const entity = spec.eventName === 'discovery.listing_viewed' &&
+                listingAttribution?.listingId
+              ? [{ entityType: 'host_listing', entityId: listingAttribution.listingId, version: '' }]
+              : spec.eventName.startsWith('recipe.') && recipeAttribution?.dishId && !(spec.entities || []).length
+                ? [{ entityType: 'recipe', entityId: recipeAttribution.dishId, version: '' }]
+                : spec.entities || []
+            // Repeating a committed cooking command must never count twice.
+            const cookKey = spec.eventName === 'recipe.cooked'
+              ? String(req.get('idempotency-key') || '')
+              : ''
+            const clientEventId = cookKey && recipeAttribution?.dishId
+              ? `cook_${crypto.createHash('sha256').update([
+                  req.currentUser?._id || req.currentUser?.id || '',
+                  recipeAttribution.dishId, cookKey,
+                ].join(':')).digest('hex')}`
+              : null
             await recordAnalyticsEventBestEffort({
               input: {
-                eventName:
-                  spec.eventName,
-                eventVersion:
-                  1,
-                occurredAt:
-                  new Date(),
-                correlationId:
-                  req.requestId ||
-                  '',
-                sessionId:
-                  '',
-                householdId:
-                  '',
-                entities:
-                  spec.entities ||
-                  [],
-                sourceDomain:
-                  spec.sourceDomain,
-                sourceVersion:
-                  'm19-v1',
-                decisionContext:
-                  'not_applicable',
-                confidenceTier:
-                  'verified',
-                featureFlags:
-                  [],
-                experiments:
-                  [],
-                payload:
-                  spec.payload ||
-                  {},
+                clientEventId,
+                eventName: spec.eventName,
+                eventVersion: 1,
+                occurredAt: new Date(),
+                correlationId: req.requestId || '',
+                sessionId: '',
+                householdId: '',
+                entities: entity,
+                sourceDomain: spec.sourceDomain,
+                sourceVersion: ['discovery.listing_viewed', 'recipe.cooked'].includes(spec.eventName)
+                  ? 'm19-host-attribution-v2'
+                  : 'm19-v1',
+                decisionContext: spec.decisionContext || 'not_applicable',
+                confidenceTier: 'verified',
+                featureFlags: [],
+                experiments: [],
+                payload: spec.payload || {},
               },
-              actorUser:
-                req.currentUser ||
-                req.user ||
-                null,
-              requestId:
-                req.requestId ||
-                '',
-              organizationId,
+              actorUser: req.currentUser || req.user || null,
+              requestId: req.requestId || '',
+              organizationId: ownerOrganizationId,
             })
+          }
+
+          // Host recipe listings use the public Host packet read route,
+          // not the canonical /recipes/:slug route. Count their verified
+          // detail views as recipe engagement too, without claiming cooking.
+          if (listingAttribution?.isRecipe && listingAttribution.organizationId) {
+            await recordAnalyticsEventBestEffort({
+              input: {
+                eventName: 'recipe.viewed',
+                eventVersion: 1,
+                occurredAt: new Date(),
+                correlationId: req.requestId || '',
+                sessionId: '',
+                householdId: '',
+                entities: [{
+                  entityType: 'host_listing',
+                  entityId: listingAttribution.listingId,
+                  version: '',
+                }],
+                sourceDomain: 'host_listings',
+                sourceVersion: 'm19-host-attribution-v2',
+                decisionContext: 'not_applicable',
+                confidenceTier: 'verified',
+                featureFlags: [],
+                experiments: [],
+                payload: { source: 'public_host_recipe_detail' },
+              },
+              actorUser: req.currentUser || req.user || null,
+              requestId: req.requestId || '',
+              organizationId: listingAttribution.organizationId,
+            })
+          }
+
+          // An actual persisted Marketplace cart is authoritative for the
+          // seller scope; never infer seller ownership from client-provided
+          // product IDs, a requested business ID or a quote preview.
+          if (savedCartAction) {
+            const carts = await safeHostAttribution(() =>
+              organizationsForSavedCart({
+                actorUser: req.currentUser || req.user,
+                idempotencyKey: req.get('idempotency-key'),
+              })) || []
+            for (const cart of carts) {
+              await recordAnalyticsEventBestEffort({
+                input: {
+                  clientEventId: `hostbasket_${crypto.createHash('sha256')
+                    .update(`${cart.cartId}:${cart.organizationId}`).digest('hex')}`,
+                  eventName: 'commerce.host_basket_created',
+                  eventVersion: 1,
+                  occurredAt: new Date(),
+                  correlationId: req.requestId || '',
+                  sessionId: '',
+                  householdId: '',
+                  entities: [{ entityType: 'marketplace_cart', entityId: cart.cartId, version: '' }],
+                  sourceDomain: 'commerce',
+                  sourceVersion: 'm19-host-attribution-v2',
+                  decisionContext: 'not_applicable',
+                  confidenceTier: 'verified',
+                  featureFlags: [],
+                  experiments: [],
+                  payload: { lineCount: cart.lineCount, fulfillmentMode: 'marketplace' },
+                },
+                actorUser: req.currentUser || req.user || null,
+                requestId: req.requestId || '',
+                organizationId: cart.organizationId,
+              })
+            }
           }
         }
       )()

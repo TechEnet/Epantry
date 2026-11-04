@@ -66,6 +66,23 @@ export const ANALYTICS_EVENT_REGISTRY = Object.freeze({
     ],
   },
 
+  // A non-paid public listing view or an actually served paid placement.
+  'discovery.listing_viewed': {
+    version: 1,
+    allowedPayloadKeys: ['surface'],
+  },
+
+  'discovery.sponsored_served': {
+    version: 1,
+    allowedPayloadKeys: ['placement'],
+  },
+
+  // Organization-scoped cart engagement, distinct from the global cart event.
+  'commerce.host_basket_created': {
+    version: 1,
+    allowedPayloadKeys: ['lineCount', 'fulfillmentMode'],
+  },
+
   'pantry.marked': {
     version: 1,
     allowedPayloadKeys: [

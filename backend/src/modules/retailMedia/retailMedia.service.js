@@ -8,6 +8,8 @@ import {
   ApiError,
 } from '../../utils/ApiError.js'
 
+import { recordAnalyticsEventBestEffort } from '../analytics/analytics.service.js'
+
 import {
   createRetailMediaImageUploadIntent,
 } from '../../integrations/media/cloudinary.provider.js'
@@ -4017,6 +4019,33 @@ export async function decideLowRiskSponsoredPlacement({
       sponsoredRankScore:
         selected.score,
     })
+
+  // Count only campaigns that actually passed safety, approval and
+  // frequency checks and were selected for serving. This is a placement
+  // serve decision, not a claimed browser impression or conversion.
+  void recordAnalyticsEventBestEffort({
+    input: {
+      eventName: 'discovery.sponsored_served',
+      eventVersion: 1,
+      occurredAt: now,
+      correlationId: `retail_${String(decisionLog?._id || selected.campaign._id)}`,
+      sessionId: '',
+      householdId: '',
+      entities: [{
+        entityType: 'retail_media_campaign',
+        entityId: String(selected.campaign._id),
+        version: '',
+      }],
+      sourceDomain: 'retail_media',
+      sourceVersion: 'm19-host-attribution-v2',
+      decisionContext: 'sponsored',
+      confidenceTier: 'verified',
+      featureFlags: [],
+      experiments: [],
+      payload: { placement: input.placement },
+    },
+    organizationId: selected.campaign.organizationId,
+  })
 
   const [
     sponsorOrganization,

@@ -1043,14 +1043,66 @@ export default function HostRetailMediaPage() {
         .host-campaigns-page .host-campaigns-creative-title { font-size: 23px !important; line-height: 1.3 !important; }
         .host-campaigns-page .host-campaigns-sidebar-title { font-size: 21px !important; line-height: 1.3 !important; }
         @media (max-width: 639px) {
-          .host-campaigns-page .host-campaigns-title { font-size: 27px !important; line-height: 1.2 !important; }
-          .host-campaigns-page .host-campaigns-section-title { font-size: 21px !important; line-height: 1.3 !important; }
-          .host-campaigns-page .host-campaigns-creative-title { font-size: 21px !important; line-height: 1.3 !important; }
+          /* Mobile-only presentation: preserve desktop styling and all campaign actions. */
+          .host-campaigns-page { padding: 8px 8px 22px !important; }
+          .host-campaigns-page .host-campaigns-title { font-size: 25px !important; line-height: 1.22 !important; }
+          .host-campaigns-page .host-campaigns-section-title,
+          .host-campaigns-page .host-campaigns-creative-title { font-size: 20px !important; line-height: 1.28 !important; }
+          .host-campaigns-page .host-campaigns-sidebar-title { font-size: 20px !important; line-height: 1.28 !important; }
+          .host-campaigns-page .campaign-header { border-radius: 13px; }
+          .host-campaigns-page .campaign-header-copy { padding: 16px !important; }
+          .host-campaigns-page .campaign-header-pills { margin-top: 12px; gap: 6px; }
+          .host-campaigns-page .campaign-header-pills > span { min-height: 28px; padding: 4px 9px; font-size: 12px; }
+          .host-campaigns-page .campaign-header-totals { flex-direction: row; align-items: center; gap: 12px; padding: 12px 16px !important; }
+          .host-campaigns-page .campaign-header-totals > div { min-width: 0; }
+          .host-campaigns-page .campaign-header-totals > div > div { margin-top: 3px; }
+          .host-campaigns-page .campaign-header-totals strong { font-size: 30px; }
+          .host-campaigns-page .campaign-header-totals > button { width: auto; min-width: 130px; flex-shrink: 0; padding-inline: 10px; font-size: 13px; }
+          .host-campaigns-page .campaign-step { gap: 9px; padding: 9px 10px; }
+          .host-campaigns-page .campaign-step > span { width: 26px; height: 26px; font-size: 12px; }
+          .host-campaigns-page .campaign-step p { font-size: 13px; line-height: 17px; }
+          .host-campaigns-page .campaign-step p + p { font-size: 12px; line-height: 16px; }
+          .host-campaigns-page .campaign-workspace { margin-top: 12px; gap: 12px; }
+          .host-campaigns-page .campaign-form-column { gap: 12px; }
+          .host-campaigns-page .campaign-brief-section,
+          .host-campaigns-page .campaign-placement-section { border-radius: 13px; padding: 15px 13px !important; }
+          .host-campaigns-page .campaign-brief-section > div:first-child,
+          .host-campaigns-page .campaign-placement-section > div:first-child { gap: 10px; }
+          .host-campaigns-page .campaign-brief-section > div:first-child > span,
+          .host-campaigns-page .campaign-placement-section > div:first-child > span,
+          .host-campaigns-page .campaign-creative-section > div:first-child > span { width: 34px; height: 34px; border-radius: 8px; }
+          .host-campaigns-page .campaign-placement-grid { gap: 7px; padding: 8px; }
+          .host-campaigns-page .campaign-placement-option { padding: 10px !important; }
+          .host-campaigns-page .campaign-creative-section { margin-top: 14px; gap: 12px; padding: 12px !important; }
+          .host-campaigns-page .campaign-image-preview,
+          .host-campaigns-page .campaign-image-uploader { height: 122px !important; }
+          .host-campaigns-page .campaign-list { border-radius: 13px; }
+          .host-campaigns-page .campaign-list-heading { padding: 13px 14px !important; }
+          .host-campaigns-page .campaign-list-heading > p { margin-top: 4px; font-size: 13px; }
+          /* Use the normal page scroll rather than a second scroll area on mobile. */
+          .host-campaigns-page .campaign-list-scroll { max-height: none !important; overflow-y: visible !important; }
+          .host-campaigns-page .campaign-entry { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 8px 12px; padding: 13px 14px !important; }
+          .host-campaigns-page .campaign-entry-image { width: 94px; height: 90px !important; border-radius: 9px; }
+          .host-campaigns-page .campaign-entry-heading { min-width: 0; margin-top: 0; flex-direction: column; align-items: flex-start; gap: 5px; }
+          .host-campaigns-page .campaign-entry-heading > span { flex-shrink: 0; padding: 3px 7px; }
+          .host-campaigns-page .campaign-entry-heading p { font-size: 14px; line-height: 19px; }
+          .host-campaigns-page .campaign-entry-heading p + p { margin-top: 2px; font-size: 12.5px; }
+          .host-campaigns-page .campaign-entry > :not(.campaign-entry-image):not(.campaign-entry-heading) { grid-column: 1 / -1; }
+          .host-campaigns-page .campaign-entry-placements { margin-top: 0; padding-top: 8px; }
+          .host-campaigns-page .campaign-entry-placements p { padding-block: 1px; font-size: 13px; line-height: 19px; }
+          .host-campaigns-page .campaign-entry-booked { margin-top: 0; font-size: 13px; line-height: 19px; }
+          .host-campaigns-page .campaign-entry-payment { margin-top: 2px; padding-block: 8px; }
+          .host-campaigns-page .campaign-entry-payment span { font-size: 13px; }
+          .host-campaigns-page .campaign-entry-review { margin-top: 0; padding: 9px 10px; font-size: 13px; line-height: 19px; }
+          .host-campaigns-page .campaign-entry-actions { margin-top: 3px; }
+          .host-campaigns-page .campaign-policies { margin-top: 12px; gap: 8px; padding: 11px 12px !important; border-radius: 11px; }
+          .host-campaigns-page .campaign-policies p { gap: 8px; font-size: 13px; line-height: 19px; }
+          .host-campaigns-page .campaign-policies svg { width: 15px; height: 15px; }
         }
       `}</style>
-      <header className="overflow-hidden rounded-[18px] border border-[#d7e2d8] bg-[#eaf1eb]">
+      <header className="campaign-header overflow-hidden rounded-[18px] border border-[#d7e2d8] bg-[#eaf1eb]">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="min-w-0 px-5 py-5 sm:px-7 sm:py-7 lg:px-8">
+          <div className="campaign-header-copy min-w-0 px-5 py-5 sm:px-7 sm:py-7 lg:px-8">
             <p className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.07em] text-[#965039]">
               <span className="h-[2px] w-6 bg-[#c86c42]" aria-hidden="true" />
               Host / Advertising
@@ -1061,7 +1113,7 @@ export default function HostRetailMediaPage() {
             <p className="mt-2 max-w-[650px] text-[14px] leading-[1.6] text-[#435b4d] sm:text-[15px]">
               Create your ad, choose its placement and submit it for approval.
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+            <div className="campaign-header-pills mt-5 flex flex-wrap items-center gap-2.5">
               <span className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[#c6d8ca] bg-white/80 px-3 text-[13px] font-medium text-[#284b3a]">
                 <ShieldCheck size={15} aria-hidden="true" /> Approval before launch
               </span>
@@ -1070,7 +1122,7 @@ export default function HostRetailMediaPage() {
               </span>
             </div>
           </div>
-          <div className="flex flex-col justify-between gap-5 bg-[#173f35] px-5 py-5 text-white sm:px-7 sm:py-6 lg:px-6">
+          <div className="campaign-header-totals flex flex-col justify-between gap-5 bg-[#173f35] px-5 py-5 text-white sm:px-7 sm:py-6 lg:px-6">
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#c9dfd1]">Your advertising</p>
               <div className="mt-2 flex items-end gap-3">
@@ -1093,9 +1145,9 @@ export default function HostRetailMediaPage() {
           </div>
         </div>
 
-        <nav className="grid grid-cols-2 gap-px border-t border-[#d0ddd2] bg-[#d0ddd2] lg:grid-cols-4" aria-label="Campaign setup stages">
+        <nav className="campaign-step-nav grid grid-cols-2 gap-px border-t border-[#d0ddd2] bg-[#d0ddd2] lg:grid-cols-4" aria-label="Campaign setup stages">
           {STEP_CARDS.map((step, index) => (
-            <div key={step.number} className={`flex min-w-0 items-center gap-3 px-3.5 py-3 sm:px-5 ${index === 0 ? 'bg-[#e0eee5]' : index === 1 ? 'bg-[#e9f2f5]' : index === 2 ? 'bg-[#f6e9e1]' : 'bg-[#f1edf8]'}`}>
+            <div key={step.number} className={`campaign-step flex min-w-0 items-center gap-3 px-3.5 py-3 sm:px-5 ${index === 0 ? 'bg-[#e0eee5]' : index === 1 ? 'bg-[#e9f2f5]' : index === 2 ? 'bg-[#f6e9e1]' : 'bg-[#f1edf8]'}`}>
               <span className={`grid size-8 shrink-0 place-items-center rounded-[9px] text-[13px] font-semibold ${index === 0 ? 'bg-[#173f35] text-white' : 'bg-white text-[#173f35]'}`}>
                 {step.number}
               </span>
@@ -1115,9 +1167,9 @@ export default function HostRetailMediaPage() {
         </div>
       ) : null}
 
-      <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_370px] xl:items-start">
-        <section id="host-retail-media-editor" aria-label="Create sponsored campaign" className="flex min-w-0 scroll-mt-24 flex-col gap-5">
-          <div className="min-w-0 rounded-[16px] border border-[#d3dfd5] bg-[#f0f4ec] px-4 py-5 sm:px-6 sm:py-6 lg:px-7">
+      <div className="campaign-workspace mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_370px] xl:items-start">
+        <section id="host-retail-media-editor" aria-label="Create sponsored campaign" className="campaign-form-column flex min-w-0 scroll-mt-24 flex-col gap-5">
+          <div className="campaign-brief-section min-w-0 rounded-[16px] border border-[#d3dfd5] bg-[#f0f4ec] px-4 py-5 sm:px-6 sm:py-6 lg:px-7">
             <div className="flex items-start gap-3 sm:items-center">
               <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-[#173f35] text-white">
                 <span className="text-[15px] font-semibold">01</span>
@@ -1246,7 +1298,7 @@ export default function HostRetailMediaPage() {
             ) : null}
           </div>
 
-          <div className="min-w-0 rounded-[16px] border border-[#d4e1e8] bg-[#eaf2f6] px-4 py-5 sm:px-6 sm:py-6 lg:px-7">
+          <div className="campaign-placement-section min-w-0 rounded-[16px] border border-[#d4e1e8] bg-[#eaf2f6] px-4 py-5 sm:px-6 sm:py-6 lg:px-7">
             <div className="flex items-start gap-3 sm:items-center">
               <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-[#315f72] text-white">
                 <span className="text-[15px] font-semibold">02</span>
@@ -1349,7 +1401,7 @@ export default function HostRetailMediaPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 bg-[#f6f9f9] p-3 sm:grid-cols-3 sm:p-4 lg:grid-cols-4">
+              <div className="campaign-placement-grid grid grid-cols-2 gap-2.5 bg-[#f6f9f9] p-3 sm:grid-cols-3 sm:p-4 lg:grid-cols-4">
                 {PLACEMENTS.map((placement) => {
                   const selected = campaignForm.placementSelections.find(
                     (item) => item.placement === placement,
@@ -1364,7 +1416,7 @@ export default function HostRetailMediaPage() {
                   )
 
                   return (
-                    <div key={placement} className={`min-w-0 rounded-[10px] border p-3 transition-colors sm:p-3.5 ${selected ? 'border-[#6a9880] bg-[#e2efe5] shadow-[0_0_0_1px_#6a9880]' : 'border-[#d5e0e3] bg-white hover:border-[#98b9c7] hover:bg-[#f5fbfc]'}`}>
+                    <div key={placement} className={`campaign-placement-option min-w-0 rounded-[10px] border p-3 transition-colors sm:p-3.5 ${selected ? 'border-[#6a9880] bg-[#e2efe5] shadow-[0_0_0_1px_#6a9880]' : 'border-[#d5e0e3] bg-white hover:border-[#98b9c7] hover:bg-[#f5fbfc]'}`}>
                       <button
                         type="button"
                         disabled={
@@ -1420,7 +1472,7 @@ export default function HostRetailMediaPage() {
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-4 rounded-[13px] border border-[#ead3c6] bg-[#fff8f3] p-4 sm:p-5">
+            <div className="campaign-creative-section mt-6 grid gap-4 rounded-[13px] border border-[#ead3c6] bg-[#fff8f3] p-4 sm:p-5">
               <div className="flex items-start gap-3 sm:items-center">
                 <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-[#aa6245] text-white">
                   <span className="text-[15px] font-semibold">03</span>
@@ -1433,7 +1485,7 @@ export default function HostRetailMediaPage() {
               <div className="grid min-w-0 gap-4 md:grid-cols-[225px_minmax(0,1fr)]">
                 <div className="overflow-hidden rounded-[11px] border border-[#e8d4c8] bg-white">
                   {campaignForm.imageUrl ? (
-                    <div className="relative h-[170px]">
+                    <div className="campaign-image-preview relative h-[170px]">
                       <img
                         src={campaignForm.imageUrl}
                         alt="Campaign creative preview"
@@ -1454,7 +1506,7 @@ export default function HostRetailMediaPage() {
                       </button>
                     </div>
                   ) : (
-                    <label className="focus-ring flex h-[170px] cursor-pointer flex-col items-center justify-center gap-2 bg-[#f3e8df] px-4 text-center transition-colors hover:bg-[#efded3]">
+                    <label className="campaign-image-uploader focus-ring flex h-[170px] cursor-pointer flex-col items-center justify-center gap-2 bg-[#f3e8df] px-4 text-center transition-colors hover:bg-[#efded3]">
                       <ImagePlus size={26} className="text-[#173f35]" aria-hidden="true" />
                       <span className="text-[13px] font-semibold text-stone-900 sm:text-xs">
                         Add campaign image
@@ -1601,8 +1653,8 @@ export default function HostRetailMediaPage() {
           </div>
         </section>
 
-        <aside className="min-w-0 self-start overflow-hidden rounded-[16px] border border-[#ddd7e4] bg-white xl:sticky xl:top-24" aria-label="Your sponsored campaigns">
-          <div className="border-b border-[#ddd4e5] bg-[#ece7f3] px-5 py-5 sm:px-6">
+        <aside className="campaign-list min-w-0 self-start overflow-hidden rounded-[16px] border border-[#ddd7e4] bg-white xl:sticky xl:top-24" aria-label="Your sponsored campaigns">
+          <div className="campaign-list-heading border-b border-[#ddd4e5] bg-[#ece7f3] px-5 py-5 sm:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <BadgeCheck size={20} className="text-[#6e5b8e]" aria-hidden="true" />
@@ -1615,7 +1667,7 @@ export default function HostRetailMediaPage() {
             <p className="mt-1 text-[14px] leading-5 text-[#5e5967]">Your ads, payments and review status.</p>
           </div>
 
-          <div className="max-h-[78vh] divide-y divide-[#e1e5de] overflow-y-auto">
+          <div className="campaign-list-scroll max-h-[78vh] divide-y divide-[#e1e5de] overflow-y-auto">
             {campaigns.length ? campaigns.map((campaign) => {
               const payment = campaign.payment || {}
               const isPaid = payment.status === 'paid'
@@ -1625,16 +1677,16 @@ export default function HostRetailMediaPage() {
                 <article
                   id={`host-retail-media-campaign-${campaign.id}`}
                   key={campaign.id}
-                  className={`scroll-mt-28 bg-white px-5 py-5 sm:px-6 ${focusCampaignId === campaign.id ? 'ring-2 ring-inset ring-[#6d9b80]' : ''}`}
+                  className={`campaign-entry scroll-mt-28 bg-white px-5 py-5 sm:px-6 ${focusCampaignId === campaign.id ? 'ring-2 ring-inset ring-[#6d9b80]' : ''}`}
                 >
                   {campaign.creative?.imageUrl ? (
-                    <img src={campaign.creative.imageUrl} alt="" className="h-[148px] w-full rounded-[11px] border border-[#e1e5df] object-cover" />
+                    <img src={campaign.creative.imageUrl} alt="" className="campaign-entry-image h-[148px] w-full rounded-[11px] border border-[#e1e5df] object-cover" />
                   ) : (
-                    <div className="grid h-[118px] w-full place-items-center rounded-[11px] bg-[#eaf1eb] text-[#486b59]">
+                    <div className="campaign-entry-image grid h-[118px] w-full place-items-center rounded-[11px] bg-[#eaf1eb] text-[#486b59]">
                       <Megaphone size={27} aria-hidden="true" />
                     </div>
                   )}
-                  <div className="mt-3 flex min-w-0 items-start justify-between gap-2">
+                  <div className="campaign-entry-heading mt-3 flex min-w-0 items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="break-words text-[16px] font-semibold leading-6 text-[#173f35]">{campaign.title}</p>
                       <p className="mt-1 text-[13px] leading-5 text-[#5b695f]">{formatDurationMinutes(campaign.durationMinutes)}</p>
@@ -1645,7 +1697,7 @@ export default function HostRetailMediaPage() {
                   </div>
 
                   {(campaign.placementSelections || []).length ? (
-                    <div className="mt-3 border-t border-[#e2e7df] pt-3">
+                    <div className="campaign-entry-placements mt-3 border-t border-[#e2e7df] pt-3">
                       {(campaign.placementSelections || []).map((selection) => (
                         <p key={`${selection.placement}-${selection.slotKey}`} className="py-0.5 text-[13px] leading-5 text-[#59665c]">
                           <span className="font-semibold text-[#263d32]">{PLACEMENT_META[selection.placement]?.label || titleize(selection.placement)}</span>
@@ -1656,12 +1708,12 @@ export default function HostRetailMediaPage() {
                     </div>
                   ) : null}
 
-                  <p className="mt-2 flex items-start gap-2 text-[12px] leading-[1.5] text-[#68746b]">
+                  <p className="campaign-entry-booked mt-2 flex items-start gap-2 text-[12px] leading-[1.5] text-[#68746b]">
                     <CalendarClock size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                     <span>Booked: {formatDateTime(campaign.scheduledStartsAt || campaign.startsAt)}</span>
                   </p>
 
-                  <div className="mt-3 flex items-center justify-between gap-3 border-y border-[#dfe5db] py-2.5">
+                  <div className="campaign-entry-payment mt-3 flex items-center justify-between gap-3 border-y border-[#dfe5db] py-2.5">
                     <div className="flex min-w-0 items-center gap-2">
                       {isPaid ? <CheckCircle2 size={16} className="shrink-0 text-[#316e52]" aria-hidden="true" /> : <CreditCard size={16} className="shrink-0 text-[#ad6748]" aria-hidden="true" />}
                       <span className="text-[14px] font-medium text-[#405548]">{isPaid ? 'Paid' : 'Payment due'}</span>
@@ -1689,13 +1741,13 @@ export default function HostRetailMediaPage() {
                     </div>
                   ) : null}
                   {campaign.review?.reason ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-[8px] bg-[#f7ece7] px-3 py-2.5 text-[13px] leading-5 text-[#775442]">
+                    <div className="campaign-entry-review mt-3 flex items-start gap-2 rounded-[8px] bg-[#f7ece7] px-3 py-2.5 text-[13px] leading-5 text-[#775442]">
                       <CircleAlert size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
                       <span>Review note: {campaign.review.reason}</span>
                     </div>
                   ) : null}
 
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="campaign-entry-actions mt-4 flex flex-wrap gap-2">
                     {!['active', 'paused', 'ended'].includes(campaign.status) ? (
                       <button type="button" disabled={busy} onClick={() => beginEditCampaign(campaign)} className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-[8px] border border-[#cbd8cc] bg-white px-3 py-2 text-[13px] font-semibold text-[#173f35] hover:bg-[#eef4ea] disabled:opacity-40">
                         <PencilLine size={14} aria-hidden="true" /> Edit
@@ -1730,7 +1782,7 @@ export default function HostRetailMediaPage() {
         </aside>
       </div>
 
-      <div className="mt-5 grid gap-2 rounded-[12px] border border-[#dce6df] bg-[#f0f4ee] px-4 py-3 text-[13px] leading-[1.6] text-[#496154] sm:grid-cols-2 sm:gap-6 sm:px-5">
+      <div className="campaign-policies mt-5 grid gap-2 rounded-[12px] border border-[#dce6df] bg-[#f0f4ee] px-4 py-3 text-[13px] leading-[1.6] text-[#496154] sm:grid-cols-2 sm:gap-6 sm:px-5">
         <p className="flex items-start gap-2">
           <Eye size={15} className="mt-0.5 shrink-0 text-[#446e5b]" aria-hidden="true" />
           Paid ads stay labelled and do not change organic search ranking.

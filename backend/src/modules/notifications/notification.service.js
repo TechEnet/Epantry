@@ -9,6 +9,11 @@ import {
 } from '../analytics/analytics.service.js'
 
 import {
+  organizationForNotification,
+  safeHostAttribution,
+} from '../analytics/analytics.hostAttribution.service.js'
+
+import {
   createCustomerPantryObservation,
 } from '../pantry/pantry.service.js'
 
@@ -1557,6 +1562,8 @@ export async function createNotificationIntent({
           ),
       },
     },
+    organizationId: await safeHostAttribution(() =>
+      organizationForNotification(created)),
     actorUser: {
       _id:
         userId,
@@ -1916,6 +1923,8 @@ export async function markNotificationDelivered({
         channel,
       },
     },
+    organizationId: await safeHostAttribution(() =>
+      organizationForNotification(notification)),
     actorUser: {
       _id:
         notification.userId,
@@ -2210,6 +2219,8 @@ export async function performNotificationAction({
           ),
       },
     },
+    organizationId: await safeHostAttribution(() =>
+      organizationForNotification(notification)),
     actorUser,
   })
 

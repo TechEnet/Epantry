@@ -1467,6 +1467,12 @@ async function decisionContextCounts({
       $lte:
         end,
     },
+    eventName: {
+      $in: [
+        'discovery.listing_viewed',
+        'discovery.sponsored_served',
+      ],
+    },
   }
 
   if (
@@ -2057,7 +2063,7 @@ export async function getHostAnalyticsDashboard({
 
     funnel:
       buildCoreFunnel(
-        counts,
+        { ...counts, 'commerce.basket_created': counts['commerce.host_basket_created'] || 0 },
       ),
 
     notificationUtility:
@@ -2083,7 +2089,7 @@ export async function getHostAnalyticsDashboard({
       commerce: {
         basketCreated:
           counts[
-            'commerce.basket_created'
+            'commerce.host_basket_created'
           ] ||
           0,
 
