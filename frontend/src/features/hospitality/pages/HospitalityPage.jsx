@@ -389,6 +389,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [dashboardFeedFailures, setDashboardFeedFailures] = useState([]);
 
   const [reason, setReason] = useState(
     "Operational review completed with supporting evidence."
@@ -523,6 +524,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    if (section === "dashboard") setDashboardFeedFailures([]);
 
     try {
       const common = await Promise.allSettled([
@@ -535,6 +537,11 @@ export default function HospitalityPage({ section = "dashboard" }) {
       }
 
       setContextData(common[0].value);
+
+      const failedDashboardFeeds = [];
+      if (section === "dashboard" && common[1].status === "rejected") {
+        failedDashboardFeeds.push("Outlets");
+      }
 
       setOutlets(
         common[1].status === "fulfilled" ? common[1].value?.outlets || [] : []
@@ -610,6 +617,21 @@ export default function HospitalityPage({ section = "dashboard" }) {
 
         const value = result.status === "fulfilled" ? result.value : null;
 
+        if (section === "dashboard" && result.status === "rejected") {
+          const feedNames = {
+            suppliers: "Suppliers",
+            supplierProducts: "Supplier items",
+            recipes: "Kitchen recipes",
+            productionPlans: "Production plans",
+            passports: "Published dish records",
+            greyBooks: "Published record books",
+            changeCases: "Changes to review",
+            menus: "Menus",
+            memberGrants: "Team access",
+          };
+          failedDashboardFeeds.push(feedNames[key] || key);
+        }
+
         if (key === "memberGrants") {
           setMemberGrants(value?.grants || []);
         }
@@ -641,6 +663,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
           setChangeCases(value?.changeCases || []);
         }
       });
+
+      if (section === "dashboard") setDashboardFeedFailures(failedDashboardFeeds);
     } catch (requestError) {
       setError(
         getHospitalityErrorMessage(
@@ -1412,7 +1436,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
     <div
       className={
         isDashboard
-          ? "p-2.5 sm:p-4 lg:p-5"
+          ? "p-3 sm:p-4 lg:p-5"
           : isOutlets ||
             isSuppliers ||
             isProducts ||
@@ -1428,77 +1452,75 @@ export default function HospitalityPage({ section = "dashboard" }) {
       }
     >
       {isDashboard ? (
-        <header className="rounded-[22px] border border-emerald-200/80 bg-[linear-gradient(135deg,#e8f7f1_0%,#eef7ff_62%,#f2efff_100%)] p-3.5 shadow-[0_12px_34px_rgba(15,23,42,0.06)] sm:rounded-[26px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-emerald-800 sm:text-[10px]">
-                <Icon size={13} />
-                Hospitality operations
+        <header className="overflow-hidden rounded-[23px] border border-[#DCE0CF] bg-[#F7F6F2] shadow-[0_12px_30px_rgba(23,63,53,0.05)]">
+          <div className="grid lg:grid-cols-[minmax(0,1.75fr)_minmax(255px,0.85fr)]">
+            <div className="bg-[#173F35] px-5 py-6 text-[#F7F6F2] sm:px-8 sm:py-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-[0.04em] text-[#DCE0CF]">
+                  <Store size={16} aria-hidden="true" /> HOST / HOSPITALITY
+                </span>
+                <button
+                  type="button"
+                  onClick={load}
+                  disabled={loading}
+                  className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[11px] border border-white/30 bg-white/10 px-3.5 text-[13px] font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+                >
+                  <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+                  Refresh
+                </button>
               </div>
-
-              <h1 className="mt-2.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
-                {config.title}
+              <h1 className="mt-5 text-[28px] font-semibold leading-[1.15] tracking-[-0.035em] sm:text-[36px]">
+                Hospitality operations
               </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                {config.description}
+              <p className="mt-3 max-w-[560px] text-[14px] leading-6 text-[#E8ECE6] sm:text-[15px]">
+                Run your outlets, manage suppliers and keep kitchen records in one place.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[10px] font-black text-emerald-800 shadow-sm sm:px-3.5 sm:text-xs"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
+            <div className="flex flex-col justify-between gap-4 bg-[#DCE0CF] px-5 py-6 sm:px-7 sm:py-8">
+              <div>
+                <p className="text-[12px] font-semibold text-[#436055]">CURRENT BUSINESS</p>
+                <p className="mt-2 break-words text-[23px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35]">
+                  {contextData?.context?.organization?.displayName || "Hospitality business"}
+                </p>
+                <p className="mt-2 text-[13px] leading-5 text-[#436055]">
+                  {isOwner ? "Full workspace access" : "Access based on assigned permissions"}
+                </p>
+              </div>
+              <Link
+                to="/host/hospitality/outlets"
+                className="focus-ring inline-flex w-fit items-center gap-2 border-b border-[#173F35]/35 pb-1 text-[13px] font-semibold text-[#173F35] hover:border-[#173F35]"
+              >
+                Manage outlets <ArrowRight size={15} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {dashboardSteps.map((step) => {
+          <nav aria-label="Hospitality quick actions" className="grid divide-y divide-[#DCE0CF] bg-[#F7F6F2] sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4">
+            {dashboardSteps.map((step, index) => {
               const StepIcon = step.icon;
-
+              const surfaces = ["bg-[#F9EFE6]", "bg-[#EAF3F8]", "bg-[#F1ECF8]", "bg-[#EAF0E4]"];
               return (
                 <Link
                   key={step.number}
                   to={step.to}
-                  className={`focus-ring group rounded-[16px] border p-2.5 transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
+                  className={`focus-ring group flex min-w-0 items-center gap-3 border-[#DCE0CF] px-4 py-3.5 transition hover:brightness-[0.97] sm:border-b lg:border-b-0 lg:border-r lg:last:border-r-0 ${surfaces[index]}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="grid size-6 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                      {step.number}
-                    </span>
-                    <StepIcon
-                      size={15}
-                      className="text-stone-600"
-                      aria-hidden="true"
-                    />
+                  <div className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-white/80 text-[#173F35]">
+                    <StepIcon size={19} aria-hidden="true" />
                   </div>
-                  <p className="mt-2 text-[11px] font-black leading-4 text-stone-950 sm:text-[13px]">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-medium leading-[1.45] text-stone-600 sm:text-[11px]">
-                    {step.text}
-                  </p>
-                  <span className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 sm:text-[10px]">
-                    Open
-                    <ArrowRight
-                      size={11}
-                      className="transition group-hover:translate-x-0.5"
-                    />
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] font-semibold text-[#826A59]">{step.number} / SETUP</span>
+                    <p className="mt-0.5 text-[14px] font-semibold leading-5 text-[#202421]">{step.title}</p>
+                  </div>
+                  <ArrowRight size={16} className="shrink-0 text-[#173F35] transition group-hover:translate-x-1" aria-hidden="true" />
                 </Link>
               );
             })}
-          </div>
-
-          <details className="mt-3 rounded-[14px] border border-white/70 bg-white/55 px-3 py-2">
-            <summary className="cursor-pointer text-[10px] font-black text-stone-700 sm:text-xs">
-              Manage another hospitality workspace
+          </nav>
+          <details className="border-t border-[#DCE0CF] bg-[#F7F6F2] px-4 py-3 sm:px-6">
+            <summary className="focus-ring cursor-pointer text-[13px] font-medium text-[#36584C]">
+              Switch hospitality business
             </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <input
                 className={inputClass}
                 value={organizationId}
@@ -2602,9 +2624,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
       ) : (
         <>
           {isDashboard ? (
-            <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
-              You will only see the outlets and tools your Host account is
-              allowed to manage.
+            <div className="mt-4 flex items-center gap-2 rounded-[12px] border border-[#DCE0CF] bg-[#EFF3EC] px-4 py-2.5 text-[13px] leading-5 text-[#36584C]">
+              <ShieldCheck size={17} className="shrink-0" aria-hidden="true" />
+              Showing records available to your Host account.
             </div>
           ) : isOutlets ? (
             <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
@@ -2669,49 +2691,76 @@ export default function HospitalityPage({ section = "dashboard" }) {
           )}
 
           {isDashboard ? (
-            <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
-              <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
-                {metrics.map(([label, value]) => (
-                  <Metric key={label} label={label} value={value} />
-                ))}
+            <div className="mt-5 space-y-5">
+              {dashboardFeedFailures.length > 0 ? (
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[13px] border border-[#E6B59D] bg-[#FDEBE3] px-4 py-3 text-[13px] text-[#854A34]">
+                  <span>
+                    Some figures could not be loaded ({dashboardFeedFailures.join(", ")}). A dash means unavailable, not zero.
+                  </span>
+                  <button type="button" onClick={load} className="focus-ring inline-flex items-center gap-1.5 font-semibold underline underline-offset-4">
+                    <RefreshCw size={14} aria-hidden="true" /> Retry
+                  </button>
+                </div>
+              ) : null}
+              <section aria-labelledby="hospitality-metrics-heading" className="overflow-hidden rounded-[20px] border border-[#DCE0CF] bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#EBF2F3] px-5 py-4 sm:px-6">
+                  <div>
+                    <h2 id="hospitality-metrics-heading" className="text-[20px] font-semibold tracking-[-0.025em] text-[#173F35] sm:text-[23px]">
+                      Business overview
+                    </h2>
+                    <p className="mt-1 text-[13px] leading-5 text-[#47635A]">
+                      Your saved hospitality records, at a glance.
+                    </p>
+                  </div>
+                  <span className="text-[12px] font-medium text-[#47635A]">Organization-scoped</span>
+                </div>
+                <div className="grid grid-cols-2 bg-white md:grid-cols-4">
+                  {metrics.slice(0, 4).map(([label, value], index) => (
+                    <div key={label} className="min-w-0 border-b border-r border-[#E6E9E2] px-4 py-4 last:border-r-0 sm:px-6 sm:py-5">
+                      <p className="text-[13px] font-medium leading-5 text-[#47635A]">{label}</p>
+                      <p className="mt-1.5 text-[28px] font-semibold tracking-[-0.045em] text-[#173F35] sm:text-[32px]">
+                        {dashboardFeedFailures.includes(label) ? "—" : value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 bg-[#F5F3F0] md:grid-cols-4">
+                  {metrics.slice(4).map(([label, value], index) => (
+                    <div key={label} className="min-w-0 border-r border-[#E6E9E2] px-4 py-4 last:border-r-0 sm:px-6 sm:py-5">
+                      <p className="text-[13px] font-medium leading-5 text-[#47635A]">{label}</p>
+                      <p className="mt-1.5 text-[28px] font-semibold tracking-[-0.045em] text-[#173F35] sm:text-[32px]">
+                        {dashboardFeedFailures.includes(label) ? "—" : value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </section>
-
-              <div className="grid gap-3 lg:grid-cols-2">
-                <section className="rounded-[20px] border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:p-5">
-                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:text-[10px]">
-                    Your business
-                  </p>
-                  <h2 className="mt-1.5 text-base font-black text-stone-950 sm:text-lg">
-                    {contextData?.context?.organization?.displayName ||
-                      "Hospitality business"}
-                  </h2>
-                  <p className="mt-1.5 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                    {isOwner
-                      ? "You can manage the full hospitality workspace for this business."
-                      : `Your account has ${permissions.length} assigned hospitality permissions.`}
-                  </p>
-                  <Link
-                    to="/host/hospitality/outlets"
-                    className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-800 sm:text-xs"
-                  >
-                    Manage outlets
-                    <ArrowRight size={12} />
-                  </Link>
-                </section>
-
-                <section className="rounded-[20px] border border-sky-200 bg-sky-50/75 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="grid size-9 shrink-0 place-items-center rounded-[13px] bg-white text-sky-700 shadow-sm">
-                      <ShieldCheck size={17} aria-hidden="true" />
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+                <section className="rounded-[20px] border border-[#D5E4DD] bg-[#E8F2EC] px-5 py-5 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-white/80 text-[#173F35]">
+                      <Building2 size={20} aria-hidden="true" />
                     </div>
                     <div>
-                      <h2 className="text-sm font-black text-stone-950 sm:text-base">
-                        Records stay traceable
-                      </h2>
-                      <p className="mt-1.5 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                        Approved dish records keep their history. When a recipe
-                        or source changes, EPANTRY creates a new review instead
-                        of silently replacing the old record.
+                      <h2 className="text-[18px] font-semibold text-[#173F35]">Manage your locations</h2>
+                      <p className="mt-0.5 text-[13px] leading-5 text-[#47635A]">
+                        Outlets, teams and access in one place.
+                      </p>
+                    </div>
+                  </div>
+                  <Link to="/host/hospitality/outlets" className="focus-ring mt-4 inline-flex items-center gap-2 border-b border-[#173F35]/40 pb-1 text-[13px] font-semibold text-[#173F35]">
+                    Open outlets <ArrowRight size={15} aria-hidden="true" />
+                  </Link>
+                </section>
+                <section className="rounded-[20px] border border-[#E7D9EE] bg-[#F2ECF8] px-5 py-5 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-white/80 text-[#554771]">
+                      <ShieldCheck size={20} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h2 className="text-[18px] font-semibold text-[#302D38]">Records stay traceable</h2>
+                      <p className="mt-0.5 text-[13px] leading-5 text-[#5D5470]">
+                        Approved dish history is kept when records change.
                       </p>
                     </div>
                   </div>
@@ -5993,24 +6042,10 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {isDashboard ? (
-            <section className="mt-3 rounded-[18px] border border-violet-200 bg-violet-50/70 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:mt-4 sm:px-5 sm:py-4">
-              <div className="flex items-start gap-3">
-                <ShieldCheck
-                  className="mt-0.5 shrink-0 text-violet-700"
-                  size={17}
-                />
-                <div>
-                  <h2 className="text-xs font-black text-stone-950 sm:text-sm">
-                    Built-in checks
-                  </h2>
-                  <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                    EPANTRY can help organize information, but important food
-                    records and business changes still follow your existing
-                    review and approval rules.
-                  </p>
-                </div>
-              </div>
-            </section>
+            <div className="mt-4 flex items-start gap-2.5 rounded-[13px] border border-[#DCE0CF] bg-[#F7F6F2] px-4 py-3 text-[13px] leading-5 text-[#47635A]">
+              <ShieldCheck size={17} className="mt-0.5 shrink-0 text-[#173F35]" aria-hidden="true" />
+              <span><strong className="font-semibold text-[#173F35]">Built-in checks:</strong> Food records and operational changes still follow EPANTRY's review and approval rules.</span>
+            </div>
           ) : isSuppliers ? (
             <section className="mt-3 rounded-[18px] border border-violet-200 bg-violet-50/70 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:mt-4 sm:px-5 sm:py-4">
               <div className="flex items-start gap-3">

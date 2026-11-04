@@ -92,20 +92,19 @@ function NavigationItem({ item, compact = false, onNavigate }) {
       end={item.end}
       onClick={onNavigate}
       title={compact ? item.label : undefined}
-      className={({ isActive }) =>
-        [
-          "focus-ring flex items-center rounded-[16px] font-bold transition-all duration-200",
-          compact
-            ? "h-11 w-11 justify-center px-0"
-            : "min-h-11 gap-3 px-3.5 py-2.5 text-[13px]",
-          isActive
-            ? "bg-emerald-700 text-white shadow-[0_8px_22px_rgba(4,120,87,0.18)]"
-            : "text-stone-600 hover:bg-white hover:text-stone-950 hover:shadow-sm",
-        ].join(" ")
-      }
+      aria-label={compact ? item.label : undefined}
+      className={({ isActive }) => [
+        "focus-ring flex items-center rounded-[17px] border font-semibold transition-all duration-200",
+        compact
+          ? "h-11 w-11 justify-center px-0"
+          : "min-h-11 w-full gap-3 px-3 py-2.5 text-[13px]",
+        isActive
+          ? "border-[#C86C42] bg-[#DCE0CF] text-[#173F35] shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_12px_rgba(23,63,53,0.10)]"
+          : "border-[#DCE0CF] bg-[#F7F6F2] text-[#202421] shadow-[0_3px_8px_rgba(23,63,53,0.06)] hover:border-[#C86C42] hover:bg-[#EBF0E8] hover:text-[#173F35]",
+      ].join(" ")}
     >
-      <Icon size={18} strokeWidth={2.1} aria-hidden="true" />
-      {compact ? null : <span className="min-w-0 truncate">{item.label}</span>}
+      <Icon size={18} strokeWidth={2} className="shrink-0" aria-hidden="true" />
+      {compact ? null : <span className="min-w-0 flex-1 leading-5">{item.label}</span>}
     </NavLink>
   );
 }
@@ -115,12 +114,12 @@ export default function HospitalityShell({ children }) {
   const [desktopHovered, setDesktopHovered] = useState(false);
 
   return (
-    <main className="min-h-[calc(100vh-72px)] bg-[#f7f5ef]">
-      <div className="sticky top-0 z-[95] flex h-14 items-center border-b border-stone-200/70 bg-[#f7f5ef]/94 px-3 backdrop-blur-xl lg:hidden">
+    <main className="min-h-[calc(100vh-72px)] bg-[#F7F6F2]">
+      <div className="sticky top-0 z-[95] flex h-14 items-center border-b border-[#DCE0CF] bg-[#F7F6F2]/95 px-3 backdrop-blur-xl lg:hidden">
         <button
           type="button"
           onClick={() => setMobileSidebarOpen(true)}
-          className="focus-ring grid size-10 place-items-center rounded-[15px] border border-stone-200 bg-white text-stone-800 shadow-[0_7px_20px_rgba(28,25,23,0.08)]"
+          className="focus-ring grid size-10 place-items-center rounded-[17px] border border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] shadow-[0_7px_20px_rgba(28,25,23,0.08)]"
           aria-label="Open hospitality navigation"
           aria-expanded={mobileSidebarOpen}
         >
@@ -128,12 +127,10 @@ export default function HospitalityShell({ children }) {
         </button>
 
         <div className="ml-3 min-w-0">
-          <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-stone-700">
+          <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[#173F35]">
             Hospitality workspace
           </p>
-          <p className="truncate text-[10px] font-semibold text-stone-500">
-            Outlets, suppliers & kitchen operations
-          </p>
+
         </div>
       </div>
 
@@ -147,35 +144,35 @@ export default function HospitalityShell({ children }) {
       ) : null}
 
       <div className="page-shell pt-0 pb-5 sm:pt-0 sm:pb-7">
-        <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-[26px] border border-[#DCE0CF] bg-[#F7F6F2] shadow-[0_6px_24px_rgba(23,63,53,0.04)]">
           <div className="grid min-h-[760px] lg:grid-cols-[70px_minmax(0,1fr)]">
-            <aside className="relative hidden bg-stone-50/95 lg:block">
+            <aside className="relative hidden bg-[#F7F6F2] lg:block">
               <div
                 onMouseEnter={() => setDesktopHovered(true)}
                 onMouseLeave={() => setDesktopHovered(false)}
                 className={[
-                  "absolute inset-y-0 left-0 z-30 flex h-full flex-col border-r border-stone-200 bg-stone-50/97 py-4 shadow-[8px_0_24px_rgba(15,23,42,0.06)] transition-[width,padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  "absolute inset-y-0 left-0 z-30 flex h-full flex-col border-r border-[#DCE0CF] bg-[#F7F6F2] py-4 shadow-[8px_0_20px_rgba(23,63,53,0.06)] transition-[width,padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
                   desktopHovered
-                    ? "w-[300px] rounded-r-[32px] px-4"
-                    : "w-[70px] rounded-r-[28px] px-3",
+                    ? "w-[292px] rounded-r-[24px] px-3"
+                    : "w-[70px] rounded-r-[22px] px-3",
                 ].join(" ")}
               >
                 {desktopHovered ? (
-                  <div className="rounded-[18px] bg-stone-950 px-3.5 py-3 text-white">
+                  <div className="rounded-[17px] bg-[#173F35] px-3.5 py-3 text-[#F7F6F2]">
                     <div className="flex items-center gap-2.5">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-600">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#DCE0CF] text-[#173F35]">
                         <Store size={17} aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-black">Hospitality</p>
-                        <p className="mt-0.5 truncate text-[10px] font-semibold text-stone-400">
+                        <p className="mt-0.5 truncate text-[10px] font-medium text-[#DCE0CF]">
                           Outlets, suppliers & kitchen operations
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="grid h-11 w-11 place-items-center rounded-[16px] bg-stone-950 text-white shadow-sm">
+                  <div className="grid h-11 w-11 place-items-center rounded-[17px] border border-[#C86C42] bg-[#DCE0CF] text-[#173F35] shadow-sm">
                     <Store size={18} aria-hidden="true" />
                   </div>
                 )}
@@ -200,19 +197,19 @@ export default function HospitalityShell({ children }) {
 
             <aside
               className={[
-                "fixed inset-y-0 left-0 z-[130] w-[min(88vw,330px)] overflow-y-auto border-r border-stone-200 bg-stone-50/98 px-4 py-4 shadow-[18px_0_50px_rgba(28,25,23,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden",
+                "fixed inset-y-0 left-0 z-[130] w-[min(88vw,330px)] overflow-y-auto border-r border-[#DCE0CF] bg-[#F7F6F2] px-4 py-4 shadow-[18px_0_50px_rgba(28,25,23,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden",
                 mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
               ].join(" ")}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#36584C]">
                   Hospitality navigation
                 </span>
                 <div className="flex items-center gap-2">
                   <NavLink
                     to="/"
                     onClick={() => setMobileSidebarOpen(false)}
-                    className="focus-ring grid size-9 place-items-center rounded-[14px] border border-stone-200 bg-white text-stone-700 shadow-sm"
+                    className="focus-ring grid size-9 place-items-center rounded-[14px] border border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] shadow-sm"
                     aria-label="Back to EPANTRY home"
                   >
                     <Home size={17} aria-hidden="true" />
@@ -220,7 +217,7 @@ export default function HospitalityShell({ children }) {
                   <button
                     type="button"
                     onClick={() => setMobileSidebarOpen(false)}
-                    className="focus-ring grid size-9 place-items-center rounded-[14px] border border-stone-200 bg-white text-stone-700 shadow-sm"
+                    className="focus-ring grid size-9 place-items-center rounded-[14px] border border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] shadow-sm"
                     aria-label="Close hospitality navigation"
                   >
                     <X size={17} aria-hidden="true" />
@@ -228,14 +225,14 @@ export default function HospitalityShell({ children }) {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[18px] bg-stone-950 px-3.5 py-3 text-white">
+              <div className="mt-4 rounded-[18px] bg-[#173F35] px-3.5 py-3 text-[#F7F6F2]">
                 <div className="flex items-center gap-2.5">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-600">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#DCE0CF] text-[#173F35]">
                     <Store size={17} aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black">Hospitality</p>
-                    <p className="mt-0.5 text-[10px] font-semibold text-stone-400">
+                    <p className="mt-0.5 text-[10px] font-semibold text-[#DCE0CF]">
                       Manage outlets, suppliers and kitchen work
                     </p>
                   </div>
@@ -253,7 +250,7 @@ export default function HospitalityShell({ children }) {
               </nav>
             </aside>
 
-            <section className="min-w-0 overflow-hidden bg-[#f7f5ef]">
+            <section className="min-w-0 overflow-hidden bg-[#F7F6F2]">
               <div className="epantry-workspace-canvas">{children}</div>
             </section>
           </div>
