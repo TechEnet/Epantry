@@ -1613,6 +1613,20 @@ function CustomerWorkspacePresentation({
   )
 }
 
+function AccountSecurityWorkspacePresentation({children}) {
+  const { hostEnabled, hostAccessStatus, activeMode } = useAuth()
+
+  if (
+    activeMode === 'host' &&
+    hostEnabled === true &&
+    hostAccessStatus === 'active'
+  ) {
+    return <HostShell>{children}</HostShell>
+  }
+
+  return children
+}
+
 function HospitalityRoute({
   section,
 }) {
@@ -2640,7 +2654,9 @@ export default function AppRoutes() {
               path="/account/security/mfa"
               element={
                 <AuthenticatedRoute>
-                  <MfaEnrollmentPage />
+                  <AccountSecurityWorkspacePresentation>
+                    <MfaEnrollmentPage />
+                  </AccountSecurityWorkspacePresentation>
                 </AuthenticatedRoute>
               }
             />

@@ -3,6 +3,7 @@ import {
   Building2,
   Camera,
   CheckCircle2,
+  ChevronDown,
   Copy,
   IdCard,
   MapPin,
@@ -35,6 +36,10 @@ import {
   updateAccountProfile,
   uploadAccountProfilePhoto,
 } from '../services/account.service'
+
+import { getCatalogProducts } from '../../grocery/services/catalog.service'
+import { listPublicRecipes } from '../../recipes/services/recipe.service'
+import { listHostListingPackets } from '../../host/services/hostUnifiedListing.service'
 
 import {
   createDeliveryAddress,
@@ -69,35 +74,8 @@ const ADDRESS_LABELS = [
   'other',
 ]
 
-const HOST_PROFILE_STEPS = [
-  {
-    number: '01',
-    title: 'Account details',
-    description: 'Keep your name and photo current.',
-    className: 'border-emerald-200 bg-emerald-100/75',
-  },
-  {
-    number: '02',
-    title: 'Business address',
-    description: 'Save where your business operates from.',
-    className: 'border-sky-200 bg-sky-100/75',
-  },
-  {
-    number: '03',
-    title: 'Stock & delivery',
-    description: 'Add stores, warehouses and delivery pincodes.',
-    className: 'border-violet-200 bg-violet-100/70',
-  },
-  {
-    number: '04',
-    title: 'Review operations',
-    description: 'Continue to Operations Center when details are ready.',
-    className: 'border-emerald-200 bg-emerald-50',
-  },
-]
-
 const hostInputClassName =
-  'focus-ring w-full rounded-[14px] border border-stone-200 bg-white px-3 py-2.5 text-[12px] font-semibold text-stone-950 outline-none transition focus:border-emerald-500 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm'
+  'focus-ring w-full min-w-0 rounded-[12px] border border-stone-200 bg-white px-3 py-2.5 text-[14px] font-medium text-stone-950 outline-none transition focus:border-emerald-500 sm:rounded-[14px] sm:px-4 sm:py-3'
 
 function getInitialHostBusinessForm(
   organization,
@@ -238,6 +216,130 @@ function formatBusinessAddress(
     )
     .filter(Boolean)
     .join(', ')
+}
+
+function normalizeLocationLabel(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+// This is a display choice only; it never changes inventory or service-area records.
+function chooseFeaturedStockNode(nodes, business) {
+  if (!Array.isArray(nodes) || !nodes.length) return null
+  const city = normalizeLocationLabel(business?.city)
+  const postalCode = String(business?.postalCode || '').trim()
+  return nodes
+    .map((node, index) => {
+      const label = normalizeLocationLabel(node?.name)
+      const nodeCity = normalizeLocationLabel(node?.address?.city)
+      const nodePostal = String(node?.address?.postalCode || '').trim()
+      const score =
+        (node?.status === 'active' ? 10 : 0) +
+        (city && (label.includes(city) || nodeCity === city) ? 60 : 0) +
+        (postalCode && nodePostal === postalCode ? 40 : 0) +
+        (node?.nodeType === 'warehouse' ? 4 : 0)
+      return { node, index, score }
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index)[0].node
+}
+
+function chooseFeaturedServiceArea(areas, business) {
+  if (!Array.isArray(areas) || !areas.length) return null
+  const city = normalizeLocationLabel(business?.city)
+  const postalCode = String(business?.postalCode || '').trim()
+  return areas
+    .map((area, index) => {
+      const label = normalizeLocationLabel(area?.name)
+      const codes = Array.isArray(area?.postalCodes) ? area.postalCodes.map(String) : []
+      const score =
+        (area?.status === 'active' ? 10 : 0) +
+        (city && label.includes(city) ? 70 : 0) +
+        (postalCode && label.includes(postalCode) ? 90 : 0) +
+        (postalCode && codes.includes(postalCode) ? 35 : 0)
+      return { area, index, score }
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index)[0].area
+}
+
+// Inventory nodes and delivery areas have no image fields in their APIs.
+// Only display a real image when its saved item title matches a listing/catalog item.
+function locationItemKey(value) {
+  return String(value || '')
+    .replace(/^Delivery\s*[-–—:]\s*/i, '')
+    .replace(/^Host stock\s*[-–—:]\s*/i, '')
+    .replace(/^EPANTRY Test Kitchen\s*[-–—:]\s*[^–—-]+\s*[-–—:]\s*/i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function savedItemImage(value) {
+  const image = typeof value === 'string'
+    ? value
+    : value?.url || value?.secureUrl || value?.src || ''
+  return typeof image === 'string' && /^(https?:\/\/|\/)/i.test(image)
+    ? image
+    : ''
+}
+
+function locationPhotoMap(listings, products, recipes) {
+  const imageByName = Object.create(null)
+  const addImage = (title, image) => {
+    const key = locationItemKey(title)
+    const url = savedItemImage(image)
+    if (key && url && !imageByName[key]) imageByName[key] = url
+  }
+
+  // Host-created listings have their actual uploaded item images.
+  for (const listing of listings || []) {
+    const packet = listing?.packet || {}
+    addImage(
+      listing?.title || packet?.title || packet?.name,
+      packet?.images?.[0] || listing?.publishedPacket?.images?.[0],
+    )
+  }
+
+  // Public catalog photos cover packaged goods without a Host listing packet.
+  for (const product of products || []) {
+    addImage(
+      product?.displayName || product?.name || product?.pack?.name,
+      product?.image || product?.images?.[0],
+    )
+  }
+  // Published recipe photos provide authentic thumbnails for matching dishes.
+  for (const item of recipes || []) {
+    addImage(
+      item?.dish?.name || item?.recipe?.title,
+      item?.dish?.heroImageUrl || item?.recipe?.heroImageUrl,
+    )
+  }
+  return imageByName
+}
+
+function LocationItemThumbnail({ photo, kind = 'stock' }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  useEffect(() => setImageFailed(false), [photo])
+  const isDelivery = kind === 'delivery'
+  const frameClass = isDelivery
+    ? 'border-[#DED4EC] bg-[#F2EDF8] text-[#685985]'
+    : 'border-[#CEE0D2] bg-[#E7F0E8] text-[#426D58]'
+  return (
+    <span className={`grid size-12 shrink-0 place-items-center overflow-hidden rounded-[11px] border ${frameClass}`} aria-hidden="true">
+      {photo && !imageFailed ? (
+        <img
+          src={photo}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="size-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : isDelivery ? (
+        <MapPin size={21} strokeWidth={1.8} />
+      ) : (
+        <Warehouse size={21} strokeWidth={1.8} />
+      )}
+    </span>
+  )
 }
 
 function getInitialAddressForm(
@@ -473,6 +575,33 @@ export default function EditProfilePage({
     hostIdCopyStatus,
     setHostIdCopyStatus,
   ] = useState('')
+
+  const [locationItemPhotos, setLocationItemPhotos] = useState({})
+
+  useEffect(() => {
+    if (isCustomer) return undefined
+    let active = true
+
+    Promise.allSettled([
+      listHostListingPackets(),
+      getCatalogProducts({ page: 1, limit: 100 }),
+      listPublicRecipes({ page: 1, limit: 100, sourceScope: 'standard' }),
+    ]).then(([listingResult, catalogResult, recipeResult]) => {
+      if (!active) return
+      const listings = listingResult.status === 'fulfilled'
+        ? listingResult.value?.listings || []
+        : []
+      const products = catalogResult.status === 'fulfilled'
+        ? catalogResult.value?.products || []
+        : []
+      const recipes = recipeResult.status === 'fulfilled'
+        ? recipeResult.value?.recipes || []
+        : []
+      setLocationItemPhotos(locationPhotoMap(listings, products, recipes))
+    })
+
+    return () => { active = false }
+  }, [isCustomer, currentUser?.id])
 
   const identityInitial =
     useMemo(
@@ -1215,96 +1344,28 @@ export default function EditProfilePage({
       formatBusinessAddress(
         hostBusinessForm,
       )
+    const featuredStock = chooseFeaturedStockNode(inventoryNodes, hostBusinessForm)
+    const otherStock = inventoryNodes.filter((node) => node.id !== featuredStock?.id)
+    const featuredArea = chooseFeaturedServiceArea(serviceAreas, hostBusinessForm)
+    const otherAreas = serviceAreas.filter((area) => area.id !== featuredArea?.id)
+    const featuredCodes = Array.isArray(featuredArea?.postalCodes) ? featuredArea.postalCodes.map(String) : []
+    const namedPostal = String(featuredArea?.name || '').match(/\b\d{6}\b/)?.[0] || ''
+    const featuredPostal = namedPostal && featuredCodes.includes(namedPostal) ? namedPostal : featuredCodes[0] || ''
 
     return (
-      <div className="px-2.5 pb-4 pt-0 sm:px-5 sm:pb-6 lg:px-6 lg:pb-7">
-        <section
-          aria-labelledby="host-account-id-heading"
-          className="mb-3 rounded-[16px] border border-[#CEDBCF] border-l-4 border-l-[#C86C42] bg-[#E9F0E8] px-3.5 py-3.5 sm:mb-4 sm:rounded-[18px] sm:px-5 sm:py-4"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#173F35] text-white" aria-hidden="true">
-                  <IdCard size={19} />
-                </span>
-                <div className="min-w-0">
-                  <h2 id="host-account-id-heading" className="text-base font-bold leading-6 text-[#173F35] sm:text-lg">
-                    Your Host account ID
-                  </h2>
-                  <p className="text-[13px] leading-5 text-[#526359] sm:text-sm">
-                    Share this ID when another business adds you to its team.
-                  </p>
-                </div>
-              </div>
-              <input
-                aria-label="Your Host account ID"
-                type="text"
-                readOnly
-                value={hostAccountId}
-                placeholder="ID unavailable"
-                onFocus={(event) => event.currentTarget.select()}
-                className="focus-ring mt-3 block min-h-[43px] w-full rounded-[10px] border border-[#BFCFC1] bg-white px-3 py-2 font-mono text-[14px] font-medium tracking-[0.015em] text-[#173F35] sm:max-w-[560px] sm:text-[15px]"
-              />
+      <div className="px-2.5 pb-3 pt-0 sm:px-5 sm:pb-6 lg:px-6 lg:pb-7">
+        <header className="overflow-hidden rounded-[22px] border border-[#173F35] bg-[#173F35] text-white sm:rounded-[26px]">
+          <div className="px-4 py-4 sm:px-8 sm:py-8">
+            <div className="hidden items-center gap-2 text-[12px] font-semibold tracking-[0.08em] text-[#BCD6C8] sm:flex">
+              <UserRound size={16} aria-hidden="true" /> HOST / PROFILE
             </div>
-            <button
-              type="button"
-              onClick={handleCopyHostAccountId}
-              disabled={!hostAccountId}
-              className="focus-ring inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#255C4C] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-            >
-              {hostIdCopyStatus === 'copied' ? (
-                <CheckCircle2 size={17} aria-hidden="true" />
-              ) : (
-                <Copy size={17} aria-hidden="true" />
-              )}
-              {hostIdCopyStatus === 'copied' ? 'Copied' : 'Copy ID'}
-            </button>
-          </div>
-          <div aria-live="polite" className="mt-1 text-[13px] text-[#173F35]">
-            {hostIdCopyStatus === 'unavailable'
-              ? 'Copy is unavailable here. Select the ID above to copy it manually.'
-              : hostIdCopyStatus === 'copied'
-                ? 'Host account ID copied.'
-                : null}
-          </div>
-        </section>
-        <header className="rounded-[22px] border border-emerald-200 bg-[linear-gradient(135deg,#dcf7e9_0%,#e9f6fb_58%,#f1ecff_100%)] p-3.5 shadow-[0_10px_28px_rgba(23,72,59,0.08)] sm:rounded-[28px] sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-700 sm:text-[10px]">
-                Host profile
-              </p>
-              <h1 className="mt-1 text-[21px] font-black tracking-[-0.035em] text-stone-950 sm:mt-2 sm:text-3xl">
-                Profile & business locations
-              </h1>
-              <p className="mt-1 max-w-3xl text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
-                Keep your account, business address, stock locations and delivery pincodes up to date.
-              </p>
+            <h1 className="text-[24px] font-semibold leading-[1.2] tracking-[-0.025em] sm:mt-3 sm:text-[38px] sm:leading-[1.15] sm:tracking-[-0.03em]">Profile & locations</h1>
+            <p className="mt-2 hidden max-w-xl text-[14px] leading-6 text-[#E0ECE5] sm:block sm:text-[15px]">
+              Manage your public account, business address and delivery coverage.
+            </p>
+            <div className="mt-5 hidden flex-wrap gap-x-5 gap-y-2 border-t border-white/20 pt-4 text-[13px] text-[#F0F5F0] sm:flex">
+              <span>01&nbsp; Account</span><span>02&nbsp; Business</span><span>03&nbsp; Stock & delivery</span>
             </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-3">
-            {HOST_PROFILE_STEPS.map((step) => (
-              <div
-                key={step.number}
-                className={`rounded-[15px] border p-2.5 sm:rounded-[20px] sm:p-4 ${step.className}`}
-              >
-                <div className="flex items-start gap-2">
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                    {step.number}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[13px] text-stone-950 sm:text-xs sm:leading-4">
-                      {step.title}
-                    </p>
-                    <p className="mt-1 text-[9px] font-semibold leading-[13px] text-stone-600 sm:text-[11px] sm:leading-4">
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </header>
 
@@ -1321,105 +1382,84 @@ export default function EditProfilePage({
           </div>
         ) : null}
 
-        <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-[250px_minmax(0,1fr)]">
-          <section className="rounded-[20px] border border-emerald-200 bg-emerald-50/80 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
-            <div className="flex items-center gap-3 xl:flex-col xl:text-center">
-              <div className="relative shrink-0">
-                {profile?.profilePhotoUrl ? (
-                  <img
-                    src={profile.profilePhotoUrl}
-                    alt="Profile"
-                    className="size-[76px] rounded-full border-[3px] border-white object-cover shadow-sm sm:size-24 xl:size-28"
-                  />
-                ) : (
-                  <div className="grid size-[76px] place-items-center rounded-full border-[3px] border-white bg-emerald-700 text-2xl font-black text-white shadow-sm sm:size-24 sm:text-3xl xl:size-28">
-                    {identityInitial}
+        <section className="mt-3 overflow-hidden rounded-[18px] border border-[#C9DDEB] bg-[#F1F7FB] sm:mt-5 sm:rounded-[24px]">
+          <div className="flex items-center gap-2.5 border-b border-[#C9DDEB] bg-[#DCEAF7] px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
+            <span className="grid size-8 shrink-0 place-items-center rounded-[11px] bg-[#173F35] text-white sm:size-9"><UserRound size={19} /></span>
+            <div className="min-w-0">
+              <h2 className="text-[18px] font-semibold leading-6 text-[#173F35] sm:text-[21px] sm:leading-7">Account details</h2>
+              <p className="hidden text-[13px] text-[#526359] sm:block">Your name, photo and Host ID.</p>
+            </div>
+          </div>
+          <div className="grid gap-0 lg:grid-cols-[255px_minmax(0,1fr)]">
+            <div className="border-b border-[#C9DDEB] px-3 py-3 sm:px-6 sm:py-5 lg:border-b-0 lg:border-r">
+              <div className="flex items-center gap-4 lg:flex-col lg:text-center">
+                <div className="relative shrink-0">
+                  {profile?.profilePhotoUrl ? (
+                    <img src={profile.profilePhotoUrl} alt="Profile" className="size-[58px] rounded-full border-[3px] border-white object-cover shadow-sm sm:size-24" />
+                  ) : (
+                    <div className="grid size-[58px] place-items-center rounded-full border-[3px] border-white bg-[#173F35] text-[23px] font-semibold text-white shadow-sm sm:size-24 sm:text-[28px]">{identityInitial}</div>
+                  )}
+                  <label className="focus-ring absolute -bottom-1 -right-1 grid size-9 cursor-pointer place-items-center rounded-full border-[3px] border-white bg-[#C86C42] text-white hover:bg-[#AF5734]">
+                    <Camera size={15} aria-hidden="true" />
+                    <span className="sr-only">Change profile photo</span>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={uploadingPhoto} onChange={handlePhotoChange} />
+                  </label>
+                </div>
+                <div className="min-w-0">
+                  <p className="break-words text-[16px] font-semibold text-[#173F35]">{profile?.name || currentUser?.name || 'Host'}</p>
+                  <p title={profile?.email || currentUser?.email || ''} className="mt-1 max-w-full overflow-x-auto whitespace-nowrap text-[12px] leading-5 tracking-[-0.02em] text-[#53675F] sm:text-[13px]">{profile?.email || currentUser?.email || ''}</p>
+                  <p className="mt-0 text-[12px] text-[#53675F] sm:mt-2">{uploadingPhoto ? 'Uploading photo…' : <span className="hidden sm:inline">Tap the camera to change photo</span>}</p>
+                </div>
+              </div>
+            </div>
+            <form onSubmit={handleProfileSubmit} className="min-w-0 px-3 py-3 sm:px-6 sm:py-5">
+              <div className="grid gap-3 sm:gap-4 xl:grid-cols-2">
+                <div className="min-w-0">
+                  <label htmlFor="host-account-name-field" className="mb-1.5 block text-[13px] font-semibold text-[#173F35]">Name</label>
+                  <input id="host-account-name-field" value={name} onChange={(event) => setName(event.target.value)} className={hostInputClassName} required minLength={2} maxLength={120} />
+                </div>
+                <div className="min-w-0">
+                  <label htmlFor="host-account-id-field" className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold text-[#173F35]">
+                    <IdCard size={15} aria-hidden="true" /> Your Host account ID
+                  </label>
+                  <div className="flex min-w-0 items-stretch gap-2">
+                    <input id="host-account-id-field" aria-label="Your Host account ID" readOnly value={hostAccountId} placeholder="ID unavailable" onFocus={(event) => event.currentTarget.select()} className="focus-ring min-w-0 flex-1 rounded-[12px] border border-[#C9DDEB] bg-white px-3 py-2.5 font-mono text-[13px] text-[#173F35]" />
+                    <button type="button" onClick={handleCopyHostAccountId} disabled={!hostAccountId} className="focus-ring inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#173F35] px-3.5 text-[13px] font-semibold text-white hover:bg-[#245B4B] disabled:opacity-50">
+                      {hostIdCopyStatus === 'copied' ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+                      {hostIdCopyStatus === 'copied' ? 'Copied' : 'Copy'}
+                    </button>
                   </div>
-                )}
-
-                <label className="focus-ring absolute bottom-0 right-0 grid size-8 cursor-pointer place-items-center rounded-full border-[3px] border-white bg-stone-950 text-white shadow-sm transition hover:bg-emerald-700 sm:size-9">
-                  <Camera size={14} aria-hidden="true" />
-                  <span className="sr-only">Change profile photo</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="sr-only"
-                    disabled={uploadingPhoto}
-                    onChange={handlePhotoChange}
-                  />
-                </label>
+                  <p className="mt-1.5 hidden text-[12px] leading-4 text-[#526359] sm:block">Share this ID when joining another business team.</p>
+                  <p aria-live="polite" className="text-[12px] text-[#173F35]">
+                    {hostIdCopyStatus === 'unavailable' ? 'Copy unavailable. Select the ID to copy manually.' : hostIdCopyStatus === 'copied' ? 'Host account ID copied.' : null}
+                  </p>
+                </div>
               </div>
-
-              <div className="min-w-0 xl:mt-3">
-                <p className="truncate text-sm font-black text-stone-950 sm:text-base">
-                  {profile?.name || currentUser?.name || 'Host'}
-                </p>
-                <p className="mt-0.5 truncate text-[10px] font-semibold text-stone-500 sm:text-xs">
-                  {profile?.email || currentUser?.email || ''}
-                </p>
-                <p className="mt-1 text-[9px] font-bold text-stone-400 sm:text-[10px]">
-                  {uploadingPhoto ? 'Uploading photo…' : 'Tap the camera to change photo'}
-                </p>
+              <div className="mt-3 flex justify-end border-t border-[#C9DDEB] pt-3 sm:mt-4 sm:pt-4">
+                <button type="submit" disabled={savingProfile} className="focus-ring inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[12px] bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-[#245B4B] disabled:opacity-60 sm:w-auto">
+                  <Save size={16} /> {savingProfile ? 'Saving…' : 'Save account'}
+                </button>
               </div>
-            </div>
-          </section>
+            </form>
+          </div>
+        </section>
 
-          <form
-            onSubmit={handleProfileSubmit}
-            className="rounded-[20px] border border-sky-200 bg-sky-50/80 p-3 shadow-sm sm:rounded-[24px] sm:p-5"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="grid size-8 place-items-center rounded-xl bg-white text-sky-700 shadow-sm sm:size-10 sm:rounded-2xl">
-                <UserRound size={17} aria-hidden="true" />
-              </div>
-              <div>
-                <h2 className="text-sm font-black text-stone-950 sm:text-lg">Account details</h2>
-                <p className="text-[9px] font-semibold text-stone-500 sm:text-xs">This name is visible across your Host workspace.</p>
-              </div>
-            </div>
-
-            <div className="mt-3 sm:mt-4 sm:max-w-xl">
-              <Field label="Name">
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className={hostInputClassName}
-                  required
-                  minLength={2}
-                  maxLength={120}
-                />
-              </Field>
-            </div>
-
-            <div className="mt-3 flex justify-end sm:mt-4">
-              <button
-                type="submit"
-                disabled={savingProfile}
-                className="focus-ring inline-flex items-center justify-center gap-2 rounded-[14px] bg-emerald-700 px-4 py-2.5 text-[11px] font-black text-white transition hover:bg-emerald-800 disabled:opacity-60 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-sm"
-              >
-                <Save size={15} aria-hidden="true" />
-                {savingProfile ? 'Saving…' : 'Save account'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <section className="mt-3 rounded-[20px] border border-sky-200 bg-[linear-gradient(135deg,#e8f5fb_0%,#eef9f4_100%)] p-3 shadow-sm sm:mt-4 sm:rounded-[24px] sm:p-5">
+        <section className="mt-3 rounded-[18px] border border-[#D5D9CB] bg-[#F7F6F2] p-3 sm:mt-5 sm:rounded-[24px] sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-2.5">
               <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-sky-700 shadow-sm sm:size-10 sm:rounded-2xl">
                 <Building2 size={17} aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-sm font-black text-stone-950 sm:text-lg">Business address & contact</h2>
-                <p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-xs">Keep the main address and contact details for your business current.</p>
+                <h2 className="text-[18px] font-semibold leading-6 text-[#173F35] sm:text-[21px]">Business address & contact</h2>
+                <p className="mt-1 hidden text-[13px] leading-5 text-[#526359] sm:block">Registered business information and contact details.</p>
               </div>
             </div>
             {!editingBusiness ? (
               <button
                 type="button"
                 onClick={() => setEditingBusiness(true)}
-                className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[10px] font-black text-sky-800 sm:text-xs"
+                className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#D5D9CB] bg-white px-3 py-2 text-[13px] font-semibold text-[#173F35]"
               >
                 <Pencil size={13} aria-hidden="true" />
                 Edit
@@ -1429,19 +1469,19 @@ export default function EditProfilePage({
 
           {!editingBusiness ? (
             <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-3">
-              <div className="rounded-[14px] border border-white/80 bg-white/75 p-3 sm:rounded-[18px]">
-                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700">Business</p>
-                <p className="mt-1 text-[11px] font-black text-stone-950 sm:text-sm">{hostBusinessForm.legalEntityName || hostOrganization?.displayName || 'Add business name'}</p>
-                <p className="mt-0.5 text-[9px] font-semibold capitalize text-stone-500 sm:text-[11px]">{String(hostBusinessForm.businessType || 'other').replaceAll('_', ' ')}</p>
+              <div className="rounded-[12px] border border-[#E2E4DA] bg-white/90 p-3 sm:rounded-[18px] sm:p-3.5">
+                <p className="text-[12px] font-semibold text-[#526359]">Business</p>
+                <p className="mt-1 text-[15px] font-semibold text-[#173F35]">{hostBusinessForm.legalEntityName || hostOrganization?.displayName || 'Add business name'}</p>
+                <p className="mt-1 text-[12px] capitalize text-[#526359]">{String(hostBusinessForm.businessType || 'other').replaceAll('_', ' ')}</p>
               </div>
-              <div className="rounded-[14px] border border-white/80 bg-white/75 p-3 sm:rounded-[18px]">
-                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700">Main location</p>
-                <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-700 sm:text-xs">{businessAddress || 'Add your business address'}</p>
+              <div className="rounded-[12px] border border-[#E2E4DA] bg-white/90 p-3 sm:rounded-[18px] sm:p-3.5">
+                <p className="text-[12px] font-semibold text-[#526359]">Main location</p>
+                <p className="mt-1 text-[14px] leading-5 text-[#173F35]">{businessAddress || 'Add your business address'}</p>
               </div>
-              <div className="rounded-[14px] border border-white/80 bg-white/75 p-3 sm:rounded-[18px]">
-                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-700">Business contact</p>
-                <p className="mt-1 truncate text-[10px] font-semibold text-stone-700 sm:text-xs">{hostBusinessForm.supportEmail || 'Add support email'}</p>
-                <p className="mt-0.5 text-[10px] font-semibold text-stone-500 sm:text-xs">{hostBusinessForm.supportPhone || 'Add support phone'}</p>
+              <div className="rounded-[12px] border border-[#E2E4DA] bg-white/90 p-3 sm:rounded-[18px] sm:p-3.5">
+                <p className="text-[12px] font-semibold text-[#526359]">Business contact</p>
+                <p className="mt-1 break-all text-[14px] text-[#173F35]">{hostBusinessForm.supportEmail || 'Add support email'}</p>
+                <p className="mt-1 text-[13px] text-[#526359]">{hostBusinessForm.supportPhone || 'Add support phone'}</p>
               </div>
             </div>
           ) : (
@@ -1475,33 +1515,50 @@ export default function EditProfilePage({
         </section>
 
         <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-2">
-          <section className="rounded-[20px] border border-emerald-200 bg-emerald-50/75 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-2.5">
-                <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 shadow-sm sm:size-10 sm:rounded-2xl"><Warehouse size={17} aria-hidden="true" /></div>
-                <div className="min-w-0"><h2 className="text-sm font-black text-stone-950 sm:text-lg">Stock locations</h2><p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-xs">Add or edit the stores, warehouses or dispatch locations where you keep stock.</p></div>
+          <section className="overflow-hidden rounded-[22px] border border-[#C8D9C8] bg-[#EDF3EB] sm:rounded-[24px]">
+            <div className="flex items-start justify-between gap-2.5 border-b border-[#C8D9C8] bg-[#DCE8D9] px-3 py-3 sm:gap-3 sm:px-5 sm:py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid size-8 shrink-0 place-items-center rounded-[12px] bg-[#173F35] text-white sm:size-10"><Warehouse size={19} /></span>
+                <div className="min-w-0"><h2 className="text-[18px] font-semibold text-[#173F35] sm:text-[21px]">Stock locations</h2></div>
               </div>
-              <button type="button" onClick={() => setInventoryNodeForm(getInitialInventoryNodeForm())} className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-xl bg-emerald-700 px-2.5 py-2 text-[10px] font-black text-white sm:px-3 sm:text-xs"><Plus size={13} /> Add</button>
+              <button type="button" onClick={() => setInventoryNodeForm(getInitialInventoryNodeForm())} className="focus-ring inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-[11px] bg-[#173F35] px-3 text-[13px] font-semibold text-white hover:bg-[#245B4B] sm:min-h-[42px] sm:px-3.5"><Plus size={15} /> Add</button>
             </div>
-
-            <div className="mt-3 space-y-2">
-              {inventoryNodes.length ? inventoryNodes.map((node) => (
-                <article key={node.id} className="rounded-[14px] border border-emerald-100 bg-white/85 p-3 sm:rounded-[18px]">
+            <div className="p-3 sm:p-5">
+              {featuredStock ? (
+                <div className="rounded-[14px] border border-[#C4D6C8] bg-white px-3 py-3 sm:rounded-[16px] sm:px-5 sm:py-4">
+                  <p className="mb-2 hidden text-[12px] font-semibold uppercase tracking-[0.07em] text-[#567362] sm:block">Main stock location</p>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5"><p className="text-[11px] font-black text-stone-950 sm:text-sm">{node.name}</p><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-emerald-700">{formatNodeType(node.nodeType)}</span></div>
-                      <p className="mt-1 text-[9px] font-semibold leading-4 text-stone-500 sm:text-[11px]">{[node.address?.line1, node.address?.city, node.address?.state, node.address?.postalCode].filter(Boolean).join(', ') || 'Address not added yet'}</p>
+                      <h3 className="break-words text-[15px] font-semibold leading-5 text-[#173F35] sm:text-[17px] sm:leading-6">{featuredStock.name}</h3>
+                      <p className="mt-1 text-[13px] text-[#596760]">{formatNodeType(featuredStock.nodeType)}{featuredStock.address?.city ? ` · ${featuredStock.address.city}` : ''}{featuredStock.address?.postalCode ? ` · ${featuredStock.address.postalCode}` : ''}</p>
+                      {featuredStock.address?.line1 ? <p className="mt-1 text-[13px] leading-5 text-[#596760]">{featuredStock.address.line1}</p> : null}
                     </div>
-                    <button type="button" onClick={() => setInventoryNodeForm(getInitialInventoryNodeForm(node))} className="focus-ring grid size-8 shrink-0 place-items-center rounded-xl border border-emerald-200 bg-white text-emerald-700" aria-label={`Edit ${node.name}`}><Pencil size={13} /></button>
+                    <button type="button" onClick={() => setInventoryNodeForm(getInitialInventoryNodeForm(featuredStock))} className="focus-ring inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-[10px] border border-[#C4D6C8] bg-[#F0F6F0] px-3 text-[13px] font-semibold text-[#173F35]"><Pencil size={14} /> Edit</button>
                   </div>
-                </article>
-              )) : (
-                <div className="rounded-[14px] border border-dashed border-emerald-200 bg-white/60 p-4 text-center text-[10px] font-semibold text-stone-500 sm:text-xs">No stock location added yet.</div>
-              )}
-            </div>
-
-            {inventoryNodeForm ? (
-              <form onSubmit={handleInventoryNodeSubmit} className="mt-3 rounded-[16px] border border-emerald-200 bg-white/90 p-3 sm:mt-4 sm:rounded-[20px] sm:p-4">
+                </div>
+              ) : <p className="rounded-[14px] bg-white px-4 py-4 text-[14px] text-[#526359]">No stock locations yet. Select Add to create one.</p>}
+              {otherStock.length > 0 ? (
+                <details className="group mt-2.5 overflow-hidden rounded-[14px] border border-[#C4D6C8] bg-white sm:mt-3">
+                  <summary className="focus-ring flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[14px] font-semibold text-[#173F35] sm:min-h-[48px] sm:px-4 sm:py-3 [&::-webkit-details-marker]:hidden">
+                    <span>Other stock locations <span className="ml-1 text-[#5D7166]">({otherStock.length})</span></span>
+                    <ChevronDown size={19} className="shrink-0 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="border-t border-[#DFE7DF]">
+                    {otherStock.map((node) => (
+                      <div key={node.id} className="flex items-center gap-3 border-b border-[#EDF0ED] px-3 py-3 last:border-b-0 sm:px-4">
+                        <LocationItemThumbnail photo={locationItemPhotos[locationItemKey(node.name)]} kind="stock" />
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-[14px] font-semibold leading-5 text-[#173F35]">{node.name}</p>
+                          <p className="mt-0.5 text-[12px] leading-4 text-[#596760]">{formatNodeType(node.nodeType)}{node.address?.city ? ` · ${node.address.city}` : ''}{node.address?.postalCode ? ` · ${node.address.postalCode}` : ''}</p>
+                        </div>
+                        <button type="button" onClick={() => setInventoryNodeForm(getInitialInventoryNodeForm(node))} className="focus-ring inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-[9px] border border-[#D5E2D8] px-2.5 text-[13px] font-semibold text-[#173F35]"><Pencil size={13} /> Edit</button>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+              {inventoryNodeForm ? (
+              <form onSubmit={handleInventoryNodeSubmit} className="mt-4 rounded-[16px] border border-[#C4D6C8] bg-white p-4 sm:rounded-[20px]">
                 <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-black text-stone-950 sm:text-sm">{inventoryNodeForm.id ? 'Edit stock location' : 'Add stock location'}</h3><button type="button" onClick={() => setInventoryNodeForm(null)} className="focus-ring grid size-8 place-items-center rounded-xl border border-stone-200 bg-white text-stone-600"><X size={14} /></button></div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <Field label="Location name"><input required value={inventoryNodeForm.name} onChange={(event) => setInventoryNodeForm((current) => ({ ...current, name: event.target.value }))} className={hostInputClassName} placeholder="Main warehouse" /></Field>
@@ -1515,39 +1572,61 @@ export default function EditProfilePage({
                 <button disabled={savingLocation} className="focus-ring mt-3 w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-[11px] font-black text-white disabled:opacity-60 sm:text-xs">{savingLocation ? 'Saving…' : inventoryNodeForm.id ? 'Save location' : 'Add location'}</button>
               </form>
             ) : null}
+            </div>
           </section>
 
-          <section className="rounded-[20px] border border-violet-200 bg-violet-50/75 p-3 shadow-sm sm:rounded-[24px] sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-2.5">
-                <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm sm:size-10 sm:rounded-2xl"><MapPinned size={17} aria-hidden="true" /></div>
-                <div className="min-w-0"><h2 className="text-sm font-black text-stone-950 sm:text-lg">Delivery areas</h2><p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-xs">Choose the customer pincodes you serve. These are the same delivery areas used in Operations Center and Pricing & Stock.</p></div>
+          <section className="overflow-hidden rounded-[22px] border border-[#DACFEB] bg-[#F5F1FA] sm:rounded-[24px]">
+            <div className="flex items-start justify-between gap-2.5 border-b border-[#DACFEB] bg-[#E8E0F3] px-3 py-3 sm:gap-3 sm:px-5 sm:py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid size-8 shrink-0 place-items-center rounded-[12px] bg-[#173F35] text-white sm:size-10"><MapPinned size={19} /></span>
+                <div className="min-w-0"><h2 className="text-[18px] font-semibold text-[#173F35] sm:text-[21px]">Delivery areas</h2></div>
               </div>
-              <button type="button" onClick={() => setServiceAreaForm(getInitialServiceAreaForm())} className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-xl bg-violet-700 px-2.5 py-2 text-[10px] font-black text-white sm:px-3 sm:text-xs"><Plus size={13} /> Add</button>
+              <button type="button" onClick={() => setServiceAreaForm(getInitialServiceAreaForm())} className="focus-ring inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-[11px] bg-[#173F35] px-3 text-[13px] font-semibold text-white hover:bg-[#245B4B] sm:min-h-[42px] sm:px-3.5"><Plus size={15} /> Add</button>
             </div>
-
-            <div className="mt-3 space-y-2">
-              {serviceAreas.length ? serviceAreas.map((area) => {
-                const linkedNode = inventoryNodes.find((node) => String(node.id) === String(area.inventoryNodeId))
-                return (
-                  <article key={area.id} className="rounded-[14px] border border-violet-100 bg-white/85 p-3 sm:rounded-[18px]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-stone-950 sm:text-sm">{area.name}</p>
-                        <p className="mt-1 text-[9px] font-semibold text-stone-500 sm:text-[11px]">{linkedNode ? `From ${linkedNode.name}` : 'All active stock locations'}</p>
-                        <div className="mt-1.5 flex flex-wrap gap-1">{(area.postalCodes || []).slice(0, 6).map((code) => <span key={code} className="rounded-full bg-violet-100 px-2 py-0.5 text-[8px] font-black text-violet-700">{code}</span>)}{(area.postalCodes || []).length > 6 ? <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[8px] font-black text-stone-600">+{area.postalCodes.length - 6}</span> : null}</div>
-                      </div>
-                      <button type="button" onClick={() => setServiceAreaForm(getInitialServiceAreaForm(area))} className="focus-ring grid size-8 shrink-0 place-items-center rounded-xl border border-violet-200 bg-white text-violet-700" aria-label={`Edit ${area.name}`}><Pencil size={13} /></button>
+            <div className="p-3 sm:p-5">
+              {featuredArea ? (
+                <div className="rounded-[14px] border border-[#DAD0E8] bg-white px-3 py-3 sm:rounded-[16px] sm:px-5 sm:py-4">
+                  <p className="mb-2 hidden text-[12px] font-semibold uppercase tracking-[0.07em] text-[#76648E] sm:block">Main delivery area</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="break-words text-[15px] font-semibold leading-5 text-[#173F35] sm:text-[17px] sm:leading-6">{featuredArea.name}</h3>
+                      <p className="mt-1 text-[13px] text-[#596760]">
+                        <span className="sm:hidden">{featuredPostal ? `${featuredPostal} · ` : ''}{(featuredArea.postalCodes || []).length} pincodes</span>
+                        <span className="hidden sm:inline">{featuredPostal ? `Main pincode ${featuredPostal} · ` : ''}{(featuredArea.postalCodes || []).length} service pincodes</span>
+                      </p>
+                      <p className="mt-1 hidden text-[13px] leading-5 text-[#596760] sm:block">
+                        {inventoryNodes.find((node) => String(node.id) === String(featuredArea.inventoryNodeId))?.name || 'All active stock locations'}
+                      </p>
                     </div>
-                  </article>
-                )
-              }) : (
-                <div className="rounded-[14px] border border-dashed border-violet-200 bg-white/60 p-4 text-center text-[10px] font-semibold text-stone-500 sm:text-xs">No delivery area added yet.</div>
-              )}
-            </div>
-
-            {serviceAreaForm ? (
-              <form onSubmit={handleServiceAreaSubmit} className="mt-3 rounded-[16px] border border-violet-200 bg-white/90 p-3 sm:mt-4 sm:rounded-[20px] sm:p-4">
+                    <button type="button" onClick={() => setServiceAreaForm(getInitialServiceAreaForm(featuredArea))} className="focus-ring inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-[10px] border border-[#DAD0E8] bg-[#F5F1FA] px-3 text-[13px] font-semibold text-[#173F35]"><Pencil size={14} /> Edit</button>
+                  </div>
+                </div>
+              ) : <p className="rounded-[14px] bg-white px-4 py-4 text-[14px] text-[#526359]">No delivery areas yet. Select Add to create one.</p>}
+              {otherAreas.length > 0 ? (
+                <details className="group mt-2.5 overflow-hidden rounded-[14px] border border-[#DAD0E8] bg-white sm:mt-3">
+                  <summary className="focus-ring flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[14px] font-semibold text-[#173F35] sm:min-h-[48px] sm:px-4 sm:py-3 [&::-webkit-details-marker]:hidden">
+                    <span>Other delivery areas <span className="ml-1 text-[#776989]">({otherAreas.length})</span></span>
+                    <ChevronDown size={19} className="shrink-0 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="border-t border-[#E8E0F3]">
+                    {otherAreas.map((area) => {
+                      const linkedNode = inventoryNodes.find((node) => String(node.id) === String(area.inventoryNodeId))
+                      return (
+                        <div key={area.id} className="flex items-center gap-3 border-b border-[#EFEAF4] px-3 py-3 last:border-b-0 sm:px-4">
+                          <LocationItemThumbnail photo={locationItemPhotos[locationItemKey(area.name)] || locationItemPhotos[locationItemKey(linkedNode?.name)]} kind="delivery" />
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-[14px] font-semibold leading-5 text-[#173F35]">{area.name}</p>
+                            <p className="mt-0.5 text-[12px] leading-4 text-[#596760]">{(area.postalCodes || []).length} pincodes · {linkedNode?.name || 'All active stock locations'}</p>
+                          </div>
+                          <button type="button" onClick={() => setServiceAreaForm(getInitialServiceAreaForm(area))} className="focus-ring inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-[9px] border border-[#E0D8EC] px-2.5 text-[13px] font-semibold text-[#173F35]"><Pencil size={13} /> Edit</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </details>
+              ) : null}
+              {serviceAreaForm ? (
+              <form onSubmit={handleServiceAreaSubmit} className="mt-4 rounded-[16px] border border-[#DAD0E8] bg-white p-4 sm:rounded-[20px]">
                 <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-black text-stone-950 sm:text-sm">{serviceAreaForm.id ? 'Edit delivery area' : 'Add delivery area'}</h3><button type="button" onClick={() => setServiceAreaForm(null)} className="focus-ring grid size-8 place-items-center rounded-xl border border-stone-200 bg-white text-stone-600"><X size={14} /></button></div>
                 <div className="mt-3 grid gap-3">
                   <Field label="Area name"><input required value={serviceAreaForm.name} onChange={(event) => setServiceAreaForm((current) => ({ ...current, name: event.target.value }))} className={hostInputClassName} placeholder="Delhi Central" /></Field>
@@ -1557,15 +1636,16 @@ export default function EditProfilePage({
                 <button disabled={savingServiceArea} className="focus-ring mt-3 w-full rounded-xl bg-violet-700 px-4 py-2.5 text-[11px] font-black text-white disabled:opacity-60 sm:text-xs">{savingServiceArea ? 'Saving…' : serviceAreaForm.id ? 'Save delivery area' : 'Add delivery area'}</button>
               </form>
             ) : null}
+            </div>
           </section>
         </div>
 
-        <section className="mt-3 flex flex-col gap-3 rounded-[20px] border border-emerald-200 bg-emerald-100/65 p-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:rounded-[24px] sm:p-5">
-          <div className="flex min-w-0 items-start gap-2.5">
-            <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 sm:size-10 sm:rounded-2xl"><Store size={17} aria-hidden="true" /></div>
-            <div><h2 className="text-sm font-black text-stone-950 sm:text-base">Next: review your operations setup</h2><p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-600 sm:text-xs">Check delivery coverage, business readiness and other Host setup details in Operations Center.</p></div>
+        <section className="mt-3 flex items-center justify-between gap-2 rounded-[16px] border border-[#C5D6C7] bg-[#DFE9DC] px-3 py-3 sm:mt-5 sm:gap-3 sm:rounded-[18px] sm:p-5">
+          <div className="flex min-w-0 items-center gap-2.5 sm:items-start">
+            <div className="hidden size-8 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 sm:grid sm:size-10 sm:rounded-2xl"><Store size={17} aria-hidden="true" /></div>
+            <div className="min-w-0"><h2 className="text-[15px] font-semibold leading-5 text-[#173F35] sm:text-[17px]"><span className="sm:hidden">Operations setup</span><span className="hidden sm:inline">Review operations setup</span></h2><p className="mt-1 hidden text-[13px] text-[#526359] sm:block">Check readiness and delivery coverage.</p></div>
           </div>
-          <Link to="/host/operations-center" className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-[11px] font-black text-white sm:text-xs">Open Operations Center <ArrowRight size={14} /></Link>
+          <Link to="/host/operations-center" className="focus-ring inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[11px] bg-[#173F35] px-3 py-2 text-[13px] font-semibold text-white hover:bg-[#245B4B] sm:gap-2 sm:rounded-[12px] sm:px-4 sm:py-2.5 sm:text-[14px]"><span className="sm:hidden">Review</span><span className="hidden sm:inline">Open Operations Center</span><ArrowRight size={16} /></Link>
         </section>
       </div>
     )
