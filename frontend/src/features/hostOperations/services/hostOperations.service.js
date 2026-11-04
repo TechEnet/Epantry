@@ -402,10 +402,11 @@ export async function submitHostCampaign(campaignId) {
   })
 }
 
-export async function getHostEarningsOverview() {
+export async function getHostEarningsOverview(params = {}) {
   return unwrap(
     await apiClient.get(
       '/host/operations/finance/earnings',
+      { params },
     ),
   )
 }

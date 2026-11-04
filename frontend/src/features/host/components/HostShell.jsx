@@ -20,7 +20,6 @@ import {
   ShoppingBag,
   Store,
   UserRound,
-  WalletCards,
   Warehouse,
   X,
 } from "lucide-react";
@@ -126,11 +125,6 @@ const navigationGroups = [
         to: "/host/earnings",
         icon: Banknote,
       },
-      {
-        label: "Payments & Finance",
-        to: "/host/finance",
-        icon: WalletCards,
-      },
     ],
   },
   {
@@ -207,7 +201,6 @@ const mobileNavigationOrder = [
   "/host/marketplace",
   "/host/orders",
   "/host/earnings",
-  "/host/finance",
   "/host/campaigns",
   "/host/settings",
   "/host/hospitality",
@@ -435,8 +428,6 @@ export default function HostShell({ children }) {
   );
 
 
-  const isHostFinanceRoute = location.pathname === "/host/finance";
-
   const isHostCampaignsRoute = location.pathname === "/host/campaigns";
 
   const isHostAnalyticsRoute = location.pathname === "/host/analytics";
@@ -496,7 +487,6 @@ export default function HostShell({ children }) {
           isHostMarketplaceRoute ||
           isHostOrdersRoute ||
           isHostOrderDetailRoute ||
-          isHostFinanceRoute ||
           isHostCampaignsRoute ||
           isHostAnalyticsRoute ||
           isHostSettingsRoute ||

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Check, Clock3, RefreshCw, WalletCards } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -10,190 +10,228 @@ import {
 } from '../../hostOperations/services/hostOperations.service'
 
 const earningsStyles = String.raw`
-/* Host earnings: Balanced Japandi editorial finance layout.
-   Scoped to this page; global navigation and footer are unchanged. */
+/* Earnings workspace: senior Balanced Japandi. Exclusively scoped to .hee-page. */
 .hee-page {
-  --hee-porcelain: #F7F6F2;
+  --hee-paper: #F7F6F2;
+  --hee-surface: #FFFEFC;
   --hee-forest: #173F35;
   --hee-charcoal: #202421;
   --hee-sage: #DCE0CF;
   --hee-clay: #C86C42;
-  --hee-muted: #57655D;
-  --hee-border: #D8DED3;
-  --hee-surface: #FFFEFB;
+  --hee-muted: #59655F;
+  --hee-rule: #DBDED7;
   box-sizing: border-box;
-  min-width: 0;
-  width: 100%;
-  padding: clamp(20px, 2.6vw, 36px) clamp(16px, 3vw, 42px) 54px;
-  background: var(--hee-porcelain);
+  width: 100%; min-width: 0;
+  padding: 32px clamp(18px, 3vw, 44px) 58px;
+  background: var(--hee-paper);
   color: var(--hee-charcoal);
-  font: 400 16px/1.6 'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+  font: 400 16px/1.6 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
 }
 .hee-page *, .hee-page *::before, .hee-page *::after { box-sizing: border-box; }
 .hee-page :is(a, button) { font-family: inherit; }
-.hee-page :is(a, button):focus-visible { outline: 3px solid var(--hee-clay); outline-offset: 3px; }
-.hee-intro { border-bottom: 1px solid var(--hee-border); padding-bottom: 25px; }
-.hee-intro-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.hee-kicker, .hee-section-label { display: inline-flex; align-items: center; gap: 11px; color: #975037; font-size: 13px; line-height: 1.5; font-weight: 700; text-transform: uppercase; letter-spacing: .055em; }
-.hee-kicker::before { content: ''; display: block; width: 25px; height: 2px; background: var(--hee-clay); }
-.hee-live-tools { display: flex; align-items: center; gap: 16px; }
-.hee-live { display: inline-flex; align-items: center; gap: 9px; color: var(--hee-muted); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
-.hee-live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #42835F; box-shadow: 0 0 0 4px #42835F20; }
-.hee-refresh { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 10px 16px; border-radius: 12px; border: 1px solid #BBC7BB; background: #FFFEFB; color: var(--hee-forest); font-size: 14px; font-weight: 650; cursor: pointer; transition: background-color .18s ease, border-color .18s ease; }
-.hee-refresh:hover:not(:disabled) { border-color: var(--hee-forest); background: #EEF1E9; }
-.hee-refresh:disabled { opacity: .66; cursor: wait; }
-.hee-heading-panel { display: flex; justify-content: space-between; align-items: flex-end; gap: 22px; margin-top: 23px; }
-.hee-heading-panel h1 { margin: 0 0 7px!important; color: var(--hee-forest)!important; font-size: clamp(30px, 3.1vw, 38px)!important; line-height: 1.2!important; font-weight: 650!important; letter-spacing: -.042em!important; }
-.hee-heading-panel p { margin: 0; color: var(--hee-muted); font-size: 16px; line-height: 1.6; }
-.hee-updated { display: inline-block; flex: none; padding-bottom: 3px; font-size: 13.5px; line-height: 1.5; color: var(--hee-muted); text-align: right; }
-.hee-snapshot { display: grid; grid-template-columns: minmax(290px, .88fr) minmax(0, 1.12fr); overflow: hidden; border-radius: 16px; margin-top: 26px; background: var(--hee-surface); border: 1px solid var(--hee-border); }
-.hee-captured { position: relative; display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 32px 36px; min-height: 275px; background: var(--hee-forest); color: #F7F6F2; }
-.hee-captured::before { content: ''; width: 38px; height: 3px; background: var(--hee-clay); position: absolute; top: 31px; left: 36px; }
-.hee-captured-label { display: block; font-size: 15px; line-height: 1.5; font-weight: 600; color: #DCE0CF; margin-top: 15px; }
-.hee-captured-value { display: block; color: #F7F6F2; margin: 7px 0 10px; font-size: clamp(38px, 4.3vw, 54px); font-weight: 650; line-height: 1.18; letter-spacing: -.052em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.hee-captured-sub { display: block; max-width: 370px; color: #E0E8DD; font-size: 14px; line-height: 1.6; }
-.hee-metrics { display: flex; flex-direction: column; min-width: 0; }
-.hee-metric { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 20px 27px; flex: 1 1 0; min-width: 0; }
-.hee-metric + .hee-metric { border-top: 1px solid var(--hee-border); }
-.hee-metric[data-kind='await'] { background: #F9F1EB; }
-.hee-metric-copy { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.hee-metric-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #E8EEE3; flex: none; color: var(--hee-forest); }
-.hee-metric[data-kind='await'] .hee-metric-icon { background: #F4DDD0; color: #9D5037; }
-.hee-metric-text { display: block; min-width: 0; }
-.hee-metric-label { display: block; color: var(--hee-charcoal); font-size: 15px; line-height: 1.4; font-weight: 650; }
-.hee-metric-note { display: block; color: var(--hee-muted); margin-top: 3px; font-size: 13px; line-height: 1.45; }
-.hee-metric-number { display: block; margin-left: 8px; flex: none; color: var(--hee-forest); font-size: clamp(23px, 2.2vw, 31px); line-height: 1.2; letter-spacing: -.045em; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
-.hee-metric[data-kind='await'] .hee-metric-number { color: #8F422D; }
-.hee-error { margin-top: 18px; padding: 13px 18px; border-left: 3px solid #B3453E; background: #F8E7E4; color: #853C34; font-size: 14px; }
-.hee-sales { min-width: 0; margin-top: 42px; }
-.hee-section-header { display: flex; align-items: end; justify-content: space-between; gap: 18px; flex-wrap: wrap; padding: 0 0 19px; }
-.hee-section-label { color: #A75B3A; }
-.hee-section-header h2, .hee-payout-head h2 { margin: 5px 0 0!important; font-size: clamp(25px, 2.7vw, 30px)!important; line-height: 1.28!important; font-weight: 650!important; letter-spacing: -.036em!important; color: var(--hee-forest)!important; }
-.hee-section-sub { margin: 5px 0 0; font-size: 15px; color: var(--hee-muted); line-height: 1.5; }
-.hee-sales-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 19px; padding-bottom: 3px; }
+.hee-page :is(a, button):focus-visible { outline: 3px solid var(--hee-clay); outline-offset: 4px; }
+.hee-intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 28px; padding-bottom: 28px; border-bottom: 1px solid var(--hee-rule); }
+.hee-intro-content { min-width: 0; }
+.hee-kicker, .hee-eyebrow { display: inline-flex; align-items: center; gap: 10px; color: #995237; font-size: 13px; font-weight: 700; line-height: 1.5; letter-spacing: .045em; text-transform: uppercase; }
+.hee-kicker::before { display: block; width: 24px; height: 2px; background: var(--hee-clay); content: ''; }
+.hee-intro h1 { margin: 11px 0 4px!important; color: var(--hee-forest)!important; font-size: clamp(30px, 3.2vw, 38px)!important; font-weight: 650!important; letter-spacing: -.045em!important; line-height: 1.24!important; }
+.hee-intro p { margin: 0; max-width: 640px; color: var(--hee-muted); font-size: 16px; line-height: 1.55; }
+.hee-control { display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 7px; flex: 0 0 auto; }
+.hee-refresh { display: inline-flex; align-items: center; justify-content: center; gap: 11px; min-height: 48px; min-width: 133px; padding: 11px 20px; border: 1px solid var(--hee-forest); border-radius: 11px; background: var(--hee-forest); color: #FFF; font-size: 15px; line-height: 1.2; font-weight: 650; cursor: pointer; transition: background-color .18s, transform .18s; }
+.hee-refresh:hover:not(:disabled) { background: #285A49; transform: translateY(-1px); }
+.hee-refresh:disabled { opacity: .68; cursor: wait; transform: none; }
+.hee-updated { max-width: 270px; font-size: 13px; line-height: 1.5; color: var(--hee-muted); text-align: right; }
+.hee-overview { display: grid; grid-template-columns: minmax(265px, 1.05fr) minmax(0, 1.6fr); min-width: 0; margin-top: 27px; border: 1px solid var(--hee-rule); border-radius: 14px; overflow: hidden; background: var(--hee-surface); }
+.hee-total { min-width: 0; padding: 33px clamp(24px, 2.7vw, 38px) 32px; background: #EEF0E7; border-right: 1px solid var(--hee-rule); }
+.hee-overline { color: var(--hee-forest); font-size: 15px; font-weight: 650; line-height: 1.45; }
+.hee-total-number { display: block; margin: 11px 0 6px; color: var(--hee-forest); font-size: clamp(39px, 4.4vw, 54px); font-weight: 650; letter-spacing: -.057em; line-height: 1.14; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hee-total-caption { display: block; max-width: 340px; color: #506157; font-size: 14px; line-height: 1.55; }
+.hee-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; }
+.hee-kpi { display: flex; flex-direction: column; justify-content: space-between; gap: 21px; min-width: 0; padding: 32px 22px 30px; }
+.hee-kpi + .hee-kpi { border-left: 1px solid var(--hee-rule); }
+.hee-kpi-title { display: flex; flex-direction: column; gap: 8px; color: var(--hee-charcoal); font-size: 14px; font-weight: 650; line-height: 1.35; }
+.hee-kpi-icon { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 9px; color: #35614B; background: #E7EEE7; }
+.hee-kpi[data-kind='await'] .hee-kpi-icon { color: #A75239; background: #F6E6DD; }
+.hee-kpi-bottom { display: block; min-width: 0; }
+.hee-kpi-number { display: block; color: var(--hee-forest); font-size: clamp(21px, 2vw, 28px); font-weight: 650; line-height: 1.25; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hee-kpi[data-kind='await'] .hee-kpi-number { color: #945039; }
+.hee-kpi-note { display: block; margin-top: 4px; color: var(--hee-muted); font-size: 13px; line-height: 1.5; }
+.hee-error { margin-top: 18px; padding: 13px 17px; border-left: 3px solid #A8443F; background: #F8E7E3; color: #8B3832; font-size: 14px; }
+.hee-sales { margin-top: 43px; min-width: 0; }
+.hee-section-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 18px; padding-bottom: 19px; }
+.hee-section-header h2, .hee-payout-title h2 { margin: 5px 0 2px!important; color: var(--hee-forest)!important; font-size: clamp(25px, 2.5vw, 30px)!important; font-weight: 650!important; line-height: 1.3!important; letter-spacing: -.037em!important; }
+.hee-section-sub { margin: 0; color: var(--hee-muted); font-size: 15px; line-height: 1.55; }
+.hee-section-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding-bottom: 2px; }
 .hee-count { color: var(--hee-muted); font-size: 14px; font-weight: 600; }
-.hee-plain-link, .hee-payout-link { display: inline-flex; align-items: center; gap: 8px; width: fit-content; text-decoration: none; color: var(--hee-forest); font-size: 14px; font-weight: 700; border-bottom: 1px solid #8BA897; padding: 4px 0; transition: color .18s, border-color .18s; }
-.hee-plain-link:hover, .hee-payout-link:hover { color: #9B4E32; border-bottom-color: var(--hee-clay); }
-.hee-order-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; border: 1px solid var(--hee-border); border-radius: 14px; overflow: hidden; background: var(--hee-surface); }
-.hee-order { position: relative; min-width: 0; min-height: 115px; display: flex; align-items: center; gap: 14px; padding: 18px 18px; background: var(--hee-surface); border-bottom: 1px solid #E4E8E0; color: inherit; text-decoration: none; transition: background-color .18s ease; }
-.hee-order:nth-child(2n) { border-left: 1px solid var(--hee-border); }
-.hee-order:last-child, .hee-order:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
-.hee-order:hover { background: #F0F3EB; }
-.hee-order:hover .hee-visit { border-color: var(--hee-forest); background: var(--hee-forest); color: #FFF; }
-.hee-photo { flex: 0 0 70px; width: 70px; height: 70px; overflow: hidden; position: relative; background: #EFF1EB; border-radius: 10px; display: block; }
-.hee-photo img { display: block; width: 100%; height: 100%; object-fit: contain; background: #FAFAF7; }
-.hee-photo-blank { display: grid; place-items: center; height: 100%; padding: 5px; text-align: center; font-size: 12px; line-height: 1.3; color: var(--hee-muted); }
-.hee-photo-number { position: absolute; right: 3px; bottom: 3px; padding: 2px 5px; background: var(--hee-forest); border-radius: 5px; font-size: 11px; line-height: 1.35; font-weight: 700; color: #FFF; }
-.hee-order-information { display: block; flex: 1 1 auto; min-width: 0; }
-.hee-product-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; color: var(--hee-charcoal); font-size: 15px; font-weight: 650; line-height: 1.45; }
-.hee-product-meta { display: block; margin-top: 5px; color: var(--hee-muted); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
-.hee-order-money { flex: 0 0 auto; min-width: 108px; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
-.hee-order-price { color: var(--hee-forest); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.035em; white-space: nowrap; }
-.hee-badge { display: inline-flex; align-items: center; padding: 4px 8px; background: #E5EFE5; color: #285D3C; border-radius: 6px; font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center; }
-.hee-badge[data-status='awaiting_settlement'] { background: #F9E6D9; color: #944A2F; }
-.hee-badge[data-status='not_yet_settleable'] { background: #E4EEF1; color: #2D6474; }
-.hee-badge[data-status='pending_approval'] { background: #EDE8F5; color: #5C4C7A; }
-.hee-badge[data-status='rejected'], .hee-badge[data-status='void'] { background: #F6E4E3; color: #973F3A; }
-.hee-visit { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid #D6DFD6; border-radius: 50%; color: var(--hee-forest); transition: background-color .18s, border-color .18s, color .18s; }
-.hee-sales-foot { display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; padding: 13px 2px 0; }
-.hee-sales-foot p { margin: 0; color: var(--hee-muted); font-size: 13.5px; }
-.hee-empty-sales { grid-column: 1 / -1; padding: 32px 26px; color: var(--hee-muted); font-size: 15px; }
-.hee-payouts { display: grid; grid-template-columns: minmax(250px, .64fr) minmax(0, 1.36fr); min-width: 0; margin-top: 39px; overflow: hidden; border-radius: 14px; border: 1px solid var(--hee-border); background: var(--hee-surface); }
-.hee-payout-head { min-width: 0; padding: 31px 32px; background: var(--hee-sage); }
-.hee-payout-head .hee-section-label { color: #74503D; }
-.hee-payout-head p { color: #4D5F54; font-size: 15px; margin: 8px 0 19px; line-height: 1.5; }
-.hee-payout-link { color: var(--hee-forest); }
-.hee-payout-list { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 18px 30px; }
-.hee-payout-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 0; border-bottom: 1px solid var(--hee-border); }
+.hee-plain-link { display: inline-flex; align-items: center; gap: 8px; width: fit-content; padding: 4px 0; border-bottom: 1px solid #92A99B; color: var(--hee-forest); text-decoration: none; font-size: 14px; font-weight: 700; transition: color .18s, border-color .18s; }
+.hee-plain-link:hover { color: #995237; border-color: var(--hee-clay); }
+.hee-ledger { min-width: 0; background: var(--hee-surface); border-top: 2px solid var(--hee-forest); border-bottom: 1px solid var(--hee-rule); }
+.hee-ledger-head, .hee-order { display: grid; grid-template-columns: minmax(0, 2fr) minmax(160px, 1.15fr) minmax(155px, .95fr) minmax(120px, .8fr); align-items: center; gap: 18px; }
+.hee-ledger-head { min-height: 45px; padding: 10px 24px; background: #EFF1EA; border-bottom: 1px solid var(--hee-rule); color: #536157; font-size: 13px; font-weight: 650; }
+.hee-ledger-head span:last-child { text-align: right; }
+.hee-order { min-height: 85px; padding: 13px 24px; color: inherit; text-decoration: none; border-bottom: 1px solid #E9EAE5; transition: background-color .18s; }
+.hee-order:last-child { border-bottom: 0; }
+.hee-order:hover { background: #F4F5F0; }
+.hee-order:hover .hee-visit { transform: translateX(3px); }
+.hee-ledger-product { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.hee-photo { position: relative; display: block; flex: 0 0 58px; width: 58px; height: 58px; border: 1px solid #E8EAE3; border-radius: 9px; overflow: hidden; background: #F0F1EB; }
+.hee-photo img { display: block; width: 100%; height: 100%; object-fit: contain; background: #FBFBF9; }
+.hee-photo-blank { display: grid; place-items: center; height: 100%; padding: 4px; color: var(--hee-muted); text-align: center; font-size: 11px; line-height: 1.25; }
+.hee-photo-number { position: absolute; right: 2px; bottom: 2px; padding: 1px 5px; border-radius: 4px; background: var(--hee-forest); color: #FFF; font-size: 11px; font-weight: 700; line-height: 1.45; }
+.hee-product-name { display: block; color: var(--hee-charcoal); font-size: 15px; font-weight: 650; line-height: 1.45; overflow-wrap: anywhere; }
+.hee-mobile-order-meta { display: none; }
+.hee-order-reference { min-width: 0; }
+.hee-order-id { display: block; color: var(--hee-charcoal); font-size: 14px; font-weight: 600; line-height: 1.35; }
+.hee-order-date { display: block; margin-top: 4px; color: var(--hee-muted); font-size: 13px; line-height: 1.5; }
+.hee-order-state { min-width: 0; }
+.hee-badge { display: inline-flex; align-items: center; max-width: 100%; padding: 5px 9px; border-radius: 6px; background: #E8F0E8; color: #2B6245; font-size: 12px; font-weight: 650; line-height: 1.35; white-space: normal; }
+.hee-badge[data-status='awaiting_settlement'] { background: #F7E8DF; color: #974F36; }
+.hee-badge[data-status='not_yet_settleable'] { background: #E5EDF0; color: #356B78; }
+.hee-badge[data-status='pending_approval'] { background: #EEE9F4; color: #65517D; }
+.hee-badge[data-status='rejected'], .hee-badge[data-status='void'] { background: #F7E4E3; color: #9D433C; }
+.hee-order-money { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
+.hee-order-price { color: var(--hee-forest); font-size: 17px; font-weight: 700; line-height: 1.3; font-variant-numeric: tabular-nums; letter-spacing: -.035em; overflow-wrap: anywhere; text-align: right; }
+.hee-visit { display: inline-flex; align-items: center; justify-content: center; color: var(--hee-forest); transition: transform .18s; }
+.hee-mobile-status { display: none; }
+.hee-empty-sales { padding: 34px 24px; color: var(--hee-muted); font-size: 15px; }
+.hee-more-sales { display: flex; align-items: center; justify-content: center; padding-top: 17px; }
+.hee-more-button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 23px; border: 1px solid #A7B8AA; border-radius: 9px; background: var(--hee-surface); color: var(--hee-forest); font-size: 15px; line-height: 1.4; font-weight: 650; cursor: pointer; transition: background-color .18s, border-color .18s; }
+.hee-more-button:hover:not(:disabled) { background: #E7EDE5; border-color: var(--hee-forest); }
+.hee-more-button:disabled { opacity: .65; cursor: wait; }
+.hee-more-error { margin: 12px 0 0; color: #8B3832; font-size: 14px; text-align: center; }
+.hee-sales-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 13px 1px 0; }
+.hee-sales-foot p { margin: 0; font-size: 14px; color: var(--hee-muted); }
+.hee-payouts { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(0, 1.5fr); gap: 26px; min-width: 0; margin-top: 44px; padding-top: 32px; border-top: 1px solid var(--hee-rule); }
+.hee-payout-title { display: flex; align-items: flex-start; flex-direction: column; min-width: 0; }
+.hee-payout-title .hee-section-sub { margin: 2px 0 17px; }
+.hee-payout-body { min-width: 0; padding-left: 28px; border-left: 1px solid var(--hee-rule); }
+.hee-payout-row { display: flex; align-items: center; justify-content: space-between; gap: 22px; min-height: 75px; padding: 13px 0; border-bottom: 1px solid var(--hee-rule); }
 .hee-payout-row:last-child { border-bottom: 0; }
-.hee-payout-value { display: block; color: var(--hee-forest); font-size: 22px; font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums; }
-.hee-payout-meta { display: block; margin-top: 5px; color: var(--hee-muted); font-size: 13px; line-height: 1.5; }
-.hee-payout-empty { display: flex; align-items: center; gap: 17px; padding: 16px 0; }
-.hee-payout-empty-icon { display: inline-grid; flex: none; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: var(--hee-forest); background: #E8EEE4; }
-.hee-payout-empty strong { display: block; color: var(--hee-forest); font-size: 16px; line-height: 1.4; font-weight: 650; }
-.hee-payout-empty p { margin: 4px 0 0; color: var(--hee-muted); font-size: 14px; line-height: 1.55; }
-@media (max-width: 1150px) {
-  .hee-metric { padding: 18px 20px; }
-  .hee-order { gap: 11px; padding: 16px 13px; }
-  .hee-photo { width: 62px; height: 66px; flex-basis: 62px; }
-  .hee-order-money { min-width: 98px; }
-  .hee-product-name { font-size: 14.5px; }
+.hee-payout-value { display: block; color: var(--hee-forest); font-size: 22px; line-height: 1.25; font-weight: 650; font-variant-numeric: tabular-nums; }
+.hee-payout-meta { display: block; margin-top: 4px; color: var(--hee-muted); font-size: 13px; line-height: 1.5; }
+.hee-payout-empty { display: flex; align-items: center; gap: 17px; min-height: 118px; padding: 23px 25px; background: #EDF0E8; border-radius: 11px; }
+.hee-payout-empty-icon { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid #D5DED3; border-radius: 10px; background: #FFFEFC; color: var(--hee-forest); }
+.hee-payout-empty strong { display: block; color: var(--hee-forest); font-size: 16px; line-height: 1.45; font-weight: 650; }
+.hee-payout-empty p { margin: 3px 0 0; color: var(--hee-muted); font-size: 14px; line-height: 1.55; }
+@media (max-width: 1130px) {
+  .hee-overview { grid-template-columns: minmax(250px, .9fr) minmax(0, 1.6fr); }
+  .hee-kpi { padding: 26px 15px; }
+  .hee-ledger-head, .hee-order { gap: 13px; grid-template-columns: minmax(0, 1.8fr) minmax(135px, 1fr) minmax(125px, .95fr) minmax(100px, .7fr); }
+  .hee-ledger-head { padding: 10px 16px; }
+  .hee-order { padding: 13px 16px; }
+  .hee-order-money { gap: 7px; }
 }
-@media (max-width: 980px) {
-  .hee-order-list { grid-template-columns: 1fr; }
-  .hee-order:nth-child(2n) { border-left: 0; }
-  .hee-order:nth-last-child(2) { border-bottom: 1px solid #E4E8E0; }
-  .hee-order { min-height: 101px; padding: 14px 22px; }
-  .hee-photo { width: 68px; height: 70px; flex-basis: 68px; }
+@media (max-width: 900px) {
+  .hee-overview { grid-template-columns: 1fr; }
+  .hee-total { border-right: 0; border-bottom: 1px solid var(--hee-rule); padding: 27px 30px; }
+  .hee-kpi { padding: 22px 24px; }
+  .hee-ledger-head, .hee-order { grid-template-columns: minmax(0, 1.8fr) minmax(130px, 1fr) minmax(115px, .9fr) minmax(95px, .7fr); gap: 10px; }
+  .hee-order { padding: 12px 14px; }
+  .hee-ledger-head { padding: 10px 14px; }
 }
-@media (max-width: 760px) {
-  .hee-page { padding: 18px 16px 40px; }
-  .hee-intro { padding-bottom: 19px; }
-  .hee-heading-panel { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: 19px; }
-  .hee-updated { text-align: left; }
-  .hee-snapshot { grid-template-columns: 1fr; margin-top: 21px; }
-  .hee-captured { min-height: 205px; padding: 30px 26px 26px; }
-  .hee-captured::before { left: 26px; top: 23px; }
-  .hee-captured-value { font-size: 41px; }
-  .hee-metric { min-height: 86px; padding: 16px 22px; }
-  .hee-sales { margin-top: 29px; }
-  .hee-payouts { margin-top: 30px; grid-template-columns: 1fr; }
-  .hee-payout-head { padding: 22px 24px; }
-  .hee-payout-list { padding: 14px 24px; }
+@media (max-width: 740px) {
+  /* Mobile-only: compact page flow without hiding finance or order information. */
+  .hee-page { padding: 20px 16px 30px; }
+  .hee-intro { align-items: flex-start; gap: 14px; padding-bottom: 18px; }
+  .hee-intro h1 { font-size: 29px!important; }
+  .hee-intro p { font-size: 15px; }
+  .hee-refresh { min-width: 110px; padding: 10px 14px; }
+  .hee-updated { max-width: 180px; }
+  .hee-sales { margin-top: 28px; }
+  .hee-section-header { gap: 10px; padding-bottom: 13px; }
+  .hee-section-sub { font-size: 14px; line-height: 1.45; }
+  .hee-section-actions { gap: 14px; }
+  .hee-ledger-head { display: none; }
+  .hee-order {
+    grid-template-columns: minmax(0, 1fr) minmax(98px, max-content);
+    grid-template-areas: 'product amount' 'reference amount';
+    column-gap: 10px; row-gap: 3px;
+    min-height: 76px; padding: 11px 14px;
+  }
+  .hee-ledger-product { grid-area: product; min-width: 0; }
+  .hee-order-reference { display: block; grid-area: reference; padding-left: 72px; min-width: 0; }
+  .hee-order-state, .hee-mobile-order-meta { display: none; }
+  .hee-order-id { font-size: 12.5px; }
+  .hee-order-date { margin-top: 1px; font-size: 12px; line-height: 1.35; }
+  .hee-order-money { grid-area: amount; flex-direction: column; align-items: flex-end; align-self: center; gap: 5px; min-width: 0; }
+  .hee-order-price { font-size: 15px; }
+  .hee-mobile-status { display: block; text-align: right; }
+  .hee-order-money .hee-visit { display: none; }
+  .hee-more-sales { padding-top: 12px; }
+  .hee-more-button { min-height: 44px; }
+  .hee-sales-foot { flex-wrap: nowrap; align-items: center; gap: 8px; padding-top: 11px; }
+  .hee-sales-foot p { min-width: 0; font-size: 13px; line-height: 1.4; }
+  .hee-sales-foot .hee-plain-link { flex: 0 0 auto; }
+  .hee-payouts { grid-template-columns: 1fr; gap: 12px; margin-top: 19px; padding-top: 18px; }
+  .hee-payout-title .hee-section-sub { margin: 1px 0 7px; }
+  .hee-payout-title h2 { margin: 2px 0!important; }
+  .hee-payout-body { padding-left: 0; border-left: 0; }
+  .hee-payout-row { min-height: 65px; padding: 10px 0; }
+  .hee-payout-empty { min-height: 0; gap: 12px; padding: 13px 14px; border-radius: 10px; }
+  .hee-payout-empty-icon { flex-basis: 38px; width: 38px; height: 38px; border-radius: 9px; }
+  .hee-payout-empty strong { font-size: 15px; line-height: 1.4; }
+  .hee-payout-empty p { margin-top: 2px; font-size: 13.5px; line-height: 1.45; }
 }
 @media (max-width: 520px) {
-  .hee-page { padding: 15px 12px 35px; }
-  .hee-intro-top { gap: 8px; }
-  .hee-kicker, .hee-section-label { font-size: 12.5px; }
-  .hee-live-tools { gap: 11px; }
-  .hee-live { font-size: 12.5px; }
-  .hee-refresh { min-height: 44px; padding: 9px 11px; font-size: 13px; }
-  .hee-heading-panel h1 { font-size: 30px!important; }
-  .hee-heading-panel p { font-size: 15px; }
-  .hee-snapshot { border-radius: 13px; }
-  .hee-captured { min-height: 194px; padding: 29px 21px 23px; }
-  .hee-captured::before { left: 21px; }
-  .hee-captured-label { font-size: 14px; }
-  .hee-captured-value { font-size: clamp(33px, 9vw, 41px); }
-  .hee-captured-sub { font-size: 13.5px; }
-  .hee-metric { padding: 15px 16px; gap: 8px; }
-  .hee-metric-copy { gap: 10px; }
-  .hee-metric-icon { width: 36px; height: 36px; border-radius: 10px; }
-  .hee-metric-label { font-size: 14px; }
-  .hee-metric-note { font-size: 12.5px; }
-  .hee-metric-number { font-size: clamp(21px, 6.1vw, 26px); margin-left: 3px; }
-  .hee-section-header { align-items: flex-start; gap: 12px; }
-  .hee-section-header h2, .hee-payout-head h2 { font-size: 26px!important; }
-  .hee-section-sub { font-size: 14px; }
-  .hee-sales-actions { gap: 16px; }
-  .hee-order { padding: 13px 11px; min-height: 94px; gap: 9px; }
-  .hee-photo { width: 57px; height: 61px; flex-basis: 57px; border-radius: 8px; }
-  .hee-product-name { font-size: 14px; }
-  .hee-product-meta { font-size: 12px; }
-  .hee-order-money { min-width: 94px; gap: 5px; }
-  .hee-order-price { font-size: 15px; }
-  .hee-badge { font-size: 11.5px; padding: 4px 6px; }
-  .hee-sales-foot { padding-top: 12px; }
-  .hee-payout-head { padding: 22px 20px; }
-  .hee-payout-list { padding: 10px 20px; }
-  .hee-payout-row { align-items: flex-start; flex-wrap: wrap; gap: 9px; }
-}
-@media (max-width: 365px) {
-  .hee-live-tools { gap: 8px; }
-  .hee-live { font-size: 11.5px; }
-  .hee-refresh { padding: 8px 9px; }
-  .hee-order { gap: 7px; padding-left: 8px; padding-right: 8px; }
-  .hee-photo { width: 48px; height: 54px; flex-basis: 48px; }
-  .hee-order-money { min-width: 88px; }
+  .hee-page { padding: 16px 12px 25px; }
+  .hee-intro { flex-direction: column; gap: 11px; padding-bottom: 15px; }
+  .hee-control { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+  .hee-kicker, .hee-eyebrow { font-size: 12.5px; }
+  .hee-intro h1 { margin: 7px 0 3px!important; font-size: 27px!important; }
+  .hee-intro p { font-size: 14px; line-height: 1.45; }
+  .hee-refresh { min-height: 44px; min-width: 100px; padding: 9px 11px; font-size: 14px; gap: 7px; }
+  .hee-updated { font-size: 12.5px; max-width: 210px; }
+  .hee-overview { margin-top: 17px; border-radius: 11px; }
+  .hee-total { padding: 18px 17px; }
+  .hee-total-number { margin: 5px 0 4px; font-size: clamp(36px, 10vw, 43px); }
+  .hee-total-caption { font-size: 13.5px; }
+  .hee-kpis { grid-template-columns: 1fr; }
+  .hee-kpi { flex-direction: row; align-items: center; gap: 10px; padding: 11px 16px; }
+  .hee-kpi + .hee-kpi { border-left: 0; border-top: 1px solid var(--hee-rule); }
+  .hee-kpi-title { flex-direction: row; align-items: center; gap: 9px; font-size: 13px; }
+  .hee-kpi-icon { width: 29px; height: 29px; flex: none; }
+  .hee-kpi-bottom { text-align: right; }
+  .hee-kpi-number { font-size: 20px; }
+  .hee-kpi-note { font-size: 12px; line-height: 1.35; }
+  .hee-sales { margin-top: 24px; }
+  .hee-section-header h2, .hee-payout-title h2 { font-size: 23px!important; }
+  .hee-section-actions { gap: 12px; }
+  .hee-count { font-size: 13px; }
+  .hee-photo { flex-basis: 46px; width: 46px; height: 48px; }
+  .hee-ledger-product { gap: 9px; }
+  .hee-product-name { font-size: 13.5px; line-height: 1.35; }
+  .hee-order { grid-template-columns: minmax(0, 1fr) minmax(92px, max-content); column-gap: 8px; row-gap: 1px; padding: 10px 10px; }
+  .hee-order-reference { padding-left: 55px; }
+  .hee-order-id { font-size: 12px; }
+  .hee-order-date { font-size: 11.5px; }
   .hee-order-price { font-size: 14px; }
-  .hee-badge { font-size: 11px; }
-  .hee-metric-icon { width: 32px; height: 32px; }
-  .hee-metric-copy { gap: 7px; }
-  .hee-metric-label { font-size: 13px; }
-  .hee-metric-note { font-size: 12px; }
-  .hee-metric-number { font-size: 20px; }
+  .hee-badge { font-size: 11px; padding: 4px 6px; }
+  .hee-more-button { min-height: 44px; }
+  .hee-sales-foot p { font-size: 12.5px; }
+  .hee-sales-foot .hee-plain-link { font-size: 13px; gap: 6px; }
+  .hee-payouts { margin-top: 16px; padding-top: 17px; gap: 11px; }
+  .hee-payout-title .hee-section-sub { margin: 1px 0 5px; }
+  .hee-payout-title .hee-plain-link { font-size: 14px; }
+  .hee-payout-empty { gap: 11px; padding: 12px; background: #EDF0E8; }
+  .hee-payout-empty-icon { flex-basis: 36px; width: 36px; height: 36px; }
+  .hee-payout-empty strong { font-size: 14.5px; }
+  .hee-payout-empty p { font-size: 13px; }
 }
-@media (prefers-reduced-motion: reduce) { .hee-page :is(a, button) { transition: none !important; } }
+@media (max-width: 370px) {
+  .hee-page { padding-right: 10px; padding-left: 10px; }
+  .hee-control { align-items: center; }
+  .hee-updated { max-width: 174px; font-size: 12px; }
+  .hee-kpi-title { gap: 6px; font-size: 12.5px; }
+  .hee-kpi { padding: 10px 12px; }
+  .hee-kpi-number { font-size: 18px; }
+  .hee-photo { flex-basis: 42px; width: 42px; height: 44px; }
+  .hee-order { grid-template-columns: minmax(0, 1fr) minmax(86px, max-content); column-gap: 6px; }
+  .hee-order-reference { padding-left: 50px; }
+  .hee-badge { font-size: 10.5px; }
+  .hee-sales-foot p { font-size: 12px; }
+  .hee-sales-foot .hee-plain-link { font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) { .hee-page :is(a, button), .hee-visit { transition: none!important; } }
 `
 function currencyMinor(value, currency = 'INR') {
   const amount = Number(value || 0) / 100
@@ -279,18 +317,27 @@ function OrderSale({ order, images, currency }) {
   const image = safeImageUrl(first.imageUrl) ||
     images[`v:${first.productVersionId}`] || images[`n:${normalizeTitle(name)}`] || ''
   const priceMinor = order.netPayableMinor ?? order.grossMinor
+  const orderId = `#${shortOrderId(order.sellerOrderId)}`
+  const when = dateTime(order.updatedAt || order.createdAt)
 
   return <Link className="hee-order" to={`/host/orders/${order.sellerOrderId}`}
     aria-label={`View ${title}, order ${shortOrderId(order.sellerOrderId)}`}>
-    <ProductPhoto src={image} name={name} count={count} />
-    <span className="hee-order-information">
-      <strong className="hee-product-name">{title}</strong>
-      <span className="hee-product-meta">#{shortOrderId(order.sellerOrderId)} · {dateTime(order.updatedAt || order.createdAt)}</span>
+    <span className="hee-ledger-product">
+      <ProductPhoto src={image} name={name} count={count} />
+      <span className="hee-order-information">
+        <strong className="hee-product-name">{title}</strong>
+        <span className="hee-mobile-order-meta">{orderId} · {when}</span>
+      </span>
     </span>
+    <span className="hee-order-reference">
+      <strong className="hee-order-id">{orderId}</strong>
+      <span className="hee-order-date">{when}</span>
+    </span>
+    <span className="hee-order-state"><Status status={order.settlementStatus} /></span>
     <span className="hee-order-money">
       <strong className="hee-order-price">{currencyMinor(priceMinor, order.currency || currency)}</strong>
-      <Status status={order.settlementStatus} />
-      <span className="hee-visit" aria-hidden="true"><ArrowRight size={15} /></span>
+      <span className="hee-mobile-status"><Status status={order.settlementStatus} /></span>
+      <span className="hee-visit" aria-hidden="true"><ArrowRight size={17} /></span>
     </span>
   </Link>
 }
@@ -298,53 +345,83 @@ function OrderSale({ order, images, currency }) {
 export default function HostEarningsPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState('')
   const [images, setImages] = useState({})
+  const [salesPage, setSalesPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreError, setMoreError] = useState('')
+  const [exhaustedSales, setExhaustedSales] = useState(false)
+  const initialFetchStarted = useRef(false)
+  const moreInFlight = useRef(false)
 
-  const load = useCallback(async ({ quiet = false } = {}) => {
-    if (quiet) setRefreshing(true)
-    else setLoading(true)
+  // Fetch once on page entry; later requests require a Refresh or View all click.
+  const load = useCallback(async () => {
+    if (moreInFlight.current) return
+    setLoading(true)
     try {
-      const result = await getHostEarningsOverview()
-      setData(result || null)
+      const result = await getHostEarningsOverview({ page: 1, limit: 8 })
+      if (!result) throw new Error('No earnings information was returned.')
+      setData(result)
+      setSalesPage(1)
+      setExhaustedSales(false)
+      setMoreError('')
+      setHasLoaded(true)
       setError('')
     } catch (loadError) {
       setError(getHostOperationsErrorMessage(loadError, 'Unable to load earnings.'))
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
-    load()
-    const interval = window.setInterval(() => load({ quiet: true }), 10000)
-    const refreshOnFocus = () => load({ quiet: true })
-    const refreshOnVisibility = () => {
-      if (document.visibilityState === 'visible') refreshOnFocus()
-    }
-    window.addEventListener('focus', refreshOnFocus)
-    document.addEventListener('visibilitychange', refreshOnVisibility)
-    return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('focus', refreshOnFocus)
-      document.removeEventListener('visibilitychange', refreshOnVisibility)
-    }
+    // Prevent duplicate mount requests from React StrictMode effect replay in development.
+    if (initialFetchStarted.current) return
+    initialFetchStarted.current = true
+    void load()
   }, [load])
 
   const earnings = data?.earnings || {}
   const currency = earnings.currency || 'INR'
   const recentOrders = Array.isArray(data?.recentOrders) ? data.recentOrders : []
   const recentSettlements = Array.isArray(data?.recentSettlements) ? data.recentSettlements : []
+  const ready = Boolean(hasLoaded && data)
+  const totalPaidOrders = Number(earnings.capturedOrders || 0)
+  const hasMoreSales = ready && !exhaustedSales && recentOrders.length < totalPaidOrders
+
+  const loadMoreSales = useCallback(async () => {
+    if (loading || moreInFlight.current || !hasMoreSales) return
+    moreInFlight.current = true
+    setLoadingMore(true)
+    setMoreError('')
+    try {
+      const nextPage = salesPage + 1
+      const result = await getHostEarningsOverview({ page: nextPage, limit: 8 })
+      if (!Array.isArray(result?.recentOrders)) throw new Error('Unable to load more sales.')
+      const nextOrders = result.recentOrders
+      if (!nextOrders.length || nextOrders.length < 8) setExhaustedSales(true)
+      setData((current) => {
+        if (!current) return current
+        const knownIds = new Set((current.recentOrders || []).map((order) => order.sellerOrderId))
+        const unique = nextOrders.filter((order) => !knownIds.has(order.sellerOrderId))
+        return { ...current, recentOrders: [...(current.recentOrders || []), ...unique] }
+      })
+      setSalesPage(nextPage)
+    } catch (loadError) {
+      setMoreError(getHostOperationsErrorMessage(loadError, 'Unable to load more sales. Please retry.'))
+    } finally {
+      moreInFlight.current = false
+      setLoadingMore(false)
+    }
+  }, [loading, hasMoreSales, salesPage])
 
   const imageLookupKey = useMemo(() => recentOrders.map((order) =>
     (order.itemPreviews || []).map((item) => `${item.productVersionId || ''}:${item.name || ''}`).join('|') ||
     (order.itemNames || []).join('|'),
   ).join('||'), [recentOrders])
 
-  // Use only existing EPANTRY images. Do not fetch stock pictures or invent assets.
-  // This runs when the list of sold products changes, NOT at every 10-second refresh.
+  // Only after a user-triggered data load, fall back to existing EPANTRY catalog imagery.
   useEffect(() => {
     if (!imageLookupKey) return undefined
     let active = true
@@ -353,8 +430,7 @@ export default function HostEarningsPage() {
     recentOrders.forEach((order) => {
       if (Array.isArray(order.itemPreviews) && order.itemPreviews.length) {
         order.itemPreviews.forEach((item) => {
-          // The Earnings API now returns the real catalog photo directly.
-          // Do not make extra catalog requests when that photo is available.
+          // Prefer the photo already supplied by Earnings; do not fetch it again.
           if (safeImageUrl(item?.imageUrl)) return
           if (normalizeTitle(item?.name)) wantedNames.add(normalizeTitle(item.name))
           if (item?.productVersionId) wantedVersions.add(String(item.productVersionId))
@@ -404,7 +480,6 @@ export default function HostEarningsPage() {
 
     Promise.allSettled([hostTask, catalogTask]).then(async () => {
       if (!active) return
-      // A targeted catalog lookup is a fallback for products beyond page one.
       const names = [...wantedNames].filter((name) => !foundKeys.has(`n:${name}`)).slice(0, 12)
       for (let index = 0; index < names.length && active; index += 6) {
         await Promise.allSettled(names.slice(index, index + 6).map(async (name) => {
@@ -415,7 +490,6 @@ export default function HostEarningsPage() {
     }).catch(() => {})
 
     return () => { active = false }
-    // imageLookupKey is a primitive snapshot, so refreshes with the same items do not restart requests.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageLookupKey])
 
@@ -423,53 +497,53 @@ export default function HostEarningsPage() {
     <style>{earningsStyles}</style>
 
     <header className="hee-intro">
-      <div className="hee-intro-top">
+      <div className="hee-intro-content">
         <span className="hee-kicker">Host / Finance</span>
-        <div className="hee-live-tools">
-          <span className="hee-live">Live · 10 sec</span>
-          <button type="button" className="hee-refresh" onClick={() => load({ quiet: true })}
-            disabled={refreshing}>
-            <RefreshCw size={16} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
+        <h1>Your earnings</h1>
+        <p>Sales, payments and payouts for your business, all in one place.</p>
       </div>
-      <div className="hee-heading-panel">
-        <div>
-          <h1>Your earnings</h1>
-          <p>Sales, payments and payouts for your business, all in one place.</p>
-        </div>
-        <span className="hee-updated">Updated {earnings.refreshedAt ? dateTime(earnings.refreshedAt) : 'when data is available'}</span>
+      <div className="hee-control">
+        <button type="button" className="hee-refresh" onClick={load} disabled={loading}
+          aria-label={loading ? 'Refreshing earnings' : 'Refresh earnings data'}>
+          <RefreshCw size={17} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+        <span className="hee-updated" aria-live="polite">
+          {loading && !ready ? 'Loading earnings…' : ready
+            ? `Updated ${dateTime(earnings.refreshedAt)}`
+            : error ? 'Unable to load earnings. Use Refresh to retry.'
+              : 'Select Refresh to load your earnings'}
+        </span>
       </div>
     </header>
 
-    <section className="hee-snapshot" aria-label="Earnings summary">
-      <div className="hee-captured">
-        <span className="hee-captured-label">Total captured revenue</span>
-        <strong className="hee-captured-value">{loading ? '—' : currencyMinor(earnings.totalEarnedMinor, currency)}</strong>
-        <span className="hee-captured-sub">Received from successful customer payments</span>
+    <section className="hee-overview" aria-label="Earnings overview" aria-busy={loading}>
+      <div className="hee-total">
+        <span className="hee-overline">Total captured revenue</span>
+        <strong className="hee-total-number">{ready ? currencyMinor(earnings.totalEarnedMinor, currency) : '—'}</strong>
+        <span className="hee-total-caption">Received from successful customer payments</span>
       </div>
-      <div className="hee-metrics">
-        <div className="hee-metric" data-kind="paid">
-          <span className="hee-metric-copy">
-            <span className="hee-metric-icon"><Check size={20} aria-hidden="true" /></span>
-            <span className="hee-metric-text"><span className="hee-metric-label">Paid to you</span><span className="hee-metric-note">Completed payouts</span></span>
+      <div className="hee-kpis">
+        <div className="hee-kpi" data-kind="paid">
+          <span className="hee-kpi-title"><span className="hee-kpi-icon"><Check size={17} aria-hidden="true" /></span>Paid to you</span>
+          <span className="hee-kpi-bottom">
+            <strong className="hee-kpi-number">{ready ? currencyMinor(earnings.paidMinor, currency) : '—'}</strong>
+            <span className="hee-kpi-note">Completed payouts</span>
           </span>
-          <strong className="hee-metric-number">{loading ? '—' : currencyMinor(earnings.paidMinor, currency)}</strong>
         </div>
-        <div className="hee-metric" data-kind="process">
-          <span className="hee-metric-copy">
-            <span className="hee-metric-icon"><WalletCards size={20} aria-hidden="true" /></span>
-            <span className="hee-metric-text"><span className="hee-metric-label">In settlement</span><span className="hee-metric-note">Under review or approved</span></span>
+        <div className="hee-kpi" data-kind="process">
+          <span className="hee-kpi-title"><span className="hee-kpi-icon"><WalletCards size={17} aria-hidden="true" /></span>In settlement</span>
+          <span className="hee-kpi-bottom">
+            <strong className="hee-kpi-number">{ready ? currencyMinor(earnings.inSettlementMinor, currency) : '—'}</strong>
+            <span className="hee-kpi-note">Under review or approved</span>
           </span>
-          <strong className="hee-metric-number">{loading ? '—' : currencyMinor(earnings.inSettlementMinor, currency)}</strong>
         </div>
-        <div className="hee-metric" data-kind="await">
-          <span className="hee-metric-copy">
-            <span className="hee-metric-icon"><Clock3 size={20} aria-hidden="true" /></span>
-            <span className="hee-metric-text"><span className="hee-metric-label">Awaiting settlement</span><span className="hee-metric-note">Delivered, not settled yet</span></span>
+        <div className="hee-kpi" data-kind="await">
+          <span className="hee-kpi-title"><span className="hee-kpi-icon"><Clock3 size={17} aria-hidden="true" /></span>Awaiting settlement</span>
+          <span className="hee-kpi-bottom">
+            <strong className="hee-kpi-number">{ready ? currencyMinor(earnings.awaitingSettlementMinor, currency) : '—'}</strong>
+            <span className="hee-kpi-note">Delivered, not settled yet</span>
           </span>
-          <strong className="hee-metric-number">{loading ? '—' : currencyMinor(earnings.awaitingSettlementMinor, currency)}</strong>
         </div>
       </div>
     </section>
@@ -479,34 +553,50 @@ export default function HostEarningsPage() {
     <section className="hee-sales" aria-labelledby="hee-sales-heading">
       <div className="hee-section-header">
         <div>
-          <span className="hee-section-label">01 / Sales</span>
+          <span className="hee-eyebrow">01 / Sales</span>
           <h2 id="hee-sales-heading">Recent sales</h2>
           <p className="hee-section-sub">Your latest paid orders and products.</p>
         </div>
-        <div className="hee-sales-actions">
-          <span className="hee-count">{loading ? '—' : Number(earnings.capturedOrders || 0)} paid orders</span>
+        <div className="hee-section-actions">
+          <span className="hee-count">{ready ? totalPaidOrders : '—'} paid orders</span>
           <Link className="hee-plain-link" to="/host/orders">All orders <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
       </div>
-      <div className="hee-order-list">
+      <div className="hee-ledger">
+        <div className="hee-ledger-head" aria-hidden="true">
+          <span>Product</span><span>Order &amp; date</span><span>Payment status</span><span>Amount</span>
+        </div>
         {recentOrders.length ? recentOrders.map((order) => (
           <OrderSale key={order.sellerOrderId} order={order} images={images} currency={currency} />
-        )) : <div className="hee-empty-sales">{loading ? 'Loading your orders…' : 'No paid orders yet.'}</div>}
+        )) : <div className="hee-empty-sales">{loading && !ready
+          ? 'Loading recent sales…'
+          : ready ? 'No paid orders yet.'
+            : error ? 'Unable to load sales. Select Refresh to retry.'
+              : 'Loading recent sales…'}</div>}
       </div>
+      {hasMoreSales ? <div className="hee-more-sales">
+        <button type="button" className="hee-more-button" onClick={loadMoreSales}
+          disabled={loading || loadingMore} aria-label={`View next ${Math.min(8, totalPaidOrders - recentOrders.length)} sales`}>
+          {loadingMore ? <RefreshCw size={16} className="animate-spin" aria-hidden="true" /> : null}
+          {loadingMore ? 'Loading…' : 'View all'}
+          {!loadingMore ? <ArrowRight size={17} aria-hidden="true" /> : null}
+        </button>
+      </div> : null}
+      {moreError ? <p className="hee-more-error" role="alert">{moreError}</p> : null}
       <div className="hee-sales-foot">
-        <p>{loading ? 'Loading sales…' : `Showing ${recentOrders.length} recent ${recentOrders.length === 1 ? 'order' : 'orders'}`}</p>
+        <p>{ready ? `Showing ${recentOrders.length} of ${totalPaidOrders} paid ${totalPaidOrders === 1 ? 'order' : 'orders'}`
+          : error ? 'Sales could not be loaded.' : 'Loading sales…'}</p>
         <Link className="hee-plain-link" to="/host/orders">Manage orders <ArrowRight size={17} aria-hidden="true" /></Link>
       </div>
     </section>
 
     <section className="hee-payouts" aria-labelledby="hee-payout-heading">
-      <div className="hee-payout-head">
-        <span className="hee-section-label">02 / Payouts</span>
+      <div className="hee-payout-title">
+        <span className="hee-eyebrow">02 / Payouts</span>
         <h2 id="hee-payout-heading">Settlements</h2>
-        <p>Payments sent or being processed.</p>
-        <Link className="hee-payout-link" to="/host/finance">Payments &amp; Finance <ArrowRight size={17} aria-hidden="true" /></Link>
+        <p className="hee-section-sub">Payments sent or being processed.</p>
       </div>
-      <div className="hee-payout-list">
+      <div className="hee-payout-body">
         {recentSettlements.length ? recentSettlements.map((settlement) => (
           <div className="hee-payout-row" key={settlement.id}>
             <div>
@@ -518,8 +608,11 @@ export default function HostEarningsPage() {
         )) : <div className="hee-payout-empty">
           <span className="hee-payout-empty-icon"><WalletCards size={21} aria-hidden="true" /></span>
           <div>
-            <strong>{loading ? 'Loading settlements…' : 'No settlements yet'}</strong>
-            <p>{loading ? 'Checking payout records.' : 'Payout records will appear here when they are created.'}</p>
+            <strong>{loading && !ready ? 'Loading settlements…' : ready ? 'No settlements yet'
+              : error ? 'Unable to load settlements' : 'Settlement history'}</strong>
+            <p>{loading && !ready ? 'Checking payout records.' : ready
+              ? 'Payout records will appear here when they are created.'
+              : error ? 'Select Refresh to try again.' : 'Loading payout records…'}</p>
           </div>
         </div>}
       </div>

@@ -396,6 +396,8 @@ async function getFinanceSnapshotForOrganization(
 
 export async function getHostEarningsOverview({
   actorUser,
+  recentOrdersPage = 1,
+  recentOrdersLimit = 12,
 }) {
   const context =
     await resolveHostFinanceContext(
@@ -605,9 +607,8 @@ export async function getHostEarningsOverview({
             createdAt:
               -1,
           })
-          .limit(
-            12,
-          )
+          .skip((recentOrdersPage - 1) * recentOrdersLimit)
+          .limit(recentOrdersLimit)
           .lean()
       : [],
 

@@ -32,7 +32,6 @@ const COMMERCE_HOST_PATHS = Object.freeze([
   '/host/marketplace',
   '/host/orders',
   '/host/earnings',
-  '/host/finance',
   '/host/analytics',
 ])
 

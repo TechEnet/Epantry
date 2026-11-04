@@ -40,6 +40,7 @@ import {
   adminSettlementDecisionSchema,
   adminSettlementPaidSchema,
   hostFinanceQuerySchema,
+  hostEarningsQuerySchema,
   settlementIdParamsSchema,
 } from './hostOperations.finance.validation.js'
 
@@ -136,17 +137,27 @@ hostRouter.get(
     async (
       req,
       res,
-    ) =>
-      sendSuccess(
+    ) => {
+      const { page, limit } = parseOrThrow(
+        hostEarningsQuerySchema,
+        req.query,
+        'HOST_EARNINGS_QUERY_INVALID',
+        'Invalid earnings pagination.',
+      )
+
+      return sendSuccess(
         req,
         res,
         200,
         await getHostEarningsOverview({
           actorUser:
             req.currentUser,
+          recentOrdersPage: page,
+          recentOrdersLimit: limit,
         }),
         'Host earnings loaded.',
-      ),
+      )
+    },
   ),
 )
 

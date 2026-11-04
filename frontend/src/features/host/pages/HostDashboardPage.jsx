@@ -14,7 +14,6 @@ import {
   Settings,
   ShoppingBag,
   Store,
-  WalletCards,
   Warehouse,
 } from "lucide-react";
 
@@ -317,13 +316,6 @@ const quickAccessItems = [
     icon: ShoppingBag,
   },
   {
-    title: "Finance",
-    description:
-      "Track earnings, settlement progress and finance-related actions.",
-    to: "/host/finance",
-    icon: WalletCards,
-  },
-  {
     title: "Analytics",
     description: "See sales, orders and business performance in one place.",
     to: "/host/analytics",
@@ -370,12 +362,11 @@ const toolGroups = [
   {
     id: "operate",
     label: "Sell & operate",
-    description: "Stock, orders, delivery and finance",
+    description: "Stock, orders and delivery",
     icon: ShoppingBag,
     paths: [
       "/host/marketplace",
       "/host/orders",
-      "/host/finance",
     ],
   },
   {

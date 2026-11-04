@@ -2995,13 +2995,7 @@ export default function AppRoutes() {
 
             <Route
               path="/host/finance"
-              element={
-                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
-                  <HostShell>
-                    <HostOperationsPage section="finance" />
-                  </HostShell>
-                </ApplicationAccessRoute>
-              }
+              element={<Navigate to="/host/earnings" replace />}
             />
 
             <Route

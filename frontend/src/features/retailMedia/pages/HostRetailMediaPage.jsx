@@ -8,7 +8,6 @@ import {
   Eye,
   ImagePlus,
   IndianRupee,
-  MapPinned,
   Megaphone,
   Pause,
   PencilLine,
@@ -59,10 +58,10 @@ const RAZORPAY_CHECKOUT_URL =
   'https://checkout.razorpay.com/v1/checkout.js'
 
 const inputClass =
-  'focus-ring w-full rounded-[13px] border border-stone-200 bg-white px-3 py-2.5 text-[12px] font-semibold text-stone-900 outline-none placeholder:text-stone-400 sm:px-3.5 sm:text-sm'
+  'focus-ring min-h-[46px] w-full rounded-[9px] border border-[#d8ddd4] bg-white px-3.5 py-2.5 text-[14px] font-normal leading-6 text-[#202421] outline-none placeholder:text-[#79847a] focus:border-[#173f35] focus:ring-2 focus:ring-[#dce8dd] disabled:bg-[#f0f1ec] disabled:text-[#67716a] sm:text-[15px]'
 
 const primaryButtonClass =
-  'focus-ring inline-flex items-center justify-center gap-2 rounded-[12px] bg-[#176b57] px-3.5 py-2.5 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(23,107,87,0.16)] transition hover:bg-[#125846] disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:text-sm'
+  'focus-ring inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[9px] bg-[#173f35] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#245547] disabled:cursor-not-allowed disabled:opacity-40'
 
 const PLACEMENTS = [
   'home',
@@ -173,30 +172,10 @@ const PLACEMENT_META = Object.freeze({
 })
 
 const STEP_CARDS = [
-  {
-    number: '01',
-    title: 'Campaign basics',
-    text: 'Name the promotion and explain the offer.',
-    className: 'border-[#b9e9d8] bg-[#e6f8f1]',
-  },
-  {
-    number: '02',
-    title: 'Pick exact positions',
-    text: 'Open each page preview and choose the section.',
-    className: 'border-[#bddff2] bg-[#e9f5fb]',
-  },
-  {
-    number: '03',
-    title: 'Creative & payment',
-    text: 'Add the ad content, image and complete payment.',
-    className: 'border-[#d8cff2] bg-[#f1edfb]',
-  },
-  {
-    number: '04',
-    title: 'Approval & start',
-    text: 'Super Admin reviews it before customers can see it.',
-    className: 'border-[#b9e9d8] bg-[#edf9f4]',
-  },
+  { number: '01', title: 'Campaign', text: 'Name & goal' },
+  { number: '02', title: 'Placement', text: 'Page & duration' },
+  { number: '03', title: 'Creative', text: 'Image & message' },
+  { number: '04', title: 'Review', text: 'Pay & approval' },
 ]
 
 function titleize(value) {
@@ -1057,88 +1036,102 @@ export default function HostRetailMediaPage() {
   }
 
   return (
-    <div className="p-2.5 sm:p-5 lg:p-6">
-      <section className="border-b border-[#c9ded6] bg-[linear-gradient(120deg,#e7f6ef_0%,#edf5fb_52%,#f2edfb_100%)] px-3 py-4 sm:rounded-[24px] sm:border sm:px-6 sm:py-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#176b57] sm:text-[10px]">
+    <main className="host-campaigns-page mx-auto w-full max-w-[1480px] px-3 pb-8 pt-3 text-[#202421] sm:px-5 sm:pb-10 sm:pt-5 lg:px-7">
+      <style>{`
+        .host-campaigns-page .host-campaigns-title { font-size: 32px !important; line-height: 1.17 !important; }
+        .host-campaigns-page .host-campaigns-section-title { font-size: 23px !important; line-height: 1.3 !important; }
+        .host-campaigns-page .host-campaigns-creative-title { font-size: 23px !important; line-height: 1.3 !important; }
+        .host-campaigns-page .host-campaigns-sidebar-title { font-size: 21px !important; line-height: 1.3 !important; }
+        @media (max-width: 639px) {
+          .host-campaigns-page .host-campaigns-title { font-size: 27px !important; line-height: 1.2 !important; }
+          .host-campaigns-page .host-campaigns-section-title { font-size: 21px !important; line-height: 1.3 !important; }
+          .host-campaigns-page .host-campaigns-creative-title { font-size: 21px !important; line-height: 1.3 !important; }
+        }
+      `}</style>
+      <header className="overflow-hidden rounded-[18px] border border-[#d7e2d8] bg-[#eaf1eb]">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0 px-5 py-5 sm:px-7 sm:py-7 lg:px-8">
+            <p className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.07em] text-[#965039]">
+              <span className="h-[2px] w-6 bg-[#c86c42]" aria-hidden="true" />
+              Host / Advertising
+            </p>
+            <h1 className="host-campaigns-title mt-2 text-[27px] font-semibold leading-[1.16] tracking-[-0.025em] text-[#173f35] sm:text-[32px]">
               Sponsored campaigns
-            </p>
-            <h1 className="mt-1 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
-              Build your promotion, choose the exact space, then go live after approval.
             </h1>
-            <p className="mt-2 max-w-4xl text-[11px] font-semibold leading-5 text-stone-600 sm:text-sm sm:leading-6">
-              Start with the campaign details, pick the exact section where customers should see the ad, choose the run time, add the creative, and pay only after the positions are final.
+            <p className="mt-2 max-w-[650px] text-[14px] leading-[1.6] text-[#435b4d] sm:text-[15px]">
+              Create your ad, choose its placement and submit it for approval.
             </p>
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[#c6d8ca] bg-white/80 px-3 text-[13px] font-medium text-[#284b3a]">
+                <ShieldCheck size={15} aria-hidden="true" /> Approval before launch
+              </span>
+              <span className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[#d1ded5] bg-white/60 px-3 text-[13px] text-[#526558]">
+                <Clock3 size={15} aria-hidden="true" /> 4 simple steps
+              </span>
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading || busy || Boolean(payingCampaignId)}
-            className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#acdcca] bg-white/90 px-3 py-2 text-[10px] font-black text-[#176b57] shadow-sm disabled:opacity-40 sm:px-4 sm:py-2.5 sm:text-sm"
-          >
-            <RefreshCw size={14} aria-hidden="true" />
-            Refresh
-          </button>
+          <div className="flex flex-col justify-between gap-5 bg-[#173f35] px-5 py-5 text-white sm:px-7 sm:py-6 lg:px-6">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#c9dfd1]">Your advertising</p>
+              <div className="mt-2 flex items-end gap-3">
+                <strong className="text-[42px] font-semibold leading-none tracking-[-0.04em] text-white">{campaigns.length}</strong>
+                <span className="pb-1 text-[14px] text-[#e0eee5]">{campaigns.length === 1 ? 'campaign' : 'campaigns'}</span>
+              </div>
+              <p className="mt-2 text-[13px] leading-5 text-[#c9dfd1]">
+                {campaigns.filter((campaign) => campaign.status === 'active').length} currently active
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading || busy || Boolean(payingCampaignId)}
+              className="focus-ring inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[10px] border border-[#9cb6a6] bg-white px-4 text-[14px] font-semibold text-[#173f35] transition-colors hover:bg-[#eaf4ec] disabled:opacity-50"
+            >
+              <RefreshCw size={16} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
+              Refresh campaigns
+            </button>
+          </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 xl:grid-cols-4">
-          {STEP_CARDS.map((step) => (
-            <div
-              key={step.number}
-              className={`min-w-0 rounded-[14px] border p-2.5 sm:rounded-[18px] sm:p-4 ${step.className}`}
-            >
-              <div className="flex items-start gap-2.5">
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-8 sm:text-[10px]">
-                  {step.number}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black leading-tight text-stone-950 sm:text-[13px]">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[8px] font-semibold leading-[1.4] text-stone-600 sm:text-[10px] sm:leading-4">
-                    {step.text}
-                  </p>
-                </div>
+        <nav className="grid grid-cols-2 gap-px border-t border-[#d0ddd2] bg-[#d0ddd2] lg:grid-cols-4" aria-label="Campaign setup stages">
+          {STEP_CARDS.map((step, index) => (
+            <div key={step.number} className={`flex min-w-0 items-center gap-3 px-3.5 py-3 sm:px-5 ${index === 0 ? 'bg-[#e0eee5]' : index === 1 ? 'bg-[#e9f2f5]' : index === 2 ? 'bg-[#f6e9e1]' : 'bg-[#f1edf8]'}`}>
+              <span className={`grid size-8 shrink-0 place-items-center rounded-[9px] text-[13px] font-semibold ${index === 0 ? 'bg-[#173f35] text-white' : 'bg-white text-[#173f35]'}`}>
+                {step.number}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold leading-5 text-[#203b30]">{step.title}</p>
+                <p className="text-[12.5px] leading-[19px] text-[#526457]">{step.text}</p>
               </div>
             </div>
           ))}
-        </div>
+        </nav>
+      </header>
 
-        <div className="mt-3 min-h-5 text-[10px] font-bold sm:text-sm" aria-live="polite">
-          {error ? (
-            <p className="text-red-700">{error}</p>
-          ) : notice ? (
-            <p className="text-[#176b57]">{notice}</p>
-          ) : loading ? (
-            <p className="text-stone-500">Loading campaign workspace…</p>
-          ) : null}
+      {error || notice || loading ? (
+        <div className={`mt-4 flex items-start gap-2 rounded-[10px] border px-4 py-3 text-[14px] leading-[1.55] ${error ? 'border-[#e6bdb4] bg-[#fff0ec] text-[#91392f]' : 'border-[#bddac7] bg-[#e9f3ea] text-[#173f35]'}`} role="status" aria-live="polite">
+          {error ? <CircleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <CheckCircle2 size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}
+          <span>{error || notice || 'Loading campaigns…'}</span>
         </div>
-      </section>
+      ) : null}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(250px,1fr)] lg:items-start">
-        <section id="host-retail-media-editor" className="scroll-mt-24 overflow-hidden rounded-[24px] border border-stone-200 bg-[#f9f8f4] shadow-[0_14px_36px_rgba(28,25,23,0.06)]">
-          <div className="px-3 py-4 sm:px-6 sm:py-6">
-            <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-[12px] bg-[#dff3ea] text-[#176b57] sm:size-10">
-                <Megaphone size={18} aria-hidden="true" />
+      <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_370px] xl:items-start">
+        <section id="host-retail-media-editor" aria-label="Create sponsored campaign" className="flex min-w-0 scroll-mt-24 flex-col gap-5">
+          <div className="min-w-0 rounded-[16px] border border-[#d3dfd5] bg-[#f0f4ec] px-4 py-5 sm:px-6 sm:py-6 lg:px-7">
+            <div className="flex items-start gap-3 sm:items-center">
+              <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-[#173f35] text-white">
+                <span className="text-[15px] font-semibold">01</span>
               </span>
               <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#176b57]">
-                  Step 1
-                </p>
-                <h2 className="mt-0.5 text-lg font-black text-stone-950 sm:text-2xl">
-                  Campaign basics
-                </h2>
-                <p className="mt-1 max-w-2xl text-[10px] font-semibold leading-5 text-stone-600 sm:text-sm">
-                  Give the campaign a clear name, choose what you want it to achieve, and explain the offer customers should understand.
-                </p>
+                <h2 className="host-campaigns-section-title text-[21px] font-semibold leading-7 tracking-[-0.015em] text-[#173f35] sm:text-[23px]">Campaign brief</h2>
+                <p className="mt-0.5 text-[14px] leading-[1.5] text-[#526357]">Start with a name, goal and offer.</p>
               </div>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <input
+              <label className="block min-w-0">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#344c40]">Campaign name</span>
+                <input
                 className={inputClass}
                 value={briefForm.title}
                 onChange={(event) =>
@@ -1147,10 +1140,13 @@ export default function HostRetailMediaPage() {
                     title: event.target.value,
                   }))
                 }
-                placeholder="Campaign name"
-              />
+                placeholder="e.g. Summer specials"
+                />
+              </label>
 
-              <select
+              <label className="block min-w-0">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#344c40]">Campaign goal</span>
+                <select
                 className={inputClass}
                 value={briefForm.objective}
                 onChange={(event) =>
@@ -1165,11 +1161,14 @@ export default function HostRetailMediaPage() {
                 <option value="conversion">Drive purchases</option>
                 <option value="sampling">Promote sampling</option>
                 <option value="promotion">Promote an offer</option>
-              </select>
+                </select>
+              </label>
 
-              <textarea
+              <label className="block min-w-0 sm:col-span-2">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#344c40]">Offer details</span>
+                <textarea
                 rows={2}
-                className={`${inputClass} sm:col-span-2`}
+                className={inputClass}
                 value={briefForm.commercialDisclosure}
                 onChange={(event) =>
                   setBriefForm((current) => ({
@@ -1177,8 +1176,9 @@ export default function HostRetailMediaPage() {
                     commercialDisclosure: event.target.value,
                   }))
                 }
-                placeholder="Explain what you are promoting and any offer customers should know about."
-              />
+                placeholder="Tell customers what this promotion offers."
+                />
+              </label>
             </div>
 
             <button
@@ -1189,24 +1189,24 @@ export default function HostRetailMediaPage() {
                 briefForm.commercialDisclosure.trim().length < 5
               }
               onClick={createBrief}
-              className={`${primaryButtonClass} mt-3`}
+              className={`${primaryButtonClass} mt-4 w-full sm:w-auto`}
             >
               <Megaphone size={15} aria-hidden="true" />
-              Save campaign basics
+              Save campaign details
             </button>
 
             {briefs.length ? (
-              <div className="mt-4 divide-y divide-stone-200 border-y border-stone-200 bg-white/70">
+              <div className="mt-5 divide-y divide-[#d4dfd5] overflow-hidden rounded-[12px] border border-[#cadacd] bg-white">
                 {briefs.map((brief) => (
                   <div
                     key={brief.id}
-                    className="flex items-center justify-between gap-3 px-3 py-3 sm:px-4"
+                    className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-[11px] font-black text-stone-900 sm:text-sm">
+                      <p className="truncate text-[14px] font-semibold text-stone-900 sm:text-sm">
                         {brief.title}
                       </p>
-                      <p className="mt-0.5 text-[8px] font-semibold text-stone-500 sm:text-[10px]">
+                      <p className="mt-0.5 text-[12px] font-semibold text-stone-500 sm:text-[13px]">
                         {titleize(brief.objective)} · {brief.status === 'draft' ? 'Basics saved' : 'Ready for ad setup'}
                       </p>
                     </div>
@@ -1216,7 +1216,7 @@ export default function HostRetailMediaPage() {
                         type="button"
                         disabled={busy || Boolean(editingCampaignId)}
                         onClick={() => submitBrief(brief.id)}
-                        className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#b8dccf] bg-white px-2.5 py-1.5 text-[9px] font-black text-[#176b57] sm:px-3 sm:py-2 sm:text-xs"
+                        className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#b8dccf] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#173f35] sm:px-3 sm:py-2 sm:text-xs"
                       >
                         <Send size={12} aria-hidden="true" />
                         Continue
@@ -1231,10 +1231,10 @@ export default function HostRetailMediaPage() {
                             briefId: brief.id,
                           }))
                         }
-                        className={`focus-ring rounded-full px-2.5 py-1.5 text-[9px] font-black disabled:cursor-not-allowed disabled:opacity-45 ${
+                        className={`focus-ring rounded-full px-2.5 py-1.5 text-[12px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
                           campaignForm.briefId === brief.id
-                            ? 'bg-[#176b57] text-white'
-                            : 'bg-[#e2f5ed] text-[#176b57]'
+                            ? 'bg-[#173f35] text-white'
+                            : 'border border-[#2b6750] bg-white text-[#173f35] hover:bg-[#e9f1e9]'
                         }`}
                       >
                         {campaignForm.briefId === brief.id ? 'Selected' : 'Use campaign'}
@@ -1246,34 +1246,27 @@ export default function HostRetailMediaPage() {
             ) : null}
           </div>
 
-          <div className="border-t border-stone-200 bg-[#edf5fb]/55 px-3 py-4 sm:px-6 sm:py-6">
-            <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-[12px] bg-[#dcecf6] text-[#2c789d] sm:size-10">
-                <MapPinned size={18} aria-hidden="true" />
+          <div className="min-w-0 rounded-[16px] border border-[#d4e1e8] bg-[#eaf2f6] px-4 py-5 sm:px-6 sm:py-6 lg:px-7">
+            <div className="flex items-start gap-3 sm:items-center">
+              <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-[#315f72] text-white">
+                <span className="text-[15px] font-semibold">02</span>
               </span>
               <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#2c789d]">
-                  Step 2 & 3
-                </p>
-                <h2 className="mt-0.5 text-lg font-black text-stone-950 sm:text-2xl">
-                  Placement & sponsored content
-                </h2>
-                <p className="mt-1 max-w-2xl text-[10px] font-semibold leading-5 text-stone-600 sm:text-sm">
-                  Choose the campaign, pick the exact page sections, set how long it should run, then add the ad customers will see.
-                </p>
+                <h2 className="host-campaigns-section-title text-[21px] font-semibold leading-7 tracking-[-0.015em] text-[#173f35] sm:text-[23px]">Where should it appear?</h2>
+                <p className="mt-0.5 text-[14px] leading-[1.5] text-[#526371]">Choose a page, exact position and duration.</p>
               </div>
             </div>
 
             {editingCampaign ? (
               <div className="mt-4 flex flex-col gap-3 border-y border-[#d9d0ee] bg-[#f4f0fb] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                 <div className="min-w-0">
-                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#6c52a4]">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#6c52a4]">
                     Editing existing campaign
                   </p>
-                  <p className="mt-1 truncate text-sm font-black text-stone-950">
+                  <p className="mt-1 truncate text-sm font-semibold text-[#202421]">
                     {editingCampaign.title}
                   </p>
-                  <p className="mt-1 text-[9px] font-semibold leading-4 text-stone-600 sm:text-[10px]">
+                  <p className="mt-1 text-[12px] font-semibold leading-5 text-stone-600 sm:text-[13px]">
                     {editingPaidCampaign
                       ? editingPaidBookingIncomplete
                         ? 'This older paid campaign still needs its exact page section selected. The paid placement type and duration stay fixed; after saving, Super Admin reviews the updated campaign again.'
@@ -1285,7 +1278,7 @@ export default function HostRetailMediaPage() {
                 <button
                   type="button"
                   onClick={cancelCampaignEdit}
-                  className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-[11px] border border-[#d3cae8] bg-white px-3 py-2 text-[10px] font-black text-[#5f4a95]"
+                  className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-[11px] border border-[#d4ddd4] bg-white px-3 py-2 text-[13px] font-semibold text-[#665c82]"
                 >
                   <Undo2 size={14} aria-hidden="true" />
                   Cancel edit
@@ -1294,41 +1287,39 @@ export default function HostRetailMediaPage() {
             ) : null}
 
             {!selectedBrief ? (
-              <div className="mt-4 border-l-4 border-[#67b89e] bg-[#e6f7f0] px-3 py-3 text-[10px] font-semibold leading-5 text-stone-700 sm:text-xs">
-                Select a campaign from Campaign basics above before choosing positions.
+              <div className="mt-4 flex items-center gap-2 rounded-[10px] border border-[#c4d6cc] bg-[#f9fcf9] px-3.5 py-3 text-[14px] leading-[1.5] text-[#315844]">
+                Save or choose a campaign above to unlock placement and creative settings.
               </div>
             ) : (
-              <div className="mt-4 flex items-center justify-between gap-3 border-y border-[#cbdfe9] bg-white/70 px-3 py-3 sm:px-4">
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-[10px] border border-[#bfd8c9] bg-[#f7fcf9] px-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-stone-500">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-500">
                     Campaign being promoted
                   </p>
-                  <p className="mt-1 truncate text-sm font-black text-stone-950">
+                  <p className="mt-1 truncate text-sm font-semibold text-[#202421]">
                     {selectedBrief.title}
                   </p>
                 </div>
-                <BadgeCheck size={18} className="shrink-0 text-[#176b57]" aria-hidden="true" />
+                <BadgeCheck size={18} className="shrink-0 text-[#173f35]" aria-hidden="true" />
               </div>
             )}
 
-            <div className="mt-4 border border-[#cfe1eb] bg-white/80">
-              <div className="flex flex-col gap-3 border-b border-[#d7e5ec] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <div className="mt-4 overflow-hidden rounded-[12px] border border-[#cfdae0] bg-white">
+              <div className="flex flex-col gap-3 border-b border-[#dce5e9] bg-[#f9fcfd] px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p className="text-[10px] font-black text-stone-950 sm:text-sm">
-                    Choose placements and duration
-                  </p>
-                  <p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-[10px]">
-                    Click a page below to open its visual preview and choose the exact section.
+                  <p className="text-[14px] font-semibold text-[#202421]">Available pages</p>
+                  <p className="mt-0.5 text-[12px] font-semibold leading-5 text-stone-500 sm:text-[13px]">
+                    Select a page to preview its available spaces.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 sm:shrink-0">
                   <div className="min-w-0">
-                    <p className="mb-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#315f7a]">
-                      Campaign duration
+                    <p className="mb-1 text-[13px] font-semibold text-[#315f72]">
+                      Duration
                     </p>
                     <select
-                      className={`${inputClass} min-w-[145px]`}
+                      className={`${inputClass} min-w-[130px]`}
                       disabled={!campaignForm.briefId || editingPaidCampaign}
                       value={campaignForm.durationMinutes}
                       onChange={(event) =>
@@ -1349,7 +1340,7 @@ export default function HostRetailMediaPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="self-end rounded-xl bg-[#e5f7f0] px-3 py-2.5 text-sm font-black text-[#176b57]">
+                  <div className="self-end rounded-[8px] border border-[#dbe5d9] bg-[#edf3e9] px-3 py-3 text-[14px] font-semibold text-[#173f35]">
                     {formatMoneyMinor(
                       selectedPlacementTotalMinor,
                       pricing?.currency || 'INR',
@@ -1358,7 +1349,7 @@ export default function HostRetailMediaPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-px bg-stone-200 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2.5 bg-[#f6f9f9] p-3 sm:grid-cols-3 sm:p-4 lg:grid-cols-4">
                 {PLACEMENTS.map((placement) => {
                   const selected = campaignForm.placementSelections.find(
                     (item) => item.placement === placement,
@@ -1373,7 +1364,7 @@ export default function HostRetailMediaPage() {
                   )
 
                   return (
-                    <div key={placement} className="min-w-0 bg-white p-2.5 sm:p-3">
+                    <div key={placement} className={`min-w-0 rounded-[10px] border p-3 transition-colors sm:p-3.5 ${selected ? 'border-[#6a9880] bg-[#e2efe5] shadow-[0_0_0_1px_#6a9880]' : 'border-[#d5e0e3] bg-white hover:border-[#98b9c7] hover:bg-[#f5fbfc]'}`}>
                       <button
                         type="button"
                         disabled={
@@ -1385,17 +1376,17 @@ export default function HostRetailMediaPage() {
                           )
                         }
                         onClick={() => openPlacementChooser(placement)}
-                        className={`focus-ring block w-full text-left disabled:cursor-not-allowed disabled:opacity-45 ${
-                          selected ? 'text-[#176b57]' : 'text-stone-900'
+                        className={`focus-ring block w-full text-left disabled:cursor-not-allowed disabled:opacity-70 ${
+                          selected ? 'text-[#173f35]' : 'text-[#263b39]'
                         }`}
                       >
-                        <span className="block truncate text-[10px] font-black sm:text-xs">
+                        <span className="block text-[14px] font-semibold leading-5">
                           {PLACEMENT_META[placement]?.label || titleize(placement)}
                         </span>
-                        <span className="mt-1 block text-[8px] font-bold text-stone-500 sm:text-[9px]">
+                        <span className="mt-1 block text-[14px] font-semibold text-[#173f35]">
                           {formatMoneyMinor(durationPrice, pricing?.currency || 'INR')}
                         </span>
-                        <span className={`mt-1.5 block min-h-[28px] text-[8px] font-black leading-4 sm:text-[9px] ${selected ? 'text-[#176b57]' : 'text-[#2c789d]'}`}>
+                        <span className={`mt-2 block min-h-[28px] text-[13px] font-medium leading-[1.45] ${selected ? 'text-[#245c42]' : 'text-[#316e80]'}`}>
                           {selected ? selected.slotLabel : 'Choose exact section →'}
                         </span>
                       </button>
@@ -1404,7 +1395,7 @@ export default function HostRetailMediaPage() {
                         <button
                           type="button"
                           onClick={() => removePlacement(placement)}
-                          className="mt-1 text-[8px] font-black text-rose-600 hover:text-rose-700"
+                          className="mt-1 text-[12px] font-semibold text-rose-600 hover:text-rose-700"
                         >
                           Remove
                         </button>
@@ -1415,25 +1406,34 @@ export default function HostRetailMediaPage() {
               </div>
             </div>
 
-            <div className="mt-3 flex items-start gap-2 border-l-4 border-[#8dbbd2] bg-[#edf6fb] px-3 py-2.5 text-[9px] font-semibold leading-4 text-[#315f7a] sm:text-[10px]">
+            <div className="mt-3 flex items-start gap-2 rounded-[9px] border border-[#cedfe5] bg-[#f8fbfc] px-3.5 py-3 text-[13px] leading-[1.55] text-[#345b62]">
               <Clock3 size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
               <p>
-                The ad can run only after Super Admin approval and activation. If a chosen section is already booked, EPANTRY shows when it becomes free so you can pre-book the next available window.
+                Your ad goes live after Super Admin approval. If a spot is booked, you can select its next available date.
               </p>
             </div>
 
             {campaignForm.scheduledStartAt ? (
-              <div className="mt-3 flex items-center gap-2 bg-[#fff3dc] px-3 py-2.5 text-[9px] font-bold text-[#7b571e] sm:text-[10px]">
+              <div className="mt-3 flex items-center gap-2 bg-[#fff3dc] px-3 py-2.5 text-[12px] font-bold text-[#7b571e] sm:text-[13px]">
                 <CalendarClock size={14} aria-hidden="true" />
                 Pre-booked start: {formatDateTime(campaignForm.scheduledStartAt)}. Final availability is checked again before payment.
               </div>
             ) : null}
 
-            <div className="mt-4 grid gap-3 border-t border-[#cfdfe7] pt-4">
-              <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
-                <div className="overflow-hidden border border-stone-200 bg-white">
+            <div className="mt-6 grid gap-4 rounded-[13px] border border-[#ead3c6] bg-[#fff8f3] p-4 sm:p-5">
+              <div className="flex items-start gap-3 sm:items-center">
+                <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-[#aa6245] text-white">
+                  <span className="text-[15px] font-semibold">03</span>
+                </span>
+                <div>
+                  <h3 className="host-campaigns-creative-title text-[21px] font-semibold leading-7 text-[#173f35] sm:text-[23px]">Build your ad</h3>
+                  <p className="text-[14px] leading-[1.5] text-[#6e584d]">Image, message and destination.</p>
+                </div>
+              </div>
+              <div className="grid min-w-0 gap-4 md:grid-cols-[225px_minmax(0,1fr)]">
+                <div className="overflow-hidden rounded-[11px] border border-[#e8d4c8] bg-white">
                   {campaignForm.imageUrl ? (
-                    <div className="relative h-[150px]">
+                    <div className="relative h-[170px]">
                       <img
                         src={campaignForm.imageUrl}
                         alt="Campaign creative preview"
@@ -1454,12 +1454,12 @@ export default function HostRetailMediaPage() {
                       </button>
                     </div>
                   ) : (
-                    <label className="focus-ring flex h-[150px] cursor-pointer flex-col items-center justify-center gap-2 bg-[#f6f5f1] px-4 text-center">
-                      <ImagePlus size={26} className="text-[#176b57]" aria-hidden="true" />
-                      <span className="text-[10px] font-black text-stone-900 sm:text-xs">
+                    <label className="focus-ring flex h-[170px] cursor-pointer flex-col items-center justify-center gap-2 bg-[#f3e8df] px-4 text-center transition-colors hover:bg-[#efded3]">
+                      <ImagePlus size={26} className="text-[#173f35]" aria-hidden="true" />
+                      <span className="text-[13px] font-semibold text-stone-900 sm:text-xs">
                         Add campaign image
                       </span>
-                      <span className="text-[8px] font-semibold text-stone-500 sm:text-[9px]">
+                      <span className="text-[12px] font-semibold text-stone-500 sm:text-[12px]">
                         JPEG, PNG or WebP
                       </span>
                       <input
@@ -1478,10 +1478,11 @@ export default function HostRetailMediaPage() {
                 </div>
 
                 <div className="grid gap-2.5">
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
+                  <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_170px]">
                     <input
                       className={inputClass}
                       disabled={!campaignForm.briefId}
+                      aria-label="Ad headline"
                       value={campaignForm.headline}
                       onChange={(event) =>
                         setCampaignForm((current) => ({
@@ -1489,13 +1490,14 @@ export default function HostRetailMediaPage() {
                           headline: event.target.value,
                         }))
                       }
-                      placeholder="Ad headline customers will see"
+                      placeholder="Headline shown on the ad"
                     />
 
                     <div>
                       <select
                         className={inputClass}
                         disabled={!campaignForm.briefId}
+                        aria-label="Customer-visible ad label"
                         value={campaignForm.sponsorLabel}
                         onChange={(event) =>
                           setCampaignForm((current) => ({
@@ -1508,8 +1510,8 @@ export default function HostRetailMediaPage() {
                         <option value="Ad">Ad</option>
                         <option value="Paid placement">Paid placement</option>
                       </select>
-                      <p className="mt-1 text-[8px] font-semibold text-stone-500">
-                        Customer label: Sponsored / Ad / Paid placement
+                      <p className="mt-1 text-[12px] font-semibold text-stone-500">
+                        Label shown to customers
                       </p>
                     </div>
                   </div>
@@ -1518,6 +1520,7 @@ export default function HostRetailMediaPage() {
                     rows={2}
                     className={inputClass}
                     disabled={!campaignForm.briefId}
+                    aria-label="Ad description"
                     value={campaignForm.body}
                     onChange={(event) =>
                       setCampaignForm((current) => ({
@@ -1525,12 +1528,13 @@ export default function HostRetailMediaPage() {
                         body: event.target.value,
                       }))
                     }
-                    placeholder="Short message explaining the promotion"
+                    placeholder="Short message about your offer"
                   />
 
                   <input
                     className={inputClass}
                     disabled={!campaignForm.briefId}
+                    aria-label="Ad destination URL or page"
                     value={campaignForm.landingRef}
                     onChange={(event) =>
                       setCampaignForm((current) => ({
@@ -1538,12 +1542,13 @@ export default function HostRetailMediaPage() {
                         landingRef: event.target.value,
                       }))
                     }
-                    placeholder="Where should customers land after clicking the ad?"
+                    placeholder="Landing page URL or path"
                   />
 
                   <input
                     className={inputClass}
                     disabled={!campaignForm.briefId}
+                    aria-label="Optional campaign tags"
                     value={campaignForm.contextualTags}
                     onChange={(event) =>
                       setCampaignForm((current) => ({
@@ -1551,21 +1556,21 @@ export default function HostRetailMediaPage() {
                         contextualTags: event.target.value,
                       }))
                     }
-                    placeholder="Optional context: cuisine, occasion, ingredient family"
+                    placeholder="Optional tags: cuisine, occasion, ingredients"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 border-y border-[#d8d0ef] bg-[#f3effb] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+              <div className="flex flex-col gap-3 rounded-[10px] border border-[#ccdcd0] bg-[#edf4ed] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black text-stone-950 sm:text-sm">
-                    Final amount before payment
+                  <p className="text-[13px] font-semibold text-[#202421] sm:text-sm">
+                    Estimated placement total
                   </p>
-                  <p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-[10px]">
-                    {selectedPlacements.length} selected page {selectedPlacements.length === 1 ? 'position' : 'positions'} · {formatDurationMinutes(selectedDurationMinutes)}. Payment becomes available after this setup is saved.
+                  <p className="mt-0.5 text-[13px] font-normal leading-5 text-[#516759]">
+                    {selectedPlacements.length} {selectedPlacements.length === 1 ? 'placement' : 'placements'} · {formatDurationMinutes(selectedDurationMinutes)} · Pay after saving.
                   </p>
                 </div>
-                <p className="shrink-0 text-xl font-black text-[#5f4a95] sm:text-2xl">
+                <p className="shrink-0 text-[23px] font-semibold tracking-[-0.02em] text-[#173f35] sm:text-[26px]">
                   {formatMoneyMinor(
                     selectedPlacementTotalMinor,
                     pricing?.currency || 'INR',
@@ -1585,225 +1590,155 @@ export default function HostRetailMediaPage() {
                   !campaignForm.landingRef.trim()
                 }
                 onClick={saveCampaign}
-                className={primaryButtonClass}
+                className={`${primaryButtonClass} w-full sm:w-auto sm:min-w-[190px] sm:justify-self-start`}
               >
                 <ShieldCheck size={15} aria-hidden="true" />
                 {editingCampaignId
                   ? 'Save campaign changes'
-                  : 'Finalize positions & create campaign'}
+                  : 'Create campaign'}
               </button>
             </div>
           </div>
         </section>
 
-        <aside className="self-start rounded-[22px] border border-[#d7d0ee] bg-[linear-gradient(160deg,#f4f1fb_0%,#fbf9ff_100%)] p-3 shadow-[0_12px_28px_rgba(95,74,149,0.07)] sm:p-4 lg:sticky lg:top-24">
-          <div className="flex items-start gap-2.5">
-            <span className="grid size-9 shrink-0 place-items-center rounded-[12px] bg-white text-[#6c52a4] shadow-sm">
-              <BadgeCheck size={17} aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-[14px] font-black text-stone-950 sm:text-lg">
-                  Your campaigns
-                </h2>
-                <span className="rounded-full border border-[#ddd4ef] bg-white px-2 py-1 text-[8px] font-black text-[#6c52a4]">
-                  {campaigns.length}
-                </span>
+        <aside className="min-w-0 self-start overflow-hidden rounded-[16px] border border-[#ddd7e4] bg-white xl:sticky xl:top-24" aria-label="Your sponsored campaigns">
+          <div className="border-b border-[#ddd4e5] bg-[#ece7f3] px-5 py-5 sm:px-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <BadgeCheck size={20} className="text-[#6e5b8e]" aria-hidden="true" />
+                <h2 className="host-campaigns-sidebar-title text-[21px] font-semibold text-[#173f35]">Your campaigns</h2>
               </div>
-              <p className="mt-1 text-[9px] font-semibold leading-4 text-stone-600 sm:text-[10px]">
-                Pay after the page positions are final. Super Admin then reviews the exact creative, duration and booked sections.
-              </p>
+              <span className="grid min-w-8 place-items-center rounded-full border border-[#d8cfe4] bg-white px-2 py-1 text-[13px] font-semibold text-[#4a3f5d]">
+                {campaigns.length}
+              </span>
             </div>
+            <p className="mt-1 text-[14px] leading-5 text-[#5e5967]">Your ads, payments and review status.</p>
           </div>
 
-          <div className="mt-3 max-h-[72vh] space-y-3 overflow-y-auto pr-1">
-            {campaigns.length ? (
-              campaigns.map((campaign) => {
-                const payment = campaign.payment || {}
-                const isPaid = payment.status === 'paid'
-                const isPaying = payingCampaignId === campaign.id
+          <div className="max-h-[78vh] divide-y divide-[#e1e5de] overflow-y-auto">
+            {campaigns.length ? campaigns.map((campaign) => {
+              const payment = campaign.payment || {}
+              const isPaid = payment.status === 'paid'
+              const isPaying = payingCampaignId === campaign.id
 
-                return (
-                  <article
-                    id={`host-retail-media-campaign-${campaign.id}`}
-                    key={campaign.id}
-                    className={`scroll-mt-28 overflow-hidden rounded-[16px] border bg-white p-3 shadow-[0_7px_18px_rgba(95,74,149,0.06)] ${
-                      focusCampaignId === campaign.id
-                        ? 'border-[#3fb98a] ring-4 ring-[#dff5ec]'
-                        : 'border-[#ded7f0]'
-                    }`}
-                  >
-                    {campaign.creative?.imageUrl ? (
-                      <img
-                        src={campaign.creative.imageUrl}
-                        alt=""
-                        className="mb-3 h-28 w-full rounded-[12px] object-cover"
-                      />
-                    ) : null}
-
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-[11px] font-black text-stone-950 sm:text-sm">
-                          {campaign.title}
-                        </p>
-                        <p className="mt-0.5 text-[8px] font-bold text-stone-500 sm:text-[9px]">
-                          {formatDurationMinutes(campaign.durationMinutes)} · {titleize(campaign.status)}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-[#e6f7f0] px-2 py-1 text-[7px] font-black uppercase text-[#176b57]">
-                        {campaign.creative?.sponsorLabel || 'Sponsored'}
-                      </span>
+              return (
+                <article
+                  id={`host-retail-media-campaign-${campaign.id}`}
+                  key={campaign.id}
+                  className={`scroll-mt-28 bg-white px-5 py-5 sm:px-6 ${focusCampaignId === campaign.id ? 'ring-2 ring-inset ring-[#6d9b80]' : ''}`}
+                >
+                  {campaign.creative?.imageUrl ? (
+                    <img src={campaign.creative.imageUrl} alt="" className="h-[148px] w-full rounded-[11px] border border-[#e1e5df] object-cover" />
+                  ) : (
+                    <div className="grid h-[118px] w-full place-items-center rounded-[11px] bg-[#eaf1eb] text-[#486b59]">
+                      <Megaphone size={27} aria-hidden="true" />
                     </div>
+                  )}
+                  <div className="mt-3 flex min-w-0 items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-[16px] font-semibold leading-6 text-[#173f35]">{campaign.title}</p>
+                      <p className="mt-1 text-[13px] leading-5 text-[#5b695f]">{formatDurationMinutes(campaign.durationMinutes)}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-[7px] px-2 py-1.5 text-[12px] font-semibold ${campaign.status === 'active' ? 'bg-[#dcefe3] text-[#1d643e]' : campaign.status === 'rejected' ? 'bg-[#ffe8e2] text-[#9b3e31]' : campaign.status === 'ended' ? 'bg-[#eaebe8] text-[#5d655e]' : 'bg-[#f1e9f6] text-[#685581]'}`}>
+                      {titleize(campaign.status)}
+                    </span>
+                  </div>
 
-                    <div className="mt-2 divide-y divide-stone-100 border-y border-stone-100">
+                  {(campaign.placementSelections || []).length ? (
+                    <div className="mt-3 border-t border-[#e2e7df] pt-3">
                       {(campaign.placementSelections || []).map((selection) => (
-                        <div
-                          key={`${selection.placement}-${selection.slotKey}`}
-                          className="py-2"
-                        >
-                          <p className="text-[8px] font-black text-stone-900">
-                            {PLACEMENT_META[selection.placement]?.label || titleize(selection.placement)}
-                          </p>
-                          <p className="mt-0.5 text-[8px] font-semibold text-[#315f7a]">
-                            {selection.slotLabel || titleize(selection.slotKey)}
-                          </p>
-                        </div>
+                        <p key={`${selection.placement}-${selection.slotKey}`} className="py-0.5 text-[13px] leading-5 text-[#59665c]">
+                          <span className="font-semibold text-[#263d32]">{PLACEMENT_META[selection.placement]?.label || titleize(selection.placement)}</span>
+                          <span className="mx-1.5 text-[#a5aea3]">/</span>
+                          {selection.slotLabel || titleize(selection.slotKey)}
+                        </p>
                       ))}
                     </div>
+                  ) : null}
 
-                    <div className="mt-2 flex items-start gap-2 text-[8px] font-semibold leading-4 text-stone-500">
-                      <CalendarClock size={13} className="mt-0.5 shrink-0 text-[#6c52a4]" aria-hidden="true" />
-                      <span>
-                        Booked: {formatDateTime(campaign.scheduledStartsAt || campaign.startsAt)}
-                      </span>
+                  <p className="mt-2 flex items-start gap-2 text-[12px] leading-[1.5] text-[#68746b]">
+                    <CalendarClock size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    <span>Booked: {formatDateTime(campaign.scheduledStartsAt || campaign.startsAt)}</span>
+                  </p>
+
+                  <div className="mt-3 flex items-center justify-between gap-3 border-y border-[#dfe5db] py-2.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {isPaid ? <CheckCircle2 size={16} className="shrink-0 text-[#316e52]" aria-hidden="true" /> : <CreditCard size={16} className="shrink-0 text-[#ad6748]" aria-hidden="true" />}
+                      <span className="text-[14px] font-medium text-[#405548]">{isPaid ? 'Paid' : 'Payment due'}</span>
                     </div>
+                    <strong className="shrink-0 text-[15px] font-semibold text-[#173f35]">
+                      {formatMoneyMinor(payment.requiredAmountMinor, payment.currency || pricing?.currency || 'INR')}
+                    </strong>
+                  </div>
 
-                    <div className="mt-2 flex items-center justify-between gap-3 bg-[#edf9f4] px-2.5 py-2.5">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          {isPaid ? (
-                            <CheckCircle2 size={13} className="text-[#176b57]" aria-hidden="true" />
-                          ) : (
-                            <CreditCard size={13} className="text-[#6c52a4]" aria-hidden="true" />
-                          )}
-                          <p className="text-[9px] font-black text-stone-950">
-                            {isPaid ? 'Payment received' : 'Payment required'}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="shrink-0 text-[12px] font-black text-stone-950">
-                        {formatMoneyMinor(
-                          payment.requiredAmountMinor,
-                          payment.currency || pricing?.currency || 'INR',
-                        )}
-                      </p>
+                  {campaign.status === 'pending_review' && !isPaid ? (
+                    <button
+                      type="button"
+                      disabled={busy || isPaying || pricing?.paymentProvider?.mode !== 'test'}
+                      onClick={() => payCampaign(campaign)}
+                      className={`${primaryButtonClass} mt-3 w-full`}
+                    >
+                      <IndianRupee size={15} aria-hidden="true" />
+                      {isPaying ? 'Opening payment…' : `Pay ${formatMoneyMinor(payment.requiredAmountMinor, payment.currency || 'INR')}`}
+                    </button>
+                  ) : null}
+                  {campaign.status === 'pending_review' && isPaid ? (
+                    <div className="mt-3 flex items-start gap-2 rounded-[8px] bg-[#e8f0f3] px-3 py-2.5 text-[13px] leading-5 text-[#315f70]">
+                      <ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                      Awaiting Super Admin approval.
                     </div>
+                  ) : null}
+                  {campaign.review?.reason ? (
+                    <div className="mt-3 flex items-start gap-2 rounded-[8px] bg-[#f7ece7] px-3 py-2.5 text-[13px] leading-5 text-[#775442]">
+                      <CircleAlert size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                      <span>Review note: {campaign.review.reason}</span>
+                    </div>
+                  ) : null}
 
-                    {campaign.status === 'pending_review' && !isPaid ? (
-                      <button
-                        type="button"
-                        disabled={
-                          busy ||
-                          isPaying ||
-                          pricing?.paymentProvider?.mode !== 'test'
-                        }
-                        onClick={() => payCampaign(campaign)}
-                        className={`${primaryButtonClass} mt-2 w-full`}
-                      >
-                        <IndianRupee size={14} aria-hidden="true" />
-                        {isPaying
-                          ? 'Opening payment…'
-                          : `Pay ${formatMoneyMinor(
-                              payment.requiredAmountMinor,
-                              payment.currency || 'INR',
-                            )}`}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {!['active', 'paused', 'ended'].includes(campaign.status) ? (
+                      <button type="button" disabled={busy} onClick={() => beginEditCampaign(campaign)} className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-[8px] border border-[#cbd8cc] bg-white px-3 py-2 text-[13px] font-semibold text-[#173f35] hover:bg-[#eef4ea] disabled:opacity-40">
+                        <PencilLine size={14} aria-hidden="true" /> Edit
                       </button>
                     ) : null}
-
-                    {campaign.status === 'pending_review' && isPaid ? (
-                      <div className="mt-2 flex items-start gap-2 bg-[#edf6fb] px-2.5 py-2 text-[8px] font-semibold leading-4 text-[#275f7c]">
-                        <ShieldCheck size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
-                        Waiting for Super Admin approval.
-                      </div>
+                    {campaign.status === 'approved' && isPaid ? (
+                      <button type="button" disabled={busy} onClick={() => transition(campaign.id, 'activate')} className={primaryButtonClass}>
+                        <Play size={14} aria-hidden="true" /> Activate
+                      </button>
                     ) : null}
-
-                    {campaign.review?.reason ? (
-                      <div className="mt-2 flex items-start gap-2 bg-stone-50 px-2.5 py-2 text-[8px] font-semibold leading-4 text-stone-600">
-                        <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
-                        Review note: {campaign.review.reason}
-                      </div>
+                    {campaign.status === 'active' ? (
+                      <button type="button" disabled={busy} onClick={() => transition(campaign.id, 'pause')} className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-[8px] border border-[#cbd8cc] bg-white px-3 py-2 text-[13px] font-semibold text-[#173f35] hover:bg-[#eef4ea]">
+                        <Pause size={14} aria-hidden="true" /> Pause
+                      </button>
                     ) : null}
-
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {!['active', 'paused', 'ended'].includes(campaign.status) ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => beginEditCampaign(campaign)}
-                          className="focus-ring inline-flex items-center gap-2 rounded-[12px] border border-[#d3cae8] bg-white px-3 py-2 text-[10px] font-black text-[#5f4a95] transition hover:bg-[#f4f0fb] disabled:opacity-40"
-                        >
-                          <PencilLine size={14} aria-hidden="true" />
-                          Edit
-                        </button>
-                      ) : null}
-
-                      {campaign.status === 'approved' && isPaid ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => transition(campaign.id, 'activate')}
-                          className={primaryButtonClass}
-                        >
-                          <Play size={14} aria-hidden="true" />
-                          Activate
-                        </button>
-                      ) : null}
-
-                      {campaign.status === 'active' ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => transition(campaign.id, 'pause')}
-                          className="focus-ring inline-flex items-center gap-2 rounded-[12px] border border-stone-200 bg-white px-3 py-2 text-[10px] font-black text-stone-700"
-                        >
-                          <Pause size={14} aria-hidden="true" />
-                          Pause
-                        </button>
-                      ) : null}
-
-                      {campaign.status === 'paused' ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => transition(campaign.id, 'resume')}
-                          className={primaryButtonClass}
-                        >
-                          <Play size={14} aria-hidden="true" />
-                          Resume
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                )
-              })
-            ) : (
-              <p className="border border-dashed border-[#d9d2ea] bg-white/70 p-3 text-[10px] font-semibold leading-5 text-stone-500">
-                No campaigns yet. Complete the setup on the left and your campaign will appear here for payment and activation.
-              </p>
+                    {campaign.status === 'paused' ? (
+                      <button type="button" disabled={busy} onClick={() => transition(campaign.id, 'resume')} className={primaryButtonClass}>
+                        <Play size={14} aria-hidden="true" /> Resume
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              )
+            }) : (
+              <div className="px-5 py-8 text-center">
+                <Megaphone size={25} className="mx-auto text-[#7e9b82]" aria-hidden="true" />
+                <p className="mt-3 text-[15px] font-semibold text-[#173f35]">No campaigns yet</p>
+                <p className="mt-1 text-[13px] leading-[1.6] text-[#677469]">Your campaigns will appear here after creation.</p>
+              </div>
             )}
           </div>
         </aside>
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 sm:gap-3">
-        <div className="flex items-start gap-2 rounded-[16px] border border-[#c7e4d8] bg-[#eef9f4] p-3 text-[9px] font-semibold leading-[1.5] text-stone-600 sm:text-[10px]">
-          <Eye size={15} className="mt-0.5 shrink-0 text-[#176b57]" aria-hidden="true" />
-          Promotions stay clearly labelled. Paid ranking never changes organic results, so normal results remain separate from paid placement.
-        </div>
-        <div className="flex items-start gap-2 rounded-[16px] border border-[#cbdfea] bg-[#eef7fb] p-3 text-[9px] font-semibold leading-[1.5] text-stone-600 sm:text-[10px]">
-          <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[#2c789d]" aria-hidden="true" />
-          Sensitive health information and allergy inferences are never advertising targeting segments.
-        </div>
+      <div className="mt-5 grid gap-2 rounded-[12px] border border-[#dce6df] bg-[#f0f4ee] px-4 py-3 text-[13px] leading-[1.6] text-[#496154] sm:grid-cols-2 sm:gap-6 sm:px-5">
+        <p className="flex items-start gap-2">
+          <Eye size={15} className="mt-0.5 shrink-0 text-[#446e5b]" aria-hidden="true" />
+          Paid ads stay labelled and do not change organic search ranking.
+        </p>
+        <p className="flex items-start gap-2">
+          <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[#446e5b]" aria-hidden="true" />
+          Health and allergy information is never used to target ads.
+        </p>
       </div>
 
       {placementModal ? (
@@ -1818,40 +1753,40 @@ export default function HostRetailMediaPage() {
             }
           }}
         >
-          <div className="flex h-[94vh] max-h-[94vh] w-full max-w-[1380px] flex-col overflow-hidden rounded-[26px] border border-white/70 bg-[#f8f7f2] shadow-[0_28px_100px_rgba(0,0,0,0.28)]">
+          <div className="flex h-[94vh] max-h-[94vh] w-full max-w-[1380px] flex-col overflow-hidden rounded-[14px] border border-white/70 bg-[#f8f7f2] shadow-[0_28px_100px_rgba(0,0,0,0.28)]">
             <div className="flex items-start justify-between gap-3 border-b border-stone-200 bg-white px-4 py-4 sm:px-6">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#176b57]">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.07em] text-[#173f35]">
                   Choose exact ad position
                 </p>
-                <h2 id="placement-preview-title" className="mt-1 text-xl font-black text-stone-950 sm:text-2xl">
+                <h2 id="placement-preview-title" className="mt-1 text-xl font-semibold text-[#202421] sm:text-[22px]">
                   {PLACEMENT_META[placementModal]?.label || titleize(placementModal)} page preview
                 </h2>
-                <p className="mt-1 max-w-3xl text-[10px] font-semibold leading-5 text-stone-600 sm:text-xs">
-                  This is the current EPANTRY page, not a mockup. Scroll through it and click a highlighted ad position. If the page UI or live data changes later, this preview changes with it.
+                <p className="mt-1 max-w-3xl text-[13px] font-semibold leading-5 text-stone-600 sm:text-[13px]">
+                  Preview the current EPANTRY page and select a highlighted ad position.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setPlacementModal(null)}
-                className="focus-ring grid size-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-stone-50 text-stone-700"
+                className="focus-ring grid size-9 shrink-0 place-items-center rounded-[9px] border border-stone-200 bg-stone-50 text-stone-700"
                 aria-label="Close placement preview"
               >
                 <X size={16} aria-hidden="true" />
               </button>
             </div>
 
-            <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="relative min-h-0 overflow-hidden bg-[#e8ebe7]">
+            <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="relative h-[48%] min-h-[220px] shrink-0 overflow-hidden bg-[#e8ebe7] sm:h-[55%] lg:h-auto lg:min-h-0 lg:shrink">
                 {placementPreviewLoading ? (
                   <div className="absolute inset-0 z-10 grid place-items-center bg-[#f4f3ee]">
                     <div className="text-center">
                       <RefreshCw
                         size={24}
-                        className="mx-auto animate-spin text-[#176b57]"
+                        className="mx-auto animate-spin text-[#173f35]"
                         aria-hidden="true"
                       />
-                      <p className="mt-3 text-xs font-black text-stone-900">
+                      <p className="mt-3 text-[13px] font-semibold text-stone-900">
                         Opening the live EPANTRY page…
                       </p>
                     </div>
@@ -1868,7 +1803,7 @@ export default function HostRetailMediaPage() {
                   <iframe
                     src={placementPreviewUrl}
                     title={`${PLACEMENT_META[placementModal]?.label || titleize(placementModal)} live page preview`}
-                    className="h-full min-h-[640px] w-full bg-white"
+                    className="h-full min-h-0 w-full bg-white"
                     onLoad={(event) => {
                       const frame = event.currentTarget
                       const documentRef = frame.contentDocument
@@ -1901,11 +1836,11 @@ export default function HostRetailMediaPage() {
                 ) : null}
               </div>
 
-              <aside className="border-t border-stone-200 bg-white p-4 lg:border-l lg:border-t-0 sm:p-5">
-                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#315f7a]">
+              <aside className="min-h-0 flex-1 overflow-y-auto border-t border-stone-200 bg-white p-4 lg:flex-none lg:border-l lg:border-t-0 sm:p-5">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.13em] text-[#315f7a]">
                   Page positions
                 </p>
-                <p className="mt-1 text-[10px] font-semibold leading-5 text-stone-500">
+                <p className="mt-1 text-[13px] font-semibold leading-5 text-stone-500">
                   {PLACEMENT_META[placementModal]?.description}
                 </p>
 
@@ -1928,10 +1863,10 @@ export default function HostRetailMediaPage() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-[10px] font-black text-stone-950 sm:text-xs">
+                            <p className="text-[13px] font-semibold text-[#202421] sm:text-[13px]">
                               {slot.label}
                             </p>
-                            <p className="mt-1 text-[8px] font-semibold leading-4 text-stone-500 sm:text-[9px]">
+                            <p className="mt-1 text-[12px] font-semibold leading-4 text-stone-500 sm:text-[12px]">
                               {!availability
                                 ? 'Checking availability…'
                                 : availability.available
@@ -1942,7 +1877,7 @@ export default function HostRetailMediaPage() {
                             </p>
                           </div>
                           {selected ? (
-                            <CheckCircle2 size={16} className="shrink-0 text-[#176b57]" aria-hidden="true" />
+                            <CheckCircle2 size={16} className="shrink-0 text-[#173f35]" aria-hidden="true" />
                           ) : null}
                         </div>
                       </button>
@@ -1950,14 +1885,14 @@ export default function HostRetailMediaPage() {
                   })}
                 </div>
 
-                <div className="mt-4 bg-[#edf6fb] p-3 text-[9px] font-semibold leading-4 text-[#315f7a]">
-                  Payment is not opened from this preview. First choose all final positions and create the campaign; payment happens afterwards from Your campaigns.
+                <div className="mt-4 bg-[#edf6fb] p-3 text-[12px] font-semibold leading-4 text-[#315f7a]">
+                  Choose your positions and create the campaign first. Complete payment from Your campaigns.
                 </div>
               </aside>
             </div>
           </div>
         </div>
       ) : null}
-    </div>
+    </main>
   )
 }

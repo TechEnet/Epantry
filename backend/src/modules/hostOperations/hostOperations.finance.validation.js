@@ -8,6 +8,11 @@ export const organizationSettlementParamsSchema = z.object({
   organizationId: objectIdSchema,
 }).strict()
 
+export const hostEarningsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+}).strict()
+
 export const hostFinanceQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
