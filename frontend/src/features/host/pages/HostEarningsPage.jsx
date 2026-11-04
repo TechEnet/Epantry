@@ -10,198 +10,191 @@ import {
 } from '../../hostOperations/services/hostOperations.service'
 
 const earningsStyles = String.raw`
-/* EPANTRY / Host earnings / Editorial ledger
-   Component-scoped CSS; navbar, sidebar and footer are not affected. */
+/* Host earnings: Balanced Japandi editorial finance layout.
+   Scoped to this page; global navigation and footer are unchanged. */
 .hee-page {
-  --hee-forest: #173f35;
-  --hee-forest-dark: #102f29;
-  --hee-clay: #c9714a;
-  --hee-clay-dark: #aa5635;
-  --hee-charcoal: #222a25;
-  --hee-sage: #e3ebe0;
-  --hee-soft-sage: #edf2e9;
-  --hee-porcelain: #f7f6f1;
-  --hee-muted: #596d62;
-  --hee-rule: #d8e0d7;
+  --hee-porcelain: #F7F6F2;
+  --hee-forest: #173F35;
+  --hee-charcoal: #202421;
+  --hee-sage: #DCE0CF;
+  --hee-clay: #C86C42;
+  --hee-muted: #57655D;
+  --hee-border: #D8DED3;
+  --hee-surface: #FFFEFB;
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
-  padding: clamp(14px, 2.2vw, 32px) clamp(14px, 2.5vw, 36px) 48px;
+  padding: clamp(20px, 2.6vw, 36px) clamp(16px, 3vw, 42px) 54px;
   background: var(--hee-porcelain);
   color: var(--hee-charcoal);
-  font: 400 15px/1.5 'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+  font: 400 16px/1.6 'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, sans-serif;
 }
 .hee-page *, .hee-page *::before, .hee-page *::after { box-sizing: border-box; }
-.hee-page :is(a, button) { font: inherit; }
+.hee-page :is(a, button) { font-family: inherit; }
 .hee-page :is(a, button):focus-visible { outline: 3px solid var(--hee-clay); outline-offset: 3px; }
-.hee-intro {
-  border: 1px solid var(--hee-rule);
-  border-top: 4px solid var(--hee-clay);
-  background: #fcfcf8;
-  border-radius: 12px;
-  overflow: hidden;
-}
-.hee-intro-top {
-  min-height: 55px;
-  padding: 13px 30px 9px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.hee-kicker { display: flex; gap: 9px; align-items: center; font-size: 12px; letter-spacing: .065em; text-transform: uppercase; font-weight: 800; color: var(--hee-clay-dark); }
-.hee-kicker::before { content: ''; width: 22px; height: 2px; background: var(--hee-clay); }
-.hee-live-tools { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-.hee-live { display: inline-flex; align-items: center; gap: 7px; color: var(--hee-muted); font-weight: 700; font-size: 13px; }
-.hee-live::before { content: ''; width: 7px; height: 7px; background: #4c926c; border-radius: 50%; box-shadow: 0 0 0 3px #4c926c1e; }
-.hee-refresh { display: inline-flex; justify-content: center; align-items: center; min-height: 36px; gap: 7px; padding: 7px 13px; border: 1px solid #c4d4c8; background: #fff; color: var(--hee-forest); border-radius: 6px; font-weight: 760!important; font-size: 13px!important; cursor: pointer; transition: background .18s, border-color .18s; }
-.hee-refresh:hover:not(:disabled) { background: var(--hee-soft-sage); border-color: #97b8a1; }
-.hee-refresh:disabled { opacity: .65; cursor: wait; }
-.hee-intro-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(285px, .78fr); align-items: stretch; }
-.hee-heading-panel { padding: 19px 30px 35px; min-width: 0; }
-.hee-heading-panel h1 { font-size: clamp(32px, 3.2vw, 45px)!important; line-height: 1.1!important; letter-spacing: -.05em!important; color: var(--hee-forest)!important; margin: 0 0 13px!important; font-weight: 800!important; }
-.hee-heading-panel p { margin: 0; max-width: 480px; color: var(--hee-muted); font-size: 15px; line-height: 1.65; }
-.hee-captured {
-  padding: 20px 30px 25px;
-  border-left: 1px solid var(--hee-rule);
-  background: var(--hee-sage);
-  position: relative;
-  min-width: 0;
-}
-.hee-captured::after { content: ''; position: absolute; width: 160px; height: 160px; border: 1px solid #b4c8b9; border-radius: 50%; right: -66px; top: -88px; pointer-events: none; box-shadow: 0 0 0 25px #d4e1d354; }
-.hee-captured-label { display: block; font-size: 13px; font-weight: 780; color: #516d5b; }
-.hee-captured-value { display: block; font-size: clamp(32px, 3vw, 44px); font-weight: 820; letter-spacing: -.052em; line-height: 1.25; color: var(--hee-forest); margin: 8px 0 4px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; position: relative; }
-.hee-captured-sub { font-size: 13px; color: #587163; display: block; }
-.hee-updated { display: block; border-top: 1px solid #c9d8c9; margin-top: 17px; padding-top: 10px; font-size: 12.5px; color: #547062; }
-.hee-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--hee-rule); }
-.hee-metric { min-width: 0; padding: 20px 27px 23px; border-right: 1px solid var(--hee-rule); background: #fdfcf9; }
-.hee-metric:last-child { border-right: 0; }
-.hee-metric[data-kind='process'] { background: #f0f3ed; }
-.hee-metric[data-kind='await'] { background: #f7e9e0; }
-.hee-metric-label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 750; color: #4c6255; }
-.hee-metric-label svg { flex: none; color: #4e7c62; }
-.hee-metric[data-kind='await'] .hee-metric-label svg { color: var(--hee-clay-dark); }
-.hee-metric-number { display: block; margin-top: 6px; font-size: clamp(26px, 2.5vw, 35px); line-height: 1.23; font-weight: 800; letter-spacing: -.04em; color: var(--hee-forest); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.hee-metric-note { display: block; margin-top: 4px; color: var(--hee-muted); font-size: 12.5px; line-height: 1.5; }
-.hee-error { margin-top: 17px; padding: 13px 15px; border-left: 3px solid #af443b; background: #faebe7; font-size: 14px; color: #933b33; }
-.hee-sales { min-width: 0; margin-top: 31px; border: 1px solid var(--hee-rule); border-top: 3px solid var(--hee-clay); border-radius: 11px; overflow: hidden; background: #fffefa; }
-.hee-section-header { padding: 26px 28px 22px; display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 15px; background: #f9eee7; border-bottom: 1px solid #e9d9cf; }
-.hee-section-label { display: inline-flex; align-items: center; gap: 8px; color: var(--hee-clay-dark); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .055em; }
-.hee-section-header h2, .hee-payout-head h2 { margin: 6px 0 0!important; font-size: clamp(24px, 2.25vw, 30px)!important; font-weight: 800!important; letter-spacing: -.042em!important; line-height: 1.19!important; color: var(--hee-forest)!important; }
-.hee-section-sub { margin: 6px 0 0; color: var(--hee-muted); font-size: 14px; }
-.hee-sales-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.hee-count { font-size: 13px; font-weight: 760; color: #3c6150; padding: 8px 11px; background: var(--hee-soft-sage); border-radius: 5px; }
-.hee-plain-link { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--hee-forest); font-size: 14px; font-weight: 790; border-bottom: 1px solid #9db5a5; padding: 5px 0; }
-.hee-plain-link:hover { color: var(--hee-clay-dark); border-bottom-color: var(--hee-clay); }
-.hee-order-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--hee-rule); min-width: 0; }
-.hee-order { min-width: 0; min-height: 118px; display: flex; align-items: center; gap: 14px; padding: 19px 22px; border-bottom: 1px solid #e2e9e0; text-decoration: none; color: inherit; background: #fffefa; position: relative; transition: background .18s ease; }
-.hee-order:nth-child(even) { border-left: 1px solid var(--hee-rule); }
-.hee-order:hover { background: #edf3ec; }
-.hee-order:hover .hee-visit { transform: translateX(2px); color: var(--hee-clay-dark); border-color: #d5a184; }
-.hee-photo { flex: 0 0 78px; width: 78px; height: 78px; overflow: hidden; position: relative; background: #f1f3ed; border: 1px solid #e2e9df; border-radius: 7px; display: block; }
-.hee-photo img { width: 100%; height: 100%; object-fit: contain; display: block; background: #f9faf7; }
-.hee-photo-blank { height: 100%; display: grid; place-items: center; text-align: center; font-size: 11px; color: #697f70; line-height: 1.25; }
-.hee-photo-number { position: absolute; right: 2px; bottom: 2px; padding: 2px 5px; color: #fff; background: var(--hee-forest); border-radius: 3px; font-size: 10px; font-weight: 800; }
-.hee-order-information { min-width: 0; flex: 1 1 auto; display: block; }
-.hee-product-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 15.5px; line-height: 1.37; color: var(--hee-charcoal); font-weight: 780; }
-.hee-product-meta { display: block; margin-top: 7px; font-size: 12.5px; line-height: 1.4; color: #697c6d; }
-.hee-order-money { min-width: 121px; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 7px; text-align: right; }
-.hee-order-price { font-size: 16px; font-weight: 815; color: var(--hee-forest); white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-.hee-badge { display: inline-flex; align-items: center; padding: 4px 7px; border-radius: 4px; background: #e2eee6; color: #346448; font-size: 11.5px; font-weight: 760; line-height: 1.3; text-align: center; }
-.hee-badge[data-status='awaiting_settlement'] { background: #f9e6d7; color: #9f4a2d; }
-.hee-badge[data-status='not_yet_settleable'] { background: #e3edf0; color: #356c76; }
-.hee-badge[data-status='pending_approval'] { background: #ede8f6; color: #675184; }
-.hee-badge[data-status='rejected'], .hee-badge[data-status='void'] { background: #f6e6e4; color: #9d403b; }
-.hee-visit { display: inline-grid; place-items: center; color: #638375; width: 25px; height: 25px; border: 1px solid #cedcd1; border-radius: 50%; transition: transform .18s, color .18s, border-color .18s; }
-.hee-sales-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 28px; background: var(--hee-soft-sage); color: var(--hee-muted); font-size: 13px; }
-.hee-sales-foot p { margin: 0; }
-.hee-empty-sales { grid-column: 1/-1; padding: 36px 28px; font-size: 14px; color: var(--hee-muted); }
-.hee-payouts { display: grid; grid-template-columns: minmax(265px, .44fr) minmax(0, 1fr); margin-top: 28px; border: 1px solid var(--hee-rule); border-radius: 11px; overflow: hidden; background: #fffefa; }
-.hee-payout-head { padding: 25px 27px; background: var(--hee-forest); min-width: 0; }
-.hee-payout-head h2 { color: #fffefa!important; }
-.hee-payout-head .hee-section-label { color: #f0bd9d; }
-.hee-payout-head p { margin: 8px 0 15px; color: #d2e2d7; font-size: 14px; }
-.hee-payout-link { display: inline-flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 780; text-decoration: none; color: #fffdf7; border-bottom: 1px solid #91baa5; padding-bottom: 4px; }
-.hee-payout-link:hover { color: #f0bd9d; border-bottom-color: #f0bd9d; }
-.hee-payout-list { padding: 13px 25px; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-.hee-payout-row { padding: 13px 0; display: flex; justify-content: space-between; align-items: center; gap: 15px; border-bottom: 1px solid var(--hee-rule); }
+.hee-intro { border-bottom: 1px solid var(--hee-border); padding-bottom: 25px; }
+.hee-intro-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.hee-kicker, .hee-section-label { display: inline-flex; align-items: center; gap: 11px; color: #975037; font-size: 13px; line-height: 1.5; font-weight: 700; text-transform: uppercase; letter-spacing: .055em; }
+.hee-kicker::before { content: ''; display: block; width: 25px; height: 2px; background: var(--hee-clay); }
+.hee-live-tools { display: flex; align-items: center; gap: 16px; }
+.hee-live { display: inline-flex; align-items: center; gap: 9px; color: var(--hee-muted); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.hee-live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #42835F; box-shadow: 0 0 0 4px #42835F20; }
+.hee-refresh { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 10px 16px; border-radius: 12px; border: 1px solid #BBC7BB; background: #FFFEFB; color: var(--hee-forest); font-size: 14px; font-weight: 650; cursor: pointer; transition: background-color .18s ease, border-color .18s ease; }
+.hee-refresh:hover:not(:disabled) { border-color: var(--hee-forest); background: #EEF1E9; }
+.hee-refresh:disabled { opacity: .66; cursor: wait; }
+.hee-heading-panel { display: flex; justify-content: space-between; align-items: flex-end; gap: 22px; margin-top: 23px; }
+.hee-heading-panel h1 { margin: 0 0 7px!important; color: var(--hee-forest)!important; font-size: clamp(30px, 3.1vw, 38px)!important; line-height: 1.2!important; font-weight: 650!important; letter-spacing: -.042em!important; }
+.hee-heading-panel p { margin: 0; color: var(--hee-muted); font-size: 16px; line-height: 1.6; }
+.hee-updated { display: inline-block; flex: none; padding-bottom: 3px; font-size: 13.5px; line-height: 1.5; color: var(--hee-muted); text-align: right; }
+.hee-snapshot { display: grid; grid-template-columns: minmax(290px, .88fr) minmax(0, 1.12fr); overflow: hidden; border-radius: 16px; margin-top: 26px; background: var(--hee-surface); border: 1px solid var(--hee-border); }
+.hee-captured { position: relative; display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 32px 36px; min-height: 275px; background: var(--hee-forest); color: #F7F6F2; }
+.hee-captured::before { content: ''; width: 38px; height: 3px; background: var(--hee-clay); position: absolute; top: 31px; left: 36px; }
+.hee-captured-label { display: block; font-size: 15px; line-height: 1.5; font-weight: 600; color: #DCE0CF; margin-top: 15px; }
+.hee-captured-value { display: block; color: #F7F6F2; margin: 7px 0 10px; font-size: clamp(38px, 4.3vw, 54px); font-weight: 650; line-height: 1.18; letter-spacing: -.052em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hee-captured-sub { display: block; max-width: 370px; color: #E0E8DD; font-size: 14px; line-height: 1.6; }
+.hee-metrics { display: flex; flex-direction: column; min-width: 0; }
+.hee-metric { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 20px 27px; flex: 1 1 0; min-width: 0; }
+.hee-metric + .hee-metric { border-top: 1px solid var(--hee-border); }
+.hee-metric[data-kind='await'] { background: #F9F1EB; }
+.hee-metric-copy { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.hee-metric-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #E8EEE3; flex: none; color: var(--hee-forest); }
+.hee-metric[data-kind='await'] .hee-metric-icon { background: #F4DDD0; color: #9D5037; }
+.hee-metric-text { display: block; min-width: 0; }
+.hee-metric-label { display: block; color: var(--hee-charcoal); font-size: 15px; line-height: 1.4; font-weight: 650; }
+.hee-metric-note { display: block; color: var(--hee-muted); margin-top: 3px; font-size: 13px; line-height: 1.45; }
+.hee-metric-number { display: block; margin-left: 8px; flex: none; color: var(--hee-forest); font-size: clamp(23px, 2.2vw, 31px); line-height: 1.2; letter-spacing: -.045em; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.hee-metric[data-kind='await'] .hee-metric-number { color: #8F422D; }
+.hee-error { margin-top: 18px; padding: 13px 18px; border-left: 3px solid #B3453E; background: #F8E7E4; color: #853C34; font-size: 14px; }
+.hee-sales { min-width: 0; margin-top: 42px; }
+.hee-section-header { display: flex; align-items: end; justify-content: space-between; gap: 18px; flex-wrap: wrap; padding: 0 0 19px; }
+.hee-section-label { color: #A75B3A; }
+.hee-section-header h2, .hee-payout-head h2 { margin: 5px 0 0!important; font-size: clamp(25px, 2.7vw, 30px)!important; line-height: 1.28!important; font-weight: 650!important; letter-spacing: -.036em!important; color: var(--hee-forest)!important; }
+.hee-section-sub { margin: 5px 0 0; font-size: 15px; color: var(--hee-muted); line-height: 1.5; }
+.hee-sales-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 19px; padding-bottom: 3px; }
+.hee-count { color: var(--hee-muted); font-size: 14px; font-weight: 600; }
+.hee-plain-link, .hee-payout-link { display: inline-flex; align-items: center; gap: 8px; width: fit-content; text-decoration: none; color: var(--hee-forest); font-size: 14px; font-weight: 700; border-bottom: 1px solid #8BA897; padding: 4px 0; transition: color .18s, border-color .18s; }
+.hee-plain-link:hover, .hee-payout-link:hover { color: #9B4E32; border-bottom-color: var(--hee-clay); }
+.hee-order-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; border: 1px solid var(--hee-border); border-radius: 14px; overflow: hidden; background: var(--hee-surface); }
+.hee-order { position: relative; min-width: 0; min-height: 115px; display: flex; align-items: center; gap: 14px; padding: 18px 18px; background: var(--hee-surface); border-bottom: 1px solid #E4E8E0; color: inherit; text-decoration: none; transition: background-color .18s ease; }
+.hee-order:nth-child(2n) { border-left: 1px solid var(--hee-border); }
+.hee-order:last-child, .hee-order:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+.hee-order:hover { background: #F0F3EB; }
+.hee-order:hover .hee-visit { border-color: var(--hee-forest); background: var(--hee-forest); color: #FFF; }
+.hee-photo { flex: 0 0 70px; width: 70px; height: 70px; overflow: hidden; position: relative; background: #EFF1EB; border-radius: 10px; display: block; }
+.hee-photo img { display: block; width: 100%; height: 100%; object-fit: contain; background: #FAFAF7; }
+.hee-photo-blank { display: grid; place-items: center; height: 100%; padding: 5px; text-align: center; font-size: 12px; line-height: 1.3; color: var(--hee-muted); }
+.hee-photo-number { position: absolute; right: 3px; bottom: 3px; padding: 2px 5px; background: var(--hee-forest); border-radius: 5px; font-size: 11px; line-height: 1.35; font-weight: 700; color: #FFF; }
+.hee-order-information { display: block; flex: 1 1 auto; min-width: 0; }
+.hee-product-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; color: var(--hee-charcoal); font-size: 15px; font-weight: 650; line-height: 1.45; }
+.hee-product-meta { display: block; margin-top: 5px; color: var(--hee-muted); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.hee-order-money { flex: 0 0 auto; min-width: 108px; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+.hee-order-price { color: var(--hee-forest); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.035em; white-space: nowrap; }
+.hee-badge { display: inline-flex; align-items: center; padding: 4px 8px; background: #E5EFE5; color: #285D3C; border-radius: 6px; font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center; }
+.hee-badge[data-status='awaiting_settlement'] { background: #F9E6D9; color: #944A2F; }
+.hee-badge[data-status='not_yet_settleable'] { background: #E4EEF1; color: #2D6474; }
+.hee-badge[data-status='pending_approval'] { background: #EDE8F5; color: #5C4C7A; }
+.hee-badge[data-status='rejected'], .hee-badge[data-status='void'] { background: #F6E4E3; color: #973F3A; }
+.hee-visit { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid #D6DFD6; border-radius: 50%; color: var(--hee-forest); transition: background-color .18s, border-color .18s, color .18s; }
+.hee-sales-foot { display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; padding: 13px 2px 0; }
+.hee-sales-foot p { margin: 0; color: var(--hee-muted); font-size: 13.5px; }
+.hee-empty-sales { grid-column: 1 / -1; padding: 32px 26px; color: var(--hee-muted); font-size: 15px; }
+.hee-payouts { display: grid; grid-template-columns: minmax(250px, .64fr) minmax(0, 1.36fr); min-width: 0; margin-top: 39px; overflow: hidden; border-radius: 14px; border: 1px solid var(--hee-border); background: var(--hee-surface); }
+.hee-payout-head { min-width: 0; padding: 31px 32px; background: var(--hee-sage); }
+.hee-payout-head .hee-section-label { color: #74503D; }
+.hee-payout-head p { color: #4D5F54; font-size: 15px; margin: 8px 0 19px; line-height: 1.5; }
+.hee-payout-link { color: var(--hee-forest); }
+.hee-payout-list { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 18px 30px; }
+.hee-payout-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 0; border-bottom: 1px solid var(--hee-border); }
 .hee-payout-row:last-child { border-bottom: 0; }
-.hee-payout-value { display: block; color: var(--hee-forest); font-size: 20px; line-height: 1.25; font-weight: 810; font-variant-numeric: tabular-nums; }
-.hee-payout-meta { display: block; margin-top: 3px; color: var(--hee-muted); font-size: 12.5px; }
-.hee-payout-empty { display: flex; align-items: flex-start; gap: 13px; padding: 16px 2px; }
-.hee-payout-empty-icon { flex: none; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--hee-forest); background: var(--hee-soft-sage); }
-.hee-payout-empty strong { display: block; font-size: 16px; color: var(--hee-forest); }
-.hee-payout-empty p { margin: 5px 0 0; color: var(--hee-muted); font-size: 14px; }
-@media (max-width: 1100px) {
-  .hee-order { padding: 16px 15px; gap: 10px; }
-  .hee-order-money { min-width: 99px; }
-  .hee-photo { width: 66px; height: 70px; flex-basis: 66px; }
+.hee-payout-value { display: block; color: var(--hee-forest); font-size: 22px; font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.hee-payout-meta { display: block; margin-top: 5px; color: var(--hee-muted); font-size: 13px; line-height: 1.5; }
+.hee-payout-empty { display: flex; align-items: center; gap: 17px; padding: 16px 0; }
+.hee-payout-empty-icon { display: inline-grid; flex: none; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: var(--hee-forest); background: #E8EEE4; }
+.hee-payout-empty strong { display: block; color: var(--hee-forest); font-size: 16px; line-height: 1.4; font-weight: 650; }
+.hee-payout-empty p { margin: 4px 0 0; color: var(--hee-muted); font-size: 14px; line-height: 1.55; }
+@media (max-width: 1150px) {
+  .hee-metric { padding: 18px 20px; }
+  .hee-order { gap: 11px; padding: 16px 13px; }
+  .hee-photo { width: 62px; height: 66px; flex-basis: 62px; }
+  .hee-order-money { min-width: 98px; }
   .hee-product-name { font-size: 14.5px; }
 }
-@media (max-width: 850px) {
-  .hee-intro-body { grid-template-columns: minmax(0, 1fr) minmax(245px, .95fr); }
-  .hee-heading-panel, .hee-captured { padding-left: 23px; padding-right: 23px; }
+@media (max-width: 980px) {
   .hee-order-list { grid-template-columns: 1fr; }
-  .hee-order:nth-child(even) { border-left: 0; }
-  .hee-order { min-height: 104px; padding: 14px 23px; }
-  .hee-photo { width: 70px; height: 72px; flex-basis: 70px; }
-  .hee-sales-foot { padding: 13px 23px; }
+  .hee-order:nth-child(2n) { border-left: 0; }
+  .hee-order:nth-last-child(2) { border-bottom: 1px solid #E4E8E0; }
+  .hee-order { min-height: 101px; padding: 14px 22px; }
+  .hee-photo { width: 68px; height: 70px; flex-basis: 68px; }
 }
-@media (max-width: 620px) {
-  .hee-page { padding: 11px 10px 35px; font-size: 14px; }
-  .hee-intro-top { padding: 15px 18px 9px; gap: 9px; }
-  .hee-kicker { font-size: 11px; }
-  .hee-live { font-size: 12px; }
-  .hee-refresh { min-height: 34px; padding: 6px 10px; }
-  .hee-intro-body { grid-template-columns: 1fr; }
-  .hee-heading-panel { padding: 12px 18px 22px; }
-  .hee-heading-panel h1 { font-size: 31px!important; margin-bottom: 7px!important; }
-  .hee-heading-panel p { font-size: 14px; }
-  .hee-captured { border-left: 0; border-top: 1px solid var(--hee-rule); padding: 15px 18px 17px; }
-  .hee-captured-label { font-size: 12.5px; }
-  .hee-captured-value { font-size: 34px; margin-top: 3px; }
-  .hee-captured-sub { font-size: 12.5px; }
-  .hee-updated { margin-top: 10px; padding-top: 8px; font-size: 12px; }
-  .hee-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hee-metric { padding: 15px 14px; }
-  .hee-metric[data-kind='paid'] { grid-column: 1/-1; border-right: 0; border-bottom: 1px solid var(--hee-rule); }
-  .hee-metric[data-kind='process'] { border-bottom: 0; }
-  .hee-metric-label { font-size: 12.5px; }
-  .hee-metric-number { font-size: 26px; }
-  .hee-metric-note { font-size: 12px; }
-  .hee-sales { margin-top: 19px; }
-  .hee-section-header { padding: 19px 17px 17px; }
-  .hee-section-header h2, .hee-payout-head h2 { font-size: 24px!important; }
-  .hee-section-sub { font-size: 13px; }
-  .hee-sales-actions { gap: 12px; }
-  .hee-count { padding: 6px 8px; font-size: 12px; }
-  .hee-plain-link { font-size: 13px; }
-  .hee-order { gap: 10px; padding: 13px 12px; }
-  .hee-photo { flex-basis: 63px; width: 63px; height: 66px; }
+@media (max-width: 760px) {
+  .hee-page { padding: 18px 16px 40px; }
+  .hee-intro { padding-bottom: 19px; }
+  .hee-heading-panel { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: 19px; }
+  .hee-updated { text-align: left; }
+  .hee-snapshot { grid-template-columns: 1fr; margin-top: 21px; }
+  .hee-captured { min-height: 205px; padding: 30px 26px 26px; }
+  .hee-captured::before { left: 26px; top: 23px; }
+  .hee-captured-value { font-size: 41px; }
+  .hee-metric { min-height: 86px; padding: 16px 22px; }
+  .hee-sales { margin-top: 29px; }
+  .hee-payouts { margin-top: 30px; grid-template-columns: 1fr; }
+  .hee-payout-head { padding: 22px 24px; }
+  .hee-payout-list { padding: 14px 24px; }
+}
+@media (max-width: 520px) {
+  .hee-page { padding: 15px 12px 35px; }
+  .hee-intro-top { gap: 8px; }
+  .hee-kicker, .hee-section-label { font-size: 12.5px; }
+  .hee-live-tools { gap: 11px; }
+  .hee-live { font-size: 12.5px; }
+  .hee-refresh { min-height: 44px; padding: 9px 11px; font-size: 13px; }
+  .hee-heading-panel h1 { font-size: 30px!important; }
+  .hee-heading-panel p { font-size: 15px; }
+  .hee-snapshot { border-radius: 13px; }
+  .hee-captured { min-height: 194px; padding: 29px 21px 23px; }
+  .hee-captured::before { left: 21px; }
+  .hee-captured-label { font-size: 14px; }
+  .hee-captured-value { font-size: clamp(33px, 9vw, 41px); }
+  .hee-captured-sub { font-size: 13.5px; }
+  .hee-metric { padding: 15px 16px; gap: 8px; }
+  .hee-metric-copy { gap: 10px; }
+  .hee-metric-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .hee-metric-label { font-size: 14px; }
+  .hee-metric-note { font-size: 12.5px; }
+  .hee-metric-number { font-size: clamp(21px, 6.1vw, 26px); margin-left: 3px; }
+  .hee-section-header { align-items: flex-start; gap: 12px; }
+  .hee-section-header h2, .hee-payout-head h2 { font-size: 26px!important; }
+  .hee-section-sub { font-size: 14px; }
+  .hee-sales-actions { gap: 16px; }
+  .hee-order { padding: 13px 11px; min-height: 94px; gap: 9px; }
+  .hee-photo { width: 57px; height: 61px; flex-basis: 57px; border-radius: 8px; }
   .hee-product-name { font-size: 14px; }
-  .hee-product-meta { font-size: 12px; margin-top: 5px; }
-  .hee-order-money { min-width: 98px; gap: 6px; }
+  .hee-product-meta { font-size: 12px; }
+  .hee-order-money { min-width: 94px; gap: 5px; }
+  .hee-order-price { font-size: 15px; }
+  .hee-badge { font-size: 11.5px; padding: 4px 6px; }
+  .hee-sales-foot { padding-top: 12px; }
+  .hee-payout-head { padding: 22px 20px; }
+  .hee-payout-list { padding: 10px 20px; }
+  .hee-payout-row { align-items: flex-start; flex-wrap: wrap; gap: 9px; }
+}
+@media (max-width: 365px) {
+  .hee-live-tools { gap: 8px; }
+  .hee-live { font-size: 11.5px; }
+  .hee-refresh { padding: 8px 9px; }
+  .hee-order { gap: 7px; padding-left: 8px; padding-right: 8px; }
+  .hee-photo { width: 48px; height: 54px; flex-basis: 48px; }
+  .hee-order-money { min-width: 88px; }
   .hee-order-price { font-size: 14px; }
   .hee-badge { font-size: 11px; }
-  .hee-sales-foot { padding: 12px 15px; }
-  .hee-payouts { margin-top: 18px; grid-template-columns: 1fr; }
-  .hee-payout-head { padding: 19px 18px 15px; }
-  .hee-payout-head p { font-size: 13px; margin: 7px 0 10px; }
-  .hee-payout-list { padding: 10px 18px; }
+  .hee-metric-icon { width: 32px; height: 32px; }
+  .hee-metric-copy { gap: 7px; }
+  .hee-metric-label { font-size: 13px; }
+  .hee-metric-note { font-size: 12px; }
+  .hee-metric-number { font-size: 20px; }
 }
-@media (max-width: 370px) {
-  .hee-intro-top { align-items: flex-start; }
-  .hee-live { display: none; }
-  .hee-photo { flex-basis: 54px; width: 54px; height: 58px; }
-  .hee-order { gap: 8px; padding: 12px 9px; }
-  .hee-order-money { min-width: 91px; }
-  .hee-product-name { font-size: 13.5px; }
-  .hee-order-price { font-size: 13.5px; }
-  .hee-metric-number { font-size: 24px; }
-}
-@media (prefers-reduced-motion: reduce) { .hee-page :is(a,button) { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .hee-page :is(a, button) { transition: none !important; } }
 `
-
 function currencyMinor(value, currency = 'INR') {
   const amount = Number(value || 0) / 100
   try {
@@ -436,41 +429,50 @@ export default function HostEarningsPage() {
           <span className="hee-live">Live · 10 sec</span>
           <button type="button" className="hee-refresh" onClick={() => load({ quiet: true })}
             disabled={refreshing}>
-            <RefreshCw size={15} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={16} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
       </div>
-      <div className="hee-intro-body">
-        <div className="hee-heading-panel">
+      <div className="hee-heading-panel">
+        <div>
           <h1>Your earnings</h1>
           <p>Sales, payments and payouts for your business, all in one place.</p>
         </div>
-        <div className="hee-captured">
-          <span className="hee-captured-label">Total captured revenue</span>
-          <strong className="hee-captured-value">{loading ? '—' : currencyMinor(earnings.totalEarnedMinor, currency)}</strong>
-          <span className="hee-captured-sub">Received from successful customer payments</span>
-          <span className="hee-updated">Updated {earnings.refreshedAt ? dateTime(earnings.refreshedAt) : 'when data is available'}</span>
-        </div>
+        <span className="hee-updated">Updated {earnings.refreshedAt ? dateTime(earnings.refreshedAt) : 'when data is available'}</span>
       </div>
-      <section className="hee-metrics" aria-label="Earnings summary">
+    </header>
+
+    <section className="hee-snapshot" aria-label="Earnings summary">
+      <div className="hee-captured">
+        <span className="hee-captured-label">Total captured revenue</span>
+        <strong className="hee-captured-value">{loading ? '—' : currencyMinor(earnings.totalEarnedMinor, currency)}</strong>
+        <span className="hee-captured-sub">Received from successful customer payments</span>
+      </div>
+      <div className="hee-metrics">
         <div className="hee-metric" data-kind="paid">
-          <span className="hee-metric-label"><Check size={17} aria-hidden="true" /> Paid to you</span>
+          <span className="hee-metric-copy">
+            <span className="hee-metric-icon"><Check size={20} aria-hidden="true" /></span>
+            <span className="hee-metric-text"><span className="hee-metric-label">Paid to you</span><span className="hee-metric-note">Completed payouts</span></span>
+          </span>
           <strong className="hee-metric-number">{loading ? '—' : currencyMinor(earnings.paidMinor, currency)}</strong>
-          <span className="hee-metric-note">Completed payouts</span>
         </div>
         <div className="hee-metric" data-kind="process">
-          <span className="hee-metric-label"><WalletCards size={17} aria-hidden="true" /> In settlement</span>
+          <span className="hee-metric-copy">
+            <span className="hee-metric-icon"><WalletCards size={20} aria-hidden="true" /></span>
+            <span className="hee-metric-text"><span className="hee-metric-label">In settlement</span><span className="hee-metric-note">Under review or approved</span></span>
+          </span>
           <strong className="hee-metric-number">{loading ? '—' : currencyMinor(earnings.inSettlementMinor, currency)}</strong>
-          <span className="hee-metric-note">Under review or approved</span>
         </div>
         <div className="hee-metric" data-kind="await">
-          <span className="hee-metric-label"><Clock3 size={17} aria-hidden="true" /> Awaiting settlement</span>
+          <span className="hee-metric-copy">
+            <span className="hee-metric-icon"><Clock3 size={20} aria-hidden="true" /></span>
+            <span className="hee-metric-text"><span className="hee-metric-label">Awaiting settlement</span><span className="hee-metric-note">Delivered, not settled yet</span></span>
+          </span>
           <strong className="hee-metric-number">{loading ? '—' : currencyMinor(earnings.awaitingSettlementMinor, currency)}</strong>
-          <span className="hee-metric-note">Delivered, not settled yet</span>
         </div>
-      </section>
-    </header>
+      </div>
+    </section>
 
     {error ? <div className="hee-error" role="alert">{error}</div> : null}
 
@@ -483,7 +485,7 @@ export default function HostEarningsPage() {
         </div>
         <div className="hee-sales-actions">
           <span className="hee-count">{loading ? '—' : Number(earnings.capturedOrders || 0)} paid orders</span>
-          <Link className="hee-plain-link" to="/host/orders">All orders <ArrowRight size={16} aria-hidden="true" /></Link>
+          <Link className="hee-plain-link" to="/host/orders">All orders <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
       </div>
       <div className="hee-order-list">
@@ -493,7 +495,7 @@ export default function HostEarningsPage() {
       </div>
       <div className="hee-sales-foot">
         <p>{loading ? 'Loading sales…' : `Showing ${recentOrders.length} recent ${recentOrders.length === 1 ? 'order' : 'orders'}`}</p>
-        <Link className="hee-plain-link" to="/host/orders">Manage orders <ArrowRight size={16} aria-hidden="true" /></Link>
+        <Link className="hee-plain-link" to="/host/orders">Manage orders <ArrowRight size={17} aria-hidden="true" /></Link>
       </div>
     </section>
 
@@ -514,7 +516,7 @@ export default function HostEarningsPage() {
             <Status status={settlement.status} />
           </div>
         )) : <div className="hee-payout-empty">
-          <span className="hee-payout-empty-icon"><WalletCards size={20} aria-hidden="true" /></span>
+          <span className="hee-payout-empty-icon"><WalletCards size={21} aria-hidden="true" /></span>
           <div>
             <strong>{loading ? 'Loading settlements…' : 'No settlements yet'}</strong>
             <p>{loading ? 'Checking payout records.' : 'Payout records will appear here when they are created.'}</p>
