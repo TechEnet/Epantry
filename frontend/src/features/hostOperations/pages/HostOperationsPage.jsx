@@ -880,33 +880,201 @@ const hostOperationsDashboardCss = String.raw`
 
 const SHARED_DELIVERY_AREA_KEY = "host-default-delivery";
 
+
 // Active legacy coverage still holds Host PIN codes. Read every page before
 // offering those existing values as the new editable business-wide default.
 async function loadActiveHostServiceAreas() {
   const serviceAreas = [];
   for (let page = 1; page <= 100; page += 1) {
-    const response = await listServiceAreas({
-      page,
-      limit: 100,
-      status: "active",
-    });
-    const rows = Array.isArray(response?.serviceAreas)
-      ? response.serviceAreas
-      : [];
+    const response = await listServiceAreas({ page, limit: 100, status: "active" });
+    const rows = Array.isArray(response?.serviceAreas) ? response.serviceAreas : [];
     serviceAreas.push(...rows);
-    const totalPages = Number(
-      response?.pagination?.pages || response?.pagination?.totalPages || 0
-    );
-    if (
-      !rows.length ||
-      (totalPages > 0 ? page >= totalPages : rows.length < 100)
-    ) {
+    const totalPages = Number(response?.pagination?.pages || response?.pagination?.totalPages || 0);
+    if (!rows.length || (totalPages > 0 ? page >= totalPages : rows.length < 100)) {
       return { serviceAreas };
     }
   }
   // Do not pretend coverage is complete when an unusually large result truncates.
   throw new Error("Delivery area results exceed the supported page limit.");
 }
+
+const hostBusinessSettingsCss = String.raw`
+/* Business settings only - senior Balanced Japandi, scoped styles. */
+.hbs-root{--hbs-forest:#173f35;--hbs-ink:#202421;--hbs-muted:#516158;--hbs-clay:#bb6745;--hbs-line:#dce2d9;box-sizing:border-box;min-width:0;width:100%;min-height:0!important;background:#f7f6f2!important;padding:20px clamp(16px,2.5vw,36px) 46px!important;color:var(--hbs-ink);font:400 16px/1.55 'Plus Jakarta Sans',Inter,system-ui,sans-serif}
+.hbs-root *, .hbs-root *::before,.hbs-root *::after{box-sizing:border-box}
+.hbs-root :is(button,input,select,a){font-family:inherit}
+.hbs-root :is(input,select,button,a):focus-visible{outline:3px solid #c86c42!important;outline-offset:3px}
+.hbs-hero{position:relative;overflow:hidden;border:1px solid #cfded5;border-top:3px solid #c86c42;border-radius:16px;background:linear-gradient(108deg,#dfeee4 0%,#eff3ea 57%,#f5e9df 100%);padding:28px 30px 0;box-shadow:0 7px 25px rgba(23,63,53,.045)}
+.hbs-hero-row{display:flex;align-items:flex-start;justify-content:space-between;gap:22px}
+.hbs-kicker{display:flex;align-items:center;gap:9px;margin:0;color:#9a5036!important;font-size:12px!important;font-weight:700!important;letter-spacing:.04em!important;text-transform:uppercase;line-height:1.45}
+.hbs-kicker::before{content:'';width:24px;height:2px;background:#c86c42;flex:none}
+.hbs-title{margin:9px 0 5px!important;font-size:clamp(28px,2.5vw,38px)!important;font-weight:650!important;line-height:1.15!important;letter-spacing:-.04em!important;color:#173f35!important}
+.hbs-subtitle{margin:0!important;max-width:660px;font-size:15px!important;line-height:1.55!important;font-weight:450!important;color:#496054!important}
+.hbs-refresh{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid #173f35;border-radius:9px;background:#173f35;color:white!important;font-size:14px;font-weight:650;cursor:pointer;transition:background .16s}
+.hbs-refresh:hover{background:#285b4b}
+.hbs-stats{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:24px 0 20px}
+.hbs-stats>span{display:inline-flex;gap:7px;align-items:baseline;padding:0 20px;color:#45574f;font-size:13px;line-height:1.4;border-right:1px solid #c5d5c9}
+.hbs-stats>span:first-child{padding-left:0}.hbs-stats>span:last-child{border:0}
+.hbs-stats strong{font-size:21px;color:#173f35;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.hbs-steps{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:0;margin:0 -30px;border-top:1px solid #d4ddd4;background:rgba(255,255,255,.68)}
+.hbs-step{display:flex;align-items:center;gap:11px;min-width:0;padding:16px 20px;border-right:1px solid #e1e6de;color:#202421}
+.hbs-step-num{display:grid;flex:none;width:28px;height:28px;place-items:center;border-radius:8px;background:#e2e9de;color:#173f35;font-size:12px;font-weight:700}
+.hbs-step--first .hbs-step-num{background:#173f35;color:#fff}
+.hbs-step strong{display:block;font-size:14px;font-weight:650;line-height:1.3}
+.hbs-step small{display:block;margin-top:2px;font-size:12px;color:#627168;line-height:1.3}
+.hbs-back{display:flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:13px 17px;color:#173f35!important;font-size:13px;font-weight:700;text-decoration:none!important;background:#e4eadf;transition:background .15s}
+.hbs-back:hover{background:#d2ddce}
+.hbs-content{display:grid;grid-template-columns:minmax(0,1.03fr) minmax(0,1fr);gap:22px;margin-top:24px}
+.hbs-section{min-width:0;border:1px solid #dce2d9;border-radius:15px;background:#fffdf9;overflow:hidden;box-shadow:0 4px 20px rgba(23,63,53,.035)}
+.hbs-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:21px 23px;border-bottom:1px solid rgba(23,63,53,.1)}
+.hbs-section-ident{display:flex;align-items:flex-start;gap:13px;min-width:0}
+.hbs-section-icon{flex:none;display:grid;place-items:center;width:39px;height:39px;border-radius:11px;background:rgba(255,255,255,.8);color:#173f35;border:1px solid rgba(23,63,53,.1)}
+.hbs-section-no{margin:0 0 2px;color:#8f4b35;font-size:11px;letter-spacing:.07em;font-weight:700;line-height:1.2}
+.hbs-section h2{margin:0;font-size:clamp(19px,1.7vw,24px);line-height:1.22;letter-spacing:-.035em;color:#173f35;font-weight:650}
+.hbs-section-caption{margin:5px 0 0;color:#4d5e56;font-size:13px;line-height:1.42}
+.hbs-section-count{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:35px;height:30px;padding:0 8px;border-radius:8px;background:rgba(255,255,255,.72);color:#173f35;font-weight:750;font-size:15px;font-variant-numeric:tabular-nums}
+.hbs-section-body{padding:22px 23px 20px}
+.hbs-section--records .hbs-section-head{background:#ffe7d9}
+.hbs-section--records{background:#fffaf5}
+.hbs-section--team .hbs-section-head{background:#dceafb}
+.hbs-section--team{background:#f5f9fd}
+.hbs-section--apps .hbs-section-head{background:#ebe4fc}
+.hbs-section--apps{background:#fbf9ff}
+.hbs-section--updates .hbs-section-head{background:#dcebe2}
+.hbs-section--updates{background:#f6faf6}
+.hbs-section--audit .hbs-section-head{background:#eee9de}
+.hbs-section--audit{background:#fffdf9}
+.hbs-form{display:grid;gap:16px}
+.hbs-form--two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.hbs-form--three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hbs-span-all{grid-column:1/-1}
+.hbs-section form label{display:block;min-width:0}
+.hbs-section form label>span:first-child{min-height:0!important;display:block!important;margin:0 0 6px!important;color:#394c42!important;font-size:13px!important;font-weight:650!important;line-height:1.35!important;letter-spacing:0!important;text-transform:none!important}
+.hbs-field{width:100%;min-width:0;height:46px;border-radius:9px;border:1px solid #d3dcd2;background:#fff!important;padding:10px 12px;color:#202421;font-size:14px;font-weight:500;outline:none;box-shadow:0 1px 2px rgba(23,63,53,.035)}
+.hbs-field::placeholder{color:#89958c;opacity:1}
+.hbs-field:focus{border-color:#638e79;box-shadow:0 0 0 3px rgba(62,130,92,.11)}
+.hbs-action{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:46px;width:100%;padding:10px 16px;border:1px solid #173f35;border-radius:9px;background:#173f35!important;color:#fff!important;font-size:14px;font-weight:650;cursor:pointer}
+.hbs-action:disabled{background:#bbc8bf!important;border-color:#bbc8bf;color:#385245!important;cursor:not-allowed;opacity:1}
+.hbs-action:hover:not(:disabled){background:#2b6552!important}
+.hbs-records{border-top:1px solid #e0e6dc;margin-top:19px;padding-top:15px}
+.hbs-list-heading{margin:0 0 10px;color:#41564a;font-size:13px;font-weight:650}
+.hbs-list{display:grid;gap:8px;min-width:0}
+.hbs-row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-width:0;border:1px solid #e0e7df;border-radius:9px;background:#fff!important;padding:10px 12px}
+.hbs-row-copy{min-width:0}
+.hbs-row-title{display:block;color:#202421!important;font-size:14px;font-weight:650;overflow-wrap:anywhere;line-height:1.4}
+.hbs-row-meta{display:block;margin-top:3px;color:#64746a;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.hbs-status{flex:none;max-width:45%;border-radius:6px;background:#e9f0e8;color:#25533e;padding:5px 8px;font-size:11px;font-weight:700;overflow-wrap:anywhere}
+.hbs-secondary{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:none;min-height:38px;border:1px solid #cfdcd2;border-radius:8px;background:#fff!important;padding:7px 10px;color:#173f35!important;font-size:12px;font-weight:700;cursor:pointer}
+.hbs-secondary:disabled{opacity:.5;cursor:not-allowed}
+.hbs-empty{padding:12px 14px;border:1px dashed #cfdcd2;border-radius:8px;background:rgba(255,255,255,.72);color:#63736a;font-size:13px;line-height:1.45}
+.hbs-error{padding:11px 13px;border:1px solid #e7b6a5;border-radius:8px;background:#fff1ec;color:#91452f;font-size:13px;line-height:1.45;font-weight:600}
+.hbs-section--audit{grid-column:1/-1}
+.hbs-audit-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.hbs-audit-row{min-width:0;border-left:3px solid #c86c42;background:#f8f8f3;padding:12px 14px;border-radius:0 8px 8px 0}
+.hbs-audit-row strong{display:block;font-size:14px;line-height:1.4;color:#202421}
+.hbs-audit-row small{display:block;margin-top:5px;color:#56675e;font-size:12px;line-height:1.45}
+/* The mobile multiline editor is separate; desktop keeps its original single-line controls. */
+.hbs-multivalue-mobile{display:none}
+.hbs-multivalue-desktop{display:block}
+@media(max-width:1050px){.hbs-content{gap:15px}.hbs-hero{padding:23px 22px 0}.hbs-steps{margin:0 -22px}.hbs-step{padding:13px 14px}}
+@media(max-width:830px){.hbs-content{grid-template-columns:1fr}.hbs-section--audit{grid-column:auto}.hbs-steps{grid-template-columns:repeat(3,1fr)}.hbs-back{grid-column:1/-1;min-height:42px;border-top:1px solid #dfe5da}.hbs-audit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){
+  .hbs-root{padding:8px 10px 24px!important}
+  .hbs-hero{padding:15px 14px 0;border-radius:12px}
+  .hbs-hero-row{gap:10px;align-items:flex-start}
+  .hbs-kicker{font-size:10px!important;letter-spacing:.035em!important}
+  .hbs-kicker::before{width:15px}
+  .hbs-title{margin:6px 0 3px!important;font-size:25px!important;line-height:1.18!important;letter-spacing:-.03em!important}
+  .hbs-subtitle{font-size:12.5px!important;line-height:1.45!important}
+  .hbs-refresh{flex:none;min-height:42px;padding:9px 11px;font-size:12px}
+  .hbs-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:13px 0 15px}
+  .hbs-stats>span{min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:4px;padding:0 8px;font-size:11px;line-height:1.3}
+  .hbs-stats>span:first-child{padding-left:0}
+  .hbs-stats strong{font-size:17px}
+  .hbs-steps{margin:0 -14px;grid-template-columns:1fr 1fr}
+  .hbs-step{gap:7px;padding:10px;min-height:46px}
+  .hbs-step strong{font-size:12px;line-height:1.25}
+  .hbs-step small{display:none}
+  .hbs-step-num{width:23px;height:23px;font-size:10px}
+  .hbs-back{grid-column:auto;min-width:0;min-height:46px;padding:10px;font-size:12px;text-align:center}
+  .hbs-content{grid-template-columns:1fr;gap:12px;margin-top:12px}
+  .hbs-section{border-radius:12px;box-shadow:none}
+  .hbs-section-head{align-items:center;gap:8px;padding:12px 13px}
+  .hbs-section-ident{align-items:center;gap:9px}
+  .hbs-section-icon{width:32px;height:32px;border-radius:9px}
+  .hbs-section-icon svg{width:17px;height:17px}
+  .hbs-section-no{margin:0 0 2px;font-size:10px;letter-spacing:.04em}
+  .hbs-section h2{font-size:18px;line-height:1.22;letter-spacing:-.025em}
+  .hbs-section-caption{display:none}
+  .hbs-section-count{min-width:29px;height:27px;padding:0 6px;border-radius:7px;font-size:13px}
+  .hbs-section-body{padding:12px 13px 14px}
+  .hbs-form{gap:10px}
+  .hbs-form--three{grid-template-columns:1fr}
+  .hbs-form--two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hbs-section form label>span:first-child{margin-bottom:5px!important;font-size:12px!important;line-height:1.3!important}
+  .hbs-field{height:43px;padding:9px 10px;border-radius:8px;font-size:13px}
+  .hbs-action{min-height:44px;padding:9px 12px;font-size:13px}
+  .hbs-records{margin-top:13px;padding-top:11px}
+  .hbs-list-heading{margin-bottom:7px;font-size:13px}
+  .hbs-list{gap:6px}
+  .hbs-row{align-items:center;gap:8px;padding:9px 10px}
+  .hbs-row-title{font-size:13px;line-height:1.35}
+  .hbs-row-meta{margin-top:2px;font-size:12px;line-height:1.35}
+  .hbs-status{padding:4px 6px;font-size:11px}
+  .hbs-secondary{min-height:40px;padding:7px 9px;font-size:12px}
+  .hbs-empty{min-height:0;padding:9px 11px;font-size:13px;line-height:1.35}
+  .hbs-error{padding:10px 11px;font-size:13px;line-height:1.4}
+  .hbs-audit-grid{grid-template-columns:1fr;gap:7px}
+  .hbs-audit-row{padding:9px 10px}
+  .hbs-audit-row small{margin-top:3px}
+  .hbs-section--audit .hbs-section-body{padding:10px 13px 13px}
+  .hbs-section--audit .hbs-empty{padding:2px 0;background:transparent;border:0;font-size:13px}
+}
+/* Mobile settings: one clearly labelled field per row, no comma-packed data. */
+@media(max-width:540px){
+  .hbs-root .hbs-form--two,.hbs-root .hbs-form--three{grid-template-columns:minmax(0,1fr)}
+  .hbs-root .hbs-form{gap:0}
+  .hbs-root .hbs-form > :not(button){min-width:0;padding:10px 0 11px;border-bottom:1px solid rgba(23,63,53,.11)}
+  .hbs-root .hbs-form > :not(button):first-child{padding-top:0}
+  .hbs-root .hbs-form > button{margin-top:14px}
+  .hbs-root .hbs-stats>span{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:3px;padding:2px 8px;font-size:11px;line-height:1.3}
+  .hbs-root .hbs-stats strong{font-size:18px;line-height:1.1}
+  .hbs-root .hbs-section-body{padding:14px 14px 15px}
+  .hbs-root .hbs-section form label > span:first-child{margin-bottom:7px!important;font-size:13px!important;line-height:1.35!important;font-weight:650!important;color:#344d41!important}
+  .hbs-root .hbs-field{width:100%;min-width:0;height:44px;border-radius:9px;font-size:16px!important;font-weight:450;line-height:1.45;padding:10px 12px}
+  .hbs-root .hbs-field::placeholder{color:#7c8b81}
+  .hbs-root .hbs-multivalue-desktop{display:none!important}
+  .hbs-root .hbs-multivalue-mobile{display:block!important}
+  .hbs-root .hbs-mobile-lines{height:auto!important;min-height:76px!important;max-height:180px;resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow-y:auto!important;line-height:1.55!important;font-size:15px!important}
+  .hbs-root .hbs-section-head{gap:10px;padding:13px 14px}
+  .hbs-root .hbs-section h2{font-size:19px;line-height:1.25;letter-spacing:-.02em}
+  .hbs-root .hbs-section-no{font-size:10px;line-height:1.25}
+  .hbs-root .hbs-section-count{min-width:30px;height:28px;font-size:13px}
+  .hbs-root .hbs-records{margin-top:15px;padding-top:13px}
+  .hbs-root .hbs-list-heading{margin-bottom:8px;font-size:13px;line-height:1.35}
+  .hbs-root .hbs-row{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:7px;padding:11px 12px}
+  .hbs-root .hbs-row .hbs-status,.hbs-root .hbs-row .hbs-secondary{justify-self:start}
+  .hbs-root .hbs-row-meta{overflow-wrap:anywhere;word-break:break-word}
+  .hbs-root .hbs-status{max-width:100%;align-self:start}
+  .hbs-root .hbs-empty{min-height:0;padding:10px 12px;font-size:13px;line-height:1.45;background:#fff!important;border:1px solid #e0e7df;border-radius:8px}
+  .hbs-root .hbs-section--updates .hbs-empty{background:#f9fcfa!important}
+  .hbs-root .hbs-section--audit .hbs-section-head{padding:13px 14px;background:#eee9df}
+  .hbs-root .hbs-section--audit .hbs-section-no{display:none}
+  .hbs-root .hbs-section--audit .hbs-section-icon{width:31px;height:31px}
+  .hbs-root .hbs-section--audit .hbs-section-body{padding:10px 14px 13px}
+  .hbs-root .hbs-section--audit .hbs-empty{padding:7px 0 0;border:0;background:transparent!important;color:#617168}
+}
+@media(max-width:380px){
+  .hbs-form--two{grid-template-columns:1fr}
+  .hbs-title{font-size:23px!important}
+  .hbs-hero-row{flex-wrap:wrap}
+  .hbs-refresh{margin-left:auto}
+  .hbs-stats>span{padding:0 6px;font-size:10.5px}
+  .hbs-step{gap:6px;padding:9px}
+  .hbs-step strong{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.hbs-root *{transition:none!important;scroll-behavior:auto!important}}
+`;
 
 const inputClass =
   "focus-ring w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none";
@@ -1031,115 +1199,45 @@ function Section({
   };
 
   const activeTone = toneStyles[tone] || toneStyles.plain;
-  const compactDashboardTone = [
-    "readiness",
-    "profile",
-    "delivery",
-    "kyb",
-  ].includes(tone);
+  const compactDashboardTone = ["readiness", "profile", "delivery", "kyb"].includes(tone);
   const compactRecipeTone = tone === "recipe";
   const compactFinanceTone = tone === "finance";
-  const compactSettingsTone = [
-    "settingsMint",
-    "settingsBlue",
-    "settingsLavender",
-  ].includes(tone);
+  const compactSettingsTone = ["settingsMint", "settingsBlue", "settingsLavender"].includes(tone);
   const sectionClass = compactDashboardTone
     ? `rounded-[20px] border ${activeTone.section} p-3.5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[26px] sm:p-6`
     : compactSettingsTone
-    ? `rounded-[20px] border ${activeTone.section} p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
-    : compactRecipeTone || compactFinanceTone
-    ? `rounded-[18px] border ${activeTone.section} p-3 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
-    : `rounded-[26px] border ${activeTone.section} p-5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:p-6`;
+      ? `rounded-[20px] border ${activeTone.section} p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
+      : compactRecipeTone || compactFinanceTone
+        ? `rounded-[18px] border ${activeTone.section} p-3 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[24px] sm:p-5`
+        : `rounded-[26px] border ${activeTone.section} p-5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:p-6`;
 
   return (
     <section className={`${sectionClass} ${className}`}>
-      <div
-        className={
-          compactDashboardTone ||
-          compactRecipeTone ||
-          compactFinanceTone ||
-          compactSettingsTone
-            ? "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3"
-            : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
-        }
-      >
-        <div
-          className={
-            compactDashboardTone ||
-            compactRecipeTone ||
-            compactFinanceTone ||
-            compactSettingsTone
-              ? "flex min-w-0 items-start gap-2 sm:gap-3"
-              : "flex items-start gap-3"
-          }
-        >
-          <div
-            className={
-              compactDashboardTone ||
-              compactRecipeTone ||
-              compactFinanceTone ||
-              compactSettingsTone
-                ? `grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${activeTone.icon}`
-                : `grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${activeTone.icon}`
-            }
-          >
-            <Icon
-              className={
-                compactDashboardTone ||
-                compactRecipeTone ||
-                compactFinanceTone ||
-                compactSettingsTone
-                  ? "h-4 w-4 sm:h-[18px] sm:w-[18px]"
-                  : "h-[18px] w-[18px]"
-              }
-            />
+      <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3" : "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"}>
+        <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "flex min-w-0 items-start gap-2 sm:gap-3" : "flex items-start gap-3"}>
+          <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone
+            ? `grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${activeTone.icon}`
+            : `grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${activeTone.icon}`}>
+            <Icon className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "h-4 w-4 sm:h-[18px] sm:w-[18px]" : "h-[18px] w-[18px]"} />
           </div>
 
-          <div
-            className={
-              compactDashboardTone ||
-              compactRecipeTone ||
-              compactFinanceTone ||
-              compactSettingsTone
-                ? "min-w-0 flex-1"
-                : ""
-            }
-          >
-            <h2
-              className={
-                compactDashboardTone
-                  ? `${
-                      [
-                        "Commercial profile",
-                        "Delivery Areas",
-                        "Business verification (KYB)",
-                      ].includes(title)
-                        ? "text-[12px] leading-[14px]"
-                        : "text-[14px] leading-4"
-                    } whitespace-nowrap font-black text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal`
-                  : compactSettingsTone
-                  ? "text-[14px] font-black leading-[18px] text-stone-950 sm:text-[17px] sm:leading-5"
-                  : compactRecipeTone || compactFinanceTone
+          <div className={compactDashboardTone || compactRecipeTone || compactFinanceTone || compactSettingsTone ? "min-w-0 flex-1" : ""}>
+            <h2 className={compactDashboardTone
+              ? `${["Commercial profile", "Delivery Areas", "Business verification (KYB)"].includes(title) ? "text-[12px] leading-[14px]" : "text-[14px] leading-4"} whitespace-nowrap font-black text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal`
+              : compactSettingsTone
+                ? "text-[14px] font-black leading-[18px] text-stone-950 sm:text-[17px] sm:leading-5"
+                : compactRecipeTone || compactFinanceTone
                   ? "text-[13px] font-black leading-4 text-stone-950 sm:text-[17px] sm:leading-5"
-                  : "text-lg font-black text-stone-950"
-              }
-            >
-              {title}
-            </h2>
+                : "text-lg font-black text-stone-950"}>{title}</h2>
 
             {description ? (
-              <p
-                className={
-                  compactDashboardTone
-                    ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5"
-                    : compactSettingsTone
-                    ? "mt-1 max-w-3xl text-[10px] font-semibold leading-[15px] text-stone-600 sm:text-[11px] sm:font-medium sm:leading-4"
-                    : compactRecipeTone || compactFinanceTone
+              <p className={compactDashboardTone
+                ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5"
+                : compactSettingsTone
+                  ? "mt-1 max-w-3xl text-[10px] font-semibold leading-[15px] text-stone-600 sm:text-[11px] sm:font-medium sm:leading-4"
+                  : compactRecipeTone || compactFinanceTone
                     ? "mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-[11px] sm:font-medium sm:leading-4"
-                    : "mt-1 max-w-3xl text-xs leading-5 text-stone-500"
-                }
-              >
+                  : "mt-1 max-w-3xl text-xs leading-5 text-stone-500"}>
                 {description}
               </p>
             ) : null}
@@ -1149,17 +1247,26 @@ function Section({
         {actions}
       </div>
 
-      <div
-        className={
-          compactSettingsTone
-            ? "mt-4 sm:mt-4"
-            : compactDashboardTone || compactRecipeTone || compactFinanceTone
-            ? "mt-3 sm:mt-4"
-            : "mt-5"
-        }
-      >
-        {children}
-      </div>
+      <div className={compactSettingsTone ? "mt-4 sm:mt-4" : compactDashboardTone || compactRecipeTone || compactFinanceTone ? "mt-3 sm:mt-4" : "mt-5"}>{children}</div>
+    </section>
+  );
+}
+
+function BusinessSettingsSection({ index, title, description, icon: Icon, variant, count, children }) {
+  return (
+    <section className={`hbs-section hbs-section--${variant}`}>
+      <header className="hbs-section-head">
+        <div className="hbs-section-ident">
+          <span className="hbs-section-icon"><Icon size={19} aria-hidden="true" /></span>
+          <div>
+            <p className="hbs-section-no">{index} / SETTINGS</p>
+            <h2>{title}</h2>
+            <p className="hbs-section-caption">{description}</p>
+          </div>
+        </div>
+        <span className="hbs-section-count" aria-label={`${count} saved entries`}>{count}</span>
+      </header>
+      <div className="hbs-section-body">{children}</div>
     </section>
   );
 }
@@ -1243,10 +1350,8 @@ function newRecipeFoodIntelligence() {
       RECIPE_FOOD_ALLERGENS.map((field) => [field.key, ""])
     ),
     dietaryClassification: "not_declared",
-    basis:
-      "Per serving. Host declaration from the submitted Recipe formulation.",
-    reason:
-      "Host-provided Recipe Food Intelligence declaration for Super Admin review.",
+    basis: "Per serving. Host declaration from the submitted Recipe formulation.",
+    reason: "Host-provided Recipe Food Intelligence declaration for Super Admin review.",
   };
 }
 
@@ -1323,7 +1428,8 @@ function buildHostFoodIntelligencePayload(form) {
       : null;
   }).filter(Boolean);
 
-  const dietaryClassification = source.dietaryClassification || "not_declared";
+  const dietaryClassification =
+    source.dietaryClassification || "not_declared";
 
   const hasDeclaration =
     nutrition.length > 0 ||
@@ -1377,7 +1483,8 @@ function hostFoodIntelligenceFromDetail(result) {
   return {
     nutrition,
     allergens,
-    dietaryClassification: declaration.dietaryClassification || "not_declared",
+    dietaryClassification:
+      declaration.dietaryClassification || "not_declared",
     basis: declaration.basis || initial.basis,
     reason:
       "Host-provided Recipe Food Intelligence declaration for Super Admin review.",
@@ -1613,8 +1720,7 @@ function HostRecipeIngredientRow({
             ingredient.ingredientQuery.trim().length >= 2 &&
             !ingredient.canonicalIngredientId ? (
             <div className="absolute z-20 mt-1 w-full rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-[10px] font-semibold leading-4 text-sky-800 shadow-lg sm:p-3 sm:text-xs">
-              EPANTRY could not match this ingredient yet. It will be included
-              with the Recipe for review.
+              EPANTRY could not match this ingredient yet. It will be included with the Recipe for review.
             </div>
           ) : null}
         </div>
@@ -1775,6 +1881,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   const [audit, setAudit] = useState([]);
 
+  const [settingsLoadErrors, setSettingsLoadErrors] = useState({});
+
   const [authorities, setAuthorities] = useState([]);
 
   const [oneTimeSecret, setOneTimeSecret] = useState("");
@@ -1835,8 +1943,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   const [kybStatus, setKybStatus] = useState("");
 
-  const [commercialProfileRequest, setCommercialProfileRequest] =
-    useState(null);
+  const [commercialProfileRequest, setCommercialProfileRequest] = useState(null);
 
   const [documentForm, setDocumentForm] = useState({
     documentType: "food_license",
@@ -1868,7 +1975,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   const [csvName, setCsvName] = useState("");
 
-  const [hostRecipeForm, setHostRecipeForm] = useState(newHostRecipeForm);
+  const [hostRecipeForm, setHostRecipeForm] = useState(
+    newHostRecipeForm
+  );
 
   const [editingHostRecipeId, setEditingHostRecipeId] = useState("");
 
@@ -1922,62 +2031,79 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       setOrganizationData(org);
 
       if (org?.organization?.id) {
+        if (section === "settings") {
+          const settingResults = await Promise.allSettled([
+            listHostDocuments(),
+            listHostTeam(),
+            listHostServiceAccounts(),
+            listHostWebhooks(),
+            listHostOperationsAudit({ page: 1, limit: 25 }),
+          ]);
+          const read = (index) => settingResults[index].status === "fulfilled"
+            ? settingResults[index].value
+            : null;
+          const records = read(0);
+          const people = read(1);
+          const apps = read(2);
+          const updates = read(3);
+          const changes = read(4);
+          const datasets = [
+            ["documents", 0, Array.isArray(records?.documents)],
+            ["team", 1, Array.isArray(people?.members)],
+            ["apps", 2, Array.isArray(apps?.serviceAccounts)],
+            ["webhooks", 3, Array.isArray(updates?.webhooks)],
+            ["audit", 4, Array.isArray(changes?.events)],
+          ];
+          setSettingsLoadErrors(Object.fromEntries(
+            datasets.filter(([, , valid]) => !valid).map(([key, index]) => [
+              key,
+              settingResults[index].status === "rejected"
+                ? getHostOperationsErrorMessage(settingResults[index].reason, "Could not load. Select Refresh to retry.")
+                : "Could not load this data. Select Refresh to retry.",
+            ])
+          ));
+          setDocuments(Array.isArray(records?.documents) ? records.documents : []);
+          setTeam(Array.isArray(people?.members) ? people : null);
+          setServiceAccounts(Array.isArray(apps?.serviceAccounts) ? apps.serviceAccounts : []);
+          setWebhooks(Array.isArray(updates?.webhooks) ? updates.webhooks : []);
+          setAudit(Array.isArray(changes?.events) ? changes.events : []);
+          return;
+        }
         // Finance uses its summary, payout records and filtered delivered orders.
         // Other Host screens keep their existing loading behaviour unchanged.
         if (section === "finance") {
-          const [summaryResult, settlementsResult, deliveredResult] =
-            await Promise.allSettled([
-              getHostFinanceSummary(),
-              listHostSettlements({ page: 1, limit: 20 }),
-              listHostOrders({ status: "delivered", page: 1, limit: 8 }),
-            ]);
-          if (
-            summaryResult.status === "fulfilled" &&
-            summaryResult.value?.summary
-          ) {
+          const [summaryResult, settlementsResult, deliveredResult] = await Promise.allSettled([
+            getHostFinanceSummary(),
+            listHostSettlements({ page: 1, limit: 20 }),
+            listHostOrders({ status: "delivered", page: 1, limit: 8 }),
+          ]);
+          if (summaryResult.status === "fulfilled" && summaryResult.value?.summary) {
             setFinance(summaryResult.value.summary);
           } else {
             setFinance(null);
             setFinanceSummaryError(
               summaryResult.status === "rejected"
-                ? getHostOperationsErrorMessage(
-                    summaryResult.reason,
-                    "Could not load earnings summary."
-                  )
+                ? getHostOperationsErrorMessage(summaryResult.reason, "Could not load earnings summary.")
                 : "Earnings summary was not returned by the server."
             );
           }
-          if (
-            settlementsResult.status === "fulfilled" &&
-            Array.isArray(settlementsResult.value?.settlements)
-          ) {
+          if (settlementsResult.status === "fulfilled" && Array.isArray(settlementsResult.value?.settlements)) {
             setSettlements(settlementsResult.value.settlements);
           } else {
             setSettlements([]);
             setFinanceSettlementsError(
               settlementsResult.status === "rejected"
-                ? getHostOperationsErrorMessage(
-                    settlementsResult.reason,
-                    "Could not load payout records."
-                  )
+                ? getHostOperationsErrorMessage(settlementsResult.reason, "Could not load payout records.")
                 : "Payout records were not returned by the server."
             );
           }
-          if (
-            deliveredResult.status === "fulfilled" &&
-            Array.isArray(deliveredResult.value?.orders)
-          ) {
+          if (deliveredResult.status === "fulfilled" && Array.isArray(deliveredResult.value?.orders)) {
             setDeliveredOrders(deliveredResult.value.orders);
-            setDeliveredOrdersTotal(
-              Number(deliveredResult.value?.pagination?.total) || 0
-            );
+            setDeliveredOrdersTotal(Number(deliveredResult.value?.pagination?.total) || 0);
           } else {
             setDeliveredOrdersError(
               deliveredResult.status === "rejected"
-                ? getHostOperationsErrorMessage(
-                    deliveredResult.reason,
-                    "Could not load delivered order details."
-                  )
+                ? getHostOperationsErrorMessage(deliveredResult.reason, "Could not load delivered order details.")
                 : "Delivered orders were not returned by the server."
             );
           }
@@ -2072,31 +2198,25 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         setServiceAreas(activeAreas);
 
         const sharedCoverageResult = value(16);
-        const exactSharedArea =
-          (sharedCoverageResult?.serviceAreas || []).find(
-            (area) => area.serviceAreaKey === SHARED_DELIVERY_AREA_KEY
-          ) || null;
-        const originalPins = [
-          ...new Set(
-            activeAreas
-              .filter(
-                (area) =>
-                  area.status === "active" &&
-                  area.serviceAreaKey !== SHARED_DELIVERY_AREA_KEY &&
-                  (area.fulfillmentTypes || []).includes("delivery")
-              )
-              .flatMap((area) => area.postalCodes || [])
-              .map((pin) => String(pin).trim())
-              .filter((pin) => /^[1-9][0-9]{5}$/.test(pin))
-          ),
-        ].sort();
+        const exactSharedArea = (sharedCoverageResult?.serviceAreas || []).find(
+          (area) => area.serviceAreaKey === SHARED_DELIVERY_AREA_KEY
+        ) || null;
+        const originalPins = [...new Set(
+          activeAreas
+            .filter((area) =>
+              area.status === "active" &&
+              area.serviceAreaKey !== SHARED_DELIVERY_AREA_KEY &&
+              (area.fulfillmentTypes || []).includes("delivery")
+            )
+            .flatMap((area) => area.postalCodes || [])
+            .map((pin) => String(pin).trim())
+            .filter((pin) => /^[1-9][0-9]{5}$/.test(pin))
+        )].sort();
         setPreviousDeliveryPins(originalPins);
         setSharedDeliveryArea(exactSharedArea);
-        const coverageError =
-          results[14]?.status === "fulfilled" &&
-          results[16]?.status === "fulfilled"
-            ? ""
-            : "Existing delivery coverage could not be loaded completely. Refresh before saving.";
+        const coverageError = results[14]?.status === "fulfilled" && results[16]?.status === "fulfilled"
+          ? ""
+          : "Existing delivery coverage could not be loaded completely. Refresh before saving.";
         setSharedDeliveryLoadError(coverageError);
         if (!deliveryAreaEditedRef.current && !coverageError) {
           // An existing business default takes priority. Until one is saved,
@@ -2187,39 +2307,25 @@ export default function HostOperationsPage({ section = "dashboard" }) {
   }, [load]);
 
   async function loadMoreDeliveredOrders() {
-    if (
-      section !== "finance" ||
-      loading ||
-      loadingMoreDelivered ||
-      deliveredOrders.length >= deliveredOrdersTotal
-    ) {
+    if (section !== "finance" || loading || loadingMoreDelivered || deliveredOrders.length >= deliveredOrdersTotal) {
       return;
     }
     setLoadingMoreDelivered(true);
     setDeliveredOrdersError("");
     try {
       const nextPage = deliveredOrdersPage + 1;
-      const response = await listHostOrders({
-        status: "delivered",
-        page: nextPage,
-        limit: 8,
-      });
+      const response = await listHostOrders({ status: "delivered", page: nextPage, limit: 8 });
       if (!Array.isArray(response?.orders)) {
         throw new Error("The server did not return delivered orders.");
       }
       const known = new Set(deliveredOrders.map((order) => String(order.id)));
-      const additional = response.orders.filter(
-        (order) => !known.has(String(order.id))
-      );
+      const additional = response.orders.filter((order) => !known.has(String(order.id)));
       setDeliveredOrders((previous) => [...previous, ...additional]);
       setDeliveredOrdersPage(nextPage);
       setDeliveredOrdersTotal(Number(response.pagination?.total) || 0);
     } catch (loadError) {
       setDeliveredOrdersError(
-        getHostOperationsErrorMessage(
-          loadError,
-          "Could not load more delivered orders."
-        )
+        getHostOperationsErrorMessage(loadError, "Could not load more delivered orders.")
       );
     } finally {
       setLoadingMoreDelivered(false);
@@ -2276,7 +2382,9 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   async function startEditHostRecipe(itemOrId) {
     const recipeVersionId =
-      typeof itemOrId === "string" ? itemOrId : itemOrId?.id || "";
+      typeof itemOrId === "string"
+        ? itemOrId
+        : itemOrId?.id || "";
 
     if (!recipeVersionId || busy || loadingHostRecipeId) {
       return;
@@ -2294,11 +2402,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       const detail = await getHostRecipeListing(recipeVersionId);
 
       if (detail?.policy?.hostCanEdit === false) {
-        throw new Error("This historical Recipe lifecycle state is read-only.");
+        throw new Error(
+          "This historical Recipe lifecycle state is read-only."
+        );
       }
 
       const listingStatus =
-        detail?.listing?.status || itemOrId?.status || "draft";
+        detail?.listing?.status ||
+        itemOrId?.status ||
+        "draft";
 
       setHostRecipeForm(hostRecipeFormFromDetail(detail));
       setEditingHostRecipeId(recipeVersionId);
@@ -2389,6 +2501,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
     clearRecipeEditQuery();
   }
 
+
   const pageTitle =
     {
       dashboard: "Host Operations Center",
@@ -2429,8 +2542,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
           </h1>
 
           <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-500">
-            Manage the people who help run your business and keep important
-            business records together in your Host workspace.
+            Manage the people who help run your business and keep important business records together in your Host workspace.
           </p>
         </section>
 
@@ -2441,9 +2553,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             icon={Users}
           >
             <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-900">
-              Team management becomes available after the business workspace is
-              initialized. Your existing Host access stays separate from staff
-              assignments.
+              Team management becomes available after the business workspace is initialized. Your existing Host access stays separate from staff assignments.
             </div>
           </Section>
 
@@ -2453,9 +2563,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             icon={FileCheck2}
           >
             <div className="rounded-2xl bg-sky-50 p-4 text-sm font-semibold leading-6 text-sky-900">
-              Business registration, tax records, food licences, bank proof and
-              authorization documents can be managed here once setup is
-              complete.
+              Business registration, tax records, food licences, bank proof and authorization documents can be managed here once setup is complete.
             </div>
           </Section>
         </div>
@@ -2468,9 +2576,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </h2>
 
               <p className="mt-1 max-w-2xl text-sm leading-6 text-amber-800">
-                Team and document records belong to your Host organization, so
-                Business Operations needs to be initialized before these tools
-                can be used.
+                Team and document records belong to your Host organization, so Business Operations needs to be initialized before these tools can be used.
               </p>
             </div>
 
@@ -2573,39 +2679,38 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         section === "dashboard"
           ? "hops-root min-h-screen w-full min-w-0 bg-[#f7f5ef] p-3 sm:p-7"
           : section === "catalog"
-          ? "hpc-root bg-[#f7f6f2] p-3 sm:p-7"
-          : section === "quality"
-          ? "hdq-root"
-          : section === "recipes"
-          ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
-          : section === "finance"
-          ? "hfin-root"
-          : section === "settings"
-          ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
-          : "min-h-screen bg-[#f7f5ef] p-5 sm:p-7"
+            ? "hpc-root bg-[#f7f6f2] p-3 sm:p-7"
+            : section === "quality"
+              ? "hdq-root"
+              : section === "recipes"
+                ? "min-h-screen bg-[#f7f5ef] px-2 pb-4 pt-1 sm:px-3 sm:pb-6 sm:pt-1"
+                : section === "finance"
+                  ? "hfin-root"
+                  : section === "settings"
+                    ? "hbs-root"
+                    : "min-h-screen bg-[#f7f5ef] p-5 sm:p-7"
       }
     >
-      {section === "dashboard" ? (
-        <style>{hostOperationsDashboardCss}</style>
-      ) : null}
+      {section === "dashboard" ? <style>{hostOperationsDashboardCss}</style> : null}
       {section === "catalog" ? <style>{hostProductCatalogCss}</style> : null}
       {section === "quality" ? <style>{hostDataQualityCss}</style> : null}
       {section === "finance" ? <style>{hostFinanceCss}</style> : null}
+      {section === "settings" ? <style>{hostBusinessSettingsCss}</style> : null}
       <section
         className={
           section === "catalog"
             ? "hpc-hero"
             : section === "dashboard"
-            ? "hops-hero rounded-[20px] border border-emerald-300 bg-emerald-100/75 p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-6"
-            : section === "quality"
-            ? "hdq-hero"
-            : section === "recipes"
-            ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
-            : section === "finance"
-            ? "hfin-hero"
-            : section === "settings"
-            ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#eef5f8] to-[#f0ebf8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
-            : "rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm"
+              ? "hops-hero rounded-[20px] border border-emerald-300 bg-emerald-100/75 p-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] sm:rounded-[28px] sm:p-6"
+              : section === "quality"
+                ? "hdq-hero"
+                : section === "recipes"
+                  ? "overflow-hidden rounded-[18px] border border-[#d6e7e1] bg-gradient-to-br from-[#e7f3ed] via-[#edf5f3] to-[#e8f1f8] p-3 shadow-[0_8px_24px_rgba(28,25,23,0.06)] sm:rounded-[26px] sm:p-5"
+                  : section === "finance"
+                    ? "hfin-hero"
+                    : section === "settings"
+                      ? "hbs-hero"
+                      : "rounded-[28px] border border-stone-200 bg-white p-6 shadow-sm"
         }
       >
         <div
@@ -2613,26 +2718,21 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             section === "dashboard"
               ? "flex items-start justify-between gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
               : section === "catalog"
-              ? "flex items-start justify-between gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-              : section === "quality"
-              ? "hdq-hero-row"
-              : section === "recipes"
-              ? "flex items-start justify-between gap-2 sm:gap-4"
-              : section === "finance"
-              ? "hfin-topline"
-              : section === "settings"
-              ? "flex items-start justify-between gap-2 sm:gap-4"
-              : "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                ? "flex items-start justify-between gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                : section === "quality"
+                  ? "hdq-hero-row"
+                  : section === "recipes"
+                    ? "flex items-start justify-between gap-2 sm:gap-4"
+                    : section === "finance"
+                      ? "hfin-topline"
+                      : section === "settings"
+                        ? "hbs-hero-row"
+                        : "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
           }
         >
           <div
             className={
-              section === "dashboard" ||
-              section === "catalog" ||
-              section === "quality" ||
-              section === "recipes" ||
-              section === "finance" ||
-              section === "settings"
+              section === "dashboard" || section === "catalog" || section === "quality" || section === "recipes" || section === "finance" || section === "settings"
                 ? "min-w-0 flex-1"
                 : ""
             }
@@ -2642,29 +2742,29 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 section === "catalog"
                   ? "hpc-hero-label"
                   : section === "dashboard"
-                  ? "text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs sm:tracking-[0.14em]"
-                  : section === "quality"
-                  ? "hdq-eyebrow"
-                  : section === "recipes"
-                  ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
-                  : section === "finance"
-                  ? "hfin-eyebrow"
-                  : section === "settings"
-                  ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
-                  : "text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
+                    ? "text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 sm:text-xs sm:tracking-[0.14em]"
+                    : section === "quality"
+                      ? "hdq-eyebrow"
+                      : section === "recipes"
+                        ? "text-[8px] font-black uppercase tracking-[0.14em] text-[#276454] sm:text-[10px] sm:tracking-[0.16em]"
+                        : section === "finance"
+                          ? "hfin-eyebrow"
+                          : section === "settings"
+                            ? "hbs-kicker"
+                            : "text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
               }
             >
               {section === "settings"
                 ? "Business setup"
                 : section === "catalog"
-                ? "Product catalog"
-                : section === "quality"
-                ? "Catalog health"
-                : section === "recipes"
-                ? "Recipe workspace"
-                : section === "finance"
-                ? "Host / Finance"
-                : "HOST OPERATIONS"}
+                  ? "Product catalog"
+                  : section === "quality"
+                    ? "Catalog health"
+                    : section === "recipes"
+                      ? "Recipe workspace"
+                      : section === "finance"
+                        ? "Host / Finance"
+                        : "HOST OPERATIONS"}
             </p>
 
             <h1
@@ -2672,16 +2772,16 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 section === "catalog"
                   ? "hpc-hero-title"
                   : section === "dashboard"
-                  ? "mt-1 whitespace-nowrap text-[18px] font-black leading-5 text-stone-950 sm:mt-2 sm:text-3xl sm:leading-normal"
-                  : section === "quality"
-                  ? "hdq-title"
-                  : section === "recipes"
-                  ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
-                  : section === "finance"
-                  ? "hfin-title"
-                  : section === "settings"
-                  ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
-                  : "mt-2 text-3xl font-black text-stone-950"
+                    ? "mt-1 whitespace-nowrap text-[18px] font-black leading-5 text-stone-950 sm:mt-2 sm:text-3xl sm:leading-normal"
+                    : section === "quality"
+                      ? "hdq-title"
+                      : section === "recipes"
+                        ? "mt-0.5 text-[20px] font-black leading-6 tracking-[-0.03em] text-stone-950 sm:mt-1 sm:text-[32px] sm:leading-[38px]"
+                        : section === "finance"
+                          ? "hfin-title"
+                          : section === "settings"
+                            ? "hbs-title"
+                            : "mt-2 text-3xl font-black text-stone-950"
               }
             >
               {pageTitle}
@@ -2692,45 +2792,40 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 section === "catalog"
                   ? "hpc-hero-meta"
                   : section === "dashboard"
-                  ? "mt-1 text-[9px] font-semibold leading-3 text-stone-500 sm:mt-2 sm:text-sm sm:font-normal sm:leading-normal"
-                  : section === "quality"
-                  ? "hdq-description"
-                  : section === "recipes"
-                  ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
-                  : section === "finance"
-                  ? "hfin-description"
-                  : section === "settings"
-                  ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
-                  : "mt-2 text-sm text-stone-500"
+                    ? "mt-1 text-[9px] font-semibold leading-3 text-stone-500 sm:mt-2 sm:text-sm sm:font-normal sm:leading-normal"
+                    : section === "quality"
+                      ? "hdq-description"
+                      : section === "recipes"
+                        ? "mt-1 max-w-2xl text-[9px] font-semibold leading-[13px] text-slate-700/70 sm:mt-1.5 sm:text-[13px] sm:leading-5"
+                        : section === "finance"
+                          ? "hfin-description"
+                          : section === "settings"
+                            ? "hbs-subtitle"
+                            : "mt-2 text-sm text-stone-500"
               }
             >
               {section === "quality" ? (
                 <>Review product completeness and outstanding details.</>
               ) : section === "recipes" ? (
-                <>
-                  Create a complete Recipe, send it for review, then track its
-                  publishing status in Listing History.
-                </>
+                <>Create a complete Recipe, send it for review, then track its publishing status in Listing History.</>
               ) : section === "finance" ? (
-                <>
-                  A clear view of delivered orders, settlement progress and
-                  payments to your business.
-                </>
+                <>A clear view of delivered orders, settlement progress and payments to your business.</>
               ) : section === "settings" ? (
-                <>
-                  Manage business records, team members and connections to other
-                  tools in one place.
-                </>
+                <>Keep your business records, team access and connected apps in one place.</>
               ) : (
                 <>
-                  {organizationData.organization.displayName} ·{" "}
-                  {section === "catalog" ? "Host status" : "Operational state"}:{" "}
-                  {titleize(
-                    organizationData.operationalProfile?.activationState
-                  )}
+                  {organizationData.organization.displayName} · {section === "catalog" ? "Host status" : "Operational state"}:{" "}
+                  {titleize(organizationData.operationalProfile?.activationState)}
                 </>
               )}
             </p>
+            {section === "settings" ? (
+              <div className="hbs-stats" aria-label="Saved business settings">
+                <span><strong>{settingsLoadErrors.documents ? "—" : documents.length}</strong> documents</span>
+                <span><strong>{settingsLoadErrors.team ? "—" : (team?.members?.length || 0)}</strong> team members</span>
+                <span><strong>{settingsLoadErrors.apps || settingsLoadErrors.webhooks ? "—" : serviceAccounts.length + webhooks.length}</strong> connections</span>
+              </div>
+            ) : null}
           </div>
 
           <button
@@ -2740,16 +2835,16 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               section === "catalog"
                 ? "hpc-refresh focus-ring"
                 : section === "dashboard"
-                ? "focus-ring ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-200 bg-sky-100 px-2 py-1.5 text-[10px] font-black text-sky-800 sm:ml-0 sm:gap-2 sm:rounded-xl sm:border-stone-200 sm:bg-transparent sm:px-4 sm:py-2.5 sm:text-sm sm:text-stone-950"
-                : section === "quality"
-                ? "hdq-refresh"
-                : section === "recipes"
-                ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
-                : section === "finance"
-                ? "hfin-refresh focus-ring"
-                : section === "settings"
-                ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
-                : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-black"
+                  ? "focus-ring ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-200 bg-sky-100 px-2 py-1.5 text-[10px] font-black text-sky-800 sm:ml-0 sm:gap-2 sm:rounded-xl sm:border-stone-200 sm:bg-transparent sm:px-4 sm:py-2.5 sm:text-sm sm:text-stone-950"
+                  : section === "quality"
+                    ? "hdq-refresh"
+                    : section === "recipes"
+                      ? "focus-ring inline-flex shrink-0 items-center gap-1 rounded-[10px] border border-[#cfe2db] bg-white/85 px-2.5 py-2 text-[9px] font-black text-[#245c4d] shadow-sm transition hover:bg-white sm:gap-1.5 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-xs"
+                      : section === "finance"
+                        ? "hfin-refresh focus-ring"
+                        : section === "settings"
+                          ? "hbs-refresh focus-ring"
+                          : "focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-black"
             }
           >
             <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -2760,30 +2855,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         {section === "recipes" ? (
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
             {[
-              [
-                "01",
-                "Add Recipe basics",
-                "Title, servings, timing and image.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-              ],
-              [
-                "02",
-                "Build the Recipe",
-                "Add ingredients and cooking steps.",
-                "bg-[#e8f1f8] border-[#d6e7f2]",
-              ],
-              [
-                "03",
-                "Add food details",
-                "Fill only nutrition and allergen details you can support.",
-                "bg-[#f0ebf8] border-[#e4daf3]",
-              ],
-              [
-                "04",
-                "Send for review",
-                "Submit, then track approval in Listing History.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-              ],
+              ["01", "Add Recipe basics", "Title, servings, timing and image.", "bg-[#e7f3ed] border-[#d4eadf]"],
+              ["02", "Build the Recipe", "Add ingredients and cooking steps.", "bg-[#e8f1f8] border-[#d6e7f2]"],
+              ["03", "Add food details", "Fill only nutrition and allergen details you can support.", "bg-[#f0ebf8] border-[#e4daf3]"],
+              ["04", "Send for review", "Submit, then track approval in Listing History.", "bg-[#e7f3ed] border-[#d4eadf]"],
             ].map(([step, label, helper, tone]) => (
               <div
                 key={step}
@@ -2794,12 +2869,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     {step}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">
-                      {helper}
-                    </p>
+                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">{label}</p>
+                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">{helper}</p>
                   </div>
                 </div>
               </div>
@@ -2808,70 +2879,19 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         ) : null}
 
         {section === "settings" ? (
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
-            {[
-              [
-                "01",
-                "Save business records",
-                "Keep licences and other important records together.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-                "",
-              ],
-              [
-                "02",
-                "Add your team",
-                "Choose who can work on this business.",
-                "bg-[#e8f1f8] border-[#d6e7f2]",
-                "",
-              ],
-              [
-                "03",
-                "Connect other tools",
-                "Only if another app needs EPANTRY data or updates.",
-                "bg-[#f0ebf8] border-[#e4daf3]",
-                "",
-              ],
-              [
-                "04",
-                "Back to operations",
-                "Return to day-to-day business management.",
-                "bg-[#e7f3ed] border-[#d4eadf]",
-                "/host/operations-center",
-              ],
-            ].map(([step, label, helper, tone, to]) => {
-              const card = (
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#173f35] text-[8px] font-black text-white sm:h-8 sm:w-8 sm:text-[10px]">
-                    {step}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black leading-[12px] text-stone-950 sm:text-sm sm:leading-4">
-                      {label}
-                    </p>
-                    <p className="mt-1 text-[8px] font-semibold leading-[11px] text-stone-600 sm:mt-1.5 sm:text-[11px] sm:leading-4">
-                      {helper}
-                    </p>
-                  </div>
-                </div>
-              );
-
-              return to ? (
-                <Link
-                  key={step}
-                  to={to}
-                  className={`focus-ring min-w-0 rounded-[16px] border p-3 shadow-[0_5px_14px_rgba(28,25,23,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(28,25,23,0.07)] sm:rounded-[20px] sm:p-4 ${tone}`}
-                >
-                  {card}
-                </Link>
-              ) : (
-                <div
-                  key={step}
-                  className={`min-w-0 rounded-[16px] border p-3 shadow-[0_5px_14px_rgba(28,25,23,0.04)] sm:rounded-[20px] sm:p-4 ${tone}`}
-                >
-                  {card}
-                </div>
-              );
-            })}
+          <div className="hbs-steps" aria-label="Business settings areas">
+            <div className="hbs-step hbs-step--first">
+              <span className="hbs-step-num">01</span><span><strong>Business records</strong><small>Licences and documents</small></span>
+            </div>
+            <div className="hbs-step">
+              <span className="hbs-step-num">02</span><span><strong>Team access</strong><small>People and permissions</small></span>
+            </div>
+            <div className="hbs-step">
+              <span className="hbs-step-num">03</span><span><strong>Connections</strong><small>Apps and notifications</small></span>
+            </div>
+            <Link className="hbs-back focus-ring" to="/host/operations-center">
+              Back to operations <ArrowRight size={15} />
+            </Link>
           </div>
         ) : null}
 
@@ -2943,62 +2963,30 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     </strong>
                     <span>Readiness checks passed</span>
                   </div>
-                  <div
-                    className="hops-check-meter"
-                    aria-label="Readiness progress"
-                  >
-                    <span
-                      style={{
-                        width: `${Math.round(
-                          (100 *
-                            Object.values(readiness.checks).filter(Boolean)
-                              .length) /
-                            Math.max(1, Object.keys(readiness.checks).length)
-                        )}%`,
-                      }}
-                    />
+                  <div className="hops-check-meter" aria-label="Readiness progress">
+                    <span style={{ width: `${Math.round(100 * Object.values(readiness.checks).filter(Boolean).length / Math.max(1, Object.keys(readiness.checks).length))}%` }} />
                   </div>
                 </div>
                 <div className="hops-readiness-grid">
                   {Object.entries(readiness.checks).map(([key, value]) => (
-                    <div
-                      className="hops-check-item"
-                      data-passed={Boolean(value)}
-                      key={key}
-                    >
-                      {value ? (
-                        <CheckCircle2
-                          className="hops-check-icon"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <CircleAlert
-                          className="hops-check-icon"
-                          aria-hidden="true"
-                        />
-                      )}
+                    <div className="hops-check-item" data-passed={Boolean(value)} key={key}>
+                      {value
+                        ? <CheckCircle2 className="hops-check-icon" aria-hidden="true" />
+                        : <CircleAlert className="hops-check-icon" aria-hidden="true" />}
                       <span>{readinessLabel(key)}</span>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <p className="hops-section-error" role="status">
-                Readiness data is unavailable. Refresh to try again.
-              </p>
+              <p className="hops-section-error" role="status">Readiness data is unavailable. Refresh to try again.</p>
             )}
 
             {activationState === "active" ? (
               <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-200/60 p-2.5 text-[10px] font-bold leading-4 text-emerald-900 sm:mt-4 sm:gap-2 sm:rounded-2xl sm:p-4 sm:text-sm sm:leading-normal">
                 <ShieldCheck className="h-4 w-4 shrink-0 sm:h-[17px] sm:w-[17px]" />
-                <span className="sm:hidden">
-                  Your Host business is live and ready. No further launch review
-                  is needed.
-                </span>
-                <span className="hidden sm:inline">
-                  Your Host business is live and ready to operate. No further
-                  launch review is needed.
-                </span>
+                <span className="sm:hidden">Your Host business is live and ready. No further launch review is needed.</span>
+                <span className="hidden sm:inline">Your Host business is live and ready to operate. No further launch review is needed.</span>
               </div>
             ) : activationState === "pending_review" ? (
               <div className="mt-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
@@ -3007,8 +2995,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </div>
             ) : activationState === "suspended" ? (
               <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
-                Host operations are suspended. Super Admin review is required
-                before commerce can resume.
+                Host operations are suspended. Super Admin review is required before commerce can resume.
               </div>
             ) : (
               <button
@@ -3252,13 +3239,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     .map((value) => value.trim())
                     .filter(Boolean);
                   const postalCodes = [...new Set(rawPins)];
-                  if (
-                    !postalCodes.length ||
-                    postalCodes.some((pin) => !/^[1-9][0-9]{5}$/.test(pin))
-                  ) {
-                    setError(
-                      "Enter valid six-digit Indian delivery PIN codes."
-                    );
+                  if (!postalCodes.length || postalCodes.some((pin) => !/^[1-9][0-9]{5}$/.test(pin))) {
+                    setError("Enter valid six-digit Indian delivery PIN codes.");
                     return;
                   }
                   const payload = {
@@ -3270,28 +3252,18 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   run(
                     async () => {
                       const result = sharedDeliveryArea
-                        ? await updateServiceArea(sharedDeliveryArea.id, {
-                            ...payload,
-                            status: "active",
-                          })
-                        : await createServiceArea({
-                            ...payload,
-                            serviceAreaKey: SHARED_DELIVERY_AREA_KEY,
-                          });
+                        ? await updateServiceArea(sharedDeliveryArea.id, { ...payload, status: "active" })
+                        : await createServiceArea({ ...payload, serviceAreaKey: SHARED_DELIVERY_AREA_KEY });
                       // Only clear the edit flag after the API confirms a save.
                       deliveryAreaEditedRef.current = false;
                       return result;
                     },
-                    sharedDeliveryArea
-                      ? "Business coverage updated."
-                      : "Business coverage saved."
+                    sharedDeliveryArea ? "Business coverage updated." : "Business coverage saved."
                   );
                 }}
               >
                 <label className="block min-w-0">
-                  <span className="mb-2 block text-sm font-bold">
-                    Delivery PIN codes
-                  </span>
+                  <span className="mb-2 block text-sm font-bold">Delivery PIN codes</span>
                   <textarea
                     required
                     rows={4}
@@ -3306,50 +3278,26 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   />
                 </label>
                 {sharedDeliveryLoadError ? (
-                  <p role="alert" className="hops-section-error">
-                    {sharedDeliveryLoadError}
-                  </p>
+                  <p role="alert" className="hops-section-error">{sharedDeliveryLoadError}</p>
                 ) : null}
-                <button
-                  type="submit"
-                  disabled={busy || Boolean(sharedDeliveryLoadError)}
-                  className={buttonClass}
-                >
-                  <Save size={17} />{" "}
-                  {sharedDeliveryArea
-                    ? "Update delivery coverage"
-                    : "Save delivery coverage"}
+                <button type="submit" disabled={busy || Boolean(sharedDeliveryLoadError)} className={buttonClass}>
+                  <Save size={17} /> {sharedDeliveryArea ? "Update delivery coverage" : "Save delivery coverage"}
                 </button>
               </form>
               <aside className="hops-coverage-summary" aria-live="polite">
                 <strong>{displayedDeliveryPins.length}</strong>
-                <p>
-                  {sharedDeliveryArea
-                    ? "Saved business PIN codes"
-                    : "Existing delivery PIN codes"}
-                </p>
+                <p>{sharedDeliveryArea ? "Saved business PIN codes" : "Existing delivery PIN codes"}</p>
                 <div className="hops-pins">
-                  {displayedDeliveryPins.slice(0, 12).map((pin) => (
-                    <span key={pin}>{pin}</span>
-                  ))}
+                  {displayedDeliveryPins.slice(0, 12).map((pin) => <span key={pin}>{pin}</span>)}
                   {displayedDeliveryPins.length > 12 ? (
                     <span>+{displayedDeliveryPins.length - 12} more</span>
                   ) : null}
                 </div>
-                {!sharedDeliveryArea &&
-                !sharedDeliveryLoadError &&
-                displayedDeliveryPins.length ? (
-                  <p className="hops-coverage-note">
-                    Previous delivery PINs are restored in the form. Save to
-                    make them the business default.
-                  </p>
+                {!sharedDeliveryArea && !sharedDeliveryLoadError && displayedDeliveryPins.length ? (
+                  <p className="hops-coverage-note">Previous delivery PINs are restored in the form. Save to make them the business default.</p>
                 ) : null}
-                {!sharedDeliveryArea &&
-                !sharedDeliveryLoadError &&
-                !displayedDeliveryPins.length ? (
-                  <p className="hops-coverage-note">
-                    No delivery PIN codes have been saved yet.
-                  </p>
+                {!sharedDeliveryArea && !sharedDeliveryLoadError && !displayedDeliveryPins.length ? (
+                  <p className="hops-coverage-note">No delivery PIN codes have been saved yet.</p>
                 ) : null}
               </aside>
             </div>
@@ -3374,13 +3322,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
                 {kybStatus === "draft" ? (
                   <span className="text-xs font-semibold text-amber-700">
-                    Draft is saved, but it will not appear in the Super Admin
-                    governance queue until Submit succeeds.
+                    Draft is saved, but it will not appear in the Super Admin governance queue until Submit succeeds.
                   </span>
                 ) : kybStatus === "submitted" ? (
                   <span className="text-xs font-semibold text-emerald-700">
-                    Submitted successfully. This case is now eligible for Super
-                    Admin review.
+                    Submitted successfully. This case is now eligible for Super Admin review.
                   </span>
                 ) : null}
               </div>
@@ -3393,10 +3339,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     Business Profile is already complete. Submit KYB next.
                   </p>
                   <p className="mt-1 text-xs font-semibold leading-5 text-emerald-800">
-                    Your commercial profile has already been saved and Super
-                    Admin was notified. Click Submit below to send this KYB for
-                    governance review. After submission, wait for Super Admin
-                    approval.
+                    Your commercial profile has already been saved and Super Admin was notified. Click Submit below to send this KYB for governance review. After submission, wait for Super Admin approval.
                   </p>
                 </div>
               ) : (
@@ -3407,9 +3350,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                         KYB saved. Complete your Business Profile next.
                       </p>
                       <p className="mt-1 text-xs font-semibold leading-5 text-sky-800">
-                        Open Business Profile, complete that step and notify
-                        Super Admin. Then return here and Submit KYB. After
-                        submission, wait for Super Admin review.
+                        Open Business Profile, complete that step and notify Super Admin. Then return here and Submit KYB. After submission, wait for Super Admin review.
                       </p>
                     </div>
 
@@ -3489,11 +3430,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               </Field>
 
               <div className="grid grid-cols-2 items-end gap-1.5 sm:flex sm:gap-2">
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className={`${buttonClass} h-9 w-full gap-1 px-1.5 py-0 text-[9px] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm`}
-                >
+                <button type="submit" disabled={busy} className={`${buttonClass} h-9 w-full gap-1 px-1.5 py-0 text-[9px] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm`}>
                   <Save className="h-3.5 w-3.5 sm:h-[15px] sm:w-[15px]" />
                   Save KYB
                 </button>
@@ -3502,18 +3439,21 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   type="button"
                   disabled={busy}
                   onClick={() =>
-                    run(async () => {
-                      await saveHostKyb({
-                        ...kybForm,
+                    run(
+                      async () => {
+                        await saveHostKyb({
+                          ...kybForm,
 
-                        documentIds: kybForm.documentIds
-                          .split(",")
-                          .map((value) => value.trim())
-                          .filter(Boolean),
-                      });
+                          documentIds: kybForm.documentIds
+                            .split(",")
+                            .map((value) => value.trim())
+                            .filter(Boolean),
+                        });
 
-                      return submitHostKyb();
-                    }, "KYB submitted for governance review.")
+                        return submitHostKyb();
+                      },
+                      "KYB submitted for governance review."
+                    )
                   }
                   className="focus-ring h-9 w-full rounded-xl border border-stone-300 px-1.5 py-0 text-[9px] font-black sm:h-auto sm:w-auto sm:px-4 sm:py-2.5 sm:text-sm"
                 >
@@ -3527,23 +3467,14 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
       {section === "catalog" ? (
         <div className="hpc-content">
-          <section
-            className="hpc-upload-section"
-            aria-labelledby="hpc-upload-heading"
-          >
+          <section className="hpc-upload-section" aria-labelledby="hpc-upload-heading">
             <div className="hpc-upload-main">
               <div className="hpc-section-head">
-                <span className="hpc-icon-box" aria-hidden="true">
-                  <Upload size={21} />
-                </span>
+                <span className="hpc-icon-box" aria-hidden="true"><Upload size={21} /></span>
                 <div className="min-w-0">
                   <p className="hpc-kicker">01 / CSV upload</p>
-                  <h2 id="hpc-upload-heading" className="hpc-section-title">
-                    Check your product file
-                  </h2>
-                  <p className="hpc-section-description">
-                    Upload your CSV to match products with EPANTRY.
-                  </p>
+                  <h2 id="hpc-upload-heading" className="hpc-section-title">Check your product file</h2>
+                  <p className="hpc-section-description">Upload your CSV to match products with EPANTRY.</p>
                 </div>
               </div>
 
@@ -3560,44 +3491,23 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   }}
                   className="sr-only"
                 />
-                <label
-                  htmlFor="host-catalog-csv-input"
-                  className="hpc-dropzone focus-ring"
-                >
-                  <span className="hpc-drop-icon" aria-hidden="true">
-                    <Upload size={24} />
-                  </span>
+                <label htmlFor="host-catalog-csv-input" className="hpc-dropzone focus-ring">
+                  <span className="hpc-drop-icon" aria-hidden="true"><Upload size={24} /></span>
                   <span className="hpc-drop-copy">
-                    <span className="hpc-drop-title">
-                      {csvRows.length
-                        ? "Choose a different CSV"
-                        : "Select a CSV file"}
-                    </span>
-                    <span className="hpc-drop-sub">
-                      Your product data stays in review until you check it.
-                    </span>
+                    <span className="hpc-drop-title">{csvRows.length ? "Choose a different CSV" : "Select a CSV file"}</span>
+                    <span className="hpc-drop-sub">Your product data stays in review until you check it.</span>
                   </span>
-                  <span className="hpc-drop-action" aria-hidden="true">
-                    Browse CSV
-                  </span>
+                  <span className="hpc-drop-action" aria-hidden="true">Browse CSV</span>
                 </label>
               </div>
 
               <div className="hpc-upload-footer">
-                <div
-                  className="hpc-file-status"
-                  data-ready={Boolean(csvRows.length)}
-                  aria-live="polite"
-                >
+                <div className="hpc-file-status" data-ready={Boolean(csvRows.length)} aria-live="polite">
                   <span className="hpc-status-dot" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="hpc-file-name">
-                      {csvRows.length ? csvName : "No file selected"}
-                    </p>
+                    <p className="hpc-file-name">{csvRows.length ? csvName : "No file selected"}</p>
                     <p className="hpc-file-helper">
-                      {csvRows.length
-                        ? `${csvRows.length} products ready for checking`
-                        : "CSV files only"}
+                      {csvRows.length ? `${csvRows.length} products ready for checking` : "CSV files only"}
                     </p>
                   </div>
                 </div>
@@ -3606,11 +3516,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   disabled={busy || !csvRows.length}
                   onClick={() =>
                     run(
-                      () =>
-                        createHostCatalogImport({
-                          sourceType: "csv_normalized",
-                          rows: csvRows,
-                        }),
+                      () => createHostCatalogImport({ sourceType: "csv_normalized", rows: csvRows }),
                       "Catalog checked. Review the results below before continuing your listings."
                     )
                   }
@@ -3624,116 +3530,59 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             <aside className="hpc-format" aria-label="CSV column format">
               <p className="hpc-kicker">File reference</p>
               <h3 className="hpc-format-head">CSV columns</h3>
-              <p className="hpc-format-description">
-                Use these exact column names in your file.
-              </p>
+              <p className="hpc-format-description">Use these exact column names in your file.</p>
               <div className="hpc-columns">
                 {[
-                  "merchantSku",
-                  "gtin",
-                  "packId",
-                  "displayName",
-                  "brandName",
-                  "netQuantityText",
-                  "priceMinor",
-                  "inventoryQuantity",
-                ].map((header) => (
-                  <code key={header}>{header}</code>
-                ))}
+                  "merchantSku", "gtin", "packId", "displayName",
+                  "brandName", "netQuantityText", "priceMinor", "inventoryQuantity",
+                ].map((header) => <code key={header}>{header}</code>)}
               </div>
               <p className="hpc-format-note">
-                <CircleAlert
-                  size={17}
-                  className="mt-0.5 shrink-0"
-                  aria-hidden="true"
-                />
+                <CircleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
                 Checking a CSV does not publish products.
               </p>
             </aside>
           </section>
 
-          <section
-            className="hpc-results"
-            aria-labelledby="hpc-results-heading"
-          >
+          <section className="hpc-results" aria-labelledby="hpc-results-heading">
             <div className="hpc-results-head">
               <div>
                 <p className="hpc-kicker">02 / Results</p>
-                <h2 id="hpc-results-heading" className="hpc-section-title">
-                  Previous catalog checks
-                </h2>
+                <h2 id="hpc-results-heading" className="hpc-section-title">Previous catalog checks</h2>
               </div>
-              <span className="hpc-results-count">
-                {imports.length} {imports.length === 1 ? "check" : "checks"}
-              </span>
+              <span className="hpc-results-count">{imports.length} {imports.length === 1 ? "check" : "checks"}</span>
             </div>
             {imports.length ? (
               <>
                 <div className="hpc-table-head" aria-hidden="true">
-                  <span>File check</span>
-                  <span>Matched</span>
-                  <span>Needs review</span>
-                  <span>Needs fixing</span>
-                  <span>Data quality</span>
+                  <span>File check</span><span>Matched</span><span>Needs review</span><span>Needs fixing</span><span>Data quality</span>
                 </div>
-                <div
-                  className="hpc-check-list"
-                  aria-label="Catalog check results"
-                >
+                <div className="hpc-check-list" aria-label="Catalog check results">
                   {imports.map((job, index) => (
                     <div className="hpc-check-row" key={job.id}>
                       <div className="hpc-check-ident">
-                        <span className="hpc-check-index" aria-hidden="true">
-                          <FileCheck2 size={19} />
-                        </span>
+                        <span className="hpc-check-index" aria-hidden="true"><FileCheck2 size={19} /></span>
                         <div className="min-w-0">
-                          <p className="hpc-check-name">
-                            CSV check{" "}
-                            {String(imports.length - index).padStart(2, "0")}
-                          </p>
-                          <p className="hpc-check-meta">
-                            {job.rowCount} products checked
-                          </p>
+                          <p className="hpc-check-name">CSV check {String(imports.length - index).padStart(2, "0")}</p>
+                          <p className="hpc-check-meta">{job.rowCount} products checked</p>
                         </div>
                       </div>
                       <div className="hpc-stat" data-state="matched">
-                        <strong className="hpc-stat-value">
-                          {job.matchedCount}
-                        </strong>
+                        <strong className="hpc-stat-value">{job.matchedCount}</strong>
                         <span className="hpc-stat-caption">Matched</span>
                       </div>
                       <div className="hpc-stat" data-state="review">
-                        <strong className="hpc-stat-value">
-                          {job.npiRequiredCount}
-                        </strong>
+                        <strong className="hpc-stat-value">{job.npiRequiredCount}</strong>
                         <span className="hpc-stat-caption">Needs review</span>
                       </div>
                       <div className="hpc-stat" data-state="fix">
-                        <strong className="hpc-stat-value">
-                          {job.invalidCount}
-                        </strong>
+                        <strong className="hpc-stat-value">{job.invalidCount}</strong>
                         <span className="hpc-stat-caption">Needs fixing</span>
                       </div>
-                      <div
-                        className="hpc-data-score"
-                        aria-label={`Data quality ${job.averageDataQualityScore} out of 100`}
-                      >
-                        <strong className="hpc-score-number">
-                          {job.averageDataQualityScore}/100
-                        </strong>
+                      <div className="hpc-data-score" aria-label={`Data quality ${job.averageDataQualityScore} out of 100`}>
+                        <strong className="hpc-score-number">{job.averageDataQualityScore}/100</strong>
                         <span className="hpc-quality-track" aria-hidden="true">
-                          <span
-                            className="hpc-quality-fill"
-                            style={{
-                              width: `${Math.max(
-                                0,
-                                Math.min(
-                                  100,
-                                  Number(job.averageDataQualityScore) || 0
-                                )
-                              )}%`,
-                            }}
-                          />
+                          <span className="hpc-quality-fill" style={{ width: `${Math.max(0, Math.min(100, Number(job.averageDataQualityScore) || 0))}%` }} />
                         </span>
                       </div>
                     </div>
@@ -3752,18 +3601,10 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
       {section === "quality" ? (
         <div className="hdq-content">
-          <section
-            className="hdq-overview"
-            aria-labelledby="hdq-overview-title"
-          >
+          <section className="hdq-overview" aria-labelledby="hdq-overview-title">
             <p className="hdq-section-kicker">01 / Overview</p>
-            <h2 className="hdq-section-heading" id="hdq-overview-title">
-              Catalog overview
-            </h2>
-            <div
-              className="hdq-metrics"
-              aria-label="Product catalog quality summary"
-            >
+            <h2 className="hdq-section-heading" id="hdq-overview-title">Catalog overview</h2>
+            <div className="hdq-metrics" aria-label="Product catalog quality summary">
               {[
                 ["Products checked", quality?.productsObserved ?? 0],
                 ["Ready matches", quality?.canonicalMatches ?? 0],
@@ -3778,15 +3619,11 @@ export default function HostOperationsPage({ section = "dashboard" }) {
             </div>
           </section>
 
-          <section
-            className="hdq-health"
-            aria-label="Catalog completeness and issues"
-          >
+          <section className="hdq-health" aria-label="Catalog completeness and issues">
             <div className="hdq-score">
               <p className="hdq-score-label">Catalog completeness</p>
               <div className="hdq-score-value">
-                {quality?.averageDataQualityScore ?? 0}
-                <span>/100</span>
+                {quality?.averageDataQualityScore ?? 0}<span>/100</span>
               </div>
               <div
                 className="hdq-score-bar"
@@ -3794,58 +3631,33 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 aria-label="Catalog completeness"
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={Math.max(
-                  0,
-                  Math.min(100, Number(quality?.averageDataQualityScore) || 0)
-                )}
+                aria-valuenow={Math.max(0, Math.min(100, Number(quality?.averageDataQualityScore) || 0))}
               >
-                <span
-                  style={{
-                    width: `${Math.max(
-                      0,
-                      Math.min(
-                        100,
-                        Number(quality?.averageDataQualityScore) || 0
-                      )
-                    )}%`,
-                  }}
-                />
+                <span style={{width: `${Math.max(0, Math.min(100, Number(quality?.averageDataQualityScore) || 0))}%`}} />
               </div>
-              <p className="hdq-score-note">
-                Average score across checked products.
-              </p>
+              <p className="hdq-score-note">Average score across checked products.</p>
             </div>
             <div className="hdq-issues-panel">
               <h2 className="hdq-issues-heading">Information to review</h2>
               {Object.keys(quality?.issueCounts || {}).length ? (
                 <div className="hdq-issues-list">
-                  {Object.entries(quality?.issueCounts || {}).map(
-                    ([key, value]) => (
-                      <div className="hdq-issue" key={key}>
-                        <span>{qualityIssueLabel(key)}</span>
-                        <strong aria-label={`${value} products`}>
-                          {value}
-                        </strong>
-                      </div>
-                    )
-                  )}
+                  {Object.entries(quality?.issueCounts || {}).map(([key, value]) => (
+                    <div className="hdq-issue" key={key}>
+                      <span>{qualityIssueLabel(key)}</span>
+                      <strong aria-label={`${value} products`}>{value}</strong>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <p className="hdq-issues-empty">
-                  No product-detail issues are showing right now.
-                </p>
+                <p className="hdq-issues-empty">No product-detail issues are showing right now.</p>
               )}
             </div>
           </section>
 
           <div className="hdq-action-bar">
             <div>
-              <p className="hdq-action-title">
-                Complete missing product details
-              </p>
-              <p className="hdq-action-description">
-                Update listings, then refresh your catalog scores.
-              </p>
+              <p className="hdq-action-title">Complete missing product details</p>
+              <p className="hdq-action-description">Update listings, then refresh your catalog scores.</p>
             </div>
             <Link to="/host/listings/new" className="hdq-cta focus-ring">
               <PackageSearch size={18} aria-hidden="true" />
@@ -3857,20 +3669,12 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
       {section === "finance" ? (
         <div className="hfin-content">
-          <section
-            className="hfin-section"
-            aria-labelledby="hfin-overview-heading"
-          >
+          <section className="hfin-section" aria-labelledby="hfin-overview-heading">
             <header className="hfin-section-heading">
               <div>
                 <p className="hfin-section-kicker">01 / Current position</p>
-                <h2 id="hfin-overview-heading" className="hfin-section-title">
-                  Earnings overview
-                </h2>
-                <p className="hfin-section-description">
-                  Know what's been delivered, what's waiting, and what's been
-                  paid.
-                </p>
+                <h2 id="hfin-overview-heading" className="hfin-section-title">Earnings overview</h2>
+                <p className="hfin-section-description">Know what's been delivered, what's waiting, and what's been paid.</p>
               </div>
               <Link className="hfin-manage focus-ring" to="/host/orders">
                 Manage orders <ArrowRight size={17} aria-hidden="true" />
@@ -3887,12 +3691,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 <span className="hfin-lead-top" aria-hidden="true" />
                 <div>
                   <p className="hfin-lead-label">Delivered orders</p>
-                  <strong className="hfin-lead-number">
-                    {finance ? finance.deliveredOrders ?? 0 : "—"}
-                  </strong>
-                  <p className="hfin-lead-description">
-                    Orders delivered to your customers
-                  </p>
+                  <strong className="hfin-lead-number">{finance ? finance.deliveredOrders ?? 0 : "—"}</strong>
+                  <p className="hfin-lead-description">Orders delivered to your customers</p>
                 </div>
               </div>
               <div className="hfin-financial">
@@ -3900,44 +3700,28 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   <div className="hfin-metric">
                     <p className="hfin-metric-label">Awaiting settlement</p>
                     <div>
-                      <strong className="hfin-metric-number">
-                        {finance ? finance.unsettledDeliveredOrders ?? 0 : "—"}
-                      </strong>
-                      <p className="hfin-metric-description">
-                        Delivered, not yet settled
-                      </p>
+                      <strong className="hfin-metric-number">{finance ? finance.unsettledDeliveredOrders ?? 0 : "—"}</strong>
+                      <p className="hfin-metric-description">Delivered, not yet settled</p>
                     </div>
                   </div>
                   <div className="hfin-metric">
                     <p className="hfin-metric-label">Payouts in progress</p>
                     <div>
-                      <strong className="hfin-metric-number">
-                        {finance ? finance.pendingSettlements ?? 0 : "—"}
-                      </strong>
-                      <p className="hfin-metric-description">
-                        Settlements awaiting completion
-                      </p>
+                      <strong className="hfin-metric-number">{finance ? finance.pendingSettlements ?? 0 : "—"}</strong>
+                      <p className="hfin-metric-description">Settlements awaiting completion</p>
                     </div>
                   </div>
                 </div>
                 <div className="hfin-paid">
                   <div>
                     <strong className="hfin-paid-label">Paid to you</strong>
-                    <p className="hfin-paid-description">
-                      Total completed payouts
-                    </p>
+                    <p className="hfin-paid-description">Total completed payouts</p>
                   </div>
-                  <strong className="hfin-paid-amount">
-                    {finance ? money(finance.paidNetMinor ?? 0) : "—"}
-                  </strong>
+                  <strong className="hfin-paid-amount">{finance ? money(finance.paidNetMinor ?? 0) : "—"}</strong>
                 </div>
               </div>
             </div>
-            <div
-              className="hfin-delivered"
-              aria-labelledby="hfin-delivered-heading"
-              aria-busy={loadingMoreDelivered}
-            >
+            <div className="hfin-delivered" aria-labelledby="hfin-delivered-heading" aria-busy={loadingMoreDelivered}>
               <div className="hfin-delivered-heading">
                 <div>
                   <h3 id="hfin-delivered-heading">Delivered items</h3>
@@ -3956,60 +3740,28 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               {deliveredOrders.length ? (
                 <div role="list" aria-label="Delivered order details">
                   {deliveredOrders.map((order) => {
-                    const names = (
-                      Array.isArray(order.itemNames) ? order.itemNames : []
-                    )
-                      .map((name) => String(name || "").trim())
-                      .filter(Boolean);
-                    const orderDate = order.createdAt
-                      ? new Date(order.createdAt)
-                      : null;
-                    const placedOn =
-                      orderDate && !Number.isNaN(orderDate.getTime())
-                        ? orderDate.toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "Date unavailable";
+                    const names = (Array.isArray(order.itemNames) ? order.itemNames : [])
+                      .map((name) => String(name || "").trim()).filter(Boolean);
+                    const orderDate = order.createdAt ? new Date(order.createdAt) : null;
+                    const placedOn = orderDate && !Number.isNaN(orderDate.getTime())
+                      ? orderDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                      : "Date unavailable";
                     return (
-                      <Link
-                        className="hfin-delivered-row focus-ring"
-                        role="listitem"
-                        key={order.id}
-                        to={`/host/orders/${order.id}`}
-                        aria-label={`Open delivered order ${String(
-                          order.id || ""
-                        ).slice(-8)}: ${
-                          names.join(", ") || "Items unavailable"
-                        }`}
-                      >
+                      <Link className="hfin-delivered-row focus-ring" role="listitem"
+                        key={order.id} to={`/host/orders/${order.id}`}
+                        aria-label={`Open delivered order ${String(order.id || "").slice(-8)}: ${names.join(", ") || "Items unavailable"}`}>
                         <span>
                           <strong className="hfin-order-products">
-                            {names.length
-                              ? names.join(" · ")
-                              : "Product names unavailable"}
+                            {names.length ? names.join(" · ") : "Product names unavailable"}
                           </strong>
                           <span className="hfin-order-meta">
-                            Order #
-                            {String(order.id || "")
-                              .slice(-8)
-                              .toUpperCase()}{" "}
-                            · {order.itemCount || names.length}{" "}
-                            {Number(order.itemCount || names.length) === 1
-                              ? "item"
-                              : "items"}
+                            Order #{String(order.id || "").slice(-8).toUpperCase()} · {order.itemCount || names.length} {Number(order.itemCount || names.length) === 1 ? "item" : "items"}
                           </span>
                         </span>
-                        <span className="hfin-order-date">
-                          Placed {placedOn}
-                        </span>
+                        <span className="hfin-order-date">Placed {placedOn}</span>
                         <span className="hfin-order-right">
                           <strong className="hfin-order-amount">
-                            {money(
-                              order.commercialSnapshot?.itemSubtotalMinor,
-                              order.commercialSnapshot?.currency || "INR"
-                            )}
+                            {money(order.commercialSnapshot?.itemSubtotalMinor, order.commercialSnapshot?.currency || "INR")}
                           </strong>
                           <ArrowRight size={17} aria-hidden="true" />
                         </span>
@@ -4019,57 +3771,31 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 </div>
               ) : !deliveredOrdersError ? (
                 <p className="hfin-delivered-empty">
-                  {finance?.deliveredOrders === 0
-                    ? "No delivered orders yet."
-                    : "Delivered order details are not available yet."}
+                  {finance?.deliveredOrders === 0 ? "No delivered orders yet." : "Delivered order details are not available yet."}
                 </p>
               ) : null}
               {deliveredOrders.length < deliveredOrdersTotal ? (
-                <button
-                  type="button"
-                  className="hfin-delivered-more"
-                  onClick={loadMoreDeliveredOrders}
-                  disabled={loadingMoreDelivered || loading}
-                >
-                  {loadingMoreDelivered ? (
-                    <LoaderCircle
-                      size={17}
-                      className="animate-spin"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <ArrowRight size={17} aria-hidden="true" />
-                  )}
-                  {loadingMoreDelivered
-                    ? "Loading orders…"
-                    : "Show next 8 delivered orders"}
+                <button type="button" className="hfin-delivered-more" onClick={loadMoreDeliveredOrders}
+                  disabled={loadingMoreDelivered || loading}>
+                  {loadingMoreDelivered ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <ArrowRight size={17} aria-hidden="true" />}
+                  {loadingMoreDelivered ? "Loading orders…" : "Show next 8 delivered orders"}
                 </button>
               ) : null}
             </div>
             {finance?.policy?.automaticPayoutExecution === false ? (
               <p className="hfin-note" role="note">
                 <CircleAlert size={17} aria-hidden="true" />
-                <span>
-                  Payouts are recorded through settlements; automatic payout
-                  execution is not enabled.
-                </span>
+                <span>Payouts are recorded through settlements; automatic payout execution is not enabled.</span>
               </p>
             ) : null}
           </section>
 
-          <section
-            className="hfin-section hfin-payouts"
-            aria-labelledby="hfin-payouts-heading"
-          >
+          <section className="hfin-section hfin-payouts" aria-labelledby="hfin-payouts-heading">
             <header className="hfin-section-heading">
               <div>
                 <p className="hfin-section-kicker">02 / Settlement records</p>
-                <h2 id="hfin-payouts-heading" className="hfin-section-title">
-                  Payout history
-                </h2>
-                <p className="hfin-section-description">
-                  Recorded settlement periods and payment status.
-                </p>
+                <h2 id="hfin-payouts-heading" className="hfin-section-title">Payout history</h2>
+                <p className="hfin-section-description">Recorded settlement periods and payment status.</p>
               </div>
             </header>
             {financeSettlementsError ? (
@@ -4078,67 +3804,35 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 <span>{financeSettlementsError} Use Refresh to try again.</span>
               </div>
             ) : settlements.length ? (
-              <div
-                className="hfin-payout-ledger"
-                role="list"
-                aria-label="Recorded payout periods"
-              >
+              <div className="hfin-payout-ledger" role="list" aria-label="Recorded payout periods">
                 {settlements.map((settlement) => (
-                  <div
-                    className="hfin-payout-row"
-                    role="listitem"
-                    key={settlement.id}
-                  >
+                  <div className="hfin-payout-row" role="listitem" key={settlement.id}>
                     <div>
                       <strong className="hfin-payout-period">
-                        {new Date(settlement.periodStart).toLocaleDateString()}{" "}
-                        – {new Date(settlement.periodEnd).toLocaleDateString()}
+                        {new Date(settlement.periodStart).toLocaleDateString()} – {new Date(settlement.periodEnd).toLocaleDateString()}
                       </strong>
-                      <p className="hfin-payout-meta">
-                        {settlement.lineCount} entries
-                      </p>
+                      <p className="hfin-payout-meta">{settlement.lineCount} entries</p>
                     </div>
-                    <strong className="hfin-payout-amount">
-                      {money(
-                        settlement.totals?.netPayableMinor,
-                        settlement.currency
-                      )}
-                    </strong>
-                    <span className="hfin-status">
-                      {titleize(settlement.status)}
-                    </span>
+                    <strong className="hfin-payout-amount">{money(settlement.totals?.netPayableMinor, settlement.currency)}</strong>
+                    <span className="hfin-status">{titleize(settlement.status)}</span>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="hfin-empty-layout">
                 <div className="hfin-empty">
-                  <span className="hfin-empty-icon">
-                    <WalletCards size={25} aria-hidden="true" />
-                  </span>
+                  <span className="hfin-empty-icon"><WalletCards size={25} aria-hidden="true" /></span>
                   <div>
                     <h3>No payouts recorded yet</h3>
-                    <p>
-                      When a settlement is created for delivered orders, its
-                      period, amount and status will appear here.
-                    </p>
+                    <p>When a settlement is created for delivered orders, its period, amount and status will appear here.</p>
                   </div>
                 </div>
                 <div className="hfin-steps">
                   <p className="hfin-steps-title">How payouts progress</p>
                   <ol className="hfin-steps-list">
-                    <li>
-                      <span className="hfin-step-index">01</span>
-                      <span>Orders are delivered</span>
-                    </li>
-                    <li>
-                      <span className="hfin-step-index">02</span>
-                      <span>Settlement is approved</span>
-                    </li>
-                    <li>
-                      <span className="hfin-step-index">03</span>
-                      <span>Payment is recorded</span>
-                    </li>
+                    <li><span className="hfin-step-index">01</span><span>Orders are delivered</span></li>
+                    <li><span className="hfin-step-index">02</span><span>Settlement is approved</span></li>
+                    <li><span className="hfin-step-index">03</span><span>Payment is recorded</span></li>
                   </ol>
                 </div>
               </div>
@@ -4317,8 +4011,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
                       <div className="flex-1">
                         <p className="text-[9px] font-semibold leading-[13px] text-stone-500 sm:text-xs sm:font-normal sm:leading-5">
-                          Add a clear Recipe photo (JPEG, PNG or WebP, up to 8
-                          MB). You can replace it later while editing.
+                          Add a clear Recipe photo (JPEG, PNG or WebP, up to 8 MB). You can replace it later while editing.
                         </p>
 
                         <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
@@ -4379,8 +4072,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   Ingredients
                 </h3>
                 <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5">
-                  Search each ingredient by name. If EPANTRY cannot find it,
-                  your entry is included for review.
+                  Search each ingredient by name. If EPANTRY cannot find it, your entry is included for review.
                 </p>
               </div>
 
@@ -4526,9 +4218,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     Nutrition, allergens & dietary information
                   </h3>
                   <p className="mt-0.5 max-w-3xl text-[9px] font-semibold leading-[13px] text-stone-600 sm:mt-1 sm:text-xs sm:font-normal sm:leading-5">
-                    Add only information you can support from your Recipe or
-                    source records. Leave anything you cannot confirm blank;
-                    these details are reviewed before publishing.
+                    Add only information you can support from your Recipe or source records. Leave anything you cannot confirm blank; these details are reviewed before publishing.
                   </p>
                 </div>
 
@@ -4593,8 +4283,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   Allergen information
                 </p>
                 <p className="mt-0.5 text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-1 sm:text-[11px] sm:font-normal sm:leading-5">
-                  Choose an option only when your Recipe or source records
-                  support it. Blank means not declared.
+                  Choose an option only when your Recipe or source records support it. Blank means not declared.
                 </p>
 
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-3 lg:grid-cols-3">
@@ -4640,8 +4329,8 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   <select
                     className={recipeInputClass}
                     value={
-                      hostRecipeForm.foodIntelligence?.dietaryClassification ||
-                      "not_declared"
+                      hostRecipeForm.foodIntelligence
+                        ?.dietaryClassification || "not_declared"
                     }
                     onChange={(event) =>
                       setHostRecipeForm((current) => ({
@@ -4709,11 +4398,15 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 hostRecipeForm.baseServings < 1 ||
                 hostRecipeForm.ingredients.some(
                   (ingredient) =>
-                    (!ingredient.canonicalIngredientId &&
-                      !ingredient.ingredientQuery.trim()) ||
+                    (
+                      !ingredient.canonicalIngredientId &&
+                      !ingredient.ingredientQuery.trim()
+                    ) ||
                     !(Number(ingredient.quantity) > 0)
                 ) ||
-                hostRecipeForm.steps.some((step) => !step.instruction.trim())
+                hostRecipeForm.steps.some(
+                  (step) => !step.instruction.trim()
+                )
               }
               onClick={async () => {
                 const payload = buildHostRecipePayload(hostRecipeForm);
@@ -4736,12 +4429,17 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               }}
               className={`${buttonClass} mt-3 w-full text-[11px] sm:mt-5 sm:w-auto sm:text-sm`}
             >
-              {editingHostRecipeId ? <Save size={15} /> : <Send size={15} />}
+              {editingHostRecipeId ? (
+                <Save size={15} />
+              ) : (
+                <Send size={15} />
+              )}
               {editingHostRecipeId
                 ? "Save Recipe Changes"
                 : "Submit Recipe for Review"}
             </button>
           </Section>
+
         </div>
       ) : null}
 
@@ -4934,523 +4632,363 @@ export default function HostOperationsPage({ section = "dashboard" }) {
       ) : null}
 
       {section === "settings" ? (
-        <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-2">
-          <Section
+        <div className="hbs-content">
+          <BusinessSettingsSection
+            index="01"
             title="Business records"
-            description="Save licences, registration, bank proof and other records your business may need."
+            description="Keep licences and key business documents organised."
             icon={FileCheck2}
-            tone="settingsMint"
+            variant="records"
+            count={settingsLoadErrors.documents ? "—" : documents.length}
           >
             <form
-              className="grid gap-2.5 sm:grid-cols-2 sm:gap-3"
+              className="hbs-form hbs-form--two"
               onSubmit={(event) => {
                 event.preventDefault();
-
-                run(
-                  () => registerHostDocument(documentForm),
-                  "Business document saved."
-                );
+                run(() => registerHostDocument(documentForm), "Business document saved.");
               }}
             >
               <Field label="Document type" compactMobile>
                 <select
-                  className={settingsInputClass}
+                  className="hbs-field"
                   value={documentForm.documentType}
-                  onChange={(event) =>
-                    setDocumentForm((current) => ({
-                      ...current,
-
-                      documentType: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setDocumentForm((current) => ({ ...current, documentType: event.target.value }))}
                 >
                   {[
-                    "incorporation",
-                    "tax_registration",
-                    "food_license",
-                    "bank_proof",
-                    "authorization_letter",
-                    "identity",
-                    "address",
-                    "other",
+                    "incorporation", "tax_registration", "food_license", "bank_proof",
+                    "authorization_letter", "identity", "address", "other",
                   ].map((value) => (
-                    <option key={value} value={value}>
-                      {titleize(value)}
-                    </option>
+                    <option key={value} value={value}>{titleize(value)}</option>
                   ))}
                 </select>
               </Field>
-
               <Field label="Document name" compactMobile>
                 <input
                   required
+                  className="hbs-field"
                   placeholder="e.g. Delhi Food Licence"
-                  className={settingsInputClass}
                   value={documentForm.label}
-                  onChange={(event) =>
-                    setDocumentForm((current) => ({
-                      ...current,
-
-                      label: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setDocumentForm((current) => ({ ...current, label: event.target.value }))}
                 />
               </Field>
-
-              <Field label="Where this file is saved (optional)" compactMobile>
+              <Field label="Stored file reference (optional)" compactMobile>
                 <input
-                  placeholder="Add the saved-file reference if you have one"
-                  className={settingsInputClass}
+                  className="hbs-field"
+                  placeholder="Reference from your storage"
                   value={documentForm.providerAssetId}
-                  onChange={(event) =>
-                    setDocumentForm((current) => ({
-                      ...current,
-
-                      providerAssetId: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setDocumentForm((current) => ({ ...current, providerAssetId: event.target.value }))}
                 />
               </Field>
-
-              <Field label="File verification code (optional)" compactMobile>
+              <Field label="Verification code (optional)" compactMobile>
                 <input
-                  placeholder="Only if your storage system provides one"
-                  className={settingsInputClass}
+                  className="hbs-field"
+                  placeholder="Only if your provider supplies one"
                   value={documentForm.checksumSha256}
-                  onChange={(event) =>
-                    setDocumentForm((current) => ({
-                      ...current,
-
-                      checksumSha256: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setDocumentForm((current) => ({ ...current, checksumSha256: event.target.value }))}
                 />
               </Field>
-
-              <button
-                disabled={busy}
-                className={`${settingsButtonClass} sm:col-span-2`}
-              >
-                <Save size={14} />
-                Save document
+              <button disabled={busy} className="hbs-action hbs-span-all" type="submit">
+                <Save size={16} /> Save business record
               </button>
             </form>
-
-            <div className="mt-3 space-y-2">
-              {documents.length ? (
-                documents.map((document) => (
-                  <div
-                    key={document.id}
-                    className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 text-[10px] font-semibold text-stone-700 sm:rounded-xl sm:text-xs"
-                  >
-                    <span className="font-black text-stone-950">
-                      {document.label}
-                    </span>
-                    <span className="text-stone-500">
-                      {" "}
-                      · {titleize(document.status)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
-                  No business documents saved yet.
-                </p>
-              )}
+            <div className="hbs-records">
+              <p className="hbs-list-heading">Saved documents</p>
+              {settingsLoadErrors.documents ? (
+                <p className="hbs-error" role="alert">{settingsLoadErrors.documents}</p>
+              ) : documents.length ? (
+                <div className="hbs-list">
+                  {documents.map((document) => (
+                    <div key={document.id} className="hbs-row">
+                      <span className="hbs-row-copy">
+                        <span className="hbs-row-title">{document.label}</span>
+                        <span className="hbs-row-meta">{titleize(document.documentType || "document")}</span>
+                      </span>
+                      <span className="hbs-status">{titleize(document.status)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="hbs-empty">No documents saved yet.</p>}
             </div>
-          </Section>
+          </BusinessSettingsSection>
 
-          <Section
-            title="Team members"
-            description="Add people who already have Host access and choose what they are allowed to work on."
+          <BusinessSettingsSection
+            index="02"
+            title="Team access"
+            description="Give existing Host users access to this business."
             icon={Users}
-            tone="settingsBlue"
+            variant="team"
+            count={settingsLoadErrors.team ? "—" : (team?.members?.length || 0)}
           >
             <form
-              className="grid gap-2.5 sm:grid-cols-3 sm:gap-3"
+              className="hbs-form hbs-form--three"
               onSubmit={(event) => {
                 event.preventDefault();
-
-                run(
-                  () =>
-                    addHostTeamMember({
-                      userId: memberForm.userId,
-
-                      roleLabel: memberForm.roleLabel,
-
-                      permissionKeys: memberForm.permissionKeys
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    }),
-                  "Team member added."
-                );
+                run(() => addHostTeamMember({
+                  userId: memberForm.userId,
+                  roleLabel: memberForm.roleLabel,
+                  permissionKeys: memberForm.permissionKeys.split(",").map((value) => value.trim()).filter(Boolean),
+                }), "Team member added.");
               }}
             >
-              <Field label="Host account ID" compactMobile>
-                <input
-                  required
-                  placeholder="Active Host user"
-                  className={settingsInputClass}
-                  value={memberForm.userId}
-                  onChange={(event) =>
-                    setMemberForm((current) => ({
-                      ...current,
-
-                      userId: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-
-              <Field label="Role in your team" compactMobile>
-                <input
-                  placeholder="e.g. Operations Staff"
-                  className={settingsInputClass}
-                  value={memberForm.roleLabel}
-                  onChange={(event) =>
-                    setMemberForm((current) => ({
-                      ...current,
-
-                      roleLabel: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-
-              <div className="sm:col-span-1">
-                <Field label="What they can access" compactMobile>
+              <div className="hbs-span-all">
+                <Field label="Host account ID" compactMobile>
                   <input
-                    placeholder="Example: orders.read, catalog.read"
-                    className={settingsInputClass}
-                    value={memberForm.permissionKeys}
-                    onChange={(event) =>
-                      setMemberForm((current) => ({
-                        ...current,
-
-                        permissionKeys: event.target.value,
-                      }))
-                    }
+                    required
+                    className="hbs-field"
+                    placeholder="Existing Host user ID"
+                    value={memberForm.userId}
+                    onChange={(event) => setMemberForm((current) => ({ ...current, userId: event.target.value }))}
                   />
                 </Field>
               </div>
-
-              <button
-                disabled={busy}
-                className={`${settingsButtonClass} sm:col-span-3`}
-              >
-                <UserPlus size={14} />
-                Add team member
+              <div className="hbs-span-all">
+                <Field label="Role" compactMobile>
+                  <input
+                    className="hbs-field"
+                    placeholder="e.g. Operations Staff"
+                    value={memberForm.roleLabel}
+                    onChange={(event) => setMemberForm((current) => ({ ...current, roleLabel: event.target.value }))}
+                  />
+                </Field>
+              </div>
+              <div className="hbs-span-all hbs-responsive-value">
+                <div className="hbs-multivalue-desktop">
+                  <Field label="Permissions (separate with commas)" compactMobile>
+                    <input
+                      className="hbs-field"
+                      placeholder="orders.read, catalog.read"
+                      value={memberForm.permissionKeys}
+                      onChange={(event) => setMemberForm((current) => ({ ...current, permissionKeys: event.target.value }))}
+                    />
+                  </Field>
+                </div>
+                <div className="hbs-multivalue-mobile">
+                  <Field label="Permissions" compactMobile>
+                    <textarea
+                      className="hbs-field hbs-mobile-lines"
+                      rows={2}
+                      placeholder={"orders.read\ncatalog.read"}
+                      value={memberForm.permissionKeys.replace(/,\s*/g, "\n")}
+                      onChange={(event) => setMemberForm((current) => ({ ...current, permissionKeys: event.target.value.replace(/\r?\n/g, ",") }))}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <button disabled={busy} className="hbs-action hbs-span-all" type="submit">
+                <UserPlus size={16} /> Add team member
               </button>
             </form>
-
-            <div className="mt-3 space-y-2">
-              {team?.members?.length ? (
-                team.members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 sm:rounded-xl"
-                  >
-                    <p className="text-[10px] font-black text-stone-950 sm:text-xs">
-                      {member.roleLabel || "Team member"}
-                    </p>
-                    <p className="mt-0.5 text-[9px] font-semibold leading-3 text-stone-500 sm:text-[11px] sm:leading-4">
-                      {titleize(member.status)} ·{" "}
-                      {(member.permissionKeys || []).join(", ") ||
-                        "No extra permissions"}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
-                  No team members added yet.
-                </p>
-              )}
+            <div className="hbs-records">
+              <p className="hbs-list-heading">Current team</p>
+              {settingsLoadErrors.team ? (
+                <p className="hbs-error" role="alert">{settingsLoadErrors.team}</p>
+              ) : team?.members?.length ? (
+                <div className="hbs-list">
+                  {team.members.map((member) => (
+                    <div key={member.id} className="hbs-row">
+                      <span className="hbs-row-copy">
+                        <span className="hbs-row-title">{member.roleLabel || "Team member"}</span>
+                        <span className="hbs-row-meta">{(member.permissionKeys || []).join(", ") || "No extra permissions"}</span>
+                      </span>
+                      <span className="hbs-status">{titleize(member.status)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="hbs-empty">No team members added yet.</p>}
             </div>
-          </Section>
+          </BusinessSettingsSection>
 
-          <Section
-            title="Connect another app"
-            description="Use this only when your warehouse, accounting or internal app needs secure access to EPANTRY."
+          <BusinessSettingsSection
+            index="03"
+            title="Connected apps"
+            description="Secure access for an approved external tool."
             icon={KeyRound}
-            tone="settingsLavender"
+            variant="apps"
+            count={settingsLoadErrors.apps ? "—" : serviceAccounts.length}
           >
             <form
-              className="grid gap-2.5 sm:grid-cols-2 sm:gap-3"
+              className="hbs-form hbs-form--two"
               onSubmit={(event) => {
                 event.preventDefault();
-
-                run(
-                  () =>
-                    createHostServiceAccount({
-                      name: serviceAccountForm.name,
-
-                      description: serviceAccountForm.description,
-
-                      scopes: serviceAccountForm.scopes
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    }),
-                  "App access created."
-                );
+                run(() => createHostServiceAccount({
+                  name: serviceAccountForm.name,
+                  description: serviceAccountForm.description,
+                  scopes: serviceAccountForm.scopes.split(",").map((value) => value.trim()).filter(Boolean),
+                }), "App access created.");
               }}
             >
               <Field label="App name" compactMobile>
                 <input
-                  required
-                  placeholder="e.g. Warehouse app"
-                  className={settingsInputClass}
+                  required className="hbs-field" placeholder="e.g. Warehouse app"
                   value={serviceAccountForm.name}
-                  onChange={(event) =>
-                    setServiceAccountForm((current) => ({
-                      ...current,
-
-                      name: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setServiceAccountForm((current) => ({ ...current, name: event.target.value }))}
                 />
               </Field>
-
-              <Field label="What this app can access" compactMobile>
-                <input
-                  placeholder="catalog.read, orders.read"
-                  className={settingsInputClass}
-                  value={serviceAccountForm.scopes}
-                  onChange={(event) =>
-                    setServiceAccountForm((current) => ({
-                      ...current,
-
-                      scopes: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-
-              <div className="sm:col-span-2">
-                <Field label="Why are you connecting it?" compactMobile>
+              <div className="hbs-responsive-value">
+                <div className="hbs-multivalue-desktop">
+                  <Field label="Allowed access" compactMobile>
+                    <input
+                      className="hbs-field" placeholder="orders.read, catalog.read"
+                      value={serviceAccountForm.scopes}
+                      onChange={(event) => setServiceAccountForm((current) => ({ ...current, scopes: event.target.value }))}
+                    />
+                  </Field>
+                </div>
+                <div className="hbs-multivalue-mobile">
+                  <Field label="Allowed access" compactMobile>
+                    <textarea
+                      className="hbs-field hbs-mobile-lines"
+                      rows={2}
+                      placeholder={"orders.read\ncatalog.read"}
+                      value={serviceAccountForm.scopes.replace(/,\s*/g, "\n")}
+                      onChange={(event) => setServiceAccountForm((current) => ({ ...current, scopes: event.target.value.replace(/\r?\n/g, ",") }))}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="hbs-span-all">
+                <Field label="Purpose" compactMobile>
                   <input
-                    placeholder="Short description"
-                    className={settingsInputClass}
+                    className="hbs-field" placeholder="Why does this app need access?"
                     value={serviceAccountForm.description}
-                    onChange={(event) =>
-                      setServiceAccountForm((current) => ({
-                        ...current,
-
-                        description: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => setServiceAccountForm((current) => ({ ...current, description: event.target.value }))}
                   />
                 </Field>
               </div>
-
-              <button
-                disabled={busy}
-                className={`${settingsButtonClass} sm:col-span-2`}
-              >
-                <KeyRound size={14} />
-                Connect app
+              <button disabled={busy} className="hbs-action hbs-span-all" type="submit">
+                <KeyRound size={16} /> Connect app
               </button>
             </form>
-
-            <div className="mt-3 space-y-2">
-              {serviceAccounts.length ? (
-                serviceAccounts.map((account) => (
-                  <div
-                    key={account.id}
-                    className="flex min-w-0 flex-col items-stretch gap-2 rounded-[14px] border border-white/80 bg-white/85 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">
-                        {account.name}
-                      </p>
-                      <p className="mt-1 break-words text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-0.5 sm:truncate sm:text-[11px] sm:leading-normal">
-                        {titleize(account.status)} ·{" "}
-                        {(account.scopes || []).join(", ") || "No permissions"}
-                      </p>
+            <div className="hbs-records">
+              <p className="hbs-list-heading">Authorised connections</p>
+              {settingsLoadErrors.apps ? (
+                <p className="hbs-error" role="alert">{settingsLoadErrors.apps}</p>
+              ) : serviceAccounts.length ? (
+                <div className="hbs-list">
+                  {serviceAccounts.map((account) => (
+                    <div key={account.id} className="hbs-row">
+                      <span className="hbs-row-copy">
+                        <span className="hbs-row-title">{account.name}</span>
+                        <span className="hbs-row-meta">{titleize(account.status)} · {(account.scopes || []).join(", ") || "No permissions"}</span>
+                      </span>
+                      <button
+                        type="button" disabled={busy} className="hbs-secondary"
+                        onClick={() => run(() => rotateHostServiceAccountCredential(account.id), "New app security key created.")}
+                      >
+                        <RotateCw size={14} /> New key
+                      </button>
                     </div>
-
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        run(
-                          () => rotateHostServiceAccountCredential(account.id),
-                          "New app security key created."
-                        )
-                      }
-                      className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-[10px] border border-[#d9cfeb] bg-white/95 px-3 py-2 text-[10px] font-black text-[#5d4a73] sm:w-auto sm:rounded-xl sm:text-xs"
-                    >
-                      <RotateCw size={12} />
-                      Create new key
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
-                  No apps connected yet.
-                </p>
-              )}
+                  ))}
+                </div>
+              ) : <p className="hbs-empty">No apps connected yet.</p>}
             </div>
-          </Section>
+          </BusinessSettingsSection>
 
-          <Section
-            title="Send updates to another system"
-            description="Use this when another system should automatically receive order or business updates from EPANTRY."
+          <BusinessSettingsSection
+            index="04"
+            title="Automatic updates"
+            description="Send selected EPANTRY events to your system."
             icon={Webhook}
-            tone="settingsBlue"
+            variant="updates"
+            count={settingsLoadErrors.webhooks ? "—" : webhooks.length}
           >
             <form
-              className="grid gap-2.5 sm:grid-cols-2 sm:gap-3"
+              className="hbs-form hbs-form--two"
               onSubmit={(event) => {
                 event.preventDefault();
-
-                run(
-                  () =>
-                    createHostWebhook({
-                      name: webhookForm.name,
-
-                      endpointUrl: webhookForm.endpointUrl,
-
-                      eventTypes: webhookForm.eventTypes
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    }),
-                  "Automatic update connection created."
-                );
+                run(() => createHostWebhook({
+                  name: webhookForm.name,
+                  endpointUrl: webhookForm.endpointUrl,
+                  eventTypes: webhookForm.eventTypes.split(",").map((value) => value.trim()).filter(Boolean),
+                }), "Automatic update connection created.");
               }}
             >
-              <Field label="Update connection name" compactMobile>
+              <Field label="Connection name" compactMobile>
                 <input
-                  required
-                  placeholder="e.g. Order updates"
-                  className={settingsInputClass}
+                  required className="hbs-field" placeholder="e.g. Order updates"
                   value={webhookForm.name}
-                  onChange={(event) =>
-                    setWebhookForm((current) => ({
-                      ...current,
-
-                      name: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setWebhookForm((current) => ({ ...current, name: event.target.value }))}
                 />
               </Field>
-
-              <Field label="Where should updates go? (URL)" compactMobile>
+              <Field label="Destination URL" compactMobile>
                 <input
-                  required
-                  placeholder="https://..."
-                  className={settingsInputClass}
+                  required className="hbs-field" placeholder="https://..."
                   value={webhookForm.endpointUrl}
-                  onChange={(event) =>
-                    setWebhookForm((current) => ({
-                      ...current,
-
-                      endpointUrl: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => setWebhookForm((current) => ({ ...current, endpointUrl: event.target.value }))}
                 />
               </Field>
-
-              <div className="sm:col-span-2">
-                <Field label="Which updates should be sent?" compactMobile>
-                  <input
-                    placeholder="Comma-separated event names"
-                    className={settingsInputClass}
-                    value={webhookForm.eventTypes}
-                    onChange={(event) =>
-                      setWebhookForm((current) => ({
-                        ...current,
-
-                        eventTypes: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
+              <div className="hbs-span-all hbs-responsive-value">
+                <div className="hbs-multivalue-desktop">
+                  <Field label="Events to send (separate with commas)" compactMobile>
+                    <input
+                      className="hbs-field" placeholder="order.status_changed, settlement.paid"
+                      value={webhookForm.eventTypes}
+                      onChange={(event) => setWebhookForm((current) => ({ ...current, eventTypes: event.target.value }))}
+                    />
+                  </Field>
+                </div>
+                <div className="hbs-multivalue-mobile">
+                  <Field label="Events to send" compactMobile>
+                    <textarea
+                      className="hbs-field hbs-mobile-lines"
+                      rows={2}
+                      placeholder={"order.status_changed\nsettlement.paid"}
+                      value={webhookForm.eventTypes.replace(/,\s*/g, "\n")}
+                      onChange={(event) => setWebhookForm((current) => ({ ...current, eventTypes: event.target.value.replace(/\r?\n/g, ",") }))}
+                    />
+                  </Field>
+                </div>
               </div>
-
-              <button
-                disabled={busy}
-                className={`${settingsButtonClass} sm:col-span-2`}
-              >
-                <Webhook size={14} />
-                Start sending updates
+              <button disabled={busy} className="hbs-action hbs-span-all" type="submit">
+                <Webhook size={16} /> Start sending updates
               </button>
             </form>
-
-            <div className="mt-3 space-y-2">
-              {webhooks.length ? (
-                webhooks.map((webhook) => (
-                  <div
-                    key={webhook.id}
-                    className="flex min-w-0 flex-col items-stretch gap-2 rounded-[14px] border border-white/80 bg-white/85 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="break-words text-[11px] font-black text-stone-950 sm:truncate sm:text-xs">
-                        {webhook.name}
-                      </p>
-                      <p className="mt-1 break-all text-[9px] font-semibold leading-[13px] text-stone-500 sm:mt-0.5 sm:truncate sm:text-[11px] sm:leading-normal">
-                        {webhook.endpointUrl}
-                      </p>
+            <div className="hbs-records">
+              <p className="hbs-list-heading">Update destinations</p>
+              {settingsLoadErrors.webhooks ? (
+                <p className="hbs-error" role="alert">{settingsLoadErrors.webhooks}</p>
+              ) : webhooks.length ? (
+                <div className="hbs-list">
+                  {webhooks.map((webhook) => (
+                    <div key={webhook.id} className="hbs-row">
+                      <span className="hbs-row-copy">
+                        <span className="hbs-row-title">{webhook.name}</span>
+                        <span className="hbs-row-meta">{webhook.endpointUrl}</span>
+                      </span>
+                      <button
+                        type="button" disabled={busy} className="hbs-secondary"
+                        onClick={() => run(() => rotateHostWebhookSecret(webhook.id), "Update connection security key reset.")}
+                      >
+                        <RotateCw size={14} /> Reset key
+                      </button>
                     </div>
-
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        run(
-                          () => rotateHostWebhookSecret(webhook.id),
-                          "Update connection security key reset."
-                        )
-                      }
-                      className="focus-ring inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-[10px] border border-[#cfe1eb] bg-white/95 px-3 py-2 text-[10px] font-black text-[#315d74] sm:w-auto sm:rounded-xl sm:text-xs"
-                    >
-                      <RotateCw size={12} />
-                      Reset security key
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:text-xs">
-                  No update connections added yet.
-                </p>
-              )}
+                  ))}
+                </div>
+              ) : <p className="hbs-empty"><span className="hbs-multivalue-mobile">No destinations added.</span><span className="hbs-multivalue-desktop">No update connections yet.</span></p>}
             </div>
-          </Section>
+          </BusinessSettingsSection>
 
-          <div className="xl:col-span-2">
-            <Section
-              title="Recent changes"
-              description="See recent changes to business records, team members and connected tools."
-              icon={ShieldCheck}
-              tone="settingsMint"
-            >
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {audit.length ? (
-                  audit.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-[12px] border border-white/80 bg-white/80 px-3 py-2 sm:rounded-xl"
-                    >
-                      <p className="text-[10px] font-black text-stone-950 sm:text-xs">
-                        {titleize(event.action)}
-                      </p>
-
-                      <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-[11px]">
-                        {titleize(event.entityType)} ·{" "}
-                        {new Date(event.occurredAt).toLocaleString()}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="rounded-[12px] border border-white/80 bg-white/70 px-3 py-2 text-[9px] font-semibold text-stone-500 sm:col-span-2 sm:text-xs xl:col-span-3">
-                    No recent changes recorded yet.
-                  </p>
-                )}
+          <BusinessSettingsSection
+            index="05"
+            title="Recent changes"
+            description="A record of team, document and integration activity."
+            icon={ShieldCheck}
+            variant="audit"
+            count={settingsLoadErrors.audit ? "—" : audit.length}
+          >
+            {settingsLoadErrors.audit ? (
+              <p className="hbs-error" role="alert">{settingsLoadErrors.audit}</p>
+            ) : audit.length ? (
+              <div className="hbs-audit-grid">
+                {audit.map((event) => (
+                  <div key={event.id} className="hbs-audit-row">
+                    <strong>{titleize(event.action)}</strong>
+                    <small>{titleize(event.entityType)} · {new Date(event.occurredAt).toLocaleString()}</small>
+                  </div>
+                ))}
               </div>
-            </Section>
-          </div>
+            ) : <p className="hbs-empty"><span className="hbs-multivalue-mobile">No changes yet.</span><span className="hbs-multivalue-desktop">No recent changes recorded yet.</span></p>}
+          </BusinessSettingsSection>
         </div>
       ) : null}
     </main>

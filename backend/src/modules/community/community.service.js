@@ -132,8 +132,9 @@ function requireChefRestaurantHostCapability(
             true &&
         actorUser?.hostAccessStatus ===
             'active' &&
-        workspaceType ===
-            'chef_restaurant'
+        ['chef_restaurant', 'hybrid'].includes(
+            workspaceType,
+        )
     ) {
         return userId;
     }

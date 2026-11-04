@@ -21,6 +21,8 @@ const HOST_ORGANIZATION_STORAGE_KEY = 'epantry_hospitality_organization_id'
 // This stylesheet is scoped to Host Analytics. It does not change any shared UI.
 const analyticsStyles = String.raw`
 /* Scoped to the Host Analytics page; shell, navigation and other pages are unaffected. */
+/* Keep desktop copy unchanged; concise alternatives only appear on mobile. */
+.hax-copy-mobile { display: none; }
 .hax-page {
   --hax-forest: #173f35;
   --hax-forest-deep: #12362e;
@@ -253,51 +255,105 @@ const analyticsStyles = String.raw`
   .hax-reach { grid-template-columns: minmax(0,1fr) minmax(225px,.49fr); }
 }
 @media (max-width: 760px) {
-  .hax-page { padding: 13px 12px 28px; }
-  .hax-hero { grid-template-columns: minmax(0,1fr); border-radius: 14px; }
-  .hax-hero-main { padding: 21px 20px 17px; }
-  .hax-page .hax-hero-title { font-size: 28px; }
-  .hax-hero-copy { margin-bottom: 10px; font-size: 14px; }
+  /* Mobile-only layout and editorial copy; data and actions remain visible. */
+  .hax-copy-desktop, .hax-mobile-omit { display: none !important; }
+  .hax-copy-mobile { display: inline; }
+  .hax-page { padding: 10px 9px 22px; font-size: 15px; line-height: 1.48; }
+  .hax-hero { grid-template-columns: minmax(0,1fr); border-radius: 13px; }
+  .hax-hero-main { padding: 17px 17px 12px; }
+  .hax-eyebrow { font-size: 12px; letter-spacing: .025em; }
+  .hax-page .hax-hero-title { margin: 9px 0 4px; font-size: 27px; line-height: 1.15; }
+  .hax-hero-copy { margin-bottom: 8px; font-size: 14px; line-height: 1.45; }
+  .hax-plain-link { min-height: 36px; font-size: 13.5px; }
   .hax-hero-side {
     display: flex; flex-direction: row; align-items: center; justify-content: space-between;
-    gap: 12px; border-left: 0; border-top: 1px solid #bed3bc; padding: 13px 20px;
+    gap: 10px; border-left: 0; border-top: 1px solid #bed3bc; padding: 10px 17px;
   }
   .hax-hero-side > div { min-width: 0; }
-  .hax-side-range { font-size: 16px; }
-  .hax-refresh { margin-top: 0; }
-  .hax-section { margin-top: 23px; }
-  .hax-section-head h2 { font-size: 23px; }
-  .hax-sale-panel { grid-template-columns: minmax(0,1fr); }
-  .hax-revenue { padding: 22px; }
-  .hax-revenue-mark { margin-bottom: 9px; }
-  .hax-revenue-note { margin-bottom: 13px; }
-  .hax-page .hax-revenue-amount { font-size: 38px; }
-  .hax-sale-metric { padding: 16px 18px; }
-  .hax-two-column { grid-template-columns: minmax(0,1fr); gap: 13px; }
-  .hax-business-panel { padding: 21px; }
-  .hax-catalog-main { margin-top: 17px; }
-  .hax-reach { grid-template-columns: minmax(0,1fr); }
-  .hax-reach-left { padding: 20px; }
-  .hax-notification { border-left: 0; border-top: 1px solid #e7b29d; padding: 17px 20px; }
-  .hax-page .hax-notification-rate { font-size: 34px; }
+  .hax-side-label { font-size: 12.5px; }
+  .hax-side-range { font-size: 15px; }
+  .hax-refresh { margin-top: 0; min-height: 44px; padding: 8px 15px; }
+  .hax-loading { font-size: 12px; }
+  .hax-section { margin-top: 18px; }
+  .hax-section-head { margin-bottom: 11px; }
+  .hax-section-number { font-size: 12.5px; }
+  .hax-section-head h2 { margin-top: 2px; font-size: 21px; line-height: 1.25; }
+  .hax-section-head p { margin-top: 3px; font-size: 13.5px; line-height: 1.42; }
+  .hax-sale-panel { grid-template-columns: minmax(0,1fr); border-radius: 13px; }
+  .hax-revenue { padding: 17px 18px; }
+  .hax-revenue-mark { margin-bottom: 8px; }
+  .hax-revenue-label { font-size: 13.5px; }
+  .hax-page .hax-revenue-amount { margin: 4px 0 5px; font-size: 36px; }
+  .hax-revenue-note { max-width: none; margin-bottom: 11px; font-size: 12.5px; line-height: 1.43; }
+  .hax-units { padding-top: 9px; font-size: 13px; }
+  .hax-units strong { font-size: 19px; }
+  .hax-sale-metric { padding: 12px 14px; }
+  .hax-page .hax-metric-value { margin: 4px 0 1px; font-size: 28px; }
+  .hax-metric-label { font-size: 13px; }
+  .hax-metric-note { display: none; }
+  .hax-two-column { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .hax-business-panel { padding: 17px; border-radius: 13px; }
+  .hax-panel-heading { gap: 10px; }
+  .hax-panel-icon { width: 37px; height: 37px; border-radius: 9px; }
+  .hax-panel-heading h3 { font-size: 18px; }
+  .hax-panel-heading p { font-size: 13px; line-height: 1.4; }
+  .hax-catalog-main { margin-top: 13px; padding-bottom: 12px; }
+  .hax-page .hax-catalog-value { font-size: 41px; }
+  .hax-catalog-main p { font-size: 13px; }
+  .hax-catalog-secondary { padding-top: 12px; }
+  .hax-catalog-secondary span { font-size: 13px; }
+  .hax-catalog-secondary strong { font-size: 19px; }
+  .hax-manage-link { margin-top: 9px; font-size: 13.5px; min-height: 35px; }
+  .hax-activity-list { margin-top: 12px; }
+  .hax-activity-item { padding: 9px 12px; }
+  .hax-activity-item span { font-size: 12.5px; }
+  .hax-activity-item strong { margin-top: 2px; font-size: 23px; }
+  .hax-activity-note { margin-top: 8px; font-size: 12.5px; line-height: 1.4; }
+  .hax-reach { grid-template-columns: minmax(0,1fr); border-radius: 13px; }
+  .hax-reach-left { padding: 15px 17px; }
+  .hax-reach-label { font-size: 16px; }
+  .hax-reach-sub { margin: 2px 0 12px; font-size: 13px; }
+  .hax-discovery div { padding-left: 12px; padding-right: 12px; }
+  .hax-discovery span { font-size: 12.5px; }
+  .hax-discovery strong { font-size: 25px; }
+  .hax-notification {
+    display: grid; grid-template-columns: minmax(0,1fr) auto;
+    align-items: center; column-gap: 10px; row-gap: 2px;
+    border-left: 0; border-top: 1px solid #e7b29d; padding: 13px 17px 14px;
+  }
+  .hax-notification-heading { grid-column: 1; grid-row: 1; min-width: 0; font-size: 14px; line-height: 1.35; }
+  .hax-page .hax-notification-rate { grid-column: 2; grid-row: 1; margin: 0; font-size: 29px; line-height: 1.1; }
+  .hax-notification > p:last-child { grid-column: 1 / -1; margin: 0; font-size: 12.5px; line-height: 1.4; }
+  .hax-footnote { gap: 8px; margin-top: 15px; padding: 11px 1px 6px; font-size: 12.5px; line-height: 1.45; }
+  .hax-footnote svg { width: 16px; height: 16px; margin-top: 1px; }
+  .hax-footnote strong { font-weight: 700; }
+  .hax-workspace { margin-top: 8px; border-radius: 10px; }
+  .hax-workspace summary { min-height: 47px; gap: 8px; padding: 10px 13px; font-size: 13.5px; line-height: 1.4; }
+  .hax-workspace summary svg:first-child { margin-left: 0; flex: 0 0 17px; }
+  .hax-workspace summary svg:last-child { margin-left: auto; flex: 0 0 18px; }
+  .hax-workspace-body { padding: 0 13px 14px; }
+  .hax-workspace-body p { font-size: 13px; }
+  .hax-workspace-row { gap: 9px; }
+  .hax-workspace input, .hax-workspace button { min-height: 44px; }
 }
 @media (max-width: 420px) {
-  .hax-page { padding: 11px 9px 25px; }
-  .hax-hero-main { padding: 19px 17px 15px; }
-  .hax-hero-side { padding: 12px 17px; }
-  .hax-eyebrow, .hax-section-number { font-size: 12px; }
-  .hax-page .hax-hero-title { font-size: 27px; }
+  .hax-page { padding: 8px 7px 20px; }
+  .hax-hero-main { padding: 15px 14px 12px; }
+  .hax-hero-side { padding: 10px 14px; }
+  .hax-page .hax-hero-title { font-size: 26px; }
   .hax-section-head { align-items: flex-start; }
-  .hax-section-head h2 { font-size: 22px; }
-  .hax-sale-metric { padding: 15px 13px; }
-  .hax-page .hax-metric-value { font-size: 28px; }
-  .hax-metric-label, .hax-metric-note { font-size: 13px; }
-  .hax-business-panel { padding: 18px; }
-  .hax-activity-item { padding: 10px 11px; }
-  .hax-page .hax-catalog-value { font-size: 45px; }
-  .hax-reach-left { padding: 17px; }
-  .hax-discovery div { padding-left: 10px; padding-right: 10px; }
-  .hax-discovery strong { font-size: 25px; }
+  .hax-section-head h2 { font-size: 21px; }
+  .hax-sale-metric { padding: 11px 12px; }
+  .hax-page .hax-metric-value { font-size: 27px; }
+  .hax-business-panel { padding: 15px; }
+  .hax-activity-item { padding: 9px 10px; }
+  .hax-reach-left { padding: 14px; }
+  .hax-discovery div { padding-left: 9px; padding-right: 9px; }
+  .hax-discovery strong { font-size: 24px; }
+  .hax-notification { padding: 12px 14px 13px; }
+  .hax-notification-heading { font-size: 13.5px; }
+  .hax-page .hax-notification-rate { font-size: 28px; }
+  .hax-workspace summary { font-size: 13px; }
   .hax-workspace-row { flex-direction: column; }
   .hax-error { flex-direction: column; align-items: flex-start; }
 }
@@ -394,11 +450,11 @@ export default function HostAnalyticsPage() {
 
       <header className="hax-hero">
         <div className="hax-hero-main">
-          <div className="hax-eyebrow">Host / Business analytics</div>
+          <div className="hax-eyebrow"><span className="hax-copy-desktop">Host / Business analytics</span><span className="hax-copy-mobile">Business analytics</span></div>
           <h1 className="hax-hero-title">
             {data?.organization?.displayName || 'Business analytics'}
           </h1>
-          <p className="hax-hero-copy">
+          <p className="hax-hero-copy hax-mobile-omit">
             Track sales, live listings and customer engagement in one place.
           </p>
           <nav className="hax-links" aria-label="Analytics quick links">
@@ -409,7 +465,7 @@ export default function HostAnalyticsPage() {
         </div>
         <div className="hax-hero-side">
           <div>
-            <div className="hax-side-label">Reporting period</div>
+            <div className="hax-side-label"><span className="hax-copy-desktop">Reporting period</span><span className="hax-copy-mobile">Period</span></div>
             <div className="hax-side-range">{rangeText}</div>
           </div>
           <button type="button" className="hax-refresh" onClick={load} disabled={loading}>
@@ -432,20 +488,20 @@ export default function HostAnalyticsPage() {
       <section className="hax-section" aria-labelledby="hax-sales-heading">
         <div className="hax-section-head">
           <div>
-            <span className="hax-section-number">01 / Sales</span>
+            <span className="hax-section-number hax-mobile-omit">01 / Sales</span>
             <h2 id="hax-sales-heading">Sales performance</h2>
-            <p>Orders recorded during this reporting period.</p>
+            <p className="hax-mobile-omit">Orders recorded during this reporting period.</p>
           </div>
         </div>
         <div className="hax-sale-panel">
           <div className="hax-revenue">
             <div>
               <span className="hax-revenue-mark" aria-hidden="true" />
-              <div className="hax-revenue-label">Tracked order value</div>
+              <div className="hax-revenue-label"><span className="hax-copy-desktop">Tracked order value</span><span className="hax-copy-mobile">Order value</span></div>
               <p className="hax-revenue-amount">
                 {hasData ? moneyFromMinor(operational.trackedOrderValueMinor, operational.currency) : '—'}
               </p>
-              <p className="hax-revenue-note">Item totals before settlement; cancelled and refunded orders are excluded.</p>
+              <p className="hax-revenue-note"><span className="hax-copy-desktop">Item totals before settlement; cancelled and refunded orders are excluded.</span><span className="hax-copy-mobile">Before settlement · excludes cancellations & refunds</span></p>
             </div>
             <div className="hax-units">
               <strong>{count(operational.unitsOrdered)}</strong> Units ordered
@@ -463,9 +519,9 @@ export default function HostAnalyticsPage() {
       <section className="hax-section" aria-labelledby="hax-business-heading">
         <div className="hax-section-head">
           <div>
-            <span className="hax-section-number">02 / Business pulse</span>
+            <span className="hax-section-number hax-mobile-omit">02 / Business pulse</span>
             <h2 id="hax-business-heading">Products & customer activity</h2>
-            <p>What is available to buy, and how customers engage.</p>
+            <p className="hax-mobile-omit">What is available to buy, and how customers engage.</p>
           </div>
         </div>
         <div className="hax-two-column">
@@ -474,15 +530,15 @@ export default function HostAnalyticsPage() {
               <span className="hax-panel-icon"><Store size={20} aria-hidden="true" /></span>
               <div>
                 <h3 id="hax-listing-heading">Your listings</h3>
-                <p>Products ready for customers.</p>
+                <p className="hax-mobile-omit">Products ready for customers.</p>
               </div>
             </div>
             <div className="hax-catalog-main">
               <p className="hax-catalog-value">{count(operational.activeListings)}</p>
-              <p>Active product listings</p>
+              <p><span className="hax-copy-desktop">Active product listings</span><span className="hax-copy-mobile">Live products</span></p>
             </div>
             <div className="hax-catalog-secondary">
-              <span>Total listings you manage</span>
+              <span><span className="hax-copy-desktop">Total listings you manage</span><span className="hax-copy-mobile">All listings</span></span>
               <strong>{count(operational.managedListings)}</strong>
             </div>
             <Link to="/host/marketplace" className="hax-manage-link">
@@ -495,7 +551,7 @@ export default function HostAnalyticsPage() {
               <span className="hax-panel-icon"><Eye size={20} aria-hidden="true" /></span>
               <div>
                 <h3 id="hax-customer-heading">Customer activity</h3>
-                <p>Recorded engagement linked to your business.</p>
+                <p className="hax-mobile-omit">Recorded engagement linked to your business.</p>
               </div>
             </div>
             <div className="hax-activity-list">
@@ -504,7 +560,7 @@ export default function HostAnalyticsPage() {
               <ActivityMetric label="Recipe selections" value={count(data?.lenses?.recipes?.selected)} />
               <ActivityMetric label="Recipes cooked" value={count(data?.lenses?.recipes?.cooked)} />
             </div>
-            <p className="hax-activity-note">Only tracked customer activity is counted, so these figures may be lower than order totals.</p>
+            <p className="hax-activity-note"><span className="hax-copy-desktop">Only tracked customer activity is counted, so these figures may be lower than order totals.</span><span className="hax-copy-mobile">Recorded actions only.</span></p>
           </section>
         </div>
       </section>
@@ -512,15 +568,15 @@ export default function HostAnalyticsPage() {
       <section className="hax-section" aria-labelledby="hax-reach-heading">
         <div className="hax-section-head">
           <div>
-            <span className="hax-section-number">03 / Visibility</span>
+            <span className="hax-section-number hax-mobile-omit">03 / Visibility</span>
             <h2 id="hax-reach-heading">Discovery & notifications</h2>
-            <p>How shoppers discover content and respond to messages.</p>
+            <p className="hax-mobile-omit">How shoppers discover content and respond to messages.</p>
           </div>
         </div>
         <div className="hax-reach">
           <div className="hax-reach-left">
             <div className="hax-reach-label"><BarChart3 size={19} aria-hidden="true" /> Discovery mix</div>
-            <p className="hax-reach-sub">Tracked organic and sponsored discovery.</p>
+            <p className="hax-reach-sub hax-mobile-omit">Tracked organic and sponsored discovery.</p>
             <div className="hax-discovery">
               <div><span>Organic</span><strong>{count(data?.organicSponsored?.organic)}</strong></div>
               <div><span>Sponsored</span><strong>{count(data?.organicSponsored?.sponsored)}</strong></div>
@@ -530,24 +586,24 @@ export default function HostAnalyticsPage() {
           <div className="hax-notification">
             <div className="hax-notification-heading"><BellRing size={18} aria-hidden="true" /> Notification action rate</div>
             <p className="hax-notification-rate">{actionPercentage(data?.notificationUtility?.actionRate, hasData)}</p>
-            <p>Share of notification intents that led to an action.</p>
+            <p className="hax-mobile-omit">Share of notification intents that led to an action.</p>
           </div>
         </div>
       </section>
 
       <div className="hax-footnote">
         <CheckCircle2 size={19} aria-hidden="true" />
-        <p><strong>About these numbers.</strong> Order and listing totals come from saved business records. Customer and discovery metrics use privacy-safe activity signals; they do not change safety, search or ranking decisions.</p>
+        <p><span className="hax-copy-desktop"><strong>About these numbers.</strong> Order and listing totals come from saved business records. Customer and discovery metrics use privacy-safe activity signals; they do not change safety, search or ranking decisions.</span><span className="hax-copy-mobile">Orders & listings use saved records. Activity is privacy-safe and never changes safety or ranking.</span></p>
       </div>
 
       <details className="hax-workspace">
         <summary>
           <ShoppingBag size={17} aria-hidden="true" />
-          Manage another business workspace
+          <span className="hax-copy-desktop">Manage another business workspace</span><span className="hax-copy-mobile">Switch business</span>
           <ChevronDown size={18} aria-hidden="true" />
         </summary>
         <div className="hax-workspace-body">
-          <p>Only use this if your Host account manages more than one business.</p>
+          <p><span className="hax-copy-desktop">Only use this if your Host account manages more than one business.</span><span className="hax-copy-mobile">For hosts managing multiple businesses.</span></p>
           <div className="hax-workspace-row">
             <input
               value={organizationId}

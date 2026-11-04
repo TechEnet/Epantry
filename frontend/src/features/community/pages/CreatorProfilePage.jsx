@@ -379,170 +379,290 @@ export default function CreatorProfilePage() {
     );
   }
 
-  if (isOwnStudio && !creator) {
+  if (isOwnStudio && !creator && error) {
     return (
-      <main className="page-shell py-8 sm:py-10">
-        <section className="mx-auto max-w-3xl rounded-[30px] border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-700 text-white">
-              <ChefHat size={22} />
+      <main className="page-shell py-6 sm:py-9">
+        <section className="overflow-hidden rounded-[18px] border border-[#DCE0CF] bg-[#F7F6F2]">
+          <div className="h-1 bg-[#C86C42]" />
+          <div className="px-5 py-7 sm:px-8 sm:py-9">
+            <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#F8E7DD] text-[#8A432A]">
+              <ShieldCheck size={22} />
             </div>
-
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                Professional Creator Studio
-              </p>
-
-              <h1 className="text-3xl font-black text-stone-950">
-                Create your Creator profile
-              </h1>
-            </div>
-          </div>
-
-          <p className="mt-4 text-sm leading-7 text-stone-600">
-            Creator Studio belongs to your approved Chef + Restaurant Host workspace. Professional publishing still requires separate Super Admin verification and governance.
-          </p>
-
-          <form
-            onSubmit={handleCreateProfile}
-            className="mt-6 grid gap-4 sm:grid-cols-2"
-          >
-            <label>
-              <span className="text-xs font-black text-stone-500">
-                Public handle
-              </span>
-
-              <input
-                required
-                value={profileForm.slug}
-                onChange={(event) =>
-                  setProfileForm((current) => ({
-                    ...current,
-
-                    slug: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none"
-              />
-            </label>
-
-            <label>
-              <span className="text-xs font-black text-stone-500">
-                Display name
-              </span>
-
-              <input
-                required
-                value={profileForm.displayName}
-                onChange={(event) =>
-                  setProfileForm((current) => ({
-                    ...current,
-
-                    displayName: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-bold outline-none"
-              />
-            </label>
-
-            <label className="sm:col-span-2">
-              <span className="text-xs font-black text-stone-500">
-                Biography
-              </span>
-
-              <textarea
-                rows={4}
-                value={profileForm.biography}
-                onChange={(event) =>
-                  setProfileForm((current) => ({
-                    ...current,
-
-                    biography: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none"
-              />
-            </label>
-
-            <label>
-              <span className="text-xs font-black text-stone-500">
-                Cuisine specialties
-              </span>
-
-              <input
-                value={profileForm.cuisineSpecialties}
-                onChange={(event) =>
-                  setProfileForm((current) => ({
-                    ...current,
-
-                    cuisineSpecialties: event.target.value,
-                  }))
-                }
-                placeholder="Indian, baking"
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none"
-              />
-            </label>
-
-            <label>
-              <span className="text-xs font-black text-stone-500">
-                Languages
-              </span>
-
-              <input
-                value={profileForm.languages}
-                onChange={(event) =>
-                  setProfileForm((current) => ({
-                    ...current,
-
-                    languages: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none"
-              />
-            </label>
-
-            <label className="sm:col-span-2">
-              <span className="text-xs font-black text-stone-500">
-                Commercial disclosure
-              </span>
-
-              <textarea
-                rows={3}
-                value={profileForm.commercialDisclosure}
-                onChange={(event) =>
-                  setProfileForm((current) => ({
-                    ...current,
-
-                    commercialDisclosure: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-semibold outline-none"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="focus-ring sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white disabled:opacity-60"
-            >
-              {busy ? (
-                <LoaderCircle size={16} className="animate-spin" />
-              ) : (
-                <Plus size={16} />
-              )}
-              Create Creator profile
-            </button>
-          </form>
-
-          {error ? (
-            <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+            <p className="text-[12px] font-semibold tracking-[0.07em] text-[#A25231]">
+              HOST / CREATOR STUDIO
+            </p>
+            <h1 className="mt-2 text-[26px] font-semibold leading-tight text-[#173F35] sm:text-[32px]">
+              Creator Studio is unavailable
+            </h1>
+            <p className="mt-3 max-w-2xl text-[15px] leading-6 text-[#49564D]">
               {error}
             </p>
-          ) : null}
+            <button
+              type="button"
+              onClick={load}
+              className="focus-ring mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-[#173F35] px-5 text-[15px] font-semibold text-white hover:bg-[#255548]"
+            >
+              Try again
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (isOwnStudio && !creator) {
+    return (
+      <main className="page-shell creator-studio-mobile py-4 sm:py-7">
+        <style>{`
+          /* Creator Studio create form: mobile-only layout. All desktop styling remains unchanged. */
+          @media (max-width: 767px) {
+            .creator-studio-mobile { padding-top: 10px; padding-bottom: 12px; }
+            .creator-studio-mobile .creator-create-panel { border-radius: 14px; }
+            .creator-studio-mobile .creator-intro { padding: 18px 16px 16px; }
+            .creator-studio-mobile .creator-intro-label { gap: 8px; }
+            .creator-studio-mobile .creator-intro-label > span { width: 34px; height: 34px; border-radius: 10px; }
+            .creator-studio-mobile .creator-intro-label > p { font-size: 12px; letter-spacing: 0.015em; }
+            .creator-studio-mobile .creator-intro-accent { margin-top: 13px; width: 33px; }
+            .creator-studio-mobile .creator-intro-title { margin-top: 10px; font-size: 24px; line-height: 1.19; letter-spacing: -0.025em; }
+            .creator-studio-mobile .creator-intro-description { margin-top: 7px; font-size: 14px; line-height: 20px; }
+            .creator-studio-mobile .creator-intro-steps { margin-top: 13px; padding-top: 11px; gap: 8px 14px; font-size: 12px; line-height: 18px; }
+            .creator-studio-mobile .creator-preview { padding: 13px 16px 14px; }
+            .creator-studio-mobile .creator-preview h2 { font-size: 15px; line-height: 21px; }
+            .creator-studio-mobile .creator-preview > div:first-child > span { padding: 3px 9px; font-size: 11px; line-height: 16px; }
+            .creator-studio-mobile .creator-preview-card { margin-top: 9px; padding: 12px; border-radius: 12px; }
+            .creator-studio-mobile .creator-preview-icon { width: 42px; height: 42px; border-radius: 11px; }
+            .creator-studio-mobile .creator-preview-icon svg { width: 21px; height: 21px; }
+            .creator-studio-mobile .creator-preview-card > div:first-child { gap: 10px; }
+            .creator-studio-mobile .creator-preview-card > div:first-child p:first-child { font-size: 16px; line-height: 22px; }
+            .creator-studio-mobile .creator-preview-bio { margin-top: 9px; padding-top: 8px; font-size: 13px; line-height: 18px; overflow-wrap: anywhere; }
+            .creator-studio-mobile .creator-preview-card > p:last-child:not(.creator-preview-bio) { margin-top: 7px; }
+            .creator-studio-mobile .creator-preview-caption { margin-top: 8px; font-size: 12px; line-height: 17px; }
+            .creator-studio-mobile .creator-public-details,
+            .creator-studio-mobile .creator-expertise { padding: 16px 15px 17px; }
+            .creator-studio-mobile .creator-section-heading { margin-bottom: 13px; gap: 9px; align-items: center; }
+            .creator-studio-mobile .creator-section-number { width: 29px; height: 29px; border-radius: 8px; font-size: 12px; }
+            .creator-studio-mobile .creator-section-heading h2 { font-size: 19px; line-height: 25px; }
+            .creator-studio-mobile .creator-section-heading p { margin-top: 1px; font-size: 12px; line-height: 17px; }
+            .creator-studio-mobile .creator-public-fields,
+            .creator-studio-mobile .creator-expertise-fields,
+            .creator-studio-mobile .creator-expertise-inline { gap: 12px; }
+            .creator-studio-mobile label { min-width: 0; }
+            .creator-studio-mobile label > span { font-size: 13px; line-height: 19px; }
+            .creator-studio-mobile input { min-width: 0; height: 44px; margin-top: 5px; padding: 0 11px; font-size: 14px; }
+            .creator-studio-mobile textarea { display: block; min-height: 78px; height: 82px; margin-top: 5px; padding: 9px 11px; font-size: 14px; line-height: 20px; resize: vertical; }
+            .creator-studio-mobile .creator-comma-hint { margin-top: -5px; font-size: 12px; line-height: 17px; }
+            .creator-studio-mobile .creator-submit-bar { padding: 14px 15px 16px; gap: 12px; }
+            .creator-studio-mobile .creator-submit-note { align-items: center; gap: 9px; }
+            .creator-studio-mobile .creator-submit-note > span { margin-top: 0; width: 30px; height: 30px; border-radius: 8px; }
+            .creator-studio-mobile .creator-submit-title { display: none; }
+            .creator-studio-mobile .creator-submit-description { margin-top: 0; font-size: 12px; line-height: 18px; }
+            .creator-studio-mobile .creator-desktop-copy { display: none; }
+            .creator-studio-mobile .creator-mobile-copy { display: inline; }
+            .creator-studio-mobile .creator-submit-button { width: 100%; min-height: 46px; padding: 0 12px; font-size: 14px; }
+          }
+          @media (min-width: 768px) {
+            .creator-studio-mobile .creator-mobile-copy { display: none; }
+          }
+          @media (min-width: 360px) and (max-width: 767px) {
+            .creator-studio-mobile .creator-public-fields,
+            .creator-studio-mobile .creator-expertise-inline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .creator-studio-mobile .creator-public-fields > label:last-child { grid-column: 1 / -1; }
+          }
+        `}</style>
+        <section className="creator-create-panel overflow-hidden rounded-[20px] border border-[#D5D9CF] bg-[#F7F6F2]">
+          {/* A distinct editorial introduction and a read-only, live profile preview. */}
+          <div className="grid lg:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
+            <header className="creator-intro bg-[#173F35] px-5 py-7 text-[#F7F6F2] sm:px-9 sm:py-9">
+              <div className="creator-intro-label flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] border border-[#658376] bg-[#2A594A] text-[#F7F6F2]">
+                  <ChefHat size={21} aria-hidden="true" />
+                </span>
+                <p className="text-[13px] font-semibold tracking-[0.035em] text-[#E2E9DE]">
+                  Host / Creator Studio
+                </p>
+              </div>
+              <div className="creator-intro-accent mt-6 h-[3px] w-11 rounded-full bg-[#D98D64]" aria-hidden="true" />
+              <h1 className="creator-intro-title mt-4 max-w-[650px] text-[28px] font-semibold leading-[1.2] tracking-[-0.025em] text-[#FFFFFF] sm:text-[34px]">
+                Create your creator profile
+              </h1>
+              <p className="creator-intro-description mt-3 max-w-[570px] text-[15px] leading-6 text-[#D8E5DA]">
+                Show customers who you are and what you love to cook.
+              </p>
+              <div className="creator-intro-steps mt-6 flex flex-wrap items-center gap-x-7 gap-y-3 border-t border-[#476B5F] pt-5 text-[13px] text-[#E3ECE2]">
+                <span className="inline-flex items-center gap-2"><span className="font-semibold text-[#F4BE97]">01</span> Build your profile</span>
+                <span className="inline-flex items-center gap-2"><span className="font-semibold text-[#F4BE97]">02</span> Request verification</span>
+              </div>
+            </header>
+
+            <aside className="creator-preview border-t border-[#E5C8B8] bg-[#FBE8DE] px-5 py-6 sm:px-8 sm:py-8 lg:border-l lg:border-t-0">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-[16px] font-semibold leading-6 text-[#713F31]">Your public profile</h2>
+                <span className="rounded-full border border-[#DDB6A1] bg-[#FFF6F0] px-3 py-1 text-[12px] font-medium text-[#814B37]">
+                  Live preview
+                </span>
+              </div>
+              <div className="creator-preview-card mt-4 rounded-[16px] border border-[#E1CEC1] bg-[#FFFFFF] px-4 py-5 sm:px-5">
+                <div className="flex items-center gap-3">
+                  <span className="creator-preview-icon grid h-14 w-14 shrink-0 place-items-center rounded-[15px] bg-[#DCE0CF] text-[#173F35]">
+                    <ChefHat size={27} aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[18px] font-semibold leading-6 text-[#173F35]">
+                      {profileForm.displayName.trim() || "Your display name"}
+                    </p>
+                    <p className="mt-0.5 truncate text-[13px] text-[#647268]">
+                      @{profileForm.slug.trim() || "your-handle"}
+                    </p>
+                  </div>
+                </div>
+                <p className="creator-preview-bio mt-4 border-t border-[#E8EAE4] pt-3 text-[14px] leading-5 break-words text-[#53645A]">
+                  {profileForm.biography.trim() || "Your cooking story will appear here."}
+                </p>
+                {profileForm.cuisineSpecialties.trim() ? (
+                  <p className="mt-3 text-[13px] font-medium leading-5 text-[#975333]">
+                    {profileForm.cuisineSpecialties}
+                  </p>
+                ) : null}
+              </div>
+              <p className="creator-preview-caption mt-3 text-[13px] leading-5 text-[#805846]">
+                Preview only. Your profile is published after the required review.
+              </p>
+            </aside>
+          </div>
+
+          <form onSubmit={handleCreateProfile}>
+            <div className="grid lg:grid-cols-[minmax(0,1.09fr)_minmax(0,0.91fr)]">
+              <section className="creator-public-details border-t border-[#E2E6E4] bg-[#EFF5F7] px-5 py-6 sm:px-9 sm:py-8">
+                <div className="creator-section-heading mb-5 flex items-start gap-3">
+                  <span className="creator-section-number grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[#D3E6EC] text-[14px] font-semibold text-[#173F35]">01</span>
+                  <div>
+                    <h2 className="text-[22px] font-semibold leading-[30px] text-[#173F35]">Public details</h2>
+                    <p className="mt-1 text-[14px] leading-5 text-[#53656A]">The name and story customers will see.</p>
+                  </div>
+                </div>
+                <div className="creator-public-fields grid gap-4 sm:grid-cols-2">
+                  <label className="block min-w-0">
+                    <span className="text-[14px] font-semibold text-[#263E3A]">Public handle <span className="text-[#A24C34]">*</span></span>
+                    <input
+                      required
+                      value={profileForm.slug}
+                      onChange={(event) =>
+                        setProfileForm((current) => ({ ...current, slug: event.target.value }))
+                      }
+                      placeholder="e.g. chef-alok"
+                      autoComplete="off"
+                      className="focus-ring mt-2 h-12 w-full rounded-[12px] border border-[#C9D9DD] bg-[#FFFFFF] px-4 text-[15px] text-[#202421] placeholder:text-[#7A8987]"
+                    />
+                  </label>
+                  <label className="block min-w-0">
+                    <span className="text-[14px] font-semibold text-[#263E3A]">Display name <span className="text-[#A24C34]">*</span></span>
+                    <input
+                      required
+                      value={profileForm.displayName}
+                      onChange={(event) =>
+                        setProfileForm((current) => ({ ...current, displayName: event.target.value }))
+                      }
+                      placeholder="Your public name"
+                      className="focus-ring mt-2 h-12 w-full rounded-[12px] border border-[#C9D9DD] bg-[#FFFFFF] px-4 text-[15px] text-[#202421] placeholder:text-[#7A8987]"
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-[14px] font-semibold text-[#263E3A]">About you</span>
+                    <textarea
+                      rows={4}
+                      value={profileForm.biography}
+                      onChange={(event) =>
+                        setProfileForm((current) => ({ ...current, biography: event.target.value }))
+                      }
+                      placeholder="Your background, cooking style and what you share"
+                      className="focus-ring mt-2 block min-h-[115px] w-full resize-y rounded-[12px] border border-[#C9D9DD] bg-[#FFFFFF] px-4 py-3 text-[15px] leading-6 text-[#202421] placeholder:text-[#7A8987]"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="creator-expertise border-t border-[#D9E1D7] bg-[#E8EEE0] px-5 py-6 sm:px-9 sm:py-8 lg:border-l">
+                <div className="creator-section-heading mb-5 flex items-start gap-3">
+                  <span className="creator-section-number grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[#D0DFC8] text-[14px] font-semibold text-[#173F35]">02</span>
+                  <div>
+                    <h2 className="text-[22px] font-semibold leading-[30px] text-[#173F35]">Your expertise</h2>
+                    <p className="mt-1 text-[14px] leading-5 text-[#586959]">Add specialties, languages and disclosures.</p>
+                  </div>
+                </div>
+                <div className="creator-expertise-fields grid gap-4">
+                  <div className="creator-expertise-inline grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                    <label className="block min-w-0">
+                      <span className="text-[14px] font-semibold text-[#263E33]">Cuisine specialties</span>
+                      <input
+                        value={profileForm.cuisineSpecialties}
+                        onChange={(event) =>
+                          setProfileForm((current) => ({ ...current, cuisineSpecialties: event.target.value }))
+                        }
+                        placeholder="Indian, baking"
+                        className="focus-ring mt-2 h-12 w-full rounded-[12px] border border-[#CEDACA] bg-[#FFFFFF] px-4 text-[15px] text-[#202421] placeholder:text-[#7A8980]"
+                      />
+                    </label>
+                    <label className="block min-w-0">
+                      <span className="text-[14px] font-semibold text-[#263E33]">Languages</span>
+                      <input
+                        value={profileForm.languages}
+                        onChange={(event) =>
+                          setProfileForm((current) => ({ ...current, languages: event.target.value }))
+                        }
+                        placeholder="en, hi"
+                        className="focus-ring mt-2 h-12 w-full rounded-[12px] border border-[#CEDACA] bg-[#FFFFFF] px-4 text-[15px] text-[#202421] placeholder:text-[#7A8980]"
+                      />
+                    </label>
+                  </div>
+                  <p className="creator-comma-hint text-[13px] leading-5 text-[#586B58]">Separate entries with commas.</p>
+                  <label className="block">
+                    <span className="text-[14px] font-semibold text-[#263E33]">Commercial disclosure</span>
+                    <textarea
+                      rows={3}
+                      value={profileForm.commercialDisclosure}
+                      onChange={(event) =>
+                        setProfileForm((current) => ({ ...current, commercialDisclosure: event.target.value }))
+                      }
+                      placeholder="Mention brand or sponsor relationships, if any"
+                      className="focus-ring mt-2 block min-h-[105px] w-full resize-y rounded-[12px] border border-[#CEDACA] bg-[#FFFFFF] px-4 py-3 text-[15px] leading-6 text-[#202421] placeholder:text-[#7A8980]"
+                    />
+                  </label>
+                </div>
+              </section>
+            </div>
+
+            <div className="creator-submit-bar flex flex-col gap-4 border-t border-[#D4DDCA] bg-[#F7F6F2] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-9">
+              <div className="creator-submit-note flex items-start gap-3">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[#DCE0CF] text-[#173F35]">
+                  <ShieldCheck size={17} aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="creator-submit-title text-[14px] font-semibold leading-5 text-[#173F35]">Ready to create your profile?</p>
+                  <p className="creator-submit-description mt-1 max-w-[460px] text-[13px] leading-5 text-[#526158]">
+                    <span className="creator-desktop-copy">Super Admin verification is required before professional publishing.</span>
+                    <span className="creator-mobile-copy">Publishing requires Super Admin approval.</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={busy}
+                className="creator-submit-button focus-ring inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-[12px] bg-[#173F35] px-6 text-[15px] font-semibold text-white transition hover:bg-[#255548] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busy ? <LoaderCircle size={17} className="animate-spin" /> : <Plus size={17} />}
+                {busy ? "Creating profile..." : "Create creator profile"}
+              </button>
+            </div>
+          </form>
 
           {notice ? (
-            <p className="mt-4 rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+            <p role="status" className="mx-5 mb-5 rounded-[12px] bg-[#E2F0E4] px-4 py-3 text-[14px] font-medium text-[#173F35] sm:mx-9">
               {notice}
+            </p>
+          ) : null}
+          {error ? (
+            <p role="alert" className="mx-5 mb-5 rounded-[12px] bg-[#F9E8DF] px-4 py-3 text-[14px] font-medium text-[#863A25] sm:mx-9">
+              {error}
             </p>
           ) : null}
         </section>

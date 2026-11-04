@@ -3,6 +3,8 @@ import {
   Building2,
   Camera,
   CheckCircle2,
+  Copy,
+  IdCard,
   MapPin,
   MapPinned,
   Pencil,
@@ -465,6 +467,11 @@ export default function EditProfilePage({
   const [
     success,
     setSuccess,
+  ] = useState('')
+
+  const [
+    hostIdCopyStatus,
+    setHostIdCopyStatus,
   ] = useState('')
 
   const identityInitial =
@@ -1169,6 +1176,30 @@ export default function EditProfilePage({
     }
   }
 
+  const hostAccountId =
+    String(
+      profile?.id ||
+        currentUser?.id ||
+        '',
+    ).trim()
+
+  async function handleCopyHostAccountId() {
+    if (!hostAccountId) {
+      return
+    }
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard unavailable')
+      }
+
+      await navigator.clipboard.writeText(hostAccountId)
+      setHostIdCopyStatus('copied')
+    } catch {
+      setHostIdCopyStatus('unavailable')
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6 sm:p-8 lg:p-10">
@@ -1187,6 +1218,57 @@ export default function EditProfilePage({
 
     return (
       <div className="px-2.5 pb-4 pt-0 sm:px-5 sm:pb-6 lg:px-6 lg:pb-7">
+        <section
+          aria-labelledby="host-account-id-heading"
+          className="mb-3 rounded-[16px] border border-[#CEDBCF] border-l-4 border-l-[#C86C42] bg-[#E9F0E8] px-3.5 py-3.5 sm:mb-4 sm:rounded-[18px] sm:px-5 sm:py-4"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#173F35] text-white" aria-hidden="true">
+                  <IdCard size={19} />
+                </span>
+                <div className="min-w-0">
+                  <h2 id="host-account-id-heading" className="text-base font-bold leading-6 text-[#173F35] sm:text-lg">
+                    Your Host account ID
+                  </h2>
+                  <p className="text-[13px] leading-5 text-[#526359] sm:text-sm">
+                    Share this ID when another business adds you to its team.
+                  </p>
+                </div>
+              </div>
+              <input
+                aria-label="Your Host account ID"
+                type="text"
+                readOnly
+                value={hostAccountId}
+                placeholder="ID unavailable"
+                onFocus={(event) => event.currentTarget.select()}
+                className="focus-ring mt-3 block min-h-[43px] w-full rounded-[10px] border border-[#BFCFC1] bg-white px-3 py-2 font-mono text-[14px] font-medium tracking-[0.015em] text-[#173F35] sm:max-w-[560px] sm:text-[15px]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyHostAccountId}
+              disabled={!hostAccountId}
+              className="focus-ring inline-flex min-h-[44px] w-full shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#255C4C] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {hostIdCopyStatus === 'copied' ? (
+                <CheckCircle2 size={17} aria-hidden="true" />
+              ) : (
+                <Copy size={17} aria-hidden="true" />
+              )}
+              {hostIdCopyStatus === 'copied' ? 'Copied' : 'Copy ID'}
+            </button>
+          </div>
+          <div aria-live="polite" className="mt-1 text-[13px] text-[#173F35]">
+            {hostIdCopyStatus === 'unavailable'
+              ? 'Copy is unavailable here. Select the ID above to copy it manually.'
+              : hostIdCopyStatus === 'copied'
+                ? 'Host account ID copied.'
+                : null}
+          </div>
+        </section>
         <header className="rounded-[22px] border border-emerald-200 bg-[linear-gradient(135deg,#dcf7e9_0%,#e9f6fb_58%,#f1ecff_100%)] p-3.5 shadow-[0_10px_28px_rgba(23,72,59,0.08)] sm:rounded-[28px] sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
