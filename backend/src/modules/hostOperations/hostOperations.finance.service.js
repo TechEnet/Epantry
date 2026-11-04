@@ -14,6 +14,8 @@ import {
   SellerOrder,
 } from '../commerce/commerce.transaction.models.js'
 
+import { ProductVersion } from '../catalog/catalog.models.js'
+
 import {
   MarketplaceOrganization,
 } from '../marketplace/marketplace.models.js'
@@ -595,7 +597,7 @@ export async function getHostEarningsOverview({
           },
         })
           .select(
-            '_id parentOrderId sellerName status commercialSnapshot createdAt updatedAt',
+            '_id parentOrderId sellerName status items commercialSnapshot createdAt updatedAt',
           )
           .sort({
             updatedAt:
@@ -766,6 +768,32 @@ export async function getHostEarningsOverview({
       ),
     )
 
+  const previewVersionIds = [
+    ...new Set(
+      recentOrders
+        .flatMap((order) => (order.items || []).map((item) => stringifyId(item?.productVersionId)))
+        .filter((id) => id && mongoose.Types.ObjectId.isValid(id)),
+    ),
+  ]
+
+  const previewVersions = previewVersionIds.length
+    ? await ProductVersion.find({
+        _id: { $in: previewVersionIds },
+      })
+        .select('_id displayName images.url')
+        .lean()
+    : []
+
+  const productPreviewByVersionId = new Map(
+    previewVersions.map((version) => [
+      stringifyId(version._id),
+      {
+        name: String(version.displayName || '').trim(),
+        imageUrl: String(version.images?.[0]?.url || '').trim(),
+      },
+    ]),
+  )
+
   const currency =
     captured._id ||
     delivered._id ||
@@ -874,6 +902,36 @@ export async function getHostEarningsOverview({
             sellerName:
               order.sellerName ||
               '',
+
+            // The saved checkout snapshot is authoritative for what was sold.
+            // No catalog re-listing or payout calculation is required.
+            itemCount:
+              (order.items || []).length,
+
+            itemNames:
+              (order.items || [])
+                .map((item) =>
+                  String(
+                    item?.displayName ||
+                      productPreviewByVersionId.get(stringifyId(item?.productVersionId))?.name ||
+                      '',
+                  ).trim(),
+                )
+                .filter(Boolean),
+
+            itemPreviews:
+              (order.items || [])
+                .map((item) => {
+                  const versionId = stringifyId(item?.productVersionId)
+                  const productPreview = productPreviewByVersionId.get(versionId) || {}
+                  return {
+                    name: String(item?.displayName || productPreview.name || '').trim(),
+                    productVersionId: versionId,
+                    imageUrl: productPreview.imageUrl || '',
+                    packCount: Number(item?.packCount || 1),
+                  }
+                })
+                .slice(0, 5),
 
             orderStatus:
               order.status ||

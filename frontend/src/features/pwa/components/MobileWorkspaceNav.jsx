@@ -6,7 +6,6 @@ import {
   ScanLine,
   ShoppingBag,
   ShoppingBasket,
-  Truck,
 } from 'lucide-react'
 
 import {
@@ -65,11 +64,6 @@ const HOST_ITEMS = Object.freeze([
     icon: ShoppingBag,
   },
   {
-    label: 'Fulfill',
-    to: '/host/fulfillment',
-    icon: Truck,
-  },
-  {
     label: 'Business',
     to: '/host/business-profile',
     icon: Building2,
@@ -95,10 +89,7 @@ export default function MobileWorkspaceNav({
     >
       <div
         className={[
-          'mx-auto grid max-w-lg gap-1',
-          items.length === 6
-            ? 'grid-cols-6'
-            : 'grid-cols-5',
+          'mx-auto grid max-w-lg grid-cols-5 gap-1',
         ].join(' ')}
       >
         {items.map((item) => {

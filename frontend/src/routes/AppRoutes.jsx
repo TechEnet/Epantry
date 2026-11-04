@@ -1051,7 +1051,6 @@ const HostOrdersPage = lazy(() => import('../features/host/pages/HostOrdersPage'
 const HostOrderDetailPage = lazy(() => import('../features/host/pages/HostOrderDetailPage'))
 const HostOperationsPage = lazy(() => import('../features/hostOperations/pages/HostOperationsPage'))
 const HostBusinessProfilePage = lazy(() => import('../features/hostOperations/pages/HostBusinessProfilePage'))
-const HostFulfillmentPage = lazy(() => import('../features/hostOperations/pages/HostFulfillmentPage'))
 const HospitalityPage = lazy(() => import('../features/hospitality/pages/HospitalityPage'))
 const HostAnalyticsPage = lazy(() => import('../features/analytics/pages/HostAnalyticsPage'))
 
@@ -3104,16 +3103,7 @@ export default function AppRoutes() {
               }
             />
 
-            <Route
-              path="/host/fulfillment"
-              element={
-                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
-                  <HostShell>
-                    <HostFulfillmentPage />
-                  </HostShell>
-                </ApplicationAccessRoute>
-              }
-            />
+            <Route path="/host/fulfillment" element={<Navigate to="/host/orders" replace />} />
 
             <Route
               path="/host/analytics"

@@ -31,7 +31,6 @@ const COMMERCE_HOST_PATHS = Object.freeze([
   '/host/listing-history',
   '/host/marketplace',
   '/host/orders',
-  '/host/fulfillment',
   '/host/earnings',
   '/host/finance',
   '/host/analytics',
@@ -71,8 +70,7 @@ const ROUTE_PREFIXES_BY_WORKSPACE = Object.freeze({
   [HOST_WORKSPACE_TYPES.CHEF_RESTAURANT]: [
     ...COMMON_HOST_PATHS,
     ...CHEF_RESTAURANT_PATHS,
-    '/host/marketplace', '/host/orders', '/host/fulfillment',
-  ],
+    '/host/marketplace', '/host/orders', ],
 })
 
 export function normalizeHostWorkspaceType(value) {

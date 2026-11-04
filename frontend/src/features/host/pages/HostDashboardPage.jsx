@@ -14,7 +14,6 @@ import {
   Settings,
   ShoppingBag,
   Store,
-  Truck,
   WalletCards,
   Warehouse,
 } from "lucide-react";
@@ -318,12 +317,6 @@ const quickAccessItems = [
     icon: ShoppingBag,
   },
   {
-    title: "Fulfillment",
-    description: "Pack, dispatch and track active orders through delivery.",
-    to: "/host/fulfillment",
-    icon: Truck,
-  },
-  {
     title: "Finance",
     description:
       "Track earnings, settlement progress and finance-related actions.",
@@ -359,7 +352,7 @@ const quickAccessItems = [
   },
 ];
 
-// The same existing 12 destinations, grouped into three business areas.
+// Available Host tools grouped into three business areas.
 // Permission filtering stays on each original route.
 const toolGroups = [
   {
@@ -382,7 +375,6 @@ const toolGroups = [
     paths: [
       "/host/marketplace",
       "/host/orders",
-      "/host/fulfillment",
       "/host/finance",
     ],
   },

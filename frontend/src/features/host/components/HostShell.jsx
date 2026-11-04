@@ -19,7 +19,6 @@ import {
   Settings,
   ShoppingBag,
   Store,
-  Truck,
   UserRound,
   WalletCards,
   Warehouse,
@@ -123,11 +122,6 @@ const navigationGroups = [
         icon: ShoppingBag,
       },
       {
-        label: "Fulfillment",
-        to: "/host/fulfillment",
-        icon: Truck,
-      },
-      {
         label: "Earnings",
         to: "/host/earnings",
         icon: Banknote,
@@ -212,7 +206,6 @@ const mobileNavigationOrder = [
   "/host/data-quality",
   "/host/marketplace",
   "/host/orders",
-  "/host/fulfillment",
   "/host/earnings",
   "/host/finance",
   "/host/campaigns",
@@ -441,7 +434,6 @@ export default function HostShell({ children }) {
     location.pathname
   );
 
-  const isHostFulfillmentRoute = location.pathname === "/host/fulfillment";
 
   const isHostFinanceRoute = location.pathname === "/host/finance";
 
@@ -504,7 +496,6 @@ export default function HostShell({ children }) {
           isHostMarketplaceRoute ||
           isHostOrdersRoute ||
           isHostOrderDetailRoute ||
-          isHostFulfillmentRoute ||
           isHostFinanceRoute ||
           isHostCampaignsRoute ||
           isHostAnalyticsRoute ||
