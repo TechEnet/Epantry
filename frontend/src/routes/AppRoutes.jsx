@@ -3151,7 +3151,7 @@ export default function AppRoutes() {
             <Route path="/host/hospitality" element={<HospitalityRoute section="dashboard" />} />
             <Route path="/host/hospitality/outlets" element={<HospitalityRoute section="outlets" />} />
             <Route path="/host/hospitality/suppliers" element={<HospitalityRoute section="suppliers" />} />
-            <Route path="/host/hospitality/products" element={<HospitalityRoute section="products" />} />
+            <Route path="/host/hospitality/products" element={<Navigate to="/host/listings/new?type=prepared_food" replace />} />
             <Route path="/host/hospitality/recipes" element={<Navigate to="/host/listings/new?type=kitchen_recipe" replace />} />
             <Route path="/host/hospitality/legacy-recipes" element={<Navigate to="/host/listings/new" replace />} />
             <Route path="/host/hospitality/menus" element={<HospitalityRoute section="menus" />} />

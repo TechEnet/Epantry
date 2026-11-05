@@ -50,6 +50,7 @@ import {
   initializeHospitalityProfile,
   listHospitalityMemberGrants,
   listHospitalityMenus,
+  listHospitalityApprovedPreparedFood,
   listHospitalityCurrentStock,
   listHospitalityOutlets,
   listHospitalityProductionPlans,
@@ -1276,6 +1277,13 @@ router.get(
       ),
   ),
 )
+
+router.get('/menus/approved-prepared-food', wrap(async (req, res) =>
+  send(req, res, 200, await listHospitalityApprovedPreparedFood({
+    actorUser: actorUser(req),
+    organizationIdHint: organizationIdHint(req),
+  }), 'Approved prepared-food listings loaded.'),
+))
 
 router.post(
   '/menus',

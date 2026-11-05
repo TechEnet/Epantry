@@ -269,6 +269,9 @@ export const listHospitalityMenus = () =>
     '/host/hospitality/menus',
   )
 
+export const listHospitalityApprovedPreparedFood = () =>
+  get('/host/hospitality/menus/approved-prepared-food')
+
 export const createHospitalityMenu = (
   input,
 ) =>

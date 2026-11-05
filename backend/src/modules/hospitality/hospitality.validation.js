@@ -736,23 +736,16 @@ export const createMenuBodySchema = z
 
 export const addMenuItemBodySchema = z
   .object({
-    productionRecipeVersionId:
-      objectIdSchema,
-
-    displayName:
-      z
-        .string()
-        .trim()
-        .min(2)
-        .max(220),
-
-    sellingPrice:
-      moneySchema
-        .nullable()
-        .optional()
-        .default(null),
+    productionRecipeVersionId: objectIdSchema.optional(),
+    hostListingPacketId: objectIdSchema.optional(),
+    displayName: z.string().trim().min(2).max(220),
+    sellingPrice: moneySchema.nullable().optional().default(null),
   })
   .strict()
+  .refine(
+    (value) => Boolean(value.productionRecipeVersionId) !== Boolean(value.hostListingPacketId),
+    { message: 'Choose exactly one approved kitchen recipe or prepared-food listing.' },
+  )
 
 export const menuItemAvailabilityParamsSchema = z
   .object({

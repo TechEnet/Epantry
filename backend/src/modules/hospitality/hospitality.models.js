@@ -1218,6 +1218,30 @@ hospitalityMenuItemSchema.index(
 |--------------------------------------------------------------------------
 */
 
+/*
+|--------------------------------------------------------------------------
+| Approved prepared-food listing menu entries
+|--------------------------------------------------------------------------
+| Listing Studio entries and Hospitality production recipe versions are
+| separate source models. Keep their menu identities and indexes separate.
+|--------------------------------------------------------------------------
+*/
+const hospitalityMenuListingItemSchema = new Schema(
+  {
+    organizationId: { type: objectId, ref: 'MarketplaceOrganization', required: true, index: true },
+    menuId: { type: objectId, ref: 'HospitalityMenu', required: true, index: true },
+    hostListingPacketId: { type: objectId, ref: 'HostUnifiedListingPacket', required: true, index: true },
+    displayName: { type: String, required: true, trim: true, maxlength: 220 },
+    imageUrl: { type: String, default: '', trim: true, maxlength: 2048 },
+    sellingPrice: { type: moneySchema, default: null },
+    status: { type: String, enum: ['active', 'disabled'], default: 'active' },
+  },
+  { ...baseOptions, collection: 'hospitalityMenuListingItems' },
+)
+hospitalityMenuListingItemSchema.index(
+  { menuId: 1, hostListingPacketId: 1 }, { unique: true },
+)
+
 const hospitalityMenuAvailabilitySchema = new Schema(
   {
     organizationId: {
@@ -1251,7 +1275,14 @@ const hospitalityMenuAvailabilitySchema = new Schema(
     productionRecipeVersionId: {
       type: objectId,
       ref: 'HospitalityProductionRecipeVersion',
-      required: true,
+      default: null,
+      index: true,
+    },
+
+    hostListingPacketId: {
+      type: objectId,
+      ref: 'HostUnifiedListingPacket',
+      default: null,
       index: true,
     },
 
@@ -1749,6 +1780,13 @@ export const HospitalityMenuItem =
   mongoose.model(
     'HospitalityMenuItem',
     hospitalityMenuItemSchema,
+  )
+
+export const HospitalityMenuListingItem =
+  mongoose.models.HospitalityMenuListingItem ||
+  mongoose.model(
+    'HospitalityMenuListingItem',
+    hospitalityMenuListingItemSchema,
   )
 
 export const HospitalityMenuAvailability =

@@ -42,8 +42,8 @@ const NAV_ITEMS = [
     icon: Truck,
   },
   {
-    label: "Ingredients & products",
-    to: "/host/hospitality/products",
+    label: "Prepared-food listing",
+    to: "/host/listings/new?type=prepared_food",
     icon: PackageSearch,
   },
   {

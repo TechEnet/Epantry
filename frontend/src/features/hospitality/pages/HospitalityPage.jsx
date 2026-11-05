@@ -23,9 +23,10 @@ import {
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { apiClient } from "../../../api/apiClient";
+import { getHostListingSellingReadiness } from "../../host/services/hostUnifiedListing.service";
 
 import {
   addHospitalityMenuItem,
@@ -53,6 +54,7 @@ import {
   listHospitalityCurrentStock,
   listHospitalityMemberGrants,
   listHospitalityMenus,
+  listHospitalityApprovedPreparedFood,
   listHospitalityOutlets,
   listHospitalityProductionPlans,
   listHospitalityProductionRecipes,
@@ -70,6 +72,9 @@ import {
 
 const inputClass =
   "focus-ring w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none placeholder:text-stone-400";
+
+const menuFieldClass =
+  "focus-ring min-h-11 w-full min-w-0 rounded-[10px] border border-[#DCE0CF] bg-white px-3.5 py-2.5 text-[14px] font-medium text-[#202421] outline-none placeholder:text-[#202421]/45 focus:border-[#173F35] sm:text-[15px]";
 
 const primaryButtonClass =
   "focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50";
@@ -364,6 +369,10 @@ function evidenceFrom(label, referenceId) {
 }
 
 export default function HospitalityPage({ section = "dashboard" }) {
+  const navigate = useNavigate();
+  const [preparedListings, setPreparedListings] = useState([]);
+  const [preparedListingError, setPreparedListingError] = useState("");
+  const [openingMarketplace, setOpeningMarketplace] = useState("");
   const config = SECTION_CONFIG[section] || SECTION_CONFIG.dashboard;
 
   const Icon = config.icon;
@@ -391,6 +400,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const [notice, setNotice] = useState("");
   const [dashboardFeedFailures, setDashboardFeedFailures] = useState([]);
   const [outletFeedFailures, setOutletFeedFailures] = useState([]);
+  const [supplierFeedFailures, setSupplierFeedFailures] = useState([]);
+  const [menuFeedFailures, setMenuFeedFailures] = useState([]);
 
   const [reason, setReason] = useState(
     "Operational review completed with supporting evidence."
@@ -401,6 +412,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const [evidenceReferenceId, setEvidenceReferenceId] = useState("");
 
   const [profileCurrency, setProfileCurrency] = useState("INR");
+  const [mobileCurrencyOpen, setMobileCurrencyOpen] = useState(false);
+  const [mobileOutletFormOpen, setMobileOutletFormOpen] = useState(false);
+  const [mobileTeamOpen, setMobileTeamOpen] = useState(false);
   const [profileSettingsSaved, setProfileSettingsSaved] = useState(false);
   const [outletSaved, setOutletSaved] = useState(false);
 
@@ -470,6 +484,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
 
   const [menuItemForm, setMenuItemForm] = useState({
     menuId: "",
+    sourceType: "prepared_food_listing",
+    hostListingPacketId: "",
     productionRecipeVersionId: "",
     displayName: "",
     sellingPriceMinor: "",
@@ -527,6 +543,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
     setError("");
     if (section === "dashboard") setDashboardFeedFailures([]);
     if (section === "outlets") setOutletFeedFailures([]);
+    if (section === "suppliers") setSupplierFeedFailures([]);
 
     try {
       const common = await Promise.allSettled([
@@ -542,6 +559,14 @@ export default function HospitalityPage({ section = "dashboard" }) {
 
       const failedDashboardFeeds = [];
       const failedOutletFeeds = [];
+      const failedSupplierFeeds = [];
+      const failedMenuFeeds = [];
+      if (section === "menus" && common[1].status === "rejected") {
+        failedMenuFeeds.push("Outlets");
+      }
+      if (section === "suppliers" && common[1].status === "rejected") {
+        failedSupplierFeeds.push("Outlets");
+      }
       if (section === "dashboard" && common[1].status === "rejected") {
         failedDashboardFeeds.push("Outlets");
       }
@@ -589,6 +614,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
       if (["dashboard", "menus"].includes(section)) {
         tasks.push(["menus", listHospitalityMenus()]);
       }
+      if (section === "menus") {
+        tasks.push(["preparedListings", listHospitalityApprovedPreparedFood()]);
+      }
 
       if (section === "procurement") {
         tasks.push(["currentStock", listHospitalityCurrentStock()]);
@@ -625,6 +653,23 @@ export default function HospitalityPage({ section = "dashboard" }) {
 
         if (section === "outlets" && key === "memberGrants" && result.status === "rejected") {
           failedOutletFeeds.push("Team access");
+        }
+
+        if (section === "suppliers" && key === "suppliers" && result.status === "rejected") {
+          failedSupplierFeeds.push("Suppliers");
+        }
+
+        if (section === "menus" && result.status === "rejected" && ["recipes", "menus"].includes(key)) {
+          failedMenuFeeds.push(key === "recipes" ? "Approved recipes" : "Saved menus");
+        }
+        if (section === "menus" && key === "preparedListings") {
+          if (result.status === "rejected") {
+            setPreparedListingError("Couldn't load approved prepared-food listings.");
+            setPreparedListings([]);
+          } else {
+            setPreparedListingError("");
+            setPreparedListings(value?.listings || []);
+          }
         }
 
         if (section === "dashboard" && result.status === "rejected") {
@@ -676,6 +721,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
 
       if (section === "dashboard") setDashboardFeedFailures(failedDashboardFeeds);
       if (section === "outlets") setOutletFeedFailures(failedOutletFeeds);
+      if (section === "suppliers") setSupplierFeedFailures(failedSupplierFeeds);
+      if (section === "menus") setMenuFeedFailures(failedMenuFeeds);
     } catch (requestError) {
       setError(
         getHospitalityErrorMessage(
@@ -770,6 +817,23 @@ export default function HospitalityPage({ section = "dashboard" }) {
         ...current,
         menuId: "",
       }));
+    }
+  }
+
+  async function openMenuItemMarketplace(menuItem) {
+    if (!menuItem?.hostListingPacketId) {
+      navigate("/host/marketplace");
+      return;
+    }
+    setOpeningMarketplace(menuItem.id);
+    try {
+      const result = await getHostListingSellingReadiness(menuItem.hostListingPacketId);
+      const path = result?.readiness?.marketplacePath;
+      navigate(path?.startsWith("/host/marketplace") ? path : "/host/marketplace");
+    } catch {
+      navigate("/host/marketplace");
+    } finally {
+      setOpeningMarketplace("");
     }
   }
 
@@ -1344,38 +1408,6 @@ export default function HospitalityPage({ section = "dashboard" }) {
     },
   ];
 
-  const supplierSteps = [
-    {
-      number: "01",
-      title: "Add a supplier",
-      text: "Save the vendor you buy ingredients or products from.",
-      icon: Truck,
-      surface: "border-emerald-200 bg-emerald-50/80",
-    },
-    {
-      number: "02",
-      title: "Set delivery time",
-      text: "Add how many days this supplier usually takes to deliver.",
-      icon: ClipboardList,
-      surface: "border-sky-200 bg-sky-50/80",
-    },
-    {
-      number: "03",
-      title: "Choose outlets served",
-      text: "Limit the supplier to selected outlets, or leave it available business-wide.",
-      icon: Store,
-      surface: "border-violet-200 bg-violet-50/75",
-    },
-    {
-      number: "04",
-      title: "Add supplied items",
-      text: "Next, connect the ingredients or products you buy from this supplier.",
-      icon: PackageSearch,
-      to: "/host/hospitality/products",
-      surface: "border-emerald-200 bg-emerald-50/75",
-    },
-  ];
-
   const outletSteps = [
     {
       number: "01",
@@ -1507,22 +1539,67 @@ export default function HospitalityPage({ section = "dashboard" }) {
           </div>
         </header>
       ) : isOutlets ? (
-        <header className="border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
-          <div className="flex flex-col gap-4 px-3 pb-5 pt-5 sm:px-7 sm:pb-7 sm:pt-7 lg:flex-row lg:items-end lg:justify-between">
+        <>
+          <header className="sm:hidden border-t-[3px] border-[#C86C42] bg-[#F7F6F2]" aria-label="Outlet workspace">
+            <div className="px-3 pt-3 pb-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold tracking-[0.04em] text-[#C86C42]">HOSPITALITY / OUTLETS</span>
+                <button
+                  type="button"
+                  onClick={load}
+                  disabled={loading}
+                  aria-label="Refresh outlet details"
+                  className="focus-ring inline-flex min-h-10 items-center gap-1.5 rounded-[8px] border border-[#DCE0CF] px-2.5 text-[12px] font-semibold text-[#173F35] disabled:opacity-50"
+                >
+                  <RefreshCw size={15} className={loading ? "animate-spin" : ""} aria-hidden="true" /> Refresh
+                </button>
+              </div>
+              <h1 className="mt-1 text-[25px] font-semibold leading-[1.15] tracking-[-0.035em] text-[#173F35]">Outlets &amp; locations</h1>
+              <div className="mt-2 flex items-center justify-between gap-2 text-[12px] text-[#173F35]">
+                <span className="min-w-0 truncate">{contextData?.context?.organization?.displayName || "Your business"}</span>
+                <span className="shrink-0 font-semibold">{outletFeedFailures.includes("Outlets") ? "—" : outlets.length} {outlets.length === 1 ? "outlet" : "outlets"}</span>
+              </div>
+            </div>
+            <nav aria-label="Outlet page shortcuts" className="grid grid-cols-4 border-y border-[#DCE0CF] bg-[#DCE0CF]/55 text-[12px] font-semibold text-[#173F35]">
+              <a href="#hosp-saved-outlets" className="focus-ring flex min-h-11 items-center justify-center border-r border-[#173F35]/10 px-1.5">Outlets</a>
+              <a href="#hosp-create-outlet" onClick={() => setMobileOutletFormOpen(true)} className="focus-ring flex min-h-11 items-center justify-center border-r border-[#173F35]/10 px-1.5">Add new</a>
+              <a href="#hosp-team-access" onClick={() => setMobileTeamOpen(true)} className="focus-ring flex min-h-11 items-center justify-center border-r border-[#173F35]/10 px-1.5">Team</a>
+              <Link to="/host/hospitality/suppliers" className="focus-ring flex min-h-11 items-center justify-center bg-[#C86C42] px-1.5 text-[#F7F6F2]">Suppliers</Link>
+            </nav>
+            <details className="px-3 py-1.5 text-[#173F35]">
+              <summary className="focus-ring w-fit cursor-pointer py-1 text-[12px] font-medium">Switch business</summary>
+              <div className="grid gap-2 pb-2 pt-1">
+                <input
+                  className="focus-ring min-h-11 min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none"
+                  value={organizationId}
+                  onChange={(event) => setOrganizationId(event.target.value)}
+                  placeholder="Workspace code"
+                  aria-label="Hospitality workspace code"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setSelectedHospitalityOrganizationId(organizationId); load(); }}
+                  className="focus-ring min-h-11 bg-[#173F35] px-3 text-[14px] font-semibold text-[#F7F6F2]"
+                >Switch workspace</button>
+              </div>
+            </details>
+          </header>
+          <header className="hidden sm:block border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
+          <div className="flex flex-col gap-2.5 px-3 pb-3 pt-3 sm:gap-4 sm:px-7 sm:pb-7 sm:pt-7 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[12px] font-semibold tracking-[0.035em] text-[#C86C42]">
                 <Building2 size={16} aria-hidden="true" />
                 Host / Hospitality
               </div>
-              <h1 className="mt-2 text-[27px] font-semibold leading-[1.12] tracking-[-0.035em] text-[#173F35] sm:text-[36px]">
+              <h1 className="mt-1.5 text-[23px] font-semibold leading-[1.15] sm:mt-2 tracking-[-0.035em] text-[#173F35] sm:text-[36px]">
                 Outlets & locations
               </h1>
-              <p className="mt-2 max-w-[640px] text-[14px] leading-[1.5] text-[#202421] sm:text-[15px]">
+              <p className="mt-2 hidden max-w-[640px] text-[14px] leading-[1.5] sm:block text-[#202421] sm:text-[15px]">
                 Set up your business locations and decide who can manage them.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[13px] font-medium text-[#173F35]">
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:justify-start sm:gap-3">
+              <span className="hidden text-[13px] font-medium text-[#173F35] sm:inline">
                 <strong className="mr-1 text-[20px] font-semibold">{outletFeedFailures.includes("Outlets") ? "—" : outlets.length}</strong>
                 {outlets.length === 1 ? "saved outlet" : "saved outlets"}
               </span>
@@ -1530,7 +1607,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                 type="button"
                 onClick={load}
                 disabled={loading}
-                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 border border-[#173F35] bg-[#F7F6F2] px-4 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
+                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 border border-[#173F35] bg-[#F7F6F2] px-3 text-[13px] sm:px-4 sm:text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
               >
                 <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
                 Refresh
@@ -1547,24 +1624,25 @@ export default function HospitalityPage({ section = "dashboard" }) {
               <a
                 key={number}
                 href={index === 0 ? "#hosp-business-defaults" : index === 1 ? "#hosp-create-outlet" : "#hosp-team-access"}
-                className="focus-ring flex min-h-12 items-center gap-3 border-b border-[#173F35]/15 px-4 text-[13px] font-semibold text-[#173F35] transition hover:bg-[#F7F6F2] sm:border-b-0 sm:border-r"
+                className="focus-ring flex min-h-11 items-center gap-1.5 border-b border-[#173F35]/15 px-3 text-[13px] sm:min-h-12 sm:gap-3 sm:px-4 font-semibold text-[#173F35] transition hover:bg-[#F7F6F2] sm:border-b-0 sm:border-r"
               >
-                <span className="text-[#C86C42]">{number}</span>
-                {label}
+                <span className="hidden text-[#C86C42] sm:inline">{number}</span>
+                <span className="sm:hidden">{index === 0 ? "Currency" : index === 1 ? "Add outlet" : "Team access"}</span>
+                <span className="hidden sm:inline">{label}</span>
               </a>
             ))}
             <Link
               to="/host/hospitality/suppliers"
-              className="focus-ring flex min-h-12 items-center justify-between gap-3 bg-[#C86C42] px-4 text-[13px] font-semibold text-[#F7F6F2] transition hover:opacity-90"
+              className="focus-ring flex min-h-11 items-center justify-between gap-1.5 bg-[#C86C42] px-3 text-[13px] sm:min-h-12 sm:gap-3 sm:px-4 font-semibold text-[#F7F6F2] transition hover:opacity-90"
             >
-              <span>Next: Suppliers</span>
+              <span className="sm:hidden">Suppliers</span><span className="hidden sm:inline">Next: Suppliers</span>
               <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </nav>
 
-          <details className="border-b border-[#DCE0CF] px-3 py-2 sm:px-7">
-            <summary className="focus-ring w-fit cursor-pointer py-2 text-[13px] font-medium text-[#173F35]">
-              Switch hospitality business
+          <details className="border-b border-[#DCE0CF] px-3 py-1 sm:px-7 sm:py-2">
+            <summary className="focus-ring w-fit cursor-pointer py-1.5 text-[13px] font-medium text-[#173F35] sm:py-2">
+              <span className="sm:hidden">Switch business</span><span className="hidden sm:inline">Switch hospitality business</span>
             </summary>
             <div className="grid max-w-[740px] gap-2 pb-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <input
@@ -1587,92 +1665,69 @@ export default function HospitalityPage({ section = "dashboard" }) {
             </div>
           </details>
         </header>
+        </>
       ) : isSuppliers ? (
-        <header className="rounded-b-[22px] border-x border-b border-emerald-200/80 bg-[linear-gradient(135deg,#e8f7f1_0%,#eef7ff_64%,#f2efff_100%)] p-3.5 shadow-[0_12px_34px_rgba(15,23,42,0.06)] sm:rounded-b-[26px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
+        <header className="border-b border-[#DCE0CF] bg-[#F7F6F2]">
+          <div className="flex flex-col gap-2 border-t-[3px] border-[#C86C42] px-3 pb-3 pt-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6 sm:px-7 sm:pb-6 sm:pt-7">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-emerald-800 sm:text-[10px]">
-                <Truck size={13} />
-                Supplier setup
-              </div>
-
-              <h1 className="mt-2.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
+              <p className="hidden items-center gap-2 text-[12px] font-semibold tracking-[0.035em] text-[#C86C42] sm:flex">
+                <Truck size={16} aria-hidden="true" /> Host / Hospitality
+              </p>
+              <h1 className="text-[27px] font-semibold leading-[1.16] tracking-[-0.035em] text-[#173F35] sm:mt-2 sm:text-[36px]">
                 Suppliers
               </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                Save the vendors that supply your outlets, how quickly they
-                deliver, and which locations they serve.
+              <p className="hidden max-w-[550px] text-[14px] leading-[1.5] text-[#202421] sm:mt-1.5 sm:block sm:text-[15px]">
+                Keep your vendors, delivery times and outlet coverage organised.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[10px] font-black text-emerald-800 shadow-sm sm:px-3.5 sm:text-xs"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
+            <div className="flex shrink-0 items-center justify-between gap-2 sm:gap-3 sm:justify-end">
+              <div className="flex items-baseline gap-1.5 border-l-[3px] border-[#C86C42] pl-3 text-[#173F35]">
+                <strong className="text-[20px] font-semibold leading-none sm:text-[24px]">{loading || supplierFeedFailures.includes("Suppliers") ? "—" : suppliers.length}</strong>
+                <span className="text-[13px]">saved suppliers</span>
+              </div>
+              <button
+                type="button"
+                onClick={load}
+                disabled={loading}
+                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 border border-[#173F35] bg-[#F7F6F2] px-3.5 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+              </button>
+            </div>
           </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {supplierSteps.map((step) => {
-              const StepIcon = step.icon;
-              const content = (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="grid size-6 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                      {step.number}
-                    </span>
-                    <StepIcon
-                      size={15}
-                      className="text-stone-600"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <p className="mt-2 text-[11px] font-black leading-4 text-stone-950 sm:text-[13px]">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-medium leading-[1.45] text-stone-600 sm:text-[11px]">
-                    {step.text}
-                  </p>
-                  {step.to ? (
-                    <span className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 sm:text-[10px]">
-                      Open
-                      <ArrowRight size={11} />
-                    </span>
-                  ) : null}
-                </>
-              );
-
-              return step.to ? (
-                <Link
-                  key={step.number}
-                  to={step.to}
-                  className={`focus-ring rounded-[16px] border p-2.5 transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </Link>
-              ) : (
-                <div
-                  key={step.number}
-                  className={`rounded-[16px] border p-2.5 sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </div>
-              );
-            })}
-          </div>
-
-          <details className="mt-3 rounded-[14px] border border-white/70 bg-white/55 px-3 py-2">
-            <summary className="cursor-pointer text-[10px] font-black text-stone-700 sm:text-xs">
-              Manage another hospitality workspace
-            </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <section aria-labelledby="supplier-setup-steps-title" className="border-y border-[#DCE0CF] bg-[#F7F6F2] sm:mx-7 sm:mb-4">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-[#DCE0CF] px-3 py-2.5 sm:px-5 sm:py-3">
+              <h2 id="supplier-setup-steps-title" className="text-[16px] font-semibold text-[#173F35] sm:text-[18px]"><span className="sm:hidden">Supplier setup · 4 steps</span><span className="hidden sm:inline">Set up a supplier in 4 steps</span></h2>
+              <span className="hidden text-[13px] leading-5 text-[#202421] sm:inline">Follow these steps, then manage your saved suppliers below.</span>
+            </div>
+            <nav aria-label="Supplier setup steps" className="grid grid-cols-2 sm:grid-cols-4">
+              <a href="#hosp-supplier-form" className="focus-ring group flex min-h-[70px] flex-col gap-1 sm:gap-2 border-b border-r border-[#DCE0CF] bg-[#DCE0CF] px-3 py-2.5 text-[#173F35] transition hover:bg-[#F7F6F2] sm:min-h-[126px] sm:border-b-0 sm:px-4 sm:py-4">
+                <span className="flex items-center justify-between gap-2"><span className="text-[12px] font-semibold text-[#C86C42] sm:text-[13px]">01 / Supplier</span><Truck size={17} className="hidden sm:block" aria-hidden="true" /></span>
+                <strong className="text-[14px] font-semibold leading-5 sm:text-[15px]"><span className="sm:hidden">Add supplier</span><span className="hidden sm:inline">Add a supplier</span></strong>
+                <span className="hidden text-[13px] leading-[1.45] sm:inline">Enter the vendor's name and code.</span>
+              </a>
+              <a href="#hosp-supplier-lead-time" className="focus-ring group flex min-h-[70px] flex-col gap-1 sm:gap-2 border-b border-[#DCE0CF] px-3 py-2.5 text-[#173F35] transition hover:bg-[#DCE0CF] sm:min-h-[126px] sm:border-b-0 sm:border-r sm:px-4 sm:py-4">
+                <span className="flex items-center justify-between gap-2"><span className="text-[12px] font-semibold text-[#C86C42] sm:text-[13px]">02 / Delivery</span><ClipboardList size={17} className="hidden sm:block" aria-hidden="true" /></span>
+                <strong className="text-[14px] font-semibold leading-5 sm:text-[15px]"><span className="sm:hidden">Delivery time</span><span className="hidden sm:inline">Set delivery time</span></strong>
+                <span className="hidden text-[13px] leading-[1.45] sm:inline">Add the usual delivery days.</span>
+              </a>
+              <a href="#hosp-supplier-outlets-served" className="focus-ring group flex min-h-[70px] flex-col gap-1 sm:gap-2 border-r border-[#DCE0CF] px-3 py-2.5 text-[#173F35] transition hover:bg-[#DCE0CF] sm:min-h-[126px] sm:px-4 sm:py-4">
+                <span className="flex items-center justify-between gap-2"><span className="text-[12px] font-semibold text-[#C86C42] sm:text-[13px]">03 / Coverage</span><Store size={17} className="hidden sm:block" aria-hidden="true" /></span>
+                <strong className="text-[14px] font-semibold leading-5 sm:text-[15px]"><span className="sm:hidden">Select outlets</span><span className="hidden sm:inline">Choose outlets</span></strong>
+                <span className="hidden text-[13px] leading-[1.45] sm:inline">Select outlets, or keep all outlets.</span>
+              </a>
+              <Link to="/host/listings/new?type=prepared_food" className="focus-ring group flex min-h-[70px] flex-col gap-1 sm:gap-2 bg-[#C86C42] px-3 py-2.5 text-[#F7F6F2] transition hover:brightness-95 sm:min-h-[126px] sm:px-4 sm:py-4">
+                <span className="flex items-center justify-between gap-2"><span className="text-[12px] font-semibold sm:text-[13px]">04 / Next</span><PackageSearch size={17} className="hidden sm:block" aria-hidden="true" /></span>
+                <strong className="text-[14px] font-semibold leading-5 sm:text-[15px]"><span className="sm:hidden">Prepared food</span><span className="hidden sm:inline">Create a prepared-food listing</span></strong>
+                <span className="hidden text-[13px] leading-[1.45] sm:inline">Open Listing Studio to publish ready-made food.</span>
+              </Link>
+            </nav>
+          </section>
+          <details className="border-b border-[#DCE0CF] px-3 py-1 sm:px-7 sm:py-3">
+            <summary className="focus-ring w-fit cursor-pointer text-[13px] font-medium text-[#173F35]"><span className="sm:hidden">Switch business</span><span className="hidden sm:inline">Switch hospitality business</span></summary>
+            <div className="mt-3 flex flex-col gap-2 sm:max-w-[620px] sm:flex-row">
               <input
-                className={inputClass}
+                className="focus-ring min-h-11 min-w-0 flex-1 border border-[#DCE0CF] bg-white px-3 text-[14px] text-[#202421] outline-none"
                 value={organizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}
                 placeholder="Business workspace code"
@@ -1683,7 +1738,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                   setSelectedHospitalityOrganizationId(organizationId);
                   load();
                 }}
-                className={secondaryButtonClass}
+                className="focus-ring min-h-11 bg-[#173F35] px-5 text-[14px] font-semibold text-[#F7F6F2]"
               >
                 Switch workspace
               </button>
@@ -1898,91 +1953,76 @@ export default function HospitalityPage({ section = "dashboard" }) {
           </details>
         </header>
       ) : isMenus ? (
-        <header className="rounded-b-[22px] border-x border-b border-emerald-200/80 bg-[linear-gradient(135deg,#e8f7f1_0%,#eef7ff_64%,#f2efff_100%)] p-3.5 shadow-[0_12px_34px_rgba(15,23,42,0.06)] sm:rounded-b-[26px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-emerald-800 sm:text-[10px]">
-                <ClipboardList size={13} />
-                Menu setup
-              </div>
-
-              <h1 className="mt-2.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
+        <header className="border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
+          <div className="grid gap-5 px-3.5 pb-5 pt-5 sm:px-6 sm:pb-7 sm:pt-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8">
+            <div>
+              <p className="flex items-center gap-2 text-[13px] font-semibold text-[#C86C42]">
+                <ClipboardList size={16} aria-hidden="true" /> Host / Hospitality
+              </p>
+              <h1 className="mt-2 text-[28px] font-semibold leading-[1.1] tracking-[-0.035em] text-[#173F35] sm:text-[38px]">
                 Outlet menus
               </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                Choose which approved kitchen dishes each outlet sells, then set
-                the customer-facing name and price.
+              <p className="mt-2 max-w-[620px] text-[14px] leading-6 text-[#202421]/75 sm:text-[16px]">
+                Create a menu, add approved dishes and manage availability for each outlet.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[10px] font-black text-emerald-800 shadow-sm sm:px-3.5 sm:text-xs"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
+            <div className="flex flex-wrap items-center gap-4 lg:justify-end">
+              <div className="flex items-baseline gap-2 border-l-[3px] border-[#C86C42] pl-3 text-[#173F35]">
+                <span className="text-[28px] font-semibold leading-none">{menuFeedFailures.includes("Saved menus") ? "—" : menus.length}</span>
+                <span className="text-[13px] font-medium">Saved menus</span>
+              </div>
+              <button
+                type="button"
+                onClick={load}
+                disabled={loading}
+                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 border border-[#DCE0CF] bg-[#F7F6F2] px-4 py-2.5 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                Refresh
+              </button>
+            </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {menuSteps.map((step) => {
-              const StepIcon = step.icon;
-              const content = (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="grid size-6 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                      {step.number}
-                    </span>
-                    <StepIcon
-                      size={15}
-                      className="text-stone-600"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <p className="mt-2 text-[11px] font-black leading-4 text-stone-950 sm:text-[13px]">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-medium leading-[1.45] text-stone-600 sm:text-[11px]">
-                    {step.text}
-                  </p>
-                  {step.to ? (
-                    <span className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 sm:text-[10px]">
-                      Open
-                      <ArrowRight size={11} />
-                    </span>
-                  ) : null}
-                </>
-              );
-
-              return step.to ? (
-                <Link
-                  key={step.number}
-                  to={step.to}
-                  className={`focus-ring rounded-[16px] border p-2.5 transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </Link>
-              ) : (
-                <div
-                  key={step.number}
-                  className={`rounded-[16px] border p-2.5 sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </div>
-              );
-            })}
+          <div className="border-y border-[#DCE0CF] bg-[#DCE0CF]/45">
+            <div className="grid grid-cols-2 lg:grid-cols-4">
+              {menuSteps.map((step, index) => {
+                const StepIcon = step.icon;
+                const stepContents = (
+                  <>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[17px] font-semibold text-[#C86C42]">{step.number}</span>
+                      <span className="min-w-0 text-[13px] font-semibold leading-5 text-[#173F35] sm:text-[15px]">{step.title}</span>
+                      <StepIcon size={17} className="ml-auto shrink-0 text-[#173F35]" aria-hidden="true" />
+                    </div>
+                    <p className="mt-1 hidden text-[13px] leading-[1.4] text-[#202421]/75 sm:block">
+                      {step.text}
+                    </p>
+                  </>
+                );
+                const stepClass = `focus-ring block min-h-[68px] border-b border-[#DCE0CF] px-3.5 py-3 transition hover:bg-[#DCE0CF] sm:min-h-[102px] sm:px-5 sm:py-4 lg:border-b-0 ${index % 2 === 0 ? "border-r" : ""} ${index !== 3 ? "lg:border-r" : ""} border-[#DCE0CF]`;
+                return step.to ? (
+                  <Link key={step.number} to={step.to} className={stepClass}>
+                    {stepContents}
+                  </Link>
+                ) : (
+                  <a
+                    key={step.number}
+                    href={step.number === "03" ? "#host-menu-add-dish" : "#host-menu-create"}
+                    className={stepClass}
+                  >
+                    {stepContents}
+                  </a>
+                );
+              })}
+            </div>
           </div>
-
-          <details className="mt-3 rounded-[14px] border border-white/70 bg-white/55 px-3 py-2">
-            <summary className="cursor-pointer text-[10px] font-black text-stone-700 sm:text-xs">
-              Manage another hospitality workspace
+          <details className="border-b border-[#DCE0CF] px-3.5 py-3 sm:px-6 lg:px-8">
+            <summary className="cursor-pointer text-[13px] font-semibold text-[#173F35]">
+              Switch hospitality business
             </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
-                className={inputClass}
+                className={menuFieldClass}
                 value={organizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}
                 placeholder="Business workspace code"
@@ -1993,7 +2033,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                   setSelectedHospitalityOrganizationId(organizationId);
                   load();
                 }}
-                className={secondaryButtonClass}
+                className="focus-ring min-h-11 shrink-0 bg-[#173F35] px-4 py-2 text-[14px] font-semibold text-[#F7F6F2]"
               >
                 Switch workspace
               </button>
@@ -2575,16 +2615,17 @@ export default function HospitalityPage({ section = "dashboard" }) {
       ) : (
         <>
           {isDashboard ? null : isOutlets ? (
-            <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
+            <div className="mt-3 hidden rounded-[16px] border border-sky-200 sm:block bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
               Team members only see the hospitality locations you give them
               access to.
             </div>
           ) : isSuppliers ? (
-            <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
-              Suppliers can serve every outlet or only the locations you choose.
-              Add the supplier first, then connect the ingredients and products
-              you buy from them.
-            </div>
+            supplierFeedFailures.length ? (
+              <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-3 border-l-[3px] border-[#C86C42] bg-[#DCE0CF] px-4 py-3 text-[14px] text-[#173F35]">
+                <span>Couldn't load {supplierFeedFailures.join(" and ")}. Please refresh to try again.</span>
+                <button type="button" disabled={loading} onClick={load} className="focus-ring min-h-10 font-semibold underline decoration-[#C86C42] underline-offset-4">Retry</button>
+              </div>
+            ) : null
           ) : isProducts ? (
             <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
               Save one supplier item for each pack and buying price you use.
@@ -2598,11 +2639,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
               approval before using it on a menu.
             </div>
           ) : isMenus ? (
-            <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
-              Menus only use Super Admin-approved kitchen recipes. Create the
-              outlet menu first, then add approved dishes with the name and
-              selling price customers should see.
-            </div>
+            null
+          
           ) : isProcurement ? (
             <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
               Record a fresh stock count, plan the portions your kitchen needs,
@@ -2734,7 +2772,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
 
                 <div className="grid border-y border-[#173F35]/20 lg:grid-cols-3">
                   {[
-                    { title: "Supply network", icon: Truck, subtitle: "Vendors & ingredients", background: "bg-[#F7F6F2]", values: [{ index: 1, to: "/host/hospitality/suppliers" }, { index: 2, to: "/host/hospitality/products" }] },
+                    { title: "Supply network", icon: Truck, subtitle: "Vendors & ingredients", background: "bg-[#F7F6F2]", values: [{ index: 1, to: "/host/hospitality/suppliers" }, { index: 2, to: "/host/listings/new?type=prepared_food" }] },
                     { title: "Kitchen planning", icon: ChefHat, subtitle: "Preparation & purchasing", background: "bg-[#DCE0CF]/50", values: [{ index: 4, to: "/host/hospitality/procurement" }] },
                     { title: "Published records", icon: BookOpenCheck, subtitle: "Approved history", background: "bg-[#C86C42]/10", values: [{ index: 5, to: "/host/hospitality/dish-passports" }, { index: 6, to: "/host/hospitality/grey-book" }] },
                   ].map((group) => {
@@ -2809,20 +2847,29 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {section === "outlets" ? (
-            <div className="mt-4 space-y-6 sm:mt-6 sm:space-y-8">
-              <div className="grid border border-[#DCE0CF] lg:grid-cols-[minmax(280px,0.36fr)_minmax(0,0.64fr)]">
-                <section id="hosp-business-defaults" className="bg-[#173F35] px-4 py-5 text-[#F7F6F2] sm:px-6 sm:py-7">
-                  <p className="text-[12px] font-semibold text-[#DCE0CF]">01 / Business settings</p>
-                  <h2 className="mt-2 text-[23px] font-semibold leading-tight tracking-[-0.025em] sm:text-[26px]">
-                    Your business currency
-                  </h2>
-                  <p className="mt-2 max-w-[340px] text-[14px] leading-[1.5] text-[#DCE0CF]">
+            <div className="mt-2 flex flex-col gap-3 sm:mt-6 sm:block sm:space-y-8 sm:gap-0">
+              <div className="contents sm:grid sm:border sm:border-[#DCE0CF] lg:grid-cols-[minmax(280px,0.36fr)_minmax(0,0.64fr)]">
+                <section id="hosp-business-defaults" className="order-3 border-y border-[#DCE0CF] bg-[#DCE0CF]/70 px-3 py-3 text-[#173F35] sm:order-none sm:border-0 sm:bg-[#173F35] sm:px-6 sm:py-7 sm:text-[#F7F6F2]">
+                  <p className="hidden text-[12px] font-semibold text-[#DCE0CF] sm:block">01 / Business settings</p>
+                  <div className="flex items-center justify-between gap-2 sm:block">
+                    <div className="min-w-0">
+                      <h2 className="text-[17px] font-semibold leading-tight tracking-[-0.025em] sm:mt-2 sm:text-[26px]">
+                        <span className="sm:hidden">Business currency</span><span className="hidden sm:inline">Your business currency</span>
+                      </h2>
+                      <p className="mt-0.5 text-[13px] font-medium sm:hidden">{profileCurrency || "INR"}</p>
+                    </div>
+                    <button type="button" aria-expanded={mobileCurrencyOpen} aria-controls="hosp-currency-fields" onClick={() => setMobileCurrencyOpen((value) => !value)} className="focus-ring min-h-10 shrink-0 border-b-2 border-[#C86C42] px-2 text-[13px] font-semibold sm:hidden">
+                      {mobileCurrencyOpen ? "Close" : "Edit"}
+                    </button>
+                  </div>
+                  <p className="mt-2 hidden max-w-[340px] text-[14px] leading-[1.5] text-[#DCE0CF] sm:block">
                     Use one currency for outlet costs and kitchen pricing.
                   </p>
-                  <label className="mt-5 block">
-                    <span className="mb-2 block text-[13px] font-semibold text-[#F7F6F2]">Currency code</span>
+                  <div id="hosp-currency-fields" className={mobileCurrencyOpen ? "block" : "hidden sm:block"}>
+                  <label className="mt-3 block sm:mt-5">
+                    <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2 sm:text-[#F7F6F2]">Currency code</span>
                     <input
-                      className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[15px] font-medium text-[#202421] outline-none placeholder:text-[#173F35]/60"
+                      className="focus-ring min-h-11 w-full min-w-0 sm:min-h-12 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[15px] font-medium text-[#202421] outline-none placeholder:text-[#173F35]/60"
                       value={profileCurrency}
                       onChange={(event) => {
                         setProfileCurrency(event.target.value.toUpperCase());
@@ -2846,31 +2893,37 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       );
                       if (result) setProfileSettingsSaved(true);
                     }}
-                    className="focus-ring mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 bg-[#C86C42] px-5 text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
+                    className="focus-ring mt-2.5 inline-flex min-h-11 w-full sm:mt-3 items-center justify-center gap-2 bg-[#C86C42] px-5 text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     <CheckCircle2 size={16} aria-hidden="true" />
                     {profileSettingsSaved ? "Settings saved" : "Save currency"}
                   </button>
+                  </div>
                 </section>
 
-                <section id="hosp-create-outlet" className="bg-[#F7F6F2] px-4 py-5 sm:px-7 sm:py-7">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-1 h-9 w-1 shrink-0 bg-[#C86C42]" aria-hidden="true" />
+                <section id="hosp-create-outlet" className="order-2 border-t-[3px] border-[#C86C42] bg-[#F7F6F2] px-3 py-3 sm:order-none sm:border-t-0 sm:px-7 sm:py-7">
+                  <button type="button" aria-expanded={mobileOutletFormOpen} aria-controls="hosp-outlet-fields" onClick={() => setMobileOutletFormOpen((value) => !value)} className="focus-ring flex min-h-11 w-full items-center justify-between gap-3 text-left sm:hidden">
+                    <span className="text-[18px] font-semibold text-[#173F35]">Add a new outlet</span>
+                    <span className="shrink-0 text-[13px] font-semibold text-[#C86C42]">{mobileOutletFormOpen ? "Close −" : "Open +"}</span>
+                  </button>
+                  <div className="hidden items-start gap-2 sm:flex sm:gap-3">
+                    <span className="mt-1 h-7 w-1 shrink-0 bg-[#C86C42] sm:h-9" aria-hidden="true" />
                     <div>
-                      <p className="text-[12px] font-semibold text-[#C86C42]">02 / New location</p>
-                      <h2 className="mt-1 text-[23px] font-semibold leading-tight text-[#173F35] sm:text-[26px]">
+                      <p className="hidden text-[12px] font-semibold text-[#C86C42] sm:block">02 / New location</p>
+                      <h2 className="text-[20px] font-semibold leading-tight text-[#173F35] sm:mt-1 sm:text-[26px]">
                         Add an outlet
                       </h2>
-                      <p className="mt-1 text-[14px] leading-[1.45] text-[#202421]">
+                      <p className="mt-1 hidden text-[14px] leading-[1.45] text-[#202421] sm:block">
                         Add a restaurant, cafe or kitchen you operate.
                       </p>
                     </div>
                   </div>
-                  <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
+                  <div id="hosp-outlet-fields" className={mobileOutletFormOpen ? "block" : "hidden sm:block"}>
+                  <div className="mt-3 grid gap-x-4 gap-y-3 sm:mt-5 sm:grid-cols-2 sm:gap-y-4">
                     <label className="block min-w-0">
-                      <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Outlet code *</span>
+                      <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2">Outlet code *</span>
                       <input
-                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
+                        className="focus-ring min-h-11 w-full min-w-0 sm:min-h-12 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
                         placeholder="e.g. DEL-TEST-01"
                         value={outletForm.outletCode}
                         onChange={(event) => {
@@ -2880,9 +2933,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       />
                     </label>
                     <label className="block min-w-0">
-                      <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Outlet name *</span>
+                      <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2">Outlet name *</span>
                       <input
-                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
+                        className="focus-ring min-h-11 w-full min-w-0 sm:min-h-12 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
                         placeholder="Restaurant or branch name"
                         value={outletForm.name}
                         onChange={(event) => {
@@ -2892,9 +2945,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       />
                     </label>
                     <label className="block min-w-0">
-                      <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Kitchen name <span className="font-normal">(optional)</span></span>
+                      <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2">Kitchen name <span className="font-normal">(optional)</span></span>
                       <input
-                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
+                        className="focus-ring min-h-11 w-full min-w-0 sm:min-h-12 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
                         placeholder="Kitchen name"
                         value={outletForm.kitchenName}
                         onChange={(event) => {
@@ -2904,9 +2957,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       />
                     </label>
                     <label className="block min-w-0">
-                      <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Cost centre <span className="font-normal">(optional)</span></span>
+                      <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2">Cost centre <span className="font-normal">(optional)</span></span>
                       <input
-                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
+                        className="focus-ring min-h-11 w-full min-w-0 sm:min-h-12 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
                         placeholder="Internal cost code"
                         value={outletForm.costCenterCode}
                         onChange={(event) => {
@@ -2916,8 +2969,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       />
                     </label>
                   </div>
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#DCE0CF] pt-4">
-                    <p className="text-[13px] text-[#202421]">* Required fields</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#DCE0CF] pt-3 sm:mt-5 sm:gap-3 sm:pt-4">
+                    <p className="hidden text-[13px] text-[#202421] sm:block">* Required fields</p>
                     <button
                       type="button"
                       disabled={
@@ -2940,22 +2993,23 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         );
                         if (result) setOutletSaved(true);
                       }}
-                      className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 bg-[#173F35] px-6 text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 bg-[#173F35] px-6 sm:w-auto text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Store size={16} aria-hidden="true" />
                       {outletSaved ? "Outlet added" : "Add outlet"}
                     </button>
                   </div>
+                  </div>
                 </section>
               </div>
 
-              <section id="hosp-saved-outlets" className="border-y-2 border-[#C86C42] bg-[#F7F6F2]">
-                <div className="flex flex-wrap items-end justify-between gap-3 px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
+              <section id="hosp-saved-outlets" className="order-1 border-b border-[#DCE0CF] bg-[#F7F6F2] sm:order-none sm:border-y-2 sm:border-[#C86C42]">
+                <div className="flex flex-wrap items-end justify-between gap-2 px-3 pb-2 pt-3 sm:gap-3 sm:px-6 sm:pb-4 sm:pt-6">
                   <div>
-                    <p className="text-[12px] font-semibold text-[#C86C42]">03 / Saved locations</p>
-                    <h2 className="mt-1 text-[24px] font-semibold text-[#173F35] sm:text-[27px]">Your outlets</h2>
+                    <p className="hidden text-[12px] font-semibold text-[#C86C42] sm:block">03 / Saved locations</p>
+                    <h2 className="text-[20px] font-semibold text-[#173F35] sm:mt-1 sm:text-[27px]">Your outlets</h2>
                   </div>
-                  <p className="text-[14px] font-medium text-[#173F35]">
+                  <p className="hidden text-[12px] font-medium text-[#173F35] sm:block sm:text-[14px]">
                     {outletFeedFailures.includes("Outlets") ? "—" : outlets.length} {outlets.length === 1 ? "outlet" : "outlets"} saved
                   </p>
                 </div>
@@ -2964,57 +3018,62 @@ export default function HospitalityPage({ section = "dashboard" }) {
                     outlets.map((outlet, index) => (
                       <div
                         key={outlet.id}
-                        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[#DCE0CF] px-4 py-3 last:border-b-0 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:px-6 sm:py-4"
+                        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[#DCE0CF] px-3 py-2.5 last:border-b-0 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:px-6 sm:py-4"
                       >
                         <span className="hidden text-[13px] font-medium text-[#C86C42] sm:block">{String(index + 1).padStart(2, "0")}</span>
                         <div className="min-w-0">
                           <p className="break-words text-[15px] font-semibold leading-5 text-[#173F35]">{outlet.name}</p>
                           <p className="mt-1 break-all text-[13px] text-[#202421]">{outlet.outletCode || "No outlet code"}</p>
                         </div>
-                        <span className="w-fit text-[13px] font-medium text-[#173F35]">{titleize(outlet.status || "active")}</span>
+                        <span className="w-fit rounded-full bg-[#DCE0CF] px-2 py-1 text-[11px] font-semibold text-[#173F35] sm:bg-transparent sm:px-0 sm:py-0 sm:text-[13px] sm:font-medium">{titleize(outlet.status || "active")}</span>
                       </div>
                     ))
                   ) : (
                     <p className="px-4 py-6 text-[14px] text-[#202421] sm:px-6">
-                      {outletFeedFailures.includes("Outlets") ? "Saved outlets couldn't be loaded. Use Retry above." : "No outlets yet. Use the form above to add your first location."}
+                      {outletFeedFailures.includes("Outlets") ? "Saved outlets couldn't be loaded. Use Retry above." : "No outlets yet. Open Add a new outlet below to get started."}
                     </p>
                   )}
                 </div>
               </section>
 
-              <section id="hosp-team-access" className="grid border border-[#DCE0CF] lg:grid-cols-[minmax(230px,0.32fr)_minmax(0,0.68fr)]">
-                <div className="bg-[#DCE0CF] px-4 py-5 sm:px-6 sm:py-7">
-                  <p className="text-[12px] font-semibold text-[#C86C42]">04 / Permissions</p>
-                  <h2 className="mt-2 text-[23px] font-semibold text-[#173F35] sm:text-[27px]">Team access</h2>
-                  <p className="mt-2 text-[14px] leading-[1.5] text-[#202421]">
+              <section id="hosp-team-access" className="order-4 grid border-t-[3px] border-[#C86C42] sm:order-none sm:border sm:border-[#DCE0CF] lg:grid-cols-[minmax(230px,0.32fr)_minmax(0,0.68fr)]">
+                <div className="bg-[#DCE0CF] px-3 py-3 sm:px-6 sm:py-7">
+                  <p className="hidden text-[12px] font-semibold text-[#C86C42] sm:block">04 / Permissions</p>
+                  <h2 className="text-[20px] font-semibold text-[#173F35] sm:mt-2 sm:text-[27px]">Team access</h2>
+                  <p className="mt-2 hidden text-[14px] leading-[1.5] text-[#202421] sm:block">
                     Choose which existing Host accounts can work with your hospitality outlets.
                   </p>
-                  <p className="mt-5 border-t border-[#173F35]/20 pt-3 text-[13px] font-medium text-[#173F35]">
-                    {outletFeedFailures.includes("Team access") ? "—" : memberGrants.length} {memberGrants.length === 1 ? "team access record" : "team access records"}
-                  </p>
+                  <div className="flex items-center justify-between gap-2 sm:block">
+                    <p className="mt-1 text-[12px] font-medium text-[#173F35] sm:mt-5 sm:border-t sm:border-[#173F35]/20 sm:pt-3 sm:text-[13px]">
+                      {outletFeedFailures.includes("Team access") ? "—" : memberGrants.length} {memberGrants.length === 1 ? "team member" : "team members"}
+                    </p>
+                    <button type="button" aria-expanded={mobileTeamOpen} aria-controls="hosp-team-fields" onClick={() => setMobileTeamOpen((value) => !value)} className="focus-ring min-h-10 shrink-0 border-b-2 border-[#C86C42] px-2 text-[13px] font-semibold text-[#173F35] sm:hidden">
+                      {mobileTeamOpen ? "Close" : "Manage"}
+                    </button>
+                  </div>
                 </div>
-                <div className="bg-[#F7F6F2] px-4 py-5 sm:px-6 sm:py-7">
-                  <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+                <div id="hosp-team-fields" className={`${mobileTeamOpen ? "block" : "hidden sm:block"} bg-[#F7F6F2] px-3 py-3 sm:px-6 sm:py-7`}>
+                  <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 sm:gap-y-4">
                     <label className="block min-w-0">
-                      <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Host account ID *</span>
+                      <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2">Host account ID *</span>
                       <input
-                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
+                        className="focus-ring min-h-11 w-full min-w-0 sm:min-h-12 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
                         placeholder="Paste the Host's account ID"
                         value={memberForm.userId}
                         onChange={(event) => setMemberForm((current) => ({ ...current, userId: event.target.value }))}
                       />
                     </label>
                     <label className="block min-w-0">
-                      <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Outlet IDs <span className="font-normal">(optional)</span></span>
+                      <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2">Outlet IDs <span className="font-normal">(optional)</span></span>
                       <input
-                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
+                        className="focus-ring min-h-11 w-full min-w-0 sm:min-h-12 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/60"
                         placeholder="Blank = all outlets"
                         value={memberForm.outletIds}
                         onChange={(event) => setMemberForm((current) => ({ ...current, outletIds: event.target.value }))}
                       />
                     </label>
                     <label className="block min-w-0 sm:col-span-2">
-                      <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Permissions (separate with commas)</span>
+                      <span className="mb-1 block text-[13px] font-semibold text-[#173F35] sm:mb-2"><span className="sm:hidden">Permissions</span><span className="hidden sm:inline">Permissions (separate with commas)</span></span>
                       <textarea
                         rows={2}
                         className="focus-ring w-full min-w-0 resize-y border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-3 text-[14px] leading-6 text-[#202421] outline-none placeholder:text-[#173F35]/60"
@@ -3023,8 +3082,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       />
                     </label>
                   </div>
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#DCE0CF] pt-4">
-                    <p className="max-w-[500px] text-[13px] leading-[1.5] text-[#202421]">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#DCE0CF] pt-3 sm:mt-5 sm:gap-3 sm:pt-4">
+                    <p className="hidden max-w-[500px] text-[13px] leading-[1.5] text-[#202421] sm:block">
                       Leave outlet IDs empty for access to every outlet.
                     </p>
                     <button
@@ -3042,15 +3101,15 @@ export default function HospitalityPage({ section = "dashboard" }) {
                           "Team access saved."
                         )
                       }
-                      className="focus-ring inline-flex min-h-11 items-center justify-center bg-[#173F35] px-6 text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="focus-ring inline-flex min-h-11 w-full items-center justify-center bg-[#173F35] px-6 sm:w-auto text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Save team access
                     </button>
                   </div>
                 </div>
               </section>
-              <div className="flex flex-col gap-3 border-t border-[#DCE0CF] bg-[#F7F6F2] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <span className="text-[14px] text-[#202421]">Next step: connect the suppliers serving your outlets.</span>
+              <div className="order-5 hidden flex-col gap-1 border-t border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 sm:order-none sm:flex sm:flex-row sm:gap-3 sm:px-6 sm:py-4 sm:items-center sm:justify-between sm:px-6">
+                <span className="hidden text-[14px] text-[#202421] sm:inline">Next step: connect the suppliers serving your outlets.</span>
                 <Link to="/host/hospitality/suppliers" className="focus-ring inline-flex min-h-11 items-center gap-2 font-semibold text-[#173F35] underline decoration-[#C86C42] decoration-2 underline-offset-4">
                   Manage suppliers <ArrowRight size={16} aria-hidden="true" />
                 </Link>
@@ -3059,243 +3118,139 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {section === "suppliers" ? (
-            <div className="mt-3 grid gap-3.5 xl:grid-cols-2 xl:gap-4">
-              <section className="rounded-[20px] border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                <div className="flex items-start gap-3">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-[13px] bg-white text-emerald-700 shadow-sm">
-                    <Truck size={17} aria-hidden="true" />
+            <div className="mt-4 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.94fr)] lg:gap-6">
+              <section id="hosp-supplier-form" aria-labelledby="hosp-add-supplier-title" className="scroll-mt-24 order-2 min-w-0 border-t-[3px] border-[#C86C42] bg-[#F7F6F2] lg:order-1">
+                <div className="flex items-start justify-between gap-4 bg-[#DCE0CF] px-4 py-4 sm:px-6 sm:py-5">
+                  <div>
+                    <p className="text-[12px] font-semibold text-[#C86C42]">01 / NEW SUPPLIER</p>
+                    <h2 id="hosp-add-supplier-title" className="mt-1 text-[22px] font-semibold leading-[1.2] text-[#173F35] sm:text-[25px]">Add a supplier</h2>
+                    <p className="mt-1 hidden text-[14px] leading-[1.5] text-[#202421] sm:block">Save a vendor and where they deliver.</p>
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-black text-stone-950 sm:text-base">
-                      Add a supplier
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Save a vendor you regularly buy ingredients or products
-                      from. You can also note delivery time and which outlets
-                      they serve.
-                    </p>
-                  </div>
+                  <Truck size={22} className="mt-1 shrink-0 text-[#173F35]" aria-hidden="true" />
                 </div>
-
-                <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
-                  <label className="grid gap-1">
-                    <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:text-[10px]">
-                      Supplier code
-                    </span>
-                    <input
-                      className={inputClass}
-                      placeholder="For example SUP-001"
-                      value={supplierForm.supplierCode}
-                      onChange={(event) =>
-                        setSupplierForm((current) => ({
-                          ...current,
-                          supplierCode: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1">
-                    <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:text-[10px]">
-                      Supplier name
-                    </span>
-                    <input
-                      className={inputClass}
-                      placeholder="Vendor or company name"
-                      value={supplierForm.name}
-                      onChange={(event) =>
-                        setSupplierForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="grid gap-1">
-                    <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:text-[10px]">
-                      Usual delivery time (days)
-                    </span>
-                    <input
-                      className={inputClass}
-                      type="number"
-                      min="0"
-                      placeholder="For example 2"
-                      value={supplierForm.leadTimeDays}
-                      onChange={(event) =>
-                        setSupplierForm((current) => ({
-                          ...current,
-                          leadTimeDays: Number(event.target.value),
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="grid gap-1 sm:col-span-2">
-                    <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:text-[10px]">
-                      Outlets served (optional)
-                    </span>
-                    <div className="flex flex-wrap gap-2 rounded-xl border border-stone-200 bg-white p-2.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSupplierForm((current) => ({
-                            ...current,
-                            serviceOutletIds: "",
-                          }))
-                        }
-                        className={`rounded-lg border px-3 py-2 text-[10px] font-black transition sm:text-xs ${
-                          supplierForm.serviceOutletIds
-                            .split(",")
-                            .map((value) => value.trim())
-                            .filter(Boolean).length === 0
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                            : "border-stone-200 bg-white text-stone-600"
-                        }`}
-                      >
-                        All outlets
-                      </button>
-
-                      {outlets.map((outlet) => {
-                        const outletId = String(outlet.id || outlet._id || "");
-                        const selectedIds = supplierForm.serviceOutletIds
-                          .split(",")
-                          .map((value) => value.trim())
-                          .filter(Boolean);
-                        const selected = selectedIds.includes(outletId);
-
-                        return (
-                          <button
-                            key={outletId}
-                            type="button"
-                            onClick={() => {
-                              const nextIds = selected
-                                ? selectedIds.filter(
-                                    (value) => value !== outletId
-                                  )
-                                : [
-                                    ...selectedIds.filter((value) =>
-                                      outlets.some(
-                                        (item) =>
-                                          String(item.id || item._id || "") ===
-                                          value
-                                      )
-                                    ),
-                                    outletId,
-                                  ];
-
-                              setSupplierForm((current) => ({
-                                ...current,
-                                serviceOutletIds: nextIds.join(","),
-                              }));
-                            }}
-                            className={`rounded-lg border px-3 py-2 text-left text-[10px] font-black transition sm:text-xs ${
-                              selected
-                                ? "border-sky-300 bg-sky-50 text-sky-800"
-                                : "border-stone-200 bg-white text-stone-600"
-                            }`}
-                          >
-                            {outlet.name || outlet.outletCode || "Outlet"}
-                          </button>
-                        );
-                      })}
+                <div className="space-y-3 border-x border-b border-[#DCE0CF] px-3 py-3 sm:space-y-4 sm:px-6 sm:py-5">
+                  <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-3">
+                    <label className="block min-w-0">
+                      <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Supplier code <span aria-hidden="true" className="text-[#C86C42]">*</span></span>
+                      <input
+                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-white px-3 text-[15px] text-[#202421] outline-none placeholder:text-[#202421]/50"
+                        placeholder="e.g. SUP-001"
+                        value={supplierForm.supplierCode}
+                        onChange={(event) => setSupplierForm((current) => ({...current, supplierCode: event.target.value}))}
+                      />
+                    </label>
+                    <label className="block min-w-0">
+                      <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Supplier name <span aria-hidden="true" className="text-[#C86C42]">*</span></span>
+                      <input
+                        className="focus-ring min-h-12 w-full min-w-0 border border-[#DCE0CF] bg-white px-3 text-[15px] text-[#202421] outline-none placeholder:text-[#202421]/50"
+                        placeholder="Vendor or company name"
+                        value={supplierForm.name}
+                        onChange={(event) => setSupplierForm((current) => ({...current, name: event.target.value}))}
+                      />
+                    </label>
+                  </div>
+                  <div id="hosp-supplier-lead-time" className="scroll-mt-24 border-t border-[#DCE0CF] pt-3 sm:pt-4">
+                    <label className="block max-w-[250px]">
+                      <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Delivery time (days)</span>
+                      <input
+                        type="number"
+                        min="0"
+                        className="focus-ring min-h-12 w-full border border-[#DCE0CF] bg-white px-3 text-[15px] text-[#202421] outline-none"
+                        value={supplierForm.leadTimeDays}
+                        onChange={(event) => setSupplierForm((current) => ({...current, leadTimeDays: Number(event.target.value)}))}
+                      />
+                    </label>
+                    <div id="hosp-supplier-outlets-served" className="mt-3 scroll-mt-24 sm:mt-4">
+                      <p className="text-[14px] font-semibold text-[#173F35]">Outlets served <span className="font-normal text-[#202421]">(optional)</span></p>
+                      <p className="mt-0.5 hidden text-[13px] text-[#202421] sm:block">Choose specific outlets, or keep all selected.</p>
+                      <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Outlets served">
+                        <button
+                          type="button"
+                          aria-pressed={!supplierForm.serviceOutletIds.split(",").map((value) => value.trim()).filter(Boolean).length}
+                          onClick={() => setSupplierForm((current) => ({...current, serviceOutletIds: ""}))}
+                          className={`focus-ring min-h-11 border px-3 text-[13px] font-semibold transition ${supplierForm.serviceOutletIds.split(",").map((value) => value.trim()).filter(Boolean).length === 0 ? "border-[#173F35] bg-[#173F35] text-[#F7F6F2]" : "border-[#DCE0CF] bg-white text-[#173F35] hover:bg-[#DCE0CF]"}`}
+                        >
+                          All outlets
+                        </button>
+                        {outlets.map((outlet) => {
+                          const outletId = String(outlet.id || outlet._id || "");
+                          const selectedIds = supplierForm.serviceOutletIds.split(",").map((value) => value.trim()).filter(Boolean);
+                          const selected = selectedIds.includes(outletId);
+                          return (
+                            <button
+                              key={outletId}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => {
+                                const nextIds = selected
+                                  ? selectedIds.filter((value) => value !== outletId)
+                                  : [...selectedIds.filter((value) => outlets.some((item) => String(item.id || item._id || "") === value)), outletId];
+                                setSupplierForm((current) => ({...current, serviceOutletIds: nextIds.join(",")}));
+                              }}
+                              className={`focus-ring min-h-11 max-w-full border px-3 text-left text-[13px] font-semibold transition ${selected ? "border-[#173F35] bg-[#DCE0CF] text-[#173F35]" : "border-[#DCE0CF] bg-white text-[#173F35] hover:bg-[#DCE0CF]"}`}
+                            >
+                              {outlet.name || outlet.outletCode || "Outlet"}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
+                  <div className="border-t border-[#DCE0CF] pt-3 sm:pt-4">
+                    <button
+                      type="button"
+                      disabled={busy || !can("hospitality.suppliers.manage") || !supplierForm.supplierCode.trim() || !supplierForm.name.trim()}
+                      onClick={() => run(() => createHospitalitySupplier({
+                        supplierCode: supplierForm.supplierCode,
+                        name: supplierForm.name,
+                        leadTimeDays: Number(supplierForm.leadTimeDays) || 0,
+                        serviceOutletIds: supplierForm.serviceOutletIds.split(",").map((value) => value.trim()).filter((value) => outlets.some((outlet) => String(outlet.id || outlet._id || "") === value)),
+                        contact: {},
+                        notes: "",
+                      }), "Supplier added.")}
+                      className="focus-ring inline-flex min-h-12 w-full items-center justify-center gap-2 bg-[#173F35] px-5 text-[15px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    >
+                      <Truck size={17} aria-hidden="true" /> Save supplier
+                    </button>
+                  </div>
                 </div>
-
-                <div className="mt-3 rounded-[14px] border border-white/80 bg-white/65 px-3 py-2 text-[9px] font-semibold leading-4 text-stone-600 sm:text-[10px] sm:leading-5">
-                  Keep “All outlets” selected if this supplier can serve the
-                  whole hospitality business.
-                </div>
-
-                <button
-                  type="button"
-                  disabled={
-                    busy ||
-                    !can("hospitality.suppliers.manage") ||
-                    !supplierForm.supplierCode.trim() ||
-                    !supplierForm.name.trim()
-                  }
-                  onClick={() =>
-                    run(
-                      () =>
-                        createHospitalitySupplier({
-                          supplierCode: supplierForm.supplierCode,
-                          name: supplierForm.name,
-                          leadTimeDays: Number(supplierForm.leadTimeDays) || 0,
-                          serviceOutletIds: supplierForm.serviceOutletIds
-                            .split(",")
-                            .map((value) => value.trim())
-                            .filter((value) =>
-                              outlets.some(
-                                (outlet) =>
-                                  String(outlet.id || outlet._id || "") ===
-                                  value
-                              )
-                            ),
-                          contact: {},
-                          notes: "",
-                        }),
-                      "Supplier added."
-                    )
-                  }
-                  className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
-                >
-                  Add supplier
-                </button>
               </section>
 
-              <section className="rounded-[20px] border border-sky-200 bg-sky-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-black text-stone-950 sm:text-base">
-                      Your suppliers
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Review the vendors already saved for this hospitality
-                      business before adding supplied items.
-                    </p>
+              <section id="hosp-supplier-list" aria-labelledby="hosp-supplier-list-title" className="order-1 min-w-0 lg:order-2">
+                <div className="flex flex-wrap items-end justify-between gap-3 border-t-[3px] border-[#173F35] bg-[#F7F6F2] px-3 py-4 sm:px-5 sm:py-5">
+                  <div>
+                    <p className="text-[12px] font-semibold text-[#C86C42]">02 / YOUR NETWORK</p>
+                    <h2 id="hosp-supplier-list-title" className="mt-1 text-[22px] font-semibold leading-[1.2] text-[#173F35] sm:text-[25px]">Saved suppliers</h2>
                   </div>
-                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-sky-700 shadow-sm sm:text-[10px]">
-                    {suppliers.length} saved
-                  </span>
-                </div>
 
-                <div className="mt-3 space-y-2">
-                  {suppliers.length ? (
-                    suppliers.map((supplier) => (
-                      <div
-                        key={supplier.id}
-                        className="rounded-[15px] border border-white/80 bg-white/85 px-3 py-2.5 shadow-sm sm:px-3.5 sm:py-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-[12px] font-black text-stone-950 sm:text-sm">
-                              {supplier.name}
-                            </p>
-                            <p className="mt-0.5 text-[9px] font-semibold leading-4 text-stone-500 sm:text-[10px]">
-                              {supplier.supplierCode || "No supplier code"} ·
-                              usually {supplier.leadTimeDays || 0} day
-                              {Number(supplier.leadTimeDays || 0) === 1
-                                ? ""
-                                : "s"}{" "}
-                              to deliver
-                            </p>
+                </div>
+                <div className="border-x border-b border-[#DCE0CF] bg-white">
+                  {supplierFeedFailures.includes("Suppliers") ? (
+                    <p role="status" className="px-4 py-6 text-[14px] text-[#173F35]">Saved suppliers couldn't be loaded. Use Refresh to try again.</p>
+                  ) : suppliers.length ? (
+                    suppliers.map((supplier, index) => (
+                      <div key={supplier.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 border-b border-[#DCE0CF] px-3 py-3 last:border-b-0 hover:bg-[#F7F6F2] sm:flex sm:flex-nowrap sm:gap-x-3 sm:gap-y-2 sm:px-5 sm:py-4">
+                        <div className="hidden size-10 shrink-0 place-items-center bg-[#DCE0CF] text-[#173F35] sm:grid"><Truck size={19} aria-hidden="true" /></div>
+                        <div className="min-w-0 sm:flex-[1_1_160px]">
+                          <p className="break-words text-[15px] font-semibold leading-5 text-[#173F35]">{supplier.name}</p>
+                          <p className="mt-0.5 break-words text-[12px] leading-4 text-[#202421] sm:mt-1 sm:text-[13px]">{supplier.supplierCode || "No code"} · {supplier.serviceOutletIds?.length ? `${supplier.serviceOutletIds.length} selected outlet${supplier.serviceOutletIds.length === 1 ? "" : "s"}` : "All outlets"}</p>
+                        </div>
+                        <div className="ml-auto flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-4">
+                          <div className="text-right text-[#173F35]">
+                            <p className="text-[14px] font-semibold leading-5 sm:text-[16px]">{Number(supplier.leadTimeDays || 0)} <span className="text-[12px] font-normal sm:hidden">days</span></p>
+                            <p className="hidden text-[12px] sm:block">delivery days</p>
                           </div>
-                          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] text-emerald-700 sm:text-[9px]">
-                            {titleize(supplier.status || "active")}
-                          </span>
+                          <span className="text-[12px] font-semibold text-[#173F35] sm:border-l sm:border-[#DCE0CF] sm:pl-3">{titleize(supplier.status || "active")}</span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="rounded-[15px] border border-dashed border-sky-200 bg-white/55 px-3 py-5 text-center">
-                      <p className="text-[10px] font-bold text-stone-600 sm:text-xs">
-                        No suppliers added yet.
-                      </p>
-                      <p className="mt-1 text-[9px] font-medium text-stone-500 sm:text-[10px]">
-                        Add your first supplier using the form beside this list.
-                      </p>
-                    </div>
+                    <div className="px-4 py-7 text-[14px] text-[#202421] sm:px-5">No suppliers yet. Use Add supplier to create the first one.</div>
                   )}
+                </div>
+                <div className="flex items-center justify-between gap-3 bg-[#DCE0CF] px-3 py-3 text-[13px] text-[#173F35] sm:px-5">
+                  <span><span className="sm:hidden">Prepared food</span><span className="hidden sm:inline">Ready-made food listings</span></span>
+                  <Link to="/host/listings/new?type=prepared_food" className="focus-ring inline-flex min-h-10 items-center gap-1 font-semibold underline decoration-[#C86C42] underline-offset-4">Create listing <ArrowRight size={15} aria-hidden="true" /></Link>
                 </div>
               </section>
             </div>
@@ -4200,32 +4155,30 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {section === "menus" ? (
-            <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4 xl:grid xl:grid-cols-3 xl:grid-rows-1 xl:items-stretch xl:gap-4 xl:space-y-0">
-              <div className="grid gap-3 xl:contents">
-                <section className="self-start rounded-[20px] border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5 xl:col-start-1 xl:row-start-1 xl:h-full xl:self-stretch">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:text-[10px]">
-                        Menu details
-                      </p>
-                      <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                        Create an outlet menu
-                      </h2>
-                      <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                        Choose the outlet and create a menu such as Breakfast,
-                        Lunch, Dinner or Main Menu.
-                      </p>
-                    </div>
-                    <Store size={18} className="shrink-0 text-emerald-700" />
-                  </div>
+            <div className="mt-5 space-y-7 sm:mt-7 sm:space-y-9">
+              {menuFeedFailures.length ? (
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-l-[4px] border-[#C86C42] bg-[#DCE0CF]/70 px-4 py-3 text-[14px] leading-5 text-[#173F35]">
+                  <span>Couldn't load {menuFeedFailures.join(", ")}. Select Refresh to retry.</span>
+                  <button type="button" disabled={loading} onClick={load} className="focus-ring min-h-10 font-semibold underline decoration-[#C86C42] underline-offset-4">Retry</button>
+                </div>
+              ) : null}
 
-                  <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+              <div className="grid gap-0 border-y border-[#DCE0CF] lg:grid-cols-2 lg:divide-x lg:divide-[#DCE0CF]">
+                <section id="host-menu-create" className="min-w-0 scroll-mt-24 bg-[#F7F6F2] px-4 py-5 sm:px-6 sm:py-7 lg:px-7">
+                  <div className="flex items-start gap-4 border-b border-[#DCE0CF] pb-4">
+                    <span className="text-[29px] font-semibold leading-none text-[#C86C42]">01</span>
+                    <div>
+                      <h2 className="text-[22px] font-semibold leading-[1.2] text-[#173F35] sm:text-[24px]">Create a menu</h2>
+                      <p className="mt-1 text-[14px] leading-5 text-[#202421]/75">Choose the outlet, then give its menu a name.</p>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <label className="grid gap-1 sm:col-span-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500">
+                      <span className="text-[13px] font-semibold text-[#173F35]">
                         Outlet
                       </span>
                       <select
-                        className={inputClass}
+                        className={menuFieldClass}
                         value={menuForm.outletId}
                         onChange={(event) =>
                           setMenuForm((current) => ({
@@ -4244,11 +4197,11 @@ export default function HospitalityPage({ section = "dashboard" }) {
                     </label>
 
                     <label className="grid gap-1">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500">
+                      <span className="text-[13px] font-semibold text-[#173F35]">
                         Menu code
                       </span>
                       <input
-                        className={inputClass}
+                        className={menuFieldClass}
                         placeholder="Example: DINNER-01"
                         value={menuForm.menuCode}
                         onChange={(event) =>
@@ -4261,11 +4214,11 @@ export default function HospitalityPage({ section = "dashboard" }) {
                     </label>
 
                     <label className="grid gap-1">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500">
+                      <span className="text-[13px] font-semibold text-[#173F35]">
                         Menu name
                       </span>
                       <input
-                        className={inputClass}
+                        className={menuFieldClass}
                         placeholder="Example: Dinner Menu"
                         value={menuForm.name}
                         onChange={(event) =>
@@ -4300,36 +4253,26 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         "Menu created."
                       )
                     }
-                    className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
+                    className="focus-ring mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-3 text-[15px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
                     Save menu
                   </button>
                 </section>
-
-                <section className="self-start rounded-[20px] border border-sky-200 bg-sky-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5 xl:col-start-2 xl:row-start-1 xl:h-full xl:self-stretch">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-800 sm:text-[10px]">
-                        Menu dish
-                      </p>
-                      <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                        Add an approved dish
-                      </h2>
-                      <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                        Pick a saved menu, choose an approved kitchen recipe,
-                        then set the name and selling price customers see.
-                      </p>
+                <section id="host-menu-add-dish" className="min-w-0 scroll-mt-24 border-t border-[#DCE0CF] bg-[#DCE0CF]/50 px-4 py-5 sm:px-6 sm:py-7 lg:border-t-0 lg:px-7">
+                  <div className="flex items-start gap-4 border-b border-[#DCE0CF] pb-4">
+                    <span className="text-[29px] font-semibold leading-none text-[#C86C42]">02</span>
+                    <div>
+                      <h2 className="text-[22px] font-semibold leading-[1.2] text-[#173F35] sm:text-[24px]">Add approved dishes</h2>
+                      <p className="mt-1 text-[14px] leading-5 text-[#202421]/75">Pick an approved recipe, name it and set its price.</p>
                     </div>
-                    <ChefHat size={18} className="shrink-0 text-sky-700" />
                   </div>
-
-                  <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <label className="grid gap-1 sm:col-span-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500">
+                      <span className="text-[13px] font-semibold text-[#173F35]">
                         Menu
                       </span>
                       <select
-                        className={inputClass}
+                        className={menuFieldClass}
                         value={menuItemForm.menuId}
                         onChange={(event) =>
                           setMenuItemForm((current) => ({
@@ -4347,43 +4290,63 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       </select>
                     </label>
 
-                    <label className="grid gap-1 sm:col-span-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500">
-                        Approved kitchen recipe
-                      </span>
-                      <select
-                        className={inputClass}
-                        value={menuItemForm.productionRecipeVersionId}
-                        onChange={(event) => {
-                          const selectedId = event.target.value;
-                          const selectedRecipe = approvedRecipes.find(
-                            (recipe) => recipe.id === selectedId
-                          );
-                          setMenuItemForm((current) => ({
-                            ...current,
-                            productionRecipeVersionId: selectedId,
-                            displayName:
-                              current.displayName ||
-                              selectedRecipe?.title ||
-                              "",
-                          }));
-                        }}
-                      >
-                        <option value="">Choose an approved recipe</option>
-                        {approvedRecipes.map((recipe) => (
-                          <option key={recipe.id} value={recipe.id}>
-                            {recipe.title} · Version {recipe.versionNumber}
-                          </option>
+                    <div className="sm:col-span-2">
+                      <span className="block text-[13px] font-semibold text-[#173F35]">Dish source</span>
+                      <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label="Choose dish source">
+                        {[["prepared_food_listing", "Prepared-food listings"], ["kitchen_recipe", "Kitchen recipes"]].map(([kind, label]) => (
+                          <button key={kind} type="button"
+                            aria-pressed={menuItemForm.sourceType === kind}
+                            onClick={() => setMenuItemForm((current) => ({ ...current,
+                              sourceType: kind, hostListingPacketId: "", productionRecipeVersionId: "", displayName: "",
+                            }))}
+                            className={`focus-ring min-h-11 border px-2 py-2 text-[13px] font-semibold transition ${menuItemForm.sourceType === kind
+                              ? "border-[#173F35] bg-[#173F35] text-[#F7F6F2]"
+                              : "border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35]"}`}>
+                            {label}
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </div>
+                    {menuItemForm.sourceType === "prepared_food_listing" ? (
+                      <label className="grid gap-1 sm:col-span-2">
+                        <span className="text-[13px] font-semibold text-[#173F35]">Approved prepared-food listing</span>
+                        <select className={menuFieldClass} value={menuItemForm.hostListingPacketId}
+                          onChange={(event) => {
+                            const selectedId = event.target.value;
+                            const selected = preparedListings.find((item) => item.id === selectedId);
+                            setMenuItemForm((current) => ({ ...current,
+                              hostListingPacketId: selectedId, displayName: selected?.title || "",
+                            }));
+                          }}>
+                          <option value="">Choose an approved listing</option>
+                          {preparedListings.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+                        </select>
+                        {preparedListingError ? <span role="alert" className="text-[13px] text-[#C86C42]">{preparedListingError} Refresh to retry.</span> : null}
+                        {!preparedListings.length && !preparedListingError ? <span className="text-[13px] text-[#202421]/70">No approved prepared-food listings yet. Publish one through Listing Studio.</span> : null}
+                      </label>
+                    ) : (
+                      <label className="grid gap-1 sm:col-span-2">
+                        <span className="text-[13px] font-semibold text-[#173F35]">Approved kitchen recipe</span>
+                        <select className={menuFieldClass} value={menuItemForm.productionRecipeVersionId}
+                          onChange={(event) => {
+                            const selectedId = event.target.value;
+                            const selectedRecipe = approvedRecipes.find((recipe) => recipe.id === selectedId);
+                            setMenuItemForm((current) => ({ ...current,
+                              productionRecipeVersionId: selectedId, displayName: selectedRecipe?.title || "",
+                            }));
+                          }}>
+                          <option value="">Choose an approved recipe</option>
+                          {approvedRecipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.title} · Version {recipe.versionNumber}</option>)}
+                        </select>
+                      </label>
+                    )}
 
                     <label className="grid gap-1">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500">
+                      <span className="text-[13px] font-semibold text-[#173F35]">
                         Customer-facing dish name
                       </span>
                       <input
-                        className={inputClass}
+                        className={menuFieldClass}
                         placeholder="Example: Paneer Tikka"
                         value={menuItemForm.displayName}
                         onChange={(event) =>
@@ -4396,12 +4359,12 @@ export default function HospitalityPage({ section = "dashboard" }) {
                     </label>
 
                     <label className="grid gap-1">
-                      <span className="text-[9px] font-black uppercase tracking-[0.08em] text-stone-500">
+                      <span className="text-[13px] font-semibold text-[#173F35]">
                         Selling price (optional)
                       </span>
                       <div className="grid grid-cols-[84px_minmax(0,1fr)] gap-2">
                         <select
-                          className={inputClass}
+                          className={menuFieldClass}
                           value={menuItemForm.currency}
                           onChange={(event) =>
                             setMenuItemForm((current) => ({
@@ -4416,7 +4379,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                           <option value="GBP">GBP</option>
                         </select>
                         <input
-                          className={inputClass}
+                          className={menuFieldClass}
                           type="number"
                           min="0"
                           step="0.01"
@@ -4433,8 +4396,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
                     </label>
                   </div>
 
-                  {!approvedRecipes.length ? (
-                    <div className="mt-3 rounded-[14px] border border-violet-200 bg-violet-50/80 px-3 py-2.5 text-[9px] font-semibold leading-4 text-violet-800 sm:text-[10px]">
+                  {menuItemForm.sourceType === "kitchen_recipe" && !approvedRecipes.length ? (
+                    <div className="mt-3 border-l-[3px] border-[#C86C42] bg-[#DCE0CF]/65 px-4 py-3 text-[13px] font-medium leading-5 text-[#173F35]">
                       No Super Admin-approved kitchen recipe is available yet.
                       Submit a recipe for review, then return after Super Admin
                       approval.
@@ -4448,15 +4411,18 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       busy ||
                       !can("hospitality.recipes.manage") ||
                       !menuItemForm.menuId.trim() ||
-                      !menuItemForm.productionRecipeVersionId.trim() ||
+                      !(menuItemForm.sourceType === "prepared_food_listing"
+                        ? menuItemForm.hostListingPacketId.trim()
+                        : menuItemForm.productionRecipeVersionId.trim()) ||
                       !menuItemForm.displayName.trim()
                     }
                     onClick={async () => {
                       const result = await run(
                         () =>
                           addHospitalityMenuItem(menuItemForm.menuId.trim(), {
-                            productionRecipeVersionId:
-                              menuItemForm.productionRecipeVersionId.trim(),
+                            ...(menuItemForm.sourceType === "prepared_food_listing"
+                              ? { hostListingPacketId: menuItemForm.hostListingPacketId.trim() }
+                              : { productionRecipeVersionId: menuItemForm.productionRecipeVersionId.trim() }),
                             displayName: menuItemForm.displayName.trim(),
                             sellingPrice:
                               menuItemForm.sellingPriceMinor === ""
@@ -4476,34 +4442,28 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         setMenuItemSaved(true);
                       }
                     }}
-                    className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
+                    className="focus-ring mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-3 text-[15px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
                     {menuItemSaved ? "Dish added" : "Add dish to menu"}
                   </button>
                 </section>
               </div>
 
-              <section className="rounded-[20px] border border-violet-200 bg-violet-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5 xl:col-start-3 xl:row-start-1 xl:h-full">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-800 sm:text-[10px]">
-                      Saved menus
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      Your outlet menus
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Review the menus already created and how many dishes are
-                      currently attached to each one.
-                    </p>
+              <section id="host-menu-saved" className="scroll-mt-24 border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE0CF] bg-[#C86C42]/10 px-4 py-5 sm:px-6">
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#C86C42]">03 / Menu management</p>
+                    <h2 className="mt-1 text-[23px] font-semibold text-[#173F35] sm:text-[26px]">Saved outlet menus</h2>
                   </div>
-                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-violet-700 shadow-sm sm:text-[10px]">
-                    {menus.length} saved
-                  </span>
+                  <div className="flex items-center gap-2 text-[#173F35]">
+                    <span className="text-[26px] font-semibold">{menuFeedFailures.includes("Saved menus") ? "—" : menus.length}</span>
+                    <span className="text-[13px] font-medium">Menus</span>
+                  </div>
                 </div>
-
-                <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-1">
-                  {menus.length ? (
+                <div className="divide-y divide-[#DCE0CF]">
+                  {menuFeedFailures.length ? (
+                    <div className="px-5 py-7 text-[14px] font-medium text-[#173F35]">Menu records could not be loaded. Select Refresh to try again.</div>
+                  ) : menus.length ? (
                     menus.map((menu) => {
                       const outlet = outlets.find(
                         (item) => item.id === menu.outletId
@@ -4511,19 +4471,19 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       return (
                         <div
                           key={menu.id}
-                          className="rounded-[15px] border border-white/85 bg-white/85 px-3 py-3 shadow-sm sm:px-3.5"
+                          className="border-b border-[#DCE0CF] px-4 py-4 last:border-b-0 sm:px-5 sm:py-5"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-[12px] font-black text-stone-950 sm:text-sm">
+                              <p className="break-words text-[17px] font-semibold leading-6 text-[#173F35]">
                                 {menu.name}
                               </p>
-                              <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-[10px]">
+                              <p className="mt-0.5 text-[13px] font-medium text-[#202421]/70">
                                 {menu.menuCode}
                               </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-1.5">
-                              <span className="rounded-full bg-violet-50 px-2 py-1 text-[8px] font-black text-violet-700 sm:text-[9px]">
+                              <span className="whitespace-nowrap bg-[#DCE0CF] px-2.5 py-1 text-[12px] font-semibold text-[#173F35]">
                                 {menu.items?.length || 0} dishes
                               </span>
                               <button
@@ -4532,7 +4492,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                   busy || !can("hospitality.recipes.manage")
                                 }
                                 onClick={() => handleDeleteMenu(menu)}
-                                className="focus-ring inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[8px] font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-[9px]"
+                                className="focus-ring inline-flex min-h-9 items-center gap-1.5 border border-[#C86C42] px-2.5 py-1.5 text-[12px] font-semibold text-[#C86C42] transition hover:bg-[#C86C42] hover:text-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-50"
                                 aria-label={`Delete ${
                                   menu.name || menu.menuCode || "menu"
                                 }`}
@@ -4543,8 +4503,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
                               </button>
                             </div>
                           </div>
-                          <div className="mt-2 flex items-center gap-1.5 text-[9px] font-semibold text-stone-600 sm:text-[10px]">
-                            <Store size={12} className="text-emerald-700" />
+                          <div className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-[#202421]/70">
+                            <Store size={12} className="text-[#173F35]" />
                             <span className="truncate">
                               {outlet?.name ||
                                 outlet?.outletCode ||
@@ -4553,7 +4513,12 @@ export default function HospitalityPage({ section = "dashboard" }) {
                           </div>
 
                           {menu.items?.length ? (
-                            <div className="mt-3 space-y-2 border-t border-violet-100 pt-3">
+                            <div
+                              tabIndex={menu.items.length > 4 ? 0 : undefined}
+                              role={menu.items.length > 4 ? "region" : undefined}
+                              aria-label={menu.items.length > 4 ? `${menu.name} dishes — scroll for more` : undefined}
+                              className={`mt-4 divide-y divide-[#DCE0CF] border-t border-[#DCE0CF] ${menu.items.length > 4 ? "max-h-[664px] overflow-y-auto sm:max-h-[608px]" : ""}`}
+                            >
                               {menu.items.map((menuItem) => {
                                 const availabilityStatus =
                                   menuItem.availability?.status || "available";
@@ -4565,33 +4530,34 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                     : "Available";
                                 const availabilityClass =
                                   availabilityStatus === "sold_out"
-                                    ? "bg-amber-100 text-amber-800"
+                                    ? "bg-[#C86C42] text-[#F7F6F2]"
                                     : availabilityStatus === "paused"
-                                    ? "bg-violet-100 text-violet-800"
-                                    : "bg-emerald-100 text-emerald-800";
+                                    ? "border border-[#C86C42] text-[#C86C42]"
+                                    : "bg-[#DCE0CF] text-[#173F35]";
 
                                 return (
                                   <div
                                     key={menuItem.id}
-                                    className="rounded-[12px] border border-stone-100 bg-stone-50/80 p-2.5"
+                                    className="min-h-[166px] py-3.5 sm:min-h-[152px]"
                                   >
                                     <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0">
-                                        <p className="truncate text-[10px] font-black text-stone-900 sm:text-[11px]">
-                                          {menuItem.displayName}
-                                        </p>
-                                        <p className="mt-0.5 text-[8px] font-semibold text-stone-500 sm:text-[9px]">
-                                          Finished-dish availability
-                                        </p>
+                                      <div className="flex min-w-0 items-start gap-2.5">
+                                        {menuItem.imageUrl ? (
+                                          <img src={menuItem.imageUrl} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                                        ) : null}
+                                        <div className="min-w-0">
+                                          <p className="break-words text-[15px] font-semibold leading-5 text-[#202421]">{menuItem.displayName}</p>
+                                          <p className="mt-1 text-[12px] text-[#202421]/70">{menuItem.hostListingPacketId ? "Prepared-food listing" : "Kitchen recipe"}</p>
+                                        </div>
                                       </div>
                                       <span
-                                        className={`shrink-0 rounded-full px-2 py-1 text-[8px] font-black ${availabilityClass}`}
+                                        className={`shrink-0 px-2.5 py-1 text-[12px] font-semibold ${availabilityClass}`}
                                       >
                                         {availabilityLabel}
                                       </span>
                                     </div>
 
-                                    <div className="mt-2 grid grid-cols-3 gap-1.5">
+                                    <div className="mt-3 grid grid-cols-3 gap-1">
                                       {[
                                         ["available", "Available"],
                                         ["sold_out", "Sold out"],
@@ -4604,9 +4570,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                             busy ||
                                             !can(
                                               "hospitality.recipes.manage"
-                                            ) ||
-                                            availabilityStatus === status
+                                            )
                                           }
+                                          aria-pressed={availabilityStatus === status}
                                           onClick={() =>
                                             run(
                                               () =>
@@ -4623,12 +4589,22 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                               `Dish marked ${label.toLowerCase()}.`
                                             )
                                           }
-                                          className="focus-ring rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-[8px] font-black text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-45 sm:text-[9px]"
+                                          className={`focus-ring min-h-10 border px-1 py-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${availabilityStatus === status
+                                            ? "border-[#173F35] bg-[#DCE0CF] text-[#173F35]"
+                                            : "border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] hover:bg-[#DCE0CF]"}`}
                                         >
                                           {label}
                                         </button>
                                       ))}
                                     </div>
+                                    {availabilityStatus === "sold_out" ? (
+                                      <button type="button" disabled={openingMarketplace === menuItem.id}
+                                        onClick={() => openMenuItemMarketplace(menuItem)}
+                                        className="focus-ring mt-2 inline-flex min-h-10 items-center gap-2 text-[13px] font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4 disabled:opacity-50">
+                                        {openingMarketplace === menuItem.id ? "Opening Marketplace…" : "Update item in Marketplace"}
+                                        <ArrowRight size={15} aria-hidden="true" />
+                                      </button>
+                                    ) : null}
                                   </div>
                                 );
                               })}
@@ -4638,17 +4614,22 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       );
                     })
                   ) : (
-                    <div className="rounded-[15px] border border-dashed border-violet-200 bg-white/55 px-3 py-5 text-center md:col-span-2 xl:col-span-1">
-                      <p className="text-[10px] font-bold text-stone-600 sm:text-xs">
+                    <div className="px-5 py-8 text-center">
+                      <p className="text-[15px] font-semibold text-[#173F35]">
                         No outlet menu created yet.
                       </p>
-                      <p className="mt-1 text-[9px] font-medium text-stone-500 sm:text-[10px]">
+                      <p className="mt-1 text-[13px] font-medium text-[#202421]/70">
                         Choose an outlet above and save your first menu.
                       </p>
                     </div>
                   )}
+                
                 </div>
               </section>
+              <div className="flex items-start gap-3 border-t border-[#C86C42] px-2 pt-4 text-[#173F35] sm:px-4">
+                <ShieldCheck size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <p className="text-[13px] leading-5">Add only Super Admin-approved kitchen recipes or prepared-food listings. Available = offered on this menu; Sold out = temporarily unavailable; Paused = intentionally hidden. Menu status does not change Marketplace stock.</p>
+              </div>
             </div>
           ) : null}
 
@@ -6039,32 +6020,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
             </div>
           ) : null}
 
-          {isDashboard ? null : isSuppliers ? (
-            <section className="mt-3 rounded-[18px] border border-violet-200 bg-violet-50/70 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:mt-4 sm:px-5 sm:py-4">
-              <div className="flex items-start gap-3">
-                <PackageSearch
-                  className="mt-0.5 shrink-0 text-violet-700"
-                  size={17}
-                />
-                <div>
-                  <h2 className="text-xs font-black text-stone-950 sm:text-sm">
-                    Next: add what each supplier provides
-                  </h2>
-                  <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                    Once your suppliers are saved, open Ingredients & products
-                    to connect their items, pack sizes and purchasing costs.
-                  </p>
-                  <Link
-                    to="/host/hospitality/products"
-                    className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-violet-800 sm:text-[10px]"
-                  >
-                    Open ingredients & products
-                    <ArrowRight size={11} />
-                  </Link>
-                </div>
-              </div>
-            </section>
-          ) : isProducts ? (
+          {isDashboard || isSuppliers ? null : isProducts ? (
             <section className="mt-3 rounded-[18px] border border-violet-200 bg-violet-50/70 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:mt-4 sm:px-5 sm:py-4">
               <div className="flex items-start gap-3">
                 <ChefHat
@@ -6244,21 +6200,18 @@ export default function HospitalityPage({ section = "dashboard" }) {
               </div>
             </section>
           ) : (
-            <section className="mt-5 rounded-[24px] border border-stone-200 bg-stone-950 p-5 text-white shadow-sm">
+            <section className={isOutlets ? "mt-3 border-t-2 border-[#C86C42] bg-[#DCE0CF]/40 px-3 py-3 text-[#173F35] sm:mt-5 sm:rounded-[24px] sm:border sm:border-stone-200 sm:bg-stone-950 sm:p-5 sm:text-white sm:shadow-sm" : "mt-5 rounded-[24px] border border-stone-200 bg-stone-950 p-5 text-white shadow-sm"}>
               <div className="flex items-start gap-3">
                 <ShieldCheck
-                  className="mt-0.5 shrink-0 text-emerald-400"
+                  className={isOutlets ? "mt-0.5 shrink-0 text-[#173F35] sm:text-emerald-400" : "mt-0.5 shrink-0 text-emerald-400"}
                   size={18}
                 />
                 <div>
-                  <h2 className="text-sm font-black">
-                    Before important changes go live
+                  <h2 className={isOutlets ? "text-[14px] font-semibold sm:text-sm sm:font-black" : "text-sm font-black"}>
+                    {isOutlets ? <><span className="sm:hidden">Approval rules</span><span className="hidden sm:inline">Before important changes go live</span></> : "Before important changes go live"}
                   </h2>
-                  <p className="mt-2 text-xs leading-5 text-stone-400">
-                    You can manage outlets, suppliers, recipes and purchasing
-                    here. Safety-sensitive dish records, allergen decisions and
-                    major changes still need the required review before they can
-                    be published or treated as final.
+                  <p className={isOutlets ? "mt-1 text-[13px] leading-5 text-[#173F35] sm:mt-2 sm:text-xs sm:text-stone-400" : "mt-2 text-xs leading-5 text-stone-400"}>
+                    {isOutlets ? <><span className="sm:hidden">Safety-sensitive changes need review before publishing.</span><span className="hidden sm:inline">You can manage outlets, suppliers, recipes and purchasing here. Safety-sensitive dish records, allergen decisions and major changes still need the required review before they can be published or treated as final.</span></> : "You can manage outlets, suppliers, recipes and purchasing here. Safety-sensitive dish records, allergen decisions and major changes still need the required review before they can be published or treated as final."}
                   </p>
                 </div>
               </div>

@@ -61,6 +61,9 @@ import {
   User,
 } from '../users/user.model.js'
 
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+import { publicHostListingFilter, publishedHostRecord } from '../hostOperations/hostUnifiedListing.public.js'
+
 import {
   DishPassportSnapshot,
 } from './hospitality.passport.models.js'
@@ -71,6 +74,7 @@ import {
   HospitalityMenu,
   HospitalityMenuAvailability,
   HospitalityMenuItem,
+  HospitalityMenuListingItem,
   HospitalityOutlet,
   HospitalityProcurementPlan,
   HospitalityProductionPlan,
@@ -750,6 +754,14 @@ function serializeMenu(
               menuItem.productionRecipeVersionId,
             ),
 
+          hostListingPacketId:
+            id(menuItem.hostListingPacketId),
+
+          sourceType:
+            menuItem.hostListingPacketId ? 'prepared_food_listing' : 'kitchen_recipe',
+
+          imageUrl: menuItem.imageUrl || '',
+
           sourceRecipeVersionId:
             id(
               menuItem.sourceRecipeVersionId,
@@ -1035,6 +1047,9 @@ function serializeMenuAvailability(
       id(
         item.productionRecipeVersionId,
       ),
+
+    hostListingPacketId:
+      id(item.hostListingPacketId),
 
     sourceRecipeVersionId:
       id(
@@ -5923,6 +5938,31 @@ export async function approveHospitalityProductionRecipe({
 |--------------------------------------------------------------------------
 */
 
+export async function listHospitalityApprovedPreparedFood({
+  actorUser,
+  organizationIdHint,
+}) {
+  const context = await resolveHospitalityContext(actorUser, organizationIdHint)
+  assertAnyPermission(context, ['hospitality.read', 'hospitality.recipes.read'])
+  // Owner is derived from the authenticated organization, never from input.
+  const records = await HostUnifiedListingPacket.find(
+    publicHostListingFilter({ ownerUserId: context.organization.ownerUserId }),
+  ).select('_id type title status packet publishedPacket publishedType publishedTitle approvedAt').sort({ updatedAt: -1 }).lean()
+  const listings = records.map((record) => {
+    const published = publishedHostRecord(record)
+    if (published.type !== 'prepared_food') return null
+    const packet = published.packet || {}
+    return {
+      id: id(record._id),
+      title: String(published.title || packet.title || 'Prepared food'),
+      imageUrl: typeof packet.images?.[0] === 'string'
+        ? packet.images[0] : (packet.images?.[0]?.url || ''),
+      approvedAt: record.approvedAt || null,
+    }
+  }).filter(Boolean)
+  return { listings }
+}
+
 export async function listHospitalityMenus({
   actorUser,
   organizationIdHint,
@@ -5984,6 +6024,11 @@ export async function listHospitalityMenus({
       },
     }).lean()
 
+  const listingItems = await HospitalityMenuListingItem.find({
+    organizationId: context.organization._id,
+    menuId: { $in: menus.map((menu) => menu._id) },
+  }).lean()
+
   const sourceRecipeVersionByProductionRecipeId =
     await loadOperationalRecipeLineageMap({
       organizationId:
@@ -6003,13 +6048,7 @@ export async function listHospitalityMenus({
       organizationId:
         context.organization._id,
 
-      menuItemIds:
-        items.map(
-          (
-            item,
-          ) =>
-            item._id,
-        ),
+      menuItemIds: [...items, ...listingItems].map((item) => item._id),
     })
 
   const itemsByMenu =
@@ -6017,7 +6056,7 @@ export async function listHospitalityMenus({
 
   for (
     const item of
-    items
+    [...items, ...listingItems]
   ) {
     const key =
       id(
@@ -6254,6 +6293,10 @@ export async function deleteHospitalityMenu({
             session,
           },
         )
+        await HospitalityMenuListingItem.deleteMany({
+          organizationId: context.organization._id,
+          menuId: menu._id,
+        }, { session })
       },
     )
   } finally {
@@ -6319,6 +6362,45 @@ export async function addHospitalityMenuItem({
     context,
     menu.outletId,
   )
+
+  if (input.hostListingPacketId) {
+    const record = await HostUnifiedListingPacket.findOne(
+      publicHostListingFilter({
+        _id: input.hostListingPacketId,
+        ownerUserId: context.organization.ownerUserId,
+      }),
+    ).lean()
+    const published = record && publishedHostRecord(record)
+    if (!published || published.type !== 'prepared_food') {
+      throw new ApiError(409, 'Choose an approved prepared-food listing owned by this business.')
+    }
+    const packet = published.packet || {}
+    const photo = packet.images?.[0]
+    try {
+      const menuItem = await HospitalityMenuListingItem.create({
+        organizationId: context.organization._id,
+        menuId: menu._id,
+        hostListingPacketId: record._id,
+        displayName: input.displayName,
+        imageUrl: typeof photo === 'string' ? photo : (photo?.url || ''),
+        sellingPrice: input.sellingPrice,
+        status: 'active',
+      })
+      return {
+        menuItem: {
+          id: id(menuItem._id), menuId: id(menuItem.menuId),
+          hostListingPacketId: id(menuItem.hostListingPacketId),
+          sourceType: 'prepared_food_listing', displayName: menuItem.displayName,
+          sellingPrice: menuItem.sellingPrice || null, status: menuItem.status,
+        },
+      }
+    } catch (error) {
+      if (duplicateKeyError(error)) {
+        throw new ApiError(409, 'This prepared-food listing is already on the selected menu.')
+      }
+      throw error
+    }
+  }
 
   const productionRecipe =
     await requireApprovedProductionRecipe(
@@ -6453,16 +6535,16 @@ export async function setHospitalityMenuItemAvailability({
   )
 
   const menuItem =
-    await HospitalityMenuItem.findOne({
-      _id:
-        menuItemId,
-
-      organizationId:
-        context.organization._id,
-
-      menuId:
-        menu._id,
-    }).lean()
+    (await HospitalityMenuItem.findOne({
+      _id: menuItemId,
+      organizationId: context.organization._id,
+      menuId: menu._id,
+    }).lean()) ||
+    (await HospitalityMenuListingItem.findOne({
+      _id: menuItemId,
+      organizationId: context.organization._id,
+      menuId: menu._id,
+    }).lean())
 
   if (!menuItem) {
     throw new ApiError(
@@ -6477,19 +6559,12 @@ export async function setHospitalityMenuItemAvailability({
     )
   }
 
-  const productionRecipe =
-    await HospitalityProductionRecipeVersion.findOne({
-      _id:
-        menuItem.productionRecipeVersionId,
-
-      organizationId:
-        context.organization._id,
-    })
-      .select({
-        sourceRecipeVersionId:
-          1,
-      })
-      .lean()
+  const productionRecipe = menuItem.productionRecipeVersionId
+    ? await HospitalityProductionRecipeVersion.findOne({
+        _id: menuItem.productionRecipeVersionId,
+        organizationId: context.organization._id,
+      }).select({ sourceRecipeVersionId: 1 }).lean()
+    : null
 
   const availability =
     await HospitalityMenuAvailability.create({
@@ -6506,7 +6581,9 @@ export async function setHospitalityMenuItemAvailability({
         menuItem._id,
 
       productionRecipeVersionId:
-        menuItem.productionRecipeVersionId,
+        menuItem.productionRecipeVersionId || null,
+
+      hostListingPacketId: menuItem.hostListingPacketId || null,
 
       sourceRecipeVersionId:
         menuItem.sourceRecipeVersionId ||
