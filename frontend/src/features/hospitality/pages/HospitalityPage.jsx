@@ -73,6 +73,9 @@ import {
 const inputClass =
   "focus-ring w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none placeholder:text-stone-400";
 
+const procurementFieldClass =
+  "focus-ring min-h-11 w-full min-w-0 rounded-[8px] border border-[#DCE0CF] bg-[#F7F6F2] px-3.5 py-2.5 text-[14px] font-medium text-[#202421] outline-none placeholder:text-[#202421]/50 focus:border-[#C86C42] sm:text-[15px]";
+
 const menuFieldClass =
   "focus-ring min-h-11 w-full min-w-0 rounded-[10px] border border-[#DCE0CF] bg-white px-3.5 py-2.5 text-[14px] font-medium text-[#202421] outline-none placeholder:text-[#202421]/45 focus:border-[#173F35] sm:text-[15px]";
 
@@ -87,6 +90,8 @@ function RecipeIngredientPicker({
   onChange,
   label = "Ingredient",
   className = "sm:col-span-2",
+  showDatabaseHint = true,
+  inputClassName = inputClass,
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -129,7 +134,7 @@ function RecipeIngredientPicker({
       </span>
       <div className="relative">
         <input
-          className={inputClass}
+          className={inputClassName}
           placeholder="Search ingredient, for example Basmati Rice"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -193,7 +198,7 @@ function RecipeIngredientPicker({
         </div>
       ) : null}
 
-      {!value ? (
+      {!value && showDatabaseHint ? (
         <p className="text-[9px] font-semibold leading-4 text-sky-700">
           Select a real EPANTRY ingredient. You do not need to paste any
           database ID.
@@ -402,6 +407,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const [outletFeedFailures, setOutletFeedFailures] = useState([]);
   const [supplierFeedFailures, setSupplierFeedFailures] = useState([]);
   const [menuFeedFailures, setMenuFeedFailures] = useState([]);
+  const [procurementFeedFailures, setProcurementFeedFailures] = useState([]);
 
   const [reason, setReason] = useState(
     "Operational review completed with supporting evidence."
@@ -544,6 +550,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
     if (section === "dashboard") setDashboardFeedFailures([]);
     if (section === "outlets") setOutletFeedFailures([]);
     if (section === "suppliers") setSupplierFeedFailures([]);
+    if (section === "procurement") setProcurementFeedFailures([]);
 
     try {
       const common = await Promise.allSettled([
@@ -561,6 +568,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
       const failedOutletFeeds = [];
       const failedSupplierFeeds = [];
       const failedMenuFeeds = [];
+      const failedProcurementFeeds = [];
       if (section === "menus" && common[1].status === "rejected") {
         failedMenuFeeds.push("Outlets");
       }
@@ -569,6 +577,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
       }
       if (section === "dashboard" && common[1].status === "rejected") {
         failedDashboardFeeds.push("Outlets");
+      }
+      if (section === "procurement" && common[1].status === "rejected") {
+        failedProcurementFeeds.push("Outlets");
       }
       if (section === "outlets" && common[1].status === "rejected") {
         failedOutletFeeds.push("Outlets");
@@ -687,6 +698,16 @@ export default function HospitalityPage({ section = "dashboard" }) {
           failedDashboardFeeds.push(feedNames[key] || key);
         }
 
+        if (section === "procurement" && result.status === "rejected") {
+          const feedLabels = {
+            suppliers: "Suppliers",
+            supplierProducts: "Supplier prices",
+            recipes: "Approved recipes",
+            currentStock: "Stock counts",
+            productionPlans: "Kitchen plans",
+          };
+          failedProcurementFeeds.push(feedLabels[key] || key);
+        }
         if (key === "memberGrants") {
           setMemberGrants(value?.grants || []);
         }
@@ -723,6 +744,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
       if (section === "outlets") setOutletFeedFailures(failedOutletFeeds);
       if (section === "suppliers") setSupplierFeedFailures(failedSupplierFeeds);
       if (section === "menus") setMenuFeedFailures(failedMenuFeeds);
+      if (section === "procurement") setProcurementFeedFailures(failedProcurementFeeds);
     } catch (requestError) {
       setError(
         getHospitalityErrorMessage(
@@ -1177,10 +1199,10 @@ export default function HospitalityPage({ section = "dashboard" }) {
     },
     {
       number: "04",
-      title: "Review food cost",
+      title: "Review kitchen cost in Marketplace",
       text: "After planning purchases, continue to costing to check recipe costs.",
       icon: Calculator,
-      to: "/host/hospitality/costing",
+      to: "/host/marketplace",
       surface: "border-emerald-200 bg-emerald-50/75",
     },
   ];
@@ -1954,30 +1976,30 @@ export default function HospitalityPage({ section = "dashboard" }) {
         </header>
       ) : isMenus ? (
         <header className="border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
-          <div className="grid gap-5 px-3.5 pb-5 pt-5 sm:px-6 sm:pb-7 sm:pt-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8">
+          <div className="grid gap-2.5 px-3.5 pb-3 pt-3.5 sm:gap-5 sm:px-6 sm:pb-7 sm:pt-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8">
             <div>
               <p className="flex items-center gap-2 text-[13px] font-semibold text-[#C86C42]">
                 <ClipboardList size={16} aria-hidden="true" /> Host / Hospitality
               </p>
-              <h1 className="mt-2 text-[28px] font-semibold leading-[1.1] tracking-[-0.035em] text-[#173F35] sm:text-[38px]">
+              <h1 className="mt-1.5 text-[25px] font-semibold leading-[1.12] tracking-[-0.025em] text-[#173F35] sm:mt-2 sm:text-[38px] sm:tracking-[-0.035em]">
                 Outlet menus
               </h1>
-              <p className="mt-2 max-w-[620px] text-[14px] leading-6 text-[#202421]/75 sm:text-[16px]">
+              <p className="mt-2 hidden max-w-[620px] text-[14px] leading-6 text-[#202421]/75 sm:block sm:text-[16px]">
                 Create a menu, add approved dishes and manage availability for each outlet.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-4 lg:justify-end">
+            <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end lg:gap-4">
               <div className="flex items-baseline gap-2 border-l-[3px] border-[#C86C42] pl-3 text-[#173F35]">
-                <span className="text-[28px] font-semibold leading-none">{menuFeedFailures.includes("Saved menus") ? "—" : menus.length}</span>
+                <span className="text-[22px] font-semibold leading-none sm:text-[28px]">{menuFeedFailures.includes("Saved menus") ? "—" : menus.length}</span>
                 <span className="text-[13px] font-medium">Saved menus</span>
               </div>
               <button
                 type="button"
                 onClick={load}
                 disabled={loading}
-                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 border border-[#DCE0CF] bg-[#F7F6F2] px-4 py-2.5 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
+                className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 text-[13px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50 sm:min-h-11 sm:px-4 sm:py-2.5 sm:text-[14px]"
               >
-                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
                 Refresh
               </button>
             </div>
@@ -1989,17 +2011,17 @@ export default function HospitalityPage({ section = "dashboard" }) {
                 const StepIcon = step.icon;
                 const stepContents = (
                   <>
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-[17px] font-semibold text-[#C86C42]">{step.number}</span>
-                      <span className="min-w-0 text-[13px] font-semibold leading-5 text-[#173F35] sm:text-[15px]">{step.title}</span>
-                      <StepIcon size={17} className="ml-auto shrink-0 text-[#173F35]" aria-hidden="true" />
+                    <div className="flex items-start gap-2 sm:items-center sm:gap-2.5">
+                      <span className="shrink-0 text-[14px] font-semibold text-[#C86C42] sm:text-[17px]">{step.number}</span>
+                      <span className="min-w-0 text-[12px] font-semibold leading-[1.35] text-[#173F35] sm:text-[15px] sm:leading-5">{step.title}</span>
+                      <StepIcon size={17} className="ml-auto hidden shrink-0 text-[#173F35] sm:block" aria-hidden="true" />
                     </div>
                     <p className="mt-1 hidden text-[13px] leading-[1.4] text-[#202421]/75 sm:block">
                       {step.text}
                     </p>
                   </>
                 );
-                const stepClass = `focus-ring block min-h-[68px] border-b border-[#DCE0CF] px-3.5 py-3 transition hover:bg-[#DCE0CF] sm:min-h-[102px] sm:px-5 sm:py-4 lg:border-b-0 ${index % 2 === 0 ? "border-r" : ""} ${index !== 3 ? "lg:border-r" : ""} border-[#DCE0CF]`;
+                const stepClass = `focus-ring block min-h-[52px] border-b border-[#DCE0CF] px-2.5 py-2.5 transition hover:bg-[#DCE0CF] sm:min-h-[102px] sm:px-5 sm:py-4 lg:border-b-0 ${index % 2 === 0 ? "border-r" : ""} ${index !== 3 ? "lg:border-r" : ""} border-[#DCE0CF]`;
                 return step.to ? (
                   <Link key={step.number} to={step.to} className={stepClass}>
                     {stepContents}
@@ -2016,9 +2038,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
               })}
             </div>
           </div>
-          <details className="border-b border-[#DCE0CF] px-3.5 py-3 sm:px-6 lg:px-8">
+          <details className="border-b border-[#DCE0CF] px-3.5 py-2.5 sm:px-6 sm:py-3 lg:px-8">
             <summary className="cursor-pointer text-[13px] font-semibold text-[#173F35]">
-              Switch hospitality business
+              <span className="sm:hidden">Switch business</span><span className="hidden sm:inline">Switch hospitality business</span>
             </summary>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
@@ -2041,105 +2063,73 @@ export default function HospitalityPage({ section = "dashboard" }) {
           </details>
         </header>
       ) : isProcurement ? (
-        <header className="rounded-b-[22px] border-x border-b border-emerald-200/80 bg-[linear-gradient(135deg,#e8f7f1_0%,#eef7ff_64%,#f2efff_100%)] p-3.5 shadow-[0_12px_34px_rgba(15,23,42,0.06)] sm:rounded-b-[26px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
+        <header className="overflow-hidden border-b border-[#DCE0CF] bg-[#F7F6F2]">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(290px,0.32fr)]">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-emerald-800 sm:text-[10px]">
-                <ShoppingCart size={13} />
-                Purchasing setup
+              <div className="bg-[#C86C42] px-4 pb-3 pt-4 sm:px-8 sm:pb-6 sm:pt-7 lg:px-9">
+                <p className="inline-flex items-center gap-2 bg-[#F7F6F2] px-3 py-1.5 text-[13px] font-semibold text-[#173F35]">
+                  <ShoppingCart size={15} aria-hidden="true" /> Host / Hospitality
+                </p>
+                <h1 className="mt-2 text-[28px] font-semibold leading-[1.1] tracking-[-0.035em] text-[#F7F6F2] sm:mt-3 sm:text-[40px]">
+                  Purchasing
+                </h1>
               </div>
-
-              <h1 className="mt-2.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
-                Purchasing
-              </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                Count what each outlet has, plan what the kitchen needs to
-                prepare, and compare suppliers before you place purchases.
-              </p>
+              <div className="hidden min-h-[70px] items-center border-r border-[#DCE0CF] bg-[#F7F6F2] px-5 py-4 sm:flex sm:px-8 lg:px-9">
+                <p className="text-[14px] leading-[1.5] text-[#202421] sm:text-[15px]">
+                  Check kitchen stock, plan portions and compare suppliers in one place.
+                </p>
+              </div>
             </div>
-
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[10px] font-black text-emerald-800 shadow-sm sm:px-3.5 sm:text-xs"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
+            <div className="flex min-w-0 flex-col justify-center bg-[#173F35] px-4 py-3 sm:px-8 sm:py-5 lg:px-7">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[14px] font-semibold text-[#F7F6F2]"><span className="sm:hidden">Kitchen records</span><span className="hidden sm:inline">Your kitchen records</span></p>
+                <button
+                  type="button"
+                  onClick={load}
+                  disabled={loading}
+                  className="focus-ring inline-flex min-h-10 shrink-0 items-center gap-2 border border-[#DCE0CF] bg-[#F7F6F2] px-3 text-[13px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
+                >
+                  <RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden="true" /> Refresh
+                </button>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-3 border-t border-[#DCE0CF]/35 pt-2 sm:mt-4 sm:gap-4 sm:pt-3">
+                <div className="border-r border-[#DCE0CF]/30 pr-2">
+                  <p className="text-[24px] font-semibold leading-none text-[#F7F6F2] sm:text-[30px]">{procurementFeedFailures.includes("Stock counts") ? "—" : currentStock.length}</p>
+                  <p className="mt-1 text-[12px] text-[#DCE0CF] sm:mt-1.5 sm:text-[13px]">Stock entries</p>
+                </div>
+                <div>
+                  <p className="text-[24px] font-semibold leading-none text-[#F7F6F2] sm:text-[30px]">{procurementFeedFailures.includes("Kitchen plans") ? "—" : productionPlans.length}</p>
+                  <p className="mt-1 text-[12px] text-[#DCE0CF] sm:mt-1.5 sm:text-[13px]">Kitchen plans</p>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {procurementSteps.map((step) => {
+          <nav aria-label="Purchasing steps" className="grid grid-cols-2 border-y border-[#DCE0CF] bg-[#F7F6F2] lg:grid-cols-4">
+            {procurementSteps.map((step, index) => {
               const StepIcon = step.icon;
               const content = (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="grid size-6 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                      {step.number}
-                    </span>
-                    <StepIcon
-                      size={15}
-                      className="text-stone-600"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <p className="mt-2 text-[11px] font-black leading-4 text-stone-950 sm:text-[13px]">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-medium leading-[1.45] text-stone-600 sm:text-[11px]">
-                    {step.text}
-                  </p>
-                  {step.to ? (
-                    <span className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 sm:text-[10px]">
-                      Open
-                      <ArrowRight size={11} />
-                    </span>
-                  ) : null}
-                </>
+                <span className="flex min-h-[50px] items-center gap-2 px-2.5 py-2 sm:min-h-[76px] sm:gap-3 sm:px-5 sm:py-3">
+                  <span className="shrink-0 self-start text-[16px] font-semibold leading-none text-[#C86C42] sm:pt-1 sm:text-[19px]">{step.number}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-semibold leading-snug text-[#173F35] sm:text-[15px]">{step.title}</span>
+                    <span className="mt-1 hidden text-[13px] leading-[1.45] text-[#202421]/80 md:block">{step.text}</span>
+                  </span>
+                  <StepIcon size={18} className="hidden shrink-0 text-[#173F35] sm:block" aria-hidden="true" />
+                </span>
               );
-
+              const stepClass = `focus-ring block min-w-0 border-b border-[#DCE0CF] transition hover:bg-[#C86C42]/15 lg:border-b-0 ${index % 2 === 0 ? "border-r" : ""} ${index !== 3 ? "lg:border-r" : ""} border-[#DCE0CF] ${index === 2 ? "bg-[#C86C42]/15" : index === 1 ? "bg-[#DCE0CF]/65" : "bg-[#F7F6F2]"}`;
               return step.to ? (
-                <Link
-                  key={step.number}
-                  to={step.to}
-                  className={`focus-ring rounded-[16px] border p-2.5 transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </Link>
+                <Link key={step.number} to={step.to} className={stepClass}>{content}</Link>
               ) : (
-                <div
-                  key={step.number}
-                  className={`rounded-[16px] border p-2.5 sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </div>
+                <a key={step.number} href={step.number === "01" ? "#purchasing-stock" : step.number === "02" ? "#purchasing-plan" : "#purchasing-compare"} className={stepClass}>{content}</a>
               );
             })}
-          </div>
-
-          <details className="mt-3 rounded-[14px] border border-white/70 bg-white/55 px-3 py-2">
-            <summary className="cursor-pointer text-[10px] font-black text-stone-700 sm:text-xs">
-              Manage another hospitality workspace
-            </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <input
-                className={inputClass}
-                value={organizationId}
-                onChange={(event) => setOrganizationId(event.target.value)}
-                placeholder="Business workspace code"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedHospitalityOrganizationId(organizationId);
-                  load();
-                }}
-                className={secondaryButtonClass}
-              >
-                Switch workspace
-              </button>
+          </nav>
+          <details className="border-b border-[#DCE0CF] px-5 py-2.5 sm:px-8 lg:px-9">
+            <summary className="cursor-pointer text-[13px] font-semibold text-[#173F35]"><span className="sm:hidden">Switch business</span><span className="hidden sm:inline">Switch hospitality business</span></summary>
+            <div className="mt-3 grid gap-2 pb-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <input className={procurementFieldClass} value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} placeholder="Business workspace code" />
+              <button type="button" onClick={() => { setSelectedHospitalityOrganizationId(organizationId); load(); }} className="focus-ring min-h-11 bg-[#173F35] px-5 text-[14px] font-semibold text-[#F7F6F2]">Switch workspace</button>
             </div>
           </details>
         </header>
@@ -2642,10 +2632,12 @@ export default function HospitalityPage({ section = "dashboard" }) {
             null
           
           ) : isProcurement ? (
-            <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
-              Record a fresh stock count, plan the portions your kitchen needs,
-              then combine those plans to compare suppliers before buying.
-            </div>
+            procurementFeedFailures.length ? (
+              <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 border-l-[3px] border-[#C86C42] bg-[#DCE0CF]/60 px-4 py-3 text-[13px] text-[#173F35]">
+                <span>Couldn't load {procurementFeedFailures.join(", ")}. Please refresh.</span>
+                <button type="button" onClick={load} disabled={loading} className="focus-ring min-h-10 font-semibold underline decoration-[#C86C42] underline-offset-4">Retry</button>
+              </div>
+            ) : null
           ) : isCosting ? (
             <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
               Choose an approved kitchen recipe and, when needed, an outlet. The
@@ -4155,7 +4147,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {section === "menus" ? (
-            <div className="mt-5 space-y-7 sm:mt-7 sm:space-y-9">
+            <div className="mt-3 space-y-4 sm:mt-7 sm:space-y-9">
               {menuFeedFailures.length ? (
                 <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-l-[4px] border-[#C86C42] bg-[#DCE0CF]/70 px-4 py-3 text-[14px] leading-5 text-[#173F35]">
                   <span>Couldn't load {menuFeedFailures.join(", ")}. Select Refresh to retry.</span>
@@ -4164,15 +4156,15 @@ export default function HospitalityPage({ section = "dashboard" }) {
               ) : null}
 
               <div className="grid gap-0 border-y border-[#DCE0CF] lg:grid-cols-2 lg:divide-x lg:divide-[#DCE0CF]">
-                <section id="host-menu-create" className="min-w-0 scroll-mt-24 bg-[#F7F6F2] px-4 py-5 sm:px-6 sm:py-7 lg:px-7">
-                  <div className="flex items-start gap-4 border-b border-[#DCE0CF] pb-4">
-                    <span className="text-[29px] font-semibold leading-none text-[#C86C42]">01</span>
+                <section id="host-menu-create" className="min-w-0 scroll-mt-24 bg-[#F7F6F2] px-3.5 py-3.5 sm:px-6 sm:py-7 lg:px-7">
+                  <div className="flex items-start gap-3 border-b border-[#DCE0CF] pb-2.5 sm:gap-4 sm:pb-4">
+                    <span className="text-[22px] font-semibold leading-none text-[#C86C42] sm:text-[29px]">01</span>
                     <div>
-                      <h2 className="text-[22px] font-semibold leading-[1.2] text-[#173F35] sm:text-[24px]">Create a menu</h2>
-                      <p className="mt-1 text-[14px] leading-5 text-[#202421]/75">Choose the outlet, then give its menu a name.</p>
+                      <h2 className="text-[20px] font-semibold leading-[1.2] text-[#173F35] sm:text-[24px]">Create a menu</h2>
+                      <p className="mt-1 hidden text-[14px] leading-5 text-[#202421]/75 sm:block">Choose the outlet, then give its menu a name.</p>
                     </div>
                   </div>
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4">
                     <label className="grid gap-1 sm:col-span-2">
                       <span className="text-[13px] font-semibold text-[#173F35]">
                         Outlet
@@ -4253,20 +4245,20 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         "Menu created."
                       )
                     }
-                    className="focus-ring mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-3 text-[15px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    className="focus-ring mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:py-3 sm:text-[15px] sm:w-auto"
                   >
                     Save menu
                   </button>
                 </section>
-                <section id="host-menu-add-dish" className="min-w-0 scroll-mt-24 border-t border-[#DCE0CF] bg-[#DCE0CF]/50 px-4 py-5 sm:px-6 sm:py-7 lg:border-t-0 lg:px-7">
-                  <div className="flex items-start gap-4 border-b border-[#DCE0CF] pb-4">
-                    <span className="text-[29px] font-semibold leading-none text-[#C86C42]">02</span>
+                <section id="host-menu-add-dish" className="min-w-0 scroll-mt-24 border-t border-[#DCE0CF] bg-[#DCE0CF]/50 px-3.5 py-3.5 sm:px-6 sm:py-7 lg:border-t-0 lg:px-7">
+                  <div className="flex items-start gap-3 border-b border-[#DCE0CF] pb-2.5 sm:gap-4 sm:pb-4">
+                    <span className="text-[22px] font-semibold leading-none text-[#C86C42] sm:text-[29px]">02</span>
                     <div>
-                      <h2 className="text-[22px] font-semibold leading-[1.2] text-[#173F35] sm:text-[24px]">Add approved dishes</h2>
-                      <p className="mt-1 text-[14px] leading-5 text-[#202421]/75">Pick an approved recipe, name it and set its price.</p>
+                      <h2 className="text-[20px] font-semibold leading-[1.2] text-[#173F35] sm:text-[24px]">Add approved dishes</h2>
+                      <p className="mt-1 hidden text-[14px] leading-5 text-[#202421]/75 sm:block">Pick an approved recipe, name it and set its price.</p>
                     </div>
                   </div>
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4">
                     <label className="grid gap-1 sm:col-span-2">
                       <span className="text-[13px] font-semibold text-[#173F35]">
                         Menu
@@ -4302,7 +4294,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
                             className={`focus-ring min-h-11 border px-2 py-2 text-[13px] font-semibold transition ${menuItemForm.sourceType === kind
                               ? "border-[#173F35] bg-[#173F35] text-[#F7F6F2]"
                               : "border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35]"}`}>
-                            {label}
+                            <span className="sm:hidden">{kind === "prepared_food_listing" ? "Prepared food" : "Kitchen recipes"}</span>
+                            <span className="hidden sm:inline">{label}</span>
                           </button>
                         ))}
                       </div>
@@ -4442,7 +4435,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         setMenuItemSaved(true);
                       }
                     }}
-                    className="focus-ring mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-3 text-[15px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    className="focus-ring mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:py-3 sm:text-[15px] sm:w-auto"
                   >
                     {menuItemSaved ? "Dish added" : "Add dish to menu"}
                   </button>
@@ -4450,12 +4443,12 @@ export default function HospitalityPage({ section = "dashboard" }) {
               </div>
 
               <section id="host-menu-saved" className="scroll-mt-24 border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DCE0CF] bg-[#C86C42]/10 px-4 py-5 sm:px-6">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#DCE0CF] bg-[#C86C42]/10 px-3.5 py-3 sm:gap-3 sm:px-6 sm:py-5">
                   <div>
-                    <p className="text-[13px] font-semibold text-[#C86C42]">03 / Menu management</p>
-                    <h2 className="mt-1 text-[23px] font-semibold text-[#173F35] sm:text-[26px]">Saved outlet menus</h2>
+                    <p className="hidden text-[13px] font-semibold text-[#C86C42] sm:block">03 / Menu management</p>
+                    <h2 className="text-[20px] font-semibold text-[#173F35] sm:mt-1 sm:text-[26px]">Saved outlet menus</h2>
                   </div>
-                  <div className="flex items-center gap-2 text-[#173F35]">
+                  <div className="hidden items-center gap-2 text-[#173F35] sm:flex">
                     <span className="text-[26px] font-semibold">{menuFeedFailures.includes("Saved menus") ? "—" : menus.length}</span>
                     <span className="text-[13px] font-medium">Menus</span>
                   </div>
@@ -4471,14 +4464,14 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       return (
                         <div
                           key={menu.id}
-                          className="border-b border-[#DCE0CF] px-4 py-4 last:border-b-0 sm:px-5 sm:py-5"
+                          className="border-b border-[#DCE0CF] px-3.5 py-3 last:border-b-0 sm:px-5 sm:py-5"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="break-words text-[17px] font-semibold leading-6 text-[#173F35]">
                                 {menu.name}
                               </p>
-                              <p className="mt-0.5 text-[13px] font-medium text-[#202421]/70">
+                              <p className="mt-0.5 text-[12px] font-medium text-[#202421]/70 sm:text-[13px]">
                                 {menu.menuCode}
                               </p>
                             </div>
@@ -4503,7 +4496,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                               </button>
                             </div>
                           </div>
-                          <div className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-[#202421]/70">
+                          <div className="mt-1.5 flex items-center gap-1.5 text-[12px] font-medium text-[#202421]/70 sm:mt-2 sm:text-[13px]">
                             <Store size={12} className="text-[#173F35]" />
                             <span className="truncate">
                               {outlet?.name ||
@@ -4517,7 +4510,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                               tabIndex={menu.items.length > 4 ? 0 : undefined}
                               role={menu.items.length > 4 ? "region" : undefined}
                               aria-label={menu.items.length > 4 ? `${menu.name} dishes — scroll for more` : undefined}
-                              className={`mt-4 divide-y divide-[#DCE0CF] border-t border-[#DCE0CF] ${menu.items.length > 4 ? "max-h-[664px] overflow-y-auto sm:max-h-[608px]" : ""}`}
+                              className={`mt-3 divide-y divide-[#DCE0CF] border-t border-[#DCE0CF] sm:mt-4 ${menu.items.length > 4 ? "max-h-[492px] overflow-y-auto sm:max-h-[608px]" : ""}`}
                             >
                               {menu.items.map((menuItem) => {
                                 const availabilityStatus =
@@ -4538,7 +4531,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                 return (
                                   <div
                                     key={menuItem.id}
-                                    className="min-h-[166px] py-3.5 sm:min-h-[152px]"
+                                    className="py-3 sm:min-h-[152px] sm:py-3.5"
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex min-w-0 items-start gap-2.5">
@@ -4551,13 +4544,13 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                         </div>
                                       </div>
                                       <span
-                                        className={`shrink-0 px-2.5 py-1 text-[12px] font-semibold ${availabilityClass}`}
+                                        className={`shrink-0 px-2 py-1 text-[12px] font-semibold sm:px-2.5 ${availabilityClass}`}
                                       >
                                         {availabilityLabel}
                                       </span>
                                     </div>
 
-                                    <div className="mt-3 grid grid-cols-3 gap-1">
+                                    <div className="mt-2 grid grid-cols-3 gap-1 sm:mt-3">
                                       {[
                                         ["available", "Available"],
                                         ["sold_out", "Sold out"],
@@ -4589,7 +4582,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                               `Dish marked ${label.toLowerCase()}.`
                                             )
                                           }
-                                          className={`focus-ring min-h-10 border px-1 py-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${availabilityStatus === status
+                                          className={`focus-ring min-h-10 border px-1 py-1.5 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 sm:py-2 ${availabilityStatus === status
                                             ? "border-[#173F35] bg-[#DCE0CF] text-[#173F35]"
                                             : "border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] hover:bg-[#DCE0CF]"}`}
                                         >
@@ -4628,36 +4621,32 @@ export default function HospitalityPage({ section = "dashboard" }) {
               </section>
               <div className="flex items-start gap-3 border-t border-[#C86C42] px-2 pt-4 text-[#173F35] sm:px-4">
                 <ShieldCheck size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
-                <p className="text-[13px] leading-5">Add only Super Admin-approved kitchen recipes or prepared-food listings. Available = offered on this menu; Sold out = temporarily unavailable; Paused = intentionally hidden. Menu status does not change Marketplace stock.</p>
+                <p className="text-[13px] leading-5"><span className="sm:hidden">Only approved dishes. Menu status does not update Marketplace stock.</span><span className="hidden sm:inline">Add only Super Admin-approved kitchen recipes or prepared-food listings. Available = offered on this menu; Sold out = temporarily unavailable; Paused = intentionally hidden. Menu status does not change Marketplace stock.</span></p>
               </div>
             </div>
           ) : null}
 
           {section === "procurement" ? (
-            <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
-              <div className="grid items-stretch gap-3 xl:grid-cols-3 xl:gap-4">
-                <section className="flex h-full flex-col rounded-[20px] border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:text-[10px]">
-                      Stock check
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      What is available now?
+            <div className="mt-2 space-y-3 sm:mt-7 sm:space-y-8">
+              <div className="grid overflow-hidden border-y border-[#DCE0CF] lg:grid-cols-2">
+                <section id="purchasing-stock" className="flex min-w-0 scroll-mt-24 flex-col border-b border-[#DCE0CF] bg-[#F7F6F2] px-3.5 pb-4 pt-4 sm:px-7 sm:pb-8 sm:pt-7 lg:border-b-0 lg:border-r">
+                  <div className="-mx-3.5 -mt-4 border-b border-[#C86C42]/35 bg-[#C86C42]/15 px-3.5 pb-3 pt-3 sm:-mx-7 sm:-mt-7 sm:px-7 sm:pb-5 sm:pt-7">
+                    <p className="text-[12px] font-semibold text-[#C86C42] sm:text-[13px]">01 / Stock check</p>
+                    <h2 className="mt-1 text-[19px] font-semibold leading-[1.2] tracking-[-0.03em] text-[#173F35] sm:text-[25px]">
+                      Check outlet stock
                     </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Save a fresh count for one ingredient at an outlet. This
-                      count helps purchasing calculations without changing your
-                      marketplace stock.
+                    <p className="mt-1 hidden text-[13px] font-medium leading-5 text-[#202421]/75 sm:block sm:text-[14px]">
+                      Record available ingredients for this kitchen.
                     </p>
                   </div>
 
-                  <div className="mt-3 grid gap-2.5">
+                  <div className="mt-3 grid gap-3 sm:mt-5 sm:gap-4">
                     <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
+                      <span className="mb-1 block text-[12px] font-semibold tracking-[0.02em] text-[#202421]/70">
                         Outlet
                       </span>
                       <select
-                        className={inputClass}
+                        className={procurementFieldClass}
                         value={stockForm.outletId}
                         onChange={(event) =>
                           setStockForm((current) => ({
@@ -4675,8 +4664,10 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       </select>
                     </label>
                     <RecipeIngredientPicker
-                      label="Ingredient reference"
+                      label="Ingredient"
                       className=""
+                      showDatabaseHint={false}
+                      inputClassName={procurementFieldClass}
                       value={stockForm.canonicalIngredientId}
                       onChange={(canonicalIngredientId) =>
                         setStockForm((current) => ({
@@ -4687,11 +4678,11 @@ export default function HospitalityPage({ section = "dashboard" }) {
                     />
                     <div className="grid grid-cols-[minmax(0,1fr)_90px] gap-2">
                       <label className="block">
-                        <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
+                        <span className="mb-1 block text-[12px] font-semibold tracking-[0.02em] text-[#202421]/70">
                           Quantity on hand
                         </span>
                         <input
-                          className={inputClass}
+                          className={procurementFieldClass}
                           type="number"
                           min="0"
                           step="0.001"
@@ -4706,11 +4697,11 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         />
                       </label>
                       <label className="block">
-                        <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
+                        <span className="mb-1 block text-[12px] font-semibold tracking-[0.02em] text-[#202421]/70">
                           Unit
                         </span>
                         <input
-                          className={inputClass}
+                          className={procurementFieldClass}
                           placeholder="kg"
                           value={stockForm.unit}
                           onChange={(event) =>
@@ -4748,22 +4739,22 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         "Stock count saved."
                       )
                     }
-                    className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
+                    className="focus-ring mt-3 inline-flex min-h-11 w-full items-center justify-center bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-[#F7F6F2] transition hover:bg-[#202421] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-4 sm:w-auto sm:py-3"
                   >
                     Save stock count
                   </button>
 
-                  <div className="mt-3 border-t border-emerald-200/80 pt-3">
+                  <div className="mt-4 border-t-2 border-[#C86C42] pt-3 sm:mt-6 sm:pt-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[9px] font-black uppercase tracking-[0.1em] text-emerald-800 sm:text-[10px]">
+                      <p className="text-[12px] font-semibold tracking-[0.02em] text-[#173F35] sm:text-[13px]">
                         Current ingredient stock
                       </p>
-                      <span className="rounded-full bg-white px-2 py-1 text-[8px] font-black text-emerald-700 sm:text-[9px]">
+                      <span className="rounded-full bg-[#F7F6F2] px-2 py-1 text-[13px] font-semibold text-[#173F35] sm:text-[12px]">
                         {currentStockForSelectedOutlet.length} items
                       </span>
                     </div>
 
-                    <div className="mt-2 max-h-44 space-y-1.5 overflow-y-auto pr-1">
+                    <div className="mt-2 max-h-[180px] divide-y divide-[#DCE0CF] overflow-y-auto overscroll-contain border-y border-[#DCE0CF] sm:mt-3 sm:max-h-[230px]">
                       {currentStockForSelectedOutlet.length ? (
                         currentStockForSelectedOutlet.map((item) => {
                           const outlet = outlets.find(
@@ -4772,26 +4763,26 @@ export default function HospitalityPage({ section = "dashboard" }) {
                           return (
                             <div
                               key={`${item.outletId}-${item.canonicalIngredientId}`}
-                              className="flex items-center justify-between gap-3 rounded-[11px] border border-white/85 bg-white/85 px-2.5 py-2 shadow-sm"
+                              className="flex items-center justify-between gap-3 bg-[#F7F6F2] px-2 py-2 sm:py-3"
                             >
                               <div className="min-w-0">
-                                <p className="truncate text-[9px] font-black text-stone-900 sm:text-[10px]">
+                                <p className="truncate text-[13px] font-semibold text-[#202421]">
                                   {item.canonicalIngredientName || "Ingredient"}
                                 </p>
-                                <p className="truncate text-[8px] font-semibold text-stone-500 sm:text-[9px]">
+                                <p className="truncate text-[12px] font-semibold text-[#202421]/70">
                                   {outlet?.name ||
                                     outlet?.outletCode ||
                                     "Outlet"}
                                 </p>
                               </div>
-                              <p className="shrink-0 text-[10px] font-black text-emerald-800 sm:text-[11px]">
+                              <p className="shrink-0 text-[13px] font-semibold text-[#173F35] sm:text-[13px]">
                                 {item.quantity} {item.unit}
                               </p>
                             </div>
                           );
                         })
                       ) : (
-                        <div className="rounded-[11px] border border-dashed border-emerald-200 bg-white/55 px-3 py-3 text-center text-[9px] font-semibold text-stone-500">
+                        <div className="rounded-[11px] border border-dashed border-[#DCE0CF] bg-[#F7F6F2] px-3 py-3 text-center text-[12px] font-semibold text-[#202421]/70">
                           No stock count saved for this outlet yet.
                         </div>
                       )}
@@ -4799,27 +4790,24 @@ export default function HospitalityPage({ section = "dashboard" }) {
                   </div>
                 </section>
 
-                <section className="flex h-full flex-col rounded-[20px] border border-sky-200 bg-sky-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-800 sm:text-[10px]">
-                      Kitchen plan
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      Plan what the kitchen will make
+                <section id="purchasing-plan" className="flex min-w-0 scroll-mt-24 flex-col bg-[#DCE0CF]/80 px-3.5 pb-4 pt-4 sm:px-7 sm:pb-8 sm:pt-7">
+                  <div className="-mx-3.5 -mt-4 border-b border-[#173F35] bg-[#173F35] px-3.5 pb-3 pt-3 sm:-mx-7 sm:-mt-7 sm:px-7 sm:pb-5 sm:pt-7">
+                    <p className="text-[12px] font-semibold text-[#DCE0CF] sm:text-[13px]">02 / Kitchen plan</p>
+                    <h2 className="mt-1 text-[19px] font-semibold leading-[1.2] tracking-[-0.03em] text-[#F7F6F2] sm:text-[25px]">
+                      Plan kitchen portions
                     </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Choose an outlet, date and approved recipes, then enter
-                      how many portions the kitchen needs to prepare.
+                    <p className="mt-1 hidden text-[13px] font-medium leading-5 text-[#DCE0CF] sm:block sm:text-[14px]">
+                      Choose recipes and how many portions to prepare.
                     </p>
                   </div>
 
-                  <div className="mt-3 grid gap-2.5">
+                  <div className="mt-3 grid gap-3 sm:mt-5 sm:gap-4">
                     <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
+                      <span className="mb-1 block text-[12px] font-semibold tracking-[0.02em] text-[#202421]/70">
                         Outlet
                       </span>
                       <select
-                        className={inputClass}
+                        className={procurementFieldClass}
                         value={productionPlanForm.outletId}
                         onChange={(event) =>
                           setProductionPlanForm((current) => ({
@@ -4837,11 +4825,11 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       </select>
                     </label>
                     <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
+                      <span className="mb-1 block text-[12px] font-semibold tracking-[0.02em] text-[#202421]/70">
                         Plan date
                       </span>
                       <input
-                        className={inputClass}
+                        className={procurementFieldClass}
                         type="date"
                         value={productionPlanForm.planDate}
                         onChange={(event) =>
@@ -4857,15 +4845,15 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       {productionPlanItems.map((item, index) => (
                         <div
                           key={`${index}-${item.productionRecipeVersionId}`}
-                          className="rounded-[14px] border border-white/80 bg-white/80 p-2.5 shadow-sm"
+                          className="border-l-[3px] border-[#C86C42] bg-[#F7F6F2] p-2.5 sm:p-4"
                         >
-                          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_105px_auto] sm:items-end">
-                            <label className="block">
-                              <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.09em] text-stone-500">
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_105px_auto] sm:items-end">
+                            <label className="col-span-2 block sm:col-span-1">
+                              <span className="mb-1 block text-[13px] font-semibold tracking-[0.02em] text-[#202421]/70">
                                 Approved recipe
                               </span>
                               <select
-                                className={inputClass}
+                                className={procurementFieldClass}
                                 value={item.productionRecipeVersionId || ""}
                                 onChange={(event) =>
                                   updateProductionPlanItem(
@@ -4884,11 +4872,11 @@ export default function HospitalityPage({ section = "dashboard" }) {
                               </select>
                             </label>
                             <label className="block">
-                              <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.09em] text-stone-500">
+                              <span className="mb-1 block text-[13px] font-semibold tracking-[0.02em] text-[#202421]/70">
                                 Portions
                               </span>
                               <input
-                                className={inputClass}
+                                className={procurementFieldClass}
                                 type="number"
                                 min="1"
                                 value={item.portions ?? 1}
@@ -4905,7 +4893,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                               type="button"
                               disabled={productionPlanItems.length <= 1}
                               onClick={() => removeProductionPlanItem(index)}
-                              className="focus-ring rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-[10px] font-black text-stone-600 disabled:opacity-40"
+                              className="focus-ring min-h-11 self-end rounded-xl border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2.5 text-[13px] font-semibold text-[#202421]/75 disabled:opacity-40 sm:min-h-0"
                             >
                               Remove
                             </button>
@@ -4917,7 +4905,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                     <button
                       type="button"
                       onClick={addProductionPlanItem}
-                      className={secondaryButtonClass}
+                      className="focus-ring inline-flex min-h-11 items-center justify-center border border-[#173F35]/35 bg-[#F7F6F2] px-4 py-2.5 text-[13px] font-semibold text-[#173F35]"
                     >
                       Add another recipe
                     </button>
@@ -4949,33 +4937,24 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         "Kitchen production plan saved."
                       )
                     }
-                    className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
+                    className="focus-ring mt-3 inline-flex min-h-11 w-full items-center justify-center bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-[#F7F6F2] transition hover:bg-[#202421] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-4 sm:w-auto sm:py-3"
                   >
                     Save production plan
                   </button>
                 </section>
 
-                <section className="flex h-full flex-col rounded-[20px] border border-violet-200 bg-violet-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-800 sm:text-[10px]">
-                        Supplier comparison
-                      </p>
-                      <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                        Compare what needs to be bought
-                      </h2>
-                      <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                        Select one or more saved production plans. EPANTRY will
-                        combine their needs and compare the eligible supplier
-                        options.
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-violet-700 shadow-sm sm:text-[10px]">
-                      {productionPlans.length} plans
-                    </span>
+                <section id="purchasing-compare" className="grid min-w-0 scroll-mt-24 border-t-[6px] border-[#C86C42] lg:col-span-2 lg:grid-cols-[310px_minmax(0,1fr)]">
+                  <div className="bg-[#C86C42]/20 px-4 py-3 sm:px-7 sm:py-7">
+                    <p className="text-[12px] font-semibold text-[#C86C42] sm:text-[13px]">03 / Supplier comparison</p>
+                    <h2 className="mt-1 text-[20px] font-semibold leading-[1.2] tracking-[-0.03em] text-[#173F35] sm:mt-2 sm:text-[28px]">Compare suppliers</h2>
+                    <p className="mt-3 hidden text-[14px] leading-6 text-[#202421]/80 sm:block">Pick a saved kitchen plan to review buying options.</p>
+                    <p className="mt-2 inline-flex items-center gap-2 border-t border-[#C86C42]/40 pt-2 text-[13px] font-semibold text-[#173F35] sm:mt-5 sm:pt-4 sm:text-[14px]">
+                      <span className="text-[21px] leading-none text-[#173F35] sm:text-[27px]">{procurementFeedFailures.includes("Kitchen plans") ? "—" : productionPlans.length}</span> Saved plans
+                    </p>
                   </div>
-
-                  <div className="mt-3 flex-1 space-y-2">
+                  <div className="min-w-0 bg-[#F7F6F2] px-3.5 pb-4 pt-3 sm:px-7 sm:pb-7 sm:pt-6">
+                    <p className="text-[14px] font-semibold text-[#173F35]">Choose plans to compare</p>
+                    <div className="mt-2 grid gap-2 sm:mt-4 sm:grid-cols-2">
                     {productionPlans.length ? (
                       productionPlans.map((plan, index) => {
                         const selected = selectedProductionPlanIds.includes(
@@ -4988,21 +4967,22 @@ export default function HospitalityPage({ section = "dashboard" }) {
                           <button
                             key={plan.id}
                             type="button"
+                            aria-pressed={selected}
                             onClick={() => toggleProductionPlan(plan.id)}
-                            className={`focus-ring w-full rounded-[14px] border px-3 py-2.5 text-left transition ${
+                            className={`focus-ring w-full border-l-[3px] border-y border-r px-3 py-2.5 text-left transition sm:py-3 ${
                               selected
-                                ? "border-violet-300 bg-white shadow-sm"
-                                : "border-white/80 bg-white/65 hover:bg-white"
+                                ? "border-[#C86C42] bg-[#DCE0CF]"
+                                : "border-[#DCE0CF] bg-[#F7F6F2] hover:border-[#C86C42]"
                             }`}
                           >
                             <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="text-[10px] font-black text-stone-950 sm:text-xs">
+                                <p className="text-[13px] font-semibold text-[#202421] sm:text-[14px]">
                                   {outlet?.name ||
                                     outlet?.outletCode ||
                                     `Production plan ${index + 1}`}
                                 </p>
-                                <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-[10px]">
+                                <p className="mt-0.5 text-[12px] font-semibold text-[#202421]/70 sm:text-[13px]">
                                   {plan.planDate
                                     ? new Date(
                                         plan.planDate
@@ -5011,10 +4991,10 @@ export default function HospitalityPage({ section = "dashboard" }) {
                                 </p>
                               </div>
                               <span
-                                className={`grid size-5 shrink-0 place-items-center rounded-full text-[9px] font-black ${
+                                className={`grid size-5 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${
                                   selected
-                                    ? "bg-violet-600 text-white"
-                                    : "border border-stone-200 bg-white text-stone-400"
+                                    ? "bg-[#173F35] text-[#F7F6F2]"
+                                    : "border border-[#DCE0CF] bg-[#F7F6F2] text-[#202421]/60"
                                 }`}
                               >
                                 {selected ? "✓" : ""}
@@ -5024,12 +5004,12 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         );
                       })
                     ) : (
-                      <div className="rounded-[14px] border border-dashed border-violet-200 bg-white/55 px-3 py-5 text-center">
-                        <p className="text-[10px] font-bold text-stone-600 sm:text-xs">
+                      <div className="rounded-[14px] border border-dashed border-[#DCE0CF] bg-[#F7F6F2] px-3 py-5 text-center">
+                        <p className="text-[13px] font-bold text-[#202421]/75 sm:text-[14px]">
                           No production plan saved yet.
                         </p>
-                        <p className="mt-1 text-[9px] font-medium text-stone-500 sm:text-[10px]">
-                          Create a kitchen plan in the middle card first.
+                        <p className="mt-1 text-[12px] font-medium text-[#202421]/70 sm:text-[13px]">
+                          Save a kitchen plan first.
                         </p>
                       </div>
                     )}
@@ -5051,34 +5031,33 @@ export default function HospitalityPage({ section = "dashboard" }) {
                         "Supplier comparison created. No purchase order was sent automatically."
                       )
                     }
-                    className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
+                    className="focus-ring mt-3 inline-flex min-h-11 w-full items-center justify-center bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-[#F7F6F2] transition hover:bg-[#202421] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-5 sm:w-auto sm:py-3"
                   >
                     Compare suppliers
                   </button>
-                  <p className="mt-2 text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                    This comparison only helps you decide what to buy. It does
-                    not place an order automatically.
+                  <p className="mt-2 text-[12px] font-medium leading-4 text-[#202421]/70 sm:text-[13px]">
+                    <span className="sm:hidden">No order is placed.</span><span className="hidden sm:inline">Comparison only. No order is placed automatically.</span>
                   </p>
+                  </div>
                 </section>
               </div>
 
               <Link
-                to="/host/hospitality/costing"
-                className="focus-ring flex items-center justify-between gap-3 rounded-[18px] border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 transition hover:-translate-y-0.5 hover:shadow-md sm:px-4 sm:py-3.5"
+                to="/host/marketplace"
+                className="focus-ring flex items-center justify-between gap-3 border-l-[5px] border-[#C86C42] bg-[#C86C42]/15 px-3 py-3 transition hover:bg-[#C86C42]/25 sm:px-6 sm:py-4"
               >
                 <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:text-[10px]">
+                  <p className="text-[12px] font-semibold tracking-[0.02em] text-[#173F35] sm:text-[13px]">
                     Next step
                   </p>
-                  <p className="mt-0.5 text-[11px] font-black text-stone-950 sm:text-sm">
+                  <p className="mt-0.5 text-[13px] font-semibold text-[#202421] sm:text-sm">
                     Review food costing
                   </p>
-                  <p className="mt-0.5 text-[9px] font-medium text-stone-600 sm:text-[10px]">
-                    After purchasing plans are ready, check the cost of your
-                    approved kitchen recipes.
+                  <p className="mt-0.5 hidden text-[12px] font-medium text-[#202421]/75 sm:block sm:text-[13px]">
+                    See the cost of your planned recipes.
                   </p>
                 </div>
-                <ArrowRight size={18} className="shrink-0 text-emerald-800" />
+                <ArrowRight size={18} className="shrink-0 text-[#173F35]" />
               </Link>
             </div>
           ) : null}
@@ -6080,9 +6059,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
                 />
                 <div>
                   <h2 className="text-xs font-black text-stone-950 sm:text-sm">
-                    Next: plan production and purchasing
+                    <span className="sm:hidden">Next: Purchasing</span><span className="hidden sm:inline">Next: plan production and purchasing</span>
                   </h2>
-                  <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
+                  <p className="mt-1 hidden text-[10px] font-medium leading-5 text-stone-600 sm:block sm:text-xs">
                     Once outlet menus are ready, continue to Purchasing to plan
                     production demand, stock needs and supplier buying.
                   </p>
@@ -6200,18 +6179,18 @@ export default function HospitalityPage({ section = "dashboard" }) {
               </div>
             </section>
           ) : (
-            <section className={isOutlets ? "mt-3 border-t-2 border-[#C86C42] bg-[#DCE0CF]/40 px-3 py-3 text-[#173F35] sm:mt-5 sm:rounded-[24px] sm:border sm:border-stone-200 sm:bg-stone-950 sm:p-5 sm:text-white sm:shadow-sm" : "mt-5 rounded-[24px] border border-stone-200 bg-stone-950 p-5 text-white shadow-sm"}>
+            <section className={isOutlets ? "mt-3 border-t-2 border-[#C86C42] bg-[#DCE0CF]/40 px-3 py-3 text-[#173F35] sm:mt-5 sm:rounded-[24px] sm:border sm:border-stone-200 sm:bg-stone-950 sm:p-5 sm:text-white sm:shadow-sm" : isProcurement ? "mt-3 border-l-[3px] border-[#C86C42] bg-[#DCE0CF]/45 px-3 py-3 text-[#173F35] sm:mt-5 sm:rounded-[24px] sm:border sm:border-stone-200 sm:bg-stone-950 sm:p-5 sm:text-white sm:shadow-sm" : "mt-5 rounded-[24px] border border-stone-200 bg-stone-950 p-5 text-white shadow-sm"}>
               <div className="flex items-start gap-3">
                 <ShieldCheck
-                  className={isOutlets ? "mt-0.5 shrink-0 text-[#173F35] sm:text-emerald-400" : "mt-0.5 shrink-0 text-emerald-400"}
+                  className={isOutlets || isProcurement ? "mt-0.5 shrink-0 text-[#173F35] sm:text-emerald-400" : "mt-0.5 shrink-0 text-emerald-400"}
                   size={18}
                 />
                 <div>
-                  <h2 className={isOutlets ? "text-[14px] font-semibold sm:text-sm sm:font-black" : "text-sm font-black"}>
-                    {isOutlets ? <><span className="sm:hidden">Approval rules</span><span className="hidden sm:inline">Before important changes go live</span></> : "Before important changes go live"}
+                  <h2 className={isOutlets || isProcurement ? "text-[14px] font-semibold sm:text-sm sm:font-black" : "text-sm font-black"}>
+                    {isOutlets || isProcurement ? <><span className="sm:hidden">Approval rules</span><span className="hidden sm:inline">Before important changes go live</span></> : "Before important changes go live"}
                   </h2>
-                  <p className={isOutlets ? "mt-1 text-[13px] leading-5 text-[#173F35] sm:mt-2 sm:text-xs sm:text-stone-400" : "mt-2 text-xs leading-5 text-stone-400"}>
-                    {isOutlets ? <><span className="sm:hidden">Safety-sensitive changes need review before publishing.</span><span className="hidden sm:inline">You can manage outlets, suppliers, recipes and purchasing here. Safety-sensitive dish records, allergen decisions and major changes still need the required review before they can be published or treated as final.</span></> : "You can manage outlets, suppliers, recipes and purchasing here. Safety-sensitive dish records, allergen decisions and major changes still need the required review before they can be published or treated as final."}
+                  <p className={isOutlets || isProcurement ? "mt-1 text-[13px] leading-5 text-[#173F35] sm:mt-2 sm:text-xs sm:text-stone-400" : "mt-2 text-xs leading-5 text-stone-400"}>
+                    {isOutlets || isProcurement ? <><span className="sm:hidden">Sensitive changes require approval.</span><span className="hidden sm:inline">You can manage outlets, suppliers, recipes and purchasing here. Safety-sensitive dish records, allergen decisions and major changes still need the required review before they can be published or treated as final.</span></> : "You can manage outlets, suppliers, recipes and purchasing here. Safety-sensitive dish records, allergen decisions and major changes still need the required review before they can be published or treated as final."}
                   </p>
                 </div>
               </div>

@@ -63,7 +63,7 @@ const NAV_ITEMS = [
   },
   {
     label: "Food costing",
-    to: "/host/hospitality/costing",
+    to: "/host/marketplace",
     icon: Calculator,
   },
   {

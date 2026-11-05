@@ -12,6 +12,11 @@ import {
   TrendingUp,
   Warehouse,
 } from "lucide-react";
+import {
+  calculateHospitalityRecipeCost,
+  listHospitalityOutlets,
+  listHospitalityProductionRecipes,
+} from "../../hospitality/services/hospitality.service";
 import { getCatalogProducts } from "../../grocery/services/catalog.service";
 import { listNotifications } from "../../analytics/services/analytics.service";
 import {
@@ -170,6 +175,195 @@ async function loadOfferStatus(offerId) {
     priceError: price.status === "rejected" ? errorText(price.reason) : "",
     loadedAt: Date.now(),
   };
+}
+
+// EPANTRY: Marketplace kitchen costing integration (retired Hospitality Costing UI)
+// This panel deliberately uses the existing, server-authorized Hospitality cost
+// endpoint. Costing does not update customer-facing prices or Marketplace stock.
+function HospitalityCostingPanel() {
+  const [expanded, setExpanded] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [error, setError] = useState("");
+  const [recipes, setRecipes] = useState([]);
+  const [outlets, setOutlets] = useState([]);
+  const [recipeId, setRecipeId] = useState("");
+  const [outletId, setOutletId] = useState("");
+  const [cost, setCost] = useState(null);
+
+  async function loadCostingOptions() {
+    if (loadingOptions) return;
+    setLoadingOptions(true);
+    setError("");
+    try {
+      const [recipeResponse, outletResponse] = await Promise.all([
+        listHospitalityProductionRecipes(),
+        listHospitalityOutlets(),
+      ]);
+      const allRecipes = Array.isArray(recipeResponse?.productionRecipes)
+        ? recipeResponse.productionRecipes
+        : [];
+      const approved = allRecipes.filter((recipe) => recipe.status === "approved");
+      setRecipes(approved);
+      setOutlets(Array.isArray(outletResponse?.outlets) ? outletResponse.outlets : []);
+      setRecipeId((previous) =>
+        approved.some((recipe) => String(recipe.id) === previous) ? previous : ""
+      );
+      setLoaded(true);
+    } catch (cause) {
+      setError(
+        cause?.response?.status === 403
+          ? "Kitchen costing requires access to your Hospitality workspace."
+          : errorText(cause)
+      );
+    } finally {
+      setLoadingOptions(false);
+    }
+  }
+
+  async function calculate(event) {
+    event.preventDefault();
+    if (calculating || !recipeId) return;
+    setCalculating(true);
+    setError("");
+    setCost(null);
+    try {
+      const response = await calculateHospitalityRecipeCost(recipeId, {
+        outletId: outletId || null,
+      });
+      if (!response?.recipeCost) {
+        throw new Error("Cost calculation returned no result. Please try again.");
+      }
+      setCost(response.recipeCost);
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setCalculating(false);
+    }
+  }
+
+  const formatCost = (minor) => {
+    const amount = Number(minor);
+    if (!Number.isFinite(amount)) return "Unavailable";
+    try {
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: cost?.currency || "INR",
+      }).format(amount / 100);
+    } catch {
+      return `₹${(amount / 100).toFixed(2)}`;
+    }
+  };
+
+  return (
+    <section
+      id="marketplace-kitchen-cost"
+      aria-labelledby="marketplace-kitchen-cost-title"
+      className="mt-5 overflow-hidden border-l-[4px] border-[#C86C42] bg-[#DCE0CF]"
+    >
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="marketplace-kitchen-cost-content"
+        onClick={() => {
+          const next = !expanded;
+          setExpanded(next);
+          if (next && !loaded) void loadCostingOptions();
+        }}
+        className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left sm:px-6"
+      >
+        <span className="min-w-0">
+          <span className="block text-[12px] font-bold uppercase tracking-[.06em] text-[#C86C42]">
+            Kitchen / Internal costing
+          </span>
+          <span id="marketplace-kitchen-cost-title" className="mt-1 block text-[19px] font-bold leading-tight text-[#173F35] sm:text-[22px]">
+            Calculate recipe food cost
+          </span>
+          <span className="mt-1 block text-[13px] text-[#202421]">
+            Based on approved kitchen recipes and saved supplier prices.
+          </span>
+        </span>
+        <span className="shrink-0 border border-[#173F35] px-3 py-2 text-[13px] font-bold text-[#173F35]">
+          {expanded ? "Close" : "Open"}
+        </span>
+      </button>
+      {expanded ? (
+        <div id="marketplace-kitchen-cost-content" className="border-t border-[#173F35]/20 bg-[#F7F6F2] px-4 py-4 sm:px-6 sm:py-5">
+          {loadingOptions ? (
+            <p role="status" className="text-[14px] text-[#173F35]">Loading kitchen recipes…</p>
+          ) : null}
+          {error ? (
+            <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-2 border-l-[3px] border-[#C86C42] px-3 py-2 text-[14px] text-[#202421]">
+              <span>{error}</span>
+              {!calculating ? (
+                <button type="button" className="font-bold underline text-[#173F35]" onClick={() => void loadCostingOptions()}>Retry loading</button>
+              ) : null}
+            </div>
+          ) : null}
+          {loaded ? (
+            <>
+              {recipes.length ? (
+                <form onSubmit={calculate} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+                  <Field label="Approved kitchen recipe">
+                    <select
+                      className={inputStyle}
+                      value={recipeId}
+                      disabled={calculating}
+                      onChange={(event) => { setRecipeId(event.target.value); setCost(null); }}
+                      required
+                    >
+                      <option value="">Choose recipe</option>
+                      {recipes.map((recipe) => (
+                        <option key={recipe.id} value={recipe.id}>{recipe.title || recipe.recipeKey || "Kitchen recipe"}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Outlet (optional)">
+                    <select
+                      className={inputStyle}
+                      value={outletId}
+                      disabled={calculating}
+                      onChange={(event) => { setOutletId(event.target.value); setCost(null); }}
+                    >
+                      <option value="">Business-wide</option>
+                      {outlets.map((outlet) => (
+                        <option key={outlet.id} value={outlet.id}>{outlet.name || outlet.outletCode || "Outlet"}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <button
+                    type="submit"
+                    disabled={!recipeId || calculating}
+                    className="min-h-[43px] bg-[#173F35] px-5 py-3 text-[14px] font-bold text-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {calculating ? "Calculating…" : "Calculate cost"}
+                  </button>
+                </form>
+              ) : (
+                <p className="text-[14px] text-[#202421]">No approved kitchen recipes are available for this business.</p>
+              )}
+              {cost ? (
+                <div role="status" aria-live="polite" className="mt-4 grid gap-3 border-t border-[#DCE0CF] pt-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[13px] text-[#202421]">Full recipe cost</p>
+                    <p className="text-[24px] font-bold tabular-nums text-[#173F35]">{formatCost(cost.totalCostMinor)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[13px] text-[#202421]">Cost per portion</p>
+                    <p className="text-[24px] font-bold tabular-nums text-[#173F35]">{formatCost(cost.costPerPortionMinor)}</p>
+                  </div>
+                </div>
+              ) : null}
+              <p className="mt-3 text-[12px] text-[#202421]">
+                A calculation saves a Hospitality cost record. It does not change Marketplace prices or stock.
+              </p>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 export default function HostMarketplacePage() {
@@ -586,6 +780,9 @@ export default function HostMarketplacePage() {
             </div>
           </div>
         </header>
+
+        {/* EPANTRY: Kitchen costing in Marketplace */}
+        <HospitalityCostingPanel />
 
         {error && (
           <p
