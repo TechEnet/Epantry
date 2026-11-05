@@ -13,6 +13,8 @@ import {
   PackageSearch,
   RefreshCw,
   ScrollText,
+  X,
+  Download,
   ShieldCheck,
   ShoppingCart,
   Store,
@@ -21,7 +23,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Link, useNavigate } from "react-router-dom";
 
@@ -76,8 +78,14 @@ const inputClass =
 const procurementFieldClass =
   "focus-ring min-h-11 w-full min-w-0 rounded-[8px] border border-[#DCE0CF] bg-[#F7F6F2] px-3.5 py-2.5 text-[14px] font-medium text-[#202421] outline-none placeholder:text-[#202421]/50 focus:border-[#C86C42] sm:text-[15px]";
 
+const changeHistoryFieldClass =
+  "focus-ring min-h-11 w-full min-w-0 border border-[#DCE0CF] bg-white px-3.5 py-2.5 text-[14px] font-medium leading-[1.5] text-[#202421] outline-none transition-colors placeholder:text-[#202421]/45 focus:border-[#C86C42] focus:ring-2 focus:ring-[#C86C42]/15 disabled:opacity-60 sm:text-[15px]";
+
 const menuFieldClass =
   "focus-ring min-h-11 w-full min-w-0 rounded-[10px] border border-[#DCE0CF] bg-white px-3.5 py-2.5 text-[14px] font-medium text-[#202421] outline-none placeholder:text-[#202421]/45 focus:border-[#173F35] sm:text-[15px]";
+
+const dishFieldClass =
+  "focus-ring min-h-11 w-full min-w-0 rounded-[7px] border border-[#173F35]/20 bg-white px-3.5 py-2.5 text-[14px] font-medium text-[#202421] outline-none transition-colors focus:border-[#C86C42] focus:ring-2 focus:ring-[#C86C42]/20 placeholder:text-[#202421]/50 disabled:opacity-60";
 
 const primaryButtonClass =
   "focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50";
@@ -357,6 +365,371 @@ function Metric({ label, value }) {
   );
 }
 
+function recordBookDisplayDate(value) {
+  if (!value) return "Not recorded";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not recorded";
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function recordBookDisplayText(value) {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number") return String(value);
+  if (!value || typeof value !== "object") return "Not specified";
+  return (
+    value.canonicalName ||
+    value.name ||
+    value.allergenName ||
+    value.nutrientName ||
+    value.ruleKey ||
+    value.nutrientKey ||
+    value.label ||
+    value.code ||
+    "Not specified"
+  );
+}
+
+function downloadRecordBookData(book) {
+  if (!book) return;
+  const name = String(book.snapshot?.outlet?.name || "outlet")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 45) || "outlet";
+  const fileName = `EPANTRY-${name}-record-book-v${book.versionNumber || 1}.json`;
+  const blob = new Blob([JSON.stringify(book, null, 2)], {
+    type: "application/json;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function RecordBookReader({ book, onClose }) {
+  const closeRef = useRef(null);
+  const readerRef = useRef(null);
+  const contentRef = useRef(null);
+  const [selectedDishIndex, setSelectedDishIndex] = useState(0);
+  const [showTechnicalExport, setShowTechnicalExport] = useState(false);
+
+  const entries = Array.isArray(book?.snapshot?.entries) ? book.snapshot.entries : [];
+  const outletName = book?.snapshot?.outlet?.name || "Outlet record book";
+  const effectiveDate = recordBookDisplayDate(book?.effectiveAt || book?.snapshot?.effectiveAt);
+  const selectedEntry = entries[selectedDishIndex] || entries[0] || null;
+  const ingredients = Array.isArray(selectedEntry?.ingredients) ? selectedEntry.ingredients : [];
+  const allergens = Array.isArray(selectedEntry?.allergens) ? selectedEntry.allergens : [];
+  const dietary = Array.isArray(selectedEntry?.dietary) ? selectedEntry.dietary : [];
+  const nutrients = Array.isArray(selectedEntry?.nutrition?.nutrients) ? selectedEntry.nutrition.nutrients : [];
+  const portions = selectedEntry?.serving?.productionBaseYieldPortions ?? selectedEntry?.serving?.recipeBaseServings;
+
+  useEffect(() => {
+    setSelectedDishIndex(0);
+    setShowTechnicalExport(false);
+  }, [book?.id]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+      if (event.key === "Tab" && readerRef.current) {
+        const elements = Array.from(readerRef.current.querySelectorAll(
+          'a[href], button:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+        )).filter((element) => element.getClientRects().length > 0);
+        if (!elements.length) return;
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [onClose]);
+
+  const chooseDish = (index) => {
+    setSelectedDishIndex(index);
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[500] flex items-center justify-center bg-[#202421]/70 p-0 backdrop-blur-[3px] sm:p-5"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        ref={readerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="record-book-reader-title"
+        aria-describedby="record-book-reader-desc"
+        className="flex h-[100dvh] w-full max-w-[1120px] flex-col overflow-hidden bg-[#F7F6F2] shadow-[0_26px_90px_#20242155] sm:h-[min(88dvh,850px)] sm:rounded-[14px]"
+      >
+        {/* A restrained editorial header, rather than a full-height dark banner. */}
+        <header className="shrink-0 border-t-[4px] border-[#C86C42] bg-[#F7F6F2] px-4 py-3.5 sm:px-7 sm:py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#C86C42]">Hospitality / Published records</p>
+              <h2 id="record-book-reader-title" className="mt-1 text-[23px] font-semibold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[29px]">
+                Outlet record book
+              </h2>
+              <p id="record-book-reader-desc" className="mt-1 truncate text-[13px] text-[#202421]/75 sm:text-[14px]">
+                {outletName}
+              </p>
+            </div>
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Close record book"
+              className="focus-ring inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[7px] border border-[#173F35]/20 bg-white px-2.5 text-[#173F35] transition-colors hover:bg-[#DCE0CF] sm:px-3"
+            >
+              <X size={18} aria-hidden="true" />
+              <span className="hidden text-[13px] font-semibold sm:inline">Close</span>
+            </button>
+          </div>
+        </header>
+
+        {/* One quiet metadata strip; no repeated KPI cards. */}
+        <div className="grid shrink-0 grid-cols-3 divide-x divide-[#173F35]/15 border-y border-[#173F35]/15 bg-[#DCE0CF]">
+          <div className="px-4 py-2.5 sm:px-7 sm:py-3">
+            <p className="text-[11px] text-[#202421]/75">Dishes</p>
+            <p className="text-[17px] font-semibold tabular-nums text-[#173F35] sm:text-[19px]">{entries.length}</p>
+          </div>
+          <div className="px-4 py-2.5 sm:px-6 sm:py-3">
+            <p className="text-[11px] text-[#202421]/75">Book version</p>
+            <p className="text-[17px] font-semibold tabular-nums text-[#173F35] sm:text-[19px]">{book.versionNumber || 1}</p>
+          </div>
+          <div className="min-w-0 px-3 py-2.5 sm:px-6 sm:py-3">
+            <p className="text-[11px] text-[#202421]/75">Effective</p>
+            <p className="truncate text-[12px] font-semibold text-[#173F35] sm:text-[15px]">{effectiveDate}</p>
+          </div>
+        </div>
+
+        {/* Navigate between dishes instead of opening several very long accordions. */}
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[320px_minmax(0,1fr)] md:grid-rows-1">
+          <nav
+            aria-label="Choose a dish to view its record"
+            className="min-w-0 border-b-2 border-[#C86C42] bg-[#DCE0CF] md:overflow-y-auto md:border-b-0 md:border-r-2 md:border-r-[#C86C42]"
+          >
+            {/* Make the dish directory unmistakably interactive. */}
+            <div className="border-b border-[#173F35]/20 bg-[#DCE0CF] px-4 py-3 md:px-5 md:py-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.09em] text-[#C86C42] sm:text-[11px]">01 / Dish navigation</p>
+                  <h3 className="mt-1 text-[18px] font-semibold leading-tight text-[#173F35] md:text-[21px]">Select a dish</h3>
+                </div>
+                <span className="inline-flex items-center rounded-[5px] border border-[#173F35]/20 bg-[#F7F6F2] px-2.5 py-1 text-[11px] font-semibold tabular-nums text-[#173F35]">
+                  {entries.length} {entries.length === 1 ? "dish" : "dishes"}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[12px] leading-[1.45] text-[#202421]/80">
+                Tap any dish below to view its saved details.
+              </p>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto px-3 py-3 md:block md:space-y-2 md:overflow-visible md:px-3 md:py-4">
+              {entries.map((entry, index) => {
+                const isSelected = index === selectedDishIndex;
+                return (
+                  <button
+                    key={`${entry?.passportSnapshotId || entry?.publicId || index}-${index}`}
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={`${isSelected ? "Currently viewing" : "View details for"} ${entry?.dish?.name || `Dish ${index + 1}`}`}
+                    onClick={() => chooseDish(index)}
+                    className={`focus-ring group relative flex min-w-[215px] max-w-[260px] flex-1 cursor-pointer items-center gap-3 overflow-hidden rounded-[8px] border-2 px-3 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C86C42] md:w-full md:max-w-none md:rounded-[9px] md:px-3.5 md:py-4 ${isSelected ? "border-[#173F35] bg-[#173F35] text-[#F7F6F2] shadow-[inset_4px_0_0_#C86C42]" : "border-[#173F35]/25 bg-[#F7F6F2] text-[#173F35] hover:-translate-y-[1px] hover:border-[#C86C42] hover:bg-white hover:shadow-[0_4px_12px_#20242115]"}`}
+                  >
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] text-[12px] font-bold tabular-nums ${isSelected ? "bg-[#C86C42] text-[#F7F6F2]" : "bg-[#DCE0CF] text-[#173F35]"}`} aria-hidden="true">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-bold leading-5 md:text-[15px]">
+                        {entry?.dish?.name || "Unnamed dish"}
+                      </span>
+                      <span className={`mt-0.5 block text-[11px] ${isSelected ? "text-[#DCE0CF]" : "text-[#202421]/70"}`}>
+                        Published version {entry?.passportVersionNumber || 1}
+                      </span>
+                      <span className={`mt-2 inline-flex items-center gap-1.5 border-b pb-0.5 text-[11px] font-bold ${isSelected ? "border-[#DCE0CF] text-[#F7F6F2]" : "border-[#C86C42] text-[#C86C42] group-hover:text-[#173F35]"}`}>
+                        {isSelected ? "Currently viewing" : "View dish details"}
+                        {isSelected ? <CheckCircle2 size={13} aria-hidden="true" /> : <ArrowRight size={13} aria-hidden="true" />}
+                      </span>
+                    </span>
+                    {!isSelected ? (
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#C86C42] text-[#C86C42] transition-colors group-hover:bg-[#C86C42] group-hover:text-[#F7F6F2]" aria-hidden="true">
+                        <ArrowRight size={15} />
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+              {!entries.length ? <p className="px-3 py-4 text-[13px] text-[#202421]/75">No published dishes saved in this version.</p> : null}
+            </div>
+
+            <div className="hidden border-t border-[#173F35]/20 bg-[#DCE0CF] px-5 py-3.5 md:block">
+              <p className="text-[11px] font-semibold text-[#173F35]">Saved historical version</p>
+              <p className="mt-1 text-[11px] text-[#202421]/70">{recordBookDisplayDate(book.generatedAt)}</p>
+            </div>
+          </nav>
+
+          <main ref={contentRef} className="min-h-0 min-w-0 overflow-y-auto overscroll-contain px-4 pb-6 pt-5 sm:px-7 sm:pb-8 sm:pt-6">
+            {selectedEntry ? (
+              <div>
+                <div className="border-b-2 border-[#C86C42] pb-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#C86C42]">Dish {String(selectedDishIndex + 1).padStart(2, "0")}</span>
+                    <span className="inline-flex items-center gap-1 bg-[#DCE0CF] px-2 py-1 text-[11px] font-semibold text-[#173F35]">
+                      <CheckCircle2 size={12} aria-hidden="true" /> Published
+                    </span>
+                  </div>
+                  <h3 className="mt-2 break-words text-[25px] font-semibold leading-tight tracking-[-0.03em] text-[#173F35] sm:text-[30px]">
+                    {selectedEntry?.dish?.name || "Unnamed dish"}
+                  </h3>
+                  <p className="mt-1 text-[13px] text-[#202421]/70">Verified dish record · Version {selectedEntry?.passportVersionNumber || 1}</p>
+                </div>
+
+                <dl className="grid grid-cols-3 divide-x divide-[#173F35]/15 border-b border-[#173F35]/15 py-4">
+                  <div className="min-w-0 pr-3 sm:pr-5">
+                    <dt className="text-[11px] text-[#202421]/65">Published</dt>
+                    <dd className="mt-1 text-[12px] font-semibold leading-5 text-[#173F35] sm:text-[14px]">{recordBookDisplayDate(selectedEntry?.publishedAt)}</dd>
+                  </div>
+                  <div className="min-w-0 px-3 sm:px-5">
+                    <dt className="text-[11px] text-[#202421]/65">Batch yield</dt>
+                    <dd className="mt-1 text-[12px] font-semibold text-[#173F35] sm:text-[14px]">{portions != null ? `${portions} portions` : "Not recorded"}</dd>
+                  </div>
+                  <div className="min-w-0 pl-3 sm:pl-5">
+                    <dt className="text-[11px] text-[#202421]/65">Ingredients</dt>
+                    <dd className="mt-1 text-[12px] font-semibold text-[#173F35] sm:text-[14px]">{ingredients.length} listed</dd>
+                  </div>
+                </dl>
+
+                <section className="mt-5" aria-labelledby="record-book-ingredients-title">
+                  <div className="flex items-end justify-between gap-3 border-b border-[#173F35]/20 pb-2">
+                    <h4 id="record-book-ingredients-title" className="text-[17px] font-semibold text-[#173F35]">Ingredients & quantities</h4>
+                    <span className="text-[11px] text-[#202421]/65">Saved recipe</span>
+                  </div>
+                  {ingredients.length ? (
+                    <div className="divide-y divide-[#173F35]/10">
+                      {ingredients.map((ingredient, ingredientIndex) => (
+                        <div key={`${ingredient?.lineNumber ?? ingredientIndex}-${ingredientIndex}`} className="flex items-start justify-between gap-4 py-3 text-[14px]">
+                          <span className="min-w-0 font-medium text-[#202421]">
+                            {recordBookDisplayText(ingredient?.canonicalName || ingredient?.name)}
+                            {ingredient?.optional ? <span className="ml-2 text-[11px] text-[#202421]/65">Optional</span> : null}
+                          </span>
+                          <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-[#173F35]">{ingredient?.quantity ?? "—"} {ingredient?.unit || ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="py-4 text-[13px] text-[#202421]/70">No ingredient quantities recorded.</p>}
+                </section>
+
+                <section className="mt-6 grid gap-0 border-y border-[#173F35]/15 sm:grid-cols-2 sm:divide-x sm:divide-[#173F35]/15" aria-label="Safety and dietary information">
+                  <div className="py-4 sm:pr-5">
+                    <h4 className="text-[15px] font-semibold text-[#173F35]">Allergens</h4>
+                    {allergens.length ? (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] leading-5 text-[#202421]">
+                        {allergens.map((item, index) => <li key={index}>{recordBookDisplayText(item)}{item?.outcome ? ` — ${titleize(item.outcome)}` : ""}</li>)}
+                      </ul>
+                    ) : <p className="mt-2 text-[13px] leading-5 text-[#202421]/70">Not recorded. This does not mean allergen-free.</p>}
+                  </div>
+                  <div className="border-t border-[#173F35]/15 py-4 sm:border-t-0 sm:pl-5">
+                    <h4 className="text-[15px] font-semibold text-[#173F35]">Dietary information</h4>
+                    {dietary.length ? (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] leading-5 text-[#202421]">
+                        {dietary.map((item, index) => <li key={index}>{recordBookDisplayText(item)}{item?.outcome ? ` — ${titleize(item.outcome)}` : ""}</li>)}
+                      </ul>
+                    ) : <p className="mt-2 text-[13px] leading-5 text-[#202421]/70">No dietary claims recorded.</p>}
+                  </div>
+                </section>
+
+                <section className="mt-5" aria-label="Nutrition information">
+                  <h4 className="border-b border-[#173F35]/20 pb-2 text-[16px] font-semibold text-[#173F35]">Nutrition</h4>
+                  {nutrients.length ? (
+                    <div className="grid gap-x-5 sm:grid-cols-2">
+                      {nutrients.map((nutrient, index) => (
+                        <div key={index} className="flex justify-between gap-3 border-b border-[#173F35]/10 py-2.5 text-[13px]">
+                          <span className="min-w-0 text-[#202421]">{recordBookDisplayText(nutrient)}</span>
+                          <span className="shrink-0 font-semibold text-[#173F35]">{nutrient?.value ?? nutrient?.amount ?? nutrient?.quantity ?? "Not recorded"} {nutrient?.unit || ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="py-3 text-[13px] text-[#202421]/70">No nutrition values recorded in this version.</p>}
+                </section>
+
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#173F35]/15 pt-4">
+                  <p className="text-[12px] leading-5 text-[#202421]/65">This is a saved historical record. It cannot be edited here.</p>
+                  {selectedEntry?.publicId ? (
+                    <Link to={`/dish-passports/${encodeURIComponent(selectedEntry.publicId)}`} className="focus-ring inline-flex min-h-10 items-center gap-2 border-b-2 border-[#C86C42] text-[13px] font-semibold text-[#173F35]">
+                      Public dish record <ArrowRight size={15} aria-hidden="true" />
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            ) : <p className="py-5 text-[14px] text-[#202421]/75">This version does not contain any published dishes.</p>}
+          </main>
+        </div>
+
+        <footer className="shrink-0 border-t border-[#173F35]/20 bg-[#F7F6F2] px-3 py-2.5 sm:px-7 sm:py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <a
+              href={greyBookExportUrl(book.id, "csv")}
+              download
+              className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-[6px] border border-[#173F35]/20 bg-[#DCE0CF] px-3 text-[12px] font-semibold text-[#173F35] transition-colors hover:bg-[#DCE0CF]/70 sm:text-[13px]"
+            >
+              <Download size={15} aria-hidden="true" /> Spreadsheet
+            </a>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                aria-expanded={showTechnicalExport}
+                onClick={() => setShowTechnicalExport((value) => !value)}
+                className="focus-ring min-h-10 border-b border-[#173F35]/40 px-1 text-[12px] font-medium text-[#202421]/80"
+              >
+                Export options
+              </button>
+              <button type="button" onClick={onClose} className="focus-ring min-h-10 rounded-[6px] bg-[#173F35] px-4 text-[13px] font-semibold text-[#F7F6F2] hover:bg-[#202421]">Done</button>
+            </div>
+          </div>
+          {showTechnicalExport ? (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#173F35]/15 pt-2">
+              <span className="text-[11px] text-[#202421]/65">For technical backup or integrations</span>
+              <button type="button" onClick={() => downloadRecordBookData(book)} className="focus-ring inline-flex min-h-9 items-center gap-2 border-b-2 border-[#C86C42] text-[12px] font-semibold text-[#173F35]">
+                <Download size={14} aria-hidden="true" /> Download JSON file
+              </button>
+            </div>
+          ) : null}
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 function evidenceFrom(label, referenceId) {
   if (!String(label || "").trim()) {
     return [];
@@ -397,7 +770,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const [productionPlans, setProductionPlans] = useState([]);
   const [passports, setPassports] = useState([]);
   const [greyBooks, setGreyBooks] = useState([]);
+  const [openGreyBookId, setOpenGreyBookId] = useState("");
   const [changeCases, setChangeCases] = useState([]);
+  const [changeCasesLoadError, setChangeCasesLoadError] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -408,6 +783,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const [supplierFeedFailures, setSupplierFeedFailures] = useState([]);
   const [menuFeedFailures, setMenuFeedFailures] = useState([]);
   const [procurementFeedFailures, setProcurementFeedFailures] = useState([]);
+  const [passportFeedFailures, setPassportFeedFailures] = useState([]);
+  const [greyBookFeedFailures, setGreyBookFeedFailures] = useState([]);
 
   const [reason, setReason] = useState(
     "Operational review completed with supporting evidence."
@@ -547,10 +924,13 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    if (section === "changeManagement") setChangeCasesLoadError("");
     if (section === "dashboard") setDashboardFeedFailures([]);
     if (section === "outlets") setOutletFeedFailures([]);
     if (section === "suppliers") setSupplierFeedFailures([]);
     if (section === "procurement") setProcurementFeedFailures([]);
+    if (section === "passports") setPassportFeedFailures([]);
+    if (section === "greyBook") setGreyBookFeedFailures([]);
 
     try {
       const common = await Promise.allSettled([
@@ -569,6 +949,14 @@ export default function HospitalityPage({ section = "dashboard" }) {
       const failedSupplierFeeds = [];
       const failedMenuFeeds = [];
       const failedProcurementFeeds = [];
+      const failedPassportFeeds = [];
+      const failedGreyBookFeeds = [];
+      if (section === "greyBook" && common[1].status === "rejected") {
+        failedGreyBookFeeds.push("Outlets");
+      }
+      if (section === "passports" && common[1].status === "rejected") {
+        failedPassportFeeds.push("Outlets");
+      }
       if (section === "menus" && common[1].status === "rejected") {
         failedMenuFeeds.push("Outlets");
       }
@@ -683,6 +1071,15 @@ export default function HospitalityPage({ section = "dashboard" }) {
           }
         }
 
+        if (section === "greyBook" && result.status === "rejected") {
+          if (key === "greyBooks") failedGreyBookFeeds.push("Record history");
+        }
+
+        if (section === "passports" && result.status === "rejected") {
+          if (key === "recipes") failedPassportFeeds.push("Approved recipes");
+          if (key === "passports") failedPassportFeeds.push("Dish records");
+        }
+
         if (section === "dashboard" && result.status === "rejected") {
           const feedNames = {
             suppliers: "Suppliers",
@@ -736,7 +1133,14 @@ export default function HospitalityPage({ section = "dashboard" }) {
           setGreyBooks(value?.greyBooks || []);
         }
         if (key === "changeCases") {
-          setChangeCases(value?.changeCases || []);
+          if (section === "changeManagement" && result.status === "rejected") {
+            setChangeCasesLoadError(
+              getHospitalityErrorMessage(result.reason, "Couldn't load change records.")
+            );
+            setChangeCases([]);
+          } else {
+            setChangeCases(value?.changeCases || []);
+          }
         }
       });
 
@@ -745,6 +1149,8 @@ export default function HospitalityPage({ section = "dashboard" }) {
       if (section === "suppliers") setSupplierFeedFailures(failedSupplierFeeds);
       if (section === "menus") setMenuFeedFailures(failedMenuFeeds);
       if (section === "procurement") setProcurementFeedFailures(failedProcurementFeeds);
+      if (section === "passports") setPassportFeedFailures(failedPassportFeeds);
+      if (section === "greyBook") setGreyBookFeedFailures(failedGreyBookFeeds);
     } catch (requestError) {
       setError(
         getHospitalityErrorMessage(
@@ -861,6 +1267,13 @@ export default function HospitalityPage({ section = "dashboard" }) {
 
   const decisionEvidence = () =>
     evidenceFrom(evidenceLabel, evidenceReferenceId);
+
+  const openChangeCount = changeCases.filter(
+    (item) => !["published", "dismissed"].includes(item.status)
+  ).length;
+  const awaitingApprovalCount = changeCases.filter(
+    (item) => item.status === "recalculated"
+  ).length;
 
   const isDashboard = section === "dashboard";
   const isOutlets = section === "outlets";
@@ -1199,10 +1612,10 @@ export default function HospitalityPage({ section = "dashboard" }) {
     },
     {
       number: "04",
-      title: "Review kitchen cost in Marketplace",
+      title: "Review food cost",
       text: "After planning purchases, continue to costing to check recipe costs.",
       icon: Calculator,
-      to: "/host/marketplace",
+      to: "/host/hospitality/costing",
       surface: "border-emerald-200 bg-emerald-50/75",
     },
   ];
@@ -1242,95 +1655,97 @@ export default function HospitalityPage({ section = "dashboard" }) {
   const passportSteps = [
     {
       number: "01",
-      title: "Choose the outlet",
-      text: "Pick the outlet this dish record belongs to.",
+      title: "Choose an outlet",
+      text: "Select the kitchen or restaurant.",
       icon: Store,
-      surface: "border-emerald-200 bg-emerald-50/80",
+      anchor: "#dish-record-create",
     },
     {
       number: "02",
-      title: "Choose an approved recipe",
-      text: "Select the approved kitchen recipe used for this dish.",
+      title: "Select an approved recipe",
+      text: "Use a verified kitchen recipe.",
       icon: ChefHat,
-      surface: "border-sky-200 bg-sky-50/80",
+      anchor: "#dish-record-create",
     },
     {
       number: "03",
-      title: "Create & review the record",
-      text: "Generate the dish record, then add the review note and supporting reference.",
+      title: "Review the record",
+      text: "Add evidence before publication.",
       icon: ShieldCheck,
-      surface: "border-violet-200 bg-violet-50/75",
+      anchor: "#dish-record-review",
     },
     {
       number: "04",
-      title: "Continue to published records",
-      text: "After publishing, continue to the outlet record book.",
+      title: "Published records",
+      text: "Continue to the record book.",
       icon: BookOpenCheck,
       to: "/host/hospitality/grey-book",
-      surface: "border-emerald-200 bg-emerald-50/75",
     },
   ];
 
   const greyBookSteps = [
     {
       number: "01",
-      title: "Choose the outlet",
-      text: "Pick the restaurant, cafe or kitchen whose published dish records you want to capture.",
+      title: "Choose an outlet",
+      text: "Select the kitchen whose records you want to save.",
       icon: Store,
-      surface: "border-emerald-200 bg-emerald-50/80",
+      anchor: "#grey-book-create",
     },
     {
       number: "02",
-      title: "Create the record book",
-      text: "Save the published dish records that are currently in effect for that outlet.",
+      title: "Create record book",
+      text: "Capture the current published dish versions.",
       icon: BookOpenCheck,
-      surface: "border-sky-200 bg-sky-50/80",
+      anchor: "#grey-book-create",
     },
     {
       number: "03",
-      title: "Review or download",
-      text: "Open the saved history and download a copy when you need it for operations or checks.",
+      title: "Review & download",
+      text: "Find older versions and download a copy.",
       icon: ClipboardList,
-      surface: "border-violet-200 bg-violet-50/75",
+      anchor: "#grey-book-history",
     },
     {
       number: "04",
-      title: "Continue to changes & history",
-      text: "When recipes or source records change, continue to the change review workspace.",
+      title: "Changes & history",
+      text: "Review updates when published records change.",
       icon: ScrollText,
       to: "/host/hospitality/change-management",
-      surface: "border-emerald-200 bg-emerald-50/75",
     },
   ];
 
   const changeManagementSteps = [
     {
       number: "01",
+      tag: "Changed record",
       title: "Choose what changed",
-      text: "Select the supplier item, ingredient or recipe record that has been updated.",
+      text: "Identify the item, ingredient or recipe.",
       icon: FileSearch,
-      surface: "border-emerald-200 bg-emerald-50/80",
+      anchor: "#change-record-form",
     },
     {
       number: "02",
+      tag: "Evidence",
       title: "Add review details",
-      text: "Explain the change and add the supporting check or document used for the review.",
+      text: "Add the reason and supporting check.",
       icon: ClipboardList,
-      surface: "border-sky-200 bg-sky-50/80",
+      anchor: "#change-review-evidence",
     },
     {
       number: "03",
-      title: "Check what is affected",
-      text: "See which kitchen recipes, outlets and published dish records may need attention.",
+      tag: "Impact",
+      title: "Check affected records",
+      text: "Find which kitchens and records need attention.",
       icon: ScrollText,
-      surface: "border-violet-200 bg-violet-50/75",
+      anchor: "#change-impact-action",
     },
     {
       number: "04",
-      title: "Super Admin approval & publish",
-      text: "After recalculation, Super Admin approves the change. You can then publish the approved update.",
-      icon: CheckCircle2,
-      surface: "border-emerald-200 bg-emerald-50/75",
+      tag: "Approval",
+      title: "Approval & publishing",
+      text: "Publish after Super Admin approval.",
+      icon: ShieldCheck,
+      anchor: "#change-record-history",
     },
   ];
 
@@ -2237,92 +2652,82 @@ export default function HospitalityPage({ section = "dashboard" }) {
           </details>
         </header>
       ) : isPassports ? (
-        <header className="rounded-b-[22px] border-x border-b border-emerald-200/80 bg-[linear-gradient(135deg,#e8f7f1_0%,#eef7ff_64%,#f2efff_100%)] p-3.5 shadow-[0_12px_34px_rgba(15,23,42,0.06)] sm:rounded-b-[26px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-emerald-800 sm:text-[10px]">
-                <FileSearch size={13} />
-                Dish records
+        <header className="border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
+          <div className="px-3 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-7 lg:px-8">
+            <div className="flex flex-col gap-2.5 sm:gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-[12px] font-semibold text-[#C86C42] sm:text-[13px]">
+                  <FileSearch size={16} aria-hidden="true" /> Host / Hospitality
+                </p>
+                <h1 className="mt-1 text-[27px] font-semibold leading-[1.12] tracking-[-0.045em] text-[#173F35] sm:mt-2 sm:text-[40px]">
+                  Dish records
+                </h1>
+                <p className="mt-1.5 hidden max-w-[670px] text-[14px] leading-[1.5] text-[#202421] sm:block">
+                  Create, review and publish approved dish records.
+                </p>
               </div>
-
-              <h1 className="mt-2.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
-                Dish records
-              </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                Create a verified record for an approved dish, review the
-                supporting details, and publish it when every required check is
-                ready.
-              </p>
+              <div className="flex w-full items-center justify-between gap-2 self-start sm:w-auto sm:gap-4 sm:self-end sm:justify-start">
+                <div className="border-l-[3px] border-[#C86C42] pl-3">
+                  <p className="text-[13px] font-semibold text-[#173F35]">
+                    <span className="text-[23px] leading-none">{loading || passportFeedFailures.includes("Dish records") ? "—" : passports.length}</span>
+                    <span className="ml-2 font-medium">saved versions</span>
+                  </p>
+                  <p className="text-[12px] text-[#202421] sm:mt-1">
+                    {loading || passportFeedFailures.includes("Dish records") ? "—" : passports.filter((item) => item.status === "published").length} published
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={load}
+                  disabled={loading}
+                  className="focus-ring inline-flex min-h-9 items-center gap-2 border border-[#173F35]/35 bg-[#F7F6F2] px-2.5 text-[13px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-60 sm:min-h-10 sm:px-3"
+                >
+                  <RefreshCw size={15} className={loading ? "animate-spin" : ""} aria-hidden="true" />
+                  Refresh
+                </button>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[10px] font-black text-emerald-800 shadow-sm sm:px-3.5 sm:text-xs"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-[#173F35]/12 pt-2.5 sm:mt-5 sm:pt-4">
+              <h2 className="text-[16px] font-semibold tracking-[-0.035em] text-[#173F35] sm:text-[23px]"><span className="sm:hidden">4 simple steps</span><span className="hidden sm:inline">Dish records in 4 steps</span></h2>
+              <p className="hidden text-[13px] text-[#202421] sm:block">Follow the steps, then track the saved versions below.</p>
+            </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {passportSteps.map((step) => {
+          <nav aria-label="Dish record setup steps" className="grid grid-cols-2 border-y border-[#173F35]/10 sm:grid-cols-4">
+            {passportSteps.map((step, index) => {
               const StepIcon = step.icon;
+              const isLast = index === passportSteps.length - 1;
               const content = (
                 <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="grid size-6 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                      {step.number}
+                  <div className="flex items-start justify-between gap-2">
+                    <span className={`text-[12px] font-semibold ${isLast ? "text-[#F7F6F2]" : "text-[#C86C42]"}`}>
+                      {step.number}<span className="hidden sm:inline"> / {index === 0 ? "Outlet" : index === 1 ? "Recipe" : index === 2 ? "Review" : "Next"}</span>
                     </span>
-                    <StepIcon
-                      size={15}
-                      className="text-stone-600"
-                      aria-hidden="true"
-                    />
+                    <StepIcon size={16} className={isLast ? "text-[#F7F6F2]" : "text-[#173F35]"} aria-hidden="true" />
                   </div>
-                  <p className="mt-2 text-[11px] font-black leading-4 text-stone-950 sm:text-[13px]">
+                  <span className={`mt-1 block text-[13px] font-semibold leading-[1.3] sm:mt-2 sm:text-[14px] ${isLast ? "text-[#F7F6F2]" : "text-[#173F35]"}`}>
                     {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-medium leading-[1.45] text-stone-600 sm:text-[11px]">
+                  </span>
+                  <span className={`mt-1 hidden text-[12px] leading-[1.45] md:block ${isLast ? "text-[#F7F6F2]" : "text-[#202421]"}`}>
                     {step.text}
-                  </p>
-                  {step.to ? (
-                    <span className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 sm:text-[10px]">
-                      Open
-                      <ArrowRight size={11} />
-                    </span>
-                  ) : null}
+                  </span>
                 </>
               );
-
+              const classes = `focus-ring block min-w-0 border-r border-b border-[#173F35]/10 px-2.5 py-2 transition sm:min-h-[116px] sm:px-4 sm:py-4 ${index === 0 ? "bg-[#DCE0CF]" : isLast ? "bg-[#C86C42]" : "bg-[#F7F6F2] hover:bg-[#DCE0CF]"}`;
               return step.to ? (
-                <Link
-                  key={step.number}
-                  to={step.to}
-                  className={`focus-ring rounded-[16px] border p-2.5 transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </Link>
+                <Link key={step.number} to={step.to} className={classes}>{content}</Link>
               ) : (
-                <div
-                  key={step.number}
-                  className={`rounded-[16px] border p-2.5 sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </div>
+                <a key={step.number} href={step.anchor} className={classes}>{content}</a>
               );
             })}
-          </div>
+          </nav>
 
-          <details className="mt-3 rounded-[14px] border border-white/70 bg-white/55 px-3 py-2">
-            <summary className="cursor-pointer text-[10px] font-black text-stone-700 sm:text-xs">
-              Manage another hospitality workspace
-            </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <details className="border-b border-[#173F35]/12 px-3 py-2 sm:px-6 sm:py-2.5 lg:px-8">
+            <summary className="focus-ring cursor-pointer text-[13px] font-semibold text-[#173F35]"><span className="sm:hidden">Switch business</span><span className="hidden sm:inline">Switch hospitality business</span></summary>
+            <div className="mt-3 grid gap-2 pb-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <input
-                className={inputClass}
+                className={dishFieldClass}
                 value={organizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}
                 placeholder="Business workspace code"
@@ -2333,7 +2738,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                   setSelectedHospitalityOrganizationId(organizationId);
                   load();
                 }}
-                className={secondaryButtonClass}
+                className="focus-ring min-h-11 border border-[#173F35]/40 px-5 text-[14px] font-semibold text-[#173F35]"
               >
                 Switch workspace
               </button>
@@ -2341,92 +2746,86 @@ export default function HospitalityPage({ section = "dashboard" }) {
           </details>
         </header>
       ) : isGreyBook ? (
-        <header className="rounded-b-[22px] border-x border-b border-emerald-200/80 bg-[linear-gradient(135deg,#e8f7f1_0%,#eef7ff_64%,#f2efff_100%)] p-3.5 shadow-[0_12px_34px_rgba(15,23,42,0.06)] sm:rounded-b-[26px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-emerald-800 sm:text-[10px]">
-                <BookOpenCheck size={13} />
-                Published records
-              </div>
-
-              <h1 className="mt-2.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
+        <header className="border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
+          <div className="flex flex-wrap items-end justify-between gap-4 px-3.5 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-6 lg:px-8">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2 text-[12px] font-semibold text-[#C86C42]">
+                <BookOpenCheck size={15} aria-hidden="true" /> Host / Hospitality
+              </p>
+              <h1 className="mt-1.5 text-[27px] font-semibold leading-[1.1] tracking-[-0.035em] text-[#173F35] sm:text-[38px]">
                 Outlet record book
               </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                Keep a dated record of the dish information that was approved
-                and published for each outlet. Older record books stay unchanged
-                so you can always check what was in effect earlier.
+              <p className="mt-2 hidden max-w-[640px] text-[14px] leading-6 text-[#202421]/75 sm:block">
+                Save a dated snapshot of approved, published dish records for each outlet.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[10px] font-black text-emerald-800 shadow-sm sm:px-3.5 sm:text-xs"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
+            <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
+              <div className="flex items-center gap-2 border-l-[3px] border-[#C86C42] pl-3 text-[#173F35]">
+                <span className="text-[23px] font-semibold tabular-nums">
+                  {greyBookFeedFailures.includes("Record history") ? "—" : greyBooks.length}
+                </span>
+                <span className="text-[13px] font-medium">Saved books</span>
+              </div>
+              <button
+                type="button"
+                onClick={load}
+                disabled={loading}
+                className="focus-ring inline-flex min-h-10 items-center gap-2 border border-[#173F35]/25 bg-[#F7F6F2] px-3 py-2 text-[13px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
+              >
+                <RefreshCw size={15} className={loading ? "animate-spin" : ""} aria-hidden="true" />
+                Refresh
+              </button>
+            </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {greyBookSteps.map((step) => {
-              const StepIcon = step.icon;
-              const content = (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="grid size-6 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                      {step.number}
-                    </span>
-                    <StepIcon
-                      size={15}
-                      className="text-stone-600"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <p className="mt-2 text-[11px] font-black leading-4 text-stone-950 sm:text-[13px]">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-medium leading-[1.45] text-stone-600 sm:text-[11px]">
-                    {step.text}
-                  </p>
-                  {step.to ? (
-                    <span className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 sm:text-[10px]">
-                      Open
-                      <ArrowRight size={11} />
-                    </span>
-                  ) : null}
-                </>
-              );
-
-              return step.to ? (
-                <Link
-                  key={step.number}
-                  to={step.to}
-                  className={`focus-ring rounded-[16px] border p-2.5 transition hover:-translate-y-0.5 hover:shadow-md sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </Link>
-              ) : (
-                <div
-                  key={step.number}
-                  className={`rounded-[16px] border p-2.5 sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  {content}
-                </div>
-              );
-            })}
+          <div className="border-y border-[#173F35]/10">
+            <div className="grid grid-cols-2 lg:grid-cols-4">
+              {greyBookSteps.map((step, index) => {
+                const StepIcon = step.icon;
+                const inner = (
+                  <>
+                    <div className="flex items-start gap-2 sm:items-center">
+                      <span className={`shrink-0 text-[15px] font-semibold ${index === 3 ? "text-[#F7F6F2]" : "text-[#C86C42]"}`}>
+                        {step.number}
+                      </span>
+                      <span className="min-w-0 text-[12px] font-semibold leading-[1.4] sm:text-[15px]">
+                        {step.title}
+                      </span>
+                      <StepIcon size={16} className="ml-auto hidden shrink-0 sm:block" aria-hidden="true" />
+                    </div>
+                    <p className="mt-1 hidden text-[13px] leading-[1.4] opacity-80 sm:block">
+                      {step.text}
+                    </p>
+                    {step.to ? <span className="mt-1.5 hidden items-center gap-1 text-[12px] font-semibold sm:inline-flex">Open <ArrowRight size={13} /></span> : null}
+                  </>
+                );
+                const color = index === 3
+                  ? "bg-[#C86C42] text-[#F7F6F2] hover:bg-[#173F35]"
+                  : index % 2 === 0
+                    ? "bg-[#DCE0CF] text-[#173F35] hover:bg-[#DCE0CF]/70"
+                    : "bg-[#F7F6F2] text-[#173F35] hover:bg-[#DCE0CF]/60";
+                const itemClass = `focus-ring block min-h-[58px] border-b border-r border-[#173F35]/10 px-3 py-3 transition sm:min-h-[103px] sm:px-4 sm:py-4 ${color}`;
+                return step.to ? (
+                  <Link key={step.number} to={step.to} className={itemClass}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <a key={step.number} href={step.anchor} className={itemClass}>
+                    {inner}
+                  </a>
+                );
+              })}
+            </div>
           </div>
 
-          <details className="mt-3 rounded-[14px] border border-white/70 bg-white/55 px-3 py-2">
-            <summary className="cursor-pointer text-[10px] font-black text-stone-700 sm:text-xs">
-              Manage another hospitality workspace
+          <details className="border-b border-[#173F35]/15 px-3.5 py-2.5 sm:px-6 lg:px-8">
+            <summary className="cursor-pointer text-[13px] font-semibold text-[#173F35]">
+              <span className="sm:hidden">Switch business</span>
+              <span className="hidden sm:inline">Switch hospitality business</span>
             </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
-                className={inputClass}
+                className={dishFieldClass}
                 value={organizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}
                 placeholder="Business workspace code"
@@ -2437,7 +2836,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                   setSelectedHospitalityOrganizationId(organizationId);
                   load();
                 }}
-                className={secondaryButtonClass}
+                className="focus-ring min-h-11 shrink-0 bg-[#173F35] px-5 text-[14px] font-semibold text-[#F7F6F2]"
               >
                 Switch workspace
               </button>
@@ -2445,76 +2844,78 @@ export default function HospitalityPage({ section = "dashboard" }) {
           </details>
         </header>
       ) : isChangeManagement ? (
-        <header className="rounded-b-[22px] border-x border-b border-emerald-200/80 bg-[linear-gradient(135deg,#e8f7f1_0%,#eef7ff_64%,#f2efff_100%)] p-3.5 shadow-[0_12px_34px_rgba(15,23,42,0.06)] sm:rounded-b-[26px] sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-emerald-800 sm:text-[10px]">
-                <ScrollText size={13} />
-                Changes & history
-              </div>
-
-              <h1 className="mt-2.5 text-[22px] font-black tracking-[-0.035em] text-stone-950 sm:text-3xl">
-                Changes & history
+        <header className="border-b border-[#DCE0CF] bg-[#F7F6F2]">
+          <div className="flex flex-col gap-3 border-t-[3px] border-[#C86C42] px-3 pb-3 pt-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6 sm:px-7 sm:pb-6 sm:pt-7">
+            <div className="min-w-0 max-w-[690px]">
+              <p className="flex items-center gap-2 text-[13px] font-semibold text-[#C86C42]">
+                <ScrollText size={16} aria-hidden="true" /> Host / Hospitality
+              </p>
+              <h1 className="mt-2 text-[29px] font-semibold leading-[1.12] tracking-[-0.035em] text-[#173F35] sm:text-[38px]">
+                Changes &amp; history
               </h1>
-
-              <p className="mt-1.5 max-w-3xl text-[11px] font-medium leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                When a supplier item, ingredient or recipe changes, check what
-                else may be affected, send the result for Super Admin approval,
-                then publish the approved update.
+              <p className="mt-2 hidden max-w-[580px] text-[14px] leading-[1.5] text-[#202421] sm:block sm:text-[15px]">
+                Review a changed item or recipe, check its impact and keep published history accurate.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[13px] border border-emerald-200 bg-white/85 px-2.5 py-2 text-[10px] font-black text-emerald-800 shadow-sm sm:px-3.5 sm:text-xs"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
-            {changeManagementSteps.map((step) => {
-              const StepIcon = step.icon;
-
-              return (
-                <div
-                  key={step.number}
-                  className={`rounded-[16px] border p-2.5 sm:rounded-[18px] sm:p-3.5 ${step.surface}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="grid size-6 place-items-center rounded-full bg-stone-950 text-[8px] font-black text-white sm:size-7 sm:text-[9px]">
-                      {step.number}
-                    </span>
-                    <StepIcon
-                      size={15}
-                      className="text-stone-600"
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <p className="mt-2 text-[11px] font-black leading-4 text-stone-950 sm:text-[13px]">
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-[9px] font-medium leading-[1.45] text-stone-600 sm:text-[11px]">
-                    {step.text}
-                  </p>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3 sm:justify-end">
+              <div className="flex items-center gap-4 border-l-[3px] border-[#C86C42] pl-3 sm:gap-5" aria-live="polite">
+                <div className="flex items-baseline gap-1.5 text-[#173F35]">
+                  <strong className="text-[22px] font-semibold leading-none tabular-nums sm:text-[26px]">{changeCasesLoadError ? "—" : loading ? "…" : openChangeCount}</strong>
+                  <span className="text-[13px]">open reviews</span>
                 </div>
-              );
-            })}
+                <div className="flex items-baseline gap-1.5 border-l border-[#DCE0CF] pl-4 text-[#173F35]">
+                  <strong className="text-[22px] font-semibold leading-none tabular-nums sm:text-[26px]">{changeCasesLoadError ? "—" : loading ? "…" : awaitingApprovalCount}</strong>
+                  <span className="text-[13px]">awaiting approval</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={load}
+                disabled={loading}
+                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 border border-[#173F35] bg-[#F7F6F2] px-3.5 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden="true" /> Refresh
+              </button>
+            </div>
           </div>
 
-          <details className="mt-3 rounded-[14px] border border-white/70 bg-white/55 px-3 py-2">
-            <summary className="cursor-pointer text-[10px] font-black text-stone-700 sm:text-xs">
-              Manage another hospitality workspace
+          <section aria-labelledby="change-steps-title" className="border-y border-[#DCE0CF] sm:mx-7 sm:mb-4">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-[#DCE0CF] px-3 py-2.5 sm:px-5 sm:py-3">
+              <h2 id="change-steps-title" className="text-[19px] font-semibold leading-tight text-[#173F35] sm:text-[25px]"><span className="sm:hidden">Review in 4 steps</span><span className="hidden sm:inline">Review a change in 4 steps</span></h2>
+              <p className="hidden text-[13px] leading-5 text-[#202421] sm:block">Follow the steps, then track each review below.</p>
+            </div>
+            <nav aria-label="Change review steps" className="grid grid-cols-2 sm:grid-cols-4">
+              {changeManagementSteps.map((step, index) => {
+                const StepIcon = step.icon;
+                return (
+                  <a
+                    href={step.anchor}
+                    key={step.number}
+                    className={`focus-ring group flex min-h-[74px] min-w-0 flex-col gap-1 border-b border-r border-[#DCE0CF] px-2.5 py-2.5 transition sm:min-h-[136px] sm:gap-2 sm:border-b-0 sm:px-4 sm:py-4 ${index === 0 ? "bg-[#DCE0CF] text-[#173F35] hover:bg-[#CBD5C2]" : index === 3 ? "bg-[#C86C42] text-white hover:bg-[#B65F36]" : index === 1 ? "bg-[#F7F6F2] text-[#173F35] hover:bg-[#EBEEE6]" : "bg-[#EDF2EC] text-[#173F35] hover:bg-[#DCE0CF]"}`}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className={`text-[12px] font-semibold sm:text-[13px] ${index === 3 ? "text-white" : "text-[#C86C42]"}`}>{step.number}<span className="hidden sm:inline"> / {step.tag}</span></span>
+                      <StepIcon size={18} className="shrink-0" aria-hidden="true" />
+                    </span>
+                    <strong className="text-[14px] font-semibold leading-[1.35] sm:text-[16px]"><span className="sm:hidden">{["Choose record", "Add evidence", "Check impact", "Admin approval"][index]}</span><span className="hidden sm:inline">{step.title}</span></strong>
+                    <span className={`hidden text-[13px] leading-[1.45] sm:block ${index === 3 ? "text-white/95" : "text-[#202421]"}`}>{step.text}</span>
+                  </a>
+                );
+              })}
+            </nav>
+          </section>
+
+          <details className="border-b border-[#DCE0CF] px-3 py-2 sm:px-7 sm:py-3">
+            <summary className="focus-ring w-fit cursor-pointer py-1 text-[13px] font-semibold text-[#173F35]">
+              <span className="sm:hidden">Switch workspace</span><span className="hidden sm:inline">Switch hospitality workspace</span>
             </summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="mt-3 flex max-w-[700px] flex-col gap-2 pb-2 sm:flex-row">
               <input
-                className={inputClass}
+                className={changeHistoryFieldClass}
                 value={organizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}
                 placeholder="Business workspace code"
+                aria-label="Business workspace code"
               />
               <button
                 type="button"
@@ -2522,7 +2923,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
                   setSelectedHospitalityOrganizationId(organizationId);
                   load();
                 }}
-                className={secondaryButtonClass}
+                className="focus-ring min-h-11 shrink-0 bg-[#173F35] px-5 text-[14px] font-semibold text-white transition hover:bg-[#235744]"
               >
                 Switch workspace
               </button>
@@ -2645,18 +3046,19 @@ export default function HospitalityPage({ section = "dashboard" }) {
               hospitality business.
             </div>
           ) : isGreyBook ? (
-            <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
-              Only dish records that were approved by Super Admin and then
-              published are included. Creating a new outlet record book never
-              changes an older one.
-            </div>
-          ) : isChangeManagement ? (
-            <div className="mt-3 rounded-[16px] border border-sky-200 bg-sky-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-slate-700 sm:mt-4 sm:text-xs">
-              Use this page when a supplier item, ingredient or recipe changes.
-              EPANTRY checks what may be affected while keeping older published
-              history unchanged.
-            </div>
-          ) : (
+            <>
+              {greyBookFeedFailures.length ? (
+                <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 border-l-[3px] border-[#C86C42] bg-[#DCE0CF] px-4 py-3 text-[13px] text-[#173F35]">
+                  <span>Couldn't load {greyBookFeedFailures.join(" and ")}. Please refresh.</span>
+                  <button type="button" disabled={loading} onClick={load} className="focus-ring min-h-10 font-semibold underline decoration-[#C86C42] underline-offset-4">Retry</button>
+                </div>
+              ) : null}
+              <div className="mt-3 flex items-start gap-2 border-l-[3px] border-[#C86C42] bg-[#DCE0CF]/60 px-3 py-2.5 text-[12px] leading-5 text-[#173F35] sm:mt-4 sm:px-4 sm:text-[13px]">
+                <ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>Only approved and published dishes are included. Older record books stay unchanged.</span>
+              </div>
+            </>
+          ) : isChangeManagement ? null : isPassports ? null : (
             <div className="mt-5">
               <Notice tone="stone">
                 Your access is based on the business and outlets you’re assigned
@@ -5043,7 +5445,7 @@ export default function HospitalityPage({ section = "dashboard" }) {
               </div>
 
               <Link
-                to="/host/marketplace"
+                to="/host/hospitality/costing"
                 className="focus-ring flex items-center justify-between gap-3 border-l-[5px] border-[#C86C42] bg-[#C86C42]/15 px-3 py-3 transition hover:bg-[#C86C42]/25 sm:px-6 sm:py-4"
               >
                 <div className="min-w-0">
@@ -5211,248 +5613,157 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {section === "passports" ? (
-            <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
-              <div className="rounded-[16px] border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 text-[10px] font-semibold leading-5 text-emerald-900 sm:rounded-[18px] sm:px-4 sm:text-xs">
-                This record can only be created after the kitchen recipe and
-                required food-safety checks are approved. If any safety detail
-                still needs review, EPANTRY will pause approval until it is
-                resolved.
+            <div className="mt-3 sm:mt-5">
+              {passportFeedFailures.length ? (
+                <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-2 border-l-[4px] border-[#C86C42] bg-[#DCE0CF] px-3 py-2 text-[13px] leading-5 text-[#202421] sm:mb-4 sm:gap-3 sm:px-4 sm:py-3 sm:text-[14px]">
+                  <span>Couldn't load {passportFeedFailures.join(", ")}. Saved records haven't been deleted.</span>
+                  <button type="button" onClick={load} disabled={loading} className="focus-ring inline-flex min-h-10 items-center gap-2 font-semibold text-[#173F35] underline decoration-[#C86C42] underline-offset-4">
+                    <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Retry
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="mb-3 flex items-center gap-2 border-y border-[#173F35]/10 bg-[#DCE0CF]/65 px-3 py-2 text-[12px] leading-5 text-[#173F35] sm:mb-4 sm:px-5 sm:py-2.5 sm:text-[13px]">
+                <ShieldCheck size={17} className="shrink-0" aria-hidden="true" />
+                <p><span className="sm:hidden">Approved recipes only. Admin approval required.</span><span className="hidden sm:inline">Approved recipes only · Super Admin approval is required to publish.</span></p>
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-3 lg:items-stretch">
-                <section className="flex h-full flex-col rounded-[20px] border border-emerald-200 bg-emerald-50/75 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:text-[10px]">
-                      Start the record
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      Create a dish record
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Choose the outlet and approved kitchen recipe EPANTRY
-                      should use to prepare this dish record.
-                    </p>
-                  </div>
-
-                  <div className="mt-3 grid gap-2.5">
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Outlet
-                      </span>
-                      <select
-                        className={inputClass}
-                        value={passportForm.outletId}
-                        onChange={(event) =>
-                          setPassportForm((current) => ({
-                            ...current,
-                            outletId: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Choose an outlet</option>
-                        {outlets.map((outlet) => (
-                          <option key={outlet.id} value={outlet.id}>
-                            {outlet.name || outlet.outletCode}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Approved kitchen recipe
-                      </span>
-                      <select
-                        className={inputClass}
-                        value={passportForm.productionRecipeVersionId}
-                        onChange={(event) =>
-                          setPassportForm((current) => ({
-                            ...current,
-                            productionRecipeVersionId: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Choose an approved recipe</option>
-                        {approvedRecipes.map((recipe) => (
-                          <option key={recipe.id} value={recipe.id}>
-                            {recipe.title || recipe.recipeKey}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={
-                      busy ||
-                      !can("hospitality.passports.generate") ||
-                      !passportForm.outletId.trim() ||
-                      !passportForm.productionRecipeVersionId.trim()
-                    }
-                    onClick={() =>
-                      run(
-                        () =>
-                          generateDishPassportSnapshot({
+              <div className="grid min-w-0 items-start gap-3 sm:gap-5 xl:grid-cols-[minmax(0,1.03fr)_minmax(0,0.97fr)]">
+                <div className="min-w-0 border-t-[3px] border-[#C86C42] bg-[#F7F6F2]">
+                  <section id="dish-record-create" aria-labelledby="dish-record-create-title" className="min-w-0 scroll-mt-28">
+                    <div className="bg-[#DCE0CF] px-3 py-2.5 sm:px-6 sm:py-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[12px] font-semibold text-[#C86C42]">01 / New record</p>
+                          <h2 id="dish-record-create-title" className="mt-0.5 text-[20px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#173F35] sm:mt-1 sm:text-[27px]">Create a dish record</h2>
+                          <p className="mt-1 hidden text-[13px] text-[#202421] sm:block">Choose an outlet and its approved recipe.</p>
+                        </div>
+                        <FileSearch size={20} className="hidden shrink-0 text-[#173F35] sm:block" aria-hidden="true" />
+                      </div>
+                    </div>
+                    <div className="px-3 pb-4 pt-3 sm:px-6 sm:pb-6 sm:pt-4">
+                      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+                        <label className="block min-w-0">
+                          <span className="mb-1.5 block text-[13px] font-semibold text-[#173F35]">Outlet</span>
+                          <select className={dishFieldClass} value={passportForm.outletId} onChange={(event) => setPassportForm((current) => ({ ...current, outletId: event.target.value }))}>
+                            <option value="">Choose an outlet</option>
+                            {outlets.map((outlet) => (
+                              <option key={outlet.id} value={outlet.id}>{outlet.name || outlet.outletCode}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block min-w-0">
+                          <span className="mb-1.5 block text-[13px] font-semibold text-[#173F35]">Approved kitchen recipe</span>
+                          <select className={dishFieldClass} value={passportForm.productionRecipeVersionId} onChange={(event) => setPassportForm((current) => ({ ...current, productionRecipeVersionId: event.target.value }))}>
+                            <option value="">Choose an approved recipe</option>
+                            {approvedRecipes.map((recipe) => (
+                              <option key={recipe.id} value={recipe.id}>{recipe.title || recipe.recipeKey}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy || !can("hospitality.passports.generate") || !passportForm.outletId.trim() || !passportForm.productionRecipeVersionId.trim()}
+                        onClick={() => run(
+                          () => generateDishPassportSnapshot({
                             outletId: passportForm.outletId.trim(),
-                            productionRecipeVersionId:
-                              passportForm.productionRecipeVersionId.trim(),
+                            productionRecipeVersionId: passportForm.productionRecipeVersionId.trim(),
                             changeCaseId: null,
                           }),
-                        "Dish record created for review."
-                      )
-                    }
-                    className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
-                  >
-                    Create dish record
-                  </button>
-                </section>
-
-                <section className="flex h-full flex-col rounded-[20px] border border-sky-200 bg-sky-50/75 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-800 sm:text-[10px]">
-                      Review details
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      Add the review note
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Add a short reason and the supporting check or document
-                      used before approving or publishing the record.
-                    </p>
-                  </div>
-
-                  <div className="mt-3 grid gap-2.5">
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Review note
-                      </span>
-                      <input
-                        className={inputClass}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                        placeholder="Why is this record ready?"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Supporting check or document
-                      </span>
-                      <input
-                        className={inputClass}
-                        value={evidenceLabel}
-                        onChange={(event) =>
-                          setEvidenceLabel(event.target.value)
-                        }
-                        placeholder="Example: Kitchen safety review"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Reference number or ID
-                      </span>
-                      <input
-                        className={inputClass}
-                        value={evidenceReferenceId}
-                        onChange={(event) =>
-                          setEvidenceReferenceId(event.target.value)
-                        }
-                        placeholder="Supporting reference"
-                      />
-                    </label>
-                  </div>
-
-                  <p className="mt-3 text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                    This review information is sent with the dish record for
-                    Super Admin approval and is also used when you publish the
-                    approved record.
-                  </p>
-                </section>
-
-                <section className="flex h-full flex-col rounded-[20px] border border-violet-200 bg-violet-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-800 sm:text-[10px]">
-                        Saved records
-                      </p>
-                      <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                        Dish record versions
-                      </h2>
-                      <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                        Review the current status, wait for Super Admin
-                        approval, then publish the approved version customers or
-                        staff should use.
-                      </p>
+                          "Dish record created for review."
+                        )}
+                        className="focus-ring mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 bg-[#173F35] px-4 py-2 text-[14px] font-semibold text-[#F7F6F2] transition hover:bg-[#202421] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-4 sm:min-h-11 sm:w-auto sm:px-5 sm:py-2.5"
+                      >
+                        <FileSearch size={16} aria-hidden="true" /> Create dish record
+                      </button>
                     </div>
-                    <span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-black text-violet-800 shadow-sm">
-                      {passports.length}
+                  </section>
+
+                  <section id="dish-record-review" aria-labelledby="dish-record-review-title" className="min-w-0 scroll-mt-28 border-t-[3px] border-[#C86C42]">
+                    <div className="flex items-start justify-between gap-2 px-3 pb-2 pt-3 sm:gap-3 sm:px-6 sm:pb-3 sm:pt-5">
+                      <div>
+                        <p className="text-[12px] font-semibold text-[#C86C42]">02 / Review evidence</p>
+                        <h2 id="dish-record-review-title" className="mt-0.5 text-[20px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#173F35] sm:mt-1 sm:text-[25px]">Review details</h2>
+                        <p className="mt-1 hidden text-[13px] text-[#202421] sm:block">Used when publishing an approved record.</p>
+                      </div>
+                      <ShieldCheck size={20} className="mt-2 hidden shrink-0 text-[#173F35] sm:block" aria-hidden="true" />
+                    </div>
+                    <div className="grid gap-3 px-3 pb-4 pt-2 sm:grid-cols-2 sm:gap-4 sm:px-6 sm:pb-6">
+                      <label className="block min-w-0 sm:col-span-2">
+                        <span className="mb-1.5 block text-[13px] font-semibold text-[#173F35]">Review note</span>
+                        <input className={dishFieldClass} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this record ready?" />
+                      </label>
+                      <label className="block min-w-0">
+                        <span className="mb-1.5 block text-[13px] font-semibold text-[#173F35]">Supporting check</span>
+                        <input className={dishFieldClass} value={evidenceLabel} onChange={(event) => setEvidenceLabel(event.target.value)} placeholder="e.g. Kitchen safety review" />
+                      </label>
+                      <label className="block min-w-0">
+                        <span className="mb-1.5 block text-[13px] font-semibold text-[#173F35]">Reference ID</span>
+                        <input className={dishFieldClass} value={evidenceReferenceId} onChange={(event) => setEvidenceReferenceId(event.target.value)} placeholder="Optional reference" />
+                      </label>
+                    </div>
+                  </section>
+                </div>
+
+                <section id="dish-record-list" aria-labelledby="dish-record-list-title" className="min-w-0 border-t-[3px] border-[#173F35] bg-[#F7F6F2]">
+                  <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-3 sm:gap-4 sm:px-6 sm:pb-4 sm:pt-5">
+                    <div>
+                      <p className="text-[12px] font-semibold text-[#C86C42]">03 / Record history</p>
+                      <h2 id="dish-record-list-title" className="mt-0.5 text-[20px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#173F35] sm:mt-1 sm:text-[27px]"><span className="sm:hidden">Saved records</span><span className="hidden sm:inline">Saved dish records</span></h2>
+                      <p className="mt-1 hidden text-[13px] text-[#202421] sm:block">Versions and approval status.</p>
+                    </div>
+                    <span className="hidden shrink-0 bg-[#DCE0CF] px-3 py-1.5 text-[13px] font-semibold text-[#173F35] sm:inline-flex">
+                      {loading || passportFeedFailures.includes("Dish records") ? "—" : `${passports.length} saved`}
                     </span>
                   </div>
-
-                  {passports.length ? (
-                    <div className="mt-3 space-y-2.5">
+                  {loading ? (
+                    <div className="border-t border-[#173F35]/15 px-4 py-6 text-[14px] text-[#202421] sm:px-6">Loading saved records…</div>
+                  ) : passportFeedFailures.includes("Dish records") ? (
+                    <div className="border-t border-[#173F35]/15 px-4 py-6 text-[14px] text-[#202421] sm:px-6">Dish records couldn't load. Choose Retry above.</div>
+                  ) : passports.length ? (
+                    <div className="divide-y divide-[#173F35]/15 border-t border-[#173F35]/15">
                       {passports.map((passport) => (
-                        <div
-                          key={passport.id}
-                          className="rounded-[16px] border border-white/85 bg-white/85 p-3 shadow-sm"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-[11px] font-black text-stone-950 sm:text-xs">
-                              {passport.snapshot?.dish?.name ||
-                                passport.passportKey}
-                            </p>
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              <span className="rounded-full bg-stone-100 px-2 py-1 text-[8px] font-black text-stone-600">
-                                v{passport.versionNumber}
-                              </span>
-                              <span className="rounded-full bg-sky-100 px-2 py-1 text-[8px] font-black text-sky-800">
-                                {titleize(passport.status)}
-                              </span>
-                              <span className="rounded-full bg-emerald-100 px-2 py-1 text-[8px] font-black text-emerald-800">
-                                {titleize(passport.verificationState)}
-                              </span>
+                        <div key={passport.id} className="px-3 py-3 sm:px-6 sm:py-5">
+                          <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="break-words text-[16px] font-semibold leading-[1.3] text-[#173F35]">
+                                {passport.snapshot?.dish?.name || passport.passportKey}
+                              </h3>
+                              <p className="mt-0.5 text-[12px] text-[#202421] sm:mt-1 sm:text-[13px]">Version {passport.versionNumber} · {titleize(passport.verificationState)}</p>
                             </div>
+                            <span className={`shrink-0 px-2.5 py-1 text-[12px] font-semibold ${passport.status === "published" ? "bg-[#DCE0CF] text-[#173F35]" : passport.status === "approved" ? "bg-[#C86C42] text-[#F7F6F2]" : "border border-[#C86C42]/50 text-[#173F35]"}`}>
+                              {titleize(passport.status)}
+                            </span>
                           </div>
-
-                          <div className="mt-2.5 flex flex-wrap gap-2">
-                            {passport.status === "draft" &&
-                            passport.verificationState === "verified" ? (
-                              <span className="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[10px] font-black text-sky-800">
-                                Waiting for Super Admin approval
-                              </span>
+                          <div className="mt-2 flex flex-wrap items-center gap-2.5">
+                            {passport.status === "draft" && passport.verificationState === "verified" ? (
+                              <span className="border-l-[3px] border-[#C86C42] pl-2 text-[12px] font-medium text-[#173F35]"><span className="sm:hidden">Awaiting approval</span><span className="hidden sm:inline">Awaiting Super Admin approval</span></span>
                             ) : null}
-                            {passport.status === "approved" &&
-                            can("hospitality.passports.generate") ? (
+                            {passport.status === "approved" && can("hospitality.passports.generate") ? (
                               <button
                                 type="button"
-                                disabled={
-                                  busy ||
-                                  decisionEvidence().length === 0 ||
-                                  reason.trim().length < 10
-                                }
-                                onClick={() =>
-                                  run(
-                                    () =>
-                                      publishDishPassportSnapshot(passport.id, {
-                                        reason: reason.trim(),
-                                        evidence: decisionEvidence(),
-                                      }),
-                                    "Dish record published; the previous version remains in history."
-                                  )
-                                }
-                                className={primaryButtonClass}
+                                disabled={busy || decisionEvidence().length === 0 || reason.trim().length < 10}
+                                onClick={() => run(
+                                  () => publishDishPassportSnapshot(passport.id, {
+                                    reason: reason.trim(),
+                                    evidence: decisionEvidence(),
+                                  }),
+                                  "Dish record published; the previous version remains in history."
+                                )}
+                                className="focus-ring inline-flex min-h-10 items-center gap-2 bg-[#173F35] px-4 text-[13px] font-semibold text-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                Publish record
+                                <span className="sm:hidden">Publish</span><span className="hidden sm:inline">Publish approved record</span><ArrowRight size={14} aria-hidden="true" />
                               </button>
                             ) : null}
                             {passport.status === "published" ? (
                               <Link
-                                className={secondaryButtonClass}
+                                className="focus-ring inline-flex min-h-10 items-center gap-2 border-b-[2px] border-[#C86C42] text-[13px] font-semibold text-[#173F35]"
                                 target="_blank"
                                 rel="noreferrer"
                                 to={`/dish-passports/${passport.publicId}`}
                               >
-                                Open public record
+                                <span className="sm:hidden">View record</span><span className="hidden sm:inline">Open public record</span><ArrowRight size={14} aria-hidden="true" />
                               </Link>
                             ) : null}
                           </div>
@@ -5460,20 +5771,9 @@ export default function HospitalityPage({ section = "dashboard" }) {
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-3 grid flex-1 place-items-center rounded-[16px] border border-dashed border-violet-200 bg-white/55 px-4 py-7 text-center">
-                      <div>
-                        <FileSearch
-                          size={22}
-                          className="mx-auto text-violet-700"
-                        />
-                        <p className="mt-2 text-[10px] font-black text-stone-700 sm:text-xs">
-                          No dish records yet
-                        </p>
-                        <p className="mt-1 text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                          Create the first record using the outlet and approved
-                          recipe on the left.
-                        </p>
-                      </div>
+                    <div className="border-t border-[#173F35]/15 px-4 py-6 text-[#202421] sm:px-6">
+                      <p className="text-[15px] font-semibold text-[#173F35]">No dish records yet</p>
+                      <p className="mt-1 hidden text-[13px] sm:block">Choose an outlet and approved recipe to create one.</p>
                     </div>
                   )}
                 </section>
@@ -5482,141 +5782,114 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {section === "greyBook" ? (
-            <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-2">
-              <section className="flex h-full flex-col rounded-[20px] border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:text-[10px]">
-                    Create record book
-                  </p>
-                  <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                    Save the current published records
+            <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)] lg:gap-6">
+              <section id="grey-book-create" className="min-w-0 border-t-[3px] border-[#C86C42] bg-[#F7F6F2] scroll-mt-28">
+                <div className="bg-[#DCE0CF] px-4 py-4 sm:px-6 sm:py-5">
+                  <p className="text-[12px] font-semibold text-[#C86C42]">01 / Create record book</p>
+                  <h2 className="mt-1 text-[24px] font-semibold leading-tight tracking-[-0.03em] text-[#173F35] sm:text-[27px]">
+                    Save published records
                   </h2>
-                  <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                    Choose an outlet to save a dated record of the dish
-                    information that is approved and published there right now.
+                  <p className="mt-1 hidden text-[14px] leading-5 text-[#202421]/80 sm:block">
+                    Capture the currently published dish versions for one outlet.
                   </p>
                 </div>
 
-                <label className="mt-3 block">
-                  <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                    Outlet
-                  </span>
-                  <select
-                    className={inputClass}
-                    value={greyBookOutletId}
-                    onChange={(event) =>
-                      setGreyBookOutletId(event.target.value)
+                <div className="px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+                  <label className="block">
+                    <span className="mb-2 block text-[13px] font-semibold text-[#173F35]">Outlet</span>
+                    <select
+                      className={dishFieldClass}
+                      value={greyBookOutletId}
+                      onChange={(event) => setGreyBookOutletId(event.target.value)}
+                    >
+                      <option value="">Choose an outlet</option>
+                      {outlets.map((outlet) => (
+                        <option key={outlet.id} value={outlet.id}>
+                          {outlet.name || outlet.outletCode}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <p className="mt-3 hidden border-t border-[#173F35]/15 pt-3 text-[13px] leading-5 text-[#202421]/75 sm:block">
+                    Each new record book is saved as a separate version.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy || !can("hospitality.grey_book.generate") || !greyBookOutletId.trim()}
+                    onClick={() =>
+                      run(
+                        () =>
+                          generateGreyBookSnapshot({
+                            outletId: greyBookOutletId.trim(),
+                            effectiveAt: new Date().toISOString(),
+                            changeCaseId: null,
+                          }),
+                        "Published outlet record book created."
+                      )
                     }
+                    className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 bg-[#173F35] px-5 py-2.5 text-[14px] font-semibold text-[#F7F6F2] transition hover:bg-[#C86C42] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
-                    <option value="">Choose an outlet</option>
-                    {outlets.map((outlet) => (
-                      <option key={outlet.id} value={outlet.id}>
-                        {outlet.name || outlet.outletCode}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="mt-3 rounded-[16px] border border-white/85 bg-white/70 p-3 text-[9px] font-medium leading-4 text-stone-600 sm:text-[10px]">
-                  A new record book keeps its own date and history. Older saved
-                  records remain unchanged.
+                    <BookOpenCheck size={16} aria-hidden="true" />
+                    Create record book
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  disabled={
-                    busy ||
-                    !can("hospitality.grey_book.generate") ||
-                    !greyBookOutletId.trim()
-                  }
-                  onClick={() =>
-                    run(
-                      () =>
-                        generateGreyBookSnapshot({
-                          outletId: greyBookOutletId.trim(),
-                          effectiveAt: new Date().toISOString(),
-                          changeCaseId: null,
-                        }),
-                      "Published outlet record book created."
-                    )
-                  }
-                  className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
-                >
-                  Create record book
-                </button>
               </section>
 
-              <section className="flex h-full flex-col rounded-[20px] border border-violet-200 bg-violet-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                <div className="flex items-start justify-between gap-3">
+              <section id="grey-book-history" className="min-w-0 scroll-mt-28 border-t-[3px] border-[#173F35] bg-[#F7F6F2]">
+                <div className="flex flex-wrap items-end justify-between gap-2 px-4 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5">
                   <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-800 sm:text-[10px]">
-                      Saved history
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
+                    <p className="text-[12px] font-semibold text-[#C86C42]">02 / Saved history</p>
+                    <h2 className="mt-1 text-[24px] font-semibold tracking-[-0.03em] text-[#173F35] sm:text-[27px]">
                       Outlet record books
                     </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Review earlier saved versions or download a copy when you
-                      need it for operations, checks or records.
-                    </p>
                   </div>
-                  <span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-black text-violet-800 shadow-sm">
-                    {greyBooks.length}
+                  <span className="text-[13px] font-semibold tabular-nums text-[#173F35]">
+                    {greyBookFeedFailures.includes("Record history") ? "Unavailable" : `${greyBooks.length} saved`}
                   </span>
                 </div>
 
-                {greyBooks.length ? (
-                  <div className="mt-3 space-y-2.5">
-                    {greyBooks.map((greyBook) => (
+                {greyBookFeedFailures.includes("Record history") ? (
+                  <div className="border-t border-[#173F35]/15 px-4 py-5 text-[14px] text-[#202421] sm:px-6">
+                    Record history could not load. Use Refresh to try again.
+                  </div>
+                ) : greyBooks.length ? (
+                  <div className="border-t border-[#173F35]/15">
+                    {greyBooks.map((greyBook, index) => (
                       <div
                         key={greyBook.id}
-                        className="rounded-[16px] border border-white/85 bg-white/85 p-3 shadow-sm"
+                        className={`flex flex-col gap-3 border-b border-[#173F35]/15 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6 ${index % 2 === 1 ? "bg-[#DCE0CF]/50" : "bg-[#F7F6F2]"}`}
                       >
-                        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="truncate text-[11px] font-black text-stone-950 sm:text-xs">
-                              {greyBook.snapshot?.outlet?.name ||
-                                greyBook.greyBookKey}
-                            </p>
-                            <p className="mt-1 text-[9px] font-medium text-stone-500 sm:text-[10px]">
-                              Version {greyBook.versionNumber} ·{" "}
-                              {greyBook.passportSnapshotIds?.length || 0}{" "}
-                              published dish records
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <a
-                              href={greyBookExportUrl(greyBook.id, "csv")}
-                              className={secondaryButtonClass}
-                            >
-                              Download spreadsheet
-                            </a>
-                            <a
-                              href={greyBookExportUrl(greyBook.id, "json")}
-                              className={secondaryButtonClass}
-                            >
-                              Download data file
-                            </a>
-                          </div>
+                        <div className="min-w-0">
+                          <p className="break-words text-[15px] font-semibold text-[#173F35] sm:text-[16px]">
+                            {greyBook.snapshot?.outlet?.name || greyBook.greyBookKey}
+                          </p>
+                          <p className="mt-1 text-[13px] leading-5 text-[#202421]/75">
+                            Version {greyBook.versionNumber} · {greyBook.passportSnapshotIds?.length || 0} published dishes
+                            {greyBook.effectiveAt ? ` · ${new Date(greyBook.effectiveAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setOpenGreyBookId(greyBook.id)}
+                            className="focus-ring inline-flex min-h-10 items-center gap-1.5 bg-[#173F35] px-3.5 text-[13px] font-semibold text-[#F7F6F2] hover:bg-[#C86C42]"
+                          >
+                            <BookOpenCheck size={15} aria-hidden="true" /> View record book
+                          </button>
+                          <a
+                            href={greyBookExportUrl(greyBook.id, "csv")}
+                            download
+                            className="focus-ring inline-flex min-h-10 items-center gap-1.5 border-b-2 border-[#C86C42] text-[13px] font-semibold text-[#173F35]"
+                          >
+                            <Download size={15} aria-hidden="true" /> Spreadsheet
+                          </a>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-3 grid flex-1 place-items-center rounded-[16px] border border-dashed border-violet-200 bg-white/55 px-4 py-7 text-center">
-                    <div>
-                      <BookOpenCheck
-                        size={22}
-                        className="mx-auto text-violet-700"
-                      />
-                      <p className="mt-2 text-[10px] font-black text-stone-700 sm:text-xs">
-                        No record books yet
-                      </p>
-                      <p className="mt-1 text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                        Choose an outlet on the left and create the first saved
-                        record.
-                      </p>
-                    </div>
+                  <div className="border-t border-[#173F35]/15 px-4 py-6 text-[14px] text-[#173F35] sm:px-6">
+                    No record books saved yet. Select an outlet to create one.
                   </div>
                 )}
               </section>
@@ -5624,374 +5897,271 @@ export default function HospitalityPage({ section = "dashboard" }) {
           ) : null}
 
           {section === "changeManagement" ? (
-            <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
-              <div className="grid gap-3 sm:gap-4 xl:grid-cols-2">
-                <section className="flex h-full flex-col rounded-[20px] border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
+            <div className="mt-3 space-y-4 sm:mt-5 sm:space-y-8">
+              <section id="change-record-form" aria-labelledby="change-record-section-title" className="scroll-mt-28 border-t-[3px] border-[#C86C42]">
+                <div className="flex flex-wrap items-end justify-between gap-2 px-3 pb-2 pt-3 sm:px-5 sm:pb-4 sm:pt-5">
                   <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:text-[10px]">
-                      Changed record
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      Check what changed
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Choose the kind of record that changed, add its reference,
-                      and describe which part of it was updated.
-                    </p>
+                    <p className="hidden text-[13px] font-semibold text-[#C86C42] sm:block">01 / START A REVIEW</p>
+                    <h2 id="change-record-section-title" className="mt-1 text-[24px] font-semibold leading-[1.18] tracking-[-0.03em] text-[#173F35] sm:text-[29px]">Record the change</h2>
+                    <p className="mt-1 hidden text-[14px] leading-5 text-[#202421] sm:block">Add the changed record on the left and your review evidence on the right.</p>
                   </div>
+                  <span className="hidden border-l-2 border-[#C86C42] pl-3 text-[13px] font-medium text-[#173F35] lg:block">Both parts are required before checking impact</span>
+                </div>
 
-                  <div className="mt-3 grid gap-2.5">
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        What changed?
-                      </span>
-                      <select
-                        className={inputClass}
-                        value={changeForm.sourceType}
-                        onChange={(event) =>
-                          setChangeForm((current) => ({
-                            ...current,
-                            sourceType: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="product_version">
-                          Product or pack record
-                        </option>
-                        <option value="canonical_ingredient">
-                          Ingredient record
-                        </option>
-                        <option value="recipe_version">
-                          Published recipe record
-                        </option>
-                        <option value="production_recipe_version">
-                          Kitchen recipe
-                        </option>
-                        <option value="supplier_product">Supplier item</option>
-                      </select>
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Record reference
-                      </span>
-                      <input
-                        className={inputClass}
-                        placeholder="Paste the reference for the changed item or recipe"
-                        value={changeForm.sourceId}
-                        onChange={(event) =>
-                          setChangeForm((current) => ({
-                            ...current,
-                            sourceId: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-
-                    <div className="grid gap-2.5 sm:grid-cols-2">
+                <div className="grid items-stretch gap-0 border-t border-[#DCE0CF] lg:grid-cols-2">
+                  <section className="min-w-0 bg-[#F7F6F2] lg:border-r lg:border-[#DCE0CF]" aria-labelledby="change-record-title">
+                    <div className="flex items-center justify-between gap-3 bg-[#DCE0CF] px-3 py-3 sm:px-5 sm:py-5">
+                      <div>
+                        <p className="hidden text-[12px] font-semibold text-[#C86C42] sm:block sm:text-[13px]">01 / CHANGED RECORD</p>
+                        <h3 id="change-record-title" className="mt-1 text-[21px] font-semibold leading-tight text-[#173F35] sm:text-[25px]">What changed?</h3>
+                        <p className="mt-1 hidden text-[13px] leading-5 text-[#202421] sm:block sm:text-[14px]">Choose the record and describe the update.</p>
+                      </div>
+                      <FileSearch size={24} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+                    </div>
+                    <div className="grid gap-3 px-3 py-3 sm:gap-4 sm:px-5 sm:py-5">
                       <label className="block">
-                        <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                          Version or label (optional)
-                        </span>
+                        <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Record type</span>
+                        <select
+                          className={changeHistoryFieldClass}
+                          value={changeForm.sourceType}
+                          onChange={(event) => setChangeForm((current) => ({ ...current, sourceType: event.target.value }))}
+                        >
+                          <option value="product_version">Product or pack record</option>
+                          <option value="canonical_ingredient">Ingredient record</option>
+                          <option value="recipe_version">Published recipe record</option>
+                          <option value="production_recipe_version">Kitchen recipe</option>
+                          <option value="supplier_product">Supplier item</option>
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Record reference</span>
                         <input
-                          className={inputClass}
-                          placeholder="Example: v3 or September update"
-                          value={changeForm.sourceVersion}
-                          onChange={(event) =>
-                            setChangeForm((current) => ({
-                              ...current,
-                              sourceVersion: event.target.value,
-                            }))
-                          }
+                          className={changeHistoryFieldClass}
+                          placeholder="Paste the record's reference ID"
+                          value={changeForm.sourceId}
+                          onChange={(event) => setChangeForm((current) => ({ ...current, sourceId: event.target.value }))}
                         />
                       </label>
+                      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+                        <label className="block min-w-0">
+                          <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Version or label <span className="text-[13px] font-normal text-[#202421]/65">(optional)</span></span>
+                          <input
+                            className={changeHistoryFieldClass}
+                            placeholder="e.g. v3 or September update"
+                            value={changeForm.sourceVersion}
+                            onChange={(event) => setChangeForm((current) => ({ ...current, sourceVersion: event.target.value }))}
+                          />
+                        </label>
+                        <label className="block min-w-0">
+                          <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">What part changed?</span>
+                          <input
+                            className={changeHistoryFieldClass}
+                            placeholder="e.g. formulation,allergen"
+                            value={changeForm.changedDomains}
+                            onChange={(event) => setChangeForm((current) => ({ ...current, changedDomains: event.target.value }))}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </section>
 
+                  <section id="change-review-evidence" className="min-w-0 scroll-mt-28 border-t border-[#DCE0CF] bg-[#F7F6F2] lg:border-t-0" aria-labelledby="change-evidence-title">
+                    <div className="flex items-center justify-between gap-3 bg-[#FFE0CF] px-3 py-3 sm:px-5 sm:py-5">
+                      <div>
+                        <p className="hidden text-[12px] font-semibold text-[#C86C42] sm:block sm:text-[13px]">02 / REVIEW EVIDENCE</p>
+                        <h3 id="change-evidence-title" className="mt-1 text-[21px] font-semibold leading-tight text-[#173F35] sm:text-[25px]">Support the change</h3>
+                        <p className="mt-1 hidden text-[13px] leading-5 text-[#202421] sm:block sm:text-[14px]">Add a reason and the supporting check or document.</p>
+                      </div>
+                      <ClipboardList size={24} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+                    </div>
+                    <div className="grid gap-3 px-3 py-3 sm:gap-4 sm:px-5 sm:py-5">
                       <label className="block">
-                        <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                          What part changed?
-                        </span>
+                        <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Review note</span>
                         <input
-                          className={inputClass}
-                          placeholder="Example: ingredients, allergen, pack size"
-                          value={changeForm.changedDomains}
-                          onChange={(event) =>
-                            setChangeForm((current) => ({
-                              ...current,
-                              changedDomains: event.target.value,
-                            }))
-                          }
+                          className={changeHistoryFieldClass}
+                          value={reason}
+                          onChange={(event) => setReason(event.target.value)}
+                          placeholder="Why does this update need a review?"
+                        />
+                        <span className="mt-1 block text-[13px] text-[#202421]/70"><span className="sm:hidden">Minimum 10 characters.</span><span className="hidden sm:inline">At least 10 characters required.</span></span>
+                      </label>
+                      <label className="block">
+                        <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Supporting check or document</span>
+                        <input
+                          className={changeHistoryFieldClass}
+                          value={evidenceLabel}
+                          onChange={(event) => setEvidenceLabel(event.target.value)}
+                          placeholder="e.g. Supplier update or kitchen review"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1.5 block text-[14px] font-semibold text-[#173F35]">Reference number or ID <span className="text-[13px] font-normal text-[#202421]/65">(optional)</span></span>
+                        <input
+                          className={changeHistoryFieldClass}
+                          value={evidenceReferenceId}
+                          onChange={(event) => setEvidenceReferenceId(event.target.value)}
+                          placeholder="Supporting reference"
                         />
                       </label>
                     </div>
+                  </section>
+                </div>
+                <div id="change-impact-action" className="flex scroll-mt-28 flex-col gap-2 border-t border-[#DCE0CF] bg-[#EDF1E6] px-3 py-3 sm:flex-row sm:gap-3 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                  <div className="hidden min-w-0 items-start gap-2.5 sm:flex">
+                    <ShieldCheck size={19} className="mt-0.5 shrink-0 text-[#173F35]" aria-hidden="true" />
+                    <div>
+                      <strong className="block text-[14px] font-semibold text-[#173F35]">03 / Check the impact</strong>
+                      <p className="mt-0.5 max-w-[570px] text-[13px] leading-5 text-[#202421] sm:text-[14px]">Published records stay in history. Any update goes live only after review and approval.</p>
+                    </div>
                   </div>
-
-                  <p className="mt-3 text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                    Add the review details in the card beside this one before
-                    checking which records are affected.
-                  </p>
-
                   <button
                     type="button"
                     disabled={
                       busy ||
                       !can("hospitality.change.manage") ||
                       !changeForm.sourceId.trim() ||
+                      !changeForm.changedDomains.trim() ||
+                      reason.trim().length < 10 ||
                       decisionEvidence().length === 0
                     }
                     onClick={() =>
                       run(
-                        () =>
-                          detectHospitalityChangeImpact({
-                            sourceType: changeForm.sourceType,
-                            sourceId: changeForm.sourceId.trim(),
-                            sourceVersion: changeForm.sourceVersion.trim(),
-                            changedDomains: changeForm.changedDomains
-                              .split(",")
-                              .map((value) => value.trim())
-                              .filter(Boolean),
-                            reason: reason.trim(),
-                            evidence: decisionEvidence(),
-                          }),
+                        () => detectHospitalityChangeImpact({
+                          sourceType: changeForm.sourceType,
+                          sourceId: changeForm.sourceId.trim(),
+                          sourceVersion: changeForm.sourceVersion.trim(),
+                          changedDomains: changeForm.changedDomains.split(",").map((value) => value.trim()).filter(Boolean),
+                          reason: reason.trim(),
+                          evidence: decisionEvidence(),
+                        }),
                         "Affected records checked."
                       )
                     }
-                    className={`${primaryButtonClass} mt-3 w-full sm:w-auto`}
+                    className="focus-ring inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 bg-[#173F35] px-5 text-[15px] font-semibold text-white transition hover:bg-[#C86C42] disabled:cursor-not-allowed disabled:bg-[#879D92] sm:w-auto"
                   >
-                    Check affected records
+                    <FileSearch size={17} aria-hidden="true" /> Check affected records <ArrowRight size={16} aria-hidden="true" />
                   </button>
-                </section>
+                </div>
+              </section>
 
-                <section className="flex h-full flex-col rounded-[20px] border border-sky-200 bg-sky-50/75 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
+              <section id="change-record-history" className="scroll-mt-28 border-t-[3px] border-[#173F35]" aria-labelledby="change-history-title">
+                <div className="flex flex-wrap items-end justify-between gap-2 px-3 pb-3 pt-3 sm:gap-3 sm:px-5 sm:pb-4 sm:pt-5">
                   <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-sky-800 sm:text-[10px]">
-                      Review details
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      Explain the change
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Add the reason for the review and the supporting check or
-                      document used before approving any updates.
-                    </p>
+                    <p className="hidden text-[13px] font-semibold text-[#C86C42] sm:block">02 / REVIEW &amp; HISTORY</p>
+                    <h2 id="change-history-title" className="mt-1 text-[24px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[29px]">Change records</h2>
+                    <p className="mt-1 hidden max-w-[730px] text-[14px] leading-5 text-[#202421] sm:block">See what's affected, recheck records and publish approved updates.</p>
                   </div>
-
-                  <div className="mt-3 grid gap-2.5">
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Review note
-                      </span>
-                      <input
-                        className={inputClass}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                        placeholder="Explain what changed and why it needs review"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Supporting check or document
-                      </span>
-                      <input
-                        className={inputClass}
-                        value={evidenceLabel}
-                        onChange={(event) =>
-                          setEvidenceLabel(event.target.value)
-                        }
-                        placeholder="Example: Supplier update or kitchen review"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.1em] text-stone-500">
-                        Reference number or ID
-                      </span>
-                      <input
-                        className={inputClass}
-                        value={evidenceReferenceId}
-                        onChange={(event) =>
-                          setEvidenceReferenceId(event.target.value)
-                        }
-                        placeholder="Supporting reference"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="mt-3 rounded-[16px] border border-white/85 bg-white/65 p-3 text-[9px] font-medium leading-4 text-stone-600 sm:text-[10px]">
-                    Older published records stay in history. Approved changes
-                    create new updated records instead of silently replacing
-                    what was already published.
-                  </div>
-                </section>
-              </div>
-
-              <section className="rounded-[20px] border border-violet-200 bg-violet-50/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:rounded-[22px] sm:p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-800 sm:text-[10px]">
-                      Review queue
-                    </p>
-                    <h2 className="mt-1 text-sm font-black text-stone-950 sm:text-base">
-                      Changes to review
-                    </h2>
-                    <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                      Check what each change affects and recheck it when needed.
-                      Recalculated changes wait for Super Admin approval before
-                      you can publish them.
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-black text-violet-800 shadow-sm">
-                    {changeCases.length}
+                  <span className="flex items-baseline gap-1.5 border-l-[3px] border-[#C86C42] pl-3 text-[#173F35]" aria-live="polite">
+                    <strong className="text-[23px] font-semibold leading-none tabular-nums">{changeCasesLoadError ? "—" : changeCases.length}</strong>
+                    <span className="text-[13px]">{changeCasesLoadError ? "unavailable" : changeCases.length === 1 ? "saved record" : "saved records"}</span>
                   </span>
                 </div>
 
-                {changeCases.length ? (
-                  <div className="mt-3 grid gap-2.5 xl:grid-cols-2">
-                    {changeCases.map((changeCase) => (
-                      <div
-                        key={changeCase.id}
-                        className="flex h-full flex-col rounded-[16px] border border-white/85 bg-white/85 p-3 shadow-sm sm:p-3.5"
-                      >
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-full bg-violet-100 px-2 py-1 text-[8px] font-black text-violet-800">
-                            {changeCase.caseKey}
-                          </span>
-                          <span className="rounded-full bg-stone-100 px-2 py-1 text-[8px] font-black text-stone-600">
-                            {titleize(changeCase.severity)}
-                          </span>
-                          <span className="rounded-full bg-sky-100 px-2 py-1 text-[8px] font-black text-sky-800">
-                            {titleize(changeCase.status)}
-                          </span>
-                        </div>
-
-                        <p className="mt-2 text-[11px] font-black text-stone-950 sm:text-xs">
-                          {changeSourceLabel(changeCase.source?.type)}
-                        </p>
-                        <p className="mt-1 break-all text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                          Reference: {changeCase.source?.id || "Not available"}
-                        </p>
-
-                        <div className="mt-2 grid grid-cols-3 gap-1.5">
-                          <div className="rounded-[12px] bg-emerald-50 px-2 py-2 text-center">
-                            <p className="text-[11px] font-black text-emerald-800">
-                              {changeCase.impactedProductionRecipeVersionIds
-                                ?.length || 0}
-                            </p>
-                            <p className="mt-0.5 text-[7px] font-black uppercase tracking-[0.08em] text-emerald-700">
-                              Recipes
-                            </p>
+                {changeCasesLoadError ? (
+                  <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-t border-[#DCE0CF] bg-[#FFF1E7] px-3 py-3 sm:gap-3 sm:px-5 sm:py-5">
+                    <div>
+                      <p className="text-[16px] font-semibold text-[#173F35]">Change records couldn't load</p>
+                      <p className="mt-1 text-[14px] leading-6 text-[#202421]">{changeCasesLoadError}<span className="hidden sm:inline"> This isn't an empty review queue.</span></p>
+                    </div>
+                    <button type="button" onClick={load} disabled={loading} className="focus-ring inline-flex min-h-11 items-center gap-2 border border-[#173F35] bg-[#F7F6F2] px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+                      <RefreshCw size={16} aria-hidden="true" /> Try again
+                    </button>
+                  </div>
+                ) : changeCases.length ? (
+                  <div className="border-t border-[#DCE0CF]" aria-live="polite">
+                    {changeCases.map((changeCase, index) => (
+                      <article key={changeCase.id} className={`grid min-w-0 gap-3 border-b border-[#DCE0CF] px-3 py-3 sm:gap-5 sm:px-5 sm:py-5 lg:grid-cols-[minmax(0,1fr)_minmax(245px,0.85fr)] ${index % 2 === 0 ? "bg-[#F7F6F2]" : "bg-[#E8EDE3]"}`}>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center bg-[#DCE0CF] px-2.5 py-1 text-[12px] font-semibold text-[#173F35]">{changeCase.caseKey}</span>
+                            <span className="inline-flex items-center bg-[#ECEBE7] px-2.5 py-1 text-[12px] font-semibold text-[#202421]">{titleize(changeCase.severity)}</span>
+                            <span className={`inline-flex items-center px-2.5 py-1 text-[12px] font-semibold ${changeCase.status === "published" ? "bg-[#DDF3E7] text-[#0F5132]" : changeCase.status === "approved" ? "bg-[#DCEAF7] text-[#173F35]" : changeCase.status === "blocked" ? "bg-[#FFE4BF] text-[#6C4100]" : "bg-[#E9E1FF] text-[#443472]"}`}>{titleize(changeCase.status)}</span>
                           </div>
-                          <div className="rounded-[12px] bg-sky-50 px-2 py-2 text-center">
-                            <p className="text-[11px] font-black text-sky-800">
-                              {changeCase.impactedOutletIds?.length || 0}
-                            </p>
-                            <p className="mt-0.5 text-[7px] font-black uppercase tracking-[0.08em] text-sky-700">
-                              Outlets
-                            </p>
-                          </div>
-                          <div className="rounded-[12px] bg-violet-50 px-2 py-2 text-center">
-                            <p className="text-[11px] font-black text-violet-800">
-                              {changeCase.candidatePassportSnapshotIds
-                                ?.length || 0}
-                            </p>
-                            <p className="mt-0.5 text-[7px] font-black uppercase tracking-[0.08em] text-violet-700">
-                              Dish records
-                            </p>
-                          </div>
-                        </div>
-
-                        {(changeCase.recalculationNotes || []).length ? (
-                          <div className="mt-2 rounded-[12px] bg-stone-50 p-2.5 text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                            {(changeCase.recalculationNotes || []).map(
-                              (note, index) => (
-                                <p key={`${changeCase.id}:${index}`}>
-                                  {titleize(note.state)}
-                                  {note.message ? ` · ${note.message}` : ""}
+                          <h3 className="mt-3 text-[18px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-[20px]">{changeSourceLabel(changeCase.source?.type)}</h3>
+                          <p className="mt-1 break-all text-[13px] leading-5 text-[#202421]/75">Reference: {changeCase.source?.id || "Not available"}</p>
+                          {changeCase.changedDomains?.length ? (
+                            <p className="mt-2 text-[13px] leading-5 text-[#202421]/75">Changed: {changeCase.changedDomains.map(titleize).join(", ")}</p>
+                          ) : null}
+                          {(changeCase.recalculationNotes || []).length ? (
+                            <div className="mt-3 border-l-2 border-[#C86C42] pl-3 text-[13px] leading-6 text-[#202421]/80">
+                              {(changeCase.recalculationNotes || []).map((note, noteIndex) => (
+                                <p key={`${changeCase.id}:${noteIndex}`}>
+                                  {titleize(note.state)}{note.message ? ` · ${note.message}` : ""}
                                 </p>
-                              )
-                            )}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-auto flex flex-wrap gap-2 pt-3">
-                          {["detected", "blocked"].includes(
-                            changeCase.status
-                          ) && can("hospitality.change.manage") ? (
-                            <button
-                              type="button"
-                              disabled={
-                                busy ||
-                                decisionEvidence().length === 0 ||
-                                reason.trim().length < 10
-                              }
-                              onClick={() =>
-                                run(
-                                  () =>
-                                    recalculateHospitalityChangeCase(
-                                      changeCase.id,
-                                      {
-                                        reason: reason.trim(),
-                                        evidence: decisionEvidence(),
-                                      }
-                                    ),
-                                  "Affected records checked again."
-                                )
-                              }
-                              className={secondaryButtonClass}
-                            >
-                              Recheck impact
-                            </button>
-                          ) : null}
-                          {changeCase.status === "recalculated" ? (
-                            <span className="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[10px] font-black text-sky-800">
-                              Waiting for Super Admin approval
-                            </span>
-                          ) : null}
-                          {changeCase.status === "approved" &&
-                          can("hospitality.change.manage") &&
-                          can("hospitality.passports.generate") &&
-                          can("hospitality.grey_book.generate") ? (
-                            <button
-                              type="button"
-                              disabled={
-                                busy ||
-                                decisionEvidence().length === 0 ||
-                                reason.trim().length < 10
-                              }
-                              onClick={() =>
-                                run(
-                                  () =>
-                                    publishHospitalityChangeCase(
-                                      changeCase.id,
-                                      {
-                                        reason: reason.trim(),
-                                        evidence: decisionEvidence(),
-                                      }
-                                    ),
-                                  "Updated records published."
-                                )
-                              }
-                              className={primaryButtonClass}
-                            >
-                              Publish update
-                            </button>
+                              ))}
+                            </div>
                           ) : null}
                         </div>
-                      </div>
+                        <div className="flex min-w-0 flex-col justify-between gap-4">
+                          <div className="grid grid-cols-3 divide-x divide-[#173F35]/15 border border-[#DCE0CF] bg-[#F1F3EC] py-3">
+                            {[
+                              ["Recipes", changeCase.impactedProductionRecipeVersionIds?.length || 0],
+                              ["Outlets", changeCase.impactedOutletIds?.length || 0],
+                              ["Dish records", changeCase.candidatePassportSnapshotIds?.length || 0],
+                            ].map(([label, count]) => (
+                              <div key={label} className="min-w-0 px-2 text-center sm:px-3">
+                                <p className="text-[24px] font-semibold leading-none tabular-nums text-[#173F35] sm:text-[28px]">{count}</p>
+                                <p className="mt-1.5 text-[12px] font-medium leading-4 text-[#202421]/75 sm:text-[13px]">{label}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {["detected", "blocked"].includes(changeCase.status) && can("hospitality.change.manage") ? (
+                              <button
+                                type="button"
+                                disabled={busy || decisionEvidence().length === 0 || reason.trim().length < 10}
+                                onClick={() => run(
+                                  () => recalculateHospitalityChangeCase(changeCase.id, { reason: reason.trim(), evidence: decisionEvidence() }),
+                                  "Affected records checked again."
+                                )}
+                                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 border border-[#173F35] bg-[#F7F6F2] px-4 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <RefreshCw size={15} aria-hidden="true" /> Recheck impact
+                              </button>
+                            ) : null}
+                            {changeCase.status === "recalculated" ? (
+                              <span className="inline-flex min-h-11 items-center gap-2 text-[13px] font-semibold leading-5 text-[#443472]">
+                                <ShieldCheck size={17} aria-hidden="true" /> Waiting for Super Admin approval
+                              </span>
+                            ) : null}
+                            {changeCase.status === "approved" &&
+                              can("hospitality.change.manage") &&
+                              can("hospitality.passports.generate") &&
+                              can("hospitality.grey_book.generate") ? (
+                                <button
+                                  type="button"
+                                  disabled={busy || decisionEvidence().length === 0 || reason.trim().length < 10}
+                                  onClick={() => run(
+                                    () => publishHospitalityChangeCase(changeCase.id, { reason: reason.trim(), evidence: decisionEvidence() }),
+                                    "Updated records published."
+                                  )}
+                                  className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 bg-[#173F35] px-4 text-[14px] font-semibold text-white transition hover:bg-[#C86C42] disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Publish update <ArrowRight size={15} aria-hidden="true" />
+                                </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </article>
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-3 grid min-h-32 place-items-center rounded-[16px] border border-dashed border-violet-200 bg-white/55 px-4 py-7 text-center">
-                    <div>
-                      <ScrollText
-                        size={22}
-                        className="mx-auto text-violet-700"
-                      />
-                      <p className="mt-2 text-[10px] font-black text-stone-700 sm:text-xs">
-                        No changes waiting for review
-                      </p>
-                      <p className="mt-1 text-[9px] font-medium leading-4 text-stone-500 sm:text-[10px]">
-                        When you check a changed record, the affected items will
-                        appear here.
-                      </p>
+                  <div className="grid border-t border-[#DCE0CF] md:grid-cols-[minmax(0,1.25fr)_minmax(230px,0.75fr)]" aria-live="polite">
+                    <div className="flex items-start gap-3 bg-[#E8EDE3] px-3 py-4 sm:gap-4 sm:px-6 sm:py-7">
+                      <span className="grid size-12 shrink-0 place-items-center bg-[#DCE0CF] text-[#173F35]">
+                        <ScrollText size={23} aria-hidden="true" />
+                      </span>
+                      <div>
+                        <p className="hidden text-[12px] font-semibold text-[#C86C42] sm:block">READY FOR THE FIRST REVIEW</p>
+                        <h3 className="mt-1 text-[21px] font-semibold leading-tight text-[#173F35]">No change records yet</h3>
+                        <p className="mt-1.5 hidden max-w-[490px] text-[14px] leading-[1.55] text-[#202421] sm:block">Once you check a change, its affected recipes, outlets and approval status will appear here.</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col justify-center gap-2 bg-[#173F35] px-3 py-3 text-white sm:gap-3 sm:px-6 sm:py-5">
+                      <p className="hidden text-[14px] font-medium leading-5 text-white/90 sm:block">Have an updated ingredient, supplier item or recipe?</p>
+                      <a href="#change-record-form" className="focus-ring inline-flex min-h-11 w-fit items-center justify-center gap-2 bg-[#F7F6F2] px-4 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF]">
+                        Start a change review <ArrowRight size={16} aria-hidden="true" />
+                      </a>
                     </div>
                   </div>
                 )}
@@ -6102,30 +6272,17 @@ export default function HospitalityPage({ section = "dashboard" }) {
               </div>
             </section>
           ) : isPassports ? (
-            <section className="mt-3 rounded-[18px] border border-violet-200 bg-violet-50/70 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:mt-4 sm:px-5 sm:py-4">
-              <div className="flex items-start gap-3">
-                <BookOpenCheck
-                  className="mt-0.5 shrink-0 text-violet-700"
-                  size={17}
-                />
+            <section className="mt-3 flex items-center justify-between gap-2 border-t-[3px] border-[#C86C42] bg-[#DCE0CF] px-3 py-3 sm:mt-5 sm:flex-wrap sm:gap-3 sm:px-6 sm:py-4">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                <BookOpenCheck size={21} className="shrink-0 text-[#173F35]" aria-hidden="true" />
                 <div>
-                  <h2 className="text-xs font-black text-stone-950 sm:text-sm">
-                    Next: keep published dish records together
-                  </h2>
-                  <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                    Once a dish record is published, continue to the outlet
-                    record book to keep the approved published versions
-                    together.
-                  </p>
-                  <Link
-                    to="/host/hospitality/grey-book"
-                    className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-violet-800 sm:text-[10px]"
-                  >
-                    Open published records
-                    <ArrowRight size={11} />
-                  </Link>
+                  <p className="hidden text-[12px] font-semibold text-[#C86C42] sm:block">Next step</p>
+                  <h2 className="text-[16px] font-semibold leading-tight text-[#173F35] sm:text-[18px]"><span className="sm:hidden">Record book</span><span className="hidden sm:inline">Published record book</span></h2>
                 </div>
               </div>
+              <Link to="/host/hospitality/grey-book" className="focus-ring inline-flex min-h-9 shrink-0 items-center gap-1 border-b-[2px] border-[#C86C42] text-[13px] font-semibold text-[#173F35] sm:min-h-10 sm:gap-2">
+                <span className="sm:hidden">Open records</span><span className="hidden sm:inline">Open published records</span><ArrowRight size={15} aria-hidden="true" />
+              </Link>
             </section>
           ) : isGreyBook ? (
             <section className="mt-3 rounded-[18px] border border-violet-200 bg-violet-50/70 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:mt-4 sm:px-5 sm:py-4">
@@ -6154,29 +6311,22 @@ export default function HospitalityPage({ section = "dashboard" }) {
               </div>
             </section>
           ) : isChangeManagement ? (
-            <section className="mt-3 rounded-[18px] border border-emerald-200 bg-emerald-50/70 px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:mt-4 sm:px-5 sm:py-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2
-                  className="mt-0.5 shrink-0 text-emerald-700"
-                  size={17}
-                />
-                <div>
-                  <h2 className="text-xs font-black text-stone-950 sm:text-sm">
-                    Finished reviewing changes?
-                  </h2>
-                  <p className="mt-1 text-[10px] font-medium leading-5 text-stone-600 sm:text-xs">
-                    Return to Hospitality overview to continue with outlets,
-                    suppliers, recipes or purchasing.
-                  </p>
-                  <Link
-                    to="/host/hospitality"
-                    className="mt-2 inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 sm:text-[10px]"
-                  >
-                    Back to Hospitality overview
-                    <ArrowRight size={11} />
-                  </Link>
-                </div>
+            <section className="mt-4 flex flex-col gap-2 border-l-[4px] border-[#C86C42] bg-[#173F35] px-4 py-4 text-white sm:mt-8 sm:gap-4 sm:px-7 sm:py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-6">
+              <div>
+                <p className="hidden items-center gap-2 text-[13px] font-medium text-[#DCE0CF] sm:flex">
+                  <CheckCircle2 size={17} aria-hidden="true" /> Continue working
+                </p>
+                <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.025em] sm:text-[23px]"><span className="sm:hidden">Finished here?</span><span className="hidden sm:inline">Finished reviewing changes?</span></h2>
+                <p className="mt-2 hidden max-w-[580px] text-[14px] leading-6 text-white/80 sm:block">
+                  Return to your Hospitality overview for outlets, suppliers, recipes and purchasing.
+                </p>
               </div>
+              <Link
+                to="/host/hospitality"
+                className="focus-ring inline-flex min-h-11 w-fit shrink-0 items-center justify-center gap-2 rounded-[9px] bg-[#F7F6F2] px-4 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF]"
+              >
+                Hospitality overview <ArrowRight size={16} aria-hidden="true" />
+              </Link>
             </section>
           ) : (
             <section className={isOutlets ? "mt-3 border-t-2 border-[#C86C42] bg-[#DCE0CF]/40 px-3 py-3 text-[#173F35] sm:mt-5 sm:rounded-[24px] sm:border sm:border-stone-200 sm:bg-stone-950 sm:p-5 sm:text-white sm:shadow-sm" : isProcurement ? "mt-3 border-l-[3px] border-[#C86C42] bg-[#DCE0CF]/45 px-3 py-3 text-[#173F35] sm:mt-5 sm:rounded-[24px] sm:border sm:border-stone-200 sm:bg-stone-950 sm:p-5 sm:text-white sm:shadow-sm" : "mt-5 rounded-[24px] border border-stone-200 bg-stone-950 p-5 text-white shadow-sm"}>
@@ -6198,6 +6348,12 @@ export default function HospitalityPage({ section = "dashboard" }) {
           )}
         </>
       )}
+      {isGreyBook && openGreyBookId && greyBooks.some((item) => item.id === openGreyBookId) ? (
+        <RecordBookReader
+          book={greyBooks.find((item) => item.id === openGreyBookId)}
+          onClose={() => setOpenGreyBookId("")}
+        />
+      ) : null}
     </div>
   );
 }

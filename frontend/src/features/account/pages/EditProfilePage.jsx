@@ -40,6 +40,7 @@ import {
 import { getCatalogProducts } from '../../grocery/services/catalog.service'
 import { listPublicRecipes } from '../../recipes/services/recipe.service'
 import { listHostListingPackets } from '../../host/services/hostUnifiedListing.service'
+import { getHospitalityContext } from '../../hospitality/services/hospitality.service'
 
 import {
   createDeliveryAddress,
@@ -576,6 +577,10 @@ export default function EditProfilePage({
     setHostIdCopyStatus,
   ] = useState('')
 
+  const [businessWorkspace, setBusinessWorkspace] = useState(null)
+  const [businessWorkspaceLoadState, setBusinessWorkspaceLoadState] = useState('loading')
+  const [businessWorkspaceCopyStatus, setBusinessWorkspaceCopyStatus] = useState('')
+
   const [locationItemPhotos, setLocationItemPhotos] = useState({})
 
   useEffect(() => {
@@ -599,6 +604,31 @@ export default function EditProfilePage({
         : []
       setLocationItemPhotos(locationPhotoMap(listings, products, recipes))
     })
+
+    return () => { active = false }
+  }, [isCustomer, currentUser?.id])
+
+  // Hospitality resolves the selected, authorized business (including workspace switching).
+  // Load independently so a Hospitality access error never blocks the Host profile.
+  useEffect(() => {
+    if (isCustomer) return undefined
+    let active = true
+    setBusinessWorkspace(null)
+    setBusinessWorkspaceLoadState('loading')
+    setBusinessWorkspaceCopyStatus('')
+
+    getHospitalityContext()
+      .then((result) => {
+        if (!active) return
+        const organization = result?.context?.organization || null
+        setBusinessWorkspace(organization?.id ? organization : null)
+        setBusinessWorkspaceLoadState(organization?.id ? 'ready' : 'unavailable')
+      })
+      .catch(() => {
+        if (!active) return
+        setBusinessWorkspace(null)
+        setBusinessWorkspaceLoadState('unavailable')
+      })
 
     return () => { active = false }
   }, [isCustomer, currentUser?.id])
@@ -1312,6 +1342,19 @@ export default function EditProfilePage({
         '',
     ).trim()
 
+  const businessWorkspaceId = String(businessWorkspace?.id || '').trim()
+
+  async function handleCopyBusinessWorkspaceId() {
+    if (!businessWorkspaceId) return
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
+      await navigator.clipboard.writeText(businessWorkspaceId)
+      setBusinessWorkspaceCopyStatus('copied')
+    } catch {
+      setBusinessWorkspaceCopyStatus('unavailable')
+    }
+  }
+
   async function handleCopyHostAccountId() {
     if (!hostAccountId) {
       return
@@ -1432,6 +1475,46 @@ export default function EditProfilePage({
                   <p className="mt-1.5 hidden text-[12px] leading-4 text-[#526359] sm:block">Share this ID when joining another business team.</p>
                   <p aria-live="polite" className="text-[12px] text-[#173F35]">
                     {hostIdCopyStatus === 'unavailable' ? 'Copy unavailable. Select the ID to copy manually.' : hostIdCopyStatus === 'copied' ? 'Host account ID copied.' : null}
+                  </p>
+                </div>
+                <div className="min-w-0 xl:col-span-2">
+                  <label htmlFor="host-business-workspace-id-field" className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold text-[#173F35]">
+                    <Building2 size={15} aria-hidden="true" /> Business workspace ID
+                    {businessWorkspace?.displayName ? (
+                      <span className="hidden truncate text-[12px] font-medium text-[#526359] sm:inline">· {businessWorkspace.displayName}</span>
+                    ) : null}
+                  </label>
+                  <div className="flex min-w-0 items-stretch gap-2">
+                    <input
+                      id="host-business-workspace-id-field"
+                      aria-label="Business workspace ID"
+                      readOnly
+                      value={businessWorkspaceId}
+                      placeholder={businessWorkspaceLoadState === 'loading' ? 'Loading business ID…' : 'Business ID unavailable'}
+                      onFocus={(event) => event.currentTarget.select()}
+                      className="focus-ring min-w-0 flex-1 rounded-[12px] border border-[#DCE0CF] bg-white px-3 py-2.5 font-mono text-[13px] text-[#173F35]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyBusinessWorkspaceId}
+                      disabled={!businessWorkspaceId}
+                      className="focus-ring inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[#173F35] px-3.5 text-[13px] font-semibold text-white hover:bg-[#245B4B] disabled:opacity-50"
+                    >
+                      {businessWorkspaceCopyStatus === 'copied' ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+                      {businessWorkspaceCopyStatus === 'copied' ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 hidden text-[12px] leading-4 text-[#526359] sm:block">
+                    Use this ID to switch to a Hospitality workspace you are authorized to access.
+                  </p>
+                  <p aria-live="polite" className="text-[12px] text-[#173F35]">
+                    {businessWorkspaceCopyStatus === 'unavailable'
+                      ? 'Copy unavailable. Select the ID to copy manually.'
+                      : businessWorkspaceCopyStatus === 'copied'
+                        ? 'Business workspace ID copied.'
+                        : businessWorkspaceLoadState === 'unavailable'
+                          ? 'Business ID could not be loaded. Confirm your Hospitality access.'
+                          : null}
                   </p>
                 </div>
               </div>
