@@ -100,7 +100,7 @@ function NavigationItem({ item, compact = false, onNavigate }) {
           : "min-h-11 w-full gap-3 px-3 py-2.5 text-[13px]",
         isActive
           ? "border-[#C86C42] bg-[#DCE0CF] text-[#173F35] shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_12px_rgba(23,63,53,0.10)]"
-          : "border-[#DCE0CF] bg-[#F7F6F2] text-[#202421] shadow-[0_3px_8px_rgba(23,63,53,0.06)] hover:border-[#C86C42] hover:bg-[#EBF0E8] hover:text-[#173F35]",
+          : "border-[#DCE0CF] bg-[#F7F6F2] text-[#202421] shadow-[0_3px_8px_rgba(23,63,53,0.06)] hover:border-[#C86C42] hover:bg-[#DCE0CF] hover:text-[#173F35]",
       ].join(" ")}
     >
       <Icon size={18} strokeWidth={2} className="shrink-0" aria-hidden="true" />
@@ -119,7 +119,7 @@ export default function HospitalityShell({ children }) {
         <button
           type="button"
           onClick={() => setMobileSidebarOpen(true)}
-          className="focus-ring grid size-10 place-items-center rounded-[17px] border border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] shadow-[0_7px_20px_rgba(28,25,23,0.08)]"
+          className="focus-ring grid size-10 place-items-center rounded-[17px] border border-[#DCE0CF] bg-[#F7F6F2] text-[#173F35] shadow-[0_7px_20px_rgba(23,63,53,0.08)]"
           aria-label="Open hospitality navigation"
           aria-expanded={mobileSidebarOpen}
         >
@@ -137,7 +137,7 @@ export default function HospitalityShell({ children }) {
       {mobileSidebarOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-[120] bg-stone-950/30 backdrop-blur-[2px] lg:hidden"
+          className="fixed inset-0 z-[120] bg-[#202421]/35 backdrop-blur-[2px] lg:hidden"
           onClick={() => setMobileSidebarOpen(false)}
           aria-label="Close hospitality navigation"
         />
@@ -197,12 +197,12 @@ export default function HospitalityShell({ children }) {
 
             <aside
               className={[
-                "fixed inset-y-0 left-0 z-[130] w-[min(88vw,330px)] overflow-y-auto border-r border-[#DCE0CF] bg-[#F7F6F2] px-4 py-4 shadow-[18px_0_50px_rgba(28,25,23,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden",
+                "fixed inset-y-0 left-0 z-[130] w-[min(88vw,330px)] overflow-y-auto border-r border-[#DCE0CF] bg-[#F7F6F2] px-4 py-4 shadow-[18px_0_50px_rgba(23,63,53,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden",
                 mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
               ].join(" ")}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#36584C]">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#173F35]">
                   Hospitality navigation
                 </span>
                 <div className="flex items-center gap-2">
