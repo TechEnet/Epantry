@@ -1,3 +1,4 @@
+import { recordWebsiteAction } from '../../websiteAnalytics/websiteAnalytics.client'
 import {
   apiClient,
 } from '../../../api/apiClient'
@@ -68,6 +69,7 @@ export async function runSmartSearch({
       },
     )
 
+  recordWebsiteAction('search_submit')
   return unwrap(
     response,
   )

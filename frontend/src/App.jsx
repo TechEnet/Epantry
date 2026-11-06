@@ -23,6 +23,7 @@ import RouteLoading from './features/system/components/RouteLoading'
 import AppRoutes from './routes/AppRoutes'
 import MfaVerificationNotice from './features/auth/components/MfaVerificationNotice'
 import CookieConsentManager from './features/cookieConsent/CookieConsentManager'
+import WebsiteAnalyticsTracker from './features/websiteAnalytics/WebsiteAnalyticsTracker'
 
 const M20_ROUTES =
   Object.freeze({
@@ -201,6 +202,7 @@ export default function App() {
       <MfaVerificationNotice />
       <AppContent />
       <CookieConsentManager />
+      <WebsiteAnalyticsTracker />
     </>
   )
 }

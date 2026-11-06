@@ -53,6 +53,7 @@ export default function CookieConsentManager() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const previousAccountKeyRef = useRef(null)
   const dialogRef = useRef(null)
   const previouslyFocused = useRef(null)
   const requestSequence = useRef(0)
@@ -83,6 +84,15 @@ export default function CookieConsentManager() {
   }, [])
 
   useEffect(() => {
+    // Authentication bootstrap may temporarily render a guest account.
+    // Do not treat that as a real account switch or erase returning-visitor
+    // identity during an ordinary signed-in page refresh.
+    if (!isBootstrapping) {
+      if (previousAccountKeyRef.current !== null && previousAccountKeyRef.current !== accountKey) {
+        window.dispatchEvent(new Event('epantry:website-identity-changed'))
+      }
+      previousAccountKeyRef.current = accountKey
+    }
     clearRuntimeCookieConsent()
     setLoaded(false)
     setModalOpen(false)
@@ -242,11 +252,11 @@ export default function CookieConsentManager() {
               <div className="mt-4 border-y border-[#D9DFD6]">
                 <ConsentOption title="Essential" required disabled checked description="Needed for login security, session handling and remembering this cookie decision." />
                 <ConsentOption title="Preferences" checked={draft.preferences} onChange={(value) => setDraft((current) => ({ ...current, preferences: value }))} description="Allow optional browser preferences. This does not change your account settings or marketing emails." />
-                <ConsentOption title="Analytics" checked={draft.analytics} onChange={(value) => setDraft((current) => ({ ...current, analytics: value }))} description="Allow privacy-limited visits and activity measurement when EPANTRY's website tracker is connected." />
+                <ConsentOption title="Analytics" checked={draft.analytics} onChange={(value) => setDraft((current) => ({ ...current, analytics: value }))} description="Allow privacy-limited page visits, recipe/product views and shopping actions to be measured." />
               </div>
               <div className="mt-3 flex items-start gap-2 rounded-xl bg-[#E8EDE5] p-3 text-[13px] leading-[1.55] text-[#344A3C]">
                 <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-                <p>No advertising tracker is connected here. Cookie choices are saved securely; analytics tracking itself is scheduled for M1-B.</p>
+                <p>No advertising tracker is connected. Website analytics runs only with your permission; you can withdraw it here anytime.</p>
               </div>
               {error && <p role="alert" className="mt-3 text-[14px] font-semibold text-[#A6422D]">{error}</p>}
             </div>

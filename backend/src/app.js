@@ -41,6 +41,7 @@ import {
 
 import authRoutes from './modules/auth/auth.routes.js'
 import cookieConsentRoutes from './modules/cookieConsent/cookieConsent.routes.js'
+import websiteAnalyticsRoutes from './modules/websiteAnalytics/websiteAnalytics.routes.js'
 
 import brandAuthorityAdminRoutes from './modules/brands/brandAuthority.admin.routes.js'
 import brandAuthorityHostRoutes from './modules/brands/brandAuthority.host.routes.js'
@@ -292,6 +293,9 @@ app.use(
 
 /* M1-A: public and authenticated browser cookie choices (not account consents). */
 app.use('/api/v1/privacy/consent', cookieConsentRoutes)
+
+/* M1-B: consent-checked public/Customer website events. M19 remains separate. */
+app.use('/api/v1/website-analytics', websiteAnalyticsRoutes)
 
 app.use(
   '/api/v1/account',

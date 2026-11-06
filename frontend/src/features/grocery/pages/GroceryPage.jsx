@@ -18,6 +18,7 @@ import {
 import EmptyState from '../../../components/common/EmptyState'
 import { openAvailabilityNotifyModal } from '../../notifications/components/AvailabilityNotifyModal'
 import { recordCustomerSearchDemand } from '../../search/services/search.service'
+import { recordWebsiteAction } from '../../websiteAnalytics/websiteAnalytics.client'
 import useGroceryCatalog from '../hooks/useGroceryCatalog'
 import { listPublicHostListings } from '../../host/services/hostUnifiedListing.service'
 
@@ -246,7 +247,10 @@ export default function GroceryPage() {
   function handleHeroSearch(event) {
     event.preventDefault()
     const value = heroSearch.trim()
-    if (value.length >= 2) void recordCustomerSearchDemand({ query: value, surface: 'grocery' })
+    if (value.length >= 2) {
+      void recordCustomerSearchDemand({ query: value, surface: 'grocery' })
+      recordWebsiteAction('search_submit')
+    }
     setCollectionQuery(value)
     setSearch(value)
     setVisibleCount(revealSize)
@@ -256,16 +260,21 @@ export default function GroceryPage() {
   function handleCollectionSearch(event) {
     event.preventDefault()
     const value = collectionQuery.trim()
-    if (value.length >= 2) void recordCustomerSearchDemand({ query: value, surface: 'grocery' })
+    if (value.length >= 2) {
+      void recordCustomerSearchDemand({ query: value, surface: 'grocery' })
+      recordWebsiteAction('search_submit')
+    }
     setSearch(value)
   }
 
   function chooseCategory(value) {
+    if (value !== categorySlug) recordWebsiteAction('filter_apply', { filterKey: 'category' })
     setCategorySlug(value)
     setVisibleCount(revealSize)
   }
 
   function chooseBrand(value) {
+    if (value !== brandSlug) recordWebsiteAction('filter_apply', { filterKey: 'brand' })
     setBrandSlug(value)
     setVisibleCount(revealSize)
   }

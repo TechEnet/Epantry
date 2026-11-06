@@ -23,6 +23,7 @@ import { listPublicRecipes } from "../services/recipe.service";
 import { getRecipeFoodIntelligence } from "../../foodIntelligence/services/foodIntelligence.service";
 
 import { recordCustomerSearchDemand } from "../../search/services/search.service";
+import { recordWebsiteAction } from "../../websiteAnalytics/websiteAnalytics.client";
 
 import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
 import { listPublicHostListings } from "../../host/services/hostUnifiedListing.service";
@@ -1080,10 +1081,12 @@ export default function RecipesPage() {
   const canViewMore = matchedRecipes.length > revealSize || moreFromServer;
 
   function chooseCollection(id) {
+    if (id !== selectedCollection) recordWebsiteAction("filter_apply", { filterKey: "category" });
     setSelectedCollection(id);
   }
 
   function chooseDiet(id) {
+    if (id !== selectedDiet) recordWebsiteAction("filter_apply", { filterKey: "dietary" });
     setSelectedDiet(id);
   }
 
@@ -1176,8 +1179,10 @@ export default function RecipesPage() {
   function handleSearch(event) {
     event.preventDefault();
     const query = searchInput.trim();
-    if (query.length >= 2)
+    if (query.length >= 2) {
       void recordCustomerSearchDemand({ query, surface: "recipes" });
+      recordWebsiteAction("search_submit");
+    }
     setCollectionQuery(query);
     browseRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }

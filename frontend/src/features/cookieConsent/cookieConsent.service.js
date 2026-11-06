@@ -19,7 +19,7 @@ export function setRuntimeCookieConsent(result) {
   analyticsAllowed = result?.hasDecision === true && result.categories?.analytics === true
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_UPDATED_EVENT, {
-      detail: { analytics: analyticsAllowed, preferences: result?.categories?.preferences === true },
+      detail: { analytics: analyticsAllowed, hasDecision: result?.hasDecision === true, preferences: result?.categories?.preferences === true },
     }))
   }
 }

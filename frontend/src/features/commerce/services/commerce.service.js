@@ -1,3 +1,4 @@
+import { recordWebsiteAction } from '../../websiteAnalytics/websiteAnalytics.client'
 import {
   apiClient,
 } from '../../../api/apiClient'
@@ -248,7 +249,7 @@ export async function createDirectMarketplaceCart({
     'delivery',
   idempotencyKey,
 }) {
-  return csrfRequest({
+  const result = await csrfRequest({
     method:
       'post',
 
@@ -293,6 +294,8 @@ export async function createDirectMarketplaceCart({
 
     idempotencyKey,
   })
+  recordWebsiteAction('add_to_cart')
+  return result
 }
 
 
@@ -304,7 +307,7 @@ export async function createRestaurantRecipeMarketplaceCart({
     'delivery',
   idempotencyKey,
 }) {
-  return csrfRequest({
+  const result = await csrfRequest({
     method:
       'post',
 
@@ -334,6 +337,8 @@ export async function createRestaurantRecipeMarketplaceCart({
 
     idempotencyKey,
   })
+  recordWebsiteAction('add_to_cart')
+  return result
 }
 
 
@@ -379,7 +384,7 @@ export async function createMarketplaceCart({
   optionKey,
   idempotencyKey,
 }) {
-  return csrfRequest({
+  const result = await csrfRequest({
     method:
       'post',
 
@@ -398,6 +403,8 @@ export async function createMarketplaceCart({
 
     idempotencyKey,
   })
+  recordWebsiteAction('add_to_cart')
+  return result
 }
 
 export async function getMarketplaceCart(
@@ -436,7 +443,7 @@ export async function prepareCheckout({
     null,
   idempotencyKey,
 }) {
-  return csrfRequest({
+  const result = await csrfRequest({
     method:
       'post',
 
@@ -462,6 +469,8 @@ export async function prepareCheckout({
 
     idempotencyKey,
   })
+  recordWebsiteAction('begin_checkout')
+  return result
 }
 
 export async function createPaymentIntent({
@@ -533,7 +542,7 @@ export async function createExternalHandoff({
   partnerId,
   idempotencyKey,
 }) {
-  return csrfRequest({
+  const result = await csrfRequest({
     method:
       'post',
 
@@ -556,6 +565,8 @@ export async function createExternalHandoff({
 
     idempotencyKey,
   })
+  recordWebsiteAction('external_retailer_handoff')
+  return result
 }
 
 export async function listOrders(

@@ -1,3 +1,4 @@
+import { recordWebsiteAction } from '../../websiteAnalytics/websiteAnalytics.client'
 import { apiClient } from '../../../api/apiClient'
 
 const unwrap = response => response?.data?.data ?? response?.data ?? {}
@@ -55,11 +56,13 @@ async function secureWrite(method, url, data) {
 export async function saveBookmark(kind, slug, userId = '') {
   const result = await secureWrite('post', '/bookmarks', { kind, slug })
   changed(userId)
+  recordWebsiteAction('bookmark_add', { entityType: kind === 'recipe' ? 'recipe' : 'product', entityId: slug })
   return result
 }
 
 export async function removeBookmark(kind, slug, userId = '') {
   const result = await secureWrite('delete', `/bookmarks/${encodeURIComponent(kind)}/${encodeURIComponent(slug)}`)
   changed(userId)
+  recordWebsiteAction('bookmark_remove', { entityType: kind === 'recipe' ? 'recipe' : 'product', entityId: slug })
   return result
 }
