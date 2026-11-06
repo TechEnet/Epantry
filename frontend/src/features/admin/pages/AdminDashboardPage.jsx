@@ -212,232 +212,177 @@ const FLOW_STEPS = [
   },
 ]
 
-function CommandMetric({ label, mobileLabel, value, icon: Icon, to, index }) {
+const superAdminStyles = String.raw`
+/* Dashboard-scoped styling. Mirrors the approved Host palette without global overrides. */
+.sad-page {--sad-green:#173F35;--sad-dark:#10382F;--sad-sage:#DCE0CF;--sad-cream:#F7F6F2;--sad-clay:#C86C42;--sad-ink:#202421;--sad-muted:#53645B;--sad-line:#D8DFD6;background:var(--sad-cream);color:var(--sad-ink);font-family:'Plus Jakarta Sans',Inter,system-ui,sans-serif;font-size:16px;line-height:1.5;min-width:0;padding:clamp(12px,1.75vw,28px) clamp(12px,1.75vw,28px) 34px}
+.sad-page *, .sad-page *::before, .sad-page *::after {box-sizing:border-box}
+.sad-page a {text-decoration:none}
+.sad-page button {font:inherit}
+.sad-page button:focus-visible,.sad-page a:focus-visible,.sad-page summary:focus-visible {outline:3px solid var(--sad-clay);outline-offset:3px}
+.sad-kicker {margin:0;display:flex;align-items:center;gap:9px;color:#AB5633;font-size:13px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.sad-kicker::before {content:'';width:23px;height:2px;flex:none;background:currentColor}
+.sad-kicker--light {color:#F5B99C}
+.sad-title {margin:6px 0 0;color:var(--sad-green)!important;font-size:clamp(26px,2.35vw,35px)!important;font-weight:850!important;letter-spacing:-.045em;line-height:1.16!important}
+.sad-sub {margin:7px 0 0;color:#5F6C62;font-size:15px;line-height:1.5}
+.sad-hero {display:grid;grid-template-columns:minmax(0,1.48fr) minmax(335px,.95fr);overflow:hidden;border-radius:15px;border:1px solid #CCD8CE;background:#E9EEE6}
+.sad-hero-main {background:linear-gradient(115deg,#10382F,#194B3D);padding:clamp(24px,3vw,41px);min-width:0;display:flex;flex-direction:column;justify-content:space-between;min-height:265px}
+.sad-hero-eyebrow {display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.sad-role {padding:4px 10px;border:1px solid #ffffff36;border-radius:100px;color:#E4F0E8;background:#ffffff13;font-size:12px;font-weight:750}
+.sad-hero h1 {margin:12px 0 0;max-width:660px;color:#FFFEFA!important;font-size:clamp(32px,3.5vw,52px)!important;line-height:1.12!important;letter-spacing:-.052em;font-weight:850!important}
+.sad-hero-desc {margin:12px 0 0;color:#E0EAE3;font-size:16px;line-height:1.58;max-width:590px}
+.sad-hero-foot {display:flex;align-items:center;flex-wrap:wrap;gap:9px 18px;margin-top:24px;border-top:1px solid #ffffff24;padding-top:15px;color:#D7E7DC;font-size:13px;font-weight:650}
+.sad-hero-foot strong {font-size:17px;color:white;font-weight:850}
+.sad-hero-side {padding:clamp(20px,2.25vw,31px);border-left:4px solid var(--sad-clay);display:flex;flex-direction:column;justify-content:center}
+.sad-hero-side h2 {margin:7px 0 12px;font-size:clamp(21px,1.8vw,27px)!important;line-height:1.2!important;color:var(--sad-green)!important;letter-spacing:-.04em;font-weight:850!important}
+.sad-flow {display:grid;grid-template-columns:1fr 1fr;gap:0 15px}
+.sad-step {display:flex;min-width:0;gap:9px;align-items:flex-start;padding:11px 0;border-top:1px solid #CFD9CD}
+.sad-step-number {font-size:13px;font-weight:850;color:#B45A35;flex:none;margin-top:1px}
+.sad-step-name {font-size:14.5px;font-weight:800;color:var(--sad-green);line-height:1.3}
+.sad-step-desc {font-size:12.5px;line-height:1.4;color:#59685D;margin-top:3px}
+.sad-section {margin-top:clamp(25px,2.5vw,35px);min-width:0}
+.sad-section-head {display:flex;align-items:end;justify-content:space-between;flex-wrap:wrap;gap:10px 18px;margin-bottom:14px}
+.sad-metrics {border:1px solid #D3DDD2;border-top:3px solid var(--sad-clay);border-radius:12px;overflow:hidden;background:#FFFEFB;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.sad-metric {position:relative;min-width:0;padding:18px 21px;display:flex;align-items:center;gap:14px;border-right:1px solid #E1E6DE;border-bottom:1px solid #E1E6DE;color:var(--sad-green);transition:background .18s}
+.sad-metric:nth-child(3n) {border-right:0}
+.sad-metric:nth-child(n+4) {border-bottom:0}
+.sad-metric[href]:hover {background:#EEF3EA}
+.sad-metric-icon {flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:#E7EEE5;color:#315E48}
+.sad-metric:nth-child(2) .sad-metric-icon,.sad-metric:nth-child(5) .sad-metric-icon {background:#F6E5D8;color:#A65A35}
+.sad-metric-content {min-width:0;flex:1}
+.sad-metric-label {display:block;color:#5A695E;font-size:14px;font-weight:700;line-height:1.35}
+.sad-metric-value {display:block;color:var(--sad-green);font-size:clamp(24px,2vw,33px);font-weight:850;letter-spacing:-.04em;line-height:1.22;margin-top:2px}
+.sad-metric-arrow {flex:none;color:#769184;transition:transform .18s}
+.sad-metric[href]:hover .sad-metric-arrow {transform:translateX(3px)}
+.sad-business {display:grid;grid-template-columns:1fr 1fr;min-width:0;border:1px solid #D1DCCE;border-radius:12px;overflow:hidden}
+.sad-business-item {min-width:0;padding:22px clamp(18px,2.2vw,30px);display:flex;align-items:center;justify-content:space-between;gap:15px;background:#E7EEE4;transition:background .2s}
+.sad-business-item + .sad-business-item {border-left:1px solid #CBD7CB;background:#F5E5DA}
+.sad-business-item:hover {background:#DCE7D9}
+.sad-business-item + .sad-business-item:hover {background:#F1DACC}
+.sad-business-label {font-size:13px;color:#9F542F;font-weight:800;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:7px}
+.sad-business-value {margin:8px 0 0;font-size:clamp(27px,2.6vw,42px);font-weight:850;letter-spacing:-.052em;line-height:1.13;color:var(--sad-green);overflow-wrap:anywhere}
+.sad-business-desc {margin:7px 0 0;font-size:14px;line-height:1.47;color:#53665A;overflow-wrap:anywhere}
+.sad-business-arrow {display:grid;place-items:center;width:39px;height:39px;flex:none;border-radius:50%;border:1px solid #BFCFC0;background:#FBFCF8;color:var(--sad-green);transition:transform .18s}
+.sad-business-item:hover .sad-business-arrow {transform:translateX(3px)}
+.sad-workspace {display:grid;grid-template-columns:minmax(230px,27%) minmax(0,1fr);overflow:hidden;border:1px solid #D6DED6;border-radius:14px;background:#FFFEFB;min-width:0}
+.sad-workspace-aside {padding:19px 14px;background:#E7EDE5;border-right:1px solid #D1DCD1}
+.sad-workspace-intro {display:flex;align-items:center;justify-content:space-between;gap:9px;margin:0 7px 13px;color:#4D6857;font-size:13px;font-weight:750}
+.sad-workspace-tabs {display:grid;gap:7px}
+.sad-workspace-tab {appearance:none;display:flex;align-items:center;gap:10px;width:100%;padding:12px 11px;min-width:0;border:1px solid transparent;border-radius:9px;text-align:left;background:transparent;color:#345648;cursor:pointer;transition:background .2s,border-color .2s}
+.sad-workspace-tab:hover {background:#F5F7F2;border-color:#CCD8CC}
+.sad-workspace-tab[aria-pressed='true'] {background:#173F35;color:#FFFEFB;border-color:#173F35}
+.sad-workspace-number {display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:7px;background:#F9FBF7;color:#356249;font-size:14px;font-weight:850}
+.sad-workspace-tab[aria-pressed='true'] .sad-workspace-number {background:#FFFFFF22;color:#FFFEFB}
+.sad-workspace-name {display:block;min-width:0;flex:1;font-size:15px;font-weight:850;line-height:1.28}
+.sad-workspace-count {display:block;margin-top:2px;font-size:12px;font-weight:650;opacity:.75}
+.sad-workspace-tab svg {flex:none;transition:transform .2s}
+.sad-workspace-tab[aria-pressed='true'] svg {transform:translateX(2px)}
+.sad-workspace-main {padding:clamp(18px,2.1vw,30px);min-width:0}
+.sad-workspace-heading {display:flex;align-items:center;gap:13px;border-bottom:1px solid #E0E6DD;padding-bottom:17px}
+.sad-workspace-heading-icon {width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:10px;background:#E7EEE4;color:#173F35}
+.sad-workspace-heading h3 {margin:4px 0 0;font-size:clamp(21px,1.9vw,28px)!important;line-height:1.2!important;color:var(--sad-green)!important;letter-spacing:-.037em;font-weight:850!important}
+.sad-workspace-hint {margin:5px 0 0;color:#5E6B60;font-size:14px}
+.sad-tool-list {display:grid;grid-template-columns:1fr 1fr;column-gap:20px;min-width:0}
+.sad-tool {display:grid;grid-template-columns:36px minmax(0,1fr) 29px;align-items:center;gap:11px;min-width:0;min-height:74px;padding:15px 2px;border-bottom:1px solid #E3E8DF;color:var(--sad-green);transition:background .2s,padding-left .2s}
+.sad-tool:hover {background:#F2F5F0;padding-left:7px}
+.sad-tool-icon {display:grid;place-items:center;width:35px;height:35px;border-radius:9px;background:#E8EEE6;color:#285841}
+.sad-tool:nth-child(3n+2) .sad-tool-icon {background:#F7E8DC;color:#A45F39}
+.sad-tool-name {display:block;color:#173F35;font-size:15px;font-weight:800;line-height:1.35}
+.sad-tool-desc {display:block;color:#647066;font-size:12.5px;line-height:1.42;margin-top:3px}
+.sad-tool-arrow {display:grid;place-items:center;width:29px;height:29px;border-radius:50%;background:#F5F8F2;border:1px solid #D8E1D5;color:#285A47;transition:transform .2s}
+.sad-tool:hover .sad-tool-arrow {transform:translateX(3px)}
+.sad-error {margin-top:16px;padding:13px 16px;border-left:4px solid #B53F32;background:#FFF0E9;color:#872C27;font-size:15px;font-weight:650;line-height:1.5}
+.sad-incidents {margin-top:15px;background:#FFF4E7;border:1px solid #EDCFB2;border-left:4px solid #B85E37;border-radius:9px;overflow:hidden}
+.sad-incident {display:flex;gap:10px;padding:13px 16px;color:#693A24}
+.sad-incident + .sad-incident {border-top:1px solid #EDCFB2}
+.sad-incident h3 {margin:0;font-weight:800;font-size:16px!important;color:#713D27!important}
+.sad-incident p {margin:3px 0 0;font-size:14px;color:#7C533C}
+.sad-page #ai-quality {border:1px solid #D6DED3!important;background:#FFFEFB!important;border-radius:13px!important;box-shadow:none!important}
+.sad-page #ai-quality > div:first-child {background:#E6ECE2!important;border-bottom:1px solid #D1DCD0!important}
+.sad-page #ai-quality > div:first-child h2 {color:#173F35!important}
+.sad-page #ai-quality > div:first-child p {color:#536A58!important}
+.sad-page #ai-quality > div:first-child button {background:#FFFEFB!important;color:#173F35!important}
+.sad-page #ai-quality > div:nth-child(2) {background:#FFFEFB!important}
+@media(max-width:1000px){.sad-hero{grid-template-columns:1fr}.sad-hero-main{min-height:0}.sad-hero-side{border-left:0;border-top:4px solid var(--sad-clay)}.sad-flow{grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}.sad-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.sad-metric:nth-child(n){border-right:1px solid #E1E6DE;border-bottom:1px solid #E1E6DE}.sad-metric:nth-child(2n){border-right:0}.sad-metric:nth-child(n+5){border-bottom:0}.sad-workspace{grid-template-columns:minmax(210px,32%) minmax(0,1fr)}.sad-tool-list{grid-template-columns:1fr}}
+@media(max-width:690px){.sad-page{padding:11px 11px 27px;font-size:15px}.sad-hero{border-radius:11px}.sad-hero-main{padding:22px 20px}.sad-hero h1{font-size:31px!important}.sad-hero-desc{font-size:14.5px}.sad-hero-foot{margin-top:15px;padding-top:12px}.sad-hero-side{padding:17px 19px}.sad-hero-side h2{font-size:21px!important}.sad-flow{grid-template-columns:1fr 1fr;gap:0 12px}.sad-step{padding:10px 0}.sad-step-name{font-size:13.5px}.sad-step-desc{display:none}.sad-section{margin-top:23px}.sad-metrics{grid-template-columns:1fr 1fr}.sad-metric{padding:13px 12px;gap:9px;min-height:82px}.sad-metric-icon{width:31px;height:31px}.sad-metric-icon svg{width:16px;height:16px}.sad-metric-value{font-size:26px}.sad-metric-label{font-size:13px}.sad-metric-arrow{display:none}.sad-business{grid-template-columns:1fr}.sad-business-item{padding:19px 17px}.sad-business-item + .sad-business-item{border-left:0;border-top:1px solid #CBD7CB}.sad-business-value{font-size:30px}.sad-workspace{grid-template-columns:1fr}.sad-workspace-aside{padding:14px;border-right:0;border-bottom:1px solid #D1DCD1}.sad-workspace-tabs{grid-template-columns:1fr 1fr;gap:7px}.sad-workspace-tab{padding:10px 8px;gap:7px;min-height:62px}.sad-workspace-number{width:28px;height:28px;font-size:12px}.sad-workspace-name{font-size:13.5px}.sad-workspace-count{font-size:11.5px}.sad-workspace-tab svg{display:none}.sad-workspace-main{padding:17px 15px}.sad-workspace-heading h3{font-size:22px!important}.sad-tool-list{grid-template-columns:1fr}.sad-tool{min-height:64px;padding:12px 0}.sad-tool-desc{font-size:12.5px}}
+@media(prefers-reduced-motion:reduce){.sad-page a,.sad-page button,.sad-page svg{animation:none!important;transition:none!important}}
+`;
+
+function CommandMetric({ label, value, icon: Icon, to }) {
   const content = (
-    <div className="flex min-h-[76px] flex-col justify-between px-4 py-3 sm:min-h-[92px] sm:px-5 sm:py-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[12px] font-black uppercase tracking-[0.14em] text-white/55 sm:hidden">{mobileLabel || label}</p>
-        <p className="hidden text-[12px] font-black uppercase tracking-[0.15em] text-white/55 sm:block">{label}</p>
-        <Icon size={14} className="shrink-0 text-[#b7d9ca]" aria-hidden="true" />
-      </div>
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <p className="text-[33.6px] font-black leading-none tracking-[-0.055em] text-white sm:text-[43.2px]">{value}</p>
-        {to ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/30 text-white/80 transition group-hover:translate-x-0.5 group-hover:bg-white/20" aria-hidden="true"><ArrowRight size={16} /></span> : null}
-      </div>
+    <>
+      <span className="sad-metric-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
+      <span className="sad-metric-content"><span className="sad-metric-label">{label}</span><span className="sad-metric-value">{value}</span></span>
+      {to ? <ArrowRight size={17} className="sad-metric-arrow" aria-hidden="true" /> : null}
+    </>
+  )
+  return to
+    ? <Link className="sad-metric" to={to}>{content}</Link>
+    : <div className="sad-metric">{content}</div>
+}
+
+function FlowStep({ item }) {
+  return (
+    <div className="sad-step">
+      <span className="sad-step-number">{item.number}</span>
+      <div className="min-w-0"><div className="sad-step-name">{item.title}</div><div className="sad-step-desc">{item.mobileCopy || item.copy}</div></div>
     </div>
   )
-
-  const className = `focus-ring group block min-w-0 transition-colors duration-200 ${to ? 'hover:bg-white/15 focus-visible:bg-white/15 active:bg-white/20' : ''} ${index % 2 ? 'border-l border-white/12' : ''} ${index > 1 ? 'border-t border-white/12 sm:border-t-0' : ''} ${index > 0 ? 'sm:border-l sm:border-white/12' : ''} ${index > 2 ? 'sm:border-t sm:border-white/12' : ''}`
-
-  if (to) {
-    return <Link to={to} className={className}>{content}</Link>
-  }
-
-  return <div className={className}>{content}</div>
 }
 
-function FlowStep({ item, index }) {
+function WorkspaceToolLink({ item }) {
   const Icon = item.icon
-
   return (
-    <article className={`relative py-3 sm:py-3 lg:px-4 ${index ? 'border-t border-[#ddcfaf] lg:border-l lg:border-t-0' : ''}`}>
-      <div className="flex items-start gap-3.5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#d2c39f] bg-[#fff8e8] text-[#174e40]">
-          <Icon size={15} aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2.5">
-            <span className="text-[12px] font-black tracking-[0.16em] text-[#9a8861]">{item.number}</span>
-            <h3 className="text-[14px] font-semibold leading-5 text-stone-950">{item.title}</h3>
-          </div>
-        </div>
-      </div>
-    </article>
-  )
-}
-
-function WorkspaceToolLink({ item, group }) {
-  const Icon = item.icon
-
-  return (
-    <Link
-      to={item.to}
-      className="focus-ring group flex min-h-[64px] min-w-0 items-center gap-3 rounded-[10px] border border-transparent border-b-[#e2e9e8] px-3 py-3.5 text-left transition-[background-color,border-color] duration-200 hover:border-[#c8d7d7] hover:bg-[#eff4f3] focus-visible:border-[#9ebaba] focus-visible:bg-[#eff4f3] sm:px-4 sm:py-4"
-    >
-      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[11px] bg-[#e9f0f0] text-[#315563] ${group.icon}`} aria-hidden="true">
-        <Icon size={21} strokeWidth={1.85} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[17px] font-bold leading-[1.35] tracking-[-0.018em] text-[#20343a] sm:text-[18px]">
-          {item.title}
-        </span>
-      </span>
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#d5e2e1] bg-white text-[#315c63] transition-[background-color,transform] duration-200 group-hover:translate-x-1 group-hover:bg-[#d8e8e7]" aria-hidden="true">
-        <ArrowRight size={18} strokeWidth={2} />
-      </span>
+    <Link to={item.to} className="sad-tool">
+      <span className="sad-tool-icon"><Icon size={19} strokeWidth={1.8} aria-hidden="true" /></span>
+      <span className="min-w-0"><span className="sad-tool-name">{item.title}</span><span className="sad-tool-desc">{item.mobileDescription || item.description}</span></span>
+      <span className="sad-tool-arrow" aria-hidden="true"><ArrowRight size={15} /></span>
     </Link>
   )
 }
 
 function WorkspaceDirectory({ groups, activeKey, onSelect }) {
   if (!groups.length) return null
-
   const activeGroup = groups.find((group) => group.key === activeKey) || groups[0]
   const activeIndex = groups.findIndex((group) => group.key === activeGroup.key)
-  const categoryIcons = {
-    reviews: BadgeCheck,
-    catalog: Package,
-    business: BarChart3,
-    governance: ShieldCheck,
-  }
+  const categoryIcons = { reviews: BadgeCheck, catalog: Package, business: BarChart3, governance: ShieldCheck }
   const ActiveIcon = categoryIcons[activeGroup.key] || Boxes
-
   return (
-    <>
-      {/* Mobile-only: clearly separated workspace selectors and nested tool links. */}
-      <div className="min-w-0 overflow-hidden rounded-[18px] border border-[#d5dfd9] bg-[#f5f5f1] lg:hidden">
-        <div className="flex items-center justify-between gap-3 border-b border-[#d5dfd9] bg-[#e9eee9] px-4 py-3.5">
-          <p className="text-[14px] font-extrabold uppercase tracking-[0.07em] text-[#244a3c]">Work areas</p>
-          <p className="shrink-0 text-[13px] font-semibold text-[#547064]">{groups.length} sections</p>
-        </div>
-
-        <div className="space-y-2.5 p-3">
+    <div className="sad-workspace">
+      <nav className="sad-workspace-aside" aria-label="Super Admin work areas">
+        <div className="sad-workspace-intro"><span>Work areas</span><span>{groups.length} sections</span></div>
+        <div className="sad-workspace-tabs">
           {groups.map((group, index) => {
-            const isActive = activeGroup.key === group.key
-            const panelId = `admin-workspace-${group.key}-panel-mobile`
-            return (
-              <div key={group.key} className={`min-w-0 overflow-hidden rounded-[14px] border shadow-[0_2px_8px_rgba(22,62,48,0.035)] ${isActive ? 'border-[#2c6454]' : 'border-[#d8e1d9]'}`}>
-                <button
-                  type="button"
-                  aria-expanded={isActive}
-                  aria-controls={panelId}
-                  onClick={() => onSelect(group.key)}
-                  className={`focus-ring group flex min-h-[65px] w-full min-w-0 items-center gap-3 px-3.5 py-3.5 text-left transition-colors duration-200 ${isActive
-                    ? 'bg-[#184b3d] text-white'
-                    : 'bg-white text-[#213e34] hover:bg-[#edf4ed] focus-visible:bg-[#edf4ed]'
-                  }`}
-                >
-                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[9px] text-[17px] font-extrabold tabular-nums ${isActive ? 'bg-white/15 text-white' : 'bg-[#e4efe7] text-[#255742]'}`} aria-hidden="true">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[16px] font-extrabold leading-[1.3] tracking-[-0.02em]">
-                      {group.eyebrow}
-                    </span>
-                    <span className={`mt-1 block text-[13px] font-medium ${isActive ? 'text-[#d6e8df]' : 'text-[#64796c]'}`}>{group.items.length} tools</span>
-                  </span>
-                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border ${isActive ? 'border-white/30 bg-white/10 text-white' : 'border-[#d4e0d7] bg-[#f5f8f5] text-[#3f715b]'}`} aria-hidden="true">
-                    <ArrowRight size={18} className={`transition-transform duration-200 ${isActive ? 'rotate-90' : ''}`} />
-                  </span>
-                </button>
-
-                {isActive && (
-                  <section
-                    id={panelId}
-                    role="region"
-                    aria-label={group.eyebrow}
-                    className="min-w-0 border-t-[3px] border-[#6eaa8a] bg-[#eef2eb] px-3 py-3.5"
-                  >
-                    <div className="space-y-2 border-l-[3px] border-[#b2d0bd] pl-2.5">
-                      {group.items.map((item) => {
-                        const Icon = item.icon
-                        return (
-                          <Link
-                            key={item.to}
-                            to={item.to}
-                            className="focus-ring group flex min-h-[60px] min-w-0 items-center gap-3 rounded-[11px] border border-[#d5e1d8] bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(25,65,48,0.035)] transition-[border-color,background-color] duration-200 hover:border-[#97b9a2] hover:bg-[#fbfefa] focus-visible:border-[#97b9a2] focus-visible:bg-[#fbfefa] active:bg-[#e5f1e7]"
-                          >
-                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#e9f2eb] text-[#246445]" aria-hidden="true">
-                              <Icon size={19} strokeWidth={1.9} />
-                            </span>
-                            <span className="min-w-0 flex-1 text-[16px] font-bold leading-[1.35] text-[#233a30]">{item.title}</span>
-                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#e6f0e8] text-[#256349]" aria-hidden="true">
-                              <ArrowRight size={17} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-                            </span>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  </section>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Desktop layout is preserved exactly as in V4. */}
-      <div className="hidden lg:block">
-    <div className="overflow-hidden rounded-[22px] border border-[#d5dcda] bg-[#fcfdfc] shadow-[0_12px_30px_rgba(31,53,61,0.06)] lg:grid lg:grid-cols-[minmax(240px,29%)_minmax(0,1fr)]">
-      <div className="relative min-w-0 bg-[#e9eeec] px-3 py-4 sm:px-4 sm:py-5 lg:px-4 lg:py-6">
-        <div className="mb-3 flex items-center justify-between gap-3 px-1 lg:mb-5">
-          <p className="text-[14px] font-extrabold uppercase tracking-[0.09em] text-[#324b55]">Work areas</p>
-          <p className="text-[14px] font-semibold tabular-nums text-[#61767a]">{groups.length} sections</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-3">
-          {groups.map((group, index) => {
-            const isActive = activeGroup.key === group.key
+            const selected = activeGroup.key === group.key
             return (
               <button
                 key={group.key}
                 type="button"
-                aria-expanded={isActive}
-                aria-controls="admin-workspace-active-panel"
+                aria-pressed={selected}
+                aria-controls="super-admin-workspace-panel"
                 onClick={() => onSelect(group.key)}
-                onPointerEnter={(event) => {
-                  // Hover changes the open workspace only for an actual mouse.
-                  // Touch and pen users keep explicit tap/click navigation.
-                  if (event.pointerType === 'mouse' && !isActive) onSelect(group.key)
-                }}
-                className={`focus-ring group relative flex min-w-0 items-center gap-2.5 rounded-[13px] border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-200 sm:gap-3 sm:px-4 sm:py-3.5 ${isActive
-                  ? 'border-[#294b55] bg-[#294b55] text-white shadow-[3px_4px_0_#b6c8c6]'
-                  : 'border-[#d7e0de] bg-white/80 text-[#2a4149] hover:border-[#a3bab8] hover:bg-white focus-visible:bg-white'
-                }`}
+                onPointerEnter={(event) => { if (event.pointerType === 'mouse' && !selected) onSelect(group.key) }}
+                className="sad-workspace-tab"
               >
-                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] text-[20px] font-extrabold tabular-nums sm:h-11 sm:w-11 sm:text-[22px] ${isActive ? 'bg-white/15 text-white' : 'bg-[#deebe8] text-[#32565c]'}`} aria-hidden="true">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[16px] font-bold leading-[1.3] sm:text-[18px]">{group.eyebrow}</span>
-                  <span className={`mt-1 block text-[13px] font-medium sm:text-[14px] ${isActive ? 'text-[#d8e8e8]' : 'text-[#61767a]'}`}>{group.items.length} tools</span>
-                </span>
-                <ArrowRight size={18} className={`hidden shrink-0 transition-transform duration-200 lg:block ${isActive ? 'text-white' : 'text-[#537b7d] group-hover:translate-x-1'}`} aria-hidden="true" />
+                <span className="sad-workspace-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <span className="min-w-0 flex-1"><span className="sad-workspace-name">{group.eyebrow}</span><span className="sad-workspace-count">{group.items.length} tools</span></span>
+                <ArrowRight size={17} aria-hidden="true" />
               </button>
             )
           })}
         </div>
-      </div>
-
-      <section
-        id="admin-workspace-active-panel"
-        role="region"
-        aria-label={activeGroup.eyebrow}
-        className="min-w-0 bg-[#fcfdfc] px-3 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6"
-      >
-        <div className="flex items-start gap-3 border-b border-[#e0e7e5] px-1 pb-4 sm:gap-4 sm:pb-5">
-          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[13px] border border-[#d5e3e0] bg-[#e9f0ee] ${activeGroup.icon}`} aria-hidden="true">
-            <ActiveIcon size={23} strokeWidth={1.85} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-bold tracking-[0.05em] text-[#536d73]">
-              SECTION {String(activeIndex + 1).padStart(2, '0')} / {String(groups.length).padStart(2, '0')}
-            </p>
-            <h3 className="mt-1 text-[24px] font-extrabold leading-[1.2] tracking-[-0.035em] text-[#233c42] sm:text-[28px]">
-              {activeGroup.title}
-            </h3>
+      </nav>
+      <section id="super-admin-workspace-panel" className="sad-workspace-main" aria-label={activeGroup.eyebrow} role="region">
+        <div className="sad-workspace-heading">
+          <span className="sad-workspace-heading-icon"><ActiveIcon size={21} strokeWidth={1.8} aria-hidden="true" /></span>
+          <div className="min-w-0">
+            <p className="sad-kicker">Section {String(activeIndex + 1).padStart(2, '0')} / {String(groups.length).padStart(2, '0')}</p>
+            <h3>{activeGroup.title}</h3>
+            <p className="sad-workspace-hint">{activeGroup.mobileDescription}</p>
           </div>
         </div>
-
-        <div className="mt-2 grid grid-cols-1 gap-0.5 md:grid-cols-2 md:gap-x-3 lg:mt-3">
-          {activeGroup.items.map((item) => (
-            <WorkspaceToolLink key={item.to} item={item} group={activeGroup} />
-          ))}
-        </div>
+        <div className="sad-tool-list">{activeGroup.items.map((item) => <WorkspaceToolLink key={item.to} item={item} />)}</div>
       </section>
     </div>
-      </div>
-    </>
   )
 }
 
@@ -756,295 +701,104 @@ export default function AdminDashboardPage() {
   return (
     <AdminShell
       flushTop
-      title={<span className="text-[24px] leading-tight sm:text-[30px]">Super Admin Overview</span>}
+      title={<span className="text-[24px] leading-tight sm:text-[30px]">Super Admin overview</span>}
       showWorkspaceBadge={false}
       actions={
         <button
           type="button"
           onClick={loadDashboard}
           disabled={loading}
-          className="focus-ring inline-flex items-center gap-2 rounded-full border border-stone-300 bg-[#f8f5ed] px-3.5 py-2 text-[15px] font-black text-stone-700 transition hover:border-stone-400 hover:bg-white disabled:opacity-50"
+          className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#cdd9cd] bg-[#fffefa] px-3.5 py-2 text-[14px] font-bold text-[#173F35] transition hover:bg-[#e7eee4] disabled:opacity-50"
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
           Refresh
         </button>
       }
     >
-      <div className="-m-2.5 bg-[#f1eee6] p-2.5 sm:-m-5 sm:p-5 lg:-m-6 lg:p-6">
-        <div className="space-y-3 sm:space-y-6">
-          <div className="sm:hidden">
-            <section className="w-full overflow-hidden rounded-[22px] border border-[#24574c] bg-[#0f4539] shadow-[0_14px_38px_rgba(38,49,45,0.10)]">
-              <div className="relative px-4 py-3.5">
-                <div className="absolute right-[-52px] top-[-58px] h-32 w-32 rounded-full border border-white/10" aria-hidden="true" />
-                <div className="absolute right-[-14px] top-[-20px] h-20 w-20 rounded-full border border-[#dcbf79]/20" aria-hidden="true" />
-
-                <div className="relative">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-black uppercase tracking-[0.15em] text-[#c3dfd3]">
-                      <CheckCircle2 size={11} className="shrink-0" aria-hidden="true" />
-                      <span>Admin overview</span>
-                    </span>
-                    <span className="shrink-0 text-[12px] font-black uppercase tracking-[0.11em] text-white/40">
-                      {adminSource === 'super_admin' ? 'Super Admin' : 'Assigned Admin'}
-                    </span>
-                  </div>
-
-                  <h2 className="mt-3 text-[27px] font-extrabold leading-[1.05] tracking-[-0.035em] text-white">
-                    Today’s priorities
-                  </h2>
-                </div>
+      <style>{superAdminStyles}</style>
+      <main className="sad-page">
+        <section className="sad-hero" aria-label="Super Admin overview">
+          <div className="sad-hero-main">
+            <div>
+              <div className="sad-hero-eyebrow">
+                <p className="sad-kicker sad-kicker--light">EPANTRY / Super Admin</p>
+                <span className="sad-role">{adminSource === 'super_admin' ? 'Super Admin' : 'Assigned Admin'}</span>
               </div>
-
-              <details className="group border-t border-[#d8c694] bg-[#efe1bd]">
-                <summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-[13px] font-black text-[#4f421f] [&::-webkit-details-marker]:hidden">
-                  <span>View admin signals</span>
-                  <span className="text-[15px] leading-none transition-transform group-open:rotate-45" aria-hidden="true">+</span>
-                </summary>
-
-                <div className="border-t border-[#d8c694] bg-[#0f4539]">
-                  <div className="grid grid-cols-2 border-b border-white/12 px-4 py-3">
-                    <div>
-                      <p className="text-[20px] font-black leading-none tracking-[-0.04em] text-[#f0d18c]">{adminPermissionKeys.length}</p>
-                      <p className="mt-1 text-[12px] font-black uppercase tracking-[0.12em] text-white/45">Permissions</p>
-                    </div>
-                    <div className="border-l border-white/12 pl-4">
-                      <p className="text-[20px] font-black leading-none tracking-[-0.04em] text-[#f0d18c]">{accessibleModules.length}</p>
-                      <p className="mt-1 text-[12px] font-black uppercase tracking-[0.12em] text-white/45">Tools available</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2">
-                    {commandMetrics.map(([label, mobileLabel, value, Icon, to], index) => (
-                      <CommandMetric
-                        key={label}
-                        label={label}
-                        mobileLabel={mobileLabel}
-                        value={loading && !commandCenter ? '...' : value}
-                        icon={Icon}
-                        to={to}
-                        index={index}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-[#d8c694] px-3.5 py-2.5">
-                  <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#6f5828]">Start here</p>
-                  <div className="mt-1.5">
-                    {FLOW_STEPS.map((item, index) => (
-                      <FlowStep key={item.number} item={item} index={index} />
-                    ))}
-                  </div>
-                </div>
-              </details>
-            </section>
+              <h1>Keep the platform moving.</h1>
+              <p className="sad-hero-desc">Review what needs attention, understand your marketplace and open the right tools in one place.</p>
+            </div>
+            <div className="sad-hero-foot">
+              <span><strong>{adminPermissionKeys.length}</strong> permissions</span>
+              <span><strong>{accessibleModules.length}</strong> available tools</span>
+            </div>
           </div>
+          <div className="sad-hero-side">
+            <p className="sad-kicker">Your starting point</p>
+            <h2>Four simple priorities</h2>
+            <div className="sad-flow">{FLOW_STEPS.map((item) => <FlowStep key={item.number} item={item} />)}</div>
+          </div>
+        </section>
 
-          <section className="hidden overflow-hidden rounded-[26px] border border-[#24574c] bg-[#0f4539] shadow-[0_18px_55px_rgba(38,49,45,0.10)] sm:block">
-            <div className="grid lg:grid-cols-[minmax(290px,0.9fr)_minmax(0,1.45fr)]">
-              <div className="relative overflow-hidden border-b border-white/12 p-4 sm:p-5 lg:border-b-0 lg:border-r lg:p-6">
-                <div className="absolute right-[-70px] top-[-70px] h-44 w-44 rounded-full border border-white/10" aria-hidden="true" />
-                <div className="absolute right-[-22px] top-[-22px] h-24 w-24 rounded-full border border-[#dcbf79]/20" aria-hidden="true" />
-
-                <div className="relative">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="inline-flex items-center gap-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#c3dfd3] sm:text-[12px]">
-                      <CheckCircle2 size={13} aria-hidden="true" />
-                      Admin overview
-                    </span>
-                    <span className="text-[12px] font-black uppercase tracking-[0.13em] text-white/40">
-                      {adminSource === 'super_admin' ? 'Super Admin' : 'Assigned Admin'}
-                    </span>
-                  </div>
-
-                  <h2 className="mt-5 max-w-[430px] text-[32px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white sm:text-[38px] lg:text-[42px]">
-                    Today’s priorities
-                  </h2>
-
-                  <div className="mt-5 grid grid-cols-2 gap-y-3 border-t border-white/12 pt-4">
-                    <div>
-                      <p className="text-[24px] font-black leading-none tracking-[-0.04em] text-[#f0d18c] sm:text-[28.8px]">{adminPermissionKeys.length}</p>
-                      <p className="mt-1.5 text-[12px] font-black uppercase tracking-[0.14em] text-white/45">Permissions</p>
-                    </div>
-                    <div className="border-l border-white/12 pl-5">
-                      <p className="text-[24px] font-black leading-none tracking-[-0.04em] text-[#f0d18c] sm:text-[28.8px]">{accessibleModules.length}</p>
-                      <p className="mt-1.5 text-[12px] font-black uppercase tracking-[0.14em] text-white/45">Tools available</p>
-                    </div>
-                  </div>
-                </div>
+        {error ? <div className="sad-error" role="alert">{error}</div> : null}
+        {(commandCenter?.incidentBanners || []).length ? (
+          <section className="sad-incidents" aria-label="Admin incident alerts">
+            {commandCenter.incidentBanners.map((incident) => (
+              <div key={incident.id} className="sad-incident">
+                <AlertTriangle size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <div><h3>{incident.title}</h3><p>{incident.banner?.message || incident.summary}</p></div>
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3">
-                {commandMetrics.map(([label, mobileLabel, value, Icon, to], index) => (
-                  <CommandMetric
-                    key={label}
-                    label={label}
-                    mobileLabel={mobileLabel}
-                    value={loading && !commandCenter ? '...' : value}
-                    icon={Icon}
-                    to={to}
-                    index={index}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-[#d8c694] bg-[#efe1bd] px-4 sm:px-5 lg:px-6">
-              <div className="grid lg:grid-cols-[210px_minmax(0,1fr)]">
-                <div className="border-b border-[#d8c694] py-3 lg:border-b-0 lg:border-r lg:py-4 lg:pr-5">
-                  <p className="text-[12px] font-black uppercase tracking-[0.18em] text-[#6f5828]">Start here</p>
-                  <p className="mt-1.5 text-[17px] font-black leading-4 text-stone-950">Four quick steps</p>
-                </div>
-                <div className="grid lg:grid-cols-4 lg:pl-5">
-                  {FLOW_STEPS.map((item, index) => (
-                    <FlowStep key={item.number} item={item} index={index} />
-                  ))}
-                </div>
-              </div>
-            </div>
+            ))}
           </section>
+        ) : null}
 
-          {error ? (
-            <div className="rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-[15px] font-semibold text-red-700 sm:px-5">{error}</div>
-          ) : null}
+        <section className="sad-section" aria-labelledby="sad-metrics-title">
+          <div className="sad-section-head">
+            <div><p className="sad-kicker">Platform pulse</p><h2 id="sad-metrics-title" className="sad-title">Today’s priorities</h2></div>
+            <p className="sad-sub">Live review queues and operational signals</p>
+          </div>
+          <div className="sad-metrics">
+            {commandMetrics.map(([label, , value, Icon, to]) => (
+              <CommandMetric key={label} label={label} value={!commandCenter ? (loading ? '…' : '—') : value} icon={Icon} to={to} />
+            ))}
+          </div>
+        </section>
 
-          {(commandCenter?.incidentBanners || []).length ? (
-            <section className="overflow-hidden rounded-[18px] border border-amber-300 bg-amber-50">
-              {(commandCenter.incidentBanners || []).map((incident, index) => (
-                <div key={incident.id} className={`flex items-start gap-3 px-4 py-3.5 sm:px-5 ${index ? 'border-t border-amber-200' : ''}`}>
-                  <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
-                  <div>
-                    <p className="text-[16.8px] font-black text-amber-950">{incident.title}</p>
-                    <p className="mt-1 text-[15px] font-semibold leading-5 text-amber-800">{incident.banner?.message || incident.summary}</p>
-                  </div>
-                </div>
-              ))}
-            </section>
-          ) : null}
-
-          <section className="w-full overflow-hidden rounded-[20px] border border-[#bed4ca] bg-[#f7f4ec] sm:hidden">
-            <header className="bg-[#d8e9df] px-4 py-2.5">
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#1b5a49]">Business pulse</p>
-                  <h2 className="mt-0.5 text-[17px] font-black leading-5 tracking-[-0.03em] text-stone-950">Money & demand</h2>
-                </div>
+        <section className="sad-section" aria-labelledby="sad-business-title">
+          <div className="sad-section-head">
+            <div><p className="sad-kicker">Business overview</p><h2 id="sad-business-title" className="sad-title">Money & demand</h2></div>
+            <p className="sad-sub">Collections this month and customer searches over 30 days</p>
+          </div>
+          <div className="sad-business">
+            <Link to="/admin/earnings" className="sad-business-item">
+              <div className="min-w-0">
+                <div className="sad-business-label"><IndianRupee size={15} aria-hidden="true" /> Collections</div>
+                <p className="sad-business-value">{earnings ? formatMoney(earnings.currentMonth?.grossCollectionsMinor) : '—'}</p>
+                <p className="sad-business-desc">Platform earnings: {earnings ? formatMoney(earnings.currentMonth?.platformRevenueMinor) : 'Not available'}</p>
               </div>
-            </header>
-
-            <div className="grid grid-cols-2">
-              <Link
-                to="/admin/earnings"
-                className="focus-ring group min-w-0 border-r border-[#bed4ca] bg-[#cce7da] px-3 py-3 transition-colors hover:bg-[#c1dece] focus-visible:bg-[#c1dece]"
-              >
-                <div className="flex items-center justify-between gap-2 text-[#145846]">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <IndianRupee size={13} className="shrink-0" aria-hidden="true" />
-                    <p className="text-[12px] font-black uppercase tracking-[0.1em]">Money</p>
-                  </div>
-                  <ArrowRight size={12} className="shrink-0 text-[#5f8f82]" aria-hidden="true" />
-                </div>
-                <p className="mt-2 break-words text-[22px] font-black leading-none tracking-[-0.05em] text-stone-950">{formatMoney(earnings?.currentMonth?.grossCollectionsMinor)}</p>
-                <p className="mt-1.5 break-words text-[12px] font-semibold leading-[1.35] text-stone-600">
-                  This month · platform {formatMoney(earnings?.currentMonth?.platformRevenueMinor)}
-                </p>
-              </Link>
-
-              <Link
-                to="/admin/analytics#customer-demand"
-                className="focus-ring group min-w-0 bg-[#d5e8f4] px-3 py-3 transition-colors hover:bg-[#c6e0f0] focus-visible:bg-[#c6e0f0]"
-              >
-                <div className="flex items-center justify-between gap-2 text-[#15527a]">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <Search size={13} className="shrink-0" aria-hidden="true" />
-                    <p className="text-[12px] font-black uppercase tracking-[0.1em]">Demand</p>
-                  </div>
-                  <ArrowRight size={12} className="shrink-0 text-[#668da7]" aria-hidden="true" />
-                </div>
-                <p className="mt-2 break-words text-[22px] font-black leading-none tracking-[-0.05em] text-stone-950">{demand?.totalSearches ?? 0}</p>
-                <p className="mt-1.5 break-words text-[12px] font-semibold leading-[1.3] text-stone-600">
-                  30 days{demand?.topQuery?.query ? ` · top: “${demand.topQuery.query}”` : ' · no top search yet'}
-                </p>
-                {demand?.topArea ? (
-                  <p className="mt-1 break-words text-[12px] font-bold leading-[1.25] text-stone-500">
-                    {[demand.topArea.city, demand.topArea.state, demand.topArea.postcode].filter(Boolean).join(', ') || 'Area not available'}
-                  </p>
-                ) : null}
-              </Link>
-            </div>
-          </section>
-
-          <section className="hidden overflow-hidden rounded-[26px] border border-[#bed4ca] bg-[#f7f4ec] sm:block">
-            <div className="grid lg:grid-cols-[250px_minmax(0,1fr)]">
-              <header className="bg-[#d8e9df] p-5 sm:p-6 lg:p-7">
-                <p className="text-[12px] font-black uppercase tracking-[0.18em] text-[#1b5a49] sm:text-[12px]">Business pulse</p>
-                <h2 className="mt-4 max-w-[210px] text-[25px] font-extrabold leading-tight tracking-[-0.035em] text-stone-950 sm:text-[28px]">Money & demand</h2>
-              </header>
-
-              <div className="grid lg:grid-cols-2">
-                <Link
-                  to="/admin/earnings"
-                  className="focus-ring group flex min-h-[174px] flex-col justify-between border-t border-[#bed4ca] bg-[#cce7da] p-5 transition hover:bg-[#c3e1d3] sm:min-h-[196px] sm:p-6 lg:border-l lg:border-t-0 lg:p-7"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-2.5 text-[#145846]">
-                      <IndianRupee size={17} aria-hidden="true" />
-                      <p className="text-[12px] font-black uppercase tracking-[0.16em]">Collections</p>
-                    </div>
-                    <ArrowRight size={16} className="text-[#5f8f82] transition group-hover:translate-x-1 group-hover:text-[#145846]" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="text-[45.6px] font-black leading-none tracking-[-0.06em] text-stone-950 sm:text-[60px]">{formatMoney(earnings?.currentMonth?.grossCollectionsMinor)}</p>
-                    <p className="mt-3 max-w-[420px] text-[13px] font-semibold leading-5 text-stone-600 sm:text-[14px]">
-                      This month · platform earnings inside this: {formatMoney(earnings?.currentMonth?.platformRevenueMinor)}
-                    </p>
-                  </div>
-                </Link>
-
-                <Link
-                  to="/admin/analytics#customer-demand"
-                  className="focus-ring group flex min-h-[174px] flex-col justify-between border-t border-[#bdd2e2] bg-[#d5e8f4] p-5 transition hover:bg-[#cce3f1] sm:min-h-[196px] sm:p-6 lg:border-l lg:border-t-0 lg:p-7"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-2.5 text-[#15527a]">
-                      <Search size={17} aria-hidden="true" />
-                      <p className="text-[12px] font-black uppercase tracking-[0.16em]">Customer search demand</p>
-                    </div>
-                    <ArrowRight size={16} className="text-[#668da7] transition group-hover:translate-x-1 group-hover:text-[#15527a]" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="text-[45.6px] font-black leading-none tracking-[-0.06em] text-stone-950 sm:text-[60px]">{demand?.totalSearches ?? 0} searches</p>
-                    <p className="mt-3 max-w-[420px] text-[13px] font-semibold leading-5 text-stone-600 sm:text-[14px]">
-                      Last 30 days · {demand?.topQuery?.query ? `top search: “${demand.topQuery.query}”` : 'search demand will appear as customers use EPANTRY search'}
-                    </p>
-                    {demand?.topArea ? (
-                      <p className="mt-1 text-[12px] font-bold text-stone-500 sm:text-[13px]">Top area: {[demand.topArea.city, demand.topArea.state, demand.topArea.postcode].filter(Boolean).join(', ') || 'Area not available'}</p>
-                    ) : null}
-                  </div>
-                </Link>
+              <span className="sad-business-arrow" aria-hidden="true"><ArrowRight size={18} /></span>
+            </Link>
+            <Link to="/admin/analytics#customer-demand" className="sad-business-item">
+              <div className="min-w-0">
+                <div className="sad-business-label"><Search size={15} aria-hidden="true" /> Customer searches</div>
+                <p className="sad-business-value">{demand ? Number(demand.totalSearches ?? 0).toLocaleString('en-IN') : '—'}</p>
+                <p className="sad-business-desc">{demand?.topQuery?.query ? `Top search: “${demand.topQuery.query}”` : demand ? 'No top search recorded yet' : 'Search data unavailable'}</p>
+                {demand?.topArea ? <p className="sad-business-desc">Area: {[demand.topArea.city, demand.topArea.state, demand.topArea.postcode].filter(Boolean).join(', ') || 'Not available'}</p> : null}
               </div>
-            </div>
-          </section>
+              <span className="sad-business-arrow" aria-hidden="true"><ArrowRight size={18} /></span>
+            </Link>
+          </div>
+        </section>
 
-          <section className="pt-1">
-            <div className="mb-3 grid gap-2 border-y border-[#d7d0c5] py-3 sm:mb-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-3 sm:py-5">
-              <div>
-                <p className="text-[12px] font-black uppercase tracking-[0.18em] text-[#185442] sm:text-[12px]">Admin workspaces</p>
-                <h2 className="mt-1 text-[24px] font-bold leading-tight tracking-[-0.035em] text-stone-950 sm:text-[30px]">Choose a workspace</h2>
-              </div>
-            </div>
+        <section className="sad-section" aria-labelledby="sad-workspaces-title">
+          <div className="sad-section-head">
+            <div><p className="sad-kicker">Admin workspaces</p><h2 id="sad-workspaces-title" className="sad-title">Choose a workspace</h2></div>
+            <p className="sad-sub">Select an area to see its tools</p>
+          </div>
+          <WorkspaceDirectory groups={moduleGroups} activeKey={openWorkspaceKey} onSelect={setActiveWorkspaceKey} />
+        </section>
 
-            <WorkspaceDirectory
-              groups={moduleGroups}
-              activeKey={openWorkspaceKey}
-              onSelect={setActiveWorkspaceKey}
-            />
-          </section>
-
-          {canReadAiQuality ? <AdminAiQualityPanel condensed /> : null}
-        </div>
-      </div>
+        {canReadAiQuality ? <section className="sad-section" aria-label="Food Copilot reliability"><AdminAiQualityPanel condensed /></section> : null}
+      </main>
     </AdminShell>
   )
-
 }
