@@ -42,6 +42,7 @@ import {
 import authRoutes from './modules/auth/auth.routes.js'
 import cookieConsentRoutes from './modules/cookieConsent/cookieConsent.routes.js'
 import websiteAnalyticsRoutes from './modules/websiteAnalytics/websiteAnalytics.routes.js'
+import websiteAnalyticsAdminRoutes from './modules/websiteAnalytics/websiteAnalytics.admin.routes.js'
 
 import brandAuthorityAdminRoutes from './modules/brands/brandAuthority.admin.routes.js'
 import brandAuthorityHostRoutes from './modules/brands/brandAuthority.host.routes.js'
@@ -296,6 +297,9 @@ app.use('/api/v1/privacy/consent', cookieConsentRoutes)
 
 /* M1-B: consent-checked public/Customer website events. M19 remains separate. */
 app.use('/api/v1/website-analytics', websiteAnalyticsRoutes)
+
+/* M1-C: root Super Admin reporting; separate from M19 operational analytics. */
+app.use('/api/v1/admin/website-analytics', websiteAnalyticsAdminRoutes)
 
 app.use(
   '/api/v1/account',

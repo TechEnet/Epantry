@@ -251,6 +251,12 @@ export default function AdminShell({
       icon: BarChart3,
       items: [
         {
+          label: "Website Analytics",
+          to: "/admin/website-analytics",
+          icon: BarChart3,
+          visible: isRootSuperAdmin,
+        },
+        {
           label: "Analytics & Customer Demand",
           to: "/admin/analytics",
           icon: BarChart3,
