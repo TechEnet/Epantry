@@ -25,6 +25,8 @@ import {
   recordAnalyticsEvent,
 } from './analytics.service.js'
 
+import { hasAnalyticsConsentForRequest } from '../cookieConsent/cookieConsent.service.js'
+
 import {
   analyticsEventBodySchema,
 } from './analytics.validation.js'
@@ -104,6 +106,14 @@ router.use(
 router.post(
   '/events',
   requireCsrfToken,
+  async (req, res, next) => {
+    try {
+      if (!(await hasAnalyticsConsentForRequest(req))) {
+        return res.status(403).json(new ApiResponse(403, null, 'Optional website analytics is not enabled.'))
+      }
+      return next()
+    } catch (error) { return next(error) }
+  },
 
   wrap(
     async (

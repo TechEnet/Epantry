@@ -1,5 +1,7 @@
 import crypto from 'crypto'
 
+import { hasAnalyticsConsentForRequest } from '../modules/cookieConsent/cookieConsent.service.js'
+
 import {
   recordAnalyticsEventBestEffort,
 } from '../modules/analytics/analytics.service.js'
@@ -715,6 +717,10 @@ export function analyticsInstrumentationMiddleware(
 
       void (
         async () => {
+          // M1-A: M19 analytics is optional measurement, not a required
+          // shopping/pantry action or a security audit log. Skip recording
+          // before consent, after rejection, or when consent cannot be read.
+          if (!(await hasAnalyticsConsentForRequest(req))) return
           const recipeMatch = pathname.match(
             /^\/api\/v1\/recipes\/([^/]+)(?:\/(?:outcome-plan|cooked))?$/,
           )

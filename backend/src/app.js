@@ -40,6 +40,7 @@ import {
 } from './modules/analytics/analytics.batch2.routes.js'
 
 import authRoutes from './modules/auth/auth.routes.js'
+import cookieConsentRoutes from './modules/cookieConsent/cookieConsent.routes.js'
 
 import brandAuthorityAdminRoutes from './modules/brands/brandAuthority.admin.routes.js'
 import brandAuthorityHostRoutes from './modules/brands/brandAuthority.host.routes.js'
@@ -288,6 +289,9 @@ app.use(
 
   authRoutes,
 )
+
+/* M1-A: public and authenticated browser cookie choices (not account consents). */
+app.use('/api/v1/privacy/consent', cookieConsentRoutes)
 
 app.use(
   '/api/v1/account',

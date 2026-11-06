@@ -6,6 +6,8 @@ import {
   Link,
 } from 'react-router-dom'
 
+import { COOKIE_SETTINGS_EVENT } from '../../features/cookieConsent/cookieConsent.service'
+
 import {
   motion,
   useReducedMotion,
@@ -23,6 +25,10 @@ const publicPages = [
   { label: 'Learn', path: '/learn' },
   { label: 'About', path: '/about' },
 ]
+
+function openCookieSettings() {
+  window.dispatchEvent(new Event(COOKIE_SETTINGS_EVENT))
+}
 
 export default function Footer() {
   const footerRef = useRef(null)
@@ -120,6 +126,7 @@ export default function Footer() {
           <p>
             © {currentYear} EPANTRY. All rights reserved.
           </p>
+          <button type="button" onClick={openCookieSettings} className="mt-1 w-fit text-left text-[14px] font-semibold normal-case tracking-normal text-[#F7F6F2] underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Cookie settings</button>
         </div>
       </div>
 
@@ -225,6 +232,8 @@ export default function Footer() {
             <p>
               © {currentYear} EPANTRY. All rights reserved.
             </p>
+            <span aria-hidden="true" className="text-white/35">·</span>
+            <button type="button" onClick={openCookieSettings} className="text-[14px] font-semibold normal-case tracking-normal text-[#F7F6F2] underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Cookie settings</button>
           </motion.div>
         </div>
       </div>
