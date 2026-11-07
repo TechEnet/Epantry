@@ -145,15 +145,24 @@ function exportAggregateCsv(report) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
-export default function AdminWebsiteAnalyticsPage() {
-  const [period, setPeriod] = useState('7')
+export default function AdminWebsiteAnalyticsPage({ embedded = false, activeView = "overview", reportDays = 30, refreshToken = 0 }) {
+  const [period, setPeriod] = useState(String(reportDays))
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [applied, setApplied] = useState({ days: 7, serial: 0 })
+  const [applied, setApplied] = useState({ days: reportDays, serial: 0 })
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filterError, setFilterError] = useState('')
+
+  useEffect(() => {
+    if (!embedded) return
+    setPeriod(String(reportDays))
+    setApplied((current) => ({ days: reportDays, serial: current.serial + 1 }))
+  }, [embedded, reportDays])
+  useEffect(() => {
+    if (embedded && refreshToken > 0) setApplied((current) => ({ ...current, serial: current.serial + 1 }))
+  }, [refreshToken, embedded])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -191,189 +200,183 @@ export default function AdminWebsiteAnalyticsPage() {
   const comparison = report?.previous
   const overview = report?.overview
   const hasData = Boolean(report?.coverage?.hasTrackedData)
+  const consentDecisions = Number(report?.consent?.currentSavedChoices || 0)
+  const recordedEvents = Number(report?.overview?.recordedEvents || 0)
   const toPercent = (value, baseline) => baseline > 0 ? `${Math.round((value - baseline) / baseline * 100)}%` : 'Not comparable'
   const compareLabel = comparison ? `${toPercent(overview.pageViews, comparison.pageViews)} vs previous period` : 'Previous period unavailable within 90-day retention'
   const paidCurrencies = report?.commerce?.byCurrency || []
 
-  return (
-    <AdminShell
-      title="Website analytics"
-      description="Traffic, content and confirmed sales in one place."
-      actions={
-        <button type="button" onClick={() => setApplied((old) => ({ ...old, serial: old.serial + 1 }))}
-          className="focus-ring inline-flex min-h-11 items-center gap-2 border border-[#A9BDB0] bg-[#F7F6F2] px-4 text-[14px] font-semibold text-[#173F35] transition-colors hover:bg-[#E6F4ED]">
-          <RefreshCw size={17} aria-hidden="true" /> Refresh
-        </button>
-      }
-    >
-      <div className="flex w-full min-w-0 flex-col gap-6 pb-8 text-[#202421] sm:gap-8">
-        {/* Filter controls stay visible; the compact ribbon replaces the tall filter panel. */}
-        <section aria-label="Report filters" className="border-t-[3px] border-[#C86C42] bg-[#E6EBDD] px-4 py-3 sm:px-5 sm:py-4">
-          <div className="flex flex-wrap items-end gap-2.5 sm:gap-3">
-            <div className="min-w-[155px] flex-1 sm:max-w-[275px]">
-              <label htmlFor="website-period" className="mb-1 block text-[13px] font-semibold text-[#254638]">Date range</label>
-              <select id="website-period" value={period} onChange={(event) => { setPeriod(event.target.value); setFilterError('') }}
-                className="focus-ring min-h-11 w-full border border-[#B9C7B6] bg-[#FFFDF9] px-3 text-[15px] text-[#173F35]">
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
-                <option value="custom">Custom dates (UTC)</option>
-              </select>
-            </div>
-            {period === 'custom' && <>
-              <div className="min-w-[145px] flex-1 sm:max-w-[220px]">
-                <label htmlFor="website-from" className="mb-1 block text-[13px] font-semibold text-[#254638]">From</label>
-                <input id="website-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="focus-ring min-h-11 w-full border border-[#B9C7B6] bg-[#FFFDF9] px-3 text-[15px] text-[#173F35]" />
-              </div>
-              <div className="min-w-[145px] flex-1 sm:max-w-[220px]">
-                <label htmlFor="website-to" className="mb-1 block text-[13px] font-semibold text-[#254638]">To</label>
-                <input id="website-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} className="focus-ring min-h-11 w-full border border-[#B9C7B6] bg-[#FFFDF9] px-3 text-[15px] text-[#173F35]" />
-              </div>
-            </>}
-            <button type="button" onClick={applyRange} className="focus-ring min-h-11 border border-[#173F35] bg-[#173F35] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#265A46]">Apply</button>
-            <button type="button" onClick={() => report && exportAggregateCsv(report)} disabled={!report || loading}
-              className="focus-ring inline-flex min-h-11 items-center gap-2 border border-[#A9BDB0] bg-[#F7F6F2] px-4 text-[14px] font-semibold text-[#173F35] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-              <Download size={17} aria-hidden="true" /> Export CSV
-            </button>
-            <span className="hidden text-[12px] text-[#4E6457] xl:ml-auto xl:block" title="All reporting dates are UTC. Raw analytics events are retained for up to 90 days.">UTC · 90-day event history</span>
+  const isOverview = activeView === 'overview'
+  const content = (
+    <div className="wi-embedded flex w-full min-w-0 flex-col gap-5 pb-5 text-[#202421]">
+      <style>{`
+        .wi-embedded {--wi-green:#173F35;--wi-sage:#DCE0CF}
+        .wi-embedded button:focus-visible,.wi-embedded summary:focus-visible {outline:2px solid #173F35;outline-offset:3px}
+        .wi-embedded .wi-panel {border:1px solid #D8E1D7;background:#FFFEFB}
+        .wi-embedded .wi-panel h3 {color:#173F35!important}
+      `}</style>
+      {isOverview ? (
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#DCE3DA] pb-3">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#C86C42]">01 / WEBSITE OVERVIEW</p>
+            <h2 className="mt-1 text-[25px] font-bold leading-tight text-[#173F35] sm:text-[30px]">Website performance</h2>
+            <p className="mt-1 text-[14px] text-[#56675C]">Only visits with analytics permission are counted.</p>
           </div>
-          {filterError && <p role="alert" className="mt-2 text-[14px] font-semibold text-[#9C2E2E]">{filterError}</p>}
-        </section>
+          <button type="button" onClick={() => report && exportAggregateCsv(report)} disabled={!report || loading}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-[#BACCBF] bg-[#FFFDF9] px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#DCE3DA] pb-3">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#C86C42]">03 / SHOPPING</p>
+            <h2 className="mt-1 text-[25px] font-bold leading-tight text-[#173F35] sm:text-[30px]">Shopping & content insights</h2>
+            <p className="mt-1 text-[14px] text-[#56675C]">Product activity and confirmed orders.</p>
+          </div>
+          <button type="button" onClick={() => report && exportAggregateCsv(report)} disabled={!report || loading}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-[#BACCBF] bg-[#FFFDF9] px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      )}
 
-        {loading && <div role="status" className="flex min-h-[160px] items-center justify-center gap-3 bg-[#EFF3ED] p-5 text-[15px] text-[#365549]"><RefreshCw size={20} className="animate-spin" aria-hidden="true" /> Loading analytics...</div>}
-        {!loading && error && <section role="alert" className="border-l-4 border-[#C86C42] bg-[#FFF0E4] px-5 py-5">
-          <h2 className="text-[21px] font-bold text-[#173F35]">Couldn't load analytics</h2>
-          <p className="mt-2 text-[15px] leading-6 text-[#544E48]">{error}</p>
-          <button type="button" onClick={() => setApplied((old) => ({ ...old, serial: old.serial + 1 }))} className="focus-ring mt-3 min-h-11 border border-[#173F35] px-5 font-semibold text-[#173F35]">Try again</button>
-        </section>}
-
-        {!loading && report && <>
-          <section aria-label="Analytics overview" className="min-w-0">
-            <SectionHeading number="01 / PERFORMANCE" title="At a glance" right={<span className="text-[13px] font-medium text-[#587063]">{report.window.from} — {report.window.to} · UTC</span>} />
-            <div className="mt-4 grid grid-cols-2 border border-[#D6DED7] sm:grid-cols-3 xl:grid-cols-5">
-              <Metric label="Visitors" value={compact(overview.visitors)} icon={Users} highlight />
-              <Metric label="Sessions" value={compact(overview.sessions)} icon={Activity} />
-              <Metric label="Page views" value={compact(overview.pageViews)} icon={Eye} note={comparison && comparison.pageViews > 0 ? compareLabel : undefined} />
-              <Metric label="Product views" value={compact(overview.productViews)} icon={ShoppingBag} />
-              <Metric label="Recipe views" value={compact(overview.recipeViews)} icon={BarChart3} />
-            </div>
-            {!hasData && <p className="mt-2 flex items-center gap-2 text-[13px] leading-5 text-[#5A6B60]"><ShieldCheck size={16} className="shrink-0 text-[#406552]" aria-hidden="true" /> No consented activity recorded yet.</p>}
-
-            <div className="mt-4 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.8fr)_minmax(265px,0.8fr)]">
-              <div className="min-w-0 border border-[#DDE4D9] bg-[#EEF2EB] px-4 py-4 sm:px-5 sm:py-5">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-[18px] font-semibold text-[#173F35]">Page views over time</h3>
-                  <BarChart3 size={19} className="text-[#527464]" aria-hidden="true" />
+      {isOverview && (
+        <details className="border-l-[3px] border-[#C86C42] bg-[#E9EDE5] px-4 py-3">
+          <summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Custom website date range · UTC</summary>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="min-w-[150px] flex-1 text-[13px] font-semibold text-[#365549]">From
+              <input type="date" value={from} onChange={(e) => {setFrom(e.target.value);setPeriod('custom')}} className="mt-1 block min-h-11 w-full border border-[#BDCBBF] bg-white px-3 text-[15px] text-[#173F35]" />
+            </label>
+            <label className="min-w-[150px] flex-1 text-[13px] font-semibold text-[#365549]">To
+              <input type="date" value={to} onChange={(e) => {setTo(e.target.value);setPeriod('custom')}} className="mt-1 block min-h-11 w-full border border-[#BDCBBF] bg-white px-3 text-[15px] text-[#173F35]" />
+            </label>
+            <button type="button" onClick={applyRange} className="min-h-11 rounded-md bg-[#173F35] px-5 text-[14px] font-semibold text-white">Apply</button>
+            <button type="button" onClick={() => {setPeriod(String(reportDays));setApplied((old) => ({days:reportDays,serial:old.serial+1}))}} className="min-h-11 rounded-md border border-[#A8BFB0] px-4 text-[14px] font-semibold text-[#173F35]">Use shared period</button>
+          </div>
+          {filterError && <p role="alert" className="mt-2 text-[14px] text-[#9B3E31]">{filterError}</p>}
+          {applied.from && <p className="mt-2 text-[13px] text-[#5F6A63]">Custom dates apply to website analytics only; Customer Demand uses the shared period.</p>}
+        </details>
+      )}
+      {report && !loading && (
+        <p className="text-[13px] font-medium text-[#50685A]">{report.window?.from} to {report.window?.to} · UTC{applied.from ? ' · Custom range' : ''}</p>
+      )}
+      {loading && <p role="status" className="py-12 text-center text-[15px] text-[#54665B]">Loading website analytics...</p>}
+      {!loading && error && (
+        <div role="alert" className="border-l-[3px] border-[#C86C42] bg-[#FFF0E7] p-5">
+          <p className="font-semibold text-[#173F35]">Website report unavailable</p>
+          <p className="mt-1 text-[14px]">{error}</p>
+          <button type="button" onClick={() => setApplied((old) => ({ ...old, serial: old.serial + 1 }))} className="mt-3 min-h-11 border border-[#9BAD9F] px-4 font-semibold text-[#173F35]">Try again</button>
+        </div>
+      )}
+      {report && !loading && (isOverview ? (
+        <>
+          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-[#D5DED5] sm:grid-cols-4">
+            <Metric label="Visitors" value={compact(report.overview.visitors)} icon={Users} highlight note="Consented browsers" />
+            <Metric label="Sessions" value={compact(report.overview.sessions)} icon={Activity} />
+            <Metric label="Page views" value={compact(report.overview.pageViews)} icon={Eye} />
+            <Metric label="Recipe views" value={compact(report.overview.recipeViews)} icon={BarChart3} />
+          </div>
+          {!hasData && (
+            <section className="border border-[#D6DFD5] bg-[#E9EEE7] px-5 py-5 sm:px-6 sm:py-6" aria-label="Tracking status">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="max-w-2xl">
+                  <h3 className="flex items-center gap-2 text-[20px] font-bold text-[#173F35]"><ShieldCheck size={22} aria-hidden="true" /> No consented visits yet</h3>
+                  <p className="mt-2 text-[15px] leading-6 text-[#465F50]">{consentDecisions === 0
+                    ? 'No cookie decisions have been saved yet. Analytics begins only after someone allows it.'
+                    : 'Cookie choices exist, but no website events were recorded in this period.'}</p>
                 </div>
-                <div className="mt-2"><TrendChart rows={report.daily} /></div>
-              </div>
-              <div className="relative flex min-w-0 flex-col justify-between overflow-hidden border-t-[3px] border-[#C86C42] bg-[#173F35] px-5 py-5 text-[#F7F6F2] sm:px-6">
-                <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full border border-white/10" />
-                <div aria-hidden="true" className="pointer-events-none absolute -right-4 -top-8 h-28 w-28 rounded-full border border-white/10" />
-                <div className="relative">
-                  <div className="flex items-center justify-between gap-2 text-[14px] font-medium text-[#DBE8DC]"><span>Verified paid orders</span><CheckCircle2 size={19} aria-hidden="true" /></div>
-                  <p className="mt-3 text-[44px] font-semibold leading-none tabular-nums text-white">{compact(report.commerce.paidOrders)}</p>
-                </div>
-                <div className="relative mt-5 border-t border-white/20 pt-3">
-                  {paidCurrencies.length ? paidCurrencies.map((currency) => (
-                    <p key={currency.currency} className="mt-2 first:mt-0">
-                      <strong className="block text-[22px] font-semibold tabular-nums text-white">{formatPaidAmount(currency.currency, currency.amountMinor)}</strong>
-                      <span className="mt-0.5 block text-[12px] text-[#CBDCD0]">Gross paid · {currency.currency}</span>
-                    </p>
-                  )) : <p className="text-[14px] text-[#D5E9DE]">No paid orders in this period</p>}
-                  <span className="mt-3 block text-[12px] text-[#BFD7C8]">From verified payments</span>
+                <div className="flex gap-6 border-l border-[#CAD8CB] pl-4 text-[13px] text-[#526658]">
+                  <span>Recorded events<strong className="block text-[26px] font-bold text-[#173F35]">{compact(recordedEvents)}</strong></span>
+                  <span>Saved choices<strong className="block text-[26px] font-bold text-[#173F35]">{compact(consentDecisions)}</strong></span>
                 </div>
               </div>
+              <details className="mt-4 border-t border-[#CCD9CE] pt-3 text-[14px] text-[#4A6254]">
+                <summary className="cursor-pointer font-bold text-[#173F35]">Check tracking</summary>
+                <p className="mt-2 leading-6">In a Customer or guest browser, allow Analytics under Cookie settings, visit a public Grocery or Recipe page, then refresh this report. Host/Admin workspace visits and searches are not part of public website tracking.</p>
+              </details>
+            </section>
+          )}
+          {hasData && <div className="wi-panel rounded-lg p-4 sm:p-6">
+            <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-[19px] font-bold">Traffic over time</h3><span className="text-[12px] text-[#6E786F]">UTC</span></div>
+            <TrendChart rows={report.daily} />
+            {report.previous && <p className="mt-1 text-[13px] text-[#657469]">Previous period: {compact(report.previous.pageViews)} page views</p>}
+          </div>}
+          {hasData && <div className="grid gap-4 lg:grid-cols-2">
+            <div className="wi-panel rounded-lg p-5">
+              <h3 className="mb-2 flex items-center gap-2 text-[18px] font-bold"><Globe2 size={18}/> Traffic sources</h3>
+              <MiniBars rows={report.acquisition.map((row) => ({ label:`${row.source} / ${row.medium}`,sessions:row.sessions }))} labelKey="label" countKey="sessions" emptyMessage="No source data yet"/>
+              {report.campaigns?.length > 0 && <details className="mt-4 border-t border-[#D7E1D8] pt-3"><summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Campaigns ({report.campaigns.length})</summary>
+                <DataTable headings={['Campaign','Sessions']} rows={report.campaigns.map((row) => [row.name,compact(row.sessions)])} empty="No campaign activity" />
+              </details>}
             </div>
-          </section>
-
-          <section aria-label="Audience and traffic">
-            <SectionHeading number="02 / AUDIENCE" title="Where people came from" />
-            <div className="mt-3 grid min-w-0 border border-[#DCE4DD] bg-[#F7F6F2] lg:grid-cols-2 lg:divide-x lg:divide-[#DCE4DD]">
-              <div className="min-w-0 px-4 py-4 sm:px-5">
-                <h3 className="mb-3 flex items-center gap-2 text-[16px] font-semibold text-[#173F35]"><Globe2 size={18} aria-hidden="true" /> Traffic sources</h3>
-                <MiniBars rows={report.acquisition.map((row) => ({ label: `${row.source} / ${row.medium}`, sessions: row.sessions }))} labelKey="label" countKey="sessions" emptyMessage="No source data yet" />
-              </div>
-              <div className="min-w-0 border-t border-[#DCE4DD] px-4 py-4 sm:px-5 lg:border-t-0">
-                <h3 className="mb-3 flex items-center gap-2 text-[16px] font-semibold text-[#173F35]"><Smartphone size={18} aria-hidden="true" /> Devices</h3>
-                <MiniBars rows={report.devices} labelKey="device" countKey="sessions" emptyMessage="No device data yet" />
-              </div>
+            <div className="wi-panel rounded-lg p-5"><h3 className="mb-2 flex items-center gap-2 text-[18px] font-bold"><Smartphone size={18}/> Devices</h3>
+              <MiniBars rows={report.devices} labelKey="device" countKey="sessions" emptyMessage="No device data yet"/>
             </div>
-            {report.campaigns.length > 0 && <details className="mt-2 border-b border-[#D5DFD6] px-1 py-2">
-              <summary className="focus-ring cursor-pointer py-1 text-[14px] font-semibold text-[#173F35]">Campaign details ({report.campaigns.length})</summary>
-              <div className="mt-2"><DataTable headings={['Campaign', 'Sessions']} rows={report.campaigns.map((row) => [row.name, compact(row.sessions)])} empty="No campaign entries" /></div>
-            </details>}
-          </section>
-
-          <section aria-label="Content discovery">
-            <SectionHeading number="03 / DISCOVERY" title="What people explored" />
-            <div className="mt-3 grid min-w-0 border-y border-[#D9E0D9] lg:grid-cols-2 lg:divide-x lg:divide-[#D9E0D9]">
-              <div className="min-w-0 px-3 py-4 sm:px-5">
-                <div className="mb-2 flex items-center justify-between gap-2"><h3 className="text-[16px] font-semibold text-[#173F35]">Popular pages</h3><Eye size={18} className="text-[#5B7866]" aria-hidden="true" /></div>
-                <DataTable headings={['Page', 'Views']} rows={report.topPages.map((row) => [row.page, compact(row.views)])} empty="No page views yet" />
-              </div>
-              <div className="min-w-0 border-t border-[#D9E0D9] px-3 py-4 sm:px-5 lg:border-t-0">
-                <div className="mb-2 flex items-center justify-between gap-2"><h3 className="text-[16px] font-semibold text-[#173F35]">Products & recipes</h3><ShoppingBag size={18} className="text-[#5B7866]" aria-hidden="true" /></div>
-                <DataTable headings={['Content', 'Views']} rows={report.topContent.map((row) => [`${row.type || 'content'} / ${row.id || 'unknown'}`, compact(row.views)])} empty="No content views yet" />
-              </div>
+          </div>}
+          <div className="border-t border-[#D6E0D6] pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-[#E8EEE3] p-4 sm:p-5">
+              <div className="flex items-center gap-3"><ShieldCheck size={22} color="#173F35"/><div><p className="text-[14px] font-semibold text-[#365549]">Saved cookie choices</p>
+                <p className="text-[21px] font-bold text-[#173F35]">{report.consent.enabledShare == null ? 'No saved choices' : `${report.consent.enabledShare}% allowed`}</p></div></div>
+              <div className="flex gap-6"><div className="text-[13px] text-[#526558]">Allowed<strong className="block text-[21px] text-[#173F35]">{compact(report.consent.analyticsEnabled)}</strong></div>
+                <div className="text-[13px] text-[#526558]">Not allowed<strong className="block text-[21px] text-[#173F35]">{compact(report.consent.analyticsRejected)}</strong></div></div>
             </div>
-            <div className="mt-3 grid grid-cols-2 border border-[#D6DED7] sm:grid-cols-3">
-              <Metric label="Searches" value={compact(overview.searches)} icon={MousePointerClick} />
-              <Metric label="Saved items" value={compact(overview.bookmarks)} icon={ShieldCheck} />
-              <Metric label="Cart additions" value={compact(overview.cartActions)} icon={ShoppingBag} />
-            </div>
-          </section>
-
-          <section aria-label="Shopping activity">
-            <SectionHeading number="04 / SHOPPING" title="From product to checkout" />
-            <div className="mt-3 grid min-w-0 grid-cols-1 border-l-[3px] border-[#C86C42] bg-[#E6EBDD] px-4 py-2 sm:grid-cols-3 sm:py-4">
-              {report.funnel.map((step, index) => (
-                <div key={step.event} className="flex min-w-0 items-center justify-between gap-4 border-b border-[#C7D2C5] py-3 last:border-0 sm:border-b-0 sm:border-r sm:px-4 sm:last:border-r-0">
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-semibold text-[#AD5D3C]">{String(index + 1).padStart(2, '0')}</p>
-                    <h3 className="mt-0.5 text-[15px] font-semibold leading-5 text-[#173F35]">{({ product_view: 'Product viewed', add_to_cart: 'Added to cart', begin_checkout: 'Checkout started' })[step.event] || step.event}</h3>
+            <details className="mt-2 border-b border-[#DAE2DA] py-3"><summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Definitions & data coverage</summary>
+              <div className="space-y-2 pt-3 text-[14px] leading-6 text-[#506052]"><p>{report.coverage.note}</p><p>{report.consent.note}</p><p>{report.commerce.note}</p><p>Report dates are UTC. Raw website events are retained up to 90 days.</p></div>
+            </details>
+            <details className="border-b border-[#DAE2DA] py-3"><summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Daily activity table</summary>
+              <div className="mt-3"><DataTable headings={['UTC day','Page views','Sessions','Recipe views','Product views']} rows={dailyTableRows} empty="No daily activity"/></div>
+            </details>
+          </div>
+          <p className="text-right text-[12px] text-[#66776C]">Updated {new Date(report.generatedAt).toLocaleString('en-IN')}</p>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-[#D5DED5] sm:grid-cols-4">
+            <Metric label="Product views" value={compact(report.overview.productViews)} icon={ShoppingBag} highlight />
+            <Metric label="Consented searches" value={compact(report.overview.searches)} icon={MousePointerClick} />
+            <Metric label="Saved items" value={compact(report.overview.bookmarks)} icon={ShieldCheck} />
+            <Metric label="Cart actions" value={compact(report.overview.cartActions)} icon={ShoppingBag} />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,.8fr)]">
+            <div className="wi-panel rounded-lg p-5">
+              <h3 className="mb-3 text-[19px] font-bold">Path to checkout</h3>
+              <div className="divide-y divide-[#D9E2D9]">
+                {report.funnel.map((step, index) => (
+                  <div key={step.event} className="flex min-w-0 items-center justify-between gap-4 py-4">
+                    <div><p className="text-[12px] font-bold text-[#C86C42]">STEP {String(index+1).padStart(2,'0')}</p>
+                      <p className="mt-1 text-[16px] font-semibold text-[#173F35]">{({product_view:'Product viewed',add_to_cart:'Added to cart',begin_checkout:'Checkout started'})[step.event] || step.event}</p></div>
+                    <strong className="text-[27px] font-bold text-[#173F35]">{compact(step.sessions)}</strong>
                   </div>
-                  <strong className="text-[29px] font-semibold tabular-nums text-[#173F35]">{compact(step.sessions)}</strong>
-                </div>
-              ))}
+                ))}
+              </div>
+              <p className="mt-3 text-[13px] text-[#647469]">Consented sessions per action, not individually linked conversions.</p>
             </div>
-            <p className="mt-2 text-[12px] leading-5 text-[#64746A]">Consented sessions at each step · not a linked customer funnel</p>
-          </section>
+            <div className="flex flex-col justify-between rounded-lg border-l-[4px] border-[#C86C42] bg-[#173F35] p-5 text-white sm:p-6">
+              <div><p className="text-[15px] font-semibold text-[#DBE6DA]">Verified paid orders</p>
+                <p className="mt-3 text-[42px] font-bold text-white">{compact(report.commerce.paidOrders)}</p></div>
+              <div className="mt-5 space-y-2 border-t border-white/20 pt-4">
+                {(report.commerce.byCurrency || []).length ? report.commerce.byCurrency.map((entry) => (
+                  <div key={entry.currency}><p className="text-[22px] font-semibold text-white">{formatPaidAmount(entry.currency,entry.amountMinor)}</p>
+                    <p className="text-[12px] text-[#C9DACC]">Gross paid · {entry.currency}</p></div>
+                )) : <p className="text-[14px] text-[#D5E5D7]">No paid orders in this period</p>}
+                <p className="text-[12px] text-[#C5D7C8]">Source: verified payment records, not tracking events.</p>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="wi-panel rounded-lg p-5"><h3 className="mb-2 text-[18px] font-bold">Popular pages</h3>
+              <DataTable headings={['Page','Views']} rows={report.topPages.map((row) => [row.page,compact(row.views)])} empty="No page views yet" />
+            </div>
+            <div className="wi-panel rounded-lg p-5"><h3 className="mb-2 text-[18px] font-bold">Products & recipes</h3>
+              <DataTable headings={['Content','Views']} rows={report.topContent.map((row) => [`${row.type||'content'} / ${row.id||'unknown'}`, compact(row.views)])} empty="No content views yet" />
+            </div>
+          </div>
 
-          <section aria-label="Privacy and report details">
-            <SectionHeading number="05 / DATA QUALITY" title="Consent & report details" />
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-4 border-l-[3px] border-[#173F35] bg-[#DCE0CF] px-4 py-4 sm:px-6">
-              <div className="flex items-center gap-3">
-                <ShieldCheck size={24} className="shrink-0 text-[#173F35]" aria-hidden="true" />
-                <div>
-                  <p className="text-[13px] font-medium text-[#486252]">Analytics consent</p>
-                  <p className="text-[24px] font-semibold leading-tight text-[#173F35]">{report.consent.enabledShare == null ? 'No saved choices' : `${report.consent.enabledShare}% allowed`}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-6 text-[14px] text-[#365549]">
-                <span>Allowed <strong className="block text-[23px] leading-tight tabular-nums text-[#173F35]">{compact(report.consent.analyticsEnabled)}</strong></span>
-                <span>Not allowed <strong className="block text-[23px] leading-tight tabular-nums text-[#173F35]">{compact(report.consent.analyticsRejected)}</strong></span>
-              </div>
-            </div>
-            <div className="mt-3 divide-y divide-[#DEE4DC] border-y border-[#DEE4DC]">
-              <details className="px-2 py-2.5 sm:px-3">
-                <summary className="focus-ring cursor-pointer py-1 text-[14px] font-semibold text-[#173F35]">How these numbers work</summary>
-                <div className="max-w-[1020px] space-y-2 pb-2 pt-3 text-[14px] leading-6 text-[#4B5B53]">
-                  <p>{report.coverage.note}</p>
-                  <p>{report.consent.note}</p>
-                  <p>{report.commerce.note}</p>
-                  <p>All report dates are in UTC. Raw analytics events are retained for up to 90 days.</p>
-                </div>
-              </details>
-              <details className="px-2 py-2.5 sm:px-3">
-                <summary className="focus-ring cursor-pointer py-1 text-[14px] font-semibold text-[#173F35]">Daily data table</summary>
-                <div className="mt-3"><DataTable headings={['UTC day', 'Page views', 'Sessions', 'Recipe views', 'Product views']} rows={dailyTableRows} empty="No daily activity" /></div>
-              </details>
-            </div>
-            <p className="mt-2 text-right text-[12px] text-[#64746A]">Updated {new Date(report.generatedAt).toLocaleString('en-IN')}</p>
-          </section>
-        </>}
-      </div>
-    </AdminShell>
+        </>
+      ))}
+    </div>
   )
+  if (embedded) return content
+  return <AdminShell title="Website analytics" description="" showWorkspaceBadge={false}>{content}</AdminShell>
 }

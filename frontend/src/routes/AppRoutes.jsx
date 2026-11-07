@@ -1073,8 +1073,7 @@ const AdminGovernancePage = lazy(() => import('../features/adminGovernance/pages
 const AdminRolesPage = lazy(() => import('../features/admin/pages/AdminRolesPage'))
 const AdminProMembershipPage = lazy(() => import('../features/admin/pages/AdminProMembershipPage'))
 const AdminAuditPage = lazy(() => import('../features/admin/pages/AdminAuditPage'))
-const AdminAnalyticsPage = lazy(() => import('../features/analytics/pages/AdminAnalyticsPage'))
-const AdminWebsiteAnalyticsPage = lazy(() => import('../features/websiteAnalytics/pages/AdminWebsiteAnalyticsPage'))
+const AdminInsightsPage = lazy(() => import('../features/analytics/pages/AdminInsightsPage'))
 
 const SystemDebugPage = lazy(() => import('../features/system/pages/SystemDebugPage'))
 
@@ -3204,7 +3203,7 @@ export default function AppRoutes() {
               path="/admin/website-analytics"
               element={
                 <AdminPermissionRoute rootOnly>
-                  <AdminWebsiteAnalyticsPage />
+                  <Navigate to="/admin/analytics?tab=overview" replace />
                 </AdminPermissionRoute>
               }
             />
@@ -3221,7 +3220,7 @@ export default function AppRoutes() {
                     'catalog.read',
                   ]}
                 >
-                  <AdminAnalyticsPage />
+                  <AdminInsightsPage />
                 </AdminPermissionRoute>
               }
             />

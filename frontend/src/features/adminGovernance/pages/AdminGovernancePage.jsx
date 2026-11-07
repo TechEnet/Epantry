@@ -175,63 +175,199 @@ import {
     'Enabled feature flags': 'Active controls',
   });
   
-  function UsersMetricCard({
-    label,
-    value,
-    icon: Icon,
-  }) {
-    return (
-      <div className="flex min-w-0 items-center justify-between gap-3 bg-white px-4 py-4 sm:px-5 sm:py-5">
+  // These paths correspond to real, permission-protected Admin routes.
+  // A metric never opens a workspace the current Admin cannot access.
+  const USER_METRIC_DESTINATIONS = Object.freeze({
+    'Open review cases': {
+      to: '/admin/trust-safety',
+      permissions: ['trust_safety.read'],
+    },
+    'Critical reviews': {
+      to: '/admin/trust-safety',
+      permissions: ['trust_safety.read'],
+    },
+    'Host activation queue': {
+      to: '/admin/host-operations',
+      permissions: ['marketplace.read', 'finance.read', 'recipe.read', 'trust_safety.read'],
+      fallbackTo: '/admin/hosts',
+      fallbackPermission: 'host.review.read',
+    },
+    'Order exceptions': {
+      to: '/admin/orders-disputes',
+      permissions: ['marketplace.read', 'trust_safety.read'],
+    },
+    'Failed webhooks': {
+      to: '/admin/integrations',
+      permissions: ['marketplace.read'],
+    },
+    'Pending settlements': {
+      to: '/admin/finance-ops',
+      permissions: ['finance.read'],
+    },
+    'Active incidents': {
+      to: '/admin/trust-safety',
+      permissions: ['trust_safety.read'],
+    },
+    'Enabled feature flags': {
+      to: '/admin/policy',
+      permissions: ['admin.dashboard.read'],
+    },
+  });
+
+  function userMetricDestination(label, isRootSuperAdmin, hasAdminPermission) {
+    const destination = USER_METRIC_DESTINATIONS[label];
+    if (!destination) return null;
+    if (isRootSuperAdmin || destination.permissions.some((permission) => hasAdminPermission(permission))) {
+      return destination.to;
+    }
+    if (destination.fallbackTo && hasAdminPermission(destination.fallbackPermission)) {
+      return destination.fallbackTo;
+    }
+    return null;
+  }
+
+  // People & Businesses uses page-specific styles so global legacy colour
+  // normalization cannot make neutral metric panels dark or unreadable.
+  const peopleBusinessStyles = `
+    .pb-workspace { color: #202421; }
+    .pb-workspace *, .pb-workspace *::before, .pb-workspace *::after { box-sizing: border-box; }
+    .pb-workspace .pb-intro { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(260px,.75fr); overflow: hidden; border-radius: 15px; border: 1px solid #D4DED4; }
+    .pb-workspace .pb-intro-main { background: #173F35 !important; color: #F7F6F2 !important; padding: 27px 32px; position: relative; }
+    .pb-workspace .pb-intro-main::before { content: ''; position: absolute; top: 0; left: 0; height: 3px; width: 82px; background: #C86C42; }
+    .pb-workspace .pb-intro-main .pb-kicker { font-size: 13px; line-height: 1.4; font-weight: 700; color: #DCE0CF !important; }
+    .pb-workspace .pb-intro-main h2 { font-size: 29px !important; line-height: 1.19 !important; font-weight: 700 !important; letter-spacing: -0.035em; margin-top: 8px; color: #F7F6F2 !important; }
+    .pb-workspace .pb-intro-main p:last-child { margin-top: 11px; font-size: 15px; line-height: 1.5; color: #E4EAE3 !important; max-width: 52ch; }
+    .pb-workspace .pb-intro-side { background: #EDF1E9 !important; padding: 24px 26px; display: flex; gap: 14px; align-items: center; }
+    .pb-workspace .pb-intro-side-icon { width: 48px; height: 48px; border-radius: 12px; flex: 0 0 48px; display: grid; place-items: center; background: #DCE0CF !important; color: #173F35 !important; }
+    .pb-workspace .pb-intro-side strong { display: block; color: #173F35 !important; font-size: 17px; font-weight: 700; }
+    .pb-workspace .pb-intro-side p { margin-top: 3px; font-size: 14px; line-height: 1.45; color: #41574B !important; }
+    .pb-workspace .pb-block { margin-top: 28px; }
+    .pb-workspace .pb-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 8px 20px; padding: 0 0 13px; border-bottom: 1px solid #CED9D0; }
+    .pb-workspace .pb-heading .pb-serial { font-size: 13px; color: #B75C35 !important; font-weight: 700; }
+    .pb-workspace .pb-heading h2 { font-size: 25px !important; line-height: 1.25 !important; font-weight: 700 !important; color: #173F35 !important; margin-top: 3px; }
+    .pb-workspace .pb-heading .pb-heading-note { color: #627266 !important; font-size: 14px; line-height: 1.45; }
+    .pb-workspace .pb-metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); border: 1px solid #DDE4DA; border-top: 0; background: #DDE4DA; gap: 1px; overflow: hidden; border-radius: 0 0 13px 13px; }
+    .pb-workspace .pb-metric { min-height: 104px; min-width: 0; background: #F7F6F2 !important; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 17px 20px; }
+    .pb-workspace .pb-metric-label { font-size: 14px; line-height: 1.4; font-weight: 600; color: #536A5C !important; }
+    .pb-workspace .pb-metric-number { font-size: 32px; line-height: 1.15; font-weight: 700; margin-top: 7px; color: #173F35 !important; font-variant-numeric: tabular-nums; }
+    .pb-workspace .pb-metric-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 9px; background: #E5EBDD !important; color: #173F35 !important; }
+    .pb-workspace .pb-metric-link { text-decoration: none; cursor: pointer; transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+    .pb-workspace .pb-metrics .pb-metric-link:hover { background: #E8EFE5 !important; box-shadow: inset 0 3px 0 #C86C42; }
+    .pb-workspace .pb-metrics .pb-metric-link:focus-visible { background: #E8EFE5 !important; outline: 3px solid #173F35; outline-offset: -3px; }
+    .pb-workspace .pb-metric-link:hover .pb-metric-cue, .pb-workspace .pb-metric-link:focus-visible .pb-metric-cue { text-decoration: underline; text-underline-offset: 3px; }
+    .pb-workspace .pb-metric-cue { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; color: #97522F !important; font-size: 12px; line-height: 1.3; font-weight: 700; }
+    .pb-workspace .pb-metric-disabled { font-size: 12px; line-height: 1.4; color: #78857A !important; margin-top: 9px; }
+    .pb-workspace .pb-metric-cue .pb-cue-short { display: none; }
+
+    .pb-workspace .pb-tool-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 0; border: 1px solid #D5DED5; border-top: 0; border-radius: 0 0 13px 13px; overflow: hidden; }
+    .pb-workspace .pb-tool { min-width: 0; display: flex; align-items: flex-start; gap: 14px; padding: 23px 21px; text-decoration: none; background: #F7F6F2 !important; border-right: 1px solid #D5DED5; color: #173F35 !important; transition: background-color .18s ease, box-shadow .18s ease; }
+    .pb-workspace .pb-tool:last-child { border-right: 0; }
+    .pb-workspace .pb-tool:hover, .pb-workspace .pb-tool:focus-visible { background: #E7EEE5 !important; box-shadow: inset 0 3px 0 #C86C42; }
+    .pb-workspace .pb-tool:focus-visible { outline: 2px solid #173F35; outline-offset: -3px; }
+    .pb-workspace .pb-tool-icon { background: #E6E9DB !important; color: #173F35 !important; width: 45px; height: 45px; flex: 0 0 45px; border-radius: 11px; display: grid; place-items: center; }
+    .pb-workspace .pb-tool-title { font-size: 17px; line-height: 1.3; color: #173F35 !important; font-weight: 700; }
+    .pb-workspace .pb-tool-description { font-size: 14px; line-height: 1.45; color: #637367 !important; margin-top: 4px; }
+    .pb-workspace .pb-tool-arrow { flex: 0 0 auto; align-self: center; font-size: 20px; font-weight: 700; color: #C86C42 !important; }
+    .pb-workspace .pb-message { padding: 19px 22px; border: 1px solid #D8E0D5; border-top: 0; border-radius: 0 0 13px 13px; background: #F5F7F1 !important; color: #173F35 !important; }
+    .pb-workspace .pb-message.pb-error { border-color: #E9C9BB; background: #FFF0E8 !important; }
+    .pb-workspace .pb-retry { display: inline-flex; align-items: center; gap: 8px; margin-top: 11px; padding: 9px 13px; border: 1px solid #98AEA0; border-radius: 8px; background: #FFFFFF !important; color: #173F35 !important; font-size: 14px; font-weight: 700; }
+    @media (max-width: 920px) {
+      .pb-workspace .pb-intro { grid-template-columns: minmax(0,1fr) minmax(225px,.72fr); }
+      .pb-workspace .pb-metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .pb-workspace .pb-tool-list { grid-template-columns: 1fr; }
+      .pb-workspace .pb-tool { border-right: 0; border-bottom: 1px solid #D5DED5; }
+      .pb-workspace .pb-tool:last-child { border-bottom: 0; }
+    }
+    @media (max-width: 640px) {
+      .pb-workspace .pb-intro { grid-template-columns: 1fr; }
+      .pb-workspace .pb-intro-main { padding: 20px; }
+      .pb-workspace .pb-intro-main h2 { font-size: 25px !important; }
+      .pb-workspace .pb-intro-side { padding: 15px 20px; }
+      .pb-workspace .pb-block { margin-top: 22px; }
+      .pb-workspace .pb-heading { padding-bottom: 10px; }
+      .pb-workspace .pb-heading h2 { font-size: 22px !important; }
+      .pb-workspace .pb-metric { padding: 14px; min-height: 94px; }
+      .pb-workspace .pb-metric-number { font-size: 28px; }
+      .pb-workspace .pb-metric-icon { width: 29px; height: 29px; flex-basis: 29px; }
+      /* Mobile-only refinements: keep the desktop People & Businesses layout unchanged. */
+      .pb-workspace .pb-intro { border-radius: 12px; }
+      .pb-workspace .pb-intro-main { padding: 17px 18px 16px; }
+      .pb-workspace .pb-intro-main .pb-kicker { font-size: 12px; }
+      .pb-workspace .pb-intro-main h2 { margin-top: 6px; font-size: 23px !important; line-height: 1.18 !important; }
+      .pb-workspace .pb-intro-main p:last-child { margin-top: 8px; font-size: 13.5px; line-height: 1.45; }
+      .pb-workspace .pb-intro-side { gap: 10px; padding: 10px 17px; }
+      .pb-workspace .pb-intro-side-icon { width: 34px; height: 34px; flex-basis: 34px; border-radius: 9px; }
+      .pb-workspace .pb-intro-side-icon svg { width: 18px; height: 18px; }
+      .pb-workspace .pb-intro-side strong { font-size: 14px; line-height: 1.35; }
+      .pb-workspace .pb-intro-side p { display: none; }
+
+      .pb-workspace .pb-block { margin-top: 20px; }
+      .pb-workspace .pb-heading { padding-bottom: 10px; }
+      .pb-workspace .pb-heading h2 { font-size: 21px !important; }
+      .pb-workspace .pb-heading .pb-heading-note { display: none; }
+      .pb-workspace .pb-metrics { border-top: 1px solid #DDE4DA; border-radius: 12px; }
+      .pb-workspace .pb-metric { min-height: 0; padding: 12px 13px 11px; gap: 4px; }
+      .pb-workspace .pb-metric-label { font-size: 13.5px; line-height: 1.28; }
+      .pb-workspace .pb-metric-number { margin-top: 5px; font-size: 27px; line-height: 1; }
+      .pb-workspace .pb-metric-icon { display: none; }
+      .pb-workspace .pb-metric-cue { margin-top: 7px; font-size: 12px; line-height: 1.3; }
+      .pb-workspace .pb-metric-cue .pb-cue-full { display: none; }
+      .pb-workspace .pb-metric-cue .pb-cue-short { display: inline; }
+      .pb-workspace .pb-metric-disabled { font-size: 12px; }
+
+      .pb-workspace .pb-tool-list { border-top: 1px solid #D5DED5; border-radius: 12px; }
+      .pb-workspace .pb-tool { align-items: center; gap: 11px; padding: 13px 14px; }
+      .pb-workspace .pb-tool-icon { width: 38px; height: 38px; flex-basis: 38px; border-radius: 9px; }
+      .pb-workspace .pb-tool-icon svg { width: 19px; height: 19px; }
+      .pb-workspace .pb-tool-title { font-size: 15.5px; line-height: 1.3; }
+      .pb-workspace .pb-tool-description { margin-top: 3px; font-size: 12.5px; line-height: 1.35; }
+      .pb-workspace .pb-tool-arrow { font-size: 18px; }
+      .pb-mobile-refresh { display: flex; margin-left: auto; }
+    }
+  `;
+
+  function UsersMetricCard({ label, value, icon: Icon, to }) {
+    const displayLabel = USER_METRIC_LABELS[label] || label;
+    const content = (
+      <>
         <div className="min-w-0">
-          <p className="text-[14px] font-semibold leading-snug text-[#476258] sm:text-[15px]">
-            {USER_METRIC_LABELS[label] || label}
-          </p>
-          <p className="mt-1.5 text-[28px] font-extrabold leading-none tabular-nums text-[#183e31] sm:text-[32px]">
-            {value ?? 0}
-          </p>
+          <p className="pb-metric-label">{displayLabel}</p>
+          <p className="pb-metric-number">{value ?? '—'}</p>
+          {to ? (
+            <span className="pb-metric-cue"><span className="pb-cue-full">Open workspace</span><span className="pb-cue-short">Open</span> <span aria-hidden="true">→</span></span>
+          ) : (
+            <p className="pb-metric-disabled">Access restricted</p>
+          )}
         </div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#edf5f0] text-[#236149]">
-          <Icon size={19} aria-hidden="true" />
-        </span>
+        <span className="pb-metric-icon" aria-hidden="true"><Icon size={18} /></span>
+      </>
+    );
+    return to ? (
+      <Link
+        to={to}
+        className="pb-metric pb-metric-link focus-ring"
+        aria-label={`${displayLabel}: ${value ?? 'unavailable'}. Open workspace`}
+      >
+        {content}
+      </Link>
+    ) : (
+      <div className="pb-metric" aria-label={`${displayLabel}: ${value ?? 'unavailable'}. Access restricted`}>
+        {content}
       </div>
     );
   }
 
-  function UsersStepCard({
-    number,
-    title,
-    body,
-    mobileTitle,
-    mobileBody,
-    icon: Icon,
-    to,
-  }) {
-    const content = (
-      <div className="flex h-full min-w-0 items-start gap-3 bg-white px-4 py-4 sm:px-5 sm:py-5">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e3efe7] text-[#1c6145]">
-          <Icon size={21} aria-hidden="true" />
+  function PeopleBusinessTool({ to, title, description, icon: Icon }) {
+    return (
+      <Link to={to} className="pb-tool focus-ring">
+        <span className="pb-tool-icon" aria-hidden="true"><Icon size={21} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="pb-tool-title block">{title}</span>
+          <span className="pb-tool-description block">{description}</span>
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-bold text-[#4a7761]">Step {String(number).padStart(2, '0')}</p>
-          <h3 className="mt-0.5 break-words text-[16px] font-extrabold leading-snug text-[#193e30] sm:text-[17px]">
-            {title}
-          </h3>
-          <p className="mt-1 text-[14px] leading-5 text-stone-600">
-            {mobileBody || body}
-          </p>
-        </div>
-        {to ? <span aria-hidden="true" className="shrink-0 self-center text-[19px] text-[#267251]">↗</span> : null}
-      </div>
-    );
-
-    return to ? (
-      <Link
-        to={to}
-        className="focus-ring block h-full min-w-0 transition-colors hover:[&>div]:bg-[#f0f8f3] focus-visible:[&>div]:bg-[#f0f8f3]"
-      >
-        {content}
+        <span className="pb-tool-arrow" aria-hidden="true">→</span>
       </Link>
-    ) : content;
+    );
   }
 
   function QueueList({
@@ -1189,7 +1325,7 @@ import {
             async () => {
                 setLoading(true);
                 setError('');
-                if (section === 'trustSafety' || section === 'aiQuality') setCommandCenterError('');
+                if (section === 'trustSafety' || section === 'aiQuality' || section === 'users') setCommandCenterError('');
                 if (section === 'policy') {
                     setPolicyLoadIssues({ rules: '', flags: '' });
                     setPolicyRelatedIssues([]);
@@ -1247,7 +1383,7 @@ import {
                         setCommandCenter(
                             results[0].value,
                         );
-                    } else if (section === 'trustSafety' || section === 'aiQuality') {
+                    } else if (section === 'trustSafety' || section === 'aiQuality' || section === 'users') {
                         setCommandCenter(null);
                         setCommandCenterError(getAdminGovernanceErrorMessage(
                             results[0].reason, 'Could not load the platform overview.',
@@ -4739,6 +4875,7 @@ import {
                         : section === 'policy' ? <><span className="text-[13px] leading-[1.3] sm:hidden">Manage rules and features.</span><span className="hidden sm:inline">Create and review food safety rules, manage feature access, and track related admin work.</span></> : config.description
             }
             showWorkspaceBadge={section !== 'users'}
+            mobileStackHeader={section === 'users'}
             flushTop={section === 'users'}
             actions={
                 <button
@@ -4760,7 +4897,7 @@ import {
                         }
                     }}
                     disabled={section === 'recipeReview' ? recipeReviewLoading : loading}
-                    className="focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50"
+                    className={`focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50 ${section === 'users' ? 'pb-mobile-refresh' : ''}`}
                 >
                     <RefreshCw
                         size={14}
@@ -4810,47 +4947,23 @@ import {
             ) : null}
   
             {section === 'users' ? (
-                <section className="mt-4 overflow-hidden rounded-[22px] border border-[#d4e2d8] bg-[#f6f8f4] sm:mt-5 sm:rounded-[26px]">
-                    <div className="flex flex-col gap-2 bg-[#174b38] px-4 py-5 text-white sm:px-7 sm:py-6">
-                        <p className="text-[13px] font-bold text-[#c6e7d2]">People & Business Access</p>
-                        <h2 className="max-w-3xl text-[24px] font-extrabold leading-tight sm:text-[29px]">
-                            Find an account. Review access. Take action.
-                        </h2>
-                    </div>
-                    <div className="grid gap-px bg-[#dce6df] sm:grid-cols-2 xl:grid-cols-4">
-                        <UsersStepCard
-                            number={1}
-                            title="Find the account"
-                            body="Search for a Customer, Host or business."
-                            mobileBody="Use the admin search above."
-                            icon={SearchCheck}
-                        />
-                        <UsersStepCard
-                            number={2}
-                            title="Review Host access"
-                            body="Check pending Host or business requests."
-                            mobileBody="Open Host approvals."
-                            icon={Building2}
-                            to="/admin/host-operations"
-                        />
-                        <UsersStepCard
-                            number={3}
-                            title="Manage permissions"
-                            body="Review internal Admin access."
-                            mobileBody="Open access controls."
-                            icon={ShieldCheck}
-                            to={isRootSuperAdmin ? '/admin/roles' : '/admin/host-operations'}
-                        />
-                        <UsersStepCard
-                            number={4}
-                            title="Check history"
-                            body="See records of Admin actions."
-                            mobileBody="View the audit history."
-                            icon={Database}
-                            to="/admin/audit"
-                        />
-                    </div>
-                </section>
+                <div className="pb-workspace mt-4 sm:mt-5">
+                    <style>{peopleBusinessStyles}</style>
+                    <section className="pb-intro" aria-labelledby="pb-welcome-title">
+                        <div className="pb-intro-main">
+                            <p className="pb-kicker">Accounts & access</p>
+                            <h2 id="pb-welcome-title">Find people. Manage access.</h2>
+                            <p>Search for a customer, Host or business, then choose the right admin tool.</p>
+                        </div>
+                        <div className="pb-intro-side">
+                            <span className="pb-intro-side-icon" aria-hidden="true"><SearchCheck size={24} /></span>
+                            <div>
+                                <strong>Find an account</strong>
+                                <p>Use the admin search above to find people or businesses.</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
             ) : null}
 
             {section !== 'recipeReview' && loading ? (
@@ -4865,90 +4978,80 @@ import {
                 </div>
             ) : (
                 <>
-                    {metricEntries.length &&
-                    section !== 'dataQuality' &&
-                    section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'aiQuality' ? (
-                        section === 'users' ? (
-                            <section className="mt-5 overflow-hidden rounded-[22px] border border-[#d8e2d9] bg-white sm:mt-6 sm:rounded-[26px]">
-                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#dde6de] bg-[#e7f0e9] px-4 py-4 sm:px-6 sm:py-5">
-                                    <h2 className="text-[22px] font-extrabold text-[#1b4b38] sm:text-[26px]">
-                                        Needs attention
-                                    </h2>
-                                    <span className="text-[14px] font-semibold text-[#4e6b5b]">Platform overview</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-px bg-[#e1e9e2] lg:grid-cols-4">
-                                    {metricEntries.map(([label, value, MetricIcon]) => (
-                                        <UsersMetricCard
-                                            key={label}
-                                            label={label}
-                                            value={value}
-                                            icon={MetricIcon}
-                                        />
-                                    ))}
-                                </div>
-                            </section>
-                        ) : (
-                            <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                {metricEntries.map(
-                                    ([
-                                        label,
-                                        value,
-                                        MetricIcon,
-                                    ]) => (
-                                        <MetricCard
-                                            key={label}
-                                            label={label}
-                                            value={value}
-                                            icon={MetricIcon}
-                                        />
-                                    ),
+                    {section === 'users' ? (
+                        <div className="pb-workspace">
+                            <section className="pb-block" aria-labelledby="pb-metrics-title">
+                                <header className="pb-heading">
+                                    <div>
+                                        <p className="pb-serial">01 / OVERVIEW</p>
+                                        <h2 id="pb-metrics-title">Access & activity</h2>
+                                    </div>
+                                    <p className="pb-heading-note">Current platform counts</p>
+                                </header>
+                                {commandCenterError ? (
+                                    <div className="pb-message pb-error" role="alert">
+                                        <p className="font-bold">Couldn't load the platform counts.</p>
+                                        <p className="mt-1 text-sm">{commandCenterError}</p>
+                                        <button type="button" className="pb-retry" disabled={loading} onClick={load}>
+                                            <RefreshCw size={16} aria-hidden="true" /> Try again
+                                        </button>
+                                    </div>
+                                ) : metricEntries.length ? (
+                                    <div className="pb-metrics">
+                                        {metricEntries.map(([label, value, MetricIcon]) => (
+                                            <UsersMetricCard
+                                                key={label}
+                                                label={label}
+                                                value={value}
+                                                icon={MetricIcon}
+                                                to={userMetricDestination(label, isRootSuperAdmin, hasAdminPermission)}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="pb-message">No overview counts are available for your access.</div>
                                 )}
                             </section>
-                        )
-                    ) : null}
-  
-                    {section === 'users' ? (
-                        <section className="mt-5 overflow-hidden rounded-[22px] border border-[#d7e3da] bg-white sm:mt-6 sm:rounded-[26px]">
-                            <div className="border-b border-[#e0e8e1] px-4 py-4 sm:px-6 sm:py-5">
-                                <h2 className="text-[22px] font-extrabold text-[#193f30] sm:text-[26px]">Open the right tool</h2>
-                            </div>
-                            <div className="grid min-w-0 md:grid-cols-2">
-                                <div className="min-w-0 bg-[#f5f7f3] px-4 py-5 sm:px-6 sm:py-6">
-                                    <div className="mb-3 flex items-center gap-3">
-                                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e2ece6] text-[#1d6047]">
-                                            <UsersRound size={22} aria-hidden="true" />
-                                        </span>
-                                        <h3 className="text-[19px] font-bold text-[#1c4133] sm:text-[21px]">Find a Customer or Host</h3>
+                            <section className="pb-block" aria-labelledby="pb-tools-title">
+                                <header className="pb-heading">
+                                    <div>
+                                        <p className="pb-serial">02 / ADMIN TOOLS</p>
+                                        <h2 id="pb-tools-title">Choose a workspace</h2>
                                     </div>
-                                    <p className="text-[15px] leading-6 text-stone-600">
-                                        Use the admin search at the top to find accounts and businesses.
-                                    </p>
+                                </header>
+                                <div className="pb-tool-list">
+                                    <PeopleBusinessTool
+                                        to="/admin/host-operations"
+                                        title="Host approvals"
+                                        description="Review business access and pending Host requests."
+                                        icon={Building2}
+                                    />
+                                    {isRootSuperAdmin ? (
+                                        <PeopleBusinessTool
+                                            to="/admin/roles"
+                                            title="Roles & permissions"
+                                            description="Manage internal Admin access."
+                                            icon={ShieldCheck}
+                                        />
+                                    ) : null}
+                                    {hasAdminPermission('admin.audit.read') ? (
+                                        <PeopleBusinessTool
+                                            to="/admin/audit"
+                                            title="Admin history"
+                                            description="Review changes and decisions."
+                                            icon={History}
+                                        />
+                                    ) : null}
                                 </div>
-                                <div className="min-w-0 border-t border-[#d7e3da] bg-[#e7f3eb] px-4 py-5 sm:px-6 sm:py-6 md:border-l md:border-t-0">
-                                    <div className="mb-3 flex items-center gap-3">
-                                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#1d6047]">
-                                            <Building2 size={22} aria-hidden="true" />
-                                        </span>
-                                        <h3 className="text-[19px] font-bold text-[#1c4133] sm:text-[21px]">Manage business access</h3>
-                                    </div>
-                                    <div className="flex flex-wrap gap-3">
-                                        <Link
-                                            to="/admin/host-operations"
-                                            className="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#15583e] px-4 py-2.5 text-[15px] font-bold text-white transition hover:bg-[#0e4933]"
-                                        >
-                                            Review Hosts ↗
-                                        </Link>
-                                        {isRootSuperAdmin ? (
-                                            <Link
-                                                to="/admin/roles"
-                                                className="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#b5d2c0] bg-white px-4 py-2.5 text-[15px] font-bold text-[#204d39] transition hover:border-[#7fac90]"
-                                            >
-                                                Roles & permissions ↗
-                                            </Link>
-                                        ) : null}
-                                    </div>
-                                </div>
-                            </div>
+                            </section>
+                        </div>
+                    ) : metricEntries.length &&
+                    section !== 'dataQuality' &&
+                    section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'aiQuality' ? (
+                        <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            {metricEntries.map(([label, value, MetricIcon]) => (
+                                <MetricCard key={label} label={label} value={value} icon={MetricIcon} />
+                            ))}
                         </section>
                     ) : null}
 

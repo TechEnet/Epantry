@@ -2091,6 +2091,21 @@ export async function getAdminSearchDemand({ query }) {
     occurredAt: { $gte: since },
   }
 
+  // Historical searches with no coarse location must not outrank real cities
+  // or appear as a named "Top location". Keep them in total search counts.
+  const withKnownArea = {
+    $and: [
+      match,
+      {
+        $or: [
+          { 'area.city': { $exists: true, $nin: ['', null] } },
+          { 'area.state': { $exists: true, $nin: ['', null] } },
+          { 'area.postcode': { $exists: true, $nin: ['', null] } },
+        ],
+      },
+    ],
+  }
+
   const q = String(query?.q || '').trim()
   const area = String(query?.area || '').trim()
 
@@ -2114,6 +2129,9 @@ export async function getAdminSearchDemand({ query }) {
     topAreas,
     queryByArea,
     recent,
+    searchesWithLocation,
+    searchesLast24Hours,
+    latestSearch,
   ] = await Promise.all([
     SearchDemandEvent.countDocuments(match),
     SearchDemandEvent.aggregate([
@@ -2129,7 +2147,7 @@ export async function getAdminSearchDemand({ query }) {
       { $limit: 15 },
     ]),
     SearchDemandEvent.aggregate([
-      { $match: match },
+      { $match: withKnownArea },
       { $group: {
           _id: {
             city: { $ifNull: ['$area.city', ''] },
@@ -2145,7 +2163,7 @@ export async function getAdminSearchDemand({ query }) {
       { $limit: 15 },
     ]),
     SearchDemandEvent.aggregate([
-      { $match: match },
+      { $match: withKnownArea },
       { $group: {
           _id: {
             query: '$normalizedQuery',
@@ -2166,12 +2184,30 @@ export async function getAdminSearchDemand({ query }) {
       .limit(limit)
       .select('displayQuery surface area occurredAt')
       .lean(),
+    SearchDemandEvent.countDocuments(withKnownArea),
+    SearchDemandEvent.countDocuments({
+      ...match,
+      occurredAt: {
+        $gte: new Date(Math.max(since.getTime(), Date.now() - 24 * 60 * 60 * 1000)),
+      },
+    }),
+    SearchDemandEvent.findOne(match)
+      .sort({ occurredAt: -1, _id: -1 })
+      .select('occurredAt')
+      .lean(),
   ])
 
   return {
     windowDays: days,
     totalSearches,
     uniqueCustomers: Number(uniqueCustomersRows?.[0]?.count || 0),
+    // Report both captured and uncaptured locations without inferring an
+    // address or retrospectively attaching a different user's location.
+    searchesWithLocation: Number(searchesWithLocation || 0),
+    searchesWithoutLocation: Math.max(0, totalSearches - Number(searchesWithLocation || 0)),
+    searchesLast24Hours: Number(searchesLast24Hours || 0),
+    latestSearchAt: latestSearch?.occurredAt || null,
+    generatedAt: new Date(),
     topQuery: topQueries?.[0] || null,
     topArea: topAreas?.[0] || null,
     topQueries,

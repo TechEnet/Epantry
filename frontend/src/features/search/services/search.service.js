@@ -28,13 +28,24 @@ function normalizeString(
 
 function getCoarseSearchArea() {
   const state = useLocationStore.getState()
-  const location = state?.currentLocation || state?.deliveryContext || {}
+  const candidates = [state?.currentLocation, state?.deliveryContext]
+
+  // A populated but incomplete location object used to mask the delivery
+  // location. Prefer the first source that actually contains a city, state
+  // or postal code. Do not mix fields from different locations.
+  const location = candidates.find((candidate) =>
+    candidate && [
+      candidate.city,
+      candidate.state,
+      candidate.postcode || candidate.postalCode || candidate.postal,
+    ].some((value) => String(value || '').trim())
+  ) || {}
 
   return {
     city: String(location.city || '').trim(),
     state: String(location.state || '').trim(),
     country: String(location.country || '').trim(),
-    postcode: String(location.postcode || '').trim(),
+    postcode: String(location.postcode || location.postalCode || location.postal || '').trim(),
   }
 }
 
