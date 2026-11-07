@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -14,6 +15,13 @@ import {
   RefreshCw,
   Save,
   ShieldAlert,
+  ChevronRight,
+  ClipboardCheck,
+  ImageIcon,
+  Layers3,
+  UtensilsCrossed,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 
 import AdminShell from '../components/AdminShell'
@@ -41,6 +49,7 @@ import {
 
 import {
   listAdminRecipes,
+  getAdminRecipeVersion,
 } from '../../recipes/services/recipe.service'
 
 /*
@@ -442,7 +451,11 @@ function readableEntityType(value) {
 async function loadAllWorkspaceRecords(loader) {
   const first = await loader({ page: 1, limit: 100 })
   const records = Array.isArray(first?.records) ? [...first.records] : []
-  const pages = Number(first?.pagination?.pages || 1)
+  const pageSize = Number(first?.pagination?.limit || 100)
+  const pages = Math.max(
+    1,
+    Number(first?.pagination?.pages) || Math.ceil(Number(first?.pagination?.total ?? records.length) / pageSize),
+  )
 
   if (pages > 1) {
     const rest = await Promise.all(
@@ -534,45 +547,94 @@ async function loadAllAdminRecipes() {
 |--------------------------------------------------------------------------
 */
 
-function StatusPill({
-  value,
-}) {
-  const normalized =
-    String(
-      value ||
-        'unknown',
-    )
-      .trim()
-      .toLowerCase()
-
-  const className =
-    normalized ===
-      'active' ||
-    normalized ===
-      'approved'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-      : normalized ===
-          'review_required' ||
-        normalized ===
-          'requires_review' ||
-        normalized ===
-          'in_review' ||
-        normalized ===
-          'calculated'
-        ? 'border-orange-200 bg-orange-50 text-orange-800'
-        : 'border-stone-200 bg-stone-50 text-stone-600'
+function StatusPill({ value }) {
+  const normalized = String(value || 'unknown').trim().toLowerCase()
+  const color = ['active', 'approved'].includes(normalized)
+    ? 'border-[#B9D9C1] bg-[#E7F4EA] text-[#1D603B]'
+    : ['review_required', 'requires_review', 'in_review', 'calculated'].includes(normalized)
+      ? 'border-[#F0D4B2] bg-[#FFF2DF] text-[#865526]'
+      : normalized === 'draft'
+        ? 'border-[#D8CEE4] bg-[#F3EFF9] text-[#664D7F]'
+        : 'border-[#DDE3DC] bg-[#F2F4F0] text-[#5F6A62]'
 
   return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${className}`}
-    >
-      {
-        normalized.replace(
-          /_/g,
-          ' ',
-        )
-      }
+    <span className={`inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-4 ${color}`}>
+      {readableStatus(normalized)}
     </span>
+  )
+}
+
+
+/* Images come only from version or dish records provided by EPANTRY APIs. */
+function foodImageUrl(value) {
+  const raw = typeof value === 'string'
+    ? value
+    : value?.url || value?.src || value?.imageUrl || ''
+  const url = String(raw || '').trim()
+  return /^(https?:\/\/|\/[^/])/i.test(url) ? url : ''
+}
+
+function foodPhotoFromProduct(product) {
+  const images = Array.isArray(product?.images) ? [...product.images] : []
+  images.sort((a, b) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0))
+  return foodImageUrl(images[0]) || foodImageUrl(product?.primaryImageUrl) || foodImageUrl(product?.imageUrl)
+}
+
+function foodPhotoFromRecipe(record) {
+  return foodImageUrl(record?.dish?.heroImageUrl || record?.heroImageUrl || record?.dish?.imageUrl)
+}
+
+function FoodItemThumb({ src, label, kind = 'recipe', large = false }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [src])
+  return (
+    <div className={`relative shrink-0 overflow-hidden bg-[#E0ECE7] ${large ? 'h-20 w-20 rounded-xl sm:h-28 sm:w-28 sm:rounded-2xl' : 'h-[56px] w-[56px] rounded-lg sm:h-[76px] sm:w-[76px] sm:rounded-xl'}`}>
+      {src && !failed ? (
+        <img src={src} alt={label ? `${label} image` : 'Food image'} loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[#537769]" aria-label="Image unavailable">
+          {kind === 'product' ? <ImageIcon size={large ? 30 : 24} aria-hidden="true" /> : <UtensilsCrossed size={large ? 29 : 23} aria-hidden="true" />}
+          <span className="text-[10px] font-semibold">No photo</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SectionHeading({ number, kicker, title, subtitle, total, tone = 'green' }) {
+  const tones = {
+    green: ['bg-[#E1F2E9]', 'text-[#156547]'],
+    coral: ['bg-[#FFE6D9]', 'text-[#A3482E]'],
+    blue: ['bg-[#DCEBF5]', 'text-[#285E78]'],
+    violet: ['bg-[#E8E1F5]', 'text-[#675192]'],
+  }
+  const [bg, fg] = tones[tone] || tones.green
+  return (
+    <div className="foodint-panel-heading mb-3.5 flex flex-wrap items-end justify-between gap-2 sm:mb-5 sm:gap-3">
+      <div className="min-w-0">
+        <div className="mb-2 flex items-center gap-2 sm:mb-3">
+          <span className={`flex h-8 w-8 items-center justify-center rounded-lg sm:h-9 sm:w-9 sm:rounded-xl ${bg} ${fg} text-[14px] font-extrabold sm:text-[15px]`}>{number}</span>
+          <p className={`text-[13px] font-bold uppercase tracking-[0.055em] ${fg}`}>{kicker}</p>
+        </div>
+        <h2 className="text-[22px] font-bold leading-[1.18] tracking-[-0.03em] text-[#18372F] sm:text-[28px] sm:leading-[1.2] sm:tracking-[-0.035em]">{title}</h2>
+        {subtitle && <p className="mt-1 text-[14px] leading-[1.5] text-[#52665C] sm:mt-2 sm:text-[15px] sm:leading-6">{subtitle}</p>}
+      </div>
+      {total !== undefined && <span className={`rounded-full px-3 py-1.5 text-[13px] font-bold sm:py-2 ${bg} ${fg}`}>{total}</span>}
+    </div>
+  )
+}
+
+function ReviewPlaceholder({ title, description, kind = 'recipe' }) {
+  const isLink = kind === 'link'
+  const isRule = kind === 'rule'
+  return (
+    <div className={`flex flex-col items-start justify-center p-4 sm:min-h-[205px] sm:p-7 ${isLink ? 'bg-[#EFF7FB]' : isRule ? 'bg-[#F7F2FB]' : 'bg-[#F1F6F1]'}`}>
+      <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl sm:mb-4 sm:h-12 sm:w-12 sm:rounded-2xl ${isLink ? 'bg-[#DAECF6] text-[#2B6F8B]' : isRule ? 'bg-[#E8DDF4] text-[#735497]' : 'bg-[#D9EBDE] text-[#1D6A4C]'}`}>
+        {kind === 'recipe' ? <ClipboardCheck size={24} /> : <Layers3 size={24} />}
+      </div>
+      <h3 className="text-[18px] font-bold text-[#173E34] sm:text-[20px]">{title}</h3>
+      <p className="mt-1 max-w-sm text-[14px] leading-[1.5] text-[#617168] sm:mt-2 sm:text-[15px] sm:leading-6">{description}</p>
+    </div>
   )
 }
 
@@ -674,16 +736,14 @@ export default function AdminFoodIntelligencePage() {
       calculations: false,
     })
 
-  const [
-    ruleTestJson,
-    setRuleTestJson,
-  ] =
-    useState(
-      `{
-  "facts": {},
-  "evidenceState": "unknown_review_required"
-}`,
-    )
+  // Keep the API payload structure, but let administrators enter readable fields.
+  const [ruleTestForm, setRuleTestForm] = useState({
+    ruleName: 'Vegetarian',
+    evidenceComplete: false,
+    facts: [],
+  })
+  const [ruleTestError, setRuleTestError] = useState('')
+  const nextRuleFactId = useRef(0)
 
   const [
     ruleTestResult,
@@ -760,6 +820,45 @@ export default function AdminFoodIntelligencePage() {
         'contains',
     })
 
+  const [selectedDecision, setSelectedDecision] = useState(null)
+  // Mobile work selector only. Desktop keeps every section in its original order.
+  const [mobileWorkSection, setMobileWorkSection] = useState('checks')
+  const mobileActiveSectionRef = useRef(null)
+  const [resolvedFoodItems, setResolvedFoodItems] = useState({})
+  const requestedFoodItemsRef = useRef(new Set())
+  const decisionPanelRef = useRef(null)
+  const productRequestRef = useRef(0)
+  const reasonInputRef = useRef(null)
+
+  function chooseMobileWorkSection(section) {
+    setMobileWorkSection(section)
+    if (typeof window === 'undefined' || window.matchMedia('(min-width: 640px)').matches) return
+    window.requestAnimationFrame(() => {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      mobileActiveSectionRef.current?.scrollIntoView({
+        behavior: reduced ? 'auto' : 'smooth',
+        block: 'start',
+      })
+    })
+  }
+
+  function chooseDecision(kind, id) {
+    if (busyKey) return
+    setSelectedDecision({ kind, id: String(id) })
+    setReasonDetails('')
+    setErrorMessage('')
+    setSuccessMessage('')
+  }
+
+  useEffect(() => {
+    if (!selectedDecision || typeof window === 'undefined' || window.matchMedia('(min-width: 1024px)').matches) return
+    const handle = window.requestAnimationFrame(() => {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      decisionPanelRef.current?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(handle)
+  }, [selectedDecision])
+
   /*
   |--------------------------------------------------------------------------
   | Load
@@ -778,54 +877,25 @@ export default function AdminFoodIntelligencePage() {
         )
 
         try {
-          const [
-            relationRecords,
-            ruleRecords,
-            calculationRecords,
-            productItems,
-            recipeRecords,
-          ] =
-            await Promise.all([
-              loadAllWorkspaceRecords(
-                listFoodIngredientRelations,
-              ),
-              loadAllWorkspaceRecords(
-                listFoodRuleProfiles,
-              ),
-              loadAllWorkspaceRecords(
-                listFoodCalculations,
-              ),
-              loadAllPublishedProductVersions(),
-              loadAllAdminRecipes(),
-            ])
-
-          setRelations(
-            relationRecords,
-          )
-
-          setRules(
-            ruleRecords,
-          )
-
-          setCalculations(
-            calculationRecords,
-          )
-
-          setPublishedProducts(
-            productItems,
-          )
-
-          setRecipeItems(
-            recipeRecords,
-          )
-        } catch (
-          error
-        ) {
-          setErrorMessage(
-            error?.response?.data?.message ||
-            error?.message ||
-            'Unable to load Food Intelligence administration.',
-          )
+          const requests = [
+            ['allergy links', loadAllWorkspaceRecords(listFoodIngredientRelations), setRelations],
+            ['dietary rules', loadAllWorkspaceRecords(listFoodRuleProfiles), setRules],
+            ['food checks', loadAllWorkspaceRecords(listFoodCalculations), setCalculations],
+            ['published products', loadAllPublishedProductVersions(), setPublishedProducts],
+            ['recipe names', loadAllAdminRecipes(), setRecipeItems],
+          ]
+          const results = await Promise.allSettled(requests.map(([, request]) => request))
+          const failed = []
+          results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+              requests[index][2](result.value)
+            } else {
+              failed.push(requests[index][0])
+            }
+          })
+          if (failed.length) {
+            setErrorMessage(`Unable to refresh ${failed.join(', ')}. Other available data is still shown. Please try Refresh data.`)
+          }
         } finally {
           setIsLoading(
             false,
@@ -849,6 +919,7 @@ export default function AdminFoodIntelligencePage() {
       async (
         productVersionId,
       ) => {
+        const requestId = ++productRequestRef.current
         if (
           !productVersionId
         ) {
@@ -861,6 +932,7 @@ export default function AdminFoodIntelligencePage() {
           setProductDeclarationForm(
             emptyProductDeclarationForm(),
           )
+          setProductDeclarationLoading(false)
           return
         }
 
@@ -884,6 +956,8 @@ export default function AdminFoodIntelligencePage() {
                 productVersionId,
               ),
             ])
+
+          if (requestId !== productRequestRef.current) return
 
           const version =
             versionResult?.productVersion ||
@@ -913,15 +987,18 @@ export default function AdminFoodIntelligencePage() {
         } catch (
           error
         ) {
+          if (requestId !== productRequestRef.current) return
+          setSelectedProductVersion(null)
+          setProductDeclarationMeta(null)
           setErrorMessage(
             error?.response?.data?.message ||
             error?.message ||
             'Unable to load Product Food Intelligence declaration.',
           )
         } finally {
-          setProductDeclarationLoading(
-            false,
-          )
+          if (requestId === productRequestRef.current) {
+            setProductDeclarationLoading(false)
+          }
         }
       },
       [],
@@ -1286,14 +1363,14 @@ export default function AdminFoodIntelligencePage() {
       type ===
       'recipe_version'
     ) {
-      return 'Recipe name unavailable'
+      return `Recipe · ${shortId(entityId)}`
     }
 
     if (
       type ===
       'product_version'
     ) {
-      return 'Product name unavailable'
+      return `Product · ${shortId(entityId)}`
     }
 
     return 'Food item'
@@ -1311,12 +1388,11 @@ export default function AdminFoodIntelligencePage() {
       callback,
       success,
     ) => {
-      if (
-        !reasonDetails.trim()
-      ) {
+      if (!selectedDecision || !reasonDetails.trim()) {
         setErrorMessage(
           'Enter a reason before approving or activating this safety-sensitive change.',
         )
+        reasonInputRef.current?.focus()
 
         return
       }
@@ -1336,10 +1412,8 @@ export default function AdminFoodIntelligencePage() {
       try {
         await callback()
 
-        setSuccessMessage(
-          success,
-        )
-
+        setSuccessMessage(success)
+        setReasonDetails('')
         await loadWorkspace()
       } catch (
         error
@@ -1358,62 +1432,139 @@ export default function AdminFoodIntelligencePage() {
 
   /*
   |--------------------------------------------------------------------------
-  | Rule Test
+  | Rule Test - guided inputs, existing API contract
   |--------------------------------------------------------------------------
   */
 
-  const handleRuleTest =
-    async () => {
-      setErrorMessage(
-        '',
-      )
+  function updateRuleTestForm(changes) {
+    setRuleTestForm((current) => ({ ...current, ...changes }))
+    setRuleTestResult(null)
+    setRuleTestError('')
+  }
 
-      setRuleTestResult(
-        null,
-      )
+  function updateRuleTestFact(id, changes) {
+    setRuleTestForm((current) => ({
+      ...current,
+      facts: current.facts.map((fact) =>
+        fact.id === id ? { ...fact, ...changes } : fact,
+      ),
+    }))
+    setRuleTestResult(null)
+    setRuleTestError('')
+  }
 
-      let payload
+  function addRuleTestFact() {
+    nextRuleFactId.current += 1
+    const id = nextRuleFactId.current
+    setRuleTestForm((current) => ({
+      ...current,
+      facts: [...current.facts, { id, name: '', type: 'boolean', expected: '', observed: '' }],
+    }))
+    setRuleTestResult(null)
+    setRuleTestError('')
+  }
 
-      try {
-        payload =
-          JSON.parse(
-            ruleTestJson,
-          )
-      } catch {
-        setErrorMessage(
-          'Rule test input must be valid JSON.',
-        )
+  function removeRuleTestFact(id) {
+    setRuleTestForm((current) => ({
+      ...current,
+      facts: current.facts.filter((fact) => fact.id !== id),
+    }))
+    setRuleTestResult(null)
+    setRuleTestError('')
+  }
 
+  async function handleRuleTest() {
+    setErrorMessage('')
+    setRuleTestError('')
+    setRuleTestResult(null)
+
+    // Translate visible names to stable keys; do not infer any dietary facts.
+    const ruleKey = String(ruleTestForm.ruleName || '')
+      .trim().toLowerCase().replace(/[\s-]+/g, '_')
+
+    if (ruleKey.length < 2 || ruleKey.length > 120) {
+      setRuleTestError('Choose or enter a dietary rule name (2–120 characters).')
+      return
+    }
+
+    const requiredFacts = []
+    const factMap = {}
+    const usedFacts = new Set()
+
+    for (let index = 0; index < ruleTestForm.facts.length; index += 1) {
+      const fact = ruleTestForm.facts[index]
+      const factKey = String(fact.name || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+      const position = index + 1
+
+      if (!factKey) {
+        setRuleTestError(`Food detail ${position}: enter what you are checking.`)
+        return
+      }
+      if (usedFacts.has(factKey)) {
+        setRuleTestError(`“${readableStatus(factKey)}” is listed twice. Keep one check per food detail.`)
+        return
+      }
+      usedFacts.add(factKey)
+
+      const expectedText = String(fact.expected ?? '').trim()
+      if (expectedText === '') {
+        setRuleTestError(`Food detail ${position}: choose or enter what the rule requires.`)
         return
       }
 
-      setBusyKey(
-        'rule-test',
-      )
+      let expectedValue
+      if (fact.type === 'boolean') {
+        expectedValue = expectedText === 'true'
+      } else if (fact.type === 'number') {
+        expectedValue = Number(expectedText)
+        if (!Number.isFinite(expectedValue)) {
+          setRuleTestError(`Food detail ${position}: the required value must be a number.`)
+          return
+        }
+      } else {
+        expectedValue = expectedText
+      }
 
-      try {
-        const result =
-          await testFoodRule(
-            payload,
-          )
+      requiredFacts.push({ factKey, expectedValue })
 
-        setRuleTestResult(
-          result,
-        )
-      } catch (
-        error
-      ) {
-        setErrorMessage(
-          error?.response?.data?.message ||
-          error?.message ||
-          'Unable to test Food Rule.',
-        )
-      } finally {
-        setBusyKey(
-          '',
-        )
+      const observedText = String(fact.observed ?? '').trim()
+      if (observedText !== '') {
+        if (fact.type === 'number') {
+          const number = Number(observedText)
+          if (!Number.isFinite(number)) {
+            setRuleTestError(`Food detail ${position}: the verified value must be a number.`)
+            return
+          }
+          factMap[factKey] = number
+        } else if (fact.type === 'boolean') {
+          factMap[factKey] = observedText === 'true'
+        } else {
+          factMap[factKey] = observedText
+        }
       }
     }
+
+    const payload = {
+      ruleKey,
+      evidenceComplete: ruleTestForm.evidenceComplete,
+      requiredFacts,
+      factMap,
+    }
+
+    setBusyKey('rule-test')
+    try {
+      const result = await testFoodRule(payload)
+      setRuleTestResult(result)
+    } catch (error) {
+      setRuleTestError(
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to test this dietary rule. Please try again.',
+      )
+    } finally {
+      setBusyKey('')
+    }
+  }
 
 
   const relationDesktopItems =
@@ -1421,30 +1572,101 @@ export default function AdminFoodIntelligencePage() {
       ? relations
       : relations.slice(0, 10)
 
-  const relationMobileItems =
-    expandedLists.relations
-      ? relations
-      : relations.slice(0, 6)
-
   const ruleDesktopItems =
     expandedLists.rules
       ? rules
       : rules.slice(0, 10)
 
-  const ruleMobileItems =
-    expandedLists.rules
-      ? rules
-      : rules.slice(0, 6)
+  const orderedCalculations = useMemo(
+    () => [...calculations].sort((left, right) => {
+      const pending = (item) => ['calculated', 'requires_review'].includes(readRecordStatus(item)) ? 1 : 0
+      return pending(right) - pending(left)
+    }),
+    [calculations],
+  )
 
   const calculationDesktopItems =
     expandedLists.calculations
-      ? calculations
-      : calculations.slice(0, 10)
+      ? orderedCalculations
+      : orderedCalculations.slice(0, 10)
 
-  const calculationMobileItems =
-    expandedLists.calculations
-      ? calculations
-      : calculations.slice(0, 6)
+  const foodItemsByVersionId = useMemo(() => {
+    const result = new Map()
+    for (const product of publishedProducts) {
+      const id = recordId(product)
+      if (id) result.set(String(id), {
+        name: product?.displayName || product?.name || 'Product',
+        image: foodPhotoFromProduct(product), kind: 'product',
+      })
+    }
+    for (const item of recipeItems) {
+      const id = recordId(item?.latestVersion)
+      if (id) result.set(String(id), {
+        name: item?.dish?.name || item?.latestVersion?.title || 'Recipe',
+        image: foodPhotoFromRecipe(item), kind: 'recipe',
+      })
+    }
+    return result
+  }, [publishedProducts, recipeItems])
+
+  // Older recipe versions may not be in the latest-version recipe list.
+  // Resolve only currently visible unmatched records, never substitute stock photos.
+  useEffect(() => {
+    let cancelled = false
+    const visible = expandedLists.calculations ? orderedCalculations : orderedCalculations.slice(0, 10)
+    const missing = visible.filter((item) => {
+      const id = String(item?.entityId || item?.subjectId || item?.targetId || '')
+      const type = String(item?.entityType || item?.subjectType || item?.targetType || '')
+      if (!id || !['recipe_version', 'product_version'].includes(type)) return false
+      if (foodItemsByVersionId.has(id) || resolvedFoodItems[id] || requestedFoodItemsRef.current.has(id)) return false
+      requestedFoodItemsRef.current.add(id)
+      return true
+    })
+    if (!missing.length) return undefined
+    ;(async () => {
+      for (let i = 0; i < missing.length; i += 4) {
+        if (cancelled) break
+        const batch = missing.slice(i, i + 4)
+        const found = await Promise.all(batch.map(async (item) => {
+          const id = String(item.entityId || item.subjectId || item.targetId)
+          try {
+            if (item.entityType === 'recipe_version') {
+              const record = await getAdminRecipeVersion(id)
+              return [id, { name: record?.dish?.name || record?.recipeVersion?.title || 'Recipe', image: foodPhotoFromRecipe(record), kind: 'recipe' }]
+            }
+            const record = await getAdminProductVersion(id)
+            const version = record?.productVersion || record?.version || record
+            return [id, { name: version?.displayName || version?.name || 'Product', image: foodPhotoFromProduct(version), kind: 'product' }]
+          } catch { return [id, null] }
+        }))
+        if (!cancelled) {
+          setResolvedFoodItems((previous) => ({ ...previous, ...Object.fromEntries(found.filter(([, data]) => data)) }))
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+      for (const item of missing) requestedFoodItemsRef.current.delete(String(item.entityId || item.subjectId || item.targetId))
+    }
+  }, [orderedCalculations, expandedLists.calculations, foodItemsByVersionId])
+
+  function calculationItem(calculation) {
+    const id = String(calculation?.entityId || calculation?.subjectId || calculation?.targetId || '')
+    const kind = String(calculation?.entityType || '').toLowerCase() === 'product_version' ? 'product' : 'recipe'
+    const details = foodItemsByVersionId.get(id) || resolvedFoodItems[id]
+    return {
+      name: details?.name || foodCheckItemName(calculation),
+      image: details?.image || '',
+      kind: details?.kind || kind,
+    }
+  }
+
+  const activeCalculation = selectedDecision?.kind === 'calculation'
+    ? calculations.find((entry) => recordId(entry) === selectedDecision.id) : null
+  const activeRelation = selectedDecision?.kind === 'relation'
+    ? relations.find((entry) => recordId(entry) === selectedDecision.id) : null
+  const activeRule = selectedDecision?.kind === 'rule'
+    ? rules.find((entry) => recordId(entry) === selectedDecision.id) : null
 
   function toggleExpandedList(key) {
     setExpandedLists((current) => ({
@@ -1456,837 +1678,883 @@ export default function AdminFoodIntelligencePage() {
   return (
     <AdminShell
       title="Food Intelligence Review"
-      description="Review nutrition, allergy and dietary information before it is trusted across EPANTRY."
+      description="Review food information, safety links and approvals."
+      mobileStackHeader
       actions={
-        <button
-          type="button"
-          onClick={loadWorkspace}
-          disabled={isLoading}
-          className="focus-ring inline-flex h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-xs font-bold text-stone-700 transition hover:border-emerald-300 hover:text-emerald-800 disabled:opacity-50"
-        >
-          <RefreshCw
-            size={14}
-            className={isLoading ? 'animate-spin' : ''}
-            aria-hidden="true"
-          />
-          Refresh
+        <button type="button" onClick={loadWorkspace} disabled={isLoading}
+          className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#C8DCD2] bg-white px-4 text-[14px] font-semibold sm:w-auto text-[#12483D] transition hover:border-[#2C8A6A] hover:bg-[#EDF7F0] disabled:opacity-60">
+          <RefreshCw size={17} aria-hidden="true" className={isLoading ? 'animate-spin' : ''} />
+          {isLoading ? 'Refreshing…' : 'Refresh data'}
         </button>
       }
     >
-      <div className="min-h-[100svh] overflow-hidden bg-[#f6f4ee]">
+      <main className="foodint-reference-mobile -mx-2.5 min-w-0 bg-[#FAF9F6] pb-0 font-sans text-[#1B342C] sm:mx-0 sm:pb-8">
+        <style>{`
+          @media (max-width: 639px) {
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > header {
+              background: #f7f6f2;
+              border-color: #e3e5df;
+              padding: 18px 15px 23px;
+            }
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > header > div:last-child {
+              position: relative;
+              gap: 8px;
+            }
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > header h1 {
+              font-size: clamp(31px, 8.2vw, 39px);
+              line-height: 1.08;
+              letter-spacing: -0.045em;
+              max-width: 270px;
+              margin-top: 11px;
+              font-weight: 800;
+              color: #202421;
+            }
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > header h1 + p {
+              font-size: 14px;
+              line-height: 1.4;
+              font-weight: 500;
+              max-width: 310px;
+              margin-top: 7px;
+              color: #606a64;
+            }
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > header > div:last-child > div:first-child > div:first-child {
+              font-size: 12px;
+              line-height: 1.25;
+              padding: 0;
+              border-radius: 0;
+              background: transparent;
+              letter-spacing: .065em;
+              max-width: 190px;
+              color: #1a5542;
+              gap: 6px;
+            }
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > header > div:last-child > div:last-child {
+              position: absolute;
+              top: -1px;
+              right: 0;
+              width: auto;
+              min-width: 115px;
+            }
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > header > div:last-child > div:last-child button {
+              background: #f7f6f2;
+              color: #203e34;
+              min-height: 41px;
+              font-size: 14px;
+              border-color: #e5e8df;
+              border-radius: 24px;
+              padding: 8px 11px;
+              white-space: nowrap;
+            }
+            .epantry-workspace-canvas:has(.foodint-reference-mobile) > div:last-child {
+              padding: 0;
+            }
+            .foodint-reference-mobile {
+              margin: 0;
+              width: 100%;
+              background: #f7f6f2;
+              overflow-x: clip;
+            }
+            .foodint-reference-mobile .foodint-hero {
+              background: transparent;
+            }
+            .foodint-reference-mobile .foodint-hero-layout {
+              display: block;
+              padding: 0;
+            }
+            .foodint-reference-mobile .foodint-hero-copy {
+              padding: 26px 18px 30px;
+              background: #173f35;
+            }
+            .foodint-reference-mobile .foodint-hero-copy h2 {
+              font-size: clamp(28px, 7.4vw, 34px);
+              line-height: 1.17;
+              letter-spacing: -0.042em;
+            }
+            .foodint-reference-mobile .foodint-hero-copy > p {
+              font-size: 15px;
+              line-height: 1.55;
+              margin-top: 11px;
+            }
+            .foodint-reference-mobile .foodint-hero-metrics {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 0;
+            }
+            .foodint-reference-mobile .foodint-hero-metrics > div {
+              padding: 17px 15px;
+              min-height: 95px;
+              border-right: 1px solid #d9ddd6;
+              border-bottom: 1px solid #d9ddd6;
+              border-radius: 0;
+              color: #173f35;
+            }
+            .foodint-reference-mobile .foodint-hero-metrics > div:nth-child(1) { background: #e0e9dd; border-bottom: 3px solid #c56c43; }
+            .foodint-reference-mobile .foodint-hero-metrics > div:nth-child(2) { background: #f7e6dc; }
+            .foodint-reference-mobile .foodint-hero-metrics > div:nth-child(3) { background: #e2ebf5; }
+            .foodint-reference-mobile .foodint-hero-metrics > div:nth-child(4) { background: #eee9f5; }
+            .foodint-reference-mobile .foodint-hero-metrics strong { font-size: 31px; color: #173f35; }
+            .foodint-reference-mobile .foodint-hero-metrics span { font-size: 14px; line-height: 1.4; color: #52675e; margin-top: 7px; }
+            .foodint-reference-mobile .foodint-work-grid button {
+              min-height: 137px;
+              border: 1px solid #d8e0d8;
+              border-radius: 11px;
+              background: #ecf0e9;
+              color: #183f33;
+              text-align: left;
+              padding: 15px 13px;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              min-width: 0;
+              transition: background-color .16s ease, border-color .16s ease;
+            }
+            .foodint-reference-mobile .foodint-work-grid button[aria-pressed="true"] {
+              background: #173f35;
+              border-color: #173f35;
+              border-left: 4px solid #c56c43;
+              color: white;
+            }
+            .foodint-reference-mobile .foodint-work-grid button:focus-visible {
+              outline: 3px solid #b06b42;
+              outline-offset: 2px;
+            }
+            .foodint-reference-mobile .foodint-work-grid button[aria-pressed="true"] .foodint-tile-count,
+            .foodint-reference-mobile .foodint-work-grid button[aria-pressed="true"] .foodint-tile-number { color: #d5eadd; }
+            .foodint-reference-mobile .foodint-decision-row { padding: 13px 12px; gap: 11px; }
+            .foodint-reference-mobile .foodint-decision-list:not(.foodint-expanded) > button:nth-child(n+6) { display: none; }
+            .foodint-reference-mobile .foodint-panel-heading { margin-bottom: 18px; }
+            .foodint-reference-mobile .foodint-panel-heading h2 { font-size: 26px; line-height: 1.18; }
+            .foodint-reference-mobile .foodint-panel-heading > div:first-child > div:first-child > span {
+              background: transparent; border-radius: 0; width: auto; height: auto;
+              padding: 0; font-size: 14px;
+            }
+            .foodint-reference-mobile .foodint-decision-row > span:nth-of-type(1) > span:first-child { font-size: 16px; line-height: 1.35; }
+            .foodint-reference-mobile .foodint-decision-row > span:nth-of-type(1) > span:nth-child(2) { font-size: 13px; }
+            .foodint-reference-mobile .foodint-queue-header { padding: 15px 14px; background: #dfeff6; border-color: #d1e2ea; }
+            .foodint-reference-mobile .foodint-queue-header > div { color: #285a71; font-size: 16px; }
+            .foodint-reference-mobile .foodint-queue-header > span { color: #446779; }
+            .foodint-reference-mobile .foodint-panel-heading p { font-size: 14px; }
+            .foodint-reference-mobile .foodint-content-anchor { scroll-margin-top: 24px; }
+          }
+        `}</style>
+
         {(errorMessage || successMessage) && (
-          <div
-            className={`border-b px-4 py-3 text-sm font-semibold sm:px-7 ${
-              errorMessage
-                ? 'border-red-200 bg-red-50 text-red-800'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-            }`}
-          >
-            {errorMessage || successMessage}
+          <div role={errorMessage ? 'alert' : 'status'} aria-live={errorMessage ? 'assertive' : 'polite'}
+            className={`flex items-start gap-3 border-b px-4 py-3 text-[15px] leading-6 sm:px-7 ${errorMessage ? 'border-[#E6BBB0] bg-[#FFF0EB] text-[#922F23]' : 'border-[#B8DBC8] bg-[#E1F4E6] text-[#165B3B]'}`}>
+            {errorMessage ? <AlertTriangle size={19} className="mt-0.5 shrink-0" aria-hidden="true" /> : <BadgeCheck size={19} className="mt-0.5 shrink-0" aria-hidden="true" />}
+            <span className="font-semibold">{errorMessage || successMessage}</span>
           </div>
         )}
 
-        <section className="bg-[#0c5f4c] text-white">
-          <div className="px-4 py-5 sm:px-7 sm:py-7">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
-              <div className="max-w-3xl">
-                <p className="text-xs font-bold text-emerald-100">Food Intelligence workspace</p>
-                <h2 className="mt-2 text-2xl font-black leading-tight sm:text-3xl">
-                  Keep customer-facing food information accurate and reviewable.
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/90">
-                  <span className="sm:hidden line-clamp-2">
-                    Review product food details, safety links and food checks before approving changes.
-                  </span>
-                  <span className="hidden sm:inline">
-                    Review published product nutrition, allergy information, dietary suitability and safety checks in one governed workspace.
-                  </span>
-                </p>
+        <section className="foodint-hero relative overflow-hidden bg-[#103F35] text-white">
+          <div className="foodint-hero-layout relative grid gap-5 px-4 pb-5 pt-5 sm:gap-7 sm:px-7 sm:pb-8 sm:pt-9 lg:grid-cols-[minmax(0,1.1fr)_minmax(310px,0.9fr)] lg:items-end">
+            <div className="foodint-hero-copy">
+              <div className="mb-2.5 flex items-center gap-2 text-[12px] font-bold tracking-[0.045em] text-[#C4EEDB] sm:mb-3 sm:text-[13px] sm:tracking-[0.06em]">
+                <span className="h-2 w-2 rounded-full bg-[#F7A378]" /> FOOD SAFETY WORKSPACE
               </div>
-
-              <div className="grid grid-cols-4 border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                {[
-                  ['Products', stats.products],
-                  ['Allergy links', stats.mappings],
-                  ['Food rules', stats.rules],
-                  ['Needs review', stats.reviewRequired],
-                ].map(([label, value], index) => (
-                  <div
-                    key={label}
-                    className={`${index > 0 ? 'border-l border-white/15 pl-3 sm:pl-4' : ''}`}
-                  >
-                    <p className="text-xl font-black sm:text-2xl">{value}</p>
-                    <p className="mt-0.5 text-[10px] font-semibold leading-4 text-emerald-100 sm:text-xs">
-                      {label}
-                    </p>
-                  </div>
-                ))}
+              <h2 className="max-w-xl text-[28px] font-extrabold leading-[1.14] tracking-[-0.035em] sm:text-[38px] sm:leading-[1.12] sm:tracking-[-0.04em]">
+                Review. Verify. <span className="text-[#F7B28F]">Approve.</span>
+              </h2>
+              <p className="mt-2.5 max-w-xl text-[14px] leading-[1.55] text-[#D4E6DC] sm:mt-3 sm:text-[15px] sm:leading-6">
+                Choose a record, inspect its details, then record a decision for that exact item.
+              </p>
+              <div className="mt-4 hidden grid-cols-3 items-center gap-2 text-[12px] font-semibold text-[#E1F3E9] sm:mt-6 sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-2 sm:text-[13px]">
+                <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#DFF3AA] font-extrabold text-[#174A34]">1</span> Select</span>
+                <ChevronRight size={15} className="hidden text-[#A8C9BA] sm:block" aria-hidden="true" />
+                <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#DFF3AA] font-extrabold text-[#174A34]">2</span> Inspect</span>
+                <ChevronRight size={15} className="hidden text-[#A8C9BA] sm:block" aria-hidden="true" />
+                <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#DFF3AA] font-extrabold text-[#174A34]">3</span> Decide</span>
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 border-t border-white/15 lg:grid-cols-4">
-            {[
-              {
-                number: '01',
-                title: 'Choose what to review',
-                mobile: 'Select a published product or open a pending food check.',
-                desktop: 'Start with a published product, an allergy link, a food rule or a food check waiting for review.',
-              },
-              {
-                number: '02',
-                title: 'Check the evidence',
-                mobile: 'Compare the values with the reviewed product or safety evidence.',
-                desktop: 'Confirm nutrition, allergy and dietary information against the product and safety evidence you trust.',
-              },
-              {
-                number: '03',
-                title: 'Record the reason',
-                mobile: 'Explain why a safety-sensitive change is being approved.',
-                desktop: 'Add a clear reason before activating a safety link, rule or calculation that changes governed data.',
-              },
-              {
-                number: '04',
-                title: 'Approve the change',
-                mobile: 'Save or approve only after the details are clear.',
-                desktop: 'Save the reviewed product details or approve the pending governed check without overwriting history.',
-              },
-            ].map((step, index) => (
-              <div
-                key={step.number}
-                className={`px-4 py-3.5 sm:px-6 sm:py-5 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l' : ''}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-black text-emerald-200">{step.number}</span>
-                  {index === 0 ? <PackageCheck size={15} aria-hidden="true" className="text-emerald-200" /> : null}
-                  {index === 1 ? <BadgeCheck size={15} aria-hidden="true" className="text-emerald-200" /> : null}
-                  {index === 2 ? <ShieldAlert size={15} aria-hidden="true" className="text-emerald-200" /> : null}
-                  {index === 3 ? <Save size={15} aria-hidden="true" className="text-emerald-200" /> : null}
+            <div className="foodint-hero-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['Products', stats.products], ['Pending checks', stats.reviewRequired],
+                ['Allergy links', stats.mappings], ['Dietary rules', stats.rules],
+              ].map(([label, value], index) => (
+                <div key={label} className={`min-w-0 rounded-xl px-3 py-3 sm:px-3.5 sm:py-4 ${index === 1 ? 'bg-[#F6B38F] text-[#542C22]' : 'bg-[#20594A] text-white'}`}>
+                  <strong className="block text-[27px] font-extrabold leading-none tracking-[-0.04em] sm:text-[29px]">
+                    {isLoading && !publishedProducts.length && !calculations.length && !relations.length && !rules.length ? '…' : value}
+                  </strong>
+                  <span className={`mt-1.5 block text-[13px] font-semibold leading-4 sm:mt-2 ${index === 1 ? 'text-[#6A3829]' : 'text-[#DBEDE2]'}`}>{label}</span>
                 </div>
-                <p className="mt-2 text-sm font-bold">{step.title}</p>
-                <p className="mt-1 text-xs leading-5 text-emerald-50/80 sm:hidden line-clamp-2">{step.mobile}</p>
-                <p className="mt-1 hidden text-xs leading-5 text-emerald-50/80 sm:block">{step.desktop}</p>
-              </div>
+              ))}
+            </div>
+          </div>
+          <nav aria-label="Food Intelligence sections" className="relative hidden grid-cols-4 gap-0 border-t border-white/15 px-1 py-1 sm:flex sm:gap-1 sm:overflow-x-auto sm:px-6 sm:pb-1 sm:pt-1">
+            {[
+              ['#food-review-product', '01', 'Products'],
+              ['#food-review-checks', '02', 'Decisions'],
+              ['#food-review-allergies', '03', 'Allergy links'],
+              ['#food-review-rules', '04', 'Dietary rules'],
+            ].map(([href, number, name]) => (
+              <a key={href} href={href} className="focus-ring flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[12px] font-semibold leading-4 text-[#EBF6EE] transition hover:bg-white/10 hover:text-white sm:inline-flex sm:min-h-11 sm:shrink-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-2 sm:text-[14px] sm:leading-normal">
+                <span className="text-[#F8B795]">{number}</span><span className="sm:hidden">{name === "Allergy links" ? "Allergy" : name === "Dietary rules" ? "Dietary" : name}</span><span className="hidden sm:inline">{name}</span>
+              </a>
+            ))}
+          </nav>
+        </section>
+
+
+        {/* Mobile only: reference-style workspace selector; desktop section navigation unchanged. */}
+        <section aria-label="Choose Food Intelligence work" className="border-b border-[#D9DFD7] bg-[#F7F6F2] px-4 pb-5 pt-6 sm:hidden">
+          <p className="text-[14px] font-extrabold uppercase tracking-[0.02em] text-[#B65F3B]">01 / Work queue</p>
+          <h2 className="mt-2 text-[26px] font-extrabold leading-[1.18] tracking-[-0.035em] text-[#173F35]">Choose what to review</h2>
+          <p className="mt-2 text-[14px] leading-5 text-[#607166]">Open a workspace below to review its records.</p>
+          <div className="foodint-work-grid mt-5 grid grid-cols-2 gap-2.5">
+            {[
+              ['checks', 'Food checks', stats.reviewRequired, '01'],
+              ['product', 'Product details', stats.products, '02'],
+              ['relations', 'Allergy links', stats.mappings, '03'],
+              ['rules', 'Dietary rules', stats.rules, '04'],
+            ].map(([section, label, count, number]) => (
+              <button key={section} type="button" aria-pressed={mobileWorkSection === section}
+                onClick={() => chooseMobileWorkSection(section)}>
+                <span className="flex w-full items-center justify-between gap-3">
+                  <span className="foodint-tile-number text-[15px] font-extrabold text-[#B26343]">{number}</span>
+                  <span className="foodint-tile-count text-[17px] font-extrabold text-[#173F35]">{count}</span>
+                </span>
+                <span className="text-[16px] font-extrabold leading-5">{label}</span>
+              </button>
             ))}
           </div>
         </section>
 
-        <section className="border-b border-stone-200 bg-[#eaf6f1] px-4 py-5 sm:px-7 sm:py-7">
-          <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-8">
-            <div>
-              <p className="text-xs font-bold text-emerald-700">Product food details</p>
-              <h2 className="mt-1 text-xl font-black text-stone-950">Review what customers will see</h2>
-              <p className="mt-2 text-sm leading-6 text-stone-600 sm:hidden line-clamp-2">
-                Choose a published product, review its food details and save an approved update.
-              </p>
-              <p className="mt-2 hidden text-sm leading-6 text-stone-600 sm:block">
-                Choose a published product. Existing nutrition and package information is loaded where available so you can review or correct it before saving.
-              </p>
-              {productDeclarationMeta ? (
-                <p className="mt-3 text-xs font-bold text-emerald-800">
-                  Approved food record · version {productDeclarationMeta.calculationVersion || '—'}
-                </p>
-              ) : null}
-            </div>
+        <div ref={mobileActiveSectionRef} className="foodint-content-anchor scroll-mt-5">
+          <div className="px-0 pt-0 sm:px-6 sm:pt-8">
 
-            <div className="min-w-0">
-              <label className="block">
-                <span className="text-xs font-bold text-stone-700">Choose a published product</span>
-                <select
-                  value={selectedProductVersionId}
-                  onChange={(event) => setSelectedProductVersionId(event.target.value)}
-                  className="mt-2 h-11 w-full rounded-xl border border-emerald-200 bg-white px-3 text-sm font-semibold text-stone-800 outline-none focus:border-emerald-500"
-                >
-                  <option value="">Select product</option>
-                  {publishedProducts.map((product) => (
-                    <option key={product.id || product._id} value={product.id || product._id}>
-                      {product.displayName || 'Unnamed product'}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {publishedProducts.length === 0 && !isLoading ? (
-                <p className="mt-2 text-xs font-semibold text-stone-500">
-                  No published products are available yet. Publish a product in Catalog & Listings first.
-                </p>
-              ) : null}
-
-              {productDeclarationLoading ? (
-                <div className="mt-4 flex items-center gap-2 border-t border-emerald-900/10 pt-4 text-sm font-semibold text-stone-600">
-                  <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-                  Loading product food details…
+          <section id="food-review-product" className={`scroll-mt-24 px-4 py-6 sm:px-0 sm:pt-0 sm:pb-9 ${mobileWorkSection === 'product' ? 'block' : 'hidden sm:block'}`}>
+            <SectionHeading number="01" kicker="Product information" title="Start with a published product"
+              subtitle="Choose one product to review its nutrition, allergens and dietary details." tone="coral" />
+            <div className="overflow-hidden rounded-[20px] border border-[#E7D6CB] bg-white shadow-[0_6px_26px_rgba(60,53,40,0.045)]">
+              <div className="grid items-center gap-4 bg-[#FFE8D9] p-4 sm:p-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                <div>
+                  <p className="text-[17px] font-extrabold text-[#6D3B2E]">Which product needs a review?</p>
+                  <p className="mt-1 text-[14px] leading-5 text-[#855647]">Select a published product to open its full form.</p>
                 </div>
-              ) : selectedProductVersion ? (
-                <form onSubmit={saveProductDeclaration} className="mt-5 border-t border-emerald-900/10 pt-5">
-                  <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {[
-                      ['Product', selectedProductVersion.displayName || '—'],
-                      ['Ingredients', selectedProductVersion.ingredientDeclarationText || 'Not provided'],
-                      ['Country of origin', selectedProductVersion.countryOfOrigin || 'Not declared'],
-                      ['Manufacturer', selectedProductVersion.manufacturerName || 'Not declared'],
-                    ].map(([label, value], index) => (
-                      <div key={label} className={`${index > 0 ? 'sm:border-l sm:border-emerald-900/10 sm:pl-5' : ''}`}>
-                        <p className="text-[11px] font-bold text-emerald-800">{label}</p>
-                        <p className="mt-1 text-sm font-semibold leading-5 text-stone-800">{value}</p>
-                      </div>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-[14px] font-bold text-[#673D31]">Published product</span>
+                  <select value={selectedProductVersionId}
+                    onChange={(event) => { setSelectedProductVersionId(event.target.value); setProductDeclarationLoading(Boolean(event.target.value)) }}
+                    disabled={isLoading || Boolean(busyKey) || publishedProducts.length === 0}
+                    className="focus-ring min-h-12 w-full min-w-0 rounded-xl border border-[#D2B9AC] bg-white px-3 text-[15px] font-semibold text-[#263B32] outline-none focus:border-[#B35F42] disabled:opacity-60">
+                    <option value="">Choose a product</option>
+                    {publishedProducts.map((product) => (
+                      <option key={recordId(product)} value={recordId(product)}>{product.displayName || product.name || 'Unnamed product'}</option>
                     ))}
+                  </select>
+                </label>
+              </div>
+              {publishedProducts.length === 0 && !isLoading && (
+                <p className="px-5 py-4 text-[14px] text-[#684D43]">No published products are available yet. Published items will appear here automatically.</p>
+              )}
+              {productDeclarationLoading ? (
+                <div className="flex items-center gap-3 px-5 py-8 text-[15px] text-[#37594C]" role="status">
+                  <LoaderCircle size={20} className="animate-spin" aria-hidden="true" /> Loading the selected product…
+                </div>
+              ) : selectedProductVersion && recordId(selectedProductVersion) === selectedProductVersionId ? (
+              <form onSubmit={saveProductDeclaration} className="divide-y divide-[#E0E9E3]">
+                <div className="flex flex-col gap-4 bg-[#E6F2EE] p-4 sm:flex-row sm:items-center sm:p-6">
+                  <FoodItemThumb src={foodPhotoFromProduct(selectedProductVersion)} label={selectedProductVersion.displayName || 'Product'} kind="product" large />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-[#167456]">Selected product</p>
+                    <h3 className="mt-1 break-words text-[22px] font-bold leading-tight text-[#153E34] sm:text-[25px]">{selectedProductVersion.displayName || selectedProductVersion.name || 'Published product'}</h3>
+                    <p className="mt-1 text-[14px] leading-6 text-[#48675B]">Check the package details, then record your evidence and final decision below.</p>
                   </div>
+                  {productDeclarationMeta && <span className="self-start rounded-full bg-white px-3 py-2 text-[13px] font-semibold text-[#1A694C]">Approved version {productDeclarationMeta.calculationVersion || '—'}</span>}
+                </div>
+                <div className="grid gap-x-5 gap-y-4 bg-[#FFF3EA] p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
+                  {[
+                    ['Product', selectedProductVersion.displayName || '—'],
+                    ['Ingredients', selectedProductVersion.ingredientDeclarationText || 'Not provided'],
+                    ['Origin', selectedProductVersion.countryOfOrigin || 'Not declared'],
+                    ['Manufacturer', selectedProductVersion.manufacturerName || 'Not declared'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <p className="text-[13px] font-semibold text-[#617266]">{label}</p>
+                      <p className="mt-1 break-words text-[15px] font-medium leading-6 text-[#1C302B]">{value}</p>
+                    </div>
+                  ))}
+                </div>
 
-                  <div className="mt-6 border-t border-emerald-900/10 pt-5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                      <div>
-                        <h3 className="text-base font-black text-stone-950">Nutrition values</h3>
-                        <p className="mt-1 text-xs leading-5 text-stone-600 sm:hidden line-clamp-2">
-                          Check each value against the reviewed label or product evidence.
-                        </p>
-                        <p className="mt-1 hidden text-xs leading-5 text-stone-600 sm:block">
-                          Values are prefilled when the published product already has nutrition data. Change them only when reviewed evidence supports the update.
-                        </p>
-                      </div>
+                <div className="bg-[#FFFFFF] p-4 sm:p-6">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[20px] font-bold text-[#12483D]">01 · Nutrition values</h3>
+                      <p className="mt-1 text-[14px] leading-5 text-[#536E68]">Use figures from verified product evidence.</p>
+                    </div>
+                    <label className="flex items-center gap-2 text-[14px] font-semibold text-[#3D5548]">
+                      <span>Basis</span>
                       <select
                         value={productDeclarationForm.nutritionBasis}
-                        onChange={(event) =>
-                          setProductDeclarationForm((current) => ({
-                            ...current,
-                            nutritionBasis: event.target.value,
-                          }))
-                        }
-                        className="h-10 rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold text-stone-700 outline-none focus:border-emerald-500"
+                        onChange={(event) => setProductDeclarationForm((current) => ({ ...current, nutritionBasis: event.target.value }))}
+                        className="focus-ring min-h-11 rounded-lg border border-[#C6D5C8] bg-white px-3 text-[14px] text-[#1C302B]"
                       >
                         <option value="per_100g">Per 100 g</option>
                         <option value="per_100ml">Per 100 ml</option>
                         <option value="per_serving">Per serving</option>
                         <option value="per_pack">Per pack</option>
                       </select>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      {PRODUCT_NUTRIENTS.map((item) => (
-                        <label key={item.key} className="block">
-                          <span className="text-xs font-semibold text-stone-600">{item.label} ({item.unit})</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={productDeclarationForm.nutrition[item.key]}
-                            onChange={(event) =>
-                              setProductDeclarationForm((current) => ({
-                                ...current,
-                                nutrition: {
-                                  ...current.nutrition,
-                                  [item.key]: event.target.value,
-                                },
-                              }))
-                            }
-                            className="mt-1.5 h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                          />
-                        </label>
-                      ))}
-                    </div>
+                    </label>
                   </div>
-
-                  <div className="mt-6 border-t border-emerald-900/10 pt-5">
-                    <h3 className="text-base font-black text-stone-950">Allergy information</h3>
-                    <p className="mt-1 text-xs leading-5 text-stone-600 sm:hidden line-clamp-2">
-                      Add only allergies supported by reviewed packaging or safety evidence.
-                    </p>
-                    <p className="mt-1 hidden text-xs leading-5 text-stone-600 sm:block">
-                      Record only confirmed relationships such as Contains, May contain or Cross-contact. Leaving this empty does not mean the product is allergy-free.
-                    </p>
-
-                    <label className="mt-4 block">
-                      <span className="text-xs font-semibold text-stone-600">Package allergy statement</span>
-                      <textarea
-                        rows={2}
-                        value={productDeclarationForm.allergenStatement}
-                        onChange={(event) =>
-                          setProductDeclarationForm((current) => ({
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                    {PRODUCT_NUTRIENTS.map((item) => (
+                      <label key={item.key} className="min-w-0">
+                        <span className="mb-1.5 block text-[13px] font-medium text-[#536C65]">{item.label} <span className="text-[#78877D]">({item.unit})</span></span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={productDeclarationForm.nutrition[item.key]}
+                          onChange={(event) => setProductDeclarationForm((current) => ({
                             ...current,
-                            allergenStatement: event.target.value,
-                          }))
-                        }
-                        placeholder="Example: Contains mustard. May contain sesame."
-                        className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white p-3 text-sm font-semibold leading-5 outline-none focus:border-emerald-500"
+                            nutrition: { ...current.nutrition, [item.key]: event.target.value },
+                          }))}
+                          className="focus-ring min-h-12 w-full min-w-0 rounded-xl border border-[#C9DED6] bg-white px-3 text-[15px] font-medium text-[#1C302B] outline-none focus:border-[#12483D]"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-[#FFF3EA] p-4 sm:p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[20px] font-bold text-[#12483D]">02 · Allergen information</h3>
+                    <p className="mt-1 text-[14px] leading-5 text-[#536E68]">An empty list does not mean allergen-free.</p>
+                  </div>
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+                    <label className="block min-w-0">
+                      <span className="mb-1.5 block text-[14px] font-semibold text-[#194D40]">Package statement</span>
+                      <textarea
+                        rows={3}
+                        value={productDeclarationForm.allergenStatement}
+                        onChange={(event) => setProductDeclarationForm((current) => ({ ...current, allergenStatement: event.target.value }))}
+                        placeholder="e.g. Contains mustard. May contain sesame."
+                        className="focus-ring min-h-[106px] w-full resize-y rounded-xl border border-[#D6DCD3] bg-white p-3 text-[15px] leading-6 text-[#1C302B] outline-none focus:border-[#12483D]"
                       />
                     </label>
-
-                    <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_auto]">
-                      <input
-                        value={allergenDraft.canonicalName}
-                        onChange={(event) =>
-                          setAllergenDraft((current) => ({
-                            ...current,
-                            canonicalName: event.target.value,
-                          }))
-                        }
-                        placeholder="Allergen name, e.g. soy"
-                        className="h-10 rounded-xl border border-stone-200 bg-white px-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                      />
-                      <select
-                        value={allergenDraft.relationship}
-                        onChange={(event) =>
-                          setAllergenDraft((current) => ({
-                            ...current,
-                            relationship: event.target.value,
-                          }))
-                        }
-                        className="h-10 rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold outline-none focus:border-emerald-500"
-                      >
-                        <option value="contains">Contains</option>
-                        <option value="may_contain">May contain</option>
-                        <option value="cross_contact">Cross-contact</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={addProductAllergen}
-                        className="focus-ring rounded-xl border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50"
-                      >
-                        Add allergy
-                      </button>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {productDeclarationForm.allergens.length ? (
-                        productDeclarationForm.allergens.map((item) => (
+                    <div className="min-w-0">
+                      <span className="mb-1.5 block text-[14px] font-semibold text-[#194D40]">Add a reviewed allergen</span>
+                      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(140px,0.8fr)_auto]">
+                        <input
+                          aria-label="Allergen name"
+                          value={allergenDraft.canonicalName}
+                          onChange={(event) => setAllergenDraft((current) => ({ ...current, canonicalName: event.target.value }))}
+                          placeholder="e.g. Soy"
+                          className="focus-ring min-h-12 w-full min-w-0 rounded-xl border border-[#D6DCD3] bg-white px-3 text-[15px] outline-none focus:border-[#12483D]"
+                        />
+                        <select
+                          aria-label="Allergen relationship"
+                          value={allergenDraft.relationship}
+                          onChange={(event) => setAllergenDraft((current) => ({ ...current, relationship: event.target.value }))}
+                          className="focus-ring min-h-12 min-w-0 rounded-xl border border-[#D6DCD3] bg-white px-3 text-[14px] outline-none focus:border-[#12483D]"
+                        >
+                          <option value="contains">Contains</option>
+                          <option value="may_contain">May contain</option>
+                          <option value="cross_contact">Cross-contact</option>
+                        </select>
+                        <button type="button" onClick={addProductAllergen} className="focus-ring min-h-12 rounded-xl bg-[#12483D] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#146951]">Add</button>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2" aria-label="Recorded allergens">
+                        {productDeclarationForm.allergens.length ? productDeclarationForm.allergens.map((item) => (
                           <button
                             key={item.key}
                             type="button"
                             onClick={() => removeProductAllergen(item.key)}
-                            className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-[10px] font-bold text-orange-900"
-                            title="Remove allergy"
+                            title={`Remove ${item.canonicalName}`}
+                            className="focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#DBBAA7] bg-[#FDE7D8] px-3 py-1 text-[13px] font-semibold text-[#794B30] transition-colors hover:bg-[#F4D8C7]"
                           >
-                            {item.canonicalName} · {item.relationship.replace(/_/g, ' ')} ×
+                            {item.canonicalName} · {readableStatus(item.relationship)} <span aria-hidden="true">×</span>
                           </button>
-                        ))
-                      ) : (
-                        <p className="text-xs font-semibold text-stone-500">No confirmed allergy relationship added.</p>
-                      )}
+                        )) : (
+                          <span className="text-[14px] leading-6 text-[#6A7269]">No allergen relationships recorded.</span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-6 border-t border-emerald-900/10 pt-5">
-                    <h3 className="text-base font-black text-stone-950">Dietary suitability</h3>
-                    <p className="mt-1 text-xs leading-5 text-stone-600 sm:hidden line-clamp-2">
-                      Mark a diet only when the reviewed evidence supports it.
-                    </p>
-                    <p className="mt-1 hidden text-xs leading-5 text-stone-600 sm:block">
-                      Choose Eligible or Not eligible only when the evidence is clear. Leave it as Not declared when there is not enough evidence.
-                    </p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                      {PRODUCT_DIETARY_KEYS.map((item) => (
-                        <label key={item.key}>
-                          <span className="text-xs font-semibold text-stone-600">{item.label}</span>
-                          <select
-                            value={productDeclarationForm.dietary[item.key]}
-                            onChange={(event) =>
-                              setProductDeclarationForm((current) => ({
-                                ...current,
-                                dietary: {
-                                  ...current.dietary,
-                                  [item.key]: event.target.value,
-                                },
-                              }))
-                            }
-                            className="mt-1.5 h-10 w-full rounded-xl border border-stone-200 bg-white px-2 text-xs font-bold outline-none focus:border-emerald-500"
-                          >
-                            <option value="not_declared">Not declared</option>
-                            <option value="eligible">Eligible</option>
-                            <option value="not_eligible">Not eligible</option>
-                          </select>
-                        </label>
-                      ))}
-                    </div>
+                <div className="bg-[#FFFFFF] p-4 sm:p-6">
+                  <h3 className="text-[20px] font-bold text-[#12483D]">03 · Dietary suitability</h3>
+                  <p className="mt-1 text-[14px] leading-5 text-[#536E68]">If the evidence is unclear, keep “Not declared”.</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+                    {PRODUCT_DIETARY_KEYS.map((item) => (
+                      <label key={item.key} className="min-w-0">
+                        <span className="mb-1.5 block text-[13px] font-medium text-[#536C65]">{item.label}</span>
+                        <select
+                          value={productDeclarationForm.dietary[item.key]}
+                          onChange={(event) => setProductDeclarationForm((current) => ({
+                            ...current,
+                            dietary: { ...current.dietary, [item.key]: event.target.value },
+                          }))}
+                          className="focus-ring min-h-12 w-full min-w-0 rounded-xl border border-[#C9DED6] bg-white px-2.5 text-[14px] text-[#1C302B] outline-none focus:border-[#12483D]"
+                        >
+                          <option value="not_declared">Not declared</option>
+                          <option value="eligible">Eligible</option>
+                          <option value="not_eligible">Not eligible</option>
+                        </select>
+                      </label>
+                    ))}
                   </div>
+                </div>
 
-                  <div className="mt-6 grid gap-4 border-t border-emerald-900/10 pt-5 lg:grid-cols-2">
-                    <label>
-                      <span className="text-xs font-semibold text-stone-600">What evidence was checked?</span>
+                <div className="bg-[#E7F2EF] p-4 sm:p-6">
+                  <div className="mb-3"><h3 className="text-[20px] font-bold text-[#12483D]">04 · Evidence &amp; decision</h3><p className="mt-1 text-[14px] leading-5 text-[#516C61]">Review this product before saving approved details.</p></div>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <label className="block min-w-0">
+                      <span className="mb-1.5 block text-[14px] font-semibold text-[#194D40]">Evidence reviewed <span className="text-[#BD5837]">*</span></span>
                       <textarea
                         required
                         rows={3}
                         value={productDeclarationForm.basis}
-                        onChange={(event) =>
-                          setProductDeclarationForm((current) => ({
-                            ...current,
-                            basis: event.target.value,
-                          }))
-                        }
-                        className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white p-3 text-sm font-semibold leading-5 outline-none focus:border-emerald-500"
+                        onChange={(event) => setProductDeclarationForm((current) => ({ ...current, basis: event.target.value }))}
+                        className="focus-ring w-full rounded-xl border border-[#C4DBD3] bg-white p-3 text-[15px] leading-6 outline-none focus:border-[#12483D]"
                       />
                     </label>
-                    <label>
-                      <span className="text-xs font-semibold text-stone-600">Why are you saving this decision?</span>
+                    <label className="block min-w-0">
+                      <span className="mb-1.5 block text-[14px] font-semibold text-[#194D40]">Reason for decision <span className="text-[#BD5837]">*</span></span>
                       <textarea
                         required
                         rows={3}
                         value={productDeclarationForm.reason}
-                        onChange={(event) =>
-                          setProductDeclarationForm((current) => ({
-                            ...current,
-                            reason: event.target.value,
-                          }))
-                        }
-                        className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white p-3 text-sm font-semibold leading-5 outline-none focus:border-emerald-500"
+                        onChange={(event) => setProductDeclarationForm((current) => ({ ...current, reason: event.target.value }))}
+                        className="focus-ring w-full rounded-xl border border-[#C4DBD3] bg-white p-3 text-[15px] leading-6 outline-none focus:border-[#12483D]"
                       />
                     </label>
                   </div>
-
-                  <p className="mt-4 border-l-4 border-[#315f7a] bg-[#edf5f9] px-4 py-3 text-xs leading-5 text-[#173b4f]">
-                    EPANTRY records the product version, calculation history and approval trail automatically when you save.
-                  </p>
-
-                  {canProductDeclare ? (
-                    <button
-                      type="submit"
-                      disabled={busyKey === 'product-declaration'}
-                      className="focus-ring mt-4 inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-bold text-white disabled:opacity-50"
-                    >
-                      {busyKey === 'product-declaration' ? (
-                        <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-                      ) : (
-                        <Save size={16} aria-hidden="true" />
-                      )}
-                      {productDeclarationMeta ? 'Save reviewed update' : 'Save approved food details'}
-                    </button>
-                  ) : (
-                    <p className="mt-4 text-xs font-bold text-stone-500">
-                      You need permission to edit Catalog or Trust & Safety data before saving these details.
-                    </p>
-                  )}
-                </form>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[#CCD8CB] pt-4">
+                    <p className="max-w-xl text-[13px] leading-5 text-[#486A5C]">Saving creates an approved version. Existing review history is retained.</p>
+                    {canProductDeclare ? (
+                      <button
+                        type="submit"
+                        disabled={busyKey === 'product-declaration'}
+                        className="focus-ring inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#12483D] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[#146951] disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                      >
+                        {busyKey === 'product-declaration' ? <LoaderCircle className="animate-spin" size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
+                        {productDeclarationMeta ? 'Save reviewed update' : 'Save approved food details'}
+                      </button>
+                    ) : (
+                      <p className="text-[14px] font-semibold text-[#71472E]">Catalog or Trust &amp; Safety edit permission is required to save.</p>
+                    )}
+                  </div>
+                </div>
+              </form>
+              ) : selectedProductVersionId ? (
+                <p role="status" className="p-5 text-[15px] text-[#985332]">Unable to show this product. Select it again or refresh the data.</p>
               ) : (
-                <p className="mt-4 border-t border-emerald-900/10 pt-4 text-sm font-semibold text-stone-600">
-                  Choose a published product to review its customer-facing food information.
-                </p>
+                <div className="flex items-center gap-3 bg-[#FFFBF8] px-5 py-5 sm:px-6">
+                  <PackageCheck size={24} aria-hidden="true" className="shrink-0 text-[#B97552]" />
+                  <p className="text-[15px] leading-6 text-[#765D4C]">After selection, the product image and editable food information appear here.</p>
+                </div>
               )}
             </div>
-          </div>
-        </section>
-
-        {canMutate ? (
-          <section className="border-b border-stone-200 bg-[#edf5f9] px-4 py-4 sm:px-7 sm:py-5">
-            <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-8">
-              <div>
-                <p className="text-xs font-bold text-[#315f7a]">Reason for safety changes</p>
-                <p className="mt-1 text-sm leading-5 text-stone-600 sm:hidden line-clamp-2">
-                  Add a clear reason before activating or approving a safety-sensitive record.
-                </p>
-                <p className="mt-1 hidden text-sm leading-6 text-stone-600 sm:block">
-                  This reason is saved with allergy links, food rules and food checks so the decision can be understood later.
-                </p>
-              </div>
-              <textarea
-                value={reasonDetails}
-                onChange={(event) => setReasonDetails(event.target.value)}
-                rows={2}
-                placeholder="Explain the evidence or review reason for this action."
-                className="w-full rounded-xl border border-[#bfd3df] bg-white p-3 text-sm text-stone-800 outline-none focus:border-[#315f7a]"
-              />
-            </div>
           </section>
-        ) : null}
 
-        <section className="border-b border-stone-200 bg-white">
-          <div className="grid gap-0 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="bg-[#173b4f] px-4 py-5 text-white sm:px-7 sm:py-6 lg:px-6">
-              <p className="text-xs font-bold text-blue-100">Ingredient allergy links</p>
-              <h2 className="mt-1 text-xl font-black">Check governed ingredient-to-allergy links</h2>
-              <p className="mt-2 text-sm leading-6 text-blue-50/90 sm:hidden line-clamp-2">
-                Review saved links between ingredients and allergies before activating a draft.
-              </p>
-              <p className="mt-2 hidden text-sm leading-6 text-blue-50/90 sm:block">
-                These links tell EPANTRY when an ingredient contains, may contain or can have cross-contact with an allergen.
-              </p>
-              <p className="mt-3 text-xs font-bold text-blue-100">{relations.length} links loaded</p>
-            </div>
+          <section id="food-review-checks" className={`scroll-mt-24 border-t border-[#E6E4DD] px-4 py-6 sm:px-0 sm:py-9 ${mobileWorkSection === 'checks' ? 'block' : 'hidden sm:block'}`}>
+            <SectionHeading number="02" kicker="Decisions" title="Food checks awaiting a decision"
+              subtitle="Select a food item to see its evidence, image and approval controls."
+              total={`${stats.reviewRequired} need review`} tone="green" />
+            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] lg:items-start">
+              <div className="order-1 min-w-0 overflow-hidden rounded-[16px] border border-[#D5E3D9] bg-white sm:order-2 sm:rounded-[18px] lg:order-1">
+                <div className="foodint-queue-header flex items-center justify-between gap-2 border-b border-[#D6E4D9] bg-[#E6F3EA] px-4 py-3.5 sm:px-5">
+                  <div className="inline-flex items-center gap-2 text-[16px] font-bold text-[#154937]"><Layers3 size={19} /> Review queue</div>
+                  <span className="text-[13px] font-bold text-[#476958]">{calculations.length} records</span>
+                </div>
+                {isLoading && calculations.length === 0 ? (
+                  <div role="status" className="flex items-center gap-2 p-5 text-[15px] text-[#536C60]"><LoaderCircle size={19} className="animate-spin" /> Loading checks…</div>
+                ) : calculations.length === 0 ? (
+                  <div className="flex items-center gap-3 p-6 text-[15px] leading-6 text-[#53665B]">
+                    <ClipboardCheck size={25} className="shrink-0 text-[#22825D]" /> No food checks are available yet.
+                  </div>
+                ) : (
+                  <>
+                    <div className={`foodint-decision-list ${expandedLists.calculations ? 'foodint-expanded max-h-[560px] overflow-y-auto overscroll-contain' : ''}`}>
+                      {calculationDesktopItems.map((calculation, index) => {
+                        const id = recordId(calculation)
+                        const status = readRecordStatus(calculation)
+                        const item = calculationItem(calculation)
+                        const active = selectedDecision?.kind === 'calculation' && selectedDecision.id === id
+                        const pending = ['calculated', 'requires_review'].includes(status)
+                        return (
+                          <button key={id || index} type="button" onClick={() => chooseDecision('calculation', id)}
+                            aria-pressed={active} disabled={Boolean(busyKey)}
+                            className={`foodint-decision-row focus-ring flex w-full min-w-0 items-center gap-2.5 border-b border-[#E7EDE7] px-3 py-2.5 text-left transition last:border-b-0 sm:gap-3 sm:px-4 sm:py-3 ${active ? 'bg-[#E5F5E9] shadow-[inset_4px_0_0_#1D865B]' : 'bg-white hover:bg-[#F3F9F4]'} disabled:cursor-wait`}>
+                            <FoodItemThumb src={item.image} label={item.name} kind={item.kind} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block break-words text-[15px] font-extrabold leading-[1.35] text-[#19372C] [overflow-wrap:anywhere]">{item.name}</span>
+                              <span className="mt-0.5 block text-[13px] leading-5 text-[#687B70] sm:mt-1">{readableEntityType(calculation.entityType)} · V{calculation.calculationVersion || calculation.version || '—'}</span>
+                              <span className={`mt-1 inline-flex rounded-full px-2.5 py-0.5 text-[12px] font-bold sm:mt-1.5 sm:py-1 ${pending ? 'bg-[#FFF0D9] text-[#8E4E20]' : status === 'approved' ? 'bg-[#E1F2E6] text-[#1B6A48]' : 'bg-[#EDF0F1] text-[#53655F]'}`}>{readableStatus(status)}</span>
+                            </span>
+                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9 ${active ? 'bg-[#146C4B] text-white' : 'bg-[#EDF4EF] text-[#176A4C]'}`}>
+                              <ChevronRight size={20} aria-label={active ? 'Selected' : 'Open review'} />
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {calculations.length > 5 && (
+                      <div className={`flex justify-center border-t border-[#E1EAE3] bg-[#FAFCF9] p-3 ${calculations.length <= 10 ? 'sm:hidden' : ''}`}>
+                        <button type="button" onClick={() => toggleExpandedList('calculations')} className="focus-ring min-h-10 rounded-xl border border-[#BCD7C6] bg-white px-5 text-[14px] font-bold text-[#16583F] hover:bg-[#E9F5EC]">
+                          {expandedLists.calculations ? 'Show fewer items' : `View all ${calculations.length} records`}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
 
-            <div className="min-w-0 px-4 sm:px-7">
-              {isLoading ? (
-                <div className="flex items-center gap-2 py-5 text-sm font-semibold text-stone-500">
-                  <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> Loading allergy links…
-                </div>
-              ) : relations.length === 0 ? (
-                <div className="py-5">
-                  <p className="text-sm font-bold text-stone-900">No ingredient allergy links have been added yet.</p>
-                  <p className="mt-1 text-xs text-stone-500">No ingredient-to-allergy links are currently available for review.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="sm:hidden">
-                    {relationMobileItems.map((relation, index) => {
-                      const id = recordId(relation)
-                      const status = readRecordStatus(relation)
-                      return (
-                        <div key={id || index} className={`py-3 ${index > 0 ? 'border-t border-stone-100' : ''}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-stone-900">Ingredient reference {shortId(relation.ingredientId || relation.canonicalIngredientId)}</p>
-                              <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">Allergen reference {shortId(relation.allergenId)} · {readableStatus(relation.relationship || relation.relationType)}</p>
-                            </div>
-                            <StatusPill value={status} />
-                          </div>
-                          <div className="mt-2 flex items-center justify-between gap-3">
-                            <span className="text-xs font-semibold text-stone-500">Evidence: {readableStatus(relation.evidenceState)}</span>
-                            {canMutate && status === 'draft' ? (
-                              <button
-                                type="button"
-                                disabled={busyKey === `mapping-${id}`}
-                                onClick={() =>
-                                  runMutation(
-                                    `mapping-${id}`,
-                                    () => activateIngredientRelation({ relationId: id, reasonDetails }),
-                                    'Ingredient allergy link activated.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg bg-[#173b4f] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                Activate
-                              </button>
-                            ) : null}
+              <div className={`${activeCalculation ? "" : "hidden sm:block"} order-2 min-w-0 scroll-mt-20 overflow-hidden rounded-[16px] border border-[#BBDCCA] bg-white sm:order-1 sm:rounded-[18px] lg:sticky lg:top-5 lg:order-2`} ref={selectedDecision?.kind === 'calculation' ? decisionPanelRef : null}>
+                {activeCalculation ? (() => {
+                  const id = recordId(activeCalculation)
+                  const item = calculationItem(activeCalculation)
+                  const status = readRecordStatus(activeCalculation)
+                  const pending = ['calculated', 'requires_review'].includes(status)
+                  return (
+                    <>
+                      <div className="border-b border-[#D6E7DB] bg-[#DAF0E3] p-4 sm:p-5">
+                        <p className="mb-3 text-[13px] font-bold uppercase tracking-[0.06em] text-[#247252]">Selected food check</p>
+                        <div className="flex items-start gap-3">
+                          <FoodItemThumb src={item.image} label={item.name} kind={item.kind} large />
+                          <div className="min-w-0 flex-1">
+                            <h3 className="break-words text-[21px] font-extrabold leading-[1.24] text-[#173C31]">{item.name}</h3>
+                            <p className="mt-1 text-[14px] text-[#4C6B5C]">{readableEntityType(activeCalculation.entityType)}</p>
+                            <div className="mt-2"><StatusPill value={status} /></div>
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
+                      </div>
+                      <div className="p-4 sm:p-5">
+                        <h4 className="text-[17px] font-extrabold text-[#19392D]">Evidence to inspect</h4>
+                        <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 text-[14px]">
+                          <div><dt className="font-semibold text-[#6C7D72]">Evidence state</dt><dd className="mt-0.5 break-words font-bold text-[#2A4B3A]">{readableStatus(activeCalculation.evidenceState || activeCalculation.overallEvidenceState)}</dd></div>
+                          <div><dt className="font-semibold text-[#6C7D72]">Calculation version</dt><dd className="mt-0.5 font-bold text-[#2A4B3A]">{activeCalculation.calculationVersion || activeCalculation.version || '—'}</dd></div>
+                          <div><dt className="font-semibold text-[#6C7D72]">Nutrition entries</dt><dd className="mt-0.5 font-bold text-[#2A4B3A]">{activeCalculation.nutrients?.length ?? '—'}</dd></div>
+                          <div><dt className="font-semibold text-[#6C7D72]">Allergen / dietary checks</dt><dd className="mt-0.5 font-bold text-[#2A4B3A]">{activeCalculation.allergens?.length ?? '—'} / {activeCalculation.dietary?.length ?? '—'}</dd></div>
+                        </dl>
+                        {activeCalculation.basis && (
+                          <div className="mt-4 rounded-xl bg-[#F3F6F0] p-3.5">
+                            <p className="text-[13px] font-bold text-[#3C654D]">Calculation basis</p>
+                            <p className="mt-1 break-words text-[14px] leading-6 text-[#4C6053]">{activeCalculation.basis}</p>
+                          </div>
+                        )}
+                        {(activeCalculation.dietary?.length > 0 || activeCalculation.allergens?.length > 0 || activeCalculation.nutrients?.length > 0 || activeCalculation.sourceVersions?.length > 0) && (
+                          <details className="mt-3 rounded-xl border border-[#DCE7DC] bg-white p-3.5">
+                            <summary className="focus-ring cursor-pointer text-[14px] font-bold text-[#1A5C40]">View calculated findings</summary>
+                            <div className="mt-3 space-y-2 text-[14px] leading-5 text-[#495E53]">
+                              {activeCalculation.dietary?.map((entry, index) => <p key={`diet-${index}`} className="break-words"><strong>{readableStatus(entry.ruleKey)}:</strong> {readableStatus(entry.outcome)} ({readableStatus(entry.evidenceState)})</p>)}
+                              {activeCalculation.allergens?.map((entry, index) => <p key={`allergy-${index}`} className="break-words"><strong>Allergen {shortId(entry.allergenId)}:</strong> {readableStatus(entry.outcome)} ({readableStatus(entry.evidenceState)})</p>)}
+                              {activeCalculation.nutrients?.map((entry, index) => <p key={`nutrition-${index}`} className="break-words"><strong>Nutrient {shortId(entry.nutrientId)}:</strong> {displayValue(entry.amount)} {entry.unit || ''} · {readableStatus(entry.basis)} ({readableStatus(entry.evidenceState)})</p>)}
+                              {activeCalculation.sourceVersions?.map((entry, index) => <p key={`source-${index}`} className="break-words"><strong>Source {index + 1}:</strong> {readableStatus(entry.sourceType)} · Version {entry.version || '—'} ({readableStatus(entry.evidenceState)})</p>)}
+                            </div>
+                          </details>
+                        )}
+                        {canMutate && pending ? (
+                          <div className="mt-4 border-t border-[#DCE8DF] pt-4">
+                            <label className="block">
+                              <span className="block text-[16px] font-extrabold text-[#1D4535]">Record your reason for {item.name}</span>
+                              <span className="mt-1 block text-[14px] leading-5 text-[#64766B]">Required before approving this specific check.</span>
+                              <textarea ref={reasonInputRef} value={reasonDetails} onChange={(event) => setReasonDetails(event.target.value)}
+                                rows={3} placeholder={`What evidence supports approving ${item.name}?`}
+                                className="focus-ring mt-3 min-h-[110px] w-full resize-y rounded-xl border border-[#A8CDBC] bg-white p-3 text-[15px] leading-6 text-[#19372C] outline-none focus:border-[#186B4C]" />
+                            </label>
+                            <button type="button" disabled={Boolean(busyKey) || !reasonDetails.trim()}
+                              onClick={() => runMutation(`calculation-${id}`, () => approveFoodCalculation({ calculationId: id, reasonDetails: reasonDetails.trim() }), `${item.name}: food check approved.`)}
+                              className="focus-ring mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#125741] px-5 text-[15px] font-extrabold text-white transition hover:bg-[#147453] disabled:cursor-not-allowed disabled:opacity-50">
+                              {busyKey === `calculation-${id}` ? <LoaderCircle size={18} className="animate-spin" /> : <BadgeCheck size={18} />}
+                              {busyKey === `calculation-${id}` ? 'Approving…' : `Approve ${item.name}`}
+                            </button>
+                          </div>
+                        ) : <p className="mt-4 rounded-xl bg-[#EEF3EE] px-3.5 py-3 text-[14px] leading-6 font-medium text-[#4D6355]">{pending ? 'Trust & Safety permission is required to approve.' : 'This record is not awaiting approval. Its history is available above.'}</p>}
+                      </div>
+                    </>
+                  )
+                })() : <ReviewPlaceholder title="Choose a food check" description="Tap an item in the queue to view its photo and evidence. The decision form opens only for that item." />}
+              </div>
+            </div>
+          </section>
 
-                  <div className="hidden sm:block">
-                    <div className="grid grid-cols-[1.4fr_1fr_1fr_auto_auto] gap-4 border-b border-stone-200 py-3 text-[11px] font-bold text-stone-500">
-                      <span>Ingredient / allergen</span><span>Relationship</span><span>Evidence</span><span>Status</span><span>Action</span>
-                    </div>
+          <section id="food-review-allergies" className={`scroll-mt-24 border-t border-[#E1E6E8] bg-[#EAF3F7] px-4 py-6 sm:-mx-6 sm:px-6 sm:py-9 ${mobileWorkSection === 'relations' ? 'block' : 'hidden sm:block'}`}>
+            <SectionHeading number="03" kicker="Safety links" title="Ingredient & allergen links"
+              subtitle="Choose a saved link to examine its relationship before activation."
+              total={`${relations.length} links`} tone="blue" />
+            <div className={`grid gap-4 ${relations.length ? 'lg:grid-cols-[minmax(0,1fr)_minmax(310px,0.9fr)]' : ''} lg:items-start`}>
+              <div className="order-1 min-w-0 overflow-hidden rounded-[16px] border border-[#CDDFE9] bg-white sm:order-2 sm:rounded-[18px] lg:order-1">
+                <div className="flex items-center justify-between border-b border-[#DFEAF0] bg-[#DAEBF4] px-4 py-3 text-[15px] font-bold text-[#295F79]"><span>Saved relationships</span><span className="text-[13px]">{relations.length}</span></div>
+                {isLoading && !relations.length ? <p role="status" className="p-5 text-[15px]">Loading allergy links…</p>
+                : !relations.length ? <div className="p-5"><p className="text-[16px] font-bold text-[#284859]">No ingredient–allergen links yet</p><p className="mt-1 text-[14px] leading-6 text-[#5A7280]">Saved links will appear here when available.</p></div>
+                : <>
+                  <div className={expandedLists.relations ? 'max-h-[450px] overflow-y-auto overscroll-contain' : ''}>
                     {relationDesktopItems.map((relation, index) => {
                       const id = recordId(relation)
-                      const status = readRecordStatus(relation)
-                      return (
-                        <div key={id || index} className="grid grid-cols-[1.4fr_1fr_1fr_auto_auto] items-center gap-4 border-b border-stone-100 py-3 text-sm">
-                          <div className="min-w-0">
-                            <p className="font-bold text-stone-900">Ingredient {shortId(relation.ingredientId || relation.canonicalIngredientId)}</p>
-                            <p className="mt-0.5 text-xs text-stone-500">Allergen {shortId(relation.allergenId)}</p>
-                          </div>
-                          <span className="font-semibold text-stone-700">{readableStatus(relation.relationship || relation.relationType)}</span>
-                          <span className="text-stone-600">{readableStatus(relation.evidenceState)}</span>
-                          <StatusPill value={status} />
-                          <div className="text-right">
-                            {canMutate && status === 'draft' ? (
-                              <button
-                                type="button"
-                                disabled={busyKey === `mapping-${id}`}
-                                onClick={() =>
-                                  runMutation(
-                                    `mapping-${id}`,
-                                    () => activateIngredientRelation({ relationId: id, reasonDetails }),
-                                    'Ingredient allergy link activated.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg bg-[#173b4f] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                Activate
-                              </button>
-                            ) : <span className="text-xs text-stone-400">—</span>}
-                          </div>
-                        </div>
-                      )
+                      const active = selectedDecision?.kind === 'relation' && selectedDecision.id === id
+                      return <button type="button" key={id || index} onClick={() => chooseDecision('relation', id)} aria-pressed={active} disabled={Boolean(busyKey)}
+                        className={`focus-ring flex w-full min-w-0 items-center gap-3 border-b border-[#E7EFF3] px-4 py-3.5 text-left transition last:border-b-0 ${active ? 'bg-[#E5F3FA] shadow-[inset_4px_0_0_#3682A0]' : 'hover:bg-[#F4F9FC]'}`}>
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#DAEBF3] text-[#277091]"><ShieldAlert size={21} /></span>
+                        <span className="min-w-0 flex-1"><strong className="block break-words text-[15px] text-[#263E4D]">Ingredient {shortId(relation.ingredientId || relation.canonicalIngredientId)}</strong>
+                          <span className="mt-1 block break-words text-[13px] text-[#627885]">Allergen {shortId(relation.allergenId)} · {readableStatus(relation.relationship || relation.relationType)}</span><span className="mt-2 inline-flex sm:hidden"><StatusPill value={readRecordStatus(relation)} /></span></span>
+                        <span className="hidden sm:block"><StatusPill value={readRecordStatus(relation)} /></span>
+                        <ChevronRight size={18} className="shrink-0 text-[#397A95]" />
+                      </button>
                     })}
                   </div>
-
-                  <div className="py-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandedList('relations')}
-                      className={`${relations.length > 6 ? 'inline-flex sm:hidden' : 'hidden'} focus-ring min-h-9 items-center justify-center rounded-lg border border-[#bfd3df] bg-[#edf5f9] px-4 text-xs font-bold text-[#173b4f]`}
-                    >
-                      {expandedLists.relations ? 'Show fewer' : `View all ${relations.length}`}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandedList('relations')}
-                      className={`${relations.length > 10 ? 'hidden sm:inline-flex' : 'hidden'} focus-ring min-h-9 items-center justify-center rounded-lg border border-[#bfd3df] bg-[#edf5f9] px-4 text-xs font-bold text-[#173b4f]`}
-                    >
-                      {expandedLists.relations ? 'Show fewer' : `View all ${relations.length}`}
-                    </button>
-                  </div>
-                </>
-              )}
+                  {relations.length > 10 && <div className="border-t border-[#DFEAF0] p-3 text-center"><button type="button" onClick={() => toggleExpandedList('relations')} className="focus-ring min-h-10 rounded-xl border border-[#B7D5E4] bg-white px-4 text-[14px] font-bold text-[#286887] hover:bg-[#EAF4FA]">{expandedLists.relations ? 'Show fewer' : `View all ${relations.length}`}</button></div>}
+                </>}
+              </div>
+              {relations.length > 0 && <div ref={selectedDecision?.kind === 'relation' ? decisionPanelRef : null} className={`${activeRelation ? "" : "hidden sm:block"} order-2 min-w-0 scroll-mt-20 overflow-hidden rounded-[16px] border border-[#C8DEE8] bg-white sm:order-1 sm:rounded-[18px] lg:order-2`}>
+                {activeRelation ? (() => {
+                  const id = recordId(activeRelation)
+                  const status = readRecordStatus(activeRelation)
+                  return <>
+                    <div className="bg-[#DCEEF6] p-4 sm:p-5"><p className="text-[13px] font-bold uppercase text-[#326D88]">Selected allergy link</p><h3 className="mt-2 break-words text-[21px] font-extrabold text-[#23485A]">Ingredient {shortId(activeRelation.ingredientId || activeRelation.canonicalIngredientId)}</h3><p className="mt-1 text-[14px] text-[#506F7E]">Linked allergen {shortId(activeRelation.allergenId)}</p></div>
+                    <div className="p-4 sm:p-5"><dl className="grid grid-cols-2 gap-4 text-[14px]"><div><dt className="font-semibold text-[#607989]">Relationship</dt><dd className="mt-1 font-bold text-[#2B5367]">{readableStatus(activeRelation.relationship || activeRelation.relationType)}</dd></div><div><dt className="font-semibold text-[#607989]">Evidence</dt><dd className="mt-1 font-bold text-[#2B5367]">{readableStatus(activeRelation.evidenceState)}</dd></div><div><dt className="font-semibold text-[#607989]">Status</dt><dd className="mt-1"><StatusPill value={status} /></dd></div><div><dt className="font-semibold text-[#607989]">Version</dt><dd className="mt-1 font-bold text-[#2B5367]">{activeRelation.version || activeRelation.relationVersion || '—'}</dd></div></dl>
+                      {canMutate && status === 'draft' ? <div className="mt-5 border-t border-[#DBEAF1] pt-4"><label className="block"><span className="text-[16px] font-extrabold text-[#254D60]">Record your reason</span><span className="mt-1 block text-[14px] text-[#567485]">Why should this ingredient–allergen link be active?</span><textarea ref={reasonInputRef} rows={3} value={reasonDetails} onChange={(event) => setReasonDetails(event.target.value)} placeholder="Describe the reviewed evidence for this link" className="focus-ring mt-3 min-h-24 w-full rounded-xl border border-[#BBD5E2] bg-white p-3 text-[15px] leading-6 outline-none focus:border-[#3883A4]" /></label><button type="button" disabled={Boolean(busyKey) || !reasonDetails.trim()} onClick={() => runMutation(`mapping-${id}`, () => activateIngredientRelation({ relationId: id, reasonDetails: reasonDetails.trim() }), 'Ingredient allergy link activated.')} className="focus-ring mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#276B87] px-4 text-[15px] font-bold text-white hover:bg-[#195775] disabled:opacity-50"><BadgeCheck size={17} /> {busyKey === `mapping-${id}` ? 'Activating…' : 'Activate reviewed link'}</button></div> : <p className="mt-5 rounded-xl bg-[#EFF5F8] p-3 text-[14px] text-[#537081]">{status === 'draft' ? 'Trust & Safety permission is required to activate.' : 'This link is not in draft status.'}</p>}
+                    </div>
+                  </>
+                })() : <ReviewPlaceholder kind="link" title="Select an allergy link" description="Click a link on the left to inspect its saved relationship and activate it when eligible." />}
+              </div>}
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="border-b border-stone-200 bg-[#f2eff8]">
-          <div className="grid gap-0 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="px-4 py-5 sm:px-7 sm:py-6 lg:px-6">
-              <p className="text-xs font-bold text-[#624a87]">Dietary rules</p>
-              <h2 className="mt-1 text-xl font-black text-stone-950">See the rules EPANTRY can apply automatically</h2>
-              <p className="mt-2 text-sm leading-6 text-stone-600 sm:hidden line-clamp-2">
-                Review rule versions and activate drafts only after the rule is ready.
-              </p>
-              <p className="mt-2 hidden text-sm leading-6 text-stone-600 sm:block">
-                Food rules are versioned so changes stay traceable. Draft rules can be activated only with the required safety permission and reason.
-              </p>
-              <p className="mt-3 text-xs font-bold text-[#624a87]">{rules.length} rules loaded</p>
-            </div>
-
-            <div className="min-w-0 bg-white/70 px-4 sm:px-7">
-              {rules.length === 0 ? (
-                <div className="py-5">
-                  <p className="text-sm font-bold text-stone-900">No food rules have been configured yet.</p>
-                  <p className="mt-1 text-xs text-stone-500">No dietary rules are currently available for review.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="sm:hidden">
-                    {ruleMobileItems.map((rule, index) => {
-                      const id = recordId(rule)
-                      const status = readRecordStatus(rule)
-                      return (
-                        <div key={id || index} className={`py-3 ${index > 0 ? 'border-t border-stone-200/70' : ''}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-stone-900">{rule.key || rule.ruleKey || rule.profileKey || shortId(id)}</p>
-                              <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">Version {rule.version || rule.ruleVersion || '—'} · {rule.jurisdiction || 'All regions'}</p>
-                            </div>
-                            <StatusPill value={status} />
-                          </div>
-                          {canMutate && status === 'draft' ? (
-                            <div className="mt-2 text-right">
-                              <button
-                                type="button"
-                                disabled={busyKey === `rule-${id}`}
-                                onClick={() =>
-                                  runMutation(
-                                    `rule-${id}`,
-                                    () => activateFoodRule({ ruleProfileId: id, reasonDetails }),
-                                    'Food rule activated.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg bg-[#624a87] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                Activate
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="hidden sm:block">
+          <section id="food-review-rules" className={`scroll-mt-24 border-t border-[#E1DEE9] bg-[#F4EFF9] px-4 py-6 sm:-mx-6 sm:px-6 sm:py-9 ${mobileWorkSection === 'rules' ? 'block' : 'hidden sm:block'}`}>
+            <SectionHeading number="04" kicker="Policy rules" title="Dietary rules"
+              subtitle="Select a rule to inspect its version and activation status."
+              total={`${rules.length} rules`} tone="violet" />
+            <div className={`grid gap-4 ${rules.length ? 'lg:grid-cols-[minmax(0,1fr)_minmax(310px,0.9fr)]' : ''} lg:items-start`}>
+              <div className="order-1 min-w-0 overflow-hidden rounded-[16px] border border-[#DCD3E9] bg-white sm:order-2 sm:rounded-[18px] lg:order-1">
+                <div className="flex items-center justify-between border-b border-[#E8E0F1] bg-[#E8DFF2] px-4 py-3 text-[15px] font-bold text-[#684984]"><span>Saved rule profiles</span><span className="text-[13px]">{rules.length}</span></div>
+                {isLoading && !rules.length ? <p role="status" className="p-5 text-[15px]">Loading dietary rules…</p>
+                : !rules.length ? <div className="p-5"><p className="text-[16px] font-bold text-[#56466A]">No dietary rules configured</p><p className="mt-1 text-[14px] leading-6 text-[#776C83]">Saved rule profiles will appear here.</p></div>
+                : <>
+                  <div className={expandedLists.rules ? 'max-h-[450px] overflow-y-auto overscroll-contain' : ''}>
                     {ruleDesktopItems.map((rule, index) => {
                       const id = recordId(rule)
-                      const status = readRecordStatus(rule)
-                      return (
-                        <div key={id || index} className={`flex items-center justify-between gap-4 py-3 ${index > 0 ? 'border-t border-stone-200/70' : ''}`}>
-                          <div className="min-w-0">
-                            <p className="font-bold text-stone-900">{rule.key || rule.ruleKey || rule.profileKey || shortId(id)}</p>
-                            <p className="mt-0.5 text-xs text-stone-500">Version {rule.version || rule.ruleVersion || '—'} · {rule.jurisdiction || 'All regions'}</p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-3">
-                            <StatusPill value={status} />
-                            {canMutate && status === 'draft' ? (
-                              <button
-                                type="button"
-                                disabled={busyKey === `rule-${id}`}
-                                onClick={() =>
-                                  runMutation(
-                                    `rule-${id}`,
-                                    () => activateFoodRule({ ruleProfileId: id, reasonDetails }),
-                                    'Food rule activated.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg bg-[#624a87] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                Activate
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                      )
+                      const active = selectedDecision?.kind === 'rule' && selectedDecision.id === id
+                      return <button type="button" key={id || index} onClick={() => chooseDecision('rule', id)} aria-pressed={active} disabled={Boolean(busyKey)}
+                        className={`focus-ring flex w-full min-w-0 items-center gap-3 border-b border-[#EEEAF3] px-4 py-3.5 text-left transition last:border-b-0 ${active ? 'bg-[#EEE7F7] shadow-[inset_4px_0_0_#8564AA]' : 'hover:bg-[#FAF7FC]'}`}>
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E9E1F5] text-[#75559D]"><Layers3 size={21} /></span>
+                        <span className="min-w-0 flex-1"><strong className="block break-words text-[15px] text-[#3E3452]">{rule.key || rule.ruleKey || rule.profileKey || shortId(id)}</strong><span className="mt-1 block text-[13px] text-[#81778B]">Version {rule.version || rule.ruleVersion || '—'} · {rule.jurisdictionCode || rule.jurisdiction || 'All regions'}</span><span className="mt-2 inline-flex sm:hidden"><StatusPill value={readRecordStatus(rule)} /></span></span>
+                        <span className="hidden sm:block"><StatusPill value={readRecordStatus(rule)} /></span><ChevronRight size={18} className="shrink-0 text-[#8467A4]" />
+                      </button>
                     })}
                   </div>
-
-                  <div className="py-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandedList('rules')}
-                      className={`${rules.length > 6 ? 'inline-flex sm:hidden' : 'hidden'} focus-ring min-h-9 items-center justify-center rounded-lg border border-[#cfc3df] bg-white px-4 text-xs font-bold text-[#624a87]`}
-                    >
-                      {expandedLists.rules ? 'Show fewer' : `View all ${rules.length}`}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandedList('rules')}
-                      className={`${rules.length > 10 ? 'hidden sm:inline-flex' : 'hidden'} focus-ring min-h-9 items-center justify-center rounded-lg border border-[#cfc3df] bg-white px-4 text-xs font-bold text-[#624a87]`}
-                    >
-                      {expandedLists.rules ? 'Show fewer' : `View all ${rules.length}`}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="border-b border-stone-200 bg-[#eef6f4]">
-          <div className="grid gap-0 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="bg-[#0f5f49] px-4 py-5 text-white sm:px-7 sm:py-6 lg:px-6">
-              <p className="text-xs font-bold text-emerald-100">Food checks waiting for review</p>
-              <h2 className="mt-1 text-xl font-black">Approve checks that need a human decision</h2>
-              <p className="mt-2 text-sm leading-6 text-emerald-50/90 sm:hidden line-clamp-2">
-                Review the evidence state, then approve checks that are ready.
-              </p>
-              <p className="mt-2 hidden text-sm leading-6 text-emerald-50/90 sm:block">
-                Calculations are saved as separate versions. Approving one records a new governed result and keeps the earlier history intact.
-              </p>
-              <p className="mt-3 text-xs font-bold text-emerald-100">{calculations.length} checks loaded</p>
-            </div>
-
-            <div className="min-w-0 bg-white/80 px-4 sm:px-7">
-              {calculations.length === 0 ? (
-                <div className="py-5">
-                  <p className="text-sm font-bold text-stone-900">No food checks are waiting in this workspace.</p>
-                  <p className="mt-1 text-xs text-stone-500">There are no food checks to review right now.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="sm:hidden">
-                    {calculationMobileItems.map((calculation, index) => {
-                      const id = recordId(calculation)
-                      const status = readRecordStatus(calculation)
-                      return (
-                        <div key={id || index} className={`py-3 ${index > 0 ? 'border-t border-stone-100' : ''}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-stone-900">{foodCheckItemName(calculation)}</p>
-                              <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">{readableEntityType(calculation.entityType || calculation.subjectType || calculation.targetType)} · {readableStatus(calculation.evidenceState || calculation.overallEvidenceState)}</p>
-                            </div>
-                            <StatusPill value={status} />
-                          </div>
-                          <div className="mt-2 flex items-center justify-between gap-3">
-                            <span className="text-xs font-semibold text-stone-500">Version {calculation.calculationVersion || calculation.version || '—'}</span>
-                            {canMutate && ['calculated', 'requires_review'].includes(status) ? (
-                              <button
-                                type="button"
-                                disabled={busyKey === `calculation-${id}`}
-                                onClick={() =>
-                                  runMutation(
-                                    `calculation-${id}`,
-                                    () => approveFoodCalculation({ calculationId: id, reasonDetails }),
-                                    'Food check approved.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg bg-[#0f5f49] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                Approve
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="hidden sm:block">
-                    <div className="grid grid-cols-[1.2fr_1fr_100px_auto_auto] gap-4 border-b border-stone-200 py-3 text-[11px] font-bold text-stone-500">
-                      <span>Food check</span><span>Evidence</span><span>Version</span><span>Status</span><span>Action</span>
+                  {rules.length > 10 && <div className="border-t border-[#E8E0F1] p-3 text-center"><button type="button" onClick={() => toggleExpandedList('rules')} className="focus-ring min-h-10 rounded-xl border border-[#D3C2E2] bg-white px-4 text-[14px] font-bold text-[#705090] hover:bg-[#F6F0FA]">{expandedLists.rules ? 'Show fewer' : `View all ${rules.length}`}</button></div>}
+                </>}
+              </div>
+              {rules.length > 0 && <div ref={selectedDecision?.kind === 'rule' ? decisionPanelRef : null} className={`${activeRule ? "" : "hidden sm:block"} order-2 min-w-0 scroll-mt-20 overflow-hidden rounded-[16px] border border-[#DCD3E9] bg-white sm:order-1 sm:rounded-[18px] lg:order-2`}>
+                {activeRule ? (() => {
+                  const id = recordId(activeRule)
+                  const status = readRecordStatus(activeRule)
+                  const name = activeRule.key || activeRule.ruleKey || activeRule.profileKey || shortId(id)
+                  return <>
+                    <div className="bg-[#E8DFF3] p-4 sm:p-5"><p className="text-[13px] font-bold uppercase text-[#765998]">Selected dietary rule</p><h3 className="mt-2 break-words text-[21px] font-extrabold text-[#423254]">{name}</h3><p className="mt-1 text-[14px] text-[#78668B]">Check the version before activation</p></div>
+                    <div className="p-4 sm:p-5"><dl className="grid grid-cols-2 gap-4 text-[14px]"><div><dt className="font-semibold text-[#7C728B]">Version</dt><dd className="mt-1 font-bold text-[#544466]">{activeRule.version || activeRule.ruleVersion || '—'}</dd></div><div><dt className="font-semibold text-[#7C728B]">Jurisdiction</dt><dd className="mt-1 font-bold text-[#544466]">{activeRule.jurisdictionCode || activeRule.jurisdiction || 'All regions'}</dd></div><div><dt className="font-semibold text-[#7C728B]">Status</dt><dd className="mt-1"><StatusPill value={status} /></dd></div></dl>
+                      {canMutate && status === 'draft' ? <div className="mt-5 border-t border-[#EAE2F3] pt-4"><label className="block"><span className="text-[16px] font-extrabold text-[#554069]">Record your reason for {name}</span><span className="mt-1 block text-[14px] text-[#78688B]">Explain why this version is ready to activate.</span><textarea ref={reasonInputRef} rows={3} value={reasonDetails} onChange={(event) => setReasonDetails(event.target.value)} placeholder={`Evidence supporting ${name}`} className="focus-ring mt-3 min-h-24 w-full rounded-xl border border-[#D5C5E4] bg-white p-3 text-[15px] leading-6 outline-none focus:border-[#8567A4]" /></label><button type="button" disabled={Boolean(busyKey) || !reasonDetails.trim()} onClick={() => runMutation(`rule-${id}`, () => activateFoodRule({ ruleProfileId: id, reasonDetails: reasonDetails.trim() }), 'Food rule activated.')} className="focus-ring mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#674D87] px-4 text-[15px] font-bold text-white hover:bg-[#553775] disabled:opacity-50"><BadgeCheck size={17} /> {busyKey === `rule-${id}` ? 'Activating…' : 'Activate selected rule'}</button></div> : <p className="mt-5 rounded-xl bg-[#F5F1F8] p-3 text-[14px] text-[#746782]">{status === 'draft' ? 'Trust & Safety permission is required to activate.' : 'This rule is not in draft status.'}</p>}
                     </div>
-                    {calculationDesktopItems.map((calculation, index) => {
-                      const id = recordId(calculation)
-                      const status = readRecordStatus(calculation)
-                      return (
-                        <div key={id || index} className="grid grid-cols-[1.2fr_1fr_100px_auto_auto] items-center gap-4 border-b border-stone-100 py-3 text-sm">
-                          <div className="min-w-0">
-                            <p className="font-bold text-stone-900">{foodCheckItemName(calculation)}</p>
-                            <p className="mt-0.5 text-xs text-stone-500">{readableEntityType(calculation.entityType || calculation.subjectType || calculation.targetType)}</p>
-                          </div>
-                          <span className="text-stone-600">{readableStatus(calculation.evidenceState || calculation.overallEvidenceState)}</span>
-                          <span className="font-semibold text-stone-600">{calculation.calculationVersion || calculation.version || '—'}</span>
-                          <StatusPill value={status} />
-                          <div className="text-right">
-                            {canMutate && ['calculated', 'requires_review'].includes(status) ? (
-                              <button
-                                type="button"
-                                disabled={busyKey === `calculation-${id}`}
-                                onClick={() =>
-                                  runMutation(
-                                    `calculation-${id}`,
-                                    () => approveFoodCalculation({ calculationId: id, reasonDetails }),
-                                    'Food check approved.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg bg-[#0f5f49] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                              >
-                                Approve
-                              </button>
-                            ) : <span className="text-xs text-stone-400">—</span>}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="py-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandedList('calculations')}
-                      className={`${calculations.length > 6 ? 'inline-flex sm:hidden' : 'hidden'} focus-ring min-h-9 items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 text-xs font-bold text-emerald-800`}
-                    >
-                      {expandedLists.calculations ? 'Show fewer' : `View all ${calculations.length}`}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleExpandedList('calculations')}
-                      className={`${calculations.length > 10 ? 'hidden sm:inline-flex' : 'hidden'} focus-ring min-h-9 items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 text-xs font-bold text-emerald-800`}
-                    >
-                      {expandedLists.calculations ? 'Show fewer' : `View all ${calculations.length}`}
-                    </button>
-                  </div>
-                </>
-              )}
+                  </>
+                })() : <ReviewPlaceholder kind="rule" title="Choose a dietary rule" description="Select a rule on the left to view its version and activation workflow." />}
+              </div>}
             </div>
-          </div>
-        </section>
 
-        {canMutate ? (
-          <section className="bg-[#f1f3f5] px-4 py-5 sm:px-7 sm:py-6">
-            <details>
-              <summary className="cursor-pointer list-none text-sm font-black text-stone-900">
-                Advanced rule check
-                <span className="ml-2 text-xs font-semibold text-stone-500">Optional</span>
-              </summary>
-              <p className="mt-2 max-w-3xl text-xs leading-5 text-stone-600 sm:hidden line-clamp-2">
-                Test an existing rule payload without publishing or activating anything.
-              </p>
-              <p className="mt-2 hidden max-w-3xl text-xs leading-5 text-stone-600 sm:block">
-                Use this only when you already have a rule test payload. It checks how the rule evaluates and does not publish, activate or change customer-facing data.
-              </p>
-              <textarea
-                value={ruleTestJson}
-                onChange={(event) => setRuleTestJson(event.target.value)}
-                rows={8}
-                spellCheck={false}
-                className="mt-4 w-full rounded-xl border border-stone-300 bg-[#111827] p-4 font-mono text-[11px] leading-5 text-stone-100 outline-none focus:border-emerald-500"
-              />
-              <button
-                type="button"
-                onClick={handleRuleTest}
-                disabled={busyKey === 'rule-test'}
-                className="focus-ring mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-[#173b4f] px-4 text-xs font-bold text-white disabled:opacity-50"
-              >
-                {busyKey === 'rule-test' ? (
-                  <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <FlaskConical size={15} aria-hidden="true" />
-                )}
-                Run test
-              </button>
-              {ruleTestResult ? (
-                <pre className="mt-4 max-h-96 overflow-auto rounded-xl bg-[#111827] p-4 text-[10px] leading-5 text-stone-100">
-                  {JSON.stringify(ruleTestResult, null, 2)}
-                </pre>
-              ) : null}
-            </details>
+            {canMutate && (
+              <details className="group mt-5 overflow-hidden rounded-[18px] border border-[#DDD2EA] bg-white">
+                <summary className="focus-ring flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-[15px] font-bold text-[#594873] marker:hidden sm:px-5">
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    <FlaskConical size={19} aria-hidden="true" />
+                    Try a dietary rule
+                    <span className="text-[13px] font-normal text-[#83748E]">Optional · No changes saved</span>
+                  </span>
+                  <span className="text-[21px] leading-none group-open:rotate-45" aria-hidden="true">+</span>
+                </summary>
+
+                <div className="border-t border-[#EAE1F0] px-4 pb-5 pt-5 sm:px-6 sm:pb-6">
+                  <h3 className="text-[21px] font-extrabold tracking-[-0.025em] text-[#3C3151]">Check a claim before using it</h3>
+                  <p className="mt-1 max-w-3xl text-[15px] leading-6 text-[#716581]">
+                    Choose a rule, tell us whether the evidence is complete, and compare the food details. This is a practice check; it does not approve or change any saved rule.
+                  </p>
+
+                  <datalist id="dietary-rule-suggestions">
+                    {Array.from(new Set([
+                      'Vegetarian', 'Vegan', 'Gluten free', 'Eggitarian', 'Non vegetarian',
+                      ...rules.map((rule) => readableStatus(rule.ruleKey || rule.key || rule.profileKey || '')).filter((name) => name !== 'Unknown'),
+                    ])).map((name) => <option key={name} value={name} />)}
+                  </datalist>
+                  <datalist id="dietary-fact-suggestions">
+                    {['Contains meat', 'Contains fish', 'Contains milk', 'Contains eggs', 'Contains gluten', 'Contains nuts'].map((name) =>
+                      <option key={name} value={name} />,
+                    )}
+                  </datalist>
+
+                  <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                    <label className="block min-w-0">
+                      <span className="mb-2 flex items-center gap-2 text-[15px] font-bold text-[#554469]">
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#EAE1F5] text-[13px] text-[#715090]">01</span>
+                        Dietary claim to test
+                      </span>
+                      <input
+                        type="text"
+                        list="dietary-rule-suggestions"
+                        maxLength={120}
+                        value={ruleTestForm.ruleName}
+                        onChange={(event) => updateRuleTestForm({ ruleName: event.target.value })}
+                        placeholder="e.g. Vegetarian"
+                        className="focus-ring min-h-12 w-full rounded-xl border border-[#D8CDE7] bg-[#FBF9FD] px-4 text-[15px] text-[#3F3350] outline-none focus:border-[#8261A6]"
+                      />
+                      <span className="mt-1.5 block text-[13px] leading-5 text-[#7C7189]">Pick a suggested claim or type the name of a saved rule.</span>
+                    </label>
+
+                    <fieldset className="min-w-0">
+                      <legend className="mb-2 flex items-center gap-2 text-[15px] font-bold text-[#554469]">
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#EAE1F5] text-[13px] text-[#715090]">02</span>
+                        Is the supporting evidence complete?
+                      </legend>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" aria-pressed={ruleTestForm.evidenceComplete}
+                          onClick={() => updateRuleTestForm({ evidenceComplete: true })}
+                          className={`focus-ring min-h-12 rounded-xl border px-3 py-2 text-[14px] font-bold transition ${ruleTestForm.evidenceComplete ? 'border-[#377659] bg-[#E1F1E7] text-[#18583E]' : 'border-[#D8CDE7] bg-[#FBF9FD] text-[#685A77] hover:bg-[#F1EBF7]'}`}>
+                          Yes, checked
+                        </button>
+                        <button type="button" aria-pressed={!ruleTestForm.evidenceComplete}
+                          onClick={() => updateRuleTestForm({ evidenceComplete: false })}
+                          className={`focus-ring min-h-12 rounded-xl border px-3 py-2 text-[14px] font-bold transition ${!ruleTestForm.evidenceComplete ? 'border-[#906CC0] bg-[#EEE7F8] text-[#624483]' : 'border-[#D8CDE7] bg-[#FBF9FD] text-[#685A77] hover:bg-[#F1EBF7]'}`}>
+                          Still checking
+                        </button>
+                      </div>
+                      <p className="mt-1.5 text-[13px] leading-5 text-[#7C7189]">Choose “Yes” only when all supporting information has been reviewed.</p>
+                    </fieldset>
+                  </div>
+
+                  <div className="mt-6 border-t border-[#EAE2F1] pt-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-[17px] font-extrabold text-[#483859]">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#EAE1F5] text-[13px] text-[#715090]">03</span>
+                          Food details to check
+                        </h4>
+                        <p className="mt-1 text-[14px] leading-6 text-[#776B84]">Enter the answer the rule requires and what the reviewed evidence actually says.</p>
+                      </div>
+                      <button type="button" onClick={addRuleTestFact}
+                        className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#BDA8D3] bg-[#F1EAF8] px-4 text-[14px] font-bold text-[#664985] transition hover:bg-[#E6D9F3]">
+                        <Plus size={17} aria-hidden="true" /> Add food detail
+                      </button>
+                    </div>
+
+                    {ruleTestForm.facts.length === 0 ? (
+                      <div className="mt-4 rounded-xl border border-dashed border-[#D9CDE7] bg-[#FAF8FC] px-4 py-5 text-[14px] leading-6 text-[#726680]">
+                        No food details added yet. Select <strong>Add food detail</strong> to check something such as whether the food contains meat or milk.
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        {ruleTestForm.facts.map((fact, index) => (
+                          <div key={fact.id} className="rounded-xl border border-[#E2D9EC] bg-[#FCFAFD] p-3 sm:p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <p className="text-[14px] font-bold text-[#594773]">Food detail {index + 1}</p>
+                              <button type="button" onClick={() => removeRuleTestFact(fact.id)} aria-label={`Remove food detail ${index + 1}`}
+                                className="focus-ring inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-[#A0454F] hover:bg-[#FCEFF0]">
+                                <Trash2 size={16} aria-hidden="true" /> Remove
+                              </button>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                              <label className="block min-w-0">
+                                <span className="mb-1.5 block text-[13px] font-bold text-[#594773]">What to check</span>
+                                <input type="text" list="dietary-fact-suggestions" value={fact.name}
+                                  onChange={(event) => updateRuleTestFact(fact.id, { name: event.target.value })}
+                                  placeholder="e.g. Contains meat"
+                                  className="focus-ring min-h-11 w-full rounded-lg border border-[#D9CDE6] bg-white px-3 text-[14px] text-[#3F3350] outline-none focus:border-[#8261A6]" />
+                              </label>
+                              <label className="block min-w-0">
+                                <span className="mb-1.5 block text-[13px] font-bold text-[#594773]">Answer type</span>
+                                <select value={fact.type} onChange={(event) => updateRuleTestFact(fact.id, { type: event.target.value, expected: '', observed: '' })}
+                                  className="focus-ring min-h-11 w-full rounded-lg border border-[#D9CDE6] bg-white px-3 text-[14px] text-[#3F3350] outline-none focus:border-[#8261A6]">
+                                  <option value="boolean">Yes or No</option>
+                                  <option value="number">Number</option>
+                                  <option value="string">Text</option>
+                                </select>
+                              </label>
+                              <label className="block min-w-0">
+                                <span className="mb-1.5 block text-[13px] font-bold text-[#594773]">Rule requires</span>
+                                {fact.type === 'boolean' ? (
+                                  <select value={fact.expected} onChange={(event) => updateRuleTestFact(fact.id, { expected: event.target.value })}
+                                    className="focus-ring min-h-11 w-full rounded-lg border border-[#D9CDE6] bg-white px-3 text-[14px] text-[#3F3350] outline-none focus:border-[#8261A6]">
+                                    <option value="">Choose answer</option>
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                  </select>
+                                ) : (
+                                  <input type={fact.type === 'number' ? 'number' : 'text'} step={fact.type === 'number' ? 'any' : undefined}
+                                    value={fact.expected} onChange={(event) => updateRuleTestFact(fact.id, { expected: event.target.value })}
+                                    placeholder={fact.type === 'number' ? 'Required number' : 'Required text'}
+                                    className="focus-ring min-h-11 w-full rounded-lg border border-[#D9CDE6] bg-white px-3 text-[14px] text-[#3F3350] outline-none focus:border-[#8261A6]" />
+                                )}
+                              </label>
+                              <label className="block min-w-0">
+                                <span className="mb-1.5 block text-[13px] font-bold text-[#594773]">Evidence says</span>
+                                {fact.type === 'boolean' ? (
+                                  <select value={fact.observed} onChange={(event) => updateRuleTestFact(fact.id, { observed: event.target.value })}
+                                    className="focus-ring min-h-11 w-full rounded-lg border border-[#D9CDE6] bg-white px-3 text-[14px] text-[#3F3350] outline-none focus:border-[#8261A6]">
+                                    <option value="">Not checked</option>
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                  </select>
+                                ) : (
+                                  <input type={fact.type === 'number' ? 'number' : 'text'} step={fact.type === 'number' ? 'any' : undefined}
+                                    value={fact.observed} onChange={(event) => updateRuleTestFact(fact.id, { observed: event.target.value })}
+                                    placeholder="Leave blank if unknown"
+                                    className="focus-ring min-h-11 w-full rounded-lg border border-[#D9CDE6] bg-white px-3 text-[14px] text-[#3F3350] outline-none focus:border-[#8261A6]" />
+                                )}
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-3 text-[13px] leading-5 text-[#7C7189]">If a detail has not been verified, leave “Evidence says” unanswered. The test will flag missing information rather than guess.</p>
+                    {ruleTestForm.evidenceComplete && ruleTestForm.facts.length === 0 && (
+                      <p className="mt-3 rounded-lg border border-[#EBCFA9] bg-[#FFF6E7] px-3 py-2 text-[14px] font-medium text-[#87592D]">
+                        No food details are being checked. A positive result would not prove any dietary claim. Add the relevant details before relying on the test.
+                      </p>
+                    )}
+                  </div>
+
+                  {ruleTestError && <p role="alert" className="mt-4 rounded-xl border border-[#EBC7C3] bg-[#FFF0EE] px-4 py-3 text-[14px] font-semibold text-[#9C3534]">{ruleTestError}</p>}
+                  <div className="mt-5 flex flex-wrap items-center gap-4">
+                    <button type="button" onClick={handleRuleTest} disabled={Boolean(busyKey)}
+                      className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#674D87] px-6 text-[15px] font-bold text-white transition hover:bg-[#553775] disabled:opacity-50">
+                      {busyKey === 'rule-test' ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <FlaskConical size={18} aria-hidden="true" />}
+                      {busyKey === 'rule-test' ? 'Checking…' : 'Check dietary rule'}
+                    </button>
+                    <span className="text-[13px] text-[#7C7189]">Test only · Nothing is published or activated</span>
+                  </div>
+
+                  {ruleTestResult && (() => {
+                    const outcome = ruleTestResult?.outcome || ''
+                    const reasonCodes = Array.isArray(ruleTestResult?.reasonCodes) ? ruleTestResult.reasonCodes : []
+                    const affectedFact = reasonCodes[1] ? readableStatus(reasonCodes[1]) : ''
+                    const eligible = outcome === 'eligible'
+                    const blocked = outcome === 'not_eligible'
+                    const title = eligible ? 'Meets the entered rule' : blocked ? 'Does not meet this rule' : 'More evidence needed'
+                    const explanation = reasonCodes.includes('FOOD_EVIDENCE_INCOMPLETE')
+                      ? 'The supporting evidence is marked incomplete. Finish checking it before relying on the claim.'
+                      : reasonCodes.includes('FOOD_DIETARY_FACT_UNKNOWN')
+                        ? `No verified answer was provided for “${affectedFact}”. Check that food detail and try again.`
+                        : reasonCodes.includes('FOOD_DIETARY_RULE_NOT_SATISFIED')
+                          ? `The verified answer for “${affectedFact}” does not match what the rule requires.`
+                          : reasonCodes.includes('FOOD_DIETARY_RULE_SATISFIED')
+                            ? 'The verified answers match every food detail entered in this test.'
+                            : 'The test has finished. Review the evidence and entered conditions before taking any action.'
+                    return (
+                      <div role="status" aria-live="polite" className={`mt-5 rounded-2xl border px-4 py-4 sm:px-5 ${eligible ? 'border-[#B7D9C4] bg-[#EAF6EF]' : blocked ? 'border-[#EAC0B8] bg-[#FFF1ED]' : 'border-[#E7D1AA] bg-[#FFF6E9]'}`}>
+                        <p className={`text-[13px] font-bold uppercase tracking-wide ${eligible ? 'text-[#2B7550]' : blocked ? 'text-[#A74534]' : 'text-[#946122]'}`}>Test result</p>
+                        <h4 className={`mt-1 text-[19px] font-extrabold ${eligible ? 'text-[#185E3F]' : blocked ? 'text-[#87392D]' : 'text-[#805321]'}`}>{title}</h4>
+                        <p className="mt-2 max-w-3xl text-[15px] leading-6 text-[#473F48]">{explanation}</p>
+                        <p className="mt-2 text-[13px] text-[#756D74]">This checks only the conditions you entered; it is not an approval or a guarantee about a product.</p>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </details>
+            )}
           </section>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      </main>
     </AdminShell>
   )
 }

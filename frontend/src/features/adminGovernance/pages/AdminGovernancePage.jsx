@@ -1,5 +1,7 @@
 import {
     AlertTriangle,
+    ArrowUpRight,
+    ChevronRight,
     Banknote,
     Bot,
     Boxes,
@@ -89,6 +91,7 @@ import {
     listAdminMarketplaceOrderExceptions,
     listAdminReviewCases,
     listAdminSupportCases,
+    searchAdminGovernance,
     updateAdminFeatureFlag,
     updateAdminIncident,
     updateAdminSupportCase,
@@ -175,233 +178,313 @@ import {
     'Enabled feature flags': 'Active controls',
   });
   
-  // These paths correspond to real, permission-protected Admin routes.
-  // A metric never opens a workspace the current Admin cannot access.
-  const USER_METRIC_DESTINATIONS = Object.freeze({
-    'Open review cases': {
-      to: '/admin/trust-safety',
-      permissions: ['trust_safety.read'],
-    },
-    'Critical reviews': {
-      to: '/admin/trust-safety',
-      permissions: ['trust_safety.read'],
-    },
-    'Host activation queue': {
-      to: '/admin/host-operations',
-      permissions: ['marketplace.read', 'finance.read', 'recipe.read', 'trust_safety.read'],
-      fallbackTo: '/admin/hosts',
-      fallbackPermission: 'host.review.read',
-    },
-    'Order exceptions': {
-      to: '/admin/orders-disputes',
-      permissions: ['marketplace.read', 'trust_safety.read'],
-    },
-    'Failed webhooks': {
-      to: '/admin/integrations',
-      permissions: ['marketplace.read'],
-    },
-    'Pending settlements': {
-      to: '/admin/finance-ops',
-      permissions: ['finance.read'],
-    },
-    'Active incidents': {
-      to: '/admin/trust-safety',
-      permissions: ['trust_safety.read'],
-    },
-    'Enabled feature flags': {
-      to: '/admin/policy',
-      permissions: ['admin.dashboard.read'],
-    },
-  });
+  // The People workspace is intentionally informational; account lookup lives in
+  // AdminShell's permission-aware global search, and decisions stay in their domain tools.
+  const PEOPLE_METRIC_DESTINATIONS = {
+    'Host activation queue': { to: '/admin/host-operations', permission: 'marketplace.read' },
+    'Order exceptions': { to: '/admin/orders-disputes', permission: 'marketplace.read' },
+    'Failed webhooks': { to: '/admin/integrations', permission: 'marketplace.read' },
+    'Pending settlements': { to: '/admin/finance-ops', permission: 'finance.read' },
+    'Active incidents': { to: '/admin/trust-safety', permission: 'trust_safety.read' },
+    'Enabled feature flags': { to: '/admin/policy', permission: 'admin.dashboard.read' },
+  };
 
-  function userMetricDestination(label, isRootSuperAdmin, hasAdminPermission) {
-    const destination = USER_METRIC_DESTINATIONS[label];
-    if (!destination) return null;
-    if (isRootSuperAdmin || destination.permissions.some((permission) => hasAdminPermission(permission))) {
-      return destination.to;
+  function PeopleBusinessWorkspace({
+    entries,
+    isLoading,
+    loadError,
+    onRefresh,
+    hasAdminPermission,
+    isRootSuperAdmin,
+  }) {
+    const [accountSearchOpen, setAccountSearchOpen] = useState(false);
+    const [accountQuery, setAccountQuery] = useState('');
+    const [accountSearchBusy, setAccountSearchBusy] = useState(false);
+    const [accountSearchError, setAccountSearchError] = useState('');
+    const [accountResults, setAccountResults] = useState(null);
+    const [selectedAccount, setSelectedAccount] = useState(null);
+
+    async function findAccounts(event) {
+      event.preventDefault();
+      const q = accountQuery.trim();
+      if (q.length < 2 || accountSearchBusy) return;
+      setAccountSearchBusy(true);
+      setAccountSearchError('');
+      setSelectedAccount(null);
+      setAccountResults(null);
+      try {
+        const data = await searchAdminGovernance({ q, limit: 30, types: ['user', 'organization'] });
+        setAccountResults(Array.isArray(data?.results) ? data.results.filter((item) =>
+          item?.type === 'user' || item?.type === 'organization') : []);
+      } catch (requestError) {
+        setAccountSearchError(getAdminGovernanceErrorMessage(requestError, 'Unable to find accounts.'));
+      } finally {
+        setAccountSearchBusy(false);
+      }
     }
-    if (destination.fallbackTo && hasAdminPermission(destination.fallbackPermission)) {
-      return destination.fallbackTo;
-    }
-    return null;
-  }
 
-  // People & Businesses uses page-specific styles so global legacy colour
-  // normalization cannot make neutral metric panels dark or unreadable.
-  const peopleBusinessStyles = `
-    .pb-workspace { color: #202421; }
-    .pb-workspace *, .pb-workspace *::before, .pb-workspace *::after { box-sizing: border-box; }
-    .pb-workspace .pb-intro { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(260px,.75fr); overflow: hidden; border-radius: 15px; border: 1px solid #D4DED4; }
-    .pb-workspace .pb-intro-main { background: #173F35 !important; color: #F7F6F2 !important; padding: 27px 32px; position: relative; }
-    .pb-workspace .pb-intro-main::before { content: ''; position: absolute; top: 0; left: 0; height: 3px; width: 82px; background: #C86C42; }
-    .pb-workspace .pb-intro-main .pb-kicker { font-size: 13px; line-height: 1.4; font-weight: 700; color: #DCE0CF !important; }
-    .pb-workspace .pb-intro-main h2 { font-size: 29px !important; line-height: 1.19 !important; font-weight: 700 !important; letter-spacing: -0.035em; margin-top: 8px; color: #F7F6F2 !important; }
-    .pb-workspace .pb-intro-main p:last-child { margin-top: 11px; font-size: 15px; line-height: 1.5; color: #E4EAE3 !important; max-width: 52ch; }
-    .pb-workspace .pb-intro-side { background: #EDF1E9 !important; padding: 24px 26px; display: flex; gap: 14px; align-items: center; }
-    .pb-workspace .pb-intro-side-icon { width: 48px; height: 48px; border-radius: 12px; flex: 0 0 48px; display: grid; place-items: center; background: #DCE0CF !important; color: #173F35 !important; }
-    .pb-workspace .pb-intro-side strong { display: block; color: #173F35 !important; font-size: 17px; font-weight: 700; }
-    .pb-workspace .pb-intro-side p { margin-top: 3px; font-size: 14px; line-height: 1.45; color: #41574B !important; }
-    .pb-workspace .pb-block { margin-top: 28px; }
-    .pb-workspace .pb-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 8px 20px; padding: 0 0 13px; border-bottom: 1px solid #CED9D0; }
-    .pb-workspace .pb-heading .pb-serial { font-size: 13px; color: #B75C35 !important; font-weight: 700; }
-    .pb-workspace .pb-heading h2 { font-size: 25px !important; line-height: 1.25 !important; font-weight: 700 !important; color: #173F35 !important; margin-top: 3px; }
-    .pb-workspace .pb-heading .pb-heading-note { color: #627266 !important; font-size: 14px; line-height: 1.45; }
-    .pb-workspace .pb-metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); border: 1px solid #DDE4DA; border-top: 0; background: #DDE4DA; gap: 1px; overflow: hidden; border-radius: 0 0 13px 13px; }
-    .pb-workspace .pb-metric { min-height: 104px; min-width: 0; background: #F7F6F2 !important; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 17px 20px; }
-    .pb-workspace .pb-metric-label { font-size: 14px; line-height: 1.4; font-weight: 600; color: #536A5C !important; }
-    .pb-workspace .pb-metric-number { font-size: 32px; line-height: 1.15; font-weight: 700; margin-top: 7px; color: #173F35 !important; font-variant-numeric: tabular-nums; }
-    .pb-workspace .pb-metric-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 9px; background: #E5EBDD !important; color: #173F35 !important; }
-    .pb-workspace .pb-metric-link { text-decoration: none; cursor: pointer; transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease; }
-    .pb-workspace .pb-metrics .pb-metric-link:hover { background: #E8EFE5 !important; box-shadow: inset 0 3px 0 #C86C42; }
-    .pb-workspace .pb-metrics .pb-metric-link:focus-visible { background: #E8EFE5 !important; outline: 3px solid #173F35; outline-offset: -3px; }
-    .pb-workspace .pb-metric-link:hover .pb-metric-cue, .pb-workspace .pb-metric-link:focus-visible .pb-metric-cue { text-decoration: underline; text-underline-offset: 3px; }
-    .pb-workspace .pb-metric-cue { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; color: #97522F !important; font-size: 12px; line-height: 1.3; font-weight: 700; }
-    .pb-workspace .pb-metric-disabled { font-size: 12px; line-height: 1.4; color: #78857A !important; margin-top: 9px; }
-    .pb-workspace .pb-metric-cue .pb-cue-short { display: none; }
+    const canReviewHosts = hasAdminPermission('marketplace.read') ||
+      hasAdminPermission('finance.read') ||
+      hasAdminPermission('recipe.read') ||
+      hasAdminPermission('trust_safety.read');
+    const canReviewHostProfiles = hasAdminPermission('host.review.read');
+    const hostReviewRoute = canReviewHosts ? '/admin/host-operations'
+      : canReviewHostProfiles ? '/admin/hosts' : '';
+    const canViewAudit = hasAdminPermission('admin.audit.read');
+    const positiveAttentionCount = entries
+      .filter(([key]) => key !== 'Enabled feature flags')
+      .reduce((total, [, value]) => total + (Number(value) > 0 ? Number(value) : 0), 0);
 
-    .pb-workspace .pb-tool-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 0; border: 1px solid #D5DED5; border-top: 0; border-radius: 0 0 13px 13px; overflow: hidden; }
-    .pb-workspace .pb-tool { min-width: 0; display: flex; align-items: flex-start; gap: 14px; padding: 23px 21px; text-decoration: none; background: #F7F6F2 !important; border-right: 1px solid #D5DED5; color: #173F35 !important; transition: background-color .18s ease, box-shadow .18s ease; }
-    .pb-workspace .pb-tool:last-child { border-right: 0; }
-    .pb-workspace .pb-tool:hover, .pb-workspace .pb-tool:focus-visible { background: #E7EEE5 !important; box-shadow: inset 0 3px 0 #C86C42; }
-    .pb-workspace .pb-tool:focus-visible { outline: 2px solid #173F35; outline-offset: -3px; }
-    .pb-workspace .pb-tool-icon { background: #E6E9DB !important; color: #173F35 !important; width: 45px; height: 45px; flex: 0 0 45px; border-radius: 11px; display: grid; place-items: center; }
-    .pb-workspace .pb-tool-title { font-size: 17px; line-height: 1.3; color: #173F35 !important; font-weight: 700; }
-    .pb-workspace .pb-tool-description { font-size: 14px; line-height: 1.45; color: #637367 !important; margin-top: 4px; }
-    .pb-workspace .pb-tool-arrow { flex: 0 0 auto; align-self: center; font-size: 20px; font-weight: 700; color: #C86C42 !important; }
-    .pb-workspace .pb-message { padding: 19px 22px; border: 1px solid #D8E0D5; border-top: 0; border-radius: 0 0 13px 13px; background: #F5F7F1 !important; color: #173F35 !important; }
-    .pb-workspace .pb-message.pb-error { border-color: #E9C9BB; background: #FFF0E8 !important; }
-    .pb-workspace .pb-retry { display: inline-flex; align-items: center; gap: 8px; margin-top: 11px; padding: 9px 13px; border: 1px solid #98AEA0; border-radius: 8px; background: #FFFFFF !important; color: #173F35 !important; font-size: 14px; font-weight: 700; }
-    @media (max-width: 920px) {
-      .pb-workspace .pb-intro { grid-template-columns: minmax(0,1fr) minmax(225px,.72fr); }
-      .pb-workspace .pb-metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
-      .pb-workspace .pb-tool-list { grid-template-columns: 1fr; }
-      .pb-workspace .pb-tool { border-right: 0; border-bottom: 1px solid #D5DED5; }
-      .pb-workspace .pb-tool:last-child { border-bottom: 0; }
-    }
-    @media (max-width: 640px) {
-      /* Mobile layout only: preserve the approved palette and all desktop rules. */
-      .pb-workspace .pb-intro { grid-template-columns: minmax(0, 1fr); border-radius: 12px; }
-      .pb-workspace .pb-intro-main { padding: 16px 18px; }
-      .pb-workspace .pb-intro-main .pb-kicker { font-size: 12px; }
-      .pb-workspace .pb-intro-main h2 { margin-top: 6px; font-size: 23px !important; line-height: 1.17 !important; }
-      .pb-workspace .pb-intro-main p:last-child { margin-top: 8px; font-size: 14px; line-height: 1.42; }
-      .pb-workspace .pb-intro-side { padding: 11px 17px; gap: 10px; }
-      .pb-workspace .pb-intro-side-icon { width: 35px; height: 35px; flex: 0 0 35px; border-radius: 9px; }
-      .pb-workspace .pb-intro-side-icon svg { width: 18px; height: 18px; }
-      .pb-workspace .pb-intro-side strong { font-size: 15px; line-height: 1.3; }
-      .pb-workspace .pb-intro-side p { display: none; }
+    const workspaces = [
+      {
+        number: '01',
+        eyebrow: 'Host & business requests',
+        title: 'Review business access',
+        description: 'Review Host requests and decide what can go live.',
+        to: hostReviewRoute,
+        icon: Building2,
+      },
+      {
+        number: '02',
+        eyebrow: 'Admin team',
+        title: 'Manage team permissions',
+        description: 'Control which internal tools other admins can use.',
+        to: isRootSuperAdmin ? '/admin/roles' : '',
+        icon: ShieldCheck,
+      },
+      {
+        number: '03',
+        eyebrow: 'Accountability',
+        title: 'View activity history',
+        description: 'See recorded admin actions and past decisions.',
+        to: canViewAudit ? '/admin/audit' : '',
+        icon: Database,
+      },
+    ];
 
-      .pb-workspace .pb-block { margin-top: 22px; }
-      .pb-workspace .pb-heading { padding-bottom: 10px; }
-      .pb-workspace .pb-heading h2 { font-size: 22px !important; line-height: 1.2 !important; }
-      .pb-workspace .pb-heading .pb-heading-note { display: none; }
-
-      /* Give each of the eight clickable metrics its own complete row area.
-         The old content-driven compact cells could visually collide at 390px. */
-      .pb-workspace .pb-metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-auto-flow: row;
-        grid-auto-rows: minmax(119px, auto);
-        align-items: stretch;
-        border-top: 1px solid #DDE4DA;
-        border-radius: 12px;
-      }
-      .pb-workspace .pb-metric {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: flex-start;
-        height: auto !important;
-        min-height: 119px !important;
-        min-width: 0;
-        padding: 12px 13px;
-        gap: 0;
-      }
-      .pb-workspace .pb-metric > div:first-child {
-        flex: 1 1 auto;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-      }
-      .pb-workspace .pb-metric-label {
-        min-height: 33px;
-        font-size: 14px;
-        line-height: 1.18;
-        overflow-wrap: break-word;
-      }
-      .pb-workspace .pb-metric-number {
-        margin-top: 5px;
-        font-size: 28px;
-        line-height: 1.08;
-      }
-      .pb-workspace .pb-metric-icon { display: none; }
-      .pb-workspace .pb-metric-cue {
-        margin-top: auto;
-        padding-top: 9px;
-        font-size: 13px;
-        line-height: 1.15;
-      }
-      .pb-workspace .pb-metric-cue .pb-cue-full { display: none; }
-      .pb-workspace .pb-metric-cue .pb-cue-short { display: inline; }
-      .pb-workspace .pb-metric-disabled { margin-top: auto; padding-top: 8px; font-size: 12px; }
-
-      .pb-workspace .pb-tool-list { border-top: 1px solid #D5DED5; border-radius: 12px; }
-      .pb-workspace .pb-tool {
-        align-items: center;
-        gap: 11px;
-        padding: 13px 14px;
-        min-height: 72px;
-      }
-      .pb-workspace .pb-tool-icon { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 9px; }
-      .pb-workspace .pb-tool-icon svg { width: 19px; height: 19px; }
-      .pb-workspace .pb-tool-title { font-size: 16px; line-height: 1.28; }
-      .pb-workspace .pb-tool-description { margin-top: 3px; font-size: 13px; line-height: 1.36; }
-      .pb-workspace .pb-tool-arrow { font-size: 19px; }
-      .pb-mobile-refresh { display: flex; margin-left: auto; }
-    }
-  `;
-
-  function UsersMetricCard({ label, value, icon: Icon, to }) {
-    const displayLabel = USER_METRIC_LABELS[label] || label;
-    const content = (
-      <>
-        <div className="min-w-0">
-          <p className="pb-metric-label">{displayLabel}</p>
-          <p className="pb-metric-number">{value ?? '—'}</p>
-          {to ? (
-            <span className="pb-metric-cue"><span className="pb-cue-full">Open workspace</span><span className="pb-cue-short">Open</span> <span aria-hidden="true">→</span></span>
-          ) : (
-            <p className="pb-metric-disabled">Access restricted</p>
-          )}
-        </div>
-        <span className="pb-metric-icon" aria-hidden="true"><Icon size={18} /></span>
-      </>
-    );
-    return to ? (
-      <Link
-        to={to}
-        className="pb-metric pb-metric-link focus-ring"
-        aria-label={`${displayLabel}: ${value ?? 'unavailable'}. Open workspace`}
-      >
-        {content}
-      </Link>
-    ) : (
-      <div className="pb-metric" aria-label={`${displayLabel}: ${value ?? 'unavailable'}. Access restricted`}>
-        {content}
-      </div>
-    );
-  }
-
-  function PeopleBusinessTool({ to, title, description, icon: Icon }) {
     return (
-      <Link to={to} className="pb-tool focus-ring">
-        <span className="pb-tool-icon" aria-hidden="true"><Icon size={21} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="pb-tool-title block">{title}</span>
-          <span className="pb-tool-description block">{description}</span>
-        </span>
-        <span className="pb-tool-arrow" aria-hidden="true">→</span>
-      </Link>
+      <div className="pbw-page mt-3 min-w-0 space-y-6 pb-2 sm:mt-5 sm:space-y-8">
+        <section aria-labelledby="pbw-intro-title" className="overflow-hidden border-y border-[#DCE2D8] bg-[#E8EDE5] sm:rounded-[16px] sm:border">
+          <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.5fr)_minmax(290px,.8fr)]">
+            <div className="min-w-0 px-4 py-6 sm:px-7 sm:py-8 lg:px-8 lg:py-9">
+              <p className="flex items-center gap-2 text-[13px] font-bold text-[#9D543B]">
+                <span className="h-[7px] w-[7px] rounded-full bg-[#C86C42]" aria-hidden="true" />
+                PEOPLE & BUSINESS ACCESS
+              </p>
+              <h2 id="pbw-intro-title" className="mt-3 max-w-[580px] text-[26px] font-bold leading-[1.14] tracking-[-.035em] text-[#173F35] sm:text-[34px] lg:text-[38px]">
+                The right account. The right decision.
+              </h2>
+              <p className="mt-3 max-w-[530px] text-[15px] leading-[1.6] text-[#4B5D53] sm:text-[16px]">
+                Look up a Customer, Host or business, review available details and open the right admin tool.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAccountSearchOpen((current) => !current)}
+                aria-expanded={accountSearchOpen}
+                aria-controls="pbw-account-lookup"
+                className="focus-ring mt-5 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-2.5 text-[15px] font-bold text-white transition-colors hover:bg-[#245845]"
+              >
+                <SearchCheck size={18} aria-hidden="true" />
+                {accountSearchOpen ? 'Close account lookup' : 'Find an account'}
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="border-t border-[#CED7CB] bg-[#F8F8F3] px-4 py-5 sm:px-7 lg:flex lg:flex-col lg:justify-center lg:border-l lg:border-t-0 lg:px-7">
+              <p className="text-[13px] font-bold text-[#8C5A41]">HOW IT WORKS</p>
+              <ol className="mt-3 divide-y divide-[#E0E5DB]">
+                {[
+                  ['01', 'Find an account', 'Open the account lookup.'],
+                  ['02', 'Review the details', 'Check the relevant work area.'],
+                  ['03', 'Take the next action', 'Open the appropriate admin tool.'],
+                ].map(([number, name, description]) => (
+                  <li key={number} className="flex items-start gap-4 py-3 first:pt-0 last:pb-0">
+                    <span className="mt-0.5 shrink-0 text-[14px] font-extrabold text-[#B86948]">{number}</span>
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-bold leading-5 text-[#173F35]">{name}</span>
+                      <span className="mt-1 block text-[13px] leading-5 text-[#626F64]">{description}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        {accountSearchOpen ? (
+          <section id="pbw-account-lookup" aria-labelledby="pbw-lookup-title" className="min-w-0 border border-[#D9E2D6] bg-white">
+            <div className="border-b border-[#E0E5DC] bg-[#F1F5EE] px-4 py-4 sm:px-6 sm:py-5">
+              <h3 id="pbw-lookup-title" className="text-[20px] font-bold leading-tight text-[#173F35] sm:text-[22px]">Find a person or business</h3>
+              <p className="mt-1 text-[14px] leading-5 text-[#56685B]">Search by name, email or organization. Select a result to inspect its available details.</p>
+              <form onSubmit={findAccounts} role="search" className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <label className="min-w-0 flex-1">
+                  <span className="sr-only">Account or business name, email, or ID</span>
+                  <input
+                    type="search"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                    value={accountQuery}
+                    onChange={(event) => setAccountQuery(event.target.value)}
+                    placeholder="Name, email or business…"
+                    className="focus-ring min-h-[46px] w-full min-w-0 rounded-[9px] border border-[#CAD9CA] bg-white px-3.5 text-[15px] text-[#203A2F] outline-none placeholder:text-[#89978A]"
+                  />
+                </label>
+                <button type="submit" disabled={accountSearchBusy || accountQuery.trim().length < 2} className="focus-ring inline-flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-[9px] bg-[#173F35] px-5 text-[15px] font-bold text-white transition hover:bg-[#255846] disabled:cursor-not-allowed disabled:opacity-50">
+                  {accountSearchBusy ? <LoaderCircle size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <SearchCheck size={18} aria-hidden="true" />}
+                  {accountSearchBusy ? 'Searching…' : 'Search'}
+                </button>
+              </form>
+            </div>
+            {accountSearchError ? (
+              <div role="alert" className="border-b border-[#EDD8D0] bg-[#FFF3EE] px-4 py-3 text-[14px] leading-5 text-[#924531] sm:px-6">{accountSearchError}</div>
+            ) : null}
+            {accountResults !== null && !accountSearchBusy ? (
+              <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="min-w-0 lg:border-r lg:border-[#E1E6DD]">
+                  <p className="border-b border-[#E7EBE4] px-4 py-3 text-[13px] font-bold text-[#536B5B] sm:px-6">{accountResults.length} {accountResults.length === 1 ? 'result' : 'results'} shown</p>
+                  {accountResults.length ? (
+                    <div className="max-h-[350px] overflow-y-auto">
+                      {accountResults.map((item) => (
+                        <button key={`${item.type}:${item.id}`} type="button" onClick={() => setSelectedAccount(item)} aria-pressed={selectedAccount?.id === item.id && selectedAccount?.type === item.type}
+                          className={`focus-ring flex min-h-[68px] w-full items-center justify-between gap-3 border-b border-[#E7EBE4] px-4 py-3 text-left transition hover:bg-[#F2F6EF] sm:px-6 ${selectedAccount?.id === item.id && selectedAccount?.type === item.type ? 'bg-[#EAF1E7]' : 'bg-white'}`}>
+                          <span className="min-w-0 flex-1">
+                            <span className="block break-words text-[15px] font-bold leading-5 text-[#173F35]">{item.title || 'Unnamed record'}</span>
+                            <span className="mt-1 block break-words text-[13px] leading-5 text-[#66756A]">{item.type === 'organization' ? 'Business' : 'Account'}{item.subtitle ? ` · ${item.subtitle}` : ''}</span>
+                          </span>
+                          <ChevronRight size={18} className="shrink-0 text-[#547464]" aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : <p className="px-4 py-5 text-[14px] text-[#58695D] sm:px-6">No matching account or business was found. Try another name or email.</p>}
+                </div>
+                <div className="min-w-0 bg-[#FAFBF8] px-4 py-5 sm:px-6 sm:py-6" aria-live="polite">
+                  {selectedAccount ? (
+                    <div>
+                      <p className="text-[13px] font-bold text-[#A15E42]">SELECTED {selectedAccount.type === 'organization' ? 'BUSINESS' : 'ACCOUNT'}</p>
+                      <h4 className="mt-2 break-words text-[21px] font-bold leading-tight text-[#173F35]">{selectedAccount.title || 'Unnamed record'}</h4>
+                      <dl className="mt-4 divide-y divide-[#E0E7DD] border-y border-[#E0E7DD]">
+                        <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Type</dt><dd className="font-bold text-[#264839]">{selectedAccount.type === 'organization' ? 'Business' : 'User account'}</dd></div>
+                        <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Status</dt><dd className="break-words font-bold text-[#264839]">{titleize(selectedAccount.status || 'Not available')}</dd></div>
+                        {selectedAccount.subtitle ? <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Reference</dt><dd className="break-words text-[#405A4C]">{selectedAccount.subtitle}</dd></div> : null}
+                        {selectedAccount.type === 'user' ? <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Host access</dt><dd className="break-words font-semibold text-[#264839]">{selectedAccount.metadata?.hostEnabled ? 'Enabled' : selectedAccount.metadata?.hostAccessStatus ? titleize(selectedAccount.metadata.hostAccessStatus) : 'Not enabled'}</dd></div> : null}
+                      </dl>
+                      {hostReviewRoute ? (
+                        <Link to={hostReviewRoute} className="focus-ring mt-5 inline-flex min-h-[44px] items-center gap-2 rounded-[9px] bg-[#173F35] px-4 py-2 text-[14px] font-bold text-white transition hover:bg-[#255846]">
+                          Go to Host approvals <ArrowUpRight size={16} aria-hidden="true" />
+                        </Link>
+                      ) : null}
+                      <p className="mt-3 text-[13px] leading-5 text-[#6D7B70]">Search results are read-only. Host approvals open in a separate queue; this account is not auto-selected there.</p>
+                    </div>
+                  ) : (
+                    <div className="flex min-h-[165px] flex-col items-start justify-center">
+                      <UsersRound size={24} className="text-[#789281]" aria-hidden="true" />
+                      <p className="mt-3 text-[15px] font-bold text-[#173F35]">Select a result to inspect it</p>
+                      <p className="mt-1 text-[14px] leading-5 text-[#637569]">Available account details will appear here.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        <section aria-labelledby="pbw-overview-title" className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-5">
+            <div>
+              <p className="text-[13px] font-bold text-[#B46646]">01 / WORKLOAD</p>
+              <h2 id="pbw-overview-title" className="mt-1 text-[24px] font-bold leading-tight tracking-[-.025em] text-[#173F35] sm:text-[28px]">
+                What needs attention
+              </h2>
+              <p className="mt-1 text-[14px] leading-6 text-[#58685C] sm:text-[15px]">Live counts from your permitted admin areas.</p>
+            </div>
+            {!isLoading && !loadError && entries.length > 0 ? (
+              <p className="inline-flex items-center gap-2 rounded-full bg-[#E9EFE7] px-3 py-2 text-[13px] font-bold text-[#315544]">
+                <span className={`h-2 w-2 rounded-full ${positiveAttentionCount ? 'bg-[#C86C42]' : 'bg-[#398360]'}`} aria-hidden="true" />
+                {positiveAttentionCount ? 'Items awaiting action' : 'No reported open items'}
+              </p>
+            ) : null}
+          </div>
+
+          {loadError ? (
+            <div role="alert" className="flex flex-col gap-3 border border-[#E8C9BE] bg-[#FFF2EC] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div>
+                <p className="text-[15px] font-bold text-[#813E2D]">The overview could not load.</p>
+                <p className="mt-1 text-[14px] leading-5 text-[#774E42]">{loadError}</p>
+              </div>
+              <button type="button" onClick={onRefresh} className="focus-ring inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-[9px] border border-[#C99583] bg-white px-4 text-[14px] font-bold text-[#813E2D]">
+                <RefreshCw size={16} aria-hidden="true" /> Retry
+              </button>
+            </div>
+          ) : isLoading ? (
+            <div role="status" aria-live="polite" className="flex min-h-[140px] items-center justify-center gap-3 border-y border-[#E0E4DC] bg-[#F4F5F0] text-[15px] font-medium text-[#526158]">
+              <LoaderCircle size={20} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Loading overview…
+            </div>
+          ) : entries.length ? (
+            <div className="grid grid-cols-2 overflow-hidden rounded-[12px] border border-[#DDE3D8] bg-[#DDE3D8] gap-px md:grid-cols-4">
+              {entries.map(([label, value, MetricIcon]) => {
+                const destination = PEOPLE_METRIC_DESTINATIONS[label];
+                const to = destination && hasAdminPermission(destination.permission) ? destination.to : '';
+                const isActive = label !== 'Enabled feature flags' && Number(value) > 0;
+                const content = (
+                  <div className="flex h-full min-h-[114px] min-w-0 flex-col justify-between bg-[#FCFCF9] px-4 py-4 transition-colors group-hover:bg-[#F1F5EE] sm:min-h-[132px] sm:px-5 sm:py-5">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <MetricIcon size={18} className={isActive ? 'text-[#BD6441]' : 'text-[#62776A]'} aria-hidden="true" />
+                      {to ? <ArrowUpRight size={16} className="text-[#62806D]" aria-hidden="true" /> : null}
+                    </div>
+                    <div className="mt-3">
+                      <p className={`text-[29px] font-extrabold leading-none tabular-nums tracking-tight sm:text-[34px] ${isActive ? 'text-[#AE5638]' : 'text-[#173F35]'}`}>{value}</p>
+                      <p className="mt-2 text-[13px] font-semibold leading-[1.3] text-[#465B4E] sm:text-[14px]">{USER_METRIC_LABELS[label] || label}</p>
+                    </div>
+                  </div>
+                );
+                return to ? (
+                  <Link key={label} to={to} className="focus-ring group block min-w-0" aria-label={`Open ${USER_METRIC_LABELS[label] || label}: ${value}`}>
+                    {content}
+                  </Link>
+                ) : <div key={label} className="group min-w-0">{content}</div>;
+              })}
+            </div>
+          ) : (
+            <div className="border-y border-[#DDE3D8] bg-[#F4F5F0] px-5 py-5 text-[14px] leading-6 text-[#526158]">No overview metrics are available for your current access.</div>
+          )}
+        </section>
+
+        <section aria-labelledby="pbw-tools-title" className="min-w-0 border-t border-[#DDE2D9] pt-6 sm:pt-8">
+          <div className="mb-4 sm:mb-5">
+            <p className="text-[13px] font-bold text-[#B46646]">02 / ADMIN TOOLS</p>
+            <h2 id="pbw-tools-title" className="mt-1 text-[24px] font-bold leading-tight tracking-[-.025em] text-[#173F35] sm:text-[28px]">Choose your next action</h2>
+            <p className="mt-1 text-[14px] leading-6 text-[#58685C] sm:text-[15px]">Your access determines which tools you can open.</p>
+          </div>
+          <div className="divide-y divide-[#DDE3D9] overflow-hidden border-y border-[#DDE3D9] bg-[#F9F9F5]">
+            {workspaces.map(({ number, eyebrow, title, description, to, icon: Icon }) => {
+              const inner = (
+                <div className="flex min-w-0 items-center gap-3 px-4 py-4 transition-colors group-hover:bg-[#EAF0E8] sm:gap-5 sm:px-6 sm:py-5">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-[#E2E9DF] text-[#245745] sm:h-12 sm:w-12">
+                    <Icon size={22} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-bold text-[#9B5F46]">{number} / {eyebrow}</span>
+                    <span className="mt-1 block text-[17px] font-bold leading-[1.25] text-[#173F35] sm:text-[19px]">{title}</span>
+                    <span className="mt-1 block text-[14px] leading-5 text-[#53675A]">{description}</span>
+                  </span>
+                  {to ? (
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#CDD9CA] bg-white text-[#173F35] group-hover:border-[#173F35]">
+                      <ChevronRight size={20} aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[12px] font-semibold text-[#78877A]">Restricted</span>
+                  )}
+                </div>
+              );
+              return to ? (
+                <Link key={number} to={to} className="focus-ring group block min-w-0" aria-label={`Open ${title}`}>{inner}</Link>
+              ) : (
+                <div key={number} className="group min-w-0 opacity-70" aria-label={`${title} is restricted`}>{inner}</div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
     );
   }
 
@@ -807,69 +890,30 @@ import {
     return labels[value] || titleize(value);
   }
 
-  function DataQualityStep({ number, title, body, mobileBody, icon: StepIcon }) {
-    const borderClass =
-        number === 4
-            ? ''
-            : 'border-b border-stone-300/80 lg:border-b-0 lg:border-r';
+  const QUALITY_VIEWS = [
+    { id: 'review', number: '01', label: 'Product reviews', short: 'Submitted records', icon: SearchCheck,
+      tint: 'bg-[#E4F1F6]', accent: 'border-[#467B99]', text: 'text-[#235270]' },
+    { id: 'duplicates', number: '02', label: 'Possible duplicates', short: 'Matches to compare', icon: Boxes,
+      tint: 'bg-[#FBE7DC]', accent: 'border-[#C86C42]', text: 'text-[#9A502C]' },
+    { id: 'catalog', number: '03', label: 'Catalog checks', short: 'Versions in review', icon: CheckCircle2,
+      tint: 'bg-[#E6F1E6]', accent: 'border-[#4C8261]', text: 'text-[#285E40]' },
+    { id: 'batches', number: '04', label: 'Batch issues', short: 'Uploads needing proof', icon: FileWarning,
+      tint: 'bg-[#EDE8F6]', accent: 'border-[#81739D]', text: 'text-[#65557D]' },
+  ];
 
+  function QualityReviewRow({ title, meta, badge, to, warning }) {
     return (
-        <div className={`grid min-h-[92px] grid-cols-[30px_minmax(0,1fr)] gap-3 px-3.5 py-3.5 sm:min-h-[118px] sm:grid-cols-[36px_minmax(0,1fr)] sm:gap-4 sm:px-5 sm:py-5 ${borderClass}`}>
-            <div className="pt-0.5">
-                <span className="text-[11px] font-black tracking-[0.08em] text-[#16665c] sm:text-xs">
-                    0{number}
-                </span>
-            </div>
-
-            <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[#16665c]">
-                    <StepIcon size={15} aria-hidden="true" />
-                    <h3 className="text-[13px] font-black leading-4 text-stone-950 sm:text-[15px] sm:leading-5">
-                        {title}
-                    </h3>
-                </div>
-
-                <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-stone-600 sm:hidden">
-                    {mobileBody || body}
-                </p>
-                <p className="mt-1.5 hidden text-sm font-semibold leading-5 text-stone-600 sm:block">
-                    {body}
-                </p>
-            </div>
+      <Link to={to} className="dq-review-row focus-ring group flex min-w-0 items-center justify-between gap-2 border-b border-[#E4E8E0] px-3 py-3 text-[#173F35] transition-colors last:border-b-0 hover:bg-[#F0F4EE] focus-visible:bg-[#F0F4EE] sm:gap-3 sm:px-5 sm:py-4">
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-[15px] font-bold leading-[1.35] text-[#173F35]">{title}</p>
+          <p className="mt-1 break-words text-[13px] leading-[1.4] text-[#5C6B60]">{meta}</p>
         </div>
-    );
-  }
-
-  function DataQualityRow({ title, meta, status, tone = 'blue', to }) {
-    const tones = {
-        blue: 'border-[#6f9ab5] text-[#24526b]',
-        green: 'border-[#64a785] text-[#176647]',
-        coral: 'border-[#d48b7c] text-[#9a4a3d]',
-        slate: 'border-[#94a0a8] text-[#4d5a64]',
-    };
-
-    const content = (
-        <div className="grid gap-2 border-t border-stone-200/90 px-4 py-3 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5 sm:py-3.5 lg:px-6">
-            <div className="min-w-0">
-                <p className="truncate text-sm font-black text-stone-950 sm:text-[15px]">
-                    {title}
-                </p>
-                <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-5 text-stone-500">
-                    {meta}
-                </p>
-            </div>
-
-            <span className={`w-fit border-l-2 pl-2 text-[10px] font-black ${tones[tone] || tones.slate}`}>
-                {status}
-            </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`hidden max-w-40 text-right text-xs font-semibold sm:inline ${warning ? 'text-[#A65331]' : 'text-[#426A58]'}`}>{badge}</span>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#EDF0E7] text-[#173F35] transition group-hover:bg-[#DCE0CF]" aria-hidden="true"><ChevronRight size={17}/></span>
         </div>
+      </Link>
     );
-
-    return to ? (
-        <Link to={to} className="block transition hover:bg-white/70">
-            {content}
-        </Link>
-    ) : content;
   }
 
 
@@ -1131,6 +1175,8 @@ import {
             versions: [],
             versionTotal: 0,
         });
+    const [dataQualityView, setDataQualityView] = useState('review');
+    const [dataQualitySourceErrors, setDataQualitySourceErrors] = useState({});
 
     const [recipeReviewLoading, setRecipeReviewLoading] =
         useState(false);
@@ -1366,7 +1412,7 @@ import {
                     setPolicyRelatedIssues([]);
                 }
 
-                if (section === 'recipeReview' || section === 'finance') {
+                if (section === 'recipeReview' || section === 'finance' || section === 'dataQuality') {
                     setReviewCases([]);
                     setIncidents([]);
                     setSupportCases([]);
@@ -1418,6 +1464,7 @@ import {
                         setCommandCenter(
                             results[0].value,
                         );
+                        if (section === 'users') setCommandCenterError('');
                     } else if (section === 'trustSafety' || section === 'aiQuality' || section === 'users') {
                         setCommandCenter(null);
                         setCommandCenterError(getAdminGovernanceErrorMessage(
@@ -1575,74 +1622,49 @@ import {
     }, [section, trustSafetyMore, trustSafetyQueueState, trustSafetyScope]);
 
 
-    const loadDataQualityWorkspace =
-        useCallback(
-            async () => {
-                if (
-                    section !==
-                    'dataQuality'
-                ) {
-                    return;
-                }
-
-                setDataQualityLoading(true);
-                setDataQualityError('');
-
-                try {
-                    const [
-                        reviewQueue,
-                        bulkBatches,
-                        catalogVersions,
-                    ] =
-                        await Promise.all([
-                            listAdminNpiReviewQueue({
-                                page: 1,
-                                limit: 100,
-                            }),
-                            listAdminNpiBulkBatches({
-                                page: 1,
-                                limit: 100,
-                            }),
-                            getAdminProductVersions({
-                                page: 1,
-                                limit: 100,
-                                publicationStatus: 'in_review',
-                            }),
-                        ]);
-
-                    setDataQualityWorkspace({
-                        drafts:
-                            reviewQueue?.drafts ||
-                            [],
-                        draftTotal:
-                            reviewQueue?.pagination?.total ||
-                            0,
-                        batches:
-                            bulkBatches?.batches ||
-                            [],
-                        batchSummary:
-                            bulkBatches?.summary ||
-                            {},
-                        versions:
-                            catalogVersions?.items ||
-                            [],
-                        versionTotal:
-                            catalogVersions?.pagination?.total ||
-                            0,
-                    });
-                } catch (requestError) {
-                    setDataQualityError(
-                        getAdminGovernanceErrorMessage(
-                            requestError,
-                            'Unable to load catalog quality data.',
-                        ),
+    const loadDataQualityWorkspace = useCallback(async () => {
+        if (section !== 'dataQuality') return;
+        setDataQualityLoading(true);
+        setDataQualityError('');
+        setDataQualitySourceErrors({});
+        const endpoints = [
+            listAdminNpiReviewQueue({ page: 1, limit: 100 }),
+            listAdminNpiBulkBatches({ page: 1, limit: 100 }),
+            getAdminProductVersions({ page: 1, limit: 100, publicationStatus: 'in_review' }),
+        ];
+        try {
+            const results = await Promise.allSettled(endpoints);
+            const sources = ['review', 'batches', 'catalog'];
+            const issues = {};
+            results.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    issues[sources[index]] = getAdminGovernanceErrorMessage(
+                        result.reason, 'This feed could not load.',
                     );
-                } finally {
-                    setDataQualityLoading(false);
                 }
-            },
-            [section],
-        );
+            });
+            const review = results[0].status === 'fulfilled' ? results[0].value : null;
+            const batches = results[1].status === 'fulfilled' ? results[1].value : null;
+            const catalog = results[2].status === 'fulfilled' ? results[2].value : null;
+            setDataQualityWorkspace({
+                drafts: review?.drafts || [],
+                draftTotal: Number(review?.pagination?.total ?? 0),
+                batches: batches?.batches || [],
+                batchSummary: batches?.summary || {},
+                versions: catalog?.items || [],
+                versionTotal: Number(catalog?.pagination?.total ?? 0),
+            });
+            setDataQualitySourceErrors(issues);
+            if (Object.keys(issues).length === sources.length) {
+                setDataQualityError('Quality records could not be loaded. Please retry.');
+            }
+        } catch (requestError) {
+            setDataQualityWorkspace({ drafts: [], draftTotal: 0, batches: [], batchSummary: {}, versions: [], versionTotal: 0 });
+            setDataQualityError(getAdminGovernanceErrorMessage(requestError, 'Unable to load quality records.'));
+        } finally {
+            setDataQualityLoading(false);
+        }
+    }, [section]);
 
     useEffect(
         () => {
@@ -2144,20 +2166,14 @@ import {
                             0,
                         ),
                     possibleDuplicates:
-                        Math.max(
-                            directDuplicates,
-                            bulkDuplicates,
-                        ),
+                        directDuplicates + bulkDuplicates,
                     catalogReview:
                         Number(
                             dataQualityWorkspace.versionTotal ||
                             0,
                         ),
                     needsAttention:
-                        Math.max(
-                            moreProofNeeded,
-                            bulkIssues,
-                        ),
+                        moreProofNeeded + bulkIssues,
                 };
             },
             [dataQualityWorkspace],
@@ -2172,8 +2188,7 @@ import {
                             Boolean(
                                 draft?.duplicateCandidateProductVersionId,
                             ),
-                    )
-                    .slice(0, 6),
+                    ),
             [dataQualityWorkspace.drafts],
         );
 
@@ -2195,8 +2210,7 @@ import {
                                 batch?.review?.potentialDuplicates ||
                                 0,
                             ) > 0,
-                    )
-                    .slice(0, 6),
+                    ),
             [dataQualityWorkspace.batches],
         );
 
@@ -4893,9 +4907,9 @@ import {
                 section === 'trustSafety'
                     ? 'Trust, Safety & Claims'
                     : section === 'users'
-                    ? <span className="text-[22px] leading-[1.18] sm:text-2xl sm:leading-tight">People &amp; Businesses</span>
+                    ? 'People & Businesses'
                     : section === 'dataQuality'
-                        ? 'Data Quality & Duplicate Review'
+                        ? <><span className="sm:hidden">Data Quality & Duplicates</span><span className="hidden sm:inline">Data Quality & Duplicate Review</span></>
                         : section === 'recipeReview'
                             ? 'Recipe Publishing Review'
                             : section === 'policy' ? <><span className="sm:hidden">Food rules & features</span><span className="hidden sm:inline">Food Rules & Feature Access</span></> : `${config.code} · ${config.title}`
@@ -4907,10 +4921,11 @@ import {
                     ? null
                     : section === 'recipeReview'
                         ? 'Review recipes waiting for a decision, check food readiness, and move each recipe to the right next step.'
+                        : section === 'dataQuality'
+                            ? <><span className="sm:hidden">Review issues, duplicates and batches.</span><span className="hidden sm:inline">Review product issues, duplicates and batches in one place.</span></>
                         : section === 'policy' ? <><span className="text-[13px] leading-[1.3] sm:hidden">Manage rules and features.</span><span className="hidden sm:inline">Create and review food safety rules, manage feature access, and track related admin work.</span></> : config.description
             }
             showWorkspaceBadge={section !== 'users'}
-            mobileStackHeader={false}
             flushTop={section === 'users'}
             actions={
                 <button
@@ -4931,13 +4946,13 @@ import {
                             loadDataQualityWorkspace();
                         }
                     }}
-                    disabled={section === 'recipeReview' ? recipeReviewLoading : loading}
-                    className={`focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50 ${section === 'users' ? 'pb-mobile-refresh' : ''}`}
+                    disabled={section === 'recipeReview' ? recipeReviewLoading : section === 'dataQuality' ? dataQualityLoading : loading}
+                    className="focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50"
                 >
                     <RefreshCw
                         size={14}
                         className={
-                            (section === 'recipeReview' ? recipeReviewLoading : loading)
+                            (section === 'recipeReview' ? recipeReviewLoading : section === 'dataQuality' ? dataQualityLoading : loading)
                                 ? 'animate-spin'
                                 : ''
                         }
@@ -4982,26 +4997,17 @@ import {
             ) : null}
   
             {section === 'users' ? (
-                <div className="pb-workspace mt-2 sm:mt-5">
-                    <style>{peopleBusinessStyles}</style>
-                    <section className="pb-intro" aria-labelledby="pb-welcome-title">
-                        <div className="pb-intro-main">
-                            <p className="pb-kicker">Accounts & access</p>
-                            <h2 id="pb-welcome-title">Find people. Manage access.</h2>
-                            <p>Search for a customer, Host or business, then choose the right admin tool.</p>
-                        </div>
-                        <div className="pb-intro-side">
-                            <span className="pb-intro-side-icon" aria-hidden="true"><SearchCheck size={24} /></span>
-                            <div>
-                                <strong>Find an account</strong>
-                                <p>Use the admin search above to find people or businesses.</p>
-                            </div>
-                        </div>
-                    </section>
-                </div>
+                <PeopleBusinessWorkspace
+                    entries={metricEntries}
+                    isLoading={loading}
+                    loadError={commandCenterError}
+                    onRefresh={load}
+                    hasAdminPermission={hasAdminPermission}
+                    isRootSuperAdmin={isRootSuperAdmin}
+                />
             ) : null}
 
-            {section !== 'recipeReview' && loading ? (
+            {section !== 'recipeReview' && section !== 'users' && loading ? (
                 <div
                     className={`grid place-items-center rounded-[22px] border border-stone-200 bg-white ${
                         section === 'users'
@@ -5013,80 +5019,20 @@ import {
                 </div>
             ) : (
                 <>
-                    {section === 'users' ? (
-                        <div className="pb-workspace">
-                            <section className="pb-block" aria-labelledby="pb-metrics-title">
-                                <header className="pb-heading">
-                                    <div>
-                                        <p className="pb-serial">01 / OVERVIEW</p>
-                                        <h2 id="pb-metrics-title">Access & activity</h2>
-                                    </div>
-                                    <p className="pb-heading-note">Current platform counts</p>
-                                </header>
-                                {commandCenterError ? (
-                                    <div className="pb-message pb-error" role="alert">
-                                        <p className="font-bold">Couldn't load the platform counts.</p>
-                                        <p className="mt-1 text-sm">{commandCenterError}</p>
-                                        <button type="button" className="pb-retry" disabled={loading} onClick={load}>
-                                            <RefreshCw size={16} aria-hidden="true" /> Try again
-                                        </button>
-                                    </div>
-                                ) : metricEntries.length ? (
-                                    <div className="pb-metrics">
-                                        {metricEntries.map(([label, value, MetricIcon]) => (
-                                            <UsersMetricCard
-                                                key={label}
-                                                label={label}
-                                                value={value}
-                                                icon={MetricIcon}
-                                                to={userMetricDestination(label, isRootSuperAdmin, hasAdminPermission)}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="pb-message">No overview counts are available for your access.</div>
-                                )}
-                            </section>
-                            <section className="pb-block" aria-labelledby="pb-tools-title">
-                                <header className="pb-heading">
-                                    <div>
-                                        <p className="pb-serial">02 / ADMIN TOOLS</p>
-                                        <h2 id="pb-tools-title">Choose a workspace</h2>
-                                    </div>
-                                </header>
-                                <div className="pb-tool-list">
-                                    <PeopleBusinessTool
-                                        to="/admin/host-operations"
-                                        title="Host approvals"
-                                        description="Review business access and pending Host requests."
-                                        icon={Building2}
-                                    />
-                                    {isRootSuperAdmin ? (
-                                        <PeopleBusinessTool
-                                            to="/admin/roles"
-                                            title="Roles & permissions"
-                                            description="Manage internal Admin access."
-                                            icon={ShieldCheck}
-                                        />
-                                    ) : null}
-                                    {hasAdminPermission('admin.audit.read') ? (
-                                        <PeopleBusinessTool
-                                            to="/admin/audit"
-                                            title="Admin history"
-                                            description="Review changes and decisions."
-                                            icon={History}
-                                        />
-                                    ) : null}
-                                </div>
-                            </section>
-                        </div>
-                    ) : metricEntries.length &&
+                    {metricEntries.length &&
                     section !== 'dataQuality' &&
-                    section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'aiQuality' ? (
+                    section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'aiQuality' && section !== 'users' ? (
                         <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            {metricEntries.map(([label, value, MetricIcon]) => (
-                                <MetricCard key={label} label={label} value={value} icon={MetricIcon} />
-                            ))}
+                            {metricEntries.map(
+                                ([label, value, MetricIcon]) => (
+                                    <MetricCard
+                                        key={label}
+                                        label={label}
+                                        value={value}
+                                        icon={MetricIcon}
+                                    />
+                                ),
+                            )}
                         </section>
                     ) : null}
 
@@ -5465,380 +5411,288 @@ import {
                     ) : null}
   
                     {section === 'dataQuality' ? (
-                        <div className="-mx-2.5 -mb-2.5 mt-2.5 min-h-[100svh] bg-[#f2f3ef] sm:-mx-5 sm:-mb-5 sm:mt-5 lg:-mx-6 lg:-mb-6">
-                            <section className="bg-[#0f4d45] text-white">
-                                <div className="grid gap-5 px-4 py-5 sm:px-7 sm:py-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end lg:gap-10 lg:px-9 lg:py-9">
-                                    <div className="max-w-3xl">
-                                        <p className="text-[10px] font-black tracking-[0.08em] text-[#a8ddd3] sm:text-xs">
-                                            Product quality desk
-                                        </p>
-
-                                        <h2 className="mt-1.5 max-w-3xl text-[22px] font-black leading-[1.1] sm:mt-2 sm:text-[34px] sm:leading-[1.08]">
-                                            See what needs attention, then open the right review workspace.
-                                        </h2>
-
-                                        <p className="mt-2 line-clamp-2 text-xs font-semibold leading-[1.45] text-white/72 sm:hidden">
-                                            Reviews, duplicates, batch issues and catalog approvals are grouped here.
-                                        </p>
-                                        <p className="mt-3 hidden max-w-2xl text-[15px] font-semibold leading-6 text-white/72 sm:block">
-                                            Use this page as the starting point for product data checks. It shows what is waiting, what may be duplicated, and where each issue should be resolved.
-                                        </p>
-                                    </div>
-
-                                    <div className="grid grid-cols-4 border-y border-white/15 lg:border-y-0 lg:border-l lg:border-white/15">
-                                        {[
-                                            ['Waiting review', dataQualitySummary.waitingReview],
-                                            ['Duplicates', dataQualitySummary.possibleDuplicates],
-                                            ['Catalog', dataQualitySummary.catalogReview],
-                                            ['Attention', dataQualitySummary.needsAttention],
-                                        ].map(([label, value], index) => (
-                                            <div
-                                                key={label}
-                                                className={`px-2.5 py-3 sm:px-4 sm:py-4 lg:px-5 ${index < 3 ? 'border-r border-white/15' : ''}`}
-                                            >
-                                                <p className="text-xl font-black sm:text-[30px]">
-                                                    {value}
-                                                </p>
-                                                <p className="mt-0.5 text-[9px] font-bold leading-3 text-white/58 sm:mt-1 sm:text-[11px] sm:leading-4">
-                                                    {label}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
+                        <main id="admin-data-quality-fullbleed" className="-mx-2.5 -mb-2.5 mt-2 min-w-0 bg-[#F7F6F2] pb-4 text-[#222923] sm:-mx-5 sm:-mb-5 sm:mt-5 sm:pb-8 lg:-mx-6 lg:-mb-6">
+                            {/* Page-specific mobile full-width layout. No changes to the shared AdminShell or desktop styling. */}
+                            <style>{`
+                              @media (max-width: 639px) {
+                                .page-shell:has(#admin-data-quality-fullbleed) {
+                                  box-sizing: border-box !important;
+                                  width: 100% !important;
+                                  max-width: none !important;
+                                  margin: 0 !important;
+                                  padding: 0 !important;
+                                }
+                                .page-shell:has(#admin-data-quality-fullbleed) > div {
+                                  border: 0 !important;
+                                  border-radius: 0 !important;
+                                  box-shadow: none !important;
+                                }
+                                .page-shell:has(#admin-data-quality-fullbleed) > div > .grid > section,
+                                .page-shell:has(#admin-data-quality-fullbleed) .epantry-workspace-canvas {
+                                  min-width: 0;
+                                  width: 100%;
+                                  border-radius: 0 !important;
+                                }
+                                .page-shell:has(#admin-data-quality-fullbleed) .epantry-workspace-canvas > header {
+                                  padding-inline: 12px !important;
+                                }
+                                .page-shell:has(#admin-data-quality-fullbleed) .epantry-workspace-canvas > div {
+                                  padding: 0 !important;
+                                }
+                                #admin-data-quality-fullbleed {
+                                  width: 100%;
+                                  margin: 0 !important;
+                                  padding-bottom: 12px;
+                                }
+                                /* Edge-to-edge workspace, with a deliberate 12px reading gutter.
+                                   Do not restore the old giant rounded outer card. */
+                                #admin-data-quality-fullbleed .data-quality-work-area {
+                                  margin-inline: 12px !important;
+                                  margin-top: 18px !important;
+                                  margin-bottom: 18px !important;
+                                }
+                                #admin-data-quality-fullbleed .data-quality-work-title {
+                                  padding-inline: 2px;
+                                  margin-bottom: 12px !important;
+                                  gap: 6px;
+                                }
+                                #admin-data-quality-fullbleed .data-quality-work-title h3 {
+                                  font-size: 21px !important;
+                                  line-height: 1.25 !important;
+                                }
+                                #admin-data-quality-fullbleed .data-quality-work-grid {
+                                  border: 1px solid #D9E1D7 !important;
+                                  border-radius: 12px !important;
+                                  overflow: hidden;
+                                  background: #FFFEFB;
+                                }
+                                #admin-data-quality-fullbleed .dq-hero-copy {
+                                  padding: 18px 16px 19px !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-hero-copy h2 {
+                                  font-size: 24px !important;
+                                  line-height: 1.18 !important;
+                                  letter-spacing: -0.035em;
+                                }
+                                #admin-data-quality-fullbleed .dq-hero-copy p.dq-hero-desc {
+                                  font-size: 13px !important;
+                                  line-height: 1.48 !important;
+                                  margin-top: 8px !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-hero-copy .dq-hero-action {
+                                  margin-top: 12px !important;
+                                  min-height: 38px;
+                                  border-radius: 6px;
+                                }
+                                #admin-data-quality-fullbleed .dq-metric {
+                                  min-height: 76px !important;
+                                  padding: 11px 14px !important;
+                                  align-items: flex-start !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-metric strong {
+                                  font-size: 25px !important;
+                                  line-height: 1.05 !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-metric span {
+                                  margin-top: 5px !important;
+                                  line-height: 1.25 !important;
+                                }
+                                /* Four truly clickable controls; stable height prevents clipping.
+                                   Tab navigation never overlaps the report below it. */
+                                #admin-data-quality-fullbleed .dq-tabs {
+                                  display: grid !important;
+                                  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                                  grid-auto-rows: minmax(100px, auto) !important;
+                                  gap: 8px !important;
+                                  padding: 10px !important;
+                                  background: #F7F6F2 !important;
+                                  align-content: start !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-tab {
+                                  box-sizing: border-box !important;
+                                  display: flex !important;
+                                  flex-direction: column !important;
+                                  justify-content: space-between !important;
+                                  align-items: stretch !important;
+                                  gap: 8px !important;
+                                  height: auto !important;
+                                  min-height: 100px !important;
+                                  padding: 12px !important;
+                                  border: 1px solid #D8E1D7 !important;
+                                  border-left: 3px solid #D8E1D7 !important;
+                                  border-radius: 8px !important;
+                                  overflow: visible !important;
+                                  text-align: left !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-tab[aria-selected="true"] {
+                                  border-color: #173F35 !important;
+                                  border-left-color: #C86C42 !important;
+                                  background: #173F35 !important;
+                                  color: #FFFEFB !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-tab[aria-selected="false"] {
+                                  background: #EFF2EC !important;
+                                  color: #173F35 !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-tab-title {
+                                  display: block !important;
+                                  font-size: 14px !important;
+                                  line-height: 1.3 !important;
+                                  letter-spacing: -0.01em;
+                                  overflow-wrap: normal;
+                                  word-break: normal;
+                                  white-space: normal;
+                                }
+                                #admin-data-quality-fullbleed .dq-panel-head {
+                                  padding: 12px 12px !important;
+                                  align-items: center;
+                                }
+                                #admin-data-quality-fullbleed .dq-panel-head h4 {
+                                  font-size: 17px !important;
+                                  line-height: 1.25 !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-panel-head a {
+                                  min-height: 38px;
+                                  border-radius: 6px;
+                                  font-size: 13px !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-review-row {
+                                  min-height: 66px;
+                                  padding: 11px 13px !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-review-row p:first-child {
+                                  font-size: 14px !important;
+                                  line-height: 1.35 !important;
+                                }
+                                #admin-data-quality-fullbleed .dq-review-row p:nth-child(2) {
+                                  font-size: 12.5px !important;
+                                  line-height: 1.4 !important;
+                                }
+                              }
+                              @media (max-width: 359px) {
+                                #admin-data-quality-fullbleed .data-quality-work-area { margin-inline: 9px !important; }
+                                #admin-data-quality-fullbleed .dq-tabs { padding: 8px !important; gap: 6px !important; }
+                                #admin-data-quality-fullbleed .dq-tab { padding: 10px !important; }
+                                #admin-data-quality-fullbleed .dq-tab-title { font-size: 13px !important; }
+                              }
+                            `}</style>
+                            <header className="dq-hero grid min-w-0 border-b border-[#D8DED5] lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                                <div className="dq-hero-copy bg-[#173F35] px-4 py-4 text-[#F7F6F2] sm:px-8 sm:py-8">
+                                    <p className="text-[12px] font-bold text-[#E2BD9C]">PRODUCT DATA / QUALITY</p>
+                                    <h2 className="mt-1.5 max-w-xl text-[22px] font-extrabold leading-[1.15] sm:mt-2 sm:text-[32px]"><span className="sm:hidden">Know what needs attention.</span><span className="hidden sm:inline">Know what needs a closer look.</span></h2>
+                                    <p className="dq-hero-desc mt-1.5 max-w-xl text-[13px] leading-[1.4] text-[#D7E3D8] sm:mt-2 sm:text-[15px] sm:leading-[1.5]">Review product records, duplicate warnings and catalog issues.</p>
+                                    <Link to={isRootSuperAdmin ? '/admin/host-listings?tab=review' : '/admin/product-intelligence'} className="dq-hero-action focus-ring mt-3 inline-flex min-h-9 items-center gap-2 border border-[#DBE6D7] bg-[#F7F6F2] px-3 py-2 text-[13px] font-bold text-[#173F35] transition hover:bg-[#DCE0CF] sm:mt-5 sm:min-h-10 sm:px-4 sm:py-2.5 sm:text-[14px]">
+                                        <span className="sm:hidden">Open listings</span><span className="hidden sm:inline">Open listing workspace</span> <ArrowUpRight size={16} aria-hidden="true" />
+                                    </Link>
                                 </div>
-                            </section>
-
-                            <section className="border-b border-stone-300 bg-[#edf1ef]">
-                                <div className="px-4 pt-4 sm:px-7 sm:pt-6 lg:px-9">
-                                    <p className="text-[10px] font-black tracking-[0.08em] text-[#16665c] sm:text-xs">
-                                        How to use this page
-                                    </p>
-                                    <h3 className="mt-1 text-lg font-black text-stone-950 sm:text-2xl">
-                                        Follow the issue from review to final catalog decision.
-                                    </h3>
+                                <div className="grid grid-cols-2 gap-px bg-[#CBD4C8]" aria-label="Current quality signals">
+                                    {[
+                                        { id: 'review', label: 'Review queue', value: dataQualitySummary.waitingReview, unavailable: dataQualitySourceErrors.review, surface: 'bg-[#E3EADF]' },
+                                        { id: 'duplicates', label: 'Duplicate flags', value: dataQualitySummary.possibleDuplicates, unavailable: dataQualitySourceErrors.review || dataQualitySourceErrors.batches, surface: 'bg-[#F8E6D9]' },
+                                        { id: 'catalog', label: 'Catalog checks', value: dataQualitySummary.catalogReview, unavailable: dataQualitySourceErrors.catalog, surface: 'bg-[#E4EDF4]' },
+                                        { id: 'batches', label: 'Needs attention', value: dataQualitySummary.needsAttention, unavailable: dataQualitySourceErrors.review || dataQualitySourceErrors.batches, surface: 'bg-[#ECE8F3]' },
+                                    ].map(item => (
+                                        <button key={item.id} type="button" onClick={() => setDataQualityView(item.id)} aria-label={`Show ${item.label.toLowerCase()}`} className={`dq-metric focus-ring flex min-h-[78px] flex-col items-start justify-center px-3 py-2.5 text-left transition-colors hover:brightness-[0.98] sm:min-h-[132px] sm:px-6 sm:py-3.5 ${item.surface} ${dataQualityView === item.id ? 'shadow-[inset_0_-4px_0_#C86C42]' : ''}`}>
+                                            <strong className="text-[24px] font-extrabold leading-none text-[#173F35] sm:text-[35px]" aria-live="polite">{dataQualityLoading ? '…' : item.unavailable ? '—' : item.value}</strong>
+                                            <span className="mt-1 text-[12px] font-semibold leading-4 text-[#466155] sm:mt-2 sm:text-[14px]">{item.label}</span>
+                                        </button>
+                                    ))}
                                 </div>
-
-                                <div className="mt-3 grid grid-cols-1 border-t border-stone-300/80 lg:mt-5 lg:grid-cols-4">
-                                    <DataQualityStep
-                                        number={1}
-                                        title="Check new product reviews"
-                                        body="Start with products waiting for a decision or more proof."
-                                        mobileBody="Review products waiting for a decision."
-                                        icon={SearchCheck}
-                                    />
-                                    <DataQualityStep
-                                        number={2}
-                                        title="Compare possible duplicates"
-                                        body="Check whether a submitted product already exists in the catalog."
-                                        mobileBody="Compare products that may already exist."
-                                        icon={Boxes}
-                                    />
-                                    <DataQualityStep
-                                        number={3}
-                                        title="Resolve product data issues"
-                                        body="Open the review or batch workspace when proof or product data is incomplete."
-                                        mobileBody="Fix missing proof or batch issues."
-                                        icon={FileWarning}
-                                    />
-                                    <DataQualityStep
-                                        number={4}
-                                        title="Finish catalog approval"
-                                        body="Complete the final checks before a governed product can move forward."
-                                        mobileBody="Finish checks before catalog approval."
-                                        icon={CheckCircle2}
-                                    />
-                                </div>
-                            </section>
+                            </header>
 
                             {dataQualityError ? (
-                                <div className="border-b border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-700 sm:px-7 sm:py-3 sm:text-sm lg:px-9">
-                                    {dataQualityError}
+                                <div role="alert" className="mx-4 mt-5 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#C85B47] bg-[#FFF0E8] px-4 py-3 text-[14px] text-[#863B2E] sm:mx-7">
+                                    <span>{dataQualityError}</span>
+                                    <button type="button" onClick={loadDataQualityWorkspace} className="focus-ring inline-flex items-center gap-2 font-bold underline underline-offset-4"><RefreshCw size={15}/> Try again</button>
                                 </div>
                             ) : null}
-
-                            {dataQualityLoading ? (
-                                <div className="grid min-h-[220px] place-items-center bg-white sm:min-h-[320px]">
-                                    <div className="text-center">
-                                        <LoaderCircle className="mx-auto animate-spin text-[#126a60]" />
-                                        <p className="mt-2 text-xs font-bold text-stone-500 sm:mt-3 sm:text-sm">
-                                            Loading current product quality data…
-                                        </p>
+                            <section className="data-quality-work-area mx-2.5 mt-4 sm:mx-7 sm:mt-8" aria-labelledby="quality-work-heading">
+                                <div className="data-quality-work-title mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-[#CDD6CC] pb-3 sm:mb-4 sm:gap-3 sm:pb-4">
+                                    <div>
+                                        <p className="text-[12px] font-bold text-[#C86C42]">01 / WORK QUEUE</p>
+                                        <h3 id="quality-work-heading" className="mt-1 text-[21px] font-extrabold leading-[1.2] text-[#173F35] sm:text-[28px]">Choose what to review</h3>
+                                    </div>
+                                    <span className="hidden text-[13px] text-[#647365] sm:inline">Select a work area below</span>
+                                </div>
+                                <div className="data-quality-work-grid grid min-w-0 overflow-hidden border border-[#D9E1D7] bg-[#FFFEFB] lg:grid-cols-[290px_minmax(0,1fr)]">
+                                    <nav className="dq-tabs grid min-w-0 grid-cols-2 gap-px bg-[#DDE4DB] lg:grid-cols-1 lg:content-start" aria-label="Quality work areas" role="tablist">
+                                        {QUALITY_VIEWS.map(view => {
+                                            const ViewIcon = view.icon;
+                                            const selected = dataQualityView === view.id;
+                                            const figure = view.id === 'review' ? dataQualitySummary.waitingReview : view.id === 'duplicates' ? dataQualitySummary.possibleDuplicates : view.id === 'catalog' ? dataQualitySummary.catalogReview : dataQualitySummary.needsAttention;
+                                            const missing = view.id === 'review' ? dataQualitySourceErrors.review : view.id === 'catalog' ? dataQualitySourceErrors.catalog : dataQualitySourceErrors.review || dataQualitySourceErrors.batches;
+                                            return (
+                                                <button key={view.id} type="button" role="tab" aria-selected={selected} aria-controls="data-quality-panel" onMouseEnter={() => setDataQualityView(view.id)} onFocus={() => setDataQualityView(view.id)} onClick={() => setDataQualityView(view.id)} className={`dq-tab focus-ring flex min-h-[76px] min-w-0 flex-col justify-between gap-1.5 px-2.5 py-2.5 text-left transition sm:min-h-[90px] sm:flex-row sm:items-start sm:justify-start sm:gap-2.5 sm:px-4 sm:py-4 lg:min-h-[94px] ${selected ? 'border-l-[4px] border-l-[#C86C42] bg-[#173F35] text-white' : 'border-l-[4px] border-l-transparent bg-[#F1F3ED] text-[#173F35] hover:bg-[#E6EDE3]'}`}>
+                                                    <span className="flex w-full items-center justify-between gap-2 sm:hidden">
+                                                        <span className={`text-[11px] font-bold ${selected ? 'text-[#DCE0CF]' : 'text-[#A45E3F]'}`}>{view.number}</span>
+                                                        <span className={`text-[14px] font-extrabold ${selected ? 'text-white' : 'text-[#173F35]'}`}>{dataQualityLoading ? '…' : missing ? '—' : figure}</span>
+                                                    </span>
+                                                    <span className={`mt-0.5 hidden size-8 shrink-0 items-center justify-center sm:flex ${selected ? 'bg-white/15 text-white' : view.tint + ' ' + view.text}`}><ViewIcon size={17} aria-hidden="true"/></span>
+                                                    <span className="min-w-0 w-full sm:flex-1">
+                                                        <span className="dq-tab-title block break-normal text-[13px] font-bold leading-[1.25] sm:text-[15px] sm:leading-5">{view.label}</span>
+                                                        <span className={`mt-1 hidden text-[12px] leading-4 sm:block ${selected ? 'text-[#CEDFD0]' : 'text-[#617363]'}`}>{view.short}</span>
+                                                    </span>
+                                                    <span className={`hidden shrink-0 text-[14px] font-bold sm:inline ${selected ? 'text-white' : 'text-[#173F35]'}`}>{dataQualityLoading ? '…' : missing ? '—' : figure}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </nav>
+                                    <div id="data-quality-panel" role="tabpanel" className="min-w-0 bg-[#FFFEFB]">
+                                        {QUALITY_VIEWS.filter(view => view.id === dataQualityView).map(view => {
+                                            const ViewIcon = view.icon;
+                                            const linkTarget = view.id === 'review' || view.id === 'duplicates'
+                                                ? (isRootSuperAdmin ? '/admin/host-listings?tab=evidence' : '/admin/product-intelligence')
+                                                : view.id === 'catalog'
+                                                    ? (isRootSuperAdmin ? '/admin/host-listings?tab=catalog' : '/admin/catalog')
+                                                    : (isRootSuperAdmin ? '/admin/host-listings?tab=bulk' : '/admin/bulk-product-review');
+                                            const sourceError = view.id === 'review' || view.id === 'duplicates'
+                                                ? dataQualitySourceErrors.review
+                                                : view.id === 'catalog' ? dataQualitySourceErrors.catalog : dataQualitySourceErrors.batches;
+                                            const list = view.id === 'review'
+                                                ? (dataQualityWorkspace.drafts || []).map(draft => ({
+                                                    id: draft.id, name: dataQualityDraftName(draft),
+                                                    meta: draft?.duplicateCandidateProductVersionId ? 'Potential catalog match · compare evidence' : draft?.safetyReviewRequired ? 'Extra safety evidence required' : dataQualityStatusLabel(draft.status),
+                                                    badge: draft?.duplicateCandidateProductVersionId ? 'Possible duplicate' : 'Inspect record', warning: !!draft?.duplicateCandidateProductVersionId,
+                                                }))
+                                                : view.id === 'duplicates'
+                                                    ? dataQualityDuplicateDrafts.map(draft => ({id: draft.id, name: dataQualityDraftName(draft), meta: 'Potential match to an existing catalog version', badge: 'Compare', warning: true}))
+                                                    : view.id === 'catalog'
+                                                        ? (dataQualityWorkspace.versions || []).map(version => ({id: version.id, name: version.displayName || 'Unnamed catalog product', meta: version.gtin ? `Barcode ${version.gtin}` : 'No barcode recorded', badge: 'In review', warning: false}))
+                                                        : dataQualityAttentionBatches.map(batch => {
+                                                            const issues = Number(batch?.review?.validationIssues || 0) + Number(batch?.review?.needsEvidence || 0);
+                                                            const duplicates = Number(batch?.review?.potentialDuplicates || 0);
+                                                            return {id: batch.id, name: batch?.organization?.displayName || batch?.sourceFileName || 'Host upload', meta: `${batch.sourceFileName || 'Uploaded batch'} · ${issues} issues · ${duplicates} duplicate flags`, badge: dataQualityStatusLabel(batch.status), warning: issues > 0 || duplicates > 0};
+                                                        });
+                                            return (
+                                                <div key={view.id}>
+                                                    <div className={`dq-panel-head flex items-center justify-between gap-2 border-b border-[#DFE5DB] px-3 py-3 sm:gap-3 sm:px-6 sm:py-5 ${view.tint}`} >
+                                                        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                                                            <span className={`hidden size-10 shrink-0 items-center justify-center bg-white/80 sm:flex ${view.text}`}><ViewIcon size={20} aria-hidden="true"/></span>
+                                                            <div className="min-w-0"><p className={`text-[10px] font-bold sm:text-[12px] ${view.text}`}>{view.number} / QUALITY CHECK</p><h4 className="text-[17px] font-bold leading-[1.2] text-[#173F35] sm:text-[22px] sm:leading-6">{view.label}</h4></div>
+                                                        </div>
+                                                        <Link to={linkTarget} className="focus-ring inline-flex min-h-9 shrink-0 items-center gap-1 border border-[#173F35] bg-[#173F35] px-2.5 py-2 text-[12px] font-bold text-white transition hover:bg-[#235546] sm:min-h-10 sm:gap-2 sm:px-4 sm:text-[14px]"><span className="sm:hidden">Open</span><span className="hidden sm:inline">Open workspace</span> <ArrowUpRight size={15} aria-hidden="true"/></Link>
+                                                    </div>
+                                                    {dataQualityLoading ? (
+                                                        <div role="status" className="flex items-center gap-3 px-5 py-10 text-[15px] text-[#5B7064]"><LoaderCircle className="animate-spin" size={19}/> Loading records…</div>
+                                                    ) : sourceError ? (
+                                                        <div role="alert" className="px-5 py-6 text-[14px] text-[#923F31]"><p>Records unavailable: {sourceError}</p><button type="button" onClick={loadDataQualityWorkspace} className="focus-ring mt-3 inline-flex items-center gap-2 font-bold underline underline-offset-4"><RefreshCw size={15}/> Retry</button></div>
+                                                    ) : list.length > 0 ? (
+                                                        <div role="region" aria-label={`${view.label} records`} className="max-h-[340px] divide-y divide-[#E6EBE4] overflow-y-auto overscroll-y-auto sm:max-h-[440px] lg:max-h-[500px]">
+                                                            {list.map((item, index) => <QualityReviewRow key={item.id || index} title={item.name} meta={item.meta} badge={item.badge} warning={item.warning} to={linkTarget} />)}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex min-h-[140px] items-center gap-3 px-5 py-7 text-[#5B7064]"><CheckCircle2 size={22} className="shrink-0 text-[#50816B]"/><span className="text-[15px] leading-6">{view.id === 'review' ? 'No product drafts in this queue.' : view.id === 'duplicates' ? (dataQualitySummary.possibleDuplicates > 0 ? 'Duplicate flags are reported in uploaded batches. Open Bulk Review to compare them.' : 'No duplicate flags in the loaded records.') : view.id === 'catalog' ? 'No catalog versions awaiting review.' : 'No batch issues in the loaded records.'}</span></div>
+                                                    )}
+                                                    <div className="border-t border-[#DDE4DB] bg-[#F4F5F0] px-3 py-2.5 text-[12px] text-[#536858] sm:px-6 sm:py-3 sm:text-[13px]"><span className="sm:hidden">{list.length > 0 ? `${list.length} records · Open for full list` : 'Review in linked workspace'}</span><span className="hidden sm:inline">{list.length > 0 ? `Showing ${list.length} records. Open the workspace for the full list.` : 'Review actions stay in the linked workspace.'}</span></div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="bg-[#f7f7f4]">
-                                    <div className="grid gap-3 border-b border-stone-300 bg-white px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:px-7 sm:py-6 lg:px-9">
-                                        <div>
-                                            <p className="text-[10px] font-black tracking-[0.08em] text-[#5a6a65] sm:text-xs">
-                                                Work waiting for you
-                                            </p>
-                                            <h3 className="mt-1 text-xl font-black text-stone-950 sm:text-[28px]">
-                                                Four workstreams, one quality view.
-                                            </h3>
-                                            <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-stone-600 sm:text-sm sm:leading-6">
-                                                Open the workstream that matches the problem instead of changing product records from this summary page.
-                                            </p>
-                                        </div>
-
-                                        <p className="text-xs font-bold text-stone-500 sm:text-sm">
-                                            {dataQualitySummary.waitingReview + dataQualitySummary.possibleDuplicates + dataQualitySummary.catalogReview + dataQualitySummary.needsAttention} items currently need attention
-                                        </p>
-                                    </div>
-
-                                    <section className="grid border-b border-stone-300 bg-white lg:grid-cols-[72px_300px_minmax(0,1fr)]">
-                                        <div className="hidden border-r border-stone-200 px-4 py-6 text-[36px] font-black leading-none text-[#b7d8cf] lg:block">
-                                            01
-                                        </div>
-                                        <div className="border-b border-stone-200 border-l-[4px] border-l-[#2b7c70] px-4 py-4 sm:px-6 sm:py-5 lg:border-b-0 lg:border-l-0 lg:border-r lg:px-6 lg:py-6">
-                                            <div className="flex items-start justify-between gap-3 lg:block">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-[#16665c] sm:text-xs">
-                                                        Product review queue
-                                                    </p>
-                                                    <h4 className="mt-1 text-base font-black text-stone-950 sm:text-lg">
-                                                        Products waiting for a decision
-                                                    </h4>
-                                                </div>
-                                                <Link
-                                                    to="/admin/product-intelligence"
-                                                    className="focus-ring shrink-0 text-xs font-black text-[#16665c] underline decoration-[#16665c]/30 underline-offset-4 sm:text-sm lg:mt-4 lg:inline-flex"
-                                                >
-                                                    Open review
-                                                </Link>
-                                            </div>
-                                            <p className="mt-1.5 line-clamp-2 text-xs font-semibold leading-[1.45] text-stone-600 sm:hidden">
-                                                Check product details and proof before Catalog.
-                                            </p>
-                                            <p className="mt-2 hidden text-sm font-semibold leading-5 text-stone-600 sm:block">
-                                                Review submitted product details and proof before sending them to Catalog.
-                                            </p>
-                                        </div>
-
-                                        <div className="min-w-0 bg-[#fbfcfb]">
-                                            {(dataQualityWorkspace.drafts || []).length ? (
-                                                <div>
-                                                    {(dataQualityWorkspace.drafts || []).slice(0, 8).map((draft) => (
-                                                        <DataQualityRow
-                                                            key={draft.id}
-                                                            title={dataQualityDraftName(draft)}
-                                                            meta={draft.duplicateCandidateProductVersionId
-                                                                ? 'Possible duplicate found · compare this product before approving it.'
-                                                                : draft.safetyReviewRequired
-                                                                    ? 'Extra safety check required before this product can move forward.'
-                                                                    : 'Submitted product is waiting for a review decision.'}
-                                                            status={draft.duplicateCandidateProductVersionId
-                                                                ? 'Possible duplicate'
-                                                                : dataQualityStatusLabel(draft.status)}
-                                                            tone={draft.duplicateCandidateProductVersionId
-                                                                ? 'coral'
-                                                                : draft.status === 'needs_more_evidence'
-                                                                    ? 'blue'
-                                                                    : 'green'}
-                                                            to="/admin/product-intelligence"
-                                                        />
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="px-4 py-4 text-xs font-semibold text-stone-500 sm:px-5 sm:py-6 sm:text-sm lg:px-6">
-                                                    No products are waiting for review right now.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </section>
-
-                                    <section className="grid border-b border-stone-300 bg-[#f4f7f9] lg:grid-cols-[72px_300px_minmax(0,1fr)]">
-                                        <div className="hidden border-r border-stone-200 px-4 py-6 text-[36px] font-black leading-none text-[#c0d3e1] lg:block">
-                                            02
-                                        </div>
-                                        <div className="border-b border-stone-200 border-l-[4px] border-l-[#5d7f9a] px-4 py-4 sm:px-6 sm:py-5 lg:border-b-0 lg:border-l-0 lg:border-r lg:px-6 lg:py-6">
-                                            <div className="flex items-start justify-between gap-3 lg:block">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-[#355a76] sm:text-xs">
-                                                        Possible duplicates
-                                                    </p>
-                                                    <h4 className="mt-1 text-base font-black text-stone-950 sm:text-lg">
-                                                        Products that may already exist
-                                                    </h4>
-                                                </div>
-                                                <span className="shrink-0 text-lg font-black text-[#355a76] sm:text-xl lg:mt-4 lg:block">
-                                                    {dataQualitySummary.possibleDuplicates}
-                                                </span>
-                                            </div>
-                                            <p className="mt-1.5 line-clamp-2 text-xs font-semibold leading-[1.45] text-stone-600 sm:hidden">
-                                                Compare matches before keeping or approving a record.
-                                            </p>
-                                            <p className="mt-2 hidden text-sm font-semibold leading-5 text-stone-600 sm:block">
-                                                Compare matching records before deciding which product should move forward.
-                                            </p>
-                                        </div>
-
-                                        <div className="min-w-0 bg-white/60">
-                                            {dataQualityDuplicateDrafts.length ? (
-                                                dataQualityDuplicateDrafts.map((draft) => (
-                                                    <DataQualityRow
-                                                        key={draft.id}
-                                                        title={dataQualityDraftName(draft)}
-                                                        meta="A matching catalog product was found. Compare both records before deciding what to keep."
-                                                        status="Compare records"
-                                                        tone="coral"
-                                                        to="/admin/product-intelligence"
-                                                    />
-                                                ))
-                                            ) : (
-                                                <p className="px-4 py-4 text-xs font-semibold text-stone-500 sm:px-5 sm:py-6 sm:text-sm lg:px-6">
-                                                    No possible duplicates need review right now.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </section>
-
-                                    <section className="grid border-b border-stone-300 bg-[#f2f7f4] lg:grid-cols-[72px_300px_minmax(0,1fr)]">
-                                        <div className="hidden border-r border-stone-200 px-4 py-6 text-[36px] font-black leading-none text-[#b9d9c8] lg:block">
-                                            03
-                                        </div>
-                                        <div className="border-b border-stone-200 border-l-[4px] border-l-[#4c8b67] px-4 py-4 sm:px-6 sm:py-5 lg:border-b-0 lg:border-l-0 lg:border-r lg:px-6 lg:py-6">
-                                            <div className="flex items-start justify-between gap-3 lg:block">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-[#236748] sm:text-xs">
-                                                        Catalog approval
-                                                    </p>
-                                                    <h4 className="mt-1 text-base font-black text-stone-950 sm:text-lg">
-                                                        Products waiting for final approval
-                                                    </h4>
-                                                </div>
-                                                <span className="shrink-0 text-lg font-black text-[#236748] sm:text-xl lg:mt-4 lg:block">
-                                                    {dataQualityWorkspace.versionTotal}
-                                                </span>
-                                            </div>
-                                            <p className="mt-1.5 line-clamp-2 text-xs font-semibold leading-[1.45] text-stone-600 sm:hidden">
-                                                Finish the final catalog check before publishing.
-                                            </p>
-                                            <p className="mt-2 hidden text-sm font-semibold leading-5 text-stone-600 sm:block">
-                                                Review governed product versions that are waiting for final catalog approval.
-                                            </p>
-                                            <Link
-                                                to="/admin/catalog"
-                                                className="focus-ring mt-2.5 inline-flex w-fit items-center text-xs font-black text-[#236748] underline decoration-[#236748]/30 underline-offset-4 sm:mt-4 sm:text-sm"
-                                            >
-                                                Open Catalog & Listings
-                                            </Link>
-                                        </div>
-
-                                        <div className="min-w-0 bg-white/65">
-                                            {(dataQualityWorkspace.versions || []).length ? (
-                                                (dataQualityWorkspace.versions || []).slice(0, 6).map((version) => (
-                                                    <DataQualityRow
-                                                        key={version.id}
-                                                        title={version.displayName || 'Unnamed catalog product'}
-                                                        meta={version.gtin
-                                                            ? `Barcode ${version.gtin}`
-                                                            : 'No barcode recorded for this product version.'}
-                                                        status="In review"
-                                                        tone="green"
-                                                        to="/admin/catalog"
-                                                    />
-                                                ))
-                                            ) : (
-                                                <p className="px-4 py-4 text-xs font-semibold text-stone-500 sm:px-5 sm:py-6 sm:text-sm lg:px-6">
-                                                    No products are waiting for catalog approval right now.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </section>
-
-                                    <section className="grid bg-[#f5f5f2] lg:grid-cols-[72px_300px_minmax(0,1fr)]">
-                                        <div className="hidden border-r border-stone-200 px-4 py-6 text-[36px] font-black leading-none text-[#ccd2d0] lg:block">
-                                            04
-                                        </div>
-                                        <div className="border-b border-stone-200 border-l-[4px] border-l-[#5d6b70] px-4 py-4 sm:px-6 sm:py-5 lg:border-b-0 lg:border-l-0 lg:border-r lg:px-6 lg:py-6">
-                                            <div className="flex items-start justify-between gap-3 lg:block">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-[#4f6471] sm:text-xs">
-                                                        Host batch checks
-                                                    </p>
-                                                    <h4 className="mt-1 text-base font-black text-stone-950 sm:text-lg">
-                                                        Uploaded batches needing attention
-                                                    </h4>
-                                                </div>
-                                                <Link
-                                                    to="/admin/bulk-product-review"
-                                                    className="focus-ring shrink-0 text-xs font-black text-[#3e5965] underline decoration-[#3e5965]/30 underline-offset-4 sm:text-sm lg:mt-4 lg:inline-flex"
-                                                >
-                                                    Open batches
-                                                </Link>
-                                            </div>
-                                            <p className="mt-1.5 line-clamp-2 text-xs font-semibold leading-[1.45] text-stone-600 sm:hidden">
-                                                Check uploads with missing proof, errors or duplicate warnings.
-                                            </p>
-                                            <p className="mt-2 hidden text-sm font-semibold leading-5 text-stone-600 sm:block">
-                                                Open a batch when products have validation problems, missing proof or duplicate warnings.
-                                            </p>
-                                        </div>
-
-                                        <div className="min-w-0 bg-white/65">
-                                            {dataQualityAttentionBatches.length ? (
-                                                dataQualityAttentionBatches.map((batch) => {
-                                                    const issueCount =
-                                                        Number(batch?.review?.validationIssues || 0) +
-                                                        Number(batch?.review?.needsEvidence || 0);
-                                                    const duplicateCount =
-                                                        Number(batch?.review?.potentialDuplicates || 0);
-
-                                                    return (
-                                                        <DataQualityRow
-                                                            key={batch.id}
-                                                            title={batch?.organization?.displayName || 'Host submission'}
-                                                            meta={`${batch.sourceFileName || 'Uploaded batch'} · ${issueCount} item${issueCount === 1 ? '' : 's'} need attention · ${duplicateCount} possible duplicate${duplicateCount === 1 ? '' : 's'}`}
-                                                            status={dataQualityStatusLabel(batch.status)}
-                                                            tone={duplicateCount > 0 ? 'coral' : 'blue'}
-                                                            to="/admin/bulk-product-review"
-                                                        />
-                                                    );
-                                                })
-                                            ) : (
-                                                <p className="px-4 py-4 text-xs font-semibold text-stone-500 sm:px-5 sm:py-6 sm:text-sm lg:px-6">
-                                                    No Host batches need a quality review right now.
-                                                </p>
-                                            )}
-                                        </div>
-                                    </section>
-
-                                    <section className="grid border-t border-stone-300 bg-[#102f35] text-white sm:grid-cols-3">
-                                        <Link
-                                            to="/admin/product-intelligence"
-                                            className="focus-ring border-b border-white/12 px-4 py-3.5 transition hover:bg-white/[0.05] sm:border-b-0 sm:border-r sm:px-6 sm:py-5"
-                                        >
-                                            <p className="text-sm font-black">Review submitted products</p>
-                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-white/60">
-                                                Check product facts, proof and duplicate warnings.
-                                            </p>
-                                        </Link>
-
-                                        <Link
-                                            to="/admin/bulk-product-review"
-                                            className="focus-ring border-b border-white/12 px-4 py-3.5 transition hover:bg-white/[0.05] sm:border-b-0 sm:border-r sm:px-6 sm:py-5"
-                                        >
-                                            <p className="text-sm font-black">Review Host batches</p>
-                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-white/60">
-                                                Resolve batch issues and duplicate warnings.
-                                            </p>
-                                        </Link>
-
-                                        <Link
-                                            to="/admin/catalog"
-                                            className="focus-ring px-4 py-3.5 transition hover:bg-white/[0.05] sm:px-6 sm:py-5"
-                                        >
-                                            <p className="text-sm font-black">Open Catalog & Listings</p>
-                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-white/60">
-                                                Finish approvals and manage governed records.
-                                            </p>
-                                        </Link>
-                                    </section>
-                                </div>
-                            )}
-                        </div>
+                            </section>
+                        </main>
                     ) : null}
-  
+
                     {section === 'recipeReview' ? (
                         <div className="-m-2.5 min-h-[100svh] bg-[#f4f3ee] sm:-m-5 lg:-m-6">
                             <section className="border-b border-[#183f4a] bg-[#173b4f] text-white">
@@ -6635,7 +6489,7 @@ import {
                     ) : null}
   
   
-                    {section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'users' ? (
+                    {section !== 'dataQuality' && section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'users' ? (
                     <section
                         className={`shadow-sm ${
                             section === 'users'

@@ -14,6 +14,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -44,7 +45,10 @@ import {
 } from '../services/hostOperations.service'
 
 const inputClass =
-  'focus-ring w-full border border-stone-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-900 outline-none focus:border-emerald-600'
+  'focus-ring w-full min-h-12 rounded-md border border-[#D0D9D2] bg-white px-4 py-3 text-[15px] font-medium text-[#202421] outline-none transition focus:border-[#173F35]'
+
+const primaryButton = 'focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#173F35] px-5 py-2.5 text-[15px] font-semibold text-white transition hover:bg-[#255845] disabled:cursor-not-allowed disabled:opacity-45'
+const warningButton = 'focus-ring inline-flex min-h-11 items-center justify-center rounded-md border border-[#B9C8BF] bg-white px-5 py-2.5 text-[15px] font-semibold text-[#173F35] transition hover:bg-[#EEF2EC] disabled:cursor-not-allowed disabled:opacity-45'
 
 function titleize(value) {
   return String(value || 'unknown')
@@ -128,7 +132,7 @@ async function loadEveryPage(loader, itemKey, params = {}) {
     const result = await loader({
       ...params,
       page,
-      limit: 100,
+      limit: 50,
     })
 
     rows.push(...(Array.isArray(result?.[itemKey]) ? result[itemKey] : []))
@@ -210,55 +214,90 @@ function QueueRows({
   getTitle,
   getMeta,
 }) {
+  const [showAllMobile, setShowAllMobile] = useState(false)
+
   if (!rows.length) {
     return (
-      <div className="border-t border-stone-200 py-5 sm:py-7">
-        <p className="text-sm font-bold text-stone-900">{emptyTitle}</p>
-        <p className="mt-1 max-w-xl text-xs leading-5 text-stone-500 sm:text-sm">
-          {emptyText}
-        </p>
+      <div className="flex items-start gap-4 px-5 py-7 sm:px-7">
+        <BadgeCheck size={25} className="mt-1 shrink-0 text-[#38715B]" aria-hidden="true" />
+        <div>
+          <p className="text-[18px] font-semibold leading-6 text-[#173F35]">{emptyTitle}</p>
+          <p className="mt-1 max-w-md text-[15px] leading-6 text-[#596B61]">{emptyText}</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="border-t border-stone-200">
-      {rows.map((item, index) => {
-        const id = getId(item)
-        const active = id === selectedId
-
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onSelect(item)}
-            className={`focus-ring block w-full border-b border-stone-200 px-3 py-3 text-left transition sm:px-4 sm:py-4 ${
-              active
-                ? 'bg-[#e7f4ef] text-stone-950'
-                : 'bg-white text-stone-800 hover:bg-stone-50'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${active ? 'bg-emerald-700' : 'bg-stone-300'}`} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="truncate text-sm font-bold">{getTitle(item)}</p>
-                  <span className="shrink-0 text-[10px] font-bold text-stone-400">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">
-                  {getMeta(item)}
-                </p>
-              </div>
-            </div>
-          </button>
-        )
-      })}
+    <div>
+      <div className="divide-y divide-[#E4E8E1] lg:max-h-[620px] lg:overflow-y-auto lg:overscroll-contain">
+        {rows.map((item, index) => {
+          const id = getId(item)
+          const active = id === selectedId
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(item)}
+              aria-pressed={active}
+              className={`focus-ring group flex w-full items-center gap-3 border-l-[3px] px-3 py-4 text-left transition sm:gap-4 sm:px-5 ${index >= 5 && !showAllMobile ? 'hidden sm:flex' : ''} ${active ? 'border-[#173F35] bg-[#EEF3ED]' : 'border-transparent bg-white hover:border-[#AFC3B4] hover:bg-[#F7F8F5]'}`}
+            >
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[14px] font-semibold ${active ? 'bg-[#173F35] text-white' : 'bg-[#F0F2EE] text-[#4B6558]'}`}>
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block break-words text-[16px] font-bold leading-5 text-[#173F35]">{getTitle(item)}</span>
+                <span className="mt-1 block text-[13px] leading-5 text-[#526D61]">{getMeta(item)}</span>
+              </span>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${active ? 'bg-[#173F35] text-white' : 'bg-[#EFF2ED] text-[#173F35] group-hover:bg-[#DFE9E1]'}`}>
+                <ArrowRight size={17} aria-hidden="true" />
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {rows.length > 5 ? (
+        <button
+          type="button"
+          onClick={() => setShowAllMobile((current) => !current)}
+          className="focus-ring min-h-12 w-full border-t border-[#D9E0D9] bg-[#F5F7F3] px-4 py-3 text-[14px] font-semibold text-[#173F35] sm:hidden"
+          aria-expanded={showAllMobile}
+        >
+          {showAllMobile ? 'Show fewer requests' : `View all ${rows.length} requests`}
+        </button>
+      ) : null}
     </div>
   )
 }
 
+function InformationGrid({ items }) {
+  return (
+    <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-1 border-y border-[#DDE2D9] py-2 sm:gap-x-8 md:grid-cols-4">
+      {items.map(([label, value]) => (
+        <div key={label} className="min-w-0 py-3">
+          <dt className="text-[13px] font-medium text-[#65746A]">{label}</dt>
+          <dd className="mt-1 break-words text-[15px] font-semibold leading-5 text-[#173F35]">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function ReviewNote({ value, onChange, placeholder, label = 'Reason for your decision' }) {
+  return (
+    <label className="mt-6 block text-[15px] font-semibold text-[#173F35]">
+      {label}
+      <textarea
+        rows={3}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className={`${inputClass} mt-2 resize-y leading-6`}
+      />
+      <span className="mt-1 block text-[13px] font-normal text-[#65746A]">This note is recorded with the decision.</span>
+    </label>
+  )
+}
 
 function friendlyLoadWarning(warnings) {
   const areas = []
@@ -339,6 +378,7 @@ export default function AdminHostOperationsPage() {
     periodEnd: '',
   })
   const [payoutReference, setPayoutReference] = useState('')
+  const detailRef = useRef(null)
 
   const hospitalityQueue = useMemo(
     () => hospitalityRows(hospitalityApprovals),
@@ -375,21 +415,14 @@ export default function AdminHostOperationsPage() {
 
       const warnings = []
 
-      if (pendingKybResult.status === 'fulfilled') {
-        const draftCases =
-          draftKybResult.status === 'fulfilled' ? draftKybResult.value : []
+      // Keep any successfully loaded records visible if either queue fails.
+      const pendingCases = pendingKybResult.status === 'fulfilled' ? pendingKybResult.value : []
+      const draftCases = draftKybResult.status === 'fulfilled' ? draftKybResult.value : []
+      setKybCases([...pendingCases, ...draftCases].filter(
+        (item, index, rows) => rows.findIndex((candidate) => candidate.id === item.id) === index,
+      ))
 
-        const mergedCases = [
-          ...pendingKybResult.value,
-          ...draftCases,
-        ].filter(
-          (item, index, rows) =>
-            rows.findIndex((candidate) => candidate.id === item.id) === index,
-        )
-
-        setKybCases(mergedCases)
-      } else {
-        setKybCases([])
+      if (pendingKybResult.status === 'rejected') {
         warnings.push('Business verification queue could not be loaded.')
       }
 
@@ -512,39 +545,6 @@ export default function AdminHostOperationsPage() {
     ['draft', 'pending_approval', 'approved'].includes(item.status),
   ).length
 
-  const tabDefinitions = [
-    {
-      value: 'kyb',
-      label: 'Business approval',
-      count: kybCases.length,
-      description: 'Check Host business details and go-live requests.',
-    },
-    {
-      value: 'recipes',
-      label: 'Brand recipes',
-      count: brandRecipes.length,
-      description: 'Decide which brand recipes are ready for Recipe Review.',
-    },
-    ...(isRootSuperAdmin
-      ? [
-          {
-            value: 'hospitality',
-            label: 'Restaurant publishing approvals',
-            count: hospitalityCount,
-            description: 'Review restaurant recipes, dish information and important changes.',
-          },
-        ]
-      : []),
-    {
-      value: 'finance',
-      label: 'Finance & payouts',
-      count: pendingSettlements,
-      description: 'Prepare, approve and record Host payout settlements.',
-    },
-  ]
-
-  const activeTab = tabDefinitions.find((item) => item.value === tab) || tabDefinitions[0]
-
   async function run(action, message) {
     setBusy(true)
     setError('')
@@ -568,11 +568,22 @@ export default function AdminHostOperationsPage() {
     setSelectedId('')
     setReason('')
     setNotice('')
+    setTestOrderReference('')
+    setPayoutReference('')
+  }
+
+  function focusDetail() {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
+      window.requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
   }
 
   function chooseStandardItem(item) {
     setSelectedId(item.id)
     setReason('')
+    setTestOrderReference('')
+    setPayoutReference('')
+    focusDetail()
 
     if (tab === 'finance') {
       setSettlementForm((current) => ({
@@ -585,6 +596,11 @@ export default function AdminHostOperationsPage() {
   function chooseHospitalityItem(item) {
     setSelectedId(item.key)
     setReason('')
+    // A notification's focus parameter should not lock the reviewer to one request.
+    if (requestedFocus && requestedFocus !== item.key) {
+      setSearchParams({ tab: 'hospitality' })
+    }
+    focusDetail()
   }
 
   async function approveHospitality() {
@@ -651,147 +667,148 @@ export default function AdminHostOperationsPage() {
     )
   }
 
+  const workAreas = [
+    {
+      value: 'kyb', number: '01', name: 'Business approvals', shortName: 'Business',
+      subtitle: 'Verify business details and go-live requests',
+      count: kybCases.length, Icon: ShieldCheck,
+    },
+    {
+      value: 'recipes', number: '02', name: 'Brand recipes', shortName: 'Recipes',
+      subtitle: 'Review new brand recipe submissions',
+      count: brandRecipes.length, Icon: ChefHat,
+    },
+    ...(isRootSuperAdmin ? [{
+      value: 'hospitality', number: '03', name: 'Restaurant requests', shortName: 'Restaurants',
+      subtitle: 'Review restaurant recipes and changes',
+      count: hospitalityCount, Icon: Store,
+    }] : []),
+    {
+      value: 'finance', number: isRootSuperAdmin ? '04' : '03', name: 'Finance & payouts', shortName: 'Payouts',
+      subtitle: 'Approve settlements and record payments',
+      count: pendingSettlements, Icon: WalletCards,
+    },
+  ]
+
+  const currentArea = workAreas.find((item) => item.value === tab) || workAreas[0]
+  const nextActiveArea = workAreas.find((item) => item.value !== tab && item.count > 0) || null
+  const selectedAreaLoadFailed = loadWarnings.some((warning) => (
+    tab === 'kyb' ? /business verification|business-verification drafts/i.test(warning)
+      : tab === 'recipes' ? /brand recipe/i.test(warning)
+        : tab === 'hospitality' ? /restaurant approval/i.test(warning)
+          : /settlement/i.test(warning)
+  ))
+  const queueRows = tab === 'kyb'
+    ? kybCases
+    : tab === 'recipes'
+      ? brandRecipes
+      : tab === 'hospitality'
+        ? hospitalityQueue
+        : settlements
+  const queueTitle = tab === 'kyb'
+    ? 'Business requests'
+    : tab === 'recipes'
+      ? 'Brand submissions'
+      : tab === 'hospitality'
+        ? 'Restaurant requests'
+        : 'Payout records'
+  const selectQueueItem = tab === 'hospitality' ? chooseHospitalityItem : chooseStandardItem
+  const getQueueId = tab === 'hospitality' ? (item) => item.key : (item) => item.id
+  const getQueueTitle = tab === 'kyb'
+    ? (item) => item.legalEntityName || 'Business verification'
+    : tab === 'recipes'
+      ? (item) => `Brand recipe${item.marketCode ? ` · ${item.marketCode}` : ''}`
+      : tab === 'hospitality'
+        ? hospitalityTitle
+        : (item) => `Host payout · ${money(item.totals?.netPayableMinor, item.currency)}`
+  const getQueueMeta = tab === 'kyb'
+    ? (item) => `${businessReviewStatus(item.status)} · ${goLiveStatus(item.activationState)}`
+    : tab === 'recipes'
+      ? (item) => `${brandRecipeStatus(item.status)} · ${item.nominatedProductPackIds?.length || 0} linked products`
+      : tab === 'hospitality'
+        ? (item) => `${item.label} · ${hospitalityStatus(item)}`
+        : (item) => `${settlementStatus(item.status)} · ${item.lineCount || 0} orders`
+
   return (
     <AdminShell
       title="Host Business Operations"
-      description="Review Host business approval, brand recipes, restaurant requests and payouts from one place."
+      description="Business approvals, brand recipes, restaurant requests and payouts."
+      mobileStackHeader
       actions={
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="focus-ring inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700 disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
-          Refresh
+        <button type="button" onClick={load} disabled={loading || busy}
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#D9E2D8] bg-white px-4 text-[14px] font-semibold text-[#173F35] hover:bg-[#EEF4EE] disabled:opacity-50">
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
+          Refresh data
         </button>
       }
     >
-      <div className="min-h-[100svh] w-full bg-[#f6f4ee] pb-6 sm:pb-8">
-        <div className="border-b border-[#D7DDCF] bg-[#E7EDE3] px-4 py-3 sm:px-7"><Link className="font-semibold text-[#173F35] underline" to="/admin/host-listings">Review unified Host listing submissions →</Link></div>
-        <section className="border-b border-stone-200 bg-[#edf4f1]">
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_420px]">
-            <div className="px-4 py-3 sm:px-7 sm:py-7">
-              <p className="text-[11px] font-bold text-emerald-700 sm:text-xs">Host operations workspace</p>
-              <h2 className="mt-1 max-w-3xl font-black leading-tight text-stone-950 sm:mt-2 sm:text-3xl">
-                <span className="whitespace-nowrap text-[17px] sm:hidden">Review the request. Take action.</span>
-                <span className="hidden sm:inline">Review the request, then take the right action.</span>
+      <div className="-mx-2.5 -mt-2.5 min-w-0 bg-[#F7F6F2] pb-8 sm:-mx-5 sm:-mt-5 lg:mx-0 lg:mt-0">
+        <section className="border-b border-[#D8DED6] bg-[#FFFEFB] px-4 py-7 sm:px-8 sm:py-9 lg:px-9" aria-label="Host operations overview">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(250px,0.55fr)] lg:gap-10">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-[13px] font-semibold tracking-[0.04em] text-[#5F7668]">
+                <span className="h-2 w-2 rounded-full bg-[#B36948]" aria-hidden="true" /> HOST OPERATIONS / REVIEW DESK
+              </p>
+              <h2 className="mt-3 max-w-2xl text-[30px] font-semibold leading-[1.13] tracking-[-0.035em] text-[#173F35] sm:text-[38px] lg:text-[40px]">
+                Make the next decision with confidence.
               </h2>
-              <p className="mt-1 whitespace-nowrap text-xs leading-5 text-stone-600 sm:hidden">
-                Choose an area, review it, decide.
+              <p className="mt-3 max-w-xl text-[15px] leading-[1.65] text-[#5B6B61] sm:text-[16px]">
+                Open a work area, check the request and record your decision.
               </p>
-              <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-stone-600 sm:block">
-                This page brings Host approvals and payouts together. The summary is for reading; the work-area controls below are where you open a queue and take action.
-              </p>
+              <Link to="/admin/host-listings"
+                className="focus-ring mt-5 inline-flex min-h-11 items-center gap-2 border-b border-[#173F35] py-2 text-[15px] font-semibold text-[#173F35] transition hover:text-[#33745A]">
+                Unified listing approvals <ArrowRight size={17} aria-hidden="true" />
+              </Link>
             </div>
-
-            <div className="border-t border-stone-200 bg-white lg:border-l lg:border-t-0">
-              <div className="border-b border-stone-200 px-4 py-1.5 sm:px-5 sm:py-2.5">
-                <p className="text-[11px] font-bold text-stone-700 sm:text-xs">Queue overview</p>
-              </div>
-              <div className="grid grid-cols-2">
-                {[
-                  ['Business checks', kybCases.length],
-                  ['Brand recipes', brandRecipes.length],
-                  ['Restaurant requests', isRootSuperAdmin ? hospitalityCount : 0],
-                  ['Payout records', pendingSettlements],
-                ].map(([label, value], index) => (
-                  <div
-                    key={label}
-                    className={`px-4 py-2 sm:px-5 sm:py-4 ${index % 2 === 1 ? 'border-l border-stone-200' : ''} ${index >= 2 ? 'border-t border-stone-200' : ''}`}
-                  >
-                    <p className="text-lg font-black text-[#123f35] sm:text-2xl">{value}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold text-stone-500 sm:text-xs">{label}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="flex flex-col justify-center border-t border-[#DCE3DA] pt-5 lg:border-l lg:border-t-0 lg:pl-9 lg:pt-0">
+              <p className="text-[13px] font-semibold tracking-[0.04em] text-[#65786D]">REQUESTS IN YOUR WORKSPACE</p>
+              <p className="mt-1 text-[54px] font-semibold leading-none tracking-[-0.06em] text-[#173F35]">
+                {workAreas.reduce((total, area) => total + area.count, 0)}
+              </p>
+              {workAreas.some((area) => area.count > 0) ? (
+                <div className="mt-4 border-t border-[#DDE4DB] pt-3">
+                  <p className="text-[13px] font-medium text-[#66776C]">Ready to open</p>
+                  <button type="button" onClick={() => chooseTab(workAreas.find((area) => area.count > 0).value)}
+                    className="focus-ring mt-1 inline-flex min-h-10 items-center gap-2 text-left text-[15px] font-semibold text-[#173F35] underline decoration-[#A9C2B0] underline-offset-4 hover:decoration-[#173F35]">
+                    {workAreas.find((area) => area.count > 0).name} <ArrowRight size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-3 text-[15px] leading-6 text-[#65746A]">No requests are waiting in these queues.</p>
+              )}
             </div>
           </div>
-
-          <div className="grid grid-cols-2 border-t border-stone-200 bg-[#123f35] text-white lg:grid-cols-4">
-            {[
-              ['01', 'Choose a work area', 'Open the right queue.'],
-              ['02', 'Open a request', 'Choose the item to review.'],
-              ['03', 'Check the details', 'Confirm what needs attention.'],
-              ['04', 'Take action', 'Approve, return or record payment.'],
-            ].map(([number, title, copy], index) => (
-              <div
-                key={number}
-                className={`px-4 py-2.5 sm:px-6 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l lg:border-white/15' : ''}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-black text-emerald-100">{number}</span>
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" />
-                </div>
-                <p className="mt-1 text-xs font-bold sm:mt-1.5 sm:text-sm">{title}</p>
-                <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-emerald-50/75 sm:text-xs sm:leading-5">{copy}</p>
-              </div>
-            ))}
+          <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#E1E5DE] pt-4 text-[13px] font-medium text-[#526A5D] sm:gap-x-8 sm:text-[14px]" aria-label="Review workflow">
+            <span><strong className="mr-2 font-semibold text-[#B36948]">01</strong>Choose an area</span>
+            <span><strong className="mr-2 font-semibold text-[#B36948]">02</strong>Check the request</span>
+            <span><strong className="mr-2 font-semibold text-[#B36948]">03</strong>Record the decision</span>
           </div>
         </section>
 
-        <section className="border-b border-stone-300 bg-[#f8f7f3]">
-          <div className="px-4 py-2.5 sm:hidden">
-            <label className="block text-xs font-bold text-stone-700">
-              Open a work area
-              <select
-                value={tab}
-                onChange={(event) => chooseTab(event.target.value)}
-                className={`${inputClass} mt-1.5 bg-white font-bold text-stone-800`}
-              >
-                {tabDefinitions.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label} ({item.count})
-                  </option>
-                ))}
-              </select>
-            </label>
+        <section className="px-4 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-10 lg:px-9" aria-label="Host operation work areas">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-semibold text-[#A45E40]">01 / WORK AREAS</p>
+              <h2 className="mt-1 text-[26px] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[29px]">Choose what to review</h2>
+            </div>
+            <p className="text-[14px] leading-5 text-[#65746A]">Select a work area to open its queue.</p>
           </div>
-
-          <div className="hidden border-b border-stone-200 px-7 py-4 sm:block">
-            <h2 className="text-lg font-black text-stone-950">Open a work area</h2>
-          </div>
-
-          <div className="hidden sm:grid sm:grid-cols-2 xl:grid-cols-4">
-            {tabDefinitions.map((item, index) => {
-              const isActive = tab === item.value
-              const Icon = item.value === 'kyb'
-                ? ShieldCheck
-                : item.value === 'recipes'
-                  ? ChefHat
-                  : item.value === 'hospitality'
-                    ? Store
-                    : WalletCards
-
+          <div className={`grid grid-cols-2 overflow-hidden border border-[#D4DDD4] bg-[#FFFEFB] ${isRootSuperAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`} role="group" aria-label="Choose a review queue">
+            {workAreas.map((area, index) => {
+              const Icon = area.Icon
+              const active = tab === area.value
               return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => chooseTab(item.value)}
-                  aria-pressed={isActive}
-                  className={`focus-ring group relative min-w-0 border-b border-stone-200 px-5 py-5 text-left transition xl:border-b-0 ${index % 2 === 1 ? 'sm:border-l' : ''} ${index > 1 ? 'sm:border-t xl:border-t-0' : ''} ${index > 0 ? 'xl:border-l' : ''} ${isActive ? 'bg-[#123f35] text-white' : 'bg-white text-stone-900 hover:bg-[#eef5f2]'}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className={`grid h-10 w-10 shrink-0 place-items-center border ${isActive ? 'border-white/20 bg-white/10 text-emerald-100' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
-                      <Icon size={18} aria-hidden="true" />
-                    </span>
-
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center justify-between gap-3">
-                        <span className="text-base font-black">{item.label}</span>
-                        <span className={`inline-flex min-w-7 shrink-0 items-center justify-center rounded-full px-2 py-1 text-[11px] font-black ${isActive ? 'bg-white text-[#123f35]' : 'bg-stone-100 text-stone-700'}`}>
-                          {item.count}
-                        </span>
-                      </span>
-                      <span className={`mt-1.5 block line-clamp-2 text-xs leading-5 ${isActive ? 'text-emerald-50/80' : 'text-stone-500'}`}>
-                        {item.description}
-                      </span>
-                    </span>
-                  </div>
-
-                  <span className={`mt-3 inline-flex items-center gap-1.5 text-xs font-black ${isActive ? 'text-white' : 'text-[#315f7a] group-hover:text-emerald-800'}`}>
-                    {isActive ? 'Workspace open' : 'Open workspace'}
-                    <ArrowRight size={14} aria-hidden="true" />
+                <button key={area.value} type="button" onClick={() => chooseTab(area.value)} aria-pressed={active}
+                  className={`focus-ring group relative min-w-0 border-b border-[#E1E6DE] p-4 text-left transition last:border-b-0 sm:p-5 lg:border-b-0 ${index % 2 === 0 && index !== workAreas.length - 1 ? 'border-r border-[#E1E6DE]' : ''} ${index < workAreas.length - 1 ? 'lg:border-r lg:border-[#E1E6DE]' : 'lg:border-r-0'} ${active ? 'bg-[#E8EFE8]' : 'bg-[#FFFEFB] hover:bg-[#F3F5F0]'}`}>
+                  <span className={`absolute inset-x-0 top-0 h-[3px] ${active ? 'bg-[#173F35]' : 'bg-transparent'}`} aria-hidden="true" />
+                  <span className="flex items-center justify-between gap-2">
+                    <Icon size={19} className="text-[#426858]" aria-hidden="true" />
+                    <span className={`min-w-9 px-2 py-1 text-center text-[18px] font-semibold tabular-nums ${area.count > 0 ? 'bg-[#173F35] text-white' : 'bg-[#F0F2EE] text-[#516A5C]'}`}>{area.count}</span>
+                  </span>
+                  <span className="mt-6 block text-[16px] font-semibold leading-5 text-[#173F35] sm:text-[17px]">{area.name}</span>
+                  <span className="mt-1.5 hidden text-[13px] leading-5 text-[#67766C] sm:block">{area.subtitle}</span>
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#426958]">
+                    {active ? 'Currently viewing' : 'Open queue'} <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                   </span>
                 </button>
               )
@@ -800,701 +817,260 @@ export default function AdminHostOperationsPage() {
         </section>
 
         {error ? (
-          <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:px-7">
-            <div className="flex items-start gap-2">
-              <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <span>{error}</span>
-            </div>
+          <div role="alert" className="mx-3 mb-3 flex items-start gap-2 border-l-4 border-[#BE5541] bg-[#FFF1EB] px-4 py-3 text-[14px] font-medium leading-6 text-[#9F3A30] sm:mx-7 lg:mx-8">
+            <CircleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />{error}
           </div>
         ) : null}
-
         {loadWarnings.length ? (
-          <div className="border-b border-[#c8dbe6] bg-[#edf5f9] px-4 py-2 text-xs font-semibold leading-5 text-[#315f7a] sm:px-7 sm:py-3 sm:text-sm">
-            {friendlyLoadWarning(loadWarnings)}
+          <div role="status" className="mx-3 mb-3 flex items-start gap-2 border-l-4 border-[#4E82AA] bg-[#EDF5FB] px-4 py-3 text-[14px] leading-6 text-[#315E4B] sm:mx-7 lg:mx-8">
+            <CircleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{friendlyLoadWarning(loadWarnings)}</span>
           </div>
         ) : null}
-
         {notice ? (
-          <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 sm:px-7">
-            {notice}
+          <div role="status" className="mx-3 mb-3 flex items-start gap-2 border-l-4 border-[#3B9468] bg-[#E5F4E8] px-4 py-3 text-[14px] font-semibold leading-6 text-[#175D3B] sm:mx-7 lg:mx-8">
+            <BadgeCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />{notice}
           </div>
         ) : null}
 
-        {loading ? (
-          <div className="grid min-h-[38svh] place-items-center">
-            <div className="flex items-center gap-2 text-sm font-semibold text-stone-600">
-              <LoaderCircle className="animate-spin text-emerald-700" size={18} aria-hidden="true" />
-              Loading Host operations…
-            </div>
-          </div>
-        ) : tab === 'kyb' ? (
-          <section className="border-b border-stone-200 bg-white">
-            <div className="border-b border-emerald-900/10 bg-[#e5f1ec] px-4 py-3 sm:px-7 sm:py-5">
-              <p className="text-xs font-bold text-emerald-700">Business approval</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="font-black text-stone-950">
-                    <span className="text-lg sm:hidden">Review business approval</span>
-                    <span className="hidden text-xl sm:inline">Review a Host business before it can go live</span>
-                  </h2>
-                  <p className="mt-1 text-xs leading-5 text-stone-600 sm:text-sm">
-                    <span className="sm:hidden">Check the business, then approve it to go live.</span>
-                    <span className="hidden sm:inline">Check the business details first. If the Host later asks to go live, complete that approval here too.</span>
-                  </p>
-                </div>
-                <p className="shrink-0 text-sm font-bold text-emerald-800">{kybCases.length} open</p>
+        <section className="px-4 pt-1 sm:px-8 lg:px-9" aria-label="Selected Host operations queue">
+          <div className="overflow-hidden border border-[#D4DDD4] bg-[#FFFEFB]">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#D5DED5] bg-[#EBF0EA] px-5 py-6 sm:px-7 sm:py-7">
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-[#597467]">02 / {currentArea.name.toUpperCase()}</p>
+                <h2 className="mt-1 text-[25px] font-semibold leading-tight tracking-[-0.03em] text-[#173F35] sm:text-[29px]">
+                  {tab === 'kyb' ? 'Check the Host business' : tab === 'recipes' ? 'Review brand submissions' : tab === 'hospitality' ? 'Review restaurant updates' : 'Review Host payouts'}
+                </h2>
+                <p className="mt-1.5 text-[15px] leading-6 text-[#5F7467]">{currentArea.subtitle}.</p>
               </div>
+              <span className="shrink-0 border-l border-[#B7C8BA] pl-4 text-[15px] font-semibold text-[#173F35]">
+                {queueRows.length} {queueRows.length === 1 ? 'record' : 'records'}
+              </span>
             </div>
 
-            <div className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-              <aside className="border-b border-stone-200 lg:border-b-0 lg:border-r">
-                <div className="px-4 py-3 sm:hidden">
-                  <label className="text-xs font-bold text-stone-600">
-                    Choose a business
-                    <select
-                      value={selectedId}
-                      onChange={(event) => {
-                        const item = kybCases.find((row) => row.id === event.target.value)
-                        if (item) chooseStandardItem(item)
-                      }}
-                      className={`${inputClass} mt-2`}
-                    >
-                      <option value="">Select business</option>
-                      {kybCases.map((item) => (
-                        <option key={item.id} value={item.id}>{item.legalEntityName || 'Business verification'}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="hidden sm:block">
-                  <QueueRows
-                    rows={kybCases}
-                    selectedId={selectedId}
-                    onSelect={chooseStandardItem}
-                    emptyTitle="No business requests need attention."
-                    emptyText="Saved business details, submitted reviews and go-live requests appear here when they need attention."
-                    getId={(item) => item.id}
-                    getTitle={(item) => item.legalEntityName || 'Business verification'}
-                    getMeta={(item) => `${businessReviewStatus(item.status)} · ${goLiveStatus(item.activationState)}`}
-                  />
-                </div>
-              </aside>
-
-              <div className="min-w-0 px-4 py-4 sm:px-7 sm:py-6">
-                {selected ? (
-                  <div className="w-full">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-bold text-emerald-700">Business under review</p>
-                        <h3 className="mt-1 text-2xl font-black text-stone-950">{selected.legalEntityName || 'Business verification'}</h3>
-                      </div>
-                      <span className="text-xs font-bold text-stone-500">{businessReviewStatus(selected.status)}</span>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 border-y border-stone-200 sm:mt-5 sm:grid-cols-4">
-                      {[
-                        ['Business type', titleize(selected.businessType)],
-                        ['Country', selected.jurisdictionCountryCode || 'Not added'],
-                        ['Tax registration', selected.taxRegistration?.registrationType || 'Not added'],
-                        ['Tax reference', selected.taxRegistration?.last4 ? `•••• ${selected.taxRegistration.last4}` : 'Not added'],
-                      ].map(([label, value], index) => (
-                        <div key={label} className={`py-3 ${index % 2 === 1 ? 'border-l border-stone-200 pl-3' : ''} ${index >= 2 ? 'border-t border-stone-200 sm:border-t-0' : ''} ${index === 2 ? 'sm:border-l sm:pl-3' : ''}`}>
-                          <p className="text-[10px] font-bold text-stone-400">{label}</p>
-                          <p className="mt-1 text-sm font-bold text-stone-800">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {selected.status === 'draft' ? (
-                      <p className="mt-4 border-l-4 border-[#7da9c2] bg-[#edf5f9] px-3 py-2.5 text-xs font-semibold leading-5 text-[#315f7a] sm:text-sm">
-                        The Host is still preparing these details. Review actions become available after submission.
-                      </p>
-                    ) : null}
-
-                    <label className="mt-4 block text-xs font-bold text-stone-700 sm:mt-5">
-                      Review note
-                      <textarea
-                        rows={3}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                        placeholder="Explain the approval or what the Host needs to change"
-                        className={`${inputClass} mt-2`}
-                      />
-                    </label>
-
-                    {canMarketplaceMutate && ['submitted', 'needs_information'].includes(selected.status) ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={busy || reason.trim().length < 3}
-                          onClick={() =>
-                            run(
-                              () => decideAdminHostKyb(selected.id, { decision: 'approved', reason }),
-                              'Business details approved. Go-live will be reviewed when the Host requests it.',
-                            )
-                          }
-                          className="focus-ring rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                        >
-                          Approve business details
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy || reason.trim().length < 3}
-                          onClick={() =>
-                            run(
-                              () => decideAdminHostKyb(selected.id, { decision: 'needs_information', reason }),
-                              'More business details requested from the Host.',
-                            )
-                          }
-                          className="focus-ring rounded-lg border border-[#bfd3df] bg-[#edf5f9] px-4 py-2.5 text-xs font-bold text-[#315f7a] disabled:opacity-50"
-                        >
-                          Request more details
-                        </button>
-                      </div>
-                    ) : null}
-
-                    <div className="mt-5 border-t border-stone-200 pt-4 sm:mt-6 sm:pt-5">
-                      <div className="flex items-center gap-2 text-[#315f7a]">
-                        <ShieldCheck size={16} aria-hidden="true" />
-                        <p className="text-sm font-bold">Go-live approval</p>
-                      </div>
-                      <p className="mt-2 text-sm text-stone-600">
-                        Business details: <strong>{businessReviewStatus(selected.status)}</strong> · Access: <strong>{goLiveStatus(selected.activationState)}</strong>
-                      </p>
-                      {selected.activationReview?.requestedAt ? (
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-500 sm:text-sm">
-                          The Host asked to go live. {selected.activationReview?.reason || ''}
-                        </p>
-                      ) : null}
-
-                      <input
-                        value={testOrderReference}
-                        onChange={(event) => setTestOrderReference(event.target.value)}
-                        placeholder="Verified test order or reference"
-                        className={`${inputClass} mt-3 max-w-xl`}
-                      />
-
-                      {canMarketplaceMutate && selected.status === 'approved' && selected.activationState === 'pending_review' ? (
-                        <button
-                          type="button"
-                          disabled={busy || reason.trim().length < 3 || !testOrderReference.trim()}
-                          onClick={() =>
-                            run(
-                              () =>
-                                decideAdminHostActivation(selected.organizationId, {
-                                  decision: 'activate',
-                                  reason,
-                                  testOrderReference,
-                                }),
-                              'Host business approved to go live for operations.',
-                            )
-                          }
-                          className="focus-ring mt-3 inline-flex items-center gap-2 rounded-lg bg-[#173b4f] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                        >
-                          <ShieldCheck size={14} aria-hidden="true" />
-                          Approve go-live
-                        </button>
-                      ) : selected.activationState === 'active' ? (
-                        <p className="mt-3 text-sm font-bold text-emerald-700">This Host business is live and approved.</p>
-                      ) : selected.status !== 'approved' ? (
-                        <p className="mt-3 text-xs font-semibold text-stone-500">Approve the business details before go-live can be reviewed.</p>
-                      ) : (
-                        <p className="mt-3 text-xs font-semibold text-stone-500">The business is approved. Waiting for the Host to request go-live.</p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-4 sm:py-6">
-                    <p className="text-sm font-bold text-stone-800">Choose a business to review.</p>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">Business requests will appear here when a Host saves, submits or asks to go live.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        ) : tab === 'recipes' ? (
-          <section className="bg-white">
-            <div className="border-b border-stone-200 bg-[#e8f1f6] px-4 py-3 sm:px-7 sm:py-5">
-              <p className="text-xs font-bold text-[#315f7a]">Brand recipe review</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="font-black text-stone-950">
-                    <span className="text-lg sm:hidden">Review brand recipes</span>
-                    <span className="hidden text-xl sm:inline">Decide which brand recipes can move to Recipe Review</span>
-                  </h2>
-                  <p className="mt-1 text-xs leading-5 text-stone-600 sm:text-sm">
-                    <span className="sm:hidden">Send ready recipes to Recipe Review or return them.</span>
-                    <span className="hidden sm:inline">Check what the brand submitted. Send a ready recipe to Recipe Review or return it with clear changes.</span>
-                  </p>
-                </div>
-                <p className="shrink-0 text-sm font-bold text-[#315f7a]">{brandRecipes.length} open</p>
-              </div>
-            </div>
-
-            <div className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-              <aside className="border-b border-stone-200 lg:border-b-0 lg:border-r">
-                <div className="px-4 py-3 sm:hidden">
-                  <label className="text-xs font-bold text-stone-600">
-                    Choose a brand recipe
-                    <select
-                      value={selectedId}
-                      onChange={(event) => {
-                        const item = brandRecipes.find((row) => row.id === event.target.value)
-                        if (item) chooseStandardItem(item)
-                      }}
-                      className={`${inputClass} mt-2`}
-                    >
-                      <option value="">Select brand recipe</option>
-                      {brandRecipes.map((item, index) => (
-                        <option key={item.id} value={item.id}>Brand recipe {index + 1}{item.marketCode ? ` · ${item.marketCode}` : ''}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="hidden sm:block">
-                  <QueueRows
-                    rows={brandRecipes}
-                    selectedId={selectedId}
-                    onSelect={chooseStandardItem}
-                    emptyTitle="No brand recipes need review."
-                    emptyText="New brand recipes appear here after a brand submits them for Super Admin review."
-                    getId={(item) => item.id}
-                    getTitle={(item, index) => `Brand recipe submission`}
-                    getMeta={(item) => `${brandRecipeStatus(item.status)}${item.marketCode ? ` · ${item.marketCode}` : ''}`}
-                  />
-                </div>
-              </aside>
-
-              <div className="min-w-0 px-4 py-4 sm:px-7 sm:py-6">
-                {selected ? (
-                  <div className="w-full">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-bold text-[#315f7a]">Brand recipe under review</p>
-                        <h3 className="mt-1 text-2xl font-black text-stone-950">Review the brand recipe</h3>
-                        <p className="mt-1 text-xs text-stone-500">Market {selected.marketCode || 'not set'} · {selected.nominatedProductPackIds?.length || 0} linked products</p>
-                      </div>
-                      <span className="text-xs font-bold text-stone-500">{brandRecipeStatus(selected.status)}</span>
-                    </div>
-
-                    <div className="mt-5 border-y border-stone-200 py-4">
-                      <p className="text-xs font-bold text-stone-500">What the brand submitted</p>
-                      <p className="mt-1 text-sm leading-6 text-stone-800">{selected.nominationDisclosure || 'No disclosure was provided.'}</p>
-                    </div>
-
-                    <label className="mt-4 block text-xs font-bold text-stone-700 sm:mt-5">
-                      Review note
-                      <textarea
-                        rows={3}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                        placeholder="Explain why it is ready or what the brand needs to change"
-                        className={`${inputClass} mt-2`}
-                      />
-                    </label>
-
-                    {canRecipeMutate ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={busy || reason.trim().length < 3}
-                          onClick={() =>
-                            run(
-                              () => reviewAdminBrandRecipe(selected.id, { decision: 'accept_for_governance', reason }),
-                              'Brand recipe sent to Recipe Review. It is not published yet.',
-                            )
-                          }
-                          className="focus-ring rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                        >
-                          Send to Recipe Review
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy || reason.trim().length < 3}
-                          onClick={() =>
-                            run(
-                              () => reviewAdminBrandRecipe(selected.id, { decision: 'request_changes', reason }),
-                              'Brand recipe returned for changes.',
-                            )
-                          }
-                          className="focus-ring rounded-lg border border-[#bfd3df] bg-[#edf5f9] px-4 py-2.5 text-xs font-bold text-[#315f7a] disabled:opacity-50"
-                        >
-                          Return for changes
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="py-4 sm:py-6">
-                    <p className="text-sm font-bold text-stone-800">Choose a brand recipe to review.</p>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">Submitted brand recipes will appear here automatically.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        ) : tab === 'hospitality' ? (
-          <section className="bg-white">
-            <div className="border-b border-stone-200 bg-[#eeeaf7] px-4 py-3 sm:px-7 sm:py-5">
-              <p className="text-xs font-bold text-[#5b4b85]">Restaurant publishing approvals</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="font-black text-stone-950">
-                    <span className="text-lg sm:hidden">Review restaurant updates</span>
-                    <span className="hidden text-xl sm:inline">Review restaurant content before customers can see it</span>
-                  </h2>
-                  <p className="mt-1 text-xs leading-5 text-stone-600 sm:text-sm">
-                    <span className="sm:hidden">Approve restaurant content before customers can see it.</span>
-                    <span className="hidden sm:inline">Check restaurant recipes, dish information and important changes when they need Super Admin approval.</span>
-                  </p>
-                </div>
-                <p className="shrink-0 text-sm font-bold text-[#5b4b85]">{hospitalityCount} open</p>
-              </div>
-            </div>
-
-            <div className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-              <aside className="border-b border-stone-200 lg:border-b-0 lg:border-r">
-                <div className="px-4 py-3 sm:hidden">
-                  <label className="text-xs font-bold text-stone-600">
-                    Choose a restaurant request
-                    <select
-                      value={selectedId}
-                      onChange={(event) => {
-                        const item = hospitalityQueue.find((row) => row.key === event.target.value)
-                        if (item) chooseHospitalityItem(item)
-                      }}
-                      className={`${inputClass} mt-2`}
-                    >
-                      <option value="">Select restaurant request</option>
-                      {hospitalityQueue.map((item) => (
-                        <option key={item.key} value={item.key}>{hospitalityTitle(item)} · {item.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="hidden sm:block">
-                  <QueueRows
-                    rows={hospitalityQueue}
-                    selectedId={selectedId}
-                    onSelect={chooseHospitalityItem}
-                    emptyTitle="No restaurant requests need approval."
-                    emptyText="Restaurant recipes, dish information and important changes appear here when they need approval."
-                    getId={(item) => item.key}
-                    getTitle={hospitalityTitle}
-                    getMeta={(item) => `${item.label} · ${hospitalityStatus(item)}`}
-                  />
-                </div>
-              </aside>
-
-              <div className="min-w-0 px-4 py-4 sm:px-7 sm:py-6">
-                {selected ? (
-                  <div className="w-full">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-bold text-[#5b4b85]">Restaurant request under review</p>
-                        <h3 className="mt-1 text-2xl font-black text-stone-950">{hospitalityTitle(selected)}</h3>
-                        <p className="mt-1 text-xs text-stone-500">{selected.item.organizationName || 'Restaurant business'} · {selected.label}</p>
-                      </div>
-                      <span className="text-xs font-bold text-stone-500">{hospitalityStatus(selected)}</span>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 border-y border-stone-200 sm:mt-5 sm:grid-cols-4">
-                      {[
-                        ['Type', selected.label],
-                        ['Restaurant', selected.item.organizationName || 'Not provided'],
-                        ['Outlet', selected.item.outletName || selected.item.snapshot?.outlet?.name || 'Not provided'],
-                        ['Status', hospitalityStatus(selected)],
-                      ].map(([label, value], index) => (
-                        <div key={label} className={`py-3 ${index % 2 === 1 ? 'border-l border-stone-200 pl-3' : ''} ${index >= 2 ? 'border-t border-stone-200 sm:border-t-0' : ''} ${index === 2 ? 'sm:border-l sm:pl-3' : ''}`}>
-                          <p className="text-[10px] font-bold text-stone-400">{label}</p>
-                          <p className="mt-1 line-clamp-2 text-sm font-bold text-stone-800">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {selected.kind === 'change_case' && selected.item.status === 'blocked' ? (
-                      <p className="mt-4 border-l-4 border-rose-400 bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-700 sm:text-sm">
-                        This change still has a safety or verification problem. The Host must fix it before approval is available.
-                      </p>
-                    ) : (
-                      <>
-                        <label className="mt-4 block text-xs font-bold text-stone-700 sm:mt-5">
-                          Review note
-                          <textarea
-                            rows={3}
-                            value={reason}
-                            onChange={(event) => setReason(event.target.value)}
-                            placeholder="Explain why this is approved or what needs to change"
-                            className={`${inputClass} mt-2`}
-                          />
-                        </label>
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            disabled={busy || reason.trim().length < 10}
-                            onClick={approveHospitality}
-                            className="focus-ring inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                          >
-                            <BadgeCheck size={14} aria-hidden="true" />
-                            Approve
-                          </button>
-                          {selected.kind === 'restaurant_recipe' ? (
-                            <button
-                              type="button"
-                              disabled={busy || reason.trim().length < 10}
-                              onClick={returnHospitalityRecipe}
-                              className="focus-ring rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 disabled:opacity-50"
-                            >
-                              Return for changes
-                            </button>
-                          ) : null}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="py-4 sm:py-6">
-                    <p className="text-sm font-bold text-stone-800">Choose a restaurant request to review.</p>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">Requests appear here when a restaurant needs Super Admin approval.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        ) : (
-          <section className="bg-white">
-            <div className="border-b border-stone-200 bg-[#eaf0f4] px-4 py-3 sm:px-7 sm:py-5">
-              <p className="text-xs font-bold text-[#315f7a]">Host payout review</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="font-black text-stone-950">
-                    <span className="text-lg sm:hidden">Review Host payouts</span>
-                    <span className="hidden text-xl sm:inline">Prepare and approve Host payouts</span>
-                  </h2>
-                  <p className="mt-1 text-xs leading-5 text-stone-600 sm:text-sm">
-                    <span className="sm:hidden">Create, approve and record Host payouts.</span>
-                    <span className="hidden sm:inline">Create a payout proposal from eligible orders, review the amount, then record the payment after it is completed.</span>
-                  </p>
-                </div>
-                <p className="shrink-0 text-sm font-bold text-[#315f7a]">{settlements.length} payout records</p>
-              </div>
-            </div>
-
-            {canFinanceMutate ? (
-              <form
-                className="border-b border-stone-200 px-4 py-4 sm:px-7 sm:py-5"
-                onSubmit={(event) => {
+            {tab === 'finance' && canFinanceMutate ? (
+              <details className="group border-b border-[#DDE5DE] bg-[#F5F7F2]">
+                <summary className="focus-ring flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-[15px] font-bold text-[#173F35] sm:px-6 [&::-webkit-details-marker]:hidden">
+                  <span className="flex items-center gap-2"><WalletCards size={19} aria-hidden="true" /> Create a payout proposal</span>
+                  <span className="text-[23px] leading-none group-open:hidden">+</span><span className="hidden text-[23px] leading-none group-open:block">−</span>
+                </summary>
+                <form className="border-t border-[#DDE5DE] px-4 py-5 sm:px-6" onSubmit={(event) => {
                   event.preventDefault()
-                  run(
-                    () =>
-                      createAdminSettlement({
-                        organizationId: settlementForm.organizationId,
-                        periodStart: new Date(settlementForm.periodStart).toISOString(),
-                        periodEnd: new Date(settlementForm.periodEnd).toISOString(),
-                        reason: reason || 'Periodic settlement reconciliation.',
-                      }),
-                    'Settlement proposal created. A different Finance Admin must approve it.',
-                  )
-                }}
-              >
-                <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">
-                  <label className="text-xs font-bold text-stone-600">
-                    Host business ID
-                    <input
-                      required
-                      className={`${inputClass} mt-2`}
-                      placeholder="Host business ID"
-                      value={settlementForm.organizationId}
-                      onChange={(event) => setSettlementForm((current) => ({ ...current, organizationId: event.target.value }))}
-                    />
-                  </label>
-                  <label className="text-xs font-bold text-stone-600">
-                    Payout period starts
-                    <input
-                      required
-                      type="date"
-                      className={`${inputClass} mt-2`}
-                      value={settlementForm.periodStart}
-                      onChange={(event) => setSettlementForm((current) => ({ ...current, periodStart: event.target.value }))}
-                    />
-                  </label>
-                  <label className="text-xs font-bold text-stone-600">
-                    Payout period ends
-                    <input
-                      required
-                      type="date"
-                      className={`${inputClass} mt-2`}
-                      value={settlementForm.periodEnd}
-                      onChange={(event) => setSettlementForm((current) => ({ ...current, periodEnd: event.target.value }))}
-                    />
-                  </label>
-                </div>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <label className="flex-1 text-xs font-bold text-stone-600">
-                    Reason for proposal
-                    <input
-                      className={`${inputClass} mt-2`}
-                      value={reason}
-                      onChange={(event) => setReason(event.target.value)}
-                      placeholder="Explain why this payout is being prepared"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className="focus-ring min-h-10 rounded-lg bg-[#173b4f] px-4 text-xs font-bold text-white disabled:opacity-50"
-                  >
-                    Create payout proposal
-                  </button>
-                </div>
-              </form>
+                  run(() => createAdminSettlement({
+                    organizationId: settlementForm.organizationId.trim(),
+                    periodStart: new Date(settlementForm.periodStart).toISOString(),
+                    periodEnd: new Date(settlementForm.periodEnd).toISOString(),
+                    reason: reason.trim() || 'Periodic settlement reconciliation.',
+                  }), 'Payout proposal created. A different Finance Admin must approve it.')
+                }}>
+                  <p className="mb-4 max-w-2xl text-[14px] leading-6 text-[#6C655D]">Create a payout from a Host organization and a completed date range. Another Finance Admin must approve it.</p>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <label className="text-[14px] font-semibold text-[#173F35]">Host organization ID
+                      <input required className={`${inputClass} mt-2`} placeholder="Organization ID" value={settlementForm.organizationId} onChange={(event) => setSettlementForm((current) => ({ ...current, organizationId: event.target.value }))} />
+                    </label>
+                    <label className="text-[14px] font-semibold text-[#173F35]">From date
+                      <input required type="date" className={`${inputClass} mt-2`} value={settlementForm.periodStart} onChange={(event) => setSettlementForm((current) => ({ ...current, periodStart: event.target.value }))} />
+                    </label>
+                    <label className="text-[14px] font-semibold text-[#173F35]">To date
+                      <input required type="date" min={settlementForm.periodStart || undefined} className={`${inputClass} mt-2`} value={settlementForm.periodEnd} onChange={(event) => setSettlementForm((current) => ({ ...current, periodEnd: event.target.value }))} />
+                    </label>
+                  </div>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label className="flex-1 text-[14px] font-semibold text-[#173F35]">Reason
+                      <input className={`${inputClass} mt-2`} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why is this payout being prepared?" />
+                    </label>
+                    <button type="submit" disabled={busy || !settlementForm.organizationId.trim() || !settlementForm.periodStart || !settlementForm.periodEnd || settlementForm.periodEnd <= settlementForm.periodStart} className={primaryButton}>Create proposal</button>
+                  </div>
+                </form>
+              </details>
             ) : null}
 
-            <div className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-              <aside className="border-b border-stone-200 lg:border-b-0 lg:border-r">
-                <div className="px-4 py-3 sm:hidden">
-                  <label className="text-xs font-bold text-stone-600">
-                    Choose a payout record
-                    <select
-                      value={selectedId}
-                      onChange={(event) => {
-                        const item = settlements.find((row) => row.id === event.target.value)
-                        if (item) chooseStandardItem(item)
-                      }}
-                      className={`${inputClass} mt-2`}
-                    >
-                      <option value="">Select payout record</option>
-                      {settlements.map((item, index) => (
-                        <option key={item.id} value={item.id}>Payout {index + 1} · {settlementStatus(item.status)}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="hidden sm:block">
-                  <QueueRows
-                    rows={settlements}
-                    selectedId={selectedId}
-                    onSelect={chooseStandardItem}
-                    emptyTitle="No payout records have been created yet."
-                    emptyText="Create a payout proposal when eligible Host orders are ready to be reconciled."
-                    getId={(item) => item.id}
-                    getTitle={(item) => `Host payout · ${money(item.totals?.netPayableMinor, item.currency)}`}
-                    getMeta={(item) => `${settlementStatus(item.status)} · ${item.lineCount || 0} orders`}
-                  />
-                </div>
-              </aside>
-
-              <div className="min-w-0 px-4 py-4 sm:px-7 sm:py-6">
-                {selected ? (
-                  <div className="w-full">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-bold text-[#315f7a]">Payout summary</p>
-                        <h3 className="mt-1 text-2xl font-black text-stone-950">{money(selected.totals?.netPayableMinor, selected.currency)}</h3>
-                        <p className="mt-1 text-xs text-stone-500">{selected.lineCount || 0} eligible orders · {settlementStatus(selected.status)}</p>
-                      </div>
-                      <WalletCards size={20} className="text-[#315f7a]" aria-hidden="true" />
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 border-y border-stone-200 sm:mt-5 sm:grid-cols-4">
-                      {[
-                        ['Status', settlementStatus(selected.status)],
-                        ['Orders', selected.lineCount || 0],
-                        ['Period start', selected.periodStart ? new Date(selected.periodStart).toLocaleDateString() : '—'],
-                        ['Period end', selected.periodEnd ? new Date(selected.periodEnd).toLocaleDateString() : '—'],
-                      ].map(([label, value], index) => (
-                        <div key={label} className={`py-3 ${index % 2 === 1 ? 'border-l border-stone-200 pl-3' : ''} ${index >= 2 ? 'border-t border-stone-200 sm:border-t-0' : ''} ${index === 2 ? 'sm:border-l sm:pl-3' : ''}`}>
-                          <p className="text-[10px] font-bold text-stone-400">{label}</p>
-                          <p className="mt-1 text-sm font-bold text-stone-800">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <label className="mt-4 block text-xs font-bold text-stone-700 sm:mt-5">
-                      Review note
-                      <textarea
-                        rows={3}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                        placeholder="Explain why this payout is approved or rejected"
-                        className={`${inputClass} mt-2`}
-                      />
-                    </label>
-
-                    {selected.status === 'pending_approval' && canFinanceMutate ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={busy || reason.trim().length < 3}
-                          onClick={() =>
-                            run(
-                              () => decideAdminSettlement(selected.id, { decision: 'approve', reason }),
-                              'Host payout approved by the reviewing Finance Admin.',
-                            )
-                          }
-                          className="focus-ring rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                        >
-                          Approve payout
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy || reason.trim().length < 3}
-                          onClick={() =>
-                            run(
-                              () => decideAdminSettlement(selected.id, { decision: 'reject', reason }),
-                              'Host payout rejected.',
-                            )
-                          }
-                          className="focus-ring rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 disabled:opacity-50"
-                        >
-                          Reject payout
-                        </button>
-                      </div>
-                    ) : null}
-
-                    {selected.status === 'approved' && canFinanceMutate ? (
-                      <div className="mt-5 border-t border-stone-200 pt-4">
-                        <p className="text-sm font-bold text-stone-900">Record the completed payment</p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-500 sm:text-sm">
-                          After the payment is completed outside this page, add its reference here to mark the payout complete.
-                        </p>
-                        <input
-                          className={`${inputClass} mt-3 max-w-xl`}
-                          value={payoutReference}
-                          onChange={(event) => setPayoutReference(event.target.value)}
-                          placeholder="Payment reference"
-                        />
-                        <button
-                          type="button"
-                          disabled={busy || !payoutReference.trim() || reason.trim().length < 3}
-                          onClick={() =>
-                            run(
-                              () => markAdminSettlementPaid(selected.id, { payoutReference, reason }),
-                              'Payment recorded and the Host payout marked complete.',
-                            )
-                          }
-                          className="focus-ring mt-3 rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                        >
-                          Record payment
-                        </button>
-                      </div>
-                    ) : null}
+            {loading ? (
+              <div className="flex min-h-64 items-center justify-center gap-3 text-[15px] font-medium text-[#496A59]" role="status">
+                <LoaderCircle size={22} className="animate-spin" aria-hidden="true" /> Loading Host requests…
+              </div>
+            ) : !queueRows.length ? (
+              <div className="flex flex-col gap-6 px-5 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-9">
+                <div className="flex min-w-0 items-start gap-4">
+                  <span className="mt-0.5 grid h-11 w-11 shrink-0 place-items-center border border-[#CCDCCF] bg-[#EDF3ED] text-[#3D7458]">
+                    <BadgeCheck size={23} aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-[20px] font-semibold leading-7 text-[#173F35]">
+                      {selectedAreaLoadFailed ? 'Unable to confirm this queue' : tab === 'kyb' ? 'No business approvals waiting' : tab === 'recipes' ? 'No brand recipes waiting' : tab === 'hospitality' ? 'No restaurant requests waiting' : 'No payout records yet'}
+                    </h3>
+                    <p className="mt-1 max-w-xl text-[15px] leading-6 text-[#62756A]">
+                      {selectedAreaLoadFailed ? 'Some records may be missing. Refresh to try loading them again.' : tab === 'kyb' ? 'New business checks and go-live requests will appear here.' : tab === 'recipes' ? 'New submissions will appear when Hosts submit brand recipes.' : tab === 'hospitality' ? 'New restaurant changes and recipe requests will appear here.' : 'Create or review payout proposals as they become available.'}
+                    </p>
                   </div>
+                </div>
+                {nextActiveArea ? (
+                  <button type="button" onClick={() => chooseTab(nextActiveArea.value)}
+                    className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start border border-[#173F35] bg-[#173F35] px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-[#28624A] sm:self-center">
+                    Open {nextActiveArea.shortName.toLowerCase()} ({nextActiveArea.count}) <ArrowRight size={17} aria-hidden="true" />
+                  </button>
                 ) : (
-                  <div className="py-4 sm:py-6">
-                    <p className="text-sm font-bold text-stone-800">Choose a payout record to review.</p>
-                    <p className="mt-1 text-xs leading-5 text-stone-500">Payout records will appear here after a proposal is created.</p>
-                  </div>
+                  <button type="button" onClick={load} disabled={loading || busy}
+                    className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start border border-[#CBD8CD] px-4 py-2 text-[14px] font-semibold text-[#173F35] hover:bg-[#F1F4EF] disabled:opacity-50 sm:self-center">
+                    <RefreshCw size={16} aria-hidden="true" /> Refresh requests
+                  </button>
                 )}
               </div>
-            </div>
-          </section>
-        )}
+            ) : (
+              <div className="grid lg:grid-cols-[minmax(280px,0.83fr)_minmax(0,1.65fr)]">
+                <aside className="min-w-0 border-b border-[#DCE3DB] lg:border-b-0 lg:border-r" aria-label={queueTitle}>
+                  <div className="flex items-center justify-between gap-3 border-b border-[#DDE5DD] bg-[#F3F5F1] px-4 py-4 sm:px-6">
+                    <h3 className="text-[17px] font-bold text-[#173F35]">{queueTitle}</h3>
+                    <span className="text-[13px] font-semibold text-[#496F59]">Select a request</span>
+                  </div>
+                  <QueueRows key={tab} rows={queueRows} selectedId={selectedId} onSelect={selectQueueItem}
+                    emptyTitle={tab === 'kyb' ? 'No business requests right now' : tab === 'recipes' ? 'No brand recipes waiting' : tab === 'hospitality' ? 'No restaurant requests right now' : 'No payout records yet'}
+                    emptyText={tab === 'kyb' ? 'Submitted business checks and go-live requests appear here.' : tab === 'recipes' ? 'New submissions appear after a brand sends a recipe for review.' : tab === 'hospitality' ? 'Restaurant approvals appear here as they are submitted.' : 'Create a proposal above when eligible Host orders are ready.'}
+                    getId={getQueueId} getTitle={getQueueTitle} getMeta={getQueueMeta} />
+                </aside>
+
+                <div ref={detailRef} className="min-w-0 scroll-mt-20 bg-[#FFFEFB] px-4 py-6 sm:px-7 sm:py-8 lg:px-9" aria-label="Request review details">
+                  {selected ? (
+                    <div>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-bold text-[#9B6047]">03 / SELECTED REQUEST</p>
+                          <h3 className="mt-1 break-words text-[24px] font-bold leading-tight tracking-[-0.03em] text-[#173F35] sm:text-[28px]">
+                            {tab === 'kyb' ? selected.legalEntityName || 'Business verification' : tab === 'recipes' ? 'Brand recipe submission' : tab === 'hospitality' ? hospitalityTitle(selected) : money(selected.totals?.netPayableMinor, selected.currency)}
+                          </h3>
+                          <p className="mt-1 text-[14px] leading-6 text-[#68766A]">
+                            {tab === 'kyb' ? businessReviewStatus(selected.status) : tab === 'recipes' ? brandRecipeStatus(selected.status) : tab === 'hospitality' ? hospitalityStatus(selected) : settlementStatus(selected.status)}
+                          </p>
+                        </div>
+                        <span className="border border-[#D2E1D3] bg-[#EDF4ED] px-3 py-1.5 text-[13px] font-semibold text-[#275A43]">Selected for review</span>
+                      </div>
+
+                      {tab === 'kyb' ? (
+                        <>
+                          <InformationGrid items={[
+                            ['Business type', titleize(selected.businessType)],
+                            ['Country', selected.jurisdictionCountryCode || 'Not provided'],
+                            ['Tax registration', selected.taxRegistration?.registrationType || 'Not provided'],
+                            ['Tax reference', selected.taxRegistration?.last4 ? `•••• ${selected.taxRegistration.last4}` : 'Not provided'],
+                          ]} />
+                          {selected.status === 'draft' ? (
+                            <p className="mt-5 rounded-xl bg-[#EDF3EF] px-4 py-3 text-[14px] leading-6 text-[#315E4B]">The Host is still preparing these details. Decisions become available after submission.</p>
+                          ) : null}
+                          <ReviewNote value={reason} onChange={setReason} placeholder={`Explain the decision for ${selected.legalEntityName || 'this business'}`} />
+                          {canMarketplaceMutate && ['submitted', 'needs_information'].includes(selected.status) ? (
+                            <div className="mt-4 flex flex-wrap gap-3">
+                              <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => run(() => decideAdminHostKyb(selected.id, { decision: 'approved', reason }), 'Business details approved. Go-live requires a separate Host request.')} className={primaryButton}>Approve business details</button>
+                              <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => run(() => decideAdminHostKyb(selected.id, { decision: 'needs_information', reason }), 'More business details requested from the Host.')} className={warningButton}>Request more details</button>
+                            </div>
+                          ) : null}
+                          <div className="mt-7 rounded-xl border border-[#CFDCD0] bg-[#EDF3EF] px-4 py-5 sm:px-5">
+                            <div className="flex items-center gap-2 text-[#315E4B]"><ShieldCheck size={19} aria-hidden="true" /><h4 className="text-[17px] font-bold">Go-live approval</h4></div>
+                            <p className="mt-2 text-[14px] leading-6 text-[#486759]">Business: <strong>{businessReviewStatus(selected.status)}</strong> · Access: <strong>{goLiveStatus(selected.activationState)}</strong></p>
+                            {selected.activationReview?.requestedAt ? (
+                              <p className="mt-2 text-[14px] leading-6 text-[#5E7165]">Host request: {selected.activationReview?.reason || 'Ready for review.'}</p>
+                            ) : null}
+                            {canMarketplaceMutate && selected.status === 'approved' && selected.activationState === 'pending_review' ? (
+                              <>
+                                <label className="mt-4 block text-[14px] font-semibold text-[#173F35]">Verified test order/reference
+                                  <input value={testOrderReference} onChange={(event) => setTestOrderReference(event.target.value)} placeholder="Enter the verified reference" className={`${inputClass} mt-2`} />
+                                </label>
+                                <p className="mt-2 text-[13px] leading-5 text-[#5E7165]">Add a review reason above, then confirm this Host can go live.</p>
+                                <button type="button" disabled={busy || reason.trim().length < 3 || !testOrderReference.trim()} onClick={() => run(() => decideAdminHostActivation(selected.organizationId, { decision: 'activate', reason, testOrderReference }), 'Host approved to go live.')} className={`${primaryButton} mt-4`}>Approve go-live</button>
+                              </>
+                            ) : selected.activationState === 'active' ? (
+                              <p className="mt-3 text-[14px] font-bold text-[#246E4C]">This Host business is live.</p>
+                            ) : selected.status !== 'approved' ? (
+                              <p className="mt-3 text-[14px] text-[#5E7165]">Approve the business details first.</p>
+                            ) : (
+                              <p className="mt-3 text-[14px] text-[#5E7165]">Waiting for the Host to request go-live.</p>
+                            )}
+                          </div>
+                        </>
+                      ) : tab === 'recipes' ? (
+                        <>
+                          <InformationGrid items={[
+                            ['Market', selected.marketCode || 'Not provided'],
+                            ['Linked products', selected.nominatedProductPackIds?.length || 0],
+                            ['Submission', brandRecipeStatus(selected.status)],
+                            ['Review stage', 'Recipe Review'],
+                          ]} />
+                          <div className="mt-5 border-l-[3px] border-[#AFC8B7] bg-[#F5F5F0] px-4 py-4">
+                            <p className="text-[14px] font-bold text-[#3D6651]">What the brand submitted</p>
+                            <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-6 text-[#403D38]">{selected.nominationDisclosure || 'No submission description provided.'}</p>
+                          </div>
+                          <ReviewNote value={reason} onChange={setReason} placeholder="Explain why this recipe is ready, or what must change" />
+                          {canRecipeMutate && selected.status === 'submitted' ? (
+                            <div className="mt-4 flex flex-wrap gap-3">
+                              <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => run(() => reviewAdminBrandRecipe(selected.id, { decision: 'accept_for_governance', reason }), 'Brand recipe sent to Recipe Review. It is not published yet.')} className={primaryButton}>Send to Recipe Review</button>
+                              <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => run(() => reviewAdminBrandRecipe(selected.id, { decision: 'request_changes', reason }), 'Brand recipe returned for changes.')} className={warningButton}>Return for changes</button>
+                            </div>
+                          ) : null}
+                        </>
+                      ) : tab === 'hospitality' ? (
+                        <>
+                          <InformationGrid items={[
+                            ['Request type', selected.label],
+                            ['Restaurant', selected.item.organizationName || 'Not provided'],
+                            ['Outlet', selected.item.outletName || selected.item.snapshot?.outlet?.name || 'Not provided'],
+                            ['Status', hospitalityStatus(selected)],
+                          ]} />
+                          {selected.kind === 'change_case' && selected.item.status === 'blocked' ? (
+                            <p className="mt-5 rounded-xl border border-[#DDA99E] bg-[#FFF1EB] px-4 py-3 text-[14px] leading-6 text-[#A04139]">This change has a safety or verification issue. The Host must fix it before approval.</p>
+                          ) : (
+                            <>
+                              <ReviewNote value={reason} onChange={setReason} placeholder={`Explain the decision for ${hospitalityTitle(selected)}`} />
+                              {isRootSuperAdmin ? (
+                                <div className="mt-4 flex flex-wrap gap-3">
+                                  <button type="button" disabled={busy || reason.trim().length < 10} onClick={approveHospitality} className={primaryButton}><BadgeCheck size={18} aria-hidden="true" /> Approve request</button>
+                                  {selected.kind === 'restaurant_recipe' ? (
+                                    <button type="button" disabled={busy || reason.trim().length < 10} onClick={returnHospitalityRecipe} className={warningButton}>Return for changes</button>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              <p className="mt-2 text-[13px] leading-5 text-[#68766A]">Restaurant decisions require a reason of at least 10 characters.</p>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <InformationGrid items={[
+                            ['Status', settlementStatus(selected.status)],
+                            ['Eligible orders', selected.lineCount || 0],
+                            ['From', selected.periodStart ? new Date(selected.periodStart).toLocaleDateString('en-IN') : 'Not provided'],
+                            ['To', selected.periodEnd ? new Date(selected.periodEnd).toLocaleDateString('en-IN') : 'Not provided'],
+                          ]} />
+                          <ReviewNote value={reason} onChange={setReason} placeholder="Explain the payout decision" />
+                          {selected.status === 'pending_approval' && canFinanceMutate ? (
+                            <div className="mt-4 flex flex-wrap gap-3">
+                              <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => run(() => decideAdminSettlement(selected.id, { decision: 'approve', reason }), 'Host payout approved.')} className={primaryButton}>Approve payout</button>
+                              <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => run(() => decideAdminSettlement(selected.id, { decision: 'reject', reason }), 'Host payout rejected.')} className={warningButton}>Reject payout</button>
+                            </div>
+                          ) : null}
+                          {selected.status === 'approved' && canFinanceMutate ? (
+                            <div className="mt-6 rounded-xl border border-[#CFDCD0] bg-[#EDF3EF] px-4 py-5 sm:px-5">
+                              <h4 className="text-[17px] font-bold text-[#315E4B]">Record completed payment</h4>
+                              <p className="mt-1 text-[14px] leading-6 text-[#5E7165]">After making the payment externally, record its reference to mark this payout as paid.</p>
+                              <label className="mt-4 block text-[14px] font-semibold text-[#173F35]">Payment reference
+                                <input className={`${inputClass} mt-2`} value={payoutReference} onChange={(event) => setPayoutReference(event.target.value)} placeholder="Enter the payment reference" />
+                              </label>
+                              <button type="button" disabled={busy || payoutReference.trim().length < 3 || reason.trim().length < 3} onClick={() => run(() => markAdminSettlementPaid(selected.id, { payoutReference, reason }), 'Payment recorded. Host payout marked complete.')} className={`${primaryButton} mt-4`}>Record payment</button>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex min-h-64 flex-col items-center justify-center py-8 text-center">
+                      <ShieldCheck size={28} className="text-[#6A987E]" aria-hidden="true" />
+                      <h3 className="mt-3 text-[20px] font-bold text-[#173F35]">Choose a request to begin</h3>
+                      <p className="mt-2 max-w-sm text-[14px] leading-6 text-[#68766A]">Select a record from the queue to see its details and available decisions.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </AdminShell>
   )
