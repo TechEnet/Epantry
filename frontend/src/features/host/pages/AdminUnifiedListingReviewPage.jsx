@@ -9,9 +9,6 @@ import AdminShell from '../../admin/components/AdminShell'
 import {
   listAdminHostListingPackets,
   reviewAdminHostListingPacket,
-  linkAdminHostListingCatalog,
-  createAdminHostListingCatalogDraft,
-  publishAdminHostListingCatalog,
 } from '../services/hostUnifiedListing.service'
 
 const correctionSections = [
@@ -158,9 +155,6 @@ export default function AdminUnifiedListingReviewPage() {
   const [selectedId, setSelectedId] = useState(focus || '')
   const [filter, setFilter] = useState('submitted_for_review')
   const [note, setNote] = useState('')
-  const [canonicalVersionId, setCanonicalVersionId] = useState('')
-  const [npiDraftId, setNpiDraftId] = useState('')
-  const [catalogCategory, setCatalogCategory] = useState('')
   const [section, setSection] = useState('details')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -201,40 +195,6 @@ export default function AdminUnifiedListingReviewPage() {
     window.addEventListener('keydown', onEscape)
     return () => window.removeEventListener('keydown', onEscape)
   }, [videoOpen])
-
-  async function attachPublishedCatalog() {
-    if (!selected || busy || !canonicalVersionId.trim()) return
-    setBusy(true); setError(''); setSuccess('')
-    try {
-      await linkAdminHostListingCatalog(selected.id, canonicalVersionId.trim())
-      setCanonicalVersionId('')
-      await load()
-      setSuccess('Published catalog product linked. The Host can set up an eligible Marketplace offer.')
-    } catch (cause) { setError(getError(cause)) }
-    finally { setBusy(false) }
-  }
-
-  async function createCatalogDraft() {
-    if (!selected || busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || catalogCategory.trim().length < 2) return
-    setBusy(true); setError(''); setSuccess('')
-    try {
-      await createAdminHostListingCatalogDraft(selected.id, { npiDraftId, categoryName: catalogCategory.trim() })
-      setCatalogCategory('')
-      setSuccess('Catalog draft created. Submit its product version for review in Catalog; then publish it here using the same evidence ID.')
-    } catch (cause) { setError(getError(cause)) }
-    finally { setBusy(false) }
-  }
-
-  async function publishReviewedProduct() {
-    if (!selected || busy || !/^[a-f0-9]{24}$/i.test(npiDraftId) || note.trim().length < 10) return
-    setBusy(true); setError(''); setSuccess('')
-    try {
-      await publishAdminHostListingCatalog(selected.id, { npiDraftId, reason: note.trim() })
-      await load()
-      setSuccess('Approved product published and linked. The Host can set stock, price and delivery in Listing Studio.')
-    } catch (cause) { setError(getError(cause)) }
-    finally { setBusy(false) }
-  }
 
   async function decide(decision) {
     if (!selected || busy || !awaitingDecision) return

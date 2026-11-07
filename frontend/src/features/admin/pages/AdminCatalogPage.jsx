@@ -104,14 +104,14 @@ function getDraftRows(result) {
   return Array.isArray(result?.drafts) ? result.drafts : [];
 }
 
-export default function AdminCatalogPage() {
+export default function AdminCatalogPage({ productOnly = false }) {
   const navigate = useNavigate();
   const { hasAdminPermission } = useAdmin();
 
   const canReadCatalog = hasAdminPermission("catalog.read");
   const canMutateCatalog = hasAdminPermission("catalog.mutate");
-  const canReadRecipes = hasAdminPermission("recipe.read");
-  const canMutateRecipes = hasAdminPermission("recipe.mutate");
+  const canReadRecipes = !productOnly && hasAdminPermission("recipe.read");
+  const canMutateRecipes = !productOnly && hasAdminPermission("recipe.mutate");
 
   const {
     versions,
@@ -629,7 +629,7 @@ export default function AdminCatalogPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 border-t border-white/15 sm:grid-cols-4">
+          <div className={`grid grid-cols-2 border-t border-white/15 ${productOnly ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}>
             {CATALOG_SECTIONS.map(([value, label, Icon], index) => {
               const selected = activeSection === value;
               const allowed = value === "recipe" ? canReadRecipes : canReadCatalog;

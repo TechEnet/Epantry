@@ -1042,7 +1042,7 @@ const HostBrandAuthorityPage = lazy(() => import('../features/brands/pages/HostB
 const HostDashboardPage = lazy(() => import('../features/host/pages/HostDashboardPage'))
 const HostListingWorkspacePage = lazy(() => import('../features/host/pages/HostListingWorkspacePage'))
 const HostUnifiedListingPage = lazy(() => import('../features/host/pages/HostUnifiedListingPage'))
-const AdminUnifiedListingReviewPage = lazy(() => import('../features/host/pages/AdminUnifiedListingReviewPage'))
+const AdminApprovalCenterPage = lazy(() => import('../features/admin/pages/AdminApprovalCenterPage'))
 const PublicApprovedHostListingsPage = lazy(() => import('../features/host/pages/PublicApprovedHostListingsPage'))
 const CountryExplorePage = lazy(() => import('../features/countries/pages/CountryExplorePage'))
 const SavedItemsPage = lazy(() => import('../features/bookmarks/pages/SavedItemsPage'))
@@ -1565,6 +1565,18 @@ function AdminPermissionBoundary({
   }
 
   return children
+}
+
+// Root Super Admin uses one integrated workspace. Delegated admins retain
+// their previously authorized standalone tools and role boundaries.
+function RootApprovalCenterRedirect({ tab, view, children }) {
+  const { isRootSuperAdmin } = useAdmin()
+  const location = useLocation()
+  if (!isRootSuperAdmin) return children
+  const params = new URLSearchParams(location.search)
+  params.set('tab', tab)
+  if (view) params.set('view', view)
+  return <Navigate to={`/admin/host-listings?${params.toString()}`} replace />
 }
 
 function AdminPermissionRoute({
@@ -3250,7 +3262,7 @@ export default function AppRoutes() {
                     'recipe.read',
                   ]}
                 >
-                  <AdminCatalogPage />
+                  <RootApprovalCenterRedirect tab="catalog"><AdminCatalogPage /></RootApprovalCenterRedirect>
                 </AdminPermissionRoute>
               }
             />
@@ -3305,7 +3317,7 @@ export default function AppRoutes() {
               path="/admin/recipes"
               element={
                 <AdminPermissionRoute permission="recipe.read">
-                  <AdminRecipesPage />
+                  <RootApprovalCenterRedirect tab="recipes"><AdminRecipesPage /></RootApprovalCenterRedirect>
                 </AdminPermissionRoute>
               }
             />
@@ -3319,7 +3331,7 @@ export default function AppRoutes() {
                     'recipe.read',
                   ]}
                 >
-                  <Navigate to="/admin/catalog" replace />
+                  <RootApprovalCenterRedirect tab="audit"><Navigate to="/admin/catalog" replace /></RootApprovalCenterRedirect>
                 </AdminPermissionRoute>
               }
             />
@@ -3342,7 +3354,7 @@ export default function AppRoutes() {
                     'trust_safety.read',
                   ]}
                 >
-                  <AdminGovernancePage section="recipeReview" />
+                  <RootApprovalCenterRedirect tab="recipes" view="review"><AdminGovernancePage section="recipeReview" /></RootApprovalCenterRedirect>
                 </AdminPermissionRoute>
               }
             />
@@ -3371,7 +3383,7 @@ export default function AppRoutes() {
                     'trust_safety.read',
                   ]}
                 >
-                  <AdminNpiReviewPage />
+                  <RootApprovalCenterRedirect tab="evidence"><AdminNpiReviewPage /></RootApprovalCenterRedirect>
                 </AdminPermissionRoute>
               }
             />
@@ -3385,7 +3397,7 @@ export default function AppRoutes() {
                     'trust_safety.read',
                   ]}
                 >
-                  <AdminBulkNpiReviewPage />
+                  <RootApprovalCenterRedirect tab="bulk"><AdminBulkNpiReviewPage /></RootApprovalCenterRedirect>
                 </AdminPermissionRoute>
               }
             />
@@ -3406,7 +3418,7 @@ export default function AppRoutes() {
 
             <Route
               path="/admin/host-listings"
-              element={<AdminAccessRoute><AdminUnifiedListingReviewPage /></AdminAccessRoute>}
+              element={<AdminAccessRoute><AdminApprovalCenterPage /></AdminAccessRoute>}
             />
             <Route
               path="/admin/marketplace"

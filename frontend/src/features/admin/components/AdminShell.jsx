@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 
 import {
   BadgeCheck,
@@ -167,6 +167,8 @@ function AdminNavigationGroup({
   );
 }
 
+export const AdminEmbeddedShellContext = createContext(false);
+
 const ADMIN_SIDEBAR_STORAGE_KEY = "epantry_admin_sidebar_collapsed";
 
 function readAdminSidebarCollapsed() {
@@ -187,6 +189,7 @@ export default function AdminShell({
   mobileStackHeader = false,
 }) {
   const location = useLocation();
+  const embeddedInApprovalCenter = useContext(AdminEmbeddedShellContext);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     readAdminSidebarCollapsed
@@ -291,25 +294,25 @@ export default function AdminShell({
           label: "Catalog & Listings",
           to: "/admin/catalog",
           icon: Package,
-          visible:
+          visible: !isRootSuperAdmin && (
             hasAdminPermission("catalog.read") ||
-            hasAdminPermission("recipe.read"),
+            hasAdminPermission("recipe.read")),
         },
         {
           label: "Product Review",
           to: "/admin/product-intelligence",
           icon: ScanLine,
-          visible:
+          visible: !isRootSuperAdmin && (
             hasAdminPermission("catalog.read") ||
-            hasAdminPermission("trust_safety.read"),
+            hasAdminPermission("trust_safety.read")),
         },
         {
           label: "Bulk Product Review",
           to: "/admin/bulk-product-review",
           icon: Boxes,
-          visible:
+          visible: !isRootSuperAdmin && (
             hasAdminPermission("catalog.read") ||
-            hasAdminPermission("trust_safety.read"),
+            hasAdminPermission("trust_safety.read")),
         },
         {
           label: "Image Privacy & Safety Review",
@@ -343,15 +346,15 @@ export default function AdminShell({
           label: "Recipes",
           to: "/admin/recipes",
           icon: ChefHat,
-          visible: hasAdminPermission("recipe.read"),
+          visible: !isRootSuperAdmin && ( hasAdminPermission("recipe.read")),
         },
         {
           label: "Recipe Review",
           to: "/admin/recipe-review",
           icon: FlaskConical,
-          visible:
+          visible: !isRootSuperAdmin && (
             hasAdminPermission("recipe.read") ||
-            hasAdminPermission("trust_safety.read"),
+            hasAdminPermission("trust_safety.read")),
         },
         {
           label: "Food Intelligence",
@@ -379,7 +382,7 @@ export default function AdminShell({
             hasAdminPermission("trust_safety.read"),
         },
         {
-          label: "Host Listing Review",
+          label: "Listings & Approvals",
           to: "/admin/host-listings",
           icon: ClipboardCheck,
           visible: isRootSuperAdmin,
@@ -515,6 +518,23 @@ export default function AdminShell({
   const primaryRole = isRootSuperAdmin
     ? "Super Admin"
     : formatRoleKey(adminRoleKeys[0]) || "Internal Admin";
+
+  // The approval centre reuses the original, fully-functional governance views.
+  // Suppress only duplicate admin navigation/header, never their buttons or data.
+  if (embeddedInApprovalCenter) {
+    return (
+      <section aria-label={title || 'Admin workspace'} className="min-w-0 bg-[#F7F6F2]">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-[#DCE3D9] bg-[#F2F4ED] px-3 py-3 sm:px-5">
+          <div className="min-w-0">
+            <h2 className="text-[19px] font-semibold leading-tight text-[#173F35] sm:text-[22px]">{title}</h2>
+            {description && <p className="mt-1 max-w-3xl text-[14px] leading-5 text-[#526759]">{description}</p>}
+          </div>
+          {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        </div>
+        <div className="min-w-0 px-2 py-3 sm:px-4 sm:py-5">{children}</div>
+      </section>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f7f5ef] lg:min-h-[calc(100vh-72px)]">

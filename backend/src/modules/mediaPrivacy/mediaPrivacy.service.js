@@ -6,7 +6,8 @@ import { buildSignedProductEvidenceUrl } from '../../integrations/media/cloudina
 
 import { recordAdminAuditEvent } from '../admin/adminAudit.service.js'
 
-import { ImageEvidence } from '../universalProduct/universalProduct.models.js'
+import { CommunityProductDraft, ImageEvidence } from '../universalProduct/universalProduct.models.js'
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
 
 import { User } from '../users/user.model.js'
 
@@ -504,6 +505,16 @@ function normalizeLimit(value, fallback = 20) {
     : fallback
 }
 
+// Resolve item identity only through verified ImageEvidence -> draft/listing links.
+// Never infer an item from the uploader's other products or from the image filename.
+export function readEvidenceItemName(candidateFields = {}) {
+  for (const candidate of [candidateFields.displayName, candidateFields.productName, candidateFields.title, candidateFields.name]) {
+    const value = typeof candidate === 'string' ? candidate : candidate?.value
+    if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 180)
+  }
+  return ''
+}
+
 async function buildAdminReviewCaseView(reviewCase) {
   if (!reviewCase) return null
 
@@ -515,9 +526,24 @@ async function buildAdminReviewCaseView(reviewCase) {
     MediaSafetyAssessment.findById(item.assessmentId).lean(),
     ImageEvidence.findById(item.imageEvidenceId).lean(),
     User.findById(item.ownerUserId)
-      .select({ email: 1, firstName: 1, lastName: 1 })
+      .select({ name: 1, email: 1, hostEnabled: 1 })
       .lean(),
   ])
+
+  // Product names come from drafts explicitly linked to this image evidence.
+  // A non-matching image must never inherit an unrelated product's name.
+  const productDraft = evidence
+    ? await CommunityProductDraft.findOne({ sourceEvidenceIds: evidence._id })
+      .select({ candidateFields: 1, listingType: 1, merchantSku: 1 })
+      .lean()
+    : null
+  const linkedListing = productDraft
+    ? await HostUnifiedListingPacket.findOne({ catalogNpiDraftId: productDraft._id, deletedAt: null })
+      .select({ title: 1, type: 1 })
+      .lean()
+    : null
+  const itemName = linkedListing?.title?.trim() || readEvidenceItemName(productDraft?.candidateFields)
+  const itemSource = linkedListing ? 'host_listing' : productDraft ? 'product_draft' : null
 
   let previewUrl = ''
 
@@ -539,10 +565,12 @@ async function buildAdminReviewCaseView(reviewCase) {
       ? {
           id: id(owner._id),
           email: owner.email || '',
-          displayName: [owner.firstName, owner.lastName].filter(Boolean).join(' ').trim(),
+          displayName: owner.name || '',
+          isHost: Boolean(owner.hostEnabled),
         }
       : null,
     organizationId: id(item.organizationId),
+    item: itemName ? { name: itemName, source: itemSource, type: linkedListing?.type || productDraft?.listingType || null } : null,
     assessment: serializeMediaSafetyAssessment(assessment),
     evidence: evidence
       ? {

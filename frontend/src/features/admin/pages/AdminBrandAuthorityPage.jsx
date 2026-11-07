@@ -1,23 +1,15 @@
 import {
   BadgeCheck,
-  FileWarning,
   LoaderCircle,
   RefreshCw,
   ShieldAlert,
+  FilePenLine,
+  UsersRound,
+  Inbox,
 } from 'lucide-react'
-
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from 'react'
-
+import { useCallback, useEffect, useState } from 'react'
 import AdminShell from '../components/AdminShell'
-
-import {
-  useAdmin,
-} from '../context/AdminContext'
-
+import { useAdmin } from '../context/AdminContext'
 import {
   approveAdminBrandClaim,
   changeAdminBrandAuthorityLifecycle,
@@ -32,6 +24,8 @@ import {
   reviewAdminBrandOverride,
 } from '../../brands/services/brandAuthority.service'
 
+// Only presentation is scoped to this workspace. The existing Brand API and
+// permission-controlled mutations remain the single source of truth.
 const AUTHORITY_SCOPES = [
   'official_content',
   'regulated_facts',
@@ -39,38 +33,6 @@ const AUTHORITY_SCOPES = [
   'packaging_media',
   'brand_recipes',
 ]
-
-function getErrorMessage(
-  error,
-) {
-  return (
-    error?.response
-      ?.data
-      ?.message ||
-    error?.message ||
-    'Something went wrong while updating this brand review.'
-  )
-}
-
-function StatusPill({
-  value,
-}) {
-  return (
-    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.06em] text-stone-600 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">
-      {
-        String(
-          value ||
-            'unknown',
-        ).replaceAll(
-          '_',
-          ' ',
-        )
-      }
-    </span>
-  )
-}
-
-
 const SCOPE_LABELS = {
   official_content: 'Official brand content',
   regulated_facts: 'Regulated product facts',
@@ -78,833 +40,485 @@ const SCOPE_LABELS = {
   packaging_media: 'Packaging & images',
   brand_recipes: 'Brand recipes',
 }
-
 const DECISION_LABELS = {
-  verified: 'Looks verified',
+  verified: 'Verify evidence',
   rejected: 'Reject evidence',
-  conflict: 'Flag a conflict',
+  conflict: 'Flag conflict',
   approve: 'Approve change',
   reject: 'Reject change',
   suspend: 'Pause access',
   revoke: 'Remove access',
 }
 
-function humanize(value) {
-  if (!value) {
-    return 'Not provided'
-  }
+function getErrorMessage(error) {
+  return error?.response?.data?.message || error?.message || 'Something went wrong while updating this brand review.'
+}
 
-  return String(value)
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+function humanize(value) {
+  if (!value) return 'Not provided'
+  return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function StatusPill({ value }) {
+  const status = String(value || 'unknown').toLowerCase()
+  const tone = ['rejected', 'revoked', 'conflict', 'quarantined'].includes(status)
+    ? 'danger'
+    : ['submitted', 'open', 'in_review', 'suspended', 'pending'].includes(status)
+      ? 'attention'
+      : ['inactive', 'draft', 'unknown'].includes(status)
+        ? 'neutral'
+        : 'success'
+  return <span className="br-status" data-tone={tone}>{humanize(status)}</span>
+}
+
+function EmptyRow({ children }) {
+  return (
+    <div className="br-empty" role="status">
+      <Inbox aria-hidden="true" />
+      <span>{children}</span>
+    </div>
+  )
+}
+
+function SectionHeading({ number, title, count, id }) {
+  return (
+    <div className="br-section-head">
+      <div className="br-section-title">
+        <span className="br-section-no">{number}</span>
+        <h2 id={`${id}-title`}>{title}</h2>
+      </div>
+      <span className="br-section-count" aria-label={`${count} records`}>{count}</span>
+    </div>
+  )
 }
 
 export default function AdminBrandAuthorityPage() {
-  const {
-    hasAdminPermission,
-  } =
-    useAdmin()
+  const { hasAdminPermission } = useAdmin()
+  const canVerify = hasAdminPermission('trust_safety.mutate')
+  const canCatalogMutate = hasAdminPermission('catalog.mutate')
+  const canReviewContent = canVerify || canCatalogMutate
 
-  const canVerify =
-    hasAdminPermission(
-      'trust_safety.mutate',
-    )
+  const [claims, setClaims] = useState([])
+  const [authorities, setAuthorities] = useState([])
+  const [proposals, setProposals] = useState([])
+  const [conflicts, setConflicts] = useState([])
+  const [selectedClaim, setSelectedClaim] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
+  const [reason, setReason] = useState('Reviewed against the submitted brand evidence.')
+  const [marketCodes, setMarketCodes] = useState('IN')
+  const [selectedScopes, setSelectedScopes] = useState(['official_content'])
 
-  const canCatalogMutate =
-    hasAdminPermission(
-      'catalog.mutate',
-    )
-
-  const canReviewContent =
-    canVerify ||
-    canCatalogMutate
-
-  const [
-    claims,
-    setClaims,
-  ] =
-    useState([])
-
-  const [
-    authorities,
-    setAuthorities,
-  ] =
-    useState([])
-
-  const [
-    proposals,
-    setProposals,
-  ] =
-    useState([])
-
-  const [
-    conflicts,
-    setConflicts,
-  ] =
-    useState([])
-
-  const [
-    selectedClaim,
-    setSelectedClaim,
-  ] =
-    useState(null)
-
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(true)
-
-  const [
-    busy,
-    setBusy,
-  ] =
-    useState(false)
-
-  const [
-    error,
-    setError,
-  ] =
-    useState(null)
-
-  const [
-    success,
-    setSuccess,
-  ] =
-    useState(null)
-
-  const [
-    reason,
-    setReason,
-  ] =
-    useState(
-      'Reviewed against the submitted brand evidence.',
-    )
-
-  const [
-    marketCodes,
-    setMarketCodes,
-  ] =
-    useState(
-      'IN',
-    )
-
-  const [
-    selectedScopes,
-    setSelectedScopes,
-  ] =
-    useState([
-      'official_content',
-    ])
-
-  const loadAll =
-    useCallback(
-      async () => {
-        setLoading(
-          true,
-        )
-
-        setError(
-          null,
-        )
-
-        try {
-          const [
-            claimResult,
-            authorityResult,
-            proposalResult,
-            conflictResult,
-          ] =
-            await Promise.all([
-              listAdminBrandClaims({
-                status:
-                  'all',
-
-                limit:
-                  100,
-              }),
-
-              listAdminBrandAuthorities({
-                status:
-                  'all',
-
-                limit:
-                  100,
-              }),
-
-              listAdminBrandOverrides({
-                status:
-                  'all',
-
-                limit:
-                  100,
-              }),
-
-              listAdminBrandConflicts({
-                status:
-                  'all',
-
-                severity:
-                  'all',
-
-                limit:
-                  100,
-              }),
-            ])
-
-          setClaims(
-            claimResult?.claims ||
-              [],
-          )
-
-          setAuthorities(
-            authorityResult?.authorities ||
-              [],
-          )
-
-          setProposals(
-            proposalResult?.proposals ||
-              [],
-          )
-
-          setConflicts(
-            conflictResult?.conflicts ||
-              [],
-          )
-        } catch (
-          requestError
-        ) {
-          setError(
-            getErrorMessage(
-              requestError,
-            ),
-          )
-        } finally {
-          setLoading(
-            false,
-          )
-        }
-      },
-      [],
-    )
-
-  useEffect(
-    () => {
-      loadAll()
-    },
-    [
-      loadAll,
-    ],
-  )
-
-  async function execute(
-    operation,
-    message,
-  ) {
-    if (
-      busy
-    ) {
-      return
+  const loadAll = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [claimResult, authorityResult, proposalResult, conflictResult] = await Promise.all([
+        listAdminBrandClaims({ status: 'all', limit: 100 }),
+        listAdminBrandAuthorities({ status: 'all', limit: 100 }),
+        listAdminBrandOverrides({ status: 'all', limit: 100 }),
+        listAdminBrandConflicts({ status: 'all', severity: 'all', limit: 100 }),
+      ])
+      setClaims(claimResult?.claims || [])
+      setAuthorities(authorityResult?.authorities || [])
+      setProposals(proposalResult?.proposals || [])
+      setConflicts(conflictResult?.conflicts || [])
+      setHasLoadedOnce(true)
+    } catch (requestError) {
+      // A failed request must not be presented as four genuine empty queues.
+      setError(getErrorMessage(requestError))
+    } finally {
+      setLoading(false)
     }
+  }, [])
 
-    setBusy(
-      true,
-    )
+  useEffect(() => { loadAll() }, [loadAll])
 
-    setError(
-      null,
-    )
-
-    setSuccess(
-      null,
-    )
-
+  async function execute(operation, message) {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    setSuccess(null)
     try {
       await operation()
-
-      setSuccess(
-        message,
-      )
-
+      setSuccess(message)
       await loadAll()
-
-      if (
-        selectedClaim
-          ?.claim
-          ?.id
-      ) {
-        const refreshed =
-          await getAdminBrandClaim(
-            selectedClaim.claim.id,
-          )
-
-        setSelectedClaim(
-          refreshed,
-        )
+      if (selectedClaim?.claim?.id) {
+        const refreshed = await getAdminBrandClaim(selectedClaim.claim.id)
+        setSelectedClaim(refreshed)
       }
-    } catch (
-      requestError
-    ) {
-      setError(
-        getErrorMessage(
-          requestError,
-        ),
-      )
+    } catch (requestError) {
+      setError(getErrorMessage(requestError))
     } finally {
-      setBusy(
-        false,
-      )
+      setBusy(false)
     }
   }
 
-  async function openClaim(
-    claimId,
-  ) {
-    setBusy(
-      true,
-    )
-
-    setError(
-      null,
-    )
-
+  async function openClaim(claimId) {
+    setBusy(true)
+    setError(null)
     try {
-      const result =
-        await getAdminBrandClaim(
-          claimId,
-        )
-
-      setSelectedClaim(
-        result,
-      )
-
-      setMarketCodes(
-        result?.claim
-          ?.requestedMarketCodes
-          ?.join(
-            ', ',
-          ) ||
-          'IN',
-      )
-    } catch (
-      requestError
-    ) {
-      setError(
-        getErrorMessage(
-          requestError,
-        ),
-      )
+      const result = await getAdminBrandClaim(claimId)
+      setSelectedClaim(result)
+      setMarketCodes(result?.claim?.requestedMarketCodes?.join(', ') || 'IN')
+    } catch (requestError) {
+      setError(getErrorMessage(requestError))
     } finally {
-      setBusy(
-        false,
-      )
+      setBusy(false)
     }
   }
 
-  function toggleScope(
-    scope,
-  ) {
-    setSelectedScopes(
-      (
-        current,
-      ) =>
-        current.includes(
-          scope,
-        )
-          ? current.filter(
-              (
-                item,
-              ) =>
-                item !==
-                scope,
-            )
-          : [
-              ...current,
-              scope,
-            ],
-    )
+  function toggleScope(scope) {
+    setSelectedScopes((current) => current.includes(scope)
+      ? current.filter((item) => item !== scope)
+      : [...current, scope])
   }
+
+  const reviewableProposals = proposals.some((proposal) => ['submitted', 'in_review'].includes(proposal.status))
+  const reviewableConflicts = conflicts.some((conflict) => ['open', 'in_review'].includes(conflict.status))
+  const activeAuthorities = authorities.filter((authority) => authority.status === 'active')
 
   return (
     <AdminShell
       title="Brand Review & Access"
-      description="Review brand ownership requests, approve important content changes, resolve conflicts, and manage active brand access."
+      description="Brand ownership, content reviews and access."
       actions={
-        <button
-          type="button"
-          onClick={loadAll}
-          className="focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-full bg-stone-950 px-3 text-xs font-bold text-white sm:min-h-10 sm:gap-2 sm:px-4 sm:text-sm"
-        >
-          <RefreshCw
-            size={15}
-            aria-hidden="true"
-          />
-          Refresh
+        <button type="button" onClick={loadAll} disabled={loading || busy} className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#cfd9cc] bg-[#f7f6f2] px-4 text-sm font-bold text-[#173f35] disabled:opacity-50">
+          <RefreshCw size={16} aria-hidden="true" />Refresh
         </button>
       }
     >
-      <div className="min-h-[100svh] bg-[#F5F4EF] px-2 py-2 sm:px-5 sm:py-6">
-        {error && (
-          <div className="mb-2 border-l-4 border-red-500 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 sm:mb-4 sm:px-4 sm:py-3 sm:text-sm">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-2 border-l-4 border-emerald-600 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 sm:mb-4 sm:px-4 sm:py-3 sm:text-sm">
-            {success}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="min-h-[calc(100svh-12rem)] animate-pulse bg-white/70" />
+      <div id="epantry-brand-review">
+        <style>{BRAND_REVIEW_STYLES}</style>
+        {error && <div className="br-alert" role="alert">{error} <button type="button" className="br-btn" onClick={loadAll}>Try again</button></div>}
+        {success && <div className="br-success" role="status">{success}</div>}
+        {loading ? <div className="br-loading" aria-label="Loading brand reviews" /> : !hasLoadedOnce ? (
+          <div className="br-section-body"><EmptyRow>Brand data could not be loaded. Use Try again above.</EmptyRow></div>
         ) : (
-          <div className="space-y-2.5 sm:space-y-6">
-            <section className="overflow-hidden bg-[#0F513F] text-white">
-              <div className="grid gap-3 px-4 py-4 sm:gap-5 sm:px-7 sm:py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)] lg:items-end">
-                <div className="max-w-3xl">
-                  <p className="text-[10px] font-bold tracking-[0.08em] text-emerald-200 sm:text-xs sm:tracking-[0.12em]">
-                    Brand review workspace
-                  </p>
-                  <h2 className="mt-1.5 max-w-2xl text-xl font-bold leading-tight sm:mt-2 sm:text-3xl">
-                    Keep brand ownership, content and access decisions in one clear place.
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-xs leading-5 text-emerald-50/85 sm:mt-3 sm:text-base sm:leading-6">
-                    Start with ownership requests, check proposed brand changes, resolve any conflicts, then review who still has active brand access.
-                  </p>
-                </div>
+          <>
+            <div className="br-intro">
+              <div className="br-intro-text">
+                <p className="br-eyebrow">Brand governance</p>
+                <h2>Review what matters.</h2>
+                <p>Ownership, brand changes and access—managed in one place.</p>
+              </div>
+              <nav className="br-summary" aria-label="Jump to brand review sections">
+                <a href="#br-ownership"><span><b>{claims.length}</b><small>Ownership requests</small></span><BadgeCheck aria-hidden="true" /></a>
+                <a href="#br-changes"><span><b>{proposals.length}</b><small>Content changes</small></span><FilePenLine aria-hidden="true" /></a>
+                <a href="#br-conflicts"><span><b>{conflicts.length}</b><small>Conflicts</small></span><ShieldAlert aria-hidden="true" /></a>
+                <a href="#br-access"><span><b>{activeAuthorities.length}</b><small>Active access</small></span><UsersRound aria-hidden="true" /></a>
+              </nav>
+            </div>
 
-                <div className="grid grid-cols-2 gap-px overflow-hidden bg-white/20 sm:grid-cols-4 lg:grid-cols-2">
-                  {[
-                    ['Ownership requests', claims.length],
-                    ['Content changes', proposals.length],
-                    ['Open conflicts', conflicts.length],
-                    ['Active access', authorities.filter((item) => item.status === 'active').length],
-                  ].map(([label, value]) => (
-                    <div key={label} className="bg-[#154F42] px-3 py-2 sm:px-4 sm:py-3.5">
-                      <p className="text-xl font-bold text-white sm:text-2xl">{value}</p>
-                      <p className="mt-0.5 text-[10px] font-medium text-emerald-100/80 sm:mt-1 sm:text-xs">{label}</p>
+            <section className="br-section" id="br-ownership" aria-labelledby="br-ownership-title" data-tone="blue">
+              <SectionHeading id="br-ownership" number="01 / OWNERSHIP" title="Review ownership requests" count={claims.length} />
+              <div className="br-section-body">
+                {claims.length === 0 ? (
+                  <EmptyRow>No ownership requests to review.</EmptyRow>
+                ) : (
+                  <div className="br-owner-layout">
+                    <div className="br-owner-list">
+                      <div className="br-list-caption">Choose a request</div>
+                      {claims.map((claim) => (
+                        <button
+                          key={claim.id}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => openClaim(claim.id)}
+                          className="br-claim-button"
+                          aria-current={selectedClaim?.claim?.id === claim.id ? 'true' : undefined}
+                        >
+                          <div className="br-claim-header"><strong>{humanize(claim.claimType)}</strong><StatusPill value={claim.status} /></div>
+                          <p className="br-caption">Brand: {claim.brandId}</p>
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="overflow-hidden bg-[#E7F0F8]">
-              <div className="border-b border-[#C8D9E7] px-4 py-3 sm:px-7 sm:py-4">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <BadgeCheck size={20} className="mt-0.5 text-[#175A7A] max-sm:h-4 max-sm:w-4" aria-hidden="true" />
-                  <div>
-                    <p className="text-xs font-bold text-[#175A7A] sm:text-sm">Brand ownership requests</p>
-                    <h2 className="mt-0.5 text-lg font-bold text-slate-950 sm:mt-1 sm:text-2xl">Confirm who is allowed to manage a brand.</h2>
-                    <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
-                      Open a request, check the proof that was submitted, then approve or reject access for the right markets and brand areas.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid min-h-0 lg:min-h-[320px] lg:grid-cols-[minmax(260px,0.7fr)_minmax(0,1.3fr)]">
-                <div className="border-b border-[#C8D9E7] bg-[#DCEAF5] lg:border-b-0 lg:border-r">
-                  <div className="border-b border-[#C8D9E7] px-3 py-2 text-xs font-semibold text-slate-700 sm:px-4 sm:py-3 sm:text-sm">
-                    {claims.length} {claims.length === 1 ? 'request' : 'requests'}
-                  </div>
-
-                  {claims.length > 0 ? (
-                    <div className="max-h-40 divide-y divide-[#C8D9E7] overflow-y-auto sm:max-h-none sm:overflow-visible">
-                      {claims.map((claim) => {
-                        const selected = selectedClaim?.claim?.id === claim.id
-                        return (
-                          <button
-                            key={claim.id}
-                            type="button"
-                            onClick={() => openClaim(claim.id)}
-                            className={`focus-ring w-full px-3 py-2 text-left transition sm:px-4 sm:py-3 ${selected ? 'bg-white' : 'hover:bg-white/65'}`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-bold text-slate-950">{humanize(claim.claimType)}</p>
-                                <p className="mt-1 truncate text-xs text-slate-500">Brand reference: {claim.brandId}</p>
-                              </div>
-                              <StatusPill value={claim.status} />
+                    <div className="br-detail">
+                      {!selectedClaim ? (
+                        <EmptyRow>Choose a request to review its evidence.</EmptyRow>
+                      ) : (
+                        <>
+                          <div className="br-detail-heading">
+                            <div>
+                              <p className="br-kicker">Ownership request</p>
+                              <h3>{humanize(selectedClaim.claim?.claimType)}</h3>
+                              <p className="br-caption">Brand: {selectedClaim.claim?.brandId}</p>
                             </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="px-3 py-4 text-xs text-slate-500 sm:px-4 sm:py-10 sm:text-sm">
-                      No ownership requests need review right now.
-                    </div>
-                  )}
-                </div>
+                            <StatusPill value={selectedClaim.claim?.status} />
+                          </div>
 
-                <div className="bg-white px-4 py-3 sm:px-7 sm:py-6">
-                  {!selectedClaim ? (
-                    <div className="flex min-h-[110px] items-center justify-center text-center sm:min-h-[250px]">
-                      <div className="max-w-md">
-                        <p className="text-base font-bold text-slate-900 sm:text-lg">Choose an ownership request</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-500 sm:mt-2 sm:text-sm sm:leading-6">
-                          Select a request from the list to see the submitted proof and make a decision.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 sm:gap-3 sm:pb-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-[#175A7A]">Ownership request</p>
-                          <h3 className="mt-0.5 text-lg font-bold text-slate-950 sm:mt-1 sm:text-xl">{humanize(selectedClaim.claim?.claimType)}</h3>
-                          <p className="mt-0.5 break-all text-xs text-slate-500 sm:mt-1 sm:text-sm">Brand reference: {selectedClaim.claim?.brandId}</p>
-                        </div>
-                        <StatusPill value={selectedClaim.claim?.status} />
-                      </div>
-
-                      <div className="mt-3 sm:mt-5">
-                        <p className="text-sm font-bold text-slate-900">Submitted proof</p>
-                        <p className="mt-1 text-sm text-slate-500">Check each item and mark whether it supports the request.</p>
-
-                        <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200 sm:mt-3">
+                          <p className="br-block-title">Submitted evidence</p>
                           {selectedClaim.evidenceChecks?.length > 0 ? (
                             selectedClaim.evidenceChecks.map((check) => (
-                              <div key={check.id} className="py-3 sm:py-4">
-                                <div className="flex flex-col gap-1.5 sm:gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-slate-900">{humanize(check.checkType)}</p>
-                                    <p className="mt-1 break-all text-xs leading-5 text-slate-500">{check.evidenceReference}</p>
-                                  </div>
-                                  <StatusPill value={check.status} />
-                                </div>
-
-                                {canVerify && (
-                                  <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
-                                    {['verified', 'rejected', 'conflict'].map((decision) => (
-                                      <button
-                                        key={decision}
-                                        type="button"
-                                        disabled={busy}
-                                        onClick={() =>
-                                          execute(
+                              <div key={check.id} className="br-evidence-row">
+                                <div className="br-evidence-content">
+                                  <strong>{humanize(check.checkType)}</strong>
+                                  <p className="br-caption">{check.evidenceReference || 'No document reference'}</p>
+                                  {canVerify && (
+                                    <div className="br-row-actions">
+                                      {['verified', 'rejected', 'conflict'].map((decision) => (
+                                        <button
+                                          key={decision}
+                                          type="button"
+                                          disabled={busy}
+                                          onClick={() => execute(
                                             () => reviewAdminBrandIdentityCheck(check.id, { decision, reason }),
-                                            decision === 'verified'
-                                              ? 'Evidence marked as verified.'
-                                              : decision === 'rejected'
-                                                ? 'Evidence rejected.'
-                                                : 'Evidence flagged for conflict review.',
-                                          )
-                                        }
-                                        className="focus-ring rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold sm:px-3 sm:py-2 sm:text-xs text-slate-700 disabled:opacity-50"
-                                      >
-                                        {DECISION_LABELS[decision]}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                                            decision === 'verified' ? 'Evidence marked as verified.' : decision === 'rejected' ? 'Evidence rejected.' : 'Evidence flagged for conflict review.',
+                                          )}
+                                          className={`br-btn ${decision === 'rejected' ? 'br-btn-danger' : ''}`}
+                                        >{DECISION_LABELS[decision]}</button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <StatusPill value={check.status} />
                               </div>
                             ))
-                          ) : (
-                            <div className="py-3 text-xs text-slate-500 sm:py-6 sm:text-sm">No supporting proof was attached to this request.</div>
-                          )}
-                        </div>
-                      </div>
+                          ) : <EmptyRow>No evidence attached to this request.</EmptyRow>}
 
-                      <div className="mt-3 sm:mt-5 grid gap-2.5 sm:gap-4 lg:grid-cols-2">
-                        <label className="block">
-                          <span className="text-xs font-semibold text-slate-800 sm:text-sm">Reason for your decision</span>
-                          <textarea
-                            value={reason}
-                            onChange={(event) => setReason(event.target.value)}
-                            rows={3}
-                            className="focus-ring mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 sm:mt-2 sm:p-3 sm:text-sm"
-                            placeholder="Add a short reason for this decision"
-                          />
-                        </label>
-
-                        {canVerify && (
-                          <label className="block">
-                            <span className="text-xs font-semibold text-slate-800 sm:text-sm">Markets this approval applies to</span>
-                            <input
-                              value={marketCodes}
-                              onChange={(event) => setMarketCodes(event.target.value)}
-                              className="focus-ring mt-1.5 h-9 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-xs sm:mt-2 sm:h-11 sm:px-3 sm:text-sm"
-                              placeholder="For example: IN, US"
-                            />
-                          </label>
-                        )}
-                      </div>
-
-                      {canVerify && (
-                        <>
-                          <div className="mt-3 sm:mt-5">
-                            <p className="text-xs font-semibold text-slate-800 sm:text-sm">What can this brand manage?</p>
-                            <div className="mt-1.5 flex flex-wrap gap-1.5 sm:mt-2 sm:gap-2">
-                              {AUTHORITY_SCOPES.map((scope) => (
-                                <label
-                                  key={scope}
-                                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold sm:gap-2 sm:px-3 sm:py-2 sm:text-xs ${selectedScopes.includes(scope) ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600'}`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedScopes.includes(scope)}
-                                    onChange={() => toggleScope(scope)}
-                                  />
-                                  {SCOPE_LABELS[scope] || humanize(scope)}
-                                </label>
-                              ))}
-                            </div>
+                          <div className="br-review-inputs">
+                            <label className="br-field">
+                              <span>Decision reason</span>
+                              <textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Add a short reason" />
+                            </label>
+                            {canVerify && <label className="br-field"><span>Approved markets</span><input value={marketCodes} onChange={(event) => setMarketCodes(event.target.value)} placeholder="IN, US" /></label>}
                           </div>
 
-                          <div className="mt-3 sm:mt-5 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              disabled={busy || selectedScopes.length === 0}
-                              onClick={() =>
-                                execute(
-                                  () =>
-                                    approveAdminBrandClaim(selectedClaim.claim.id, {
-                                      marketCodes: marketCodes
-                                        .split(',')
-                                        .map((item) => item.trim())
-                                        .filter(Boolean),
-                                      scopes: selectedScopes,
-                                      reason,
-                                    }),
+                          {canVerify && (
+                            <>
+                              <p className="br-block-title">Brand permissions</p>
+                              <div className="br-scope-row">
+                                {AUTHORITY_SCOPES.map((scope) => (
+                                  <label key={scope} className="br-scope-option" data-selected={selectedScopes.includes(scope)}>
+                                    <input type="checkbox" checked={selectedScopes.includes(scope)} onChange={() => toggleScope(scope)} />
+                                    {SCOPE_LABELS[scope] || humanize(scope)}
+                                  </label>
+                                ))}
+                              </div>
+                              <div className="br-row-actions" style={{ marginTop: 16 }}>
+                                <button type="button" className="br-btn br-btn-primary" disabled={busy || selectedScopes.length === 0} onClick={() => execute(
+                                  () => approveAdminBrandClaim(selectedClaim.claim.id, {
+                                    marketCodes: marketCodes.split(',').map((item) => item.trim()).filter(Boolean),
+                                    scopes: selectedScopes,
+                                    reason,
+                                  }),
                                   'Brand access approved.',
-                                )
-                              }
-                              className="focus-ring rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold sm:px-4 sm:py-2.5 sm:text-sm text-white disabled:opacity-50"
-                            >
-                              Approve brand access
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                execute(
+                                )}>Approve brand access</button>
+                                <button type="button" className="br-btn br-btn-danger" disabled={busy} onClick={() => execute(
                                   () => rejectAdminBrandClaim(selectedClaim.claim.id, { reason }),
                                   'Brand access request rejected.',
-                                )
-                              }
-                              className="focus-ring rounded-xl bg-red-50 px-3 py-2 text-xs font-bold sm:px-4 sm:py-2.5 sm:text-sm text-red-700 disabled:opacity-50"
-                            >
-                              Reject request
-                            </button>
-                          </div>
+                                )}>Reject request</button>
+                              </div>
+                            </>
+                          )}
                         </>
                       )}
-                    </>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className="overflow-hidden bg-[#E7F4EF]">
-              <div className="border-b border-[#CBE3DA] px-4 py-3 sm:px-7 sm:py-4">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <ShieldAlert size={20} className="mt-0.5 text-[#17624A] max-sm:h-4 max-sm:w-4" aria-hidden="true" />
-                  <div>
-                    <p className="text-xs font-bold text-[#17624A] sm:text-sm">Brand content changes</p>
-                    <h2 className="mt-0.5 text-lg font-bold text-slate-950 sm:mt-1 sm:text-2xl">Review important changes before they go live.</h2>
-                    <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
-                      These requests change important brand or product information. Approve a change, reject it, or flag it when the evidence does not agree.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white">
-                {proposals.length > 0 ? (
-                  <div className="divide-y divide-slate-200">
-                    {proposals.map((proposal) => (
-                      <div key={proposal.id} className="px-4 py-3 sm:px-7 sm:py-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-950">
-                              {proposal.fieldChanges?.length
-                                ? proposal.fieldChanges.map((change) => humanize(change.fieldKey)).join(', ')
-                                : 'Brand content update'}
-                            </p>
-                            <p className="mt-1 break-all text-xs text-slate-500">Product reference: {proposal.packId}</p>
-                          </div>
-                          <StatusPill value={proposal.status} />
-                        </div>
-
-                        {canReviewContent && ['submitted', 'in_review'].includes(proposal.status) && (
-                          <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
-                            {['approve', 'reject', 'conflict'].map((decision) => (
-                              <button
-                                key={decision}
-                                type="button"
-                                disabled={busy}
-                                onClick={() =>
-                                  execute(
-                                    () => reviewAdminBrandOverride(proposal.id, { decision, reason }),
-                                    decision === 'approve'
-                                      ? 'Brand content change approved.'
-                                      : decision === 'reject'
-                                        ? 'Brand content change rejected.'
-                                        : 'Brand content change flagged for conflict review.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold sm:px-3 sm:py-2 sm:text-xs text-slate-700 disabled:opacity-50"
-                              >
-                                {DECISION_LABELS[decision]}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="px-4 py-4 text-xs text-slate-500 sm:px-7 sm:py-8 sm:text-sm">
-                    No brand content changes are waiting for review.
+                    </div>
                   </div>
                 )}
               </div>
             </section>
 
-            <section className="grid gap-2.5 sm:gap-5 xl:grid-cols-2">
-              <div className="overflow-hidden bg-[#F7EDEC]">
-                <div className="border-b border-[#E8D1CE] px-4 py-3 sm:px-7 sm:py-4">
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <FileWarning size={20} className="mt-0.5 text-[#A34338] max-sm:h-4 max-sm:w-4" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-bold text-[#A34338]">Conflicts that need a decision</p>
-                      <h2 className="mt-0.5 text-lg font-bold text-slate-950 sm:mt-1 sm:text-xl">Resolve evidence that does not agree.</h2>
-                      <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
-                        Use the strongest evidence, or hold the item for manual review when the correct answer is still unclear.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white">
-                  {conflicts.length > 0 ? (
-                    <div className="divide-y divide-slate-200">
-                      {conflicts.map((conflict) => (
-                        <div key={conflict.id} className="px-4 py-3 sm:px-7 sm:py-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-bold text-slate-950">{humanize(conflict.severity)} priority</p>
-                            <StatusPill value={conflict.status} />
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">{conflict.openedReason}</p>
-
-                          {canVerify && ['open', 'in_review'].includes(conflict.status) && (
-                            <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
-                              {conflict.proposalIds?.[0] && (
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    execute(
-                                      () =>
-                                        resolveAdminBrandConflict(conflict.id, {
-                                          resolution: 'approve_proposal',
-                                          selectedProposalId: conflict.proposalIds[0],
-                                          reason,
-                                        }),
-                                      'Conflict resolved using the selected change.',
-                                    )
-                                  }
-                                  className="focus-ring rounded-lg bg-emerald-700 px-3 py-1.5 text-[11px] font-bold sm:px-3.5 sm:py-2 sm:text-xs text-white disabled:opacity-50"
-                                >
-                                  Use selected change
-                                </button>
-                              )}
-
+            <section className="br-section" id="br-changes" aria-labelledby="br-changes-title" data-tone="sage">
+              <SectionHeading id="br-changes" number="02 / BRAND CONTENT" title="Review content changes" count={proposals.length} />
+              <div className="br-section-body">
+                {proposals.length === 0 ? <EmptyRow>No content changes waiting.</EmptyRow> : (
+                  <>
+                    {canReviewContent && reviewableProposals && (
+                      <div className="br-note-strip"><label htmlFor="br-change-reason">Decision reason</label><input id="br-change-reason" value={reason} onChange={(event) => setReason(event.target.value)} /></div>
+                    )}
+                    {proposals.map((proposal) => (
+                      <div className="br-flat-row" key={proposal.id}>
+                        <div>
+                          <strong>{proposal.fieldChanges?.length ? proposal.fieldChanges.map((change) => humanize(change.fieldKey)).join(', ') : 'Brand content update'}</strong>
+                          <p className="br-flat-row-meta">Product: {proposal.packId}</p>
+                        </div>
+                        <StatusPill value={proposal.status} />
+                        {canReviewContent && ['submitted', 'in_review'].includes(proposal.status) && (
+                          <div className="br-flat-actions">
+                            {['approve', 'reject', 'conflict'].map((decision) => (
                               <button
+                                key={decision}
                                 type="button"
                                 disabled={busy}
-                                onClick={() =>
-                                  execute(
-                                    () => resolveAdminBrandConflict(conflict.id, { resolution: 'quarantine', reason }),
-                                    'Conflict held for manual review.',
-                                  )
-                                }
-                                className="focus-ring rounded-lg bg-red-50 px-3 py-1.5 text-[11px] font-bold sm:px-3.5 sm:py-2 sm:text-xs text-red-700 disabled:opacity-50"
-                              >
-                                Hold for manual review
-                              </button>
+                                className={`br-btn ${decision === 'approve' ? 'br-btn-primary' : decision === 'reject' ? 'br-btn-danger' : ''}`}
+                                onClick={() => execute(
+                                  () => reviewAdminBrandOverride(proposal.id, { decision, reason }),
+                                  decision === 'approve' ? 'Brand content change approved.' : decision === 'reject' ? 'Brand content change rejected.' : 'Brand content change flagged for conflict review.',
+                                )}
+                              >{DECISION_LABELS[decision]}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </section>
+
+            <div className="br-two-sections">
+              <section className="br-section" id="br-conflicts" aria-labelledby="br-conflicts-title" data-tone="peach">
+                <SectionHeading id="br-conflicts" number="03 / CONFLICTS" title="Resolve conflicts" count={conflicts.length} />
+                <div className="br-section-body">
+                  {conflicts.length === 0 ? <EmptyRow>No conflicts need attention.</EmptyRow> : (
+                    <>
+                      {canVerify && reviewableConflicts && <div className="br-note-strip"><label htmlFor="br-conflict-reason">Decision reason</label><input id="br-conflict-reason" value={reason} onChange={(event) => setReason(event.target.value)} /></div>}
+                      {conflicts.map((conflict) => (
+                        <div key={conflict.id} className="br-flat-row">
+                          <div>
+                            <strong>{humanize(conflict.severity)} priority</strong>
+                            <p className="br-flat-row-meta">{conflict.openedReason}</p>
+                          </div>
+                          <StatusPill value={conflict.status} />
+                          {canVerify && ['open', 'in_review'].includes(conflict.status) && (
+                            <div className="br-flat-actions">
+                              {conflict.proposalIds?.[0] && (
+                                <button type="button" disabled={busy} className="br-btn br-btn-primary" onClick={() => execute(
+                                  () => resolveAdminBrandConflict(conflict.id, { resolution: 'approve_proposal', selectedProposalId: conflict.proposalIds[0], reason }),
+                                  'Conflict resolved using the selected change.',
+                                )}>Use selected change</button>
+                              )}
+                              <button type="button" disabled={busy} className="br-btn br-btn-danger" onClick={() => execute(
+                                () => resolveAdminBrandConflict(conflict.id, { resolution: 'quarantine', reason }),
+                                'Conflict held for manual review.',
+                              )}>Hold for review</button>
                             </div>
                           )}
                         </div>
                       ))}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-4 text-xs text-slate-500 sm:px-7 sm:py-8 sm:text-sm">
-                      No brand conflicts need attention right now.
-                    </div>
+                    </>
                   )}
                 </div>
-              </div>
+              </section>
 
-              <div className="overflow-hidden bg-[#ECEAF6]">
-                <div className="border-b border-[#D9D5EC] px-4 py-3 sm:px-7 sm:py-4">
-                  <div>
-                    <p className="text-sm font-bold text-[#514A86]">Active brand access</p>
-                    <h2 className="mt-0.5 text-lg font-bold text-slate-950 sm:mt-1 sm:text-xl">See who can currently manage brand information.</h2>
-                    <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
-                      Pause access temporarily or remove it when a brand relationship should no longer be active.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-white">
-                  {authorities.length > 0 ? (
-                    <div className="divide-y divide-slate-200">
+              <section className="br-section" id="br-access" aria-labelledby="br-access-title" data-tone="lavender">
+                <SectionHeading id="br-access" number="04 / BRAND ACCESS" title="Manage brand access" count={activeAuthorities.length} />
+                <div className="br-section-body">
+                  {authorities.length === 0 ? <EmptyRow>No active brand access yet.</EmptyRow> : (
+                    <>
+                      {canVerify && activeAuthorities.length > 0 && <div className="br-note-strip"><label htmlFor="br-access-reason">Decision reason</label><input id="br-access-reason" value={reason} onChange={(event) => setReason(event.target.value)} /></div>}
                       {authorities.map((authority) => (
-                        <div key={authority.id} className="px-4 py-3 sm:px-7 sm:py-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-950">{humanize(authority.authorityType)}</p>
-                              <p className="mt-1 break-all text-xs text-slate-500">Brand reference: {authority.brandId}</p>
-                            </div>
-                            <StatusPill value={authority.status} />
+                        <div key={authority.id} className="br-flat-row">
+                          <div>
+                            <strong>{humanize(authority.authorityType)}</strong>
+                            <p className="br-flat-row-meta">Brand: {authority.brandId}</p>
                           </div>
-
+                          <StatusPill value={authority.status} />
                           {canVerify && authority.status === 'active' && (
-                            <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
+                            <div className="br-flat-actions">
                               {['suspend', 'revoke'].map((action) => (
-                                <button
-                                  key={action}
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    execute(
-                                      () => changeAdminBrandAuthorityLifecycle(authority.id, { action, reason }),
-                                      action === 'suspend' ? 'Brand access paused.' : 'Brand access removed.',
-                                    )
-                                  }
-                                  className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold sm:px-3.5 sm:py-2 sm:text-xs text-slate-700 disabled:opacity-50"
-                                >
-                                  {DECISION_LABELS[action]}
-                                </button>
+                                <button key={action} type="button" disabled={busy} className={`br-btn ${action === 'revoke' ? 'br-btn-danger' : ''}`} onClick={() => execute(
+                                  () => changeAdminBrandAuthorityLifecycle(authority.id, { action, reason }),
+                                  action === 'suspend' ? 'Brand access paused.' : 'Brand access removed.',
+                                )}>{DECISION_LABELS[action]}</button>
                               ))}
                             </div>
                           )}
                         </div>
                       ))}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-4 text-xs text-slate-500 sm:px-7 sm:py-8 sm:text-sm">
-                      No active brand access has been granted yet.
-                    </div>
+                    </>
                   )}
                 </div>
-              </div>
-            </section>
-
-            {busy && (
-              <div className="fixed bottom-3 right-3 z-50 inline-flex items-center gap-1.5 rounded-full bg-stone-950 px-3 py-2 text-xs font-semibold sm:bottom-5 sm:right-5 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm text-white shadow-xl">
-                <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
-                Saving changes...
-              </div>
-            )}
-          </div>
+              </section>
+            </div>
+            {busy && <div className="br-floating" role="status"><LoaderCircle size={17} className="animate-spin" aria-hidden="true" />Saving changes...</div>}
+          </>
         )}
       </div>
     </AdminShell>
   )
 }
+
+const BRAND_REVIEW_STYLES = String.raw`
+#epantry-brand-review{--br-forest:#173f35;--br-deep:#143d33;--br-sage:#dce0cf;--br-porcelain:#f7f6f2;--br-clay:#c86c42;--br-ink:#222b27;--br-muted:#63736a;--br-line:#d9dfd7;color:var(--br-ink);background:var(--br-porcelain);padding:4px 0 28px;min-width:0}
+#epantry-brand-review *,#epantry-brand-review *::before,#epantry-brand-review *::after{box-sizing:border-box}
+#epantry-brand-review button,#epantry-brand-review input,#epantry-brand-review textarea{font:inherit}
+#epantry-brand-review button:focus-visible,#epantry-brand-review a:focus-visible,#epantry-brand-review input:focus-visible,#epantry-brand-review textarea:focus-visible{outline:3px solid #c86c42;outline-offset:2px}
+#epantry-brand-review .br-intro{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(380px,.95fr);background:var(--br-forest);border-top:3px solid var(--br-clay);overflow:hidden;border-radius:12px;margin-bottom:26px}
+#epantry-brand-review .br-intro-text{padding:24px 28px;color:#f7f6f2;display:flex;flex-direction:column;justify-content:center}
+#epantry-brand-review .br-eyebrow{font-size:12px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#dcaf95;margin:0 0 9px}
+#epantry-brand-review .br-intro h2{font-size:clamp(23px,2.2vw,32px);line-height:1.15;letter-spacing:-.035em;font-weight:750;color:#f7f6f2;margin:0 0 7px}
+#epantry-brand-review .br-intro-text p:last-child{font-size:14px;line-height:1.55;color:#dfebe4;margin:0}
+#epantry-brand-review .br-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:#e8eee5;padding:10px;gap:1px}
+#epantry-brand-review .br-summary a{min-width:0;display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;background:#f1f3ed;text-decoration:none;color:var(--br-forest);transition:background .18s,color .18s}
+#epantry-brand-review .br-summary a:hover{background:var(--br-sage)}
+#epantry-brand-review .br-summary b{display:block;font-size:28px;line-height:1.05;font-weight:800;font-variant-numeric:tabular-nums}
+#epantry-brand-review .br-summary small{display:block;font-size:12px;line-height:1.35;font-weight:700;color:#536a5d;margin-top:3px}
+#epantry-brand-review .br-summary svg{width:17px;height:17px;flex:0 0 auto}
+#epantry-brand-review .br-section{margin:0 0 26px;scroll-margin-top:95px}
+#epantry-brand-review .br-section-head{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:16px 20px;border-top:2px solid var(--br-clay);background:#eaf0f5}
+#epantry-brand-review .br-section[data-tone="sage"] .br-section-head{background:#e8eee6;border-top-color:#173f35}
+#epantry-brand-review .br-section[data-tone="peach"] .br-section-head{background:#f6e7dd;border-top-color:var(--br-clay)}
+#epantry-brand-review .br-section[data-tone="lavender"] .br-section-head{background:#eeeaf4;border-top-color:#6f688d}
+#epantry-brand-review .br-section-title{min-width:0}
+#epantry-brand-review .br-section-no{display:block;color:#b5603b;font-weight:800;font-size:12px;line-height:1.3;letter-spacing:.025em;text-transform:uppercase;margin-bottom:3px}
+#epantry-brand-review .br-section-title h2{font-size:clamp(20px,1.6vw,25px);line-height:1.15;letter-spacing:-.027em;color:var(--br-forest);font-weight:750;margin:0}
+#epantry-brand-review .br-section-count{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;padding:7px 11px;background:#fffdfa;color:#173f35;font-size:13px;line-height:1.1;font-weight:750;border:1px solid #d7ded3;border-radius:100px}
+#epantry-brand-review .br-section-body{background:#fffefa;border:1px solid #e5e8e1;border-top:0}
+#epantry-brand-review .br-owner-layout{display:grid;grid-template-columns:minmax(245px,.42fr) minmax(0,.58fr);align-items:stretch}
+#epantry-brand-review .br-owner-list{border-right:1px solid #e0e5df;background:#f3f6f1;max-height:570px;overflow-y:auto;overscroll-behavior:contain}
+#epantry-brand-review .br-list-caption{padding:12px 15px;border-bottom:1px solid #dce4da;font-size:13px;font-weight:700;color:#536b5b}
+#epantry-brand-review .br-claim-button{display:block;width:100%;border:0;border-bottom:1px solid #dce4da;background:transparent;text-align:left;cursor:pointer;padding:16px;transition:background .18s;position:relative;color:var(--br-ink)}
+#epantry-brand-review .br-claim-button:hover{background:#e4ece3}
+#epantry-brand-review .br-claim-button[aria-current="true"]{background:#fffaf4;box-shadow:inset 4px 0 0 var(--br-clay)}
+#epantry-brand-review .br-claim-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#epantry-brand-review .br-claim-button strong{display:block;font-size:15px;line-height:1.3;color:var(--br-forest)}
+#epantry-brand-review .br-caption{color:var(--br-muted);font-size:13px;line-height:1.5;margin:5px 0 0;overflow-wrap:anywhere}
+#epantry-brand-review .br-detail{padding:20px 24px;min-width:0}
+#epantry-brand-review .br-detail-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:15px;border-bottom:1px solid var(--br-line)}
+#epantry-brand-review .br-detail-heading h3{font-size:20px;line-height:1.2;color:var(--br-forest);font-weight:750;margin:0}
+#epantry-brand-review .br-kicker{font-size:12px;line-height:1.3;color:#b95f3c;font-weight:800;letter-spacing:.02em;text-transform:uppercase;margin:0 0 5px}
+#epantry-brand-review .br-block-title{font-weight:750;font-size:15px;line-height:1.35;color:var(--br-forest);margin:16px 0 10px}
+#epantry-brand-review .br-evidence-row{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;border-top:1px solid var(--br-line);padding:13px 0}
+#epantry-brand-review .br-evidence-row strong{font-size:14px;color:var(--br-ink)}
+#epantry-brand-review .br-evidence-content{min-width:0;flex:1 1 250px}
+#epantry-brand-review .br-row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:11px}
+#epantry-brand-review .br-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #b7c7ba;border-radius:7px;min-height:38px;padding:8px 13px;background:#fffefa;color:var(--br-forest);font-size:13px;font-weight:750;line-height:1.25;cursor:pointer;transition:background .16s,border-color .16s,transform .16s;text-decoration:none}
+#epantry-brand-review .br-btn:hover:not(:disabled){background:#e4ece4;border-color:#739481;transform:translateY(-1px)}
+#epantry-brand-review .br-btn:disabled{opacity:.53;cursor:not-allowed}
+#epantry-brand-review .br-btn-primary{background:var(--br-forest);border-color:var(--br-forest);color:white}
+#epantry-brand-review .br-btn-primary:hover:not(:disabled){background:#285d48;color:white}
+#epantry-brand-review .br-btn-danger{border-color:#e6bcb5;color:#9c3e32;background:#fff5f2}
+#epantry-brand-review .br-btn-danger:hover:not(:disabled){background:#fbe7e3}
+#epantry-brand-review .br-btn-clay{border-color:#c86c42;color:#fff;background:#c86c42}
+#epantry-brand-review .br-btn-clay:hover:not(:disabled){background:#b85e37;color:#fff}
+#epantry-brand-review .br-review-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+#epantry-brand-review .br-field{display:block;min-width:0}
+#epantry-brand-review .br-field span{display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--br-forest)}
+#epantry-brand-review .br-field input,#epantry-brand-review .br-field textarea{display:block;width:100%;min-height:42px;padding:10px 12px;border:1px solid #cfd8cd;border-radius:7px;background:white;color:var(--br-ink);font-size:14px;line-height:1.5;resize:vertical}
+#epantry-brand-review .br-field textarea{min-height:83px}
+#epantry-brand-review .br-scope-row{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0 0}
+#epantry-brand-review .br-scope-option{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid #d5dfd2;background:#fafbf7;padding:9px 10px;border-radius:7px;font-size:13px;line-height:1.25;color:#355549;font-weight:650}
+#epantry-brand-review .br-scope-option[data-selected="true"]{background:#dce9dd;border-color:#87a895}
+#epantry-brand-review .br-scope-option input{accent-color:#173f35;width:15px;height:15px}
+#epantry-brand-review .br-note-strip{display:flex;align-items:center;gap:12px;padding:12px 19px;border-bottom:1px solid var(--br-line);background:#fbfbf8}
+#epantry-brand-review .br-note-strip label{font-size:13px;font-weight:750;color:var(--br-forest);white-space:nowrap}
+#epantry-brand-review .br-note-strip input{flex:1;min-width:0;border:1px solid #d5ded5;background:white;border-radius:6px;min-height:38px;padding:7px 11px;font-size:13px;color:var(--br-ink)}
+#epantry-brand-review .br-flat-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:17px 20px;border-bottom:1px solid var(--br-line);align-items:start}
+#epantry-brand-review .br-flat-row:last-child{border-bottom:0}
+#epantry-brand-review .br-flat-row strong{font-size:15px;line-height:1.35;color:var(--br-forest)}
+#epantry-brand-review .br-flat-row-meta{font-size:13px;line-height:1.5;color:var(--br-muted);margin:5px 0 0;overflow-wrap:anywhere}
+#epantry-brand-review .br-flat-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:0}
+#epantry-brand-review .br-empty{display:flex;align-items:center;gap:15px;min-height:74px;padding:17px 20px;color:#5a7062;font-size:14px;line-height:1.4;font-weight:600}
+#epantry-brand-review .br-empty svg{width:24px;height:24px;flex:0 0 auto;color:#719880}
+#epantry-brand-review .br-status{display:inline-flex;align-items:center;border:1px solid #dce3d8;border-radius:100px;background:#edf3ea;color:#335b45;padding:4px 8px;font-size:11px;line-height:1.2;font-weight:800;text-transform:capitalize;white-space:nowrap}
+#epantry-brand-review .br-status[data-tone="attention"]{background:#fff1e9;color:#a65336;border-color:#f3ccaf}
+#epantry-brand-review .br-status[data-tone="danger"]{background:#fff1ef;color:#9e433a;border-color:#ecc4bd}
+#epantry-brand-review .br-status[data-tone="neutral"]{background:#f3f5f1;color:#576960;border-color:#dce3d9}
+#epantry-brand-review .br-alert{border-left:4px solid #aa5143;background:#fff1ec;padding:12px 16px;font-size:14px;color:#903e31;line-height:1.5;margin:0 0 15px}
+#epantry-brand-review .br-success{border-left:4px solid #21815a;background:#e7f2e9;padding:12px 16px;font-size:14px;color:#22563f;line-height:1.5;margin:0 0 15px}
+#epantry-brand-review .br-loading{height:240px;border:1px solid #dbe0d8;background:linear-gradient(110deg,#ecf0e9,#f8f9f5,#ecf0e9);background-size:180% 100%;animation:br-pulse 1.5s ease-in-out infinite}
+@keyframes br-pulse{to{background-position:-180% 0}}
+#epantry-brand-review .br-floating{position:fixed;right:18px;bottom:18px;z-index:50;padding:12px 16px;border-radius:9px;background:#173f35;color:white;font-size:13px;box-shadow:0 12px 35px #102b2550;display:flex;align-items:center;gap:9px}
+#epantry-brand-review .br-two-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:20px}
+#epantry-brand-review .br-two-sections .br-flat-row{grid-template-columns:minmax(0,1fr);gap:8px}
+#epantry-brand-review .br-two-sections .br-status{justify-self:start}
+#epantry-brand-review .br-section-foot{padding:8px 18px;background:#fafbf7;border-top:1px solid #e4e9e1;font-size:12px;color:#63776a}
+@media (max-width:950px){#epantry-brand-review .br-intro{grid-template-columns:1fr}#epantry-brand-review .br-owner-layout{grid-template-columns:1fr}#epantry-brand-review .br-owner-list{max-height:255px;border-right:0;border-bottom:1px solid #d9dfd8}#epantry-brand-review .br-two-sections{grid-template-columns:1fr}#epantry-brand-review .br-intro-text{padding:22px}}
+@media (max-width:600px){#epantry-brand-review{padding:0 0 18px}#epantry-brand-review .br-intro{margin-bottom:21px;border-radius:8px}#epantry-brand-review .br-intro-text{padding:17px 17px 15px}#epantry-brand-review .br-intro h2{font-size:23px}#epantry-brand-review .br-intro-text p:last-child{font-size:13px}#epantry-brand-review .br-summary{padding:6px}#epantry-brand-review .br-summary a{padding:11px 12px}#epantry-brand-review .br-summary b{font-size:24px}#epantry-brand-review .br-summary small{font-size:12px}#epantry-brand-review .br-section{margin-bottom:22px}#epantry-brand-review .br-section-head{padding:14px 14px}#epantry-brand-review .br-section-title h2{font-size:21px}#epantry-brand-review .br-detail{padding:16px 14px}#epantry-brand-review .br-review-inputs{grid-template-columns:1fr}#epantry-brand-review .br-flat-row{padding:14px}#epantry-brand-review .br-empty{padding:16px 14px}#epantry-brand-review .br-note-strip{padding:12px 14px;flex-direction:column;align-items:stretch;gap:6px}#epantry-brand-review .br-claim-button{padding:13px 14px}}
+
+`
