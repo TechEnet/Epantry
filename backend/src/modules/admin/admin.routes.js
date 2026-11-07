@@ -32,7 +32,9 @@ import {
 
 import {
   createAdminRoleController,
+  deleteAdminRoleController,
   getAdminUserRolesController,
+  listAdminAssignableHostsController,
   listAdminPermissionsController,
   listAdminRolesController,
   updateAdminRoleController,
@@ -244,6 +246,17 @@ router.patch(
   updateAdminRoleController,
 )
 
+router.delete(
+  '/roles/:roleId',
+  authenticateSession,
+  requireCsrfToken,
+  loadCurrentUser,
+  requireActiveAccount,
+  ...requireRecentPrivilegedAccess('super_admin'),
+  loadAdminAuthorization,
+  deleteAdminRoleController,
+)
+
 /*
 |--------------------------------------------------------------------------
 | Limited Internal Admin Assignment
@@ -260,6 +273,17 @@ router.patch(
 | activeMode
 |
 */
+
+/* Host directory for role assignment - root Super Admin only. */
+router.get(
+  '/role-assignment/hosts',
+  authenticateSession,
+  loadCurrentUser,
+  requireActiveAccount,
+  ...requirePrivilegedAccess('super_admin'),
+  loadAdminAuthorization,
+  listAdminAssignableHostsController,
+)
 
 router.get(
   '/users/:userId/roles',

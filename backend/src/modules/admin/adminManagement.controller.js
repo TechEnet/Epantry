@@ -12,7 +12,9 @@ import {
 
 import {
   createAdminRole,
+  deleteAdminRole,
   getAdminUserRoles,
+  listAdminAssignableHosts,
   listAdminPermissionCatalog,
   listAdminRoles,
   updateAdminRole,
@@ -421,6 +423,28 @@ export async function createAdminRoleController(
   }
 }
 
+export async function deleteAdminRoleController(req, res, next) {
+  try {
+    const { roleId } = parseOrThrow(roleParamsSchema, req.params, {
+      code: 'ADMIN_ROLE_ID_INVALID', message: 'A valid admin role ID is required.',
+    })
+    const { reasonCode, reasonDetails } = parseOrThrow(reasonSchema.strict(), req.body, {
+      code: 'ADMIN_ROLE_DELETE_BODY_INVALID', message: 'A reason is required to delete this role.',
+    })
+    const deletedRole = await deleteAdminRole({
+      roleId, reasonCode, reasonDetails,
+      actorUser: req.currentUser,
+      adminAuthorization: req.adminAuthorization,
+      requestId: req.requestId,
+    })
+    return res.status(200).json(new ApiResponse(200, {
+      deletedRole, requestId: req.requestId,
+    }, 'Custom role deleted'))
+  } catch (error) {
+    return next(error)
+  }
+}
+
 export async function updateAdminRoleController(
   req,
   res,
@@ -499,6 +523,29 @@ export async function updateAdminRoleController(
 | User Role Assignment
 |--------------------------------------------------------------------------
 */
+
+const hostDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional().default(''),
+  page: z.coerce.number().int().min(1).max(100000).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(25),
+}).strict()
+
+export async function listAdminAssignableHostsController(req, res, next) {
+  try {
+    const query = parseOrThrow(hostDirectoryQuerySchema, req.query, {
+      code: 'ADMIN_HOST_DIRECTORY_QUERY_INVALID',
+      message: 'Invalid Host directory request.',
+    })
+    const result = await listAdminAssignableHosts({
+      search: query.q, page: query.page, limit: query.limit,
+    })
+    return res.status(200).json(new ApiResponse(200, {
+      ...result, requestId: req.requestId,
+    }, 'Host accounts loaded'))
+  } catch (error) {
+    return next(error)
+  }
+}
 
 export async function getAdminUserRolesController(
   req,

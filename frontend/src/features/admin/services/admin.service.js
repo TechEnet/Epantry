@@ -33,6 +33,9 @@ export const ADMIN_REASON_CODES =
     ROLE_DISABLED:
       'admin_role.disabled',
 
+    ROLE_DELETED:
+      'admin_role.deleted',
+
     ASSIGNMENT_GRANTED:
       'admin_assignment.granted',
 
@@ -545,6 +548,19 @@ export async function createAdminRole({
       data?.requestId ||
       null,
   }
+}
+
+export async function deleteAdminRole({
+  roleId,
+  reasonCode = ADMIN_REASON_CODES.ROLE_DELETED,
+  reasonDetails = null,
+}) {
+  const data = await performAdminMutation({
+    method: 'delete',
+    url: `/admin/roles/${encodePathValue(roleId)}`,
+    data: { reasonCode, reasonDetails },
+  })
+  return { deletedRole: data?.deletedRole || null, requestId: data?.requestId || null }
 }
 
 export async function updateAdminRole({
@@ -1087,3 +1103,16 @@ export async function updateAdminProPlan({
   })
 }
 
+
+
+/* Paginated, root Super Admin-only Host directory for role assignment. */
+export async function getAdminAssignableHosts({ search = '', page = 1, limit = 25 } = {}) {
+  const response = await apiClient.get('/admin/role-assignment/hosts', {
+    params: normalizeQueryParams({ q: search.trim(), page, limit }),
+  })
+  const data = unwrapApiData(response)
+  return {
+    hosts: Array.isArray(data?.hosts) ? data.hosts : [],
+    pagination: data?.pagination || { hasMore: false, total: 0 },
+  }
+}

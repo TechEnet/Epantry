@@ -763,6 +763,65 @@ export async function createAdminRole({
 
 /*
 |--------------------------------------------------------------------------
+| Delete unassigned custom role
+|--------------------------------------------------------------------------
+| System roles cannot be deleted. Roles referenced by ANY assignment are
+| protected (including revoked assignments) to preserve history and avoid
+| dangling reference IDs. Audit snapshot remains after deletion.
+*/
+export async function deleteAdminRole({
+  roleId, actorUser, adminAuthorization, reasonCode, reasonDetails, requestId,
+}) {
+  const normalizedRoleId = normalizeObjectId(roleId, {
+    code: 'ADMIN_ROLE_ID_INVALID',
+    message: 'A valid admin role ID is required.',
+  })
+
+  normalizeAdminAuditReason({
+    action: 'admin.role.delete', reasonCode, reasonDetails,
+  })
+
+  const role = await AdminRole.findById(normalizedRoleId)
+  if (!role) {
+    throw new ApiError(404, 'Admin role was not found.', [{ code: 'ADMIN_ROLE_NOT_FOUND' }])
+  }
+  if (role.isSystem === true || ADMIN_SYSTEM_ROLE_TEMPLATES[role.key]) {
+    throw new ApiError(409, 'EPANTRY system roles cannot be deleted.', [
+      { code: 'ADMIN_SYSTEM_ROLE_IMMUTABLE' },
+    ])
+  }
+
+  const assigned = await AdminAssignment.exists({ roleIds: role._id })
+  if (assigned) {
+    throw new ApiError(409, 'This role is assigned to an account or retained in assignment history. Remove assignments first or disable the role instead.', [
+      { code: 'ADMIN_ROLE_IN_USE' },
+    ])
+  }
+
+  const beforeSnapshot = serializeAdminRole(role)
+  const result = await AdminRole.deleteOne({ _id: role._id, isSystem: false })
+  if (result.deletedCount !== 1) {
+    throw new ApiError(409, 'Role could not be deleted. Refresh and try again.', [
+      { code: 'ADMIN_ROLE_DELETE_CONFLICT' },
+    ])
+  }
+
+  await recordAdminAuditEvent({
+    actorUser, adminAuthorization,
+    action: 'admin.role.delete',
+    permissionKey: 'admin.roles.manage',
+    entityType: 'admin_role',
+    entityId: String(role._id),
+    reasonCode, reasonDetails,
+    beforeSnapshot,
+    afterSnapshot: null,
+    requestId,
+  })
+  return beforeSnapshot
+}
+
+/*
+|--------------------------------------------------------------------------
 | Update Custom Role
 |--------------------------------------------------------------------------
 */
@@ -1503,4 +1562,60 @@ export async function updateAdminUserRoles({
   })
 
   return afterSnapshot
+}
+
+/*
+|--------------------------------------------------------------------------
+| Role assignment - Host account directory (read-only)
+|--------------------------------------------------------------------------
+| Lists Host-lifecycle accounts for the root Super Admin's picker.
+| This does not grant privileges; updates still use the existing protected
+| role-assignment endpoint with its own MFA/CSRF/audit validations.
+*/
+export function buildAdminAssignableHostFilter(search = '') {
+  const normalized = String(search || '').trim().slice(0, 80)
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const filter = {
+    hostAccessStatus: { $in: ['pending', 'active', 'rejected', 'suspended'] },
+    superAdminEnabled: { $ne: true },
+  }
+  if (normalized) {
+    const pattern = new RegExp(escaped, 'i')
+    filter.$or = [{ name: pattern }, { email: pattern }]
+  }
+  return filter
+}
+
+export async function listAdminAssignableHosts({ search = '', page = 1, limit = 25 } = {}) {
+  const safePage = Math.max(1, Number(page) || 1)
+  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 25))
+  const filter = buildAdminAssignableHostFilter(search)
+  const [rows, total] = await Promise.all([
+    User.find(filter, {
+      name: 1, email: 1, hostAccessStatus: 1,
+      accountStatus: 1, hostWorkspaceType: 1,
+    })
+      .sort({ name: 1, _id: 1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .lean(),
+    User.countDocuments(filter),
+  ])
+  return {
+    hosts: rows.map((user) => ({
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      hostAccessStatus: user.hostAccessStatus || 'not_requested',
+      accountStatus: user.accountStatus,
+      canAssign: user.accountStatus === 'active',
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.ceil(total / safeLimit),
+      hasMore: safePage * safeLimit < total,
+    },
+  }
 }

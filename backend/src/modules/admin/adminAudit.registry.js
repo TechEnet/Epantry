@@ -98,6 +98,12 @@ export const ADMIN_AUDIT_REASON_DEFINITIONS =
     }),
 
     freezeReasonDefinition({
+      code: 'admin_role.deleted',
+      label: 'Admin custom role deleted',
+      requiresDetails: true,
+    }),
+
+    freezeReasonDefinition({
       code:
         'admin_assignment.granted',
 
@@ -280,6 +286,10 @@ export const ADMIN_AUDIT_CRITICAL_ACTION_REASONS =
       Object.freeze([
         'admin_role.disabled',
       ]),
+
+    'admin.role.delete': Object.freeze([
+      'admin_role.deleted',
+    ]),
 
     'admin.assignment.grant':
       Object.freeze([

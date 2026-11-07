@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Activity, BarChart3, CalendarDays,
+  Activity, BarChart3, CalendarDays, ChevronDown,
   CheckCircle2, Download, Eye, Globe2, MousePointerClick,
   RefreshCw, ShieldCheck, ShoppingBag, Smartphone, Users,
 } from 'lucide-react'
@@ -35,13 +35,13 @@ function SectionHeading({ number, title, subtitle, right, tone = 'green' }) {
 
 function Metric({ label, value, icon: Icon, note, highlight = false }) {
   return (
-    <div className={`min-w-0 border-b border-[#D6DED7] px-3 py-3 last:border-b-0 sm:px-4 sm:py-4 lg:border-b-0 lg:border-r lg:last:border-r-0 ${highlight ? 'bg-[#DCE0CF]' : 'bg-[#F7F6F2]'}`}>
+    <div className={`wi-metric min-w-0 border-b border-[#D6DED7] px-3 py-3 last:border-b-0 sm:px-4 sm:py-4 lg:border-b-0 lg:border-r lg:last:border-r-0 ${highlight ? 'bg-[#DCE0CF]' : 'bg-[#F7F6F2]'}`}>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[14px] font-semibold text-[#365549] sm:text-[15px]">{label}</span>
-        <Icon size={19} aria-hidden="true" className="shrink-0 text-[#416E5B]" />
+        <span className="wi-metric-label text-[14px] font-semibold text-[#365549] sm:text-[15px]">{label}</span>
+        <Icon size={19} aria-hidden="true" className="wi-metric-icon shrink-0 text-[#416E5B]" />
       </div>
-      <div className="mt-2 text-[28px] font-bold leading-tight tabular-nums text-[#173F35] sm:text-[34px]">{value}</div>
-      {note && <p className="mt-1 text-[13px] leading-5 text-[#56665B]">{note}</p>}
+      <div className="wi-metric-value mt-2 text-[28px] font-bold leading-tight tabular-nums text-[#173F35] sm:text-[34px]">{value}</div>
+      {note && <p className="wi-metric-note mt-1 text-[13px] leading-5 text-[#56665B]">{note}</p>}
     </div>
   )
 }
@@ -212,39 +212,136 @@ export default function AdminWebsiteAnalyticsPage({ embedded = false, activeView
       <style>{`
         .wi-embedded {--wi-green:#173F35;--wi-sage:#DCE0CF}
         .wi-embedded button:focus-visible,.wi-embedded summary:focus-visible {outline:2px solid #173F35;outline-offset:3px}
-        .wi-embedded .wi-panel {border:1px solid #D8E1D7;background:#FFFEFB}
+        .wi-embedded .wi-panel {border:1px solid #D8E1D7;background:#F7F6F2}
         .wi-embedded .wi-panel h3 {color:#173F35!important}
+        .wi-embedded .wi-custom-date {width:100%;min-width:0}
+        .wi-embedded .wi-custom-date-trigger {
+          display:inline-flex!important;align-items:center;gap:11px;box-sizing:border-box;
+          width:min(100%,440px);min-height:54px;list-style:none;cursor:pointer;
+          padding:6px 7px 6px 9px;border:1.5px solid #A8BDAE!important;border-radius:12px;
+          background:#FFFDF9!important;color:#173F35!important;
+          box-shadow:0 2px 0 rgba(23,63,53,.07);
+          transition:border-color .18s,background-color .18s,box-shadow .18s;
+        }
+        .wi-embedded .wi-custom-date-trigger::-webkit-details-marker {display:none}
+        .wi-embedded .wi-custom-date-trigger::marker {content:''}
+        .wi-embedded .wi-custom-date-trigger:hover {background:#E9EFE6!important;border-color:#173F35!important;box-shadow:0 3px 10px rgba(23,63,53,.09)}
+        .wi-embedded .wi-date-icon {display:inline-flex;flex:0 0 36px;height:36px;align-items:center;justify-content:center;border-radius:9px;background:#DCE0CF!important;color:#173F35!important}
+        .wi-embedded .wi-date-label {flex:1;min-width:0;text-align:left;font-size:14px;font-weight:700;line-height:1.3}
+        .wi-embedded .wi-custom-date-chevron {display:inline-flex;flex:0 0 38px;height:38px;align-items:center;justify-content:center;border-radius:9px;background:#173F35!important;color:#FFFEFB!important;transition:transform .2s ease,background-color .2s ease}
+        .wi-embedded details.wi-custom-date[open] .wi-custom-date-trigger {border-color:#173F35!important;background:#E8EEE5!important;box-shadow:0 0 0 2px rgba(23,63,53,.08)}
+        .wi-embedded details.wi-custom-date[open] .wi-custom-date-chevron {background:#285D48!important}
+        .wi-embedded details.wi-custom-date[open] .wi-custom-date-chevron svg {transform:rotate(180deg)}
+        .wi-embedded .wi-custom-date-chevron svg {transition:transform .2s ease}
+        .wi-embedded .wi-date-fields {margin-top:11px;border:1px solid #CDD8CD;border-left:3px solid #C86C42;border-radius:10px;background:#F7F6F2;padding:16px}
+        /* Analytics palette restoration: only inside this report, never site-wide. */
+        .wi-embedded {color:#202421!important}
+        .wi-embedded .wi-report-head {
+          padding:17px 20px 16px!important;
+          border:1px solid #CEDACB!important;border-top:3px solid #C86C42!important;
+          border-radius:12px;background:#E6ECE3!important;
+        }
+        .wi-embedded .wi-report-head h2 {color:#173F35!important;font-size:29px!important;line-height:1.2!important}
+        .wi-embedded .wi-report-head p {color:#42604E}
+        .wi-embedded .wi-report-head p:first-child {color:#B65936!important}
+        .wi-embedded .wi-export {background:#FFFDF9!important;color:#173F35!important;border-color:#A9BFAF!important}
+        .wi-embedded .wi-export:hover:not(:disabled) {background:#DCE0CF!important}
+        .wi-embedded .wi-metrics {border-color:#C8D7CA!important;background:#FFFDF9!important}
+        .wi-embedded .wi-metrics .wi-metric {background:#FFFDF9!important;border-color:#D5DED4!important}
+        .wi-embedded .wi-metrics .wi-metric:first-child {background:#DCE0CF!important}
+        .wi-embedded .wi-metric-label {color:#355646!important}
+        .wi-embedded .wi-metric-value {color:#173F35!important}
+        .wi-embedded .wi-tracking-status {
+          background:#E9EFE8!important;border:1px solid #C5D8C9!important;
+          border-left:4px solid #C86C42!important;border-radius:12px;
+        }
+        .wi-embedded .wi-tracking-status-title,.wi-embedded .wi-tracking-status strong {color:#173F35!important}
+        .wi-embedded .wi-tracking-copy {color:#425B4B!important}
+        .wi-embedded .wi-consent-summary {background:#DCE0CF!important;border:1px solid #C9D4C3!important;border-radius:10px}
+        .wi-embedded .wi-consent-summary p,.wi-embedded .wi-consent-summary strong {color:#173F35!important}
+        .wi-embedded .wi-report-details {border-color:#D2DED3!important}
+        .wi-embedded .wi-report-date {color:#385848!important}
+        .wi-embedded .wi-mobile-consent-detail,.wi-embedded .wi-short-copy {display:none}
+        @media (max-width:520px) {
+          /* The responsive report stays fully actionable; only the presentation is condensed. */
+          .wi-embedded {gap:12px!important;padding-bottom:8px!important}
+          .wi-embedded .wi-report-head {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px!important;border-radius:10px!important}
+          .wi-embedded .wi-report-head h2 {font-size:22px!important;line-height:1.2!important;margin-top:3px!important;overflow-wrap:anywhere}
+          .wi-embedded .wi-report-subtitle {display:none}
+          .wi-embedded .wi-export {min-height:40px!important;padding:7px 10px!important;font-size:13px!important;white-space:nowrap;gap:5px!important;align-self:center}
+          .wi-embedded .wi-custom-date-trigger {width:100%;min-height:50px;padding:5px 6px 5px 7px;gap:9px}
+          .wi-embedded .wi-date-icon {height:34px;flex-basis:34px}
+          .wi-embedded .wi-date-label {font-size:13.5px;line-height:1.3}
+          .wi-embedded .wi-custom-date-chevron {height:36px;flex-basis:36px}
+          .wi-embedded .wi-date-fields {padding:12px;margin-top:9px}
+          .wi-embedded .wi-report-date {font-size:12.5px!important;line-height:1.4!important;overflow-wrap:anywhere}
+          .wi-embedded .wi-metrics {border-radius:11px!important}
+          .wi-embedded .wi-metric {padding:10px 12px!important;min-height:75px!important;border-color:#D7E1D8!important}
+          .wi-embedded .wi-metric-label {font-size:13.5px!important;line-height:1.2!important}
+          .wi-embedded .wi-metric-icon {width:17px;height:17px}
+          .wi-embedded .wi-metric-value {font-size:27px!important;line-height:1.1!important;margin-top:7px!important}
+          .wi-embedded .wi-metric-note {display:none}
+          .wi-embedded .wi-tracking-status {padding:13px!important;border-radius:11px}
+          .wi-embedded .wi-tracking-status-title {font-size:17px!important;line-height:1.25!important}
+          .wi-embedded .wi-tracking-status-title svg {width:18px;height:18px}
+          .wi-embedded .wi-tracking-copy {font-size:13px!important;line-height:1.45!important;margin-top:4px!important}
+          .wi-embedded .wi-long-copy {display:none}
+          .wi-embedded .wi-short-copy {display:inline}
+          .wi-embedded .wi-tracking-counts {width:100%;display:flex;flex-wrap:wrap;gap:12px!important;border-left:0!important;border-top:1px solid #CAD8CB;padding:9px 0 0!important;font-size:12px!important}
+          .wi-embedded .wi-tracking-counts strong {font-size:20px!important;line-height:1.2!important}
+          .wi-embedded .wi-mobile-consent-detail {display:flex;align-items:center;flex-wrap:wrap;gap:6px 13px;width:100%;margin-top:9px;color:#3D594B;font-size:12.5px}
+          .wi-embedded .wi-mobile-consent-detail strong {color:#173F35;font-weight:750}
+          .wi-embedded .wi-tracking-check {margin-top:10px!important;padding-top:9px!important;font-size:13px!important}
+          .wi-embedded .wi-tracking-check p {line-height:1.5!important}
+          .wi-embedded .wi-hide-consent-on-empty {display:none!important}
+          .wi-embedded .wi-consent-summary {padding:12px!important;gap:10px!important}
+          .wi-embedded .wi-consent-summary > div {min-width:0}
+          .wi-embedded .wi-consent-summary p {font-size:13px!important}
+          .wi-embedded .wi-consent-share {font-size:17px!important}
+          .wi-embedded .wi-consent-summary svg {width:18px;height:18px}
+          .wi-embedded .wi-consent-summary .wi-consent-numbers {gap:12px!important}
+          .wi-embedded .wi-consent-summary .wi-consent-numbers strong {font-size:18px!important}
+          .wi-embedded .wi-report-details {padding:11px 0!important;margin-top:0!important}
+          .wi-embedded .wi-report-details summary {font-size:13px!important}
+          .wi-embedded .wi-updated-at {font-size:12px!important;margin-top:0}
+          .wi-embedded .wi-panel {padding:14px!important}
+          .wi-embedded .wi-panel h3 {font-size:17px!important}
+        }
       `}</style>
       {isOverview ? (
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#DCE3DA] pb-3">
+        <div className="wi-report-head flex flex-wrap items-end justify-between gap-3 border-b border-[#DCE3DA] pb-3">
           <div>
             <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#C86C42]">01 / WEBSITE OVERVIEW</p>
             <h2 className="mt-1 text-[25px] font-bold leading-tight text-[#173F35] sm:text-[30px]">Website performance</h2>
-            <p className="mt-1 text-[14px] text-[#56675C]">Only visits with analytics permission are counted.</p>
+            <p className="wi-report-subtitle mt-1 text-[14px] text-[#56675C]">Only visits with analytics permission are counted.</p>
           </div>
           <button type="button" onClick={() => report && exportAggregateCsv(report)} disabled={!report || loading}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-[#BACCBF] bg-[#FFFDF9] px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+            className="wi-export inline-flex min-h-[44px] items-center gap-2 rounded-md border border-[#BACCBF] bg-[#FFFDF9] px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
             <Download size={16} /> Export CSV
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#DCE3DA] pb-3">
+        <div className="wi-report-head flex flex-wrap items-end justify-between gap-3 border-b border-[#DCE3DA] pb-3">
           <div>
             <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#C86C42]">03 / SHOPPING</p>
             <h2 className="mt-1 text-[25px] font-bold leading-tight text-[#173F35] sm:text-[30px]">Shopping & content insights</h2>
-            <p className="mt-1 text-[14px] text-[#56675C]">Product activity and confirmed orders.</p>
+            <p className="wi-report-subtitle mt-1 text-[14px] text-[#56675C]">Product activity and confirmed orders.</p>
           </div>
           <button type="button" onClick={() => report && exportAggregateCsv(report)} disabled={!report || loading}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-[#BACCBF] bg-[#FFFDF9] px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+            className="wi-export inline-flex min-h-[44px] items-center gap-2 rounded-md border border-[#BACCBF] bg-[#FFFDF9] px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
             <Download size={16} /> Export CSV
           </button>
         </div>
       )}
 
       {isOverview && (
-        <details className="border-l-[3px] border-[#C86C42] bg-[#E9EDE5] px-4 py-3">
-          <summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Custom website date range · UTC</summary>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
+        <details className="wi-custom-date">
+          <summary className="wi-custom-date-trigger">
+            <span className="wi-date-icon" aria-hidden="true"><CalendarDays size={19} strokeWidth={2} /></span>
+            <span className="wi-date-label">Custom website date range · UTC</span>
+            <span className="wi-custom-date-chevron" aria-hidden="true"><ChevronDown size={20} strokeWidth={2.6} /></span>
+          </summary>
+          <div className="wi-date-fields flex flex-wrap items-end gap-3">
             <label className="min-w-[150px] flex-1 text-[13px] font-semibold text-[#365549]">From
               <input type="date" value={from} onChange={(e) => {setFrom(e.target.value);setPeriod('custom')}} className="mt-1 block min-h-11 w-full border border-[#BDCBBF] bg-white px-3 text-[15px] text-[#173F35]" />
             </label>
@@ -259,7 +356,7 @@ export default function AdminWebsiteAnalyticsPage({ embedded = false, activeView
         </details>
       )}
       {report && !loading && (
-        <p className="text-[13px] font-medium text-[#50685A]">{report.window?.from} to {report.window?.to} · UTC{applied.from ? ' · Custom range' : ''}</p>
+        <p className="wi-report-date text-[13px] font-medium text-[#50685A]">{report.window?.from} to {report.window?.to} · UTC{applied.from ? ' · Custom range' : ''}</p>
       )}
       {loading && <p role="status" className="py-12 text-center text-[15px] text-[#54665B]">Loading website analytics...</p>}
       {!loading && error && (
@@ -271,27 +368,37 @@ export default function AdminWebsiteAnalyticsPage({ embedded = false, activeView
       )}
       {report && !loading && (isOverview ? (
         <>
-          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-[#D5DED5] sm:grid-cols-4">
+          <div className="wi-metrics grid grid-cols-2 overflow-hidden rounded-lg border border-[#D5DED5] sm:grid-cols-4">
             <Metric label="Visitors" value={compact(report.overview.visitors)} icon={Users} highlight note="Consented browsers" />
             <Metric label="Sessions" value={compact(report.overview.sessions)} icon={Activity} />
             <Metric label="Page views" value={compact(report.overview.pageViews)} icon={Eye} />
             <Metric label="Recipe views" value={compact(report.overview.recipeViews)} icon={BarChart3} />
           </div>
           {!hasData && (
-            <section className="border border-[#D6DFD5] bg-[#E9EEE7] px-5 py-5 sm:px-6 sm:py-6" aria-label="Tracking status">
+            <section className="wi-tracking-status border border-[#D6DFD5] bg-[#E9EEE7] px-5 py-5 sm:px-6 sm:py-6" aria-label="Tracking status">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="max-w-2xl">
-                  <h3 className="flex items-center gap-2 text-[20px] font-bold text-[#173F35]"><ShieldCheck size={22} aria-hidden="true" /> No consented visits yet</h3>
-                  <p className="mt-2 text-[15px] leading-6 text-[#465F50]">{consentDecisions === 0
-                    ? 'No cookie decisions have been saved yet. Analytics begins only after someone allows it.'
-                    : 'Cookie choices exist, but no website events were recorded in this period.'}</p>
+                  <h3 className="wi-tracking-status-title flex items-center gap-2 text-[20px] font-bold text-[#173F35]"><ShieldCheck size={22} aria-hidden="true" /> No consented visits yet</h3>
+                  <p className="wi-tracking-copy mt-2 text-[15px] leading-6 text-[#465F50]">
+                    <span className="wi-long-copy">{consentDecisions === 0
+                      ? 'No cookie decisions have been saved yet. Analytics begins only after someone allows it.'
+                      : 'Cookie choices exist, but no website events were recorded in this period.'}</span>
+                    <span className="wi-short-copy">{consentDecisions === 0
+                      ? 'Analytics starts after a visitor allows it.'
+                      : 'No website activity recorded in this period.'}</span>
+                  </p>
                 </div>
-                <div className="flex gap-6 border-l border-[#CAD8CB] pl-4 text-[13px] text-[#526658]">
+                <div className="wi-tracking-counts flex gap-6 border-l border-[#CAD8CB] pl-4 text-[13px] text-[#526658]">
                   <span>Recorded events<strong className="block text-[26px] font-bold text-[#173F35]">{compact(recordedEvents)}</strong></span>
                   <span>Saved choices<strong className="block text-[26px] font-bold text-[#173F35]">{compact(consentDecisions)}</strong></span>
                 </div>
               </div>
-              <details className="mt-4 border-t border-[#CCD9CE] pt-3 text-[14px] text-[#4A6254]">
+              <div className="wi-mobile-consent-detail" aria-label="Cookie consent summary">
+                <span><strong>Allowed:</strong> {compact(report.consent.analyticsEnabled)}</span>
+                <span><strong>Not allowed:</strong> {compact(report.consent.analyticsRejected)}</span>
+                <span><strong>Share allowed:</strong> {report.consent.enabledShare == null ? '—' : `${report.consent.enabledShare}%`}</span>
+              </div>
+              <details className="wi-tracking-check mt-4 border-t border-[#CCD9CE] pt-3 text-[14px] text-[#4A6254]">
                 <summary className="cursor-pointer font-bold text-[#173F35]">Check tracking</summary>
                 <p className="mt-2 leading-6">In a Customer or guest browser, allow Analytics under Cookie settings, visit a public Grocery or Recipe page, then refresh this report. Host/Admin workspace visits and searches are not part of public website tracking.</p>
               </details>
@@ -315,24 +422,24 @@ export default function AdminWebsiteAnalyticsPage({ embedded = false, activeView
             </div>
           </div>}
           <div className="border-t border-[#D6E0D6] pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-[#E8EEE3] p-4 sm:p-5">
+            <div className={`wi-consent-summary flex flex-wrap items-center justify-between gap-4 bg-[#E8EEE3] p-4 sm:p-5 ${!hasData ? 'wi-hide-consent-on-empty' : ''}`}>
               <div className="flex items-center gap-3"><ShieldCheck size={22} color="#173F35"/><div><p className="text-[14px] font-semibold text-[#365549]">Saved cookie choices</p>
-                <p className="text-[21px] font-bold text-[#173F35]">{report.consent.enabledShare == null ? 'No saved choices' : `${report.consent.enabledShare}% allowed`}</p></div></div>
-              <div className="flex gap-6"><div className="text-[13px] text-[#526558]">Allowed<strong className="block text-[21px] text-[#173F35]">{compact(report.consent.analyticsEnabled)}</strong></div>
+                <p className="wi-consent-share text-[21px] font-bold text-[#173F35]">{report.consent.enabledShare == null ? 'No saved choices' : `${report.consent.enabledShare}% allowed`}</p></div></div>
+              <div className="wi-consent-numbers flex gap-6"><div className="text-[13px] text-[#526558]">Allowed<strong className="block text-[21px] text-[#173F35]">{compact(report.consent.analyticsEnabled)}</strong></div>
                 <div className="text-[13px] text-[#526558]">Not allowed<strong className="block text-[21px] text-[#173F35]">{compact(report.consent.analyticsRejected)}</strong></div></div>
             </div>
-            <details className="mt-2 border-b border-[#DAE2DA] py-3"><summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Definitions & data coverage</summary>
+            <details className="wi-report-details mt-2 border-b border-[#DAE2DA] py-3"><summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Definitions & data coverage</summary>
               <div className="space-y-2 pt-3 text-[14px] leading-6 text-[#506052]"><p>{report.coverage.note}</p><p>{report.consent.note}</p><p>{report.commerce.note}</p><p>Report dates are UTC. Raw website events are retained up to 90 days.</p></div>
             </details>
-            <details className="border-b border-[#DAE2DA] py-3"><summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Daily activity table</summary>
+            <details className="wi-report-details border-b border-[#DAE2DA] py-3"><summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Daily activity table</summary>
               <div className="mt-3"><DataTable headings={['UTC day','Page views','Sessions','Recipe views','Product views']} rows={dailyTableRows} empty="No daily activity"/></div>
             </details>
           </div>
-          <p className="text-right text-[12px] text-[#66776C]">Updated {new Date(report.generatedAt).toLocaleString('en-IN')}</p>
+          <p className="wi-updated-at text-right text-[12px] text-[#66776C]">Updated {new Date(report.generatedAt).toLocaleString('en-IN')}</p>
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-[#D5DED5] sm:grid-cols-4">
+          <div className="wi-metrics grid grid-cols-2 overflow-hidden rounded-lg border border-[#D5DED5] sm:grid-cols-4">
             <Metric label="Product views" value={compact(report.overview.productViews)} icon={ShoppingBag} highlight />
             <Metric label="Consented searches" value={compact(report.overview.searches)} icon={MousePointerClick} />
             <Metric label="Saved items" value={compact(report.overview.bookmarks)} icon={ShieldCheck} />

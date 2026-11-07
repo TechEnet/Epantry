@@ -1,21 +1,29 @@
 import {
   CircleAlert,
+  Check,
+  ChevronDown,
   LoaderCircle,
   Plus,
   Search,
   ShieldCheck,
   Trash2,
+  X,
+  Users,
 } from 'lucide-react'
 
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
 import {
   Link,
 } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+
+import { getAdminAssignableHosts } from '../services/admin.service'
 
 import AdminShell from '../components/AdminShell'
 
@@ -35,6 +43,23 @@ function getErrorMessage(error) {
 
 function getRoleKey(role) {
   return role?.key || role?.roleKey || ''
+}
+
+// Keep role identifiers compatible with the existing backend validation.
+// Display names remain unchanged; only the internal identifier is normalized.
+function normalizeRoleKey(value) {
+  const normalized = String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+/, '')
+
+  const withLetterPrefix = normalized && !/^[a-z]/.test(normalized)
+    ? `role_${normalized}`
+    : normalized
+
+  return withLetterPrefix.slice(0, 64)
 }
 
 function getAssignmentRoleKeys(access) {
@@ -142,9 +167,9 @@ const STEPS = [
   },
   {
     number: '03',
-    title: 'Give access to a person',
-    text: 'Find the user and choose the admin role they actually need.',
-    mobileText: 'Assign only the role the person actually needs.',
+    title: 'Choose a Host',
+    text: 'Choose a Host, then assign the admin role they need.',
+    mobileText: 'Select a Host and assign the needed role.',
     href: '#assign-access',
   },
   {
@@ -181,17 +206,20 @@ export default function AdminRolesPage() {
   const {
     permissions,
     isLoading: isLoadingPermissions,
+    error: permissionsError,
+    refetch: refetchPermissions,
   } = useAdminPermissionCatalog()
 
   const {
     roles,
     isLoading: isLoadingRoles,
     error: rolesError,
+    refetch: refetchRoles,
   } = useAdminRoles()
 
   const {
     createRole,
-    disableRole,
+    deleteRole,
     grantUserRoles,
     updateUserRoles,
     revokeUserRoles,
@@ -206,7 +234,37 @@ export default function AdminRolesPage() {
   })
 
   const [createError, setCreateError] = useState('')
-  const [userIdInput, setUserIdInput] = useState('')
+  const [createdRoleKey, setCreatedRoleKey] = useState('')
+  const [highlightRoleKey, setHighlightRoleKey] = useState('')
+  const [roleToDelete, setRoleToDelete] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [allHostsOpen, setAllHostsOpen] = useState(false)
+  const [allHostQuery, setAllHostQuery] = useState('')
+  const [debouncedAllHostQuery, setDebouncedAllHostQuery] = useState('')
+  const [allHostPage, setAllHostPage] = useState(1)
+  const [allHostOptions, setAllHostOptions] = useState([])
+  const [allHostTotal, setAllHostTotal] = useState(0)
+  const [allHostMore, setAllHostMore] = useState(false)
+  const [allHostLoading, setAllHostLoading] = useState(false)
+  const [allHostError, setAllHostError] = useState('')
+  const [allHostRetry, setAllHostRetry] = useState(0)
+
+  const [hostQuery, setHostQuery] = useState('')
+  const [debouncedHostQuery, setDebouncedHostQuery] = useState('')
+  const [hostPickerOpen, setHostPickerOpen] = useState(false)
+  const [hostPage, setHostPage] = useState(1)
+  const [hostOptions, setHostOptions] = useState([])
+  const [hostTotal, setHostTotal] = useState(0)
+  const [hasMoreHosts, setHasMoreHosts] = useState(false)
+  const [isLoadingHosts, setIsLoadingHosts] = useState(false)
+  const [hostDirectoryError, setHostDirectoryError] = useState('')
+  const [hostRetry, setHostRetry] = useState(0)
+  const [highlightedHost, setHighlightedHost] = useState(0)
+  const [selectedHost, setSelectedHost] = useState(null)
+  const hostPickerRef = useRef(null)
+  const allHostSearchRef = useRef(null)
+  const allHostNextPageLock = useRef(false)
   const [selectedUserId, setSelectedUserId] = useState('')
   const [selectedRoleKeys, setSelectedRoleKeys] = useState([])
   const [assignmentError, setAssignmentError] = useState('')
@@ -225,6 +283,206 @@ export default function AdminRolesPage() {
 
     setSelectedRoleKeys(getAssignmentRoleKeys(userAccess))
   }, [userAccess])
+
+  // Only fetch the Host directory while the picker is open.
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedHostQuery(hostQuery.trim()), 220)
+    return () => clearTimeout(timeout)
+  }, [hostQuery])
+
+  useEffect(() => {
+    if (!hostPickerOpen || hostQuery.trim() !== debouncedHostQuery) return undefined
+    let active = true
+    setIsLoadingHosts(true)
+    setHostDirectoryError('')
+    getAdminAssignableHosts({ search: debouncedHostQuery, page: hostPage, limit: 10 })
+      .then(({ hosts, pagination }) => {
+        if (!active) return
+        setHostOptions((existing) => hostPage === 1
+          ? hosts
+          : [...existing.filter((item) => !hosts.some((next) => next.id === item.id)), ...hosts])
+        setHasMoreHosts(Boolean(pagination.hasMore))
+        setHostTotal(Number(pagination.total || 0))
+      })
+      .catch((error) => {
+        if (active) setHostDirectoryError(getErrorMessage(error))
+      })
+      .finally(() => {
+        if (active) setIsLoadingHosts(false)
+      })
+    return () => { active = false }
+  }, [hostPickerOpen, debouncedHostQuery, hostQuery, hostPage, hostRetry])
+
+  useEffect(() => {
+    if (!hostPickerOpen) return undefined
+    const handleOutside = (event) => {
+      if (!hostPickerRef.current?.contains(event.target)) setHostPickerOpen(false)
+    }
+    document.addEventListener('pointerdown', handleOutside)
+    return () => document.removeEventListener('pointerdown', handleOutside)
+  }, [hostPickerOpen])
+
+  // Modal uses the same protected host-directory API, paged on scroll.
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedAllHostQuery(allHostQuery.trim()), 220)
+    return () => clearTimeout(timeout)
+  }, [allHostQuery])
+
+  useEffect(() => {
+    if (!allHostsOpen || allHostQuery.trim() !== debouncedAllHostQuery) return undefined
+    let active = true
+    setAllHostLoading(true)
+    setAllHostError('')
+    getAdminAssignableHosts({ search: debouncedAllHostQuery, page: allHostPage, limit: 25 })
+      .then(({ hosts, pagination }) => {
+        if (!active) return
+        setAllHostOptions((existing) => allHostPage === 1
+          ? hosts
+          : [...existing.filter((host) => !hosts.some((next) => next.id === host.id)), ...hosts])
+        setAllHostTotal(Number(pagination.total || 0))
+        setAllHostMore(Boolean(pagination.hasMore))
+      })
+      .catch((error) => { if (active) setAllHostError(getErrorMessage(error)) })
+      .finally(() => { if (active) { setAllHostLoading(false); allHostNextPageLock.current = false } })
+    return () => { active = false }
+  }, [allHostsOpen, allHostQuery, debouncedAllHostQuery, allHostPage, allHostRetry])
+
+  useEffect(() => {
+    if (!allHostsOpen && !roleToDelete) return undefined
+    const handleKey = (event) => {
+      if (event.key === 'Escape') {
+        if (roleToDelete && !deleteBusy) setRoleToDelete(null)
+        if (allHostsOpen) setAllHostsOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [allHostsOpen, roleToDelete, deleteBusy])
+
+  useEffect(() => {
+    if (!allHostsOpen) return undefined
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const focus = window.setTimeout(() => allHostSearchRef.current?.focus(), 40)
+    return () => {
+      document.body.style.overflow = previous
+      window.clearTimeout(focus)
+    }
+  }, [allHostsOpen])
+
+  const openAllHosts = () => {
+    allHostNextPageLock.current = false
+    setAllHostQuery(hostQuery)
+    setDebouncedAllHostQuery(hostQuery.trim())
+    setAllHostPage(1)
+    setAllHostOptions([])
+    setAllHostError('')
+    setHostPickerOpen(false)
+    setAllHostsOpen(true)
+  }
+
+  const changeAllHostQuery = (value) => {
+    allHostNextPageLock.current = false
+    setAllHostQuery(value)
+    setAllHostPage(1)
+    setAllHostOptions([])
+  }
+
+  const handleAllHostScroll = (event) => {
+    const list = event.currentTarget
+    if (!allHostLoading && !allHostNextPageLock.current && allHostMore && !allHostError &&
+      list.scrollHeight - list.scrollTop - list.clientHeight < 100) {
+      allHostNextPageLock.current = true
+      setAllHostPage((page) => page + 1)
+    }
+  }
+
+  useEffect(() => {
+    if (!createdRoleKey) return
+    const matched = roles.find((role) => getRoleKey(role) === createdRoleKey)
+    if (!matched) return
+    const element = document.getElementById(`admin-role-${createdRoleKey}`)
+    if (!element) return
+    setHighlightRoleKey(createdRoleKey)
+    setCreatedRoleKey('')
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
+  }, [createdRoleKey, roles])
+
+  useEffect(() => {
+    if (!highlightRoleKey) return undefined
+    const timeout = window.setTimeout(() => setHighlightRoleKey(''), 3200)
+    return () => window.clearTimeout(timeout)
+  }, [highlightRoleKey])
+
+  const confirmDeleteRole = async () => {
+    if (!roleToDelete || deleteBusy) return
+    setDeleteBusy(true)
+    setDeleteError('')
+    try {
+      await deleteRole({
+        roleId: roleToDelete.id,
+        reasonDetails: `Deleted unassigned custom role ${roleToDelete.name || roleToDelete.key} in Roles & Permissions.`,
+      })
+      setRoleToDelete(null)
+      setHighlightRoleKey('')
+    } catch (error) {
+      setDeleteError(getErrorMessage(error))
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
+  const changeHostQuery = (value) => {
+    setHostQuery(value)
+    setSelectedHost(null)
+    setSelectedUserId('')
+    setSelectedRoleKeys([])
+    setAssignmentError('')
+    setHostOptions([])
+    setHostPage(1)
+    setHighlightedHost(0)
+    setHostPickerOpen(true)
+  }
+
+  const selectHost = (host) => {
+    if (!host.canAssign) return
+    setSelectedHost(host)
+    setSelectedUserId(host.id)
+    setSelectedRoleKeys([])
+    setAssignmentError('')
+    setHostQuery('')
+    setHostOptions([])
+    setHostPage(1)
+    setHostPickerOpen(false)
+    setAllHostsOpen(false)
+  }
+
+  const handleHostKeyboard = (event) => {
+    if (event.key === 'Escape') {
+      setHostPickerOpen(false)
+      return
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (!hostPickerOpen) { setHostPickerOpen(true); return }
+      const direction = event.key === 'ArrowDown' ? 1 : -1
+      setHighlightedHost((index) => {
+        if (!hostOptions.length) return 0
+        let candidate = index
+        for (let attempts = 0; attempts < hostOptions.length; attempts++) {
+          candidate = (candidate + direction + hostOptions.length) % hostOptions.length
+          if (hostOptions[candidate]?.canAssign) return candidate
+        }
+        return index
+      })
+    }
+    if (event.key === 'Enter' && hostPickerOpen) {
+      event.preventDefault()
+      const candidate = hostOptions[highlightedHost]
+      if (candidate?.canAssign) selectHost(candidate)
+    }
+  }
 
   const delegablePermissions = useMemo(
     () => permissions.filter((permission) => permission?.delegable !== false),
@@ -282,11 +540,19 @@ export default function AdminRolesPage() {
     event.preventDefault()
     setCreateError('')
 
+    const key = normalizeRoleKey(roleForm.key)
+    if (!/^[a-z][a-z0-9_]{2,63}$/.test(key)) {
+      setCreateError('Enter an internal role ID of at least 3 characters.')
+      return
+    }
+
     try {
-      await createRole({
+      const created = await createRole({
         ...roleForm,
+        key,
         reasonDetails: 'Created through EPANTRY Roles & Permissions interface.',
       })
+      setCreatedRoleKey(created?.role?.key || key)
 
       setRoleForm({
         key: '',
@@ -297,18 +563,6 @@ export default function AdminRolesPage() {
     } catch (error) {
       setCreateError(getErrorMessage(error))
     }
-  }
-
-  const lookupUser = (event) => {
-    event.preventDefault()
-    const normalized = userIdInput.trim()
-
-    if (!normalized) {
-      return
-    }
-
-    setAssignmentError('')
-    setSelectedUserId(normalized)
   }
 
   const saveAssignment = async () => {
@@ -359,452 +613,578 @@ export default function AdminRolesPage() {
   return (
     <AdminShell
       title="Roles & Permissions"
-      description="Decide which internal admin tools each team member can use without changing their Customer or Host account."
+      description="Manage internal admin access without changing Customer or Host accounts."
       flushTop
     >
-      {rolesError ? (
-        <div className="mb-5 flex items-start gap-3 border-y border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-5 text-red-700">
-          <CircleAlert size={18} className="mt-0.5 shrink-0" />
-          {getErrorMessage(rolesError)}
-        </div>
-      ) : null}
+      <div className="ep-roles-v2">
+        <style>{`
+          .ep-roles-v2 { --ep-forest:#173F35; --ep-charcoal:#202421; --ep-sage:#DCE0CF; --ep-porcelain:#F7F6F2; --ep-clay:#C86C42; --ep-line:#D8DED5; color:var(--ep-charcoal); font-family:'Plus Jakarta Sans',Inter,sans-serif; }
+          .ep-roles-v2 *, .ep-roles-v2 *::before, .ep-roles-v2 *::after { box-sizing:border-box; }
+          .ep-roles-v2 .roles-hero { display:grid; grid-template-columns:minmax(0,1fr) 220px; background:var(--ep-forest)!important; color:var(--ep-porcelain)!important; border-top:3px solid var(--ep-clay); }
+          .ep-roles-v2 .roles-hero-main { padding:28px 34px; }
+          .ep-roles-v2 .roles-hero-kicker { font-size:12px!important; line-height:1.4!important; font-weight:700; color:#DCE0CF!important; }
+          .ep-roles-v2 .roles-hero h2 { font-size:30px!important; line-height:1.17!important; font-weight:700!important; letter-spacing:-.035em; color:#F7F6F2!important; margin:8px 0; }
+          .ep-roles-v2 .roles-hero p { margin:0; color:#E2EBE3!important; font-size:15px!important; line-height:1.6!important; }
+          .ep-roles-v2 .roles-hero-stat { border-left:1px solid rgba(247,246,242,.2); padding:27px 28px; display:flex; flex-direction:column; justify-content:center; }
+          .ep-roles-v2 .roles-hero-stat strong { font-size:48px!important; line-height:1.1!important; font-weight:700; color:#F7F6F2!important; }
+          .ep-roles-v2 .roles-hero-stat span { font-size:14px!important; color:#DCE0CF!important; font-weight:600; }
+          .ep-roles-v2 .roles-steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--ep-line); border-top:0; background:#F1F3EC!important; }
+          .ep-roles-v2 .roles-step { position:relative; min-width:0; display:flex; align-items:center; gap:12px; padding:16px 18px; color:var(--ep-forest)!important; text-decoration:none; border-right:1px solid var(--ep-line); transition:background .18s; }
+          .ep-roles-v2 .roles-step:last-child { border-right:0; }
+          .ep-roles-v2 .roles-step:hover, .ep-roles-v2 .roles-step:focus-visible { background:var(--ep-sage)!important; }
+          .ep-roles-v2 .roles-step-num { width:32px; height:32px; flex-shrink:0; display:grid; place-items:center; border-radius:50%; background:#F7F6F2!important; border:1px solid #BDCCBE; font-size:12px!important; font-weight:700; }
+          .ep-roles-v2 .roles-step-title { font-size:14px!important; line-height:1.35!important; font-weight:700; color:var(--ep-forest)!important; }
+          .ep-roles-v2 .roles-step-arrow { margin-left:auto; flex-shrink:0; opacity:.7; }
+          .ep-roles-v2 .roles-section { margin-top:30px; }
+          .ep-roles-v2 .roles-section-head { display:flex; justify-content:space-between; align-items:end; gap:18px; padding-bottom:14px; border-bottom:1px solid var(--ep-line); margin-bottom:0; }
+          .ep-roles-v2 .roles-kicker { display:block; color:var(--ep-clay)!important; font-size:13px!important; line-height:1.35!important; font-weight:700; letter-spacing:0; }
+          .ep-roles-v2 .roles-section-head h2, .ep-roles-v2 .roles-section-panel h2 { margin:4px 0 0; color:var(--ep-forest)!important; font-size:26px!important; line-height:1.22!important; letter-spacing:-.03em; font-weight:700!important; }
+          .ep-roles-v2 .roles-section-head p, .ep-roles-v2 .roles-section-panel p { margin:5px 0 0; font-size:14px!important; line-height:1.5!important; color:#56645B!important; }
+          .ep-roles-v2 .roles-pill { flex-shrink:0; display:inline-flex; padding:7px 11px; font-size:13px!important; font-weight:700; background:#EDF1E7!important; color:var(--ep-forest)!important; border-radius:30px; }
+          .ep-roles-v2 .roles-table-head { display:grid; grid-template-columns:minmax(200px,1fr) minmax(0,1.65fr) 90px; gap:18px; padding:12px 18px; color:#58685E!important; background:#EBEFE7!important; font-size:13px!important; font-weight:700; }
+          .ep-roles-v2 .roles-list { border:1px solid var(--ep-line); border-top:0; background:#FFFEFB!important; }
+          .ep-roles-v2 .roles-list-row { display:grid; grid-template-columns:minmax(200px,1fr) minmax(0,1.65fr) 90px; gap:18px; padding:18px; border-bottom:1px solid var(--ep-line); align-items:start; background:#FFFEFB!important; transition:background .18s; }
+          .ep-roles-v2 .roles-list-row:last-child { border-bottom:0; }
+          .ep-roles-v2 .roles-list-row { scroll-margin-top:128px; }
+          .ep-roles-v2 .roles-new-highlight { background:#EFF3E4!important; box-shadow:inset 5px 0 0 #C86C42, 0 0 0 2px rgba(200,108,66,.18); animation:ep-role-new-pulse 2.8s ease-out; }
+          @keyframes ep-role-new-pulse { 0%,40% { background:#F8E4CE; } 100% { background:#EFF3E4; } }
+          @media(prefers-reduced-motion:reduce) { .ep-roles-v2 .roles-new-highlight { animation:none; } }
 
-      {/* ACCESS OVERVIEW */}
-      <section className="overflow-hidden bg-[#103E36] text-white">
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="px-4 py-5 sm:px-8 sm:py-9 lg:px-10 lg:py-10">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-200 sm:text-[11px] sm:tracking-[0.18em]">
-              Admin access control
-            </p>
-            <h2 className="mt-2 max-w-3xl text-[23px] font-black leading-[1.04] tracking-[-0.035em] sm:mt-3 sm:text-[40px] sm:leading-[1.02] sm:tracking-[-0.04em] lg:text-[46px]">
-              Roles should make responsibility clear, not complicated.
-            </h2>
-            <p className="mt-2 max-w-2xl text-[12px] font-medium leading-[1.45] text-white/72 sm:hidden">
-              Reuse a standard role, create only when needed, assign it, then verify the change.
-            </p>
-            <p className="mt-4 hidden max-w-2xl text-[15px] font-medium leading-6 text-white/72 sm:block">
-              Reuse an existing role first, create a focused role only when necessary, then assign it to the right person and verify the change.
-            </p>
+          .ep-roles-v2 .roles-list-row:hover { background:#F4F6F0!important; }
+          .ep-roles-v2 .roles-role-number { color:var(--ep-clay)!important; font-size:12px!important; font-weight:700; }
+          .ep-roles-v2 .roles-role-name { font-size:17px!important; font-weight:700; color:var(--ep-forest)!important; line-height:1.35!important; overflow-wrap:anywhere; }
+          .ep-roles-v2 .roles-role-desc { font-size:13px!important; color:#637168!important; line-height:1.5!important; margin:5px 0 0; }
+          .ep-roles-v2 .roles-tag { display:inline-flex; align-items:center; border:1px solid #C7D4C8; padding:2px 7px; border-radius:4px; color:#315C49!important; font-size:11px!important; font-weight:700; white-space:nowrap; }
+          .ep-roles-v2 .roles-tag-off { color:#A1372C!important; border-color:#E6C0B8; }
+          .ep-roles-v2 .roles-permission-preview { display:flex; flex-wrap:wrap; gap:6px; }
+          .ep-roles-v2 .roles-permission-preview span { padding:5px 8px; background:#EDF2E9!important; color:#37574B!important; border-radius:4px; font-size:12px!important; line-height:1.4!important; }
+          .ep-roles-v2 .roles-permission-detail { margin-top:8px; }
+          .ep-roles-v2 .roles-permission-detail summary { color:var(--ep-forest)!important; font-size:13px!important; font-weight:700; cursor:pointer; width:max-content; padding:3px 0; }
+          .ep-roles-v2 .roles-all-permissions { margin-top:8px; display:grid; gap:6px; font-size:13px!important; color:#53665A!important; }
+          .ep-roles-v2 .roles-all-permissions span { display:block; }
+          .ep-roles-v2 .roles-action { justify-self:end; display:flex; align-items:center; gap:6px; border:1px solid #EACAC4; background:#FFF5F1!important; color:#A63A2F!important; padding:8px 10px; border-radius:7px; font-size:13px!important; font-weight:700; cursor:pointer; }
+          .ep-roles-v2 .roles-action:hover { background:#FFE7E0!important; }
+          .ep-roles-v2 .roles-action:disabled { opacity:.55; cursor:not-allowed; }
+          .ep-roles-v2 .roles-section-panel { border:1px solid var(--ep-line); overflow:hidden; background:#FFFEFB!important; }
+          /* Assign Access is a complete Clay-toned workspace, not an isolated orange input. */
+          .ep-roles-v2 #assign-access { overflow:visible; border-color:#E6C6B1; background:#FFF8F2!important; }
+          .ep-roles-v2 #assign-access .roles-panel-header { background:#F3DFD1!important; border-top-color:#C86C42; }
+          .ep-roles-v2 #assign-access .roles-panel-header .roles-kicker { color:#A64F2D!important; }
+          .ep-roles-v2 #assign-access .roles-panel-header > svg { color:#9A4F30!important; }
+          .ep-roles-v2 #assign-access .roles-panel-inner { background:#FFF8F2!important; }
+          .ep-roles-v2 #assign-access .roles-host-label { color:#173F35!important; }
+          .ep-roles-v2 #assign-access .roles-assign-panel { border-top-color:#E7CABB; }
+          .ep-roles-v2 #assign-access .roles-assign-row { border-bottom-color:#E9D7CB; }
+          .ep-roles-v2 #assign-access .roles-assign-row:hover { background:#FBEAE0!important; }
+          .ep-roles-v2 .roles-panel-header { padding:24px 28px; background:#E9EEE2!important; display:flex; justify-content:space-between; align-items:center; gap:20px; border-top:3px solid var(--ep-clay); }
+          .ep-roles-v2 .roles-panel-header.is-blue { background:#E7EFF5!important; border-top-color:#3F7287; }
+          .ep-roles-v2 .roles-panel-header h2 { font-size:26px!important; line-height:1.2!important; color:var(--ep-forest)!important; margin:4px 0; }
+          .ep-roles-v2 .roles-panel-header p { font-size:14px!important; color:#516257!important; margin:3px 0 0; }
+          .ep-roles-v2 .roles-panel-inner { padding:25px 28px 28px; background:#FFFEFB!important; }
+          .ep-roles-v2 .roles-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+          .ep-roles-v2 .roles-field { display:block; min-width:0; }
+          .ep-roles-v2 .roles-field > span { display:block; font-size:14px!important; font-weight:700; color:var(--ep-forest)!important; margin-bottom:8px; }
+          .ep-roles-v2 .roles-field input, .ep-roles-v2 .roles-field textarea { display:block; width:100%; min-height:45px; padding:11px 12px; border:1px solid #CCD8CE!important; border-radius:7px; font-size:15px!important; line-height:1.5!important; background:#FFFFFF!important; color:var(--ep-charcoal)!important; outline:none; box-shadow:none; }
+          .ep-roles-v2 .roles-field textarea { min-height:90px; resize:vertical; }
+          .ep-roles-v2 .roles-field input:focus, .ep-roles-v2 .roles-field textarea:focus { outline:2px solid #7FAD95; outline-offset:1px; border-color:var(--ep-forest)!important; }
+          .ep-roles-v2 .roles-field input::placeholder, .ep-roles-v2 .roles-field textarea::placeholder { color:#87928A!important; }
+          .ep-roles-v2 .roles-matrix-top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin:22px 0 12px; }
+          .ep-roles-v2 .roles-matrix-top strong { font-size:18px!important; color:var(--ep-forest)!important; }
+          .ep-roles-v2 .roles-matrix-top span { color:#496C55!important; font-size:13px!important; font-weight:700; white-space:nowrap; }
+          .ep-roles-v2 .roles-permission-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:start; }
+          .ep-roles-v2 .roles-permission-group { min-width:0; border:1px solid var(--ep-line); border-radius:8px; background:#F7F8F4!important; }
+          .ep-roles-v2 .roles-permission-group summary { display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:pointer; padding:15px 16px; list-style:none; font-weight:700; font-size:15px!important; color:var(--ep-forest)!important; }
+          .ep-roles-v2 .roles-permission-group summary::-webkit-details-marker { display:none; }
+          .ep-roles-v2 .roles-permission-group summary::after { content:'⌄'; font-size:22px; font-weight:400; line-height:1; color:var(--ep-forest); }
+          .ep-roles-v2 .roles-permission-group[open] summary::after { transform:rotate(180deg); }
+          .ep-roles-v2 .roles-permission-group summary small { display:block; margin-top:3px; font-size:12px!important; font-weight:500; color:#718076!important; }
+          .ep-roles-v2 .roles-permission-group .group-items { padding:4px 16px 13px; border-top:1px solid var(--ep-line); display:grid; gap:3px; }
+          .ep-roles-v2 .roles-checkbox-row { display:flex; cursor:pointer; gap:10px; align-items:flex-start; padding:8px 2px; border-bottom:1px solid #E4EAE2; }
+          .ep-roles-v2 .roles-checkbox-row:last-child { border-bottom:0; }
+          .ep-roles-v2 .roles-checkbox-row input { width:17px; height:17px; margin-top:3px; accent-color:#173F35; flex-shrink:0; }
+          .ep-roles-v2 .roles-checkbox-row .label-main { display:block; color:var(--ep-charcoal)!important; font-size:14px!important; line-height:1.45!important; font-weight:600; }
+          .ep-roles-v2 .roles-checkbox-row .label-help { display:block; margin-top:3px; color:#67746C!important; font-size:12.5px!important; line-height:1.5!important; }
+          .ep-roles-v2 .roles-form-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:21px; padding-top:18px; border-top:1px solid var(--ep-line); }
+          .ep-roles-v2 .roles-button { min-height:44px; border-radius:7px; padding:11px 17px; font-size:14px!important; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; text-decoration:none; }
+          .ep-roles-v2 .roles-button-primary { color:#F7F6F2!important; background:var(--ep-forest)!important; border:1px solid var(--ep-forest)!important; }
+          .ep-roles-v2 .roles-button-primary:hover { background:#215345!important; }
+          .ep-roles-v2 .roles-button-secondary { background:#F7F6F2!important; color:var(--ep-forest)!important; border:1px solid #AEC2B2!important; }
+          .ep-roles-v2 .roles-button-secondary:hover { background:var(--ep-sage)!important; }
+          .ep-roles-v2 .roles-button-danger { background:#FFF6F3!important; border:1px solid #E6AFA6!important; color:#9D332C!important; }
+          .ep-roles-v2 .roles-button:disabled { opacity:.52; cursor:not-allowed; }
+          .ep-roles-v2 .roles-error { display:flex; align-items:flex-start; gap:9px; background:#FFF0EC!important; color:#A4372E!important; padding:13px 15px; border-left:3px solid #C54B3B; margin:14px 0; font-size:14px!important; font-weight:600; line-height:1.5!important; }
+          .ep-roles-v2 .roles-lookup { display:flex; align-items:end; gap:12px; }
+          .ep-roles-v2 .roles-lookup .roles-field { flex:1; }
+          .ep-roles-v2 .roles-host-picker { position:relative; max-width:680px; min-width:0; }
+          .ep-roles-v2 .roles-host-label { display:block; font-size:14px!important; font-weight:700; color:var(--ep-forest)!important; margin-bottom:9px; }
+          .ep-roles-v2 .roles-host-control { display:flex; align-items:center; min-height:52px; border:1px solid #D6AE95; background:#FFFEFB!important; border-radius:9px; overflow:hidden; transition:border-color .15s,box-shadow .15s; }
+          .ep-roles-v2 .roles-host-control:focus-within { border-color:#AD542F; box-shadow:0 0 0 3px rgba(200,108,66,.18); }
+          .ep-roles-v2 .roles-host-control > svg { margin-left:15px; flex-shrink:0; color:#A45230; }
+          .ep-roles-v2 .roles-host-control input { flex:1; width:100%; min-width:0; height:50px; padding:11px 12px; background:transparent!important; outline:0!important; border:0!important; box-shadow:none!important; font-size:15px!important; color:#173F35!important; }
+          .ep-roles-v2 .roles-host-control input::placeholder { color:#867A72!important; }
+          .ep-roles-v2 .roles-host-chevron { height:50px; width:52px; flex-shrink:0; display:grid; place-items:center; border:0; border-left:1px solid #BD8D72; background:#C86C42!important; color:#FFFFFF!important; cursor:pointer; transition:background .15s; }
+          .ep-roles-v2 .roles-host-chevron:hover, .ep-roles-v2 .roles-host-chevron:focus-visible { background:#A64F2D!important; outline-offset:-3px; }
+          .ep-roles-v2 .roles-host-chevron[aria-expanded=true] svg { transform:rotate(180deg); }
+          /* Keep the open list IN DOCUMENT FLOW so Assign Access grows and pushes
+             Audit + Footer down instead of painting over them. */
+          .ep-roles-v2 .roles-host-dropdown { position:relative; z-index:1; inset:auto; margin-top:8px; width:100%; max-height:none; display:flex; flex-direction:column; overflow:hidden; background:#FFFEFB!important; border:1px solid #E2BEAA; border-top:2px solid #C86C42; border-radius:9px; box-shadow:0 8px 22px rgba(77,43,27,.08); }
+          .ep-roles-v2 .roles-host-dropdown-head { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-bottom:1px solid #ECD7C8; font-size:13px!important; font-weight:700; color:#7F4029!important; background:#F9EBE1!important; }
+          .ep-roles-v2 .roles-host-scroll { max-height:278px; overflow-y:auto; overflow-x:hidden; min-height:0; overscroll-behavior:contain; }
+          .ep-roles-v2 .roles-host-option { display:flex; width:100%; text-align:left; align-items:center; gap:12px; border:0; border-bottom:1px solid #F0E2D8; padding:13px 14px; background:#FFFEFB!important; cursor:pointer; color:#173F35!important; transition:background .15s,box-shadow .15s; }
+          .ep-roles-v2 .roles-host-option:last-child { border-bottom:0; }
+          .ep-roles-v2 .roles-host-option:hover, .ep-roles-v2 .roles-host-option.is-highlighted, .ep-roles-v2 .roles-host-option:focus-visible { background:#F8E6D9!important; box-shadow:inset 3px 0 0 #C86C42; outline:none; }
+          .ep-roles-v2 .roles-host-option:disabled { cursor:not-allowed; opacity:.55; }
+          .ep-roles-v2 .roles-host-avatar { display:grid; place-items:center; width:40px; height:40px; flex-shrink:0; border-radius:9px; background:#F3D5C1!important; color:#8C4428!important; font-weight:800; font-size:15px!important; }
+          .ep-roles-v2 .roles-host-option-name { display:block; font-size:14px!important; font-weight:700; line-height:1.35!important; color:#173F35!important; }
+          .ep-roles-v2 .roles-host-option-email { display:block; font-size:12px!important; line-height:1.45!important; color:#746C65!important; overflow-wrap:anywhere; }
+          .ep-roles-v2 .roles-host-status { margin-left:auto; flex-shrink:0; border:1px solid #E9C3AA; border-radius:999px; background:#FFF2E8!important; padding:5px 8px; font-size:11px!important; font-weight:700; color:#8A472D!important; text-transform:capitalize; }
+          .ep-roles-v2 .roles-host-empty { padding:17px 14px; font-size:14px!important; color:#56645B!important; }
+          .ep-roles-v2 .roles-host-more { display:flex; align-items:center; justify-content:center; gap:8px; padding:13px; border:0; border-top:1px solid #E9C3AD; background:#F9E7DA!important; color:#824128!important; font-size:13px!important; font-weight:700; cursor:pointer; }
+          .ep-roles-v2 .roles-host-more:hover { background:#F2D6C4!important; }
+          .ep-roles-v2 .roles-selected-host { max-width:680px; margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; background:#F8E7DB!important; border-left:3px solid #C86C42; color:#173F35!important; }
+          .ep-roles-v2 .roles-selected-host strong { font-size:14px!important; }
+          .ep-roles-v2 .roles-selected-host span { display:block; font-size:12px!important; color:#85513D!important; }
+          .ep-roles-v2 .roles-assign-panel { margin-top:20px; border-top:1px solid var(--ep-line); padding-top:18px; }
+          .ep-roles-v2 .roles-assign-list { max-height:440px; overflow-y:auto; overscroll-behavior:contain; border:1px solid #E7CABB; border-radius:9px; }
+          .ep-roles-v2 .roles-assign-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:9px; }
+          .ep-roles-v2 .roles-assign-head strong { font-size:18px!important; color:var(--ep-forest)!important; }
+          .ep-roles-v2 .roles-assign-head span { font-size:13px!important; color:#5D6B62!important; }
+          .ep-roles-v2 .roles-assign-row { display:flex; align-items:center; gap:12px; padding:14px 10px; border-bottom:1px solid var(--ep-line); cursor:pointer; }
+          .ep-roles-v2 .roles-assign-row:hover { background:#EFF3ED!important; }
+          .ep-roles-v2 .roles-assign-row input { height:18px; width:18px; accent-color:#173F35; flex-shrink:0; }
+          .ep-roles-v2 .roles-assign-row strong { font-size:15px!important; font-weight:700; color:var(--ep-forest)!important; }
+          .ep-roles-v2 .roles-assign-row p { font-size:13px!important; line-height:1.5!important; margin:2px 0 0; color:#65736A!important; }
+          .ep-roles-v2 .roles-assign-row .roles-status { margin-left:auto; font-size:12px!important; font-weight:700; color:#4D7258!important; }
+          .ep-roles-v2 .roles-audit { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:30px; padding:20px 26px; border-top:3px solid var(--ep-clay); background:#E9EEE2!important; }
+          .ep-roles-v2 .roles-audit h3 { font-size:20px!important; color:var(--ep-forest)!important; font-weight:700; margin:3px 0 0; line-height:1.2!important; }
+          .ep-roles-v2 .roles-audit-link { color:var(--ep-forest)!important; border-bottom:2px solid var(--ep-clay); text-decoration:none; padding-bottom:3px; font-size:14px!important; font-weight:700; flex-shrink:0; }
+          .ep-roles-v2 .roles-step:focus-visible, .ep-roles-v2 .roles-button:focus-visible, .ep-roles-v2 .roles-action:focus-visible, .ep-roles-v2 summary:focus-visible, .ep-roles-v2 .roles-audit-link:focus-visible { outline:3px solid #C86C42; outline-offset:2px; }
+          /* Portalled dialogs use uniquely prefixed selectors to avoid global changes. */
+          .ep-hosts-modal-scrim { position:fixed; inset:0; z-index:11000; display:flex; justify-content:center; align-items:center; padding:20px; background:rgba(20,36,29,.56); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px); }
+          .ep-hosts-modal, .ep-role-delete-modal { width:min(690px,100%); max-height:min(85dvh,820px); display:flex; flex-direction:column; border:1px solid #E3C0AB; border-radius:16px; background:#FFF8F2; box-shadow:0 24px 78px rgba(15,40,30,.25); color:#173F35; font-family:'Plus Jakarta Sans',Inter,sans-serif; overflow:hidden; }
+          .ep-hosts-modal-head { flex-shrink:0; background:#F3DFD1; border-top:4px solid #C86C42; display:flex; justify-content:space-between; align-items:center; gap:16px; padding:21px 24px; }
+          .ep-hosts-modal-head span { font-size:12px; font-weight:700; color:#A64F2D; }
+          .ep-hosts-modal-head h2 { color:#173F35!important; font-size:24px!important; font-weight:700; margin:4px 0 0; }
+          .ep-hosts-modal-close { display:grid; place-items:center; width:40px; height:40px; flex-shrink:0; border:1px solid #D7B59F; border-radius:50%; background:#FFFEFB; color:#173F35; cursor:pointer; }
+          .ep-hosts-modal-search { background:#FFF8F2; flex-shrink:0; padding:12px 20px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #E8D5C7; }
+          .ep-hosts-modal-search svg { flex-shrink:0; color:#A64F2D; }
+          .ep-hosts-modal-search input { flex:1; min-width:0; padding:11px 7px; background:#FFFEFB!important; color:#173F35!important; border:1px solid #D9BAA7; border-radius:7px; font-size:15px!important; }
+          .ep-hosts-modal-search > span { flex-shrink:0; color:#92533B; font-size:12px; font-weight:700; }
+          .ep-hosts-modal-list { min-height:120px; overflow-y:auto; overscroll-behavior:contain; background:#FFFEFB; }
+          .ep-hosts-modal-row { display:flex; width:100%; min-width:0; align-items:center; text-align:left; gap:12px; padding:14px 20px; border:0; border-bottom:1px solid #F0DED4; background:#FFFEFB; color:#173F35; cursor:pointer; }
+          .ep-hosts-modal-row:hover, .ep-hosts-modal-row:focus-visible { background:#F8E6D9; box-shadow:inset 3px 0 0 #C86C42; outline:none; }
+          .ep-hosts-modal-row:disabled { opacity:.55; cursor:not-allowed; }
+          .ep-hosts-modal-avatar { display:grid; place-items:center; flex-shrink:0; width:39px; height:39px; border-radius:8px; background:#F3D5C1; color:#8C4428; font-weight:800; }
+          .ep-hosts-modal-identity { display:block; flex:1; min-width:0; }
+          .ep-hosts-modal-identity strong { display:block; font-size:15px; color:#173F35; overflow-wrap:anywhere; }
+          .ep-hosts-modal-identity small { display:block; font-size:12px; color:#6D655F; overflow-wrap:anywhere; }
+          .ep-hosts-modal-status { font-size:12px; color:#915337; text-transform:capitalize; }
+          .ep-hosts-modal-empty { padding:18px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; color:#625A56; }
+          .ep-hosts-modal-empty button, .ep-hosts-modal-foot button { border:1px solid #D3A88D; border-radius:7px; background:#FFF8F2; color:#87432A; padding:10px 16px; font-weight:700; cursor:pointer; }
+          .ep-hosts-modal-foot { background:#F3DFD1; border-top:1px solid #E3C8B5; padding:10px 20px; text-align:center; }
+          .ep-role-delete-modal { max-width:450px; padding:26px; gap:14px; background:#FFFEFB; }
+          .ep-role-delete-icon { width:46px; height:46px; border-radius:11px; display:grid; place-items:center; background:#FCE1DC; color:#A4372E; }
+          .ep-role-delete-modal h2 { font-size:24px!important; font-weight:700; margin:0; color:#173F35!important; }
+          .ep-role-delete-modal p { font-size:14px!important; line-height:1.65!important; margin:0; color:#516257!important; }
+          .ep-role-delete-error { border-left:3px solid #B63D32; background:#FFF0EC; color:#A4372E; padding:12px; font-size:13px; }
+          .ep-role-delete-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:5px; }
+          .ep-role-delete-actions button { border:1px solid #D0D9D0; border-radius:8px; padding:11px 16px; font-size:14px; font-weight:700; background:#F7F6F2; color:#173F35; cursor:pointer; }
+          .ep-role-delete-actions .ep-role-delete-confirm { color:#fff; border-color:#AA4437; background:#AA4437; }
+          .ep-role-delete-actions button:disabled { opacity:.6; cursor:not-allowed; }
+          @media(max-width:650px) { .ep-hosts-modal-scrim { padding:12px; } .ep-hosts-modal-head { padding:17px; } .ep-hosts-modal-head h2 { font-size:20px!important; } .ep-hosts-modal-search { padding:10px; flex-wrap:wrap; } .ep-hosts-modal-row { padding:12px; } .ep-role-delete-modal { padding:19px; } }
+
+          @media(max-width:900px) { .ep-roles-v2 .roles-steps { grid-template-columns:repeat(2,minmax(0,1fr)); } .ep-roles-v2 .roles-step:nth-child(2){ border-right:0; } .ep-roles-v2 .roles-step:nth-child(-n+2){ border-bottom:1px solid var(--ep-line); } .ep-roles-v2 .roles-list-row,.ep-roles-v2 .roles-table-head { grid-template-columns:minmax(170px,1fr) minmax(0,1.45fr) 90px; } }
+          @media(max-width:650px) {
+            .ep-roles-v2 .roles-hero { grid-template-columns:minmax(0,1fr) 88px; }
+            .ep-roles-v2 .roles-hero-main { padding:19px 15px; }
+            .ep-roles-v2 .roles-hero h2 { font-size:23px!important; }
+            .ep-roles-v2 .roles-hero p { font-size:13px!important; line-height:1.5!important; }
+            .ep-roles-v2 .roles-hero-stat { padding:17px 10px; text-align:center; }
+            .ep-roles-v2 .roles-hero-stat strong { font-size:33px!important; }
+            .ep-roles-v2 .roles-hero-stat span { font-size:12px!important; }
+            .ep-roles-v2 .roles-steps { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .ep-roles-v2 .roles-step { padding:12px 9px; gap:7px; }
+            .ep-roles-v2 .roles-step-num { width:25px; height:25px; font-size:11px!important; }
+            .ep-roles-v2 .roles-step-title { font-size:12.5px!important; }
+            .ep-roles-v2 .roles-step-arrow { display:none; }
+            .ep-roles-v2 .roles-section { margin-top:24px; }
+            .ep-roles-v2 .roles-section-head { align-items:start; }
+            .ep-roles-v2 .roles-section-head h2, .ep-roles-v2 .roles-panel-header h2 { font-size:22px!important; }
+            .ep-roles-v2 .roles-kicker { font-size:12px!important; }
+            .ep-roles-v2 .roles-table-head { display:none; }
+            .ep-roles-v2 .roles-list { border-top:1px solid var(--ep-line); }
+            .ep-roles-v2 .roles-list-row { grid-template-columns:minmax(0,1fr) auto; gap:12px; padding:16px; }
+            .ep-roles-v2 .roles-row-access { grid-column:1/-1; }
+            .ep-roles-v2 .roles-action { grid-column:2; grid-row:1; }
+            .ep-roles-v2 .roles-permission-preview span { font-size:12px!important; }
+            .ep-roles-v2 .roles-panel-header { padding:18px 17px; }
+            .ep-roles-v2 .roles-panel-inner { padding:18px 16px 20px; }
+            .ep-roles-v2 .roles-form-grid, .ep-roles-v2 .roles-permission-groups { grid-template-columns:1fr; }
+            .ep-roles-v2 .roles-field input, .ep-roles-v2 .roles-field textarea { font-size:15px!important; }
+            .ep-roles-v2 .roles-host-picker { max-width:none; }
+            .ep-roles-v2 .roles-host-dropdown { max-height:none; }
+            .ep-roles-v2 .roles-host-scroll { max-height:258px; }
+            .ep-roles-v2 .roles-host-option { padding:10px; gap:9px; }
+            .ep-roles-v2 .roles-host-status { font-size:10px!important; }
+            .ep-roles-v2 .roles-lookup { align-items:stretch; gap:8px; }
+            .ep-roles-v2 .roles-lookup button { align-self:end; }
+            .ep-roles-v2 .roles-form-actions { flex-direction:column; }
+            .ep-roles-v2 .roles-audit { padding:16px 17px; }
+            .ep-roles-v2 .roles-audit h3 { font-size:18px!important; }
+            .ep-roles-v2 .roles-audit-link { font-size:13px!important; }
+          }
+
+          /* Mobile-only Roles & Permissions polish. Approved desktop design stays unchanged. */
+          .ep-roles-v2 .roles-mobile-access { display:none; }
+          @media (max-width:650px) {
+            .ep-roles-v2 { width:100%; min-width:0; }
+            .ep-roles-v2 .roles-hero { grid-template-columns:minmax(0,1fr) 76px; }
+            .ep-roles-v2 .roles-hero-main { padding:17px 15px 16px; }
+            .ep-roles-v2 .roles-hero-kicker { font-size:12px!important; }
+            .ep-roles-v2 .roles-hero h2 { margin:5px 0 7px; font-size:21px!important; line-height:1.24!important; letter-spacing:-.025em; }
+            .ep-roles-v2 .roles-hero p { font-size:13px!important; line-height:1.42!important; }
+            .ep-roles-v2 .roles-hero-stat { padding:12px 7px; }
+            .ep-roles-v2 .roles-hero-stat strong { font-size:30px!important; }
+            .ep-roles-v2 .roles-hero-stat span { font-size:11.5px!important; line-height:1.32!important; }
+            .ep-roles-v2 .roles-steps { gap:0; }
+            .ep-roles-v2 .roles-step { min-height:48px; padding:9px 10px; gap:9px; }
+            .ep-roles-v2 .roles-step-num { width:25px; height:25px; }
+            .ep-roles-v2 .roles-step-title { font-size:13px!important; line-height:1.3!important; }
+            .ep-roles-v2 .roles-section { margin-top:22px; }
+            .ep-roles-v2 .roles-section-head { align-items:center; gap:10px; padding-bottom:10px; }
+            .ep-roles-v2 .roles-kicker { font-size:12px!important; }
+            .ep-roles-v2 .roles-section-head h2,
+            .ep-roles-v2 .roles-section-panel h2,
+            .ep-roles-v2 .roles-panel-header h2 { font-size:21px!important; line-height:1.25!important; }
+            .ep-roles-v2 .roles-section-head p { font-size:12.5px!important; line-height:1.4!important; }
+            .ep-roles-v2 .roles-pill { padding:5px 8px; font-size:12px!important; }
+            .ep-roles-v2 .roles-list-row { grid-template-columns:minmax(0,1fr) auto; gap:7px 9px; padding:12px 13px; align-items:start; }
+            .ep-roles-v2 .roles-list-row > div:last-child { grid-column:2; grid-row:1; justify-self:end; }
+            .ep-roles-v2 .roles-list-row > div:last-child:empty { display:none; }
+            .ep-roles-v2 .roles-role-number { font-size:12px!important; }
+            .ep-roles-v2 .roles-role-name { font-size:15.5px!important; line-height:1.38!important; }
+            .ep-roles-v2 .roles-tag { font-size:10.5px!important; padding:2px 6px; }
+            .ep-roles-v2 .roles-role-desc { font-size:12.5px!important; line-height:1.4!important; margin-top:3px; }
+            .ep-roles-v2 .roles-row-access { min-width:0; padding-top:1px; }
+            .ep-roles-v2 .roles-permission-preview,
+            .ep-roles-v2 .roles-permission-detail { display:none; }
+            .ep-roles-v2 .roles-mobile-access { display:block; }
+            .ep-roles-v2 .roles-mobile-access summary { display:flex; width:fit-content; align-items:center; gap:6px; list-style:none; cursor:pointer; min-height:32px; padding:4px 0; color:var(--ep-forest)!important; font-weight:700; font-size:13px!important; }
+            .ep-roles-v2 .roles-mobile-access summary::-webkit-details-marker { display:none; }
+            .ep-roles-v2 .roles-mobile-access summary svg { flex-shrink:0; transition:transform .15s; }
+            .ep-roles-v2 .roles-mobile-access[open] summary svg { transform:rotate(180deg); }
+            .ep-roles-v2 .roles-mobile-access summary:focus-visible { outline:2px solid var(--ep-clay); outline-offset:2px; }
+            .ep-roles-v2 .roles-mobile-access-list { border-top:1px solid var(--ep-line); margin-top:3px; padding:7px 0 3px; display:grid; gap:5px; }
+            .ep-roles-v2 .roles-mobile-access-list span { display:block; color:#53665A!important; font-size:12.5px!important; line-height:1.45!important; }
+            .ep-roles-v2 .roles-action { min-height:36px; padding:7px 9px; font-size:12px!important; white-space:nowrap; }
+            .ep-roles-v2 .roles-panel-header { padding:15px 16px; gap:8px; }
+            .ep-roles-v2 .roles-panel-header > svg { width:23px; height:23px; flex-shrink:0; }
+            .ep-roles-v2 .roles-panel-header p { margin-top:3px; font-size:12.5px!important; line-height:1.42!important; }
+            .ep-roles-v2 .roles-panel-inner { padding:16px 14px 18px; }
+            .ep-roles-v2 .roles-form-grid { gap:13px; }
+            .ep-roles-v2 .roles-field > span { margin-bottom:6px; font-size:13.5px!important; }
+            .ep-roles-v2 .roles-field input { min-height:46px; }
+            .ep-roles-v2 .roles-field textarea { min-height:76px; }
+            .ep-roles-v2 .roles-matrix-top { margin:16px 0 10px; }
+            .ep-roles-v2 .roles-matrix-top strong { font-size:17px!important; }
+            .ep-roles-v2 .roles-permission-groups { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; align-items:start; }
+            .ep-roles-v2 .roles-permission-group[open] { grid-column:1/-1; }
+            .ep-roles-v2 .roles-permission-group summary { padding:12px 10px; min-height:54px; font-size:13px!important; gap:4px; }
+            .ep-roles-v2 .roles-permission-group summary::after { font-size:18px; }
+            .ep-roles-v2 .roles-permission-group summary small { font-size:11.5px!important; line-height:1.35!important; }
+            .ep-roles-v2 .roles-permission-group .group-items { padding:4px 12px 9px; }
+            .ep-roles-v2 .roles-checkbox-row { padding:9px 1px; }
+            .ep-roles-v2 .roles-checkbox-row input { width:18px; height:18px; }
+            .ep-roles-v2 .roles-checkbox-row .label-main { font-size:14px!important; }
+            .ep-roles-v2 .roles-checkbox-row .label-help { font-size:12.5px!important; }
+            .ep-roles-v2 .roles-form-actions { margin-top:15px; padding-top:14px; }
+            .ep-roles-v2 .roles-form-actions .roles-button { width:100%; }
+            .ep-roles-v2 .roles-host-picker, .ep-roles-v2 .roles-selected-host { width:100%; }
+            .ep-roles-v2 .roles-host-label { margin-bottom:7px; }
+            .ep-roles-v2 .roles-host-control, .ep-roles-v2 .roles-host-control input, .ep-roles-v2 .roles-host-chevron { min-height:48px; height:48px; }
+            .ep-roles-v2 .roles-host-chevron { width:48px; }
+            .ep-roles-v2 .roles-host-scroll { max-height:252px; }
+            .ep-roles-v2 .roles-host-option-name { font-size:13.5px!important; }
+            .ep-roles-v2 .roles-host-option-email { font-size:12px!important; }
+            .ep-roles-v2 .roles-host-status { font-size:11px!important; }
+            .ep-roles-v2 .roles-assign-panel { margin-top:16px; padding-top:14px; }
+            .ep-roles-v2 .roles-assign-head strong { font-size:16px!important; }
+            .ep-roles-v2 .roles-assign-row { padding:12px 8px; }
+            .ep-roles-v2 .roles-audit { margin-top:22px; padding:13px 14px; }
+            .ep-roles-v2 .roles-audit h3 { font-size:16px!important; }
+            .ep-roles-v2 .roles-audit-link { font-size:12.5px!important; }
+          }
+          @media (max-width:359px) {
+            .ep-roles-v2 .roles-permission-groups { grid-template-columns:minmax(0,1fr); }
+          }
+        `}</style>
+
+        {rolesError ? (
+          <div className="roles-error" role="alert"><CircleAlert size={19} />{getErrorMessage(rolesError)} <button className="roles-button roles-button-secondary" style={{marginLeft:"auto"}} type="button" onClick={() => refetchRoles()}>Try again</button></div>
+        ) : null}
+
+        <section className="roles-hero" aria-label="Admin access overview">
+          <div className="roles-hero-main">
+            <div className="roles-hero-kicker">ADMIN ACCESS</div>
+            <h2>Give the right people the right access.</h2>
+            <p>Review available roles, create one if needed, and assign it securely.</p>
           </div>
-
-          <div className="border-t border-white/12 px-4 py-3.5 sm:px-8 sm:py-5 lg:border-l lg:border-t-0 lg:px-8 lg:py-10">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/50 sm:text-[10px] sm:tracking-[0.18em]">
-              Active role library
-            </p>
-            <div className="mt-1.5 flex items-end gap-2 sm:mt-3 sm:gap-3 lg:block">
-              <p className="text-[36px] font-black leading-none tracking-[-0.05em] text-emerald-200 sm:text-[58px]">
-                {roles.length}
-              </p>
-              <p className="pb-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-white/55 sm:pb-1 sm:text-[11px] sm:tracking-[0.14em] lg:mt-2 lg:pb-0">
-                roles available
-              </p>
-            </div>
+          <div className="roles-hero-stat">
+            <strong>{rolesError ? "—" : roles.length}</strong>
+            <span>Available roles</span>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 border-t border-white/12 lg:grid-cols-4">
-          {STEPS.map((step, index) => {
-            const body = (
-              <div className={`group px-3 py-3 transition hover:bg-white/[0.045] sm:min-h-[126px] sm:px-5 sm:py-5 ${index % 2 === 0 ? 'border-r border-white/10' : ''} ${index < 2 ? 'border-b border-white/10 lg:border-b-0' : ''} ${index > 0 ? 'lg:border-l lg:border-white/10' : ''} lg:border-r-0`}>
-                <div className="flex items-center justify-between gap-2 sm:gap-3">
-                  <span className="text-[9px] font-black tracking-[0.14em] text-emerald-200 sm:text-[11px] sm:tracking-[0.16em]">
-                    {step.number}
-                  </span>
-                  <span className="text-sm text-white/30 transition group-hover:translate-x-1 group-hover:text-emerald-200 sm:text-base">→</span>
-                </div>
-                <h3 className="mt-1.5 text-[12px] font-black leading-4 text-white sm:mt-3 sm:text-[15px] sm:leading-5">
-                  {step.title}
-                </h3>
-                <p className="mt-1 text-[10px] font-medium leading-4 text-white/58 sm:hidden">
-                  {step.mobileText}
-                </p>
-                <p className="mt-1.5 hidden text-[12px] font-medium leading-5 text-white/58 sm:block">
-                  {step.text}
-                </p>
-              </div>
-            )
-
-            return step.to ? (
-              <Link key={step.number} to={step.to} className="focus-ring block">
-                {body}
-              </Link>
-            ) : (
-              <a key={step.number} href={step.href} className="focus-ring block">
-                {body}
-              </a>
-            )
+        </section>
+        <nav className="roles-steps" aria-label="Role management steps">
+          {[
+            { number:'01', title:'Browse roles', href:'#role-library' },
+            { number:'02', title:'Create a role', href:'#create-role' },
+            { number:'03', title:'Assign access', href:'#assign-access' },
+            { number:'04', title:'Review history', to:'/admin/audit' },
+          ].map((step) => {
+            const content = <><span className="roles-step-num">{step.number}</span><span className="roles-step-title">{step.title}</span><span className="roles-step-arrow" aria-hidden="true">↗</span></>
+            return step.to
+              ? <Link className="roles-step" to={step.to} key={step.number}>{content}</Link>
+              : <a className="roles-step" href={step.href} key={step.number}>{content}</a>
           })}
-        </div>
-      </section>
+        </nav>
 
-      {/* ROLE LIBRARY */}
-      <section id="role-library" className="scroll-mt-24 bg-[#F7F6F1] px-4 py-5 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
-        <div className="grid gap-4 sm:gap-7 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10">
-          <div className="lg:sticky lg:top-24 lg:self-start">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#176B57]">01 · Role library</p>
-            <h2 className="mt-1.5 text-[21px] font-black leading-[1.08] tracking-[-0.03em] text-stone-950 sm:mt-2 sm:text-[30px]">
-              Start with what already exists.
-            </h2>
-            <p className="mt-1.5 text-[12px] font-medium leading-[1.45] text-stone-600 sm:hidden">
-              Use standard roles first. They are easier to review and maintain.
-            </p>
-            <p className="mt-3 hidden text-[14px] font-medium leading-6 text-stone-600 sm:block">
-              Standard roles are easier to understand, audit and maintain than one-off access bundles.
-            </p>
+        <section className="roles-section" id="role-library">
+          <div className="roles-section-head">
+            <div><span className="roles-kicker">01 / ROLE LIBRARY</span><h2>Existing admin roles</h2><p>Choose a ready-made role before creating a new one.</p></div>
+            <span className="roles-pill">{rolesError ? "Unavailable" : `${roles.length} roles`}</span>
           </div>
-
-          <div className="border-t-2 border-stone-900/80">
-            <div className="hidden grid-cols-[minmax(190px,0.75fr)_minmax(0,1.7fr)_auto] gap-6 border-b border-stone-300 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-stone-400 sm:grid">
-              <span>Role</span>
-              <span>Included access</span>
-              <span>Action</span>
-            </div>
-
+          <div className="roles-table-head"><span>Role</span><span>Included access</span><span>Action</span></div>
+          <div className="roles-list">
             {isLoadingRoles ? (
-              <div className="grid min-h-40 place-items-center border-b border-stone-300">
-                <LoaderCircle size={26} className="animate-spin text-[#176B57]" />
-              </div>
-            ) : (
-              roles.map((role, index) => {
-                const roleKey = getRoleKey(role)
-                const isSystem = role?.isSystem === true || role?.system === true
-                const rolePermissions = role.permissionKeys || []
-
-                return (
-                  <article
-                    key={role.id || roleKey}
-                    className="group relative grid gap-2.5 border-b border-stone-300 py-3.5 transition hover:bg-white/70 sm:grid-cols-[minmax(190px,0.75fr)_minmax(0,1.7fr)_auto] sm:items-start sm:gap-6 sm:py-6"
-                  >
-                    <span className="absolute inset-y-0 left-0 w-[3px] origin-y scale-y-0 bg-[#176B57] transition duration-200 group-hover:scale-y-100" />
-
-                    <div className="min-w-0 sm:pl-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-400">
-                          {String(index + 1).padStart(2, '0')}
-                        </span>
-                        <h3 className="text-[14px] font-black text-stone-950 sm:text-[16px]">
-                          {role.name || roleKey}
-                        </h3>
-                        {isSystem ? (
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#176B57]">
-                            EPANTRY
-                          </span>
-                        ) : null}
-                        {role.status === 'disabled' ? (
-                          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-red-600">
-                            Disabled
-                          </span>
-                        ) : null}
-                      </div>
-                      {role.description ? (
-                        <p className="mt-1 text-[11px] font-medium leading-4 text-stone-600 sm:mt-2 sm:text-[13px] sm:leading-5">
-                          {role.description}
-                        </p>
-                      ) : null}
+              <div style={{padding:25,display:'flex',alignItems:'center',gap:10,color:'#173F35'}}><LoaderCircle className="animate-spin" size={21} /> Loading roles…</div>
+            ) : !roles.length && !rolesError ? (
+              <p style={{padding:20,fontSize:14,color:'#56645B'}}>No roles available.</p>
+            ) : roles.map((role, index) => {
+              const roleKey = getRoleKey(role)
+              const isSystem = role?.isSystem === true || role?.system === true
+              const rolePermissions = Array.isArray(role?.permissionKeys) ? role.permissionKeys : []
+              return (
+                <article id={`admin-role-${roleKey}`} className={`roles-list-row${highlightRoleKey === roleKey ? ' roles-new-highlight' : ''}`} key={role.id || roleKey}>
+                  <div>
+                    <div style={{display:'flex',alignItems:'baseline',flexWrap:'wrap',gap:8}}>
+                      <span className="roles-role-number">{String(index + 1).padStart(2,'0')}</span>
+                      <strong className="roles-role-name">{role.name || roleKey}</strong>
+                      {isSystem ? <span className="roles-tag">EPANTRY</span> : null}
+                      {role.status === 'disabled' ? <span className="roles-tag roles-tag-off">Disabled</span> : null}
                     </div>
-
-                    <div className="min-w-0 sm:border-l sm:border-stone-200 sm:pl-6">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-400 sm:hidden">
-                        Included access
-                      </p>
-                      <div className="mt-1.5 grid grid-cols-1 gap-y-1 sm:hidden">
-                        {rolePermissions.length ? (
-                          rolePermissions.slice(0, 4).map((permission) => (
-                            <span key={permission} className="text-[10px] font-semibold leading-4 text-stone-600 before:mr-1.5 before:text-[#176B57] before:content-['•']">
-                              {titleizePermission(permission)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] font-medium text-stone-400">No delegated admin tools</span>
-                        )}
-                      </div>
-                      <div className="mt-0 hidden gap-x-5 gap-y-1.5 sm:grid sm:grid-cols-2 xl:grid-cols-3">
-                        {rolePermissions.length ? (
-                          rolePermissions.slice(0, 9).map((permission) => (
-                            <span key={permission} className="text-[12px] font-semibold leading-5 text-stone-600 before:mr-1.5 before:text-[#176B57] before:content-['•']">
-                              {titleizePermission(permission)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[12px] font-medium text-stone-400">No delegated admin tools</span>
-                        )}
-                      </div>
-                      {rolePermissions.length > 4 ? (
-                        <p className="mt-1 text-[10px] font-black text-[#176B57] sm:hidden">+{rolePermissions.length - 4} more</p>
-                      ) : null}
-                      {rolePermissions.length > 9 ? (
-                        <p className="mt-2 hidden text-[11px] font-black text-[#176B57] sm:block">+{rolePermissions.length - 9} more</p>
-                      ) : null}
-                    </div>
-
-                    {!isSystem && role.status !== 'disabled' ? (
+                    {role.description ? <p className="roles-role-desc">{role.description}</p> : null}
+                  </div>
+                  <div className="roles-row-access">
+                    {rolePermissions.length ? (
+                      <details className="roles-mobile-access">
+                        <summary>View {rolePermissions.length} {rolePermissions.length === 1 ? 'permission' : 'permissions'} <ChevronDown size={15} aria-hidden="true" /></summary>
+                        <div className="roles-mobile-access-list">
+                          {rolePermissions.map((permission) => <span key={permission}>{titleizePermission(permission)}</span>)}
+                        </div>
+                      </details>
+                    ) : null}
+                    {rolePermissions.length ? (
+                      <>
+                        <div className="roles-permission-preview">{rolePermissions.slice(0, 3).map((permission) => <span key={permission}>{titleizePermission(permission)}</span>)}</div>
+                        {rolePermissions.length > 3 ? (
+                          <details className="roles-permission-detail"><summary>View all {rolePermissions.length} permissions</summary><div className="roles-all-permissions">{rolePermissions.map((permission) => <span key={permission}>{titleizePermission(permission)}</span>)}</div></details>
+                        ) : null}
+                      </>
+                    ) : <span style={{fontSize:13,color:'#66756B'}}>No delegated admin tools</span>}
+                  </div>
+                  <div>
+                    {!isSystem ? (
                       <button
                         type="button"
                         disabled={isMutatingAdminControlPlane}
-                        onClick={async () => {
-                          try {
-                            await disableRole({
-                              roleId: role.id,
-                              reasonDetails: 'Disabled through EPANTRY Roles & Permissions interface.',
-                            })
-                          } catch (error) {
-                            setCreateError(getErrorMessage(error))
-                          }
-                        }}
-                        className="focus-ring absolute right-0 top-5 text-stone-300 transition hover:text-red-700 disabled:opacity-40 sm:static"
-                        aria-label={`Disable ${role.name || roleKey}`}
-                      >
-                        <Trash2 size={17} />
-                      </button>
+                        aria-label={`Delete ${role.name || roleKey}`}
+                        onClick={() => { setDeleteError(''); setRoleToDelete(role) }}
+                        className="roles-action"
+                      ><Trash2 size={15} /> Delete</button>
                     ) : null}
-                  </article>
-                )
-              })
-            )}
+                  </div>
+                </article>
+              )
+            })}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CUSTOM ROLE BUILDER */}
-      <section id="create-role" className="scroll-mt-24 bg-[#DFF1E9]">
-        <div className="grid lg:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="bg-[#176B57] px-4 py-5 text-white sm:px-8 sm:py-9 lg:px-9 lg:py-11">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">02 · Custom role</p>
-            <h2 className="mt-1.5 text-[21px] font-black leading-[1.08] tracking-[-0.03em] sm:mt-3 sm:text-[31px]">
-              Build only the access the job needs.
-            </h2>
-            <p className="mt-1.5 text-[12px] font-medium leading-[1.45] text-white/72 sm:hidden">
-              Create a custom role only when standard roles do not fit.
-            </p>
-            <p className="mt-3 hidden text-[14px] font-medium leading-6 text-white/72 sm:block">
-              Use this only when the ready-made roles do not match the responsibility clearly enough.
-            </p>
-            <div className="mt-3 border-t border-white/18 pt-2.5 text-[10px] font-semibold leading-4 text-white/65 sm:hidden">
-              Keep access narrow; expand it only when the job needs more.
+        <section className="roles-section roles-section-panel" id="create-role">
+          <header className="roles-panel-header">
+            <div><span className="roles-kicker">02 / CUSTOM ROLE</span><h2>Create an admin role</h2><p>Define the role and choose exactly which tools it can use.</p></div>
+            <ShieldCheck size={30} color="#173F35" aria-hidden="true" />
+          </header>
+          <form onSubmit={submitNewRole} className="roles-panel-inner">
+            <div className="roles-form-grid">
+              <label className="roles-field"><span>Internal role ID</span><input required maxLength={64} value={roleForm.key} onChange={(event) => { setRoleForm((current) => ({...current,key:normalizeRoleKey(event.target.value)})); setCreateError('') }} placeholder="operations_support" autoCapitalize="none" spellCheck={false} /></label>
+              <label className="roles-field"><span>Role name</span><input required value={roleForm.name} onChange={(event) => setRoleForm((current) => ({...current,name:event.target.value}))} placeholder="Operations Support" /></label>
             </div>
-            <div className="mt-7 hidden border-t border-white/18 pt-4 text-[12px] font-semibold leading-5 text-white/65 sm:block">
-              Keep access narrow. Add more later only when the role truly needs it.
-            </div>
-          </div>
-
-          <form onSubmit={submitNewRole} className="px-4 py-5 sm:px-8 sm:py-9 lg:px-10 lg:py-11">
-            <div className="grid gap-3.5 sm:grid-cols-2 sm:gap-7">
-              <label className="block">
-                <span className="text-[11px] font-black uppercase tracking-[0.13em] text-stone-600">Internal role ID</span>
-                <input
-                  required
-                  value={roleForm.key}
-                  onChange={(event) => setRoleForm((current) => ({ ...current, key: event.target.value }))}
-                  placeholder="operations_support"
-                  className="focus-ring mt-1.5 w-full border-0 border-b border-emerald-900/30 bg-transparent px-0 py-2 text-[14px] font-semibold text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-[#176B57] sm:mt-2 sm:py-3 sm:text-[15px]"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-[11px] font-black uppercase tracking-[0.13em] text-stone-600">Role name</span>
-                <input
-                  required
-                  value={roleForm.name}
-                  onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="Operations Support"
-                  className="focus-ring mt-1.5 w-full border-0 border-b border-emerald-900/30 bg-transparent px-0 py-2 text-[14px] font-semibold text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-[#176B57] sm:mt-2 sm:py-3 sm:text-[15px]"
-                />
-              </label>
-            </div>
-
-            <label className="mt-3.5 block sm:mt-7">
-              <span className="text-[11px] font-black uppercase tracking-[0.13em] text-stone-600">Purpose</span>
-              <textarea
-                value={roleForm.description}
-                onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))}
-                rows={2}
-                placeholder="Example: Handles routine Host support without finance or publishing access."
-                className="focus-ring mt-1.5 w-full resize-none border-0 border-b border-emerald-900/30 bg-transparent px-0 py-2 text-[13px] font-medium leading-5 text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-[#176B57] sm:mt-2 sm:py-3 sm:text-[14px] sm:leading-6"
-              />
-            </label>
-
-            <div className="mt-4 sm:mt-9">
-              <div className="flex items-end justify-between gap-3 border-b border-emerald-900/20 pb-2 sm:gap-4 sm:pb-3">
-                <div>
-                  <p className="text-[12px] font-black uppercase tracking-[0.13em] text-stone-800">Access matrix</p>
-                  <p className="mt-1 text-[12px] font-medium text-stone-600">Only permissions safe to delegate are listed here.</p>
-                </div>
-                <span className="shrink-0 text-[11px] font-black text-[#176B57]">{roleForm.permissionKeys.length} selected</span>
+            <label className="roles-field" style={{marginTop:18}}><span>Purpose</span><textarea required minLength={2} maxLength={280} rows={2} value={roleForm.description} onChange={(event) => setRoleForm((current) => ({...current,description:event.target.value}))} placeholder="Describe what this role is responsible for" /></label>
+            <div className="roles-matrix-top"><strong>Permissions</strong><span>{roleForm.permissionKeys.length} selected</span></div>
+            {permissionsError ? <div className="roles-error" role="alert"><CircleAlert size={18} />{getErrorMessage(permissionsError)} <button className="roles-button roles-button-secondary" style={{marginLeft:"auto"}} type="button" onClick={() => refetchPermissions()}>Try again</button></div> : isLoadingPermissions ? <div style={{padding:16}}><LoaderCircle className="animate-spin" size={22} color="#173F35" /></div> : (
+              <div className="roles-permission-groups">
+                {groupedPermissions.map((group, index) => {
+                  const selectedInGroup = group.permissions.filter((permission) => roleForm.permissionKeys.includes(getPermissionKey(permission))).length
+                  return (
+                    <details className="roles-permission-group" defaultOpen={index === 0} key={group.id}>
+                      <summary><span>{group.label}<small>{selectedInGroup} of {group.permissions.length} selected</small></span></summary>
+                      <div className="group-items">{group.permissions.map((permission) => {
+                        const permissionKey = getPermissionKey(permission)
+                        return <label className="roles-checkbox-row" key={permissionKey}>
+                          <input type="checkbox" checked={roleForm.permissionKeys.includes(permissionKey)} onChange={() => togglePermission(permissionKey)} />
+                          <span><span className="label-main">{titleizePermission(permissionKey)}</span>{permission.description ? <span className="label-help">{permission.description}</span> : null}</span>
+                        </label>
+                      })}</div>
+                    </details>
+                  )
+                })}
               </div>
-
-              {isLoadingPermissions ? (
-                <LoaderCircle size={22} className="mt-5 animate-spin text-[#176B57]" />
-              ) : (
-                <div className="max-h-[330px] overflow-y-auto pr-1 sm:max-h-[520px]">
-                  {groupedPermissions.map((group) => (
-                    <div key={group.id} className="grid gap-2 border-b border-emerald-900/10 py-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-6 sm:py-5">
-                      <div className="flex items-center justify-between sm:block">
-                        <h3 className="text-[11px] font-black uppercase tracking-[0.12em] text-stone-800">{group.label}</h3>
-                        <span className="text-[10px] font-semibold text-stone-500 sm:mt-1 sm:block">{group.permissions.length} options</span>
-                      </div>
-
-                      <div className="grid gap-x-7 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
-                        {group.permissions.map((permission) => {
-                          const permissionKey = getPermissionKey(permission)
-                          const selected = roleForm.permissionKeys.includes(permissionKey)
-
-                          return (
-                            <label key={permissionKey} className="group/perm flex cursor-pointer items-start gap-2 py-1 sm:gap-2.5 sm:py-1.5">
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => togglePermission(permissionKey)}
-                                className="mt-1 accent-[#176B57]"
-                              />
-                              <span className="min-w-0">
-                                <span className={`block text-[12px] font-black leading-5 transition ${selected ? 'text-[#125B4A]' : 'text-stone-700 group-hover/perm:text-stone-950'}`}>
-                                  {titleizePermission(permissionKey)}
-                                </span>
-                                {permission.description ? (
-                                  <span className="mt-0.5 hidden text-[11px] leading-4 text-stone-500 xl:block">{permission.description}</span>
-                                ) : null}
-                              </span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {createError ? (
-              <p className="mt-5 border-l-2 border-red-500 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{createError}</p>
-            ) : null}
-
-            <div className="mt-4 flex justify-end border-t border-emerald-900/20 pt-3.5 sm:mt-8 sm:pt-5">
-              <button
-                type="submit"
-                disabled={isMutatingAdminControlPlane}
-                className="focus-ring inline-flex w-full items-center justify-center gap-2 bg-[#103E36] px-4 py-2.5 text-[13px] font-black text-white transition hover:bg-[#0B302A] disabled:opacity-50 sm:w-auto sm:px-5 sm:py-3 sm:text-[14px]"
-              >
-                {isMutatingAdminControlPlane ? <LoaderCircle size={17} className="animate-spin" /> : <Plus size={17} />}
-                Create admin role
-              </button>
-            </div>
+            )}
+            {createError ? <div className="roles-error" role="alert"><CircleAlert size={18} />{createError}</div> : null}
+            <div className="roles-form-actions"><button type="submit" disabled={isMutatingAdminControlPlane} className="roles-button roles-button-primary">{isMutatingAdminControlPlane ? <LoaderCircle className="animate-spin" size={17} /> : <Plus size={17} />} Create admin role</button></div>
           </form>
-        </div>
-      </section>
+        </section>
 
-      {/* ASSIGN ACCESS */}
-      <section id="assign-access" className="scroll-mt-24 bg-[#E7F0F8] px-4 py-5 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
-        <div className="grid gap-4 sm:gap-7 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-10">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#245D87]">03 · Assign access</p>
-            <h2 className="mt-1.5 text-[21px] font-black leading-[1.08] tracking-[-0.03em] text-stone-950 sm:mt-2 sm:text-[30px]">
-              Match the person to the responsibility.
-            </h2>
-            <p className="mt-1.5 text-[12px] font-medium leading-[1.45] text-stone-600 sm:hidden">
-              Admin access is added to the existing Customer or Host account.
-            </p>
-            <p className="mt-3 hidden text-[14px] font-medium leading-6 text-stone-600 sm:block">
-              Admin access sits alongside their existing Customer or Host account; it does not replace it.
-            </p>
-          </div>
-
-          <div className="border-t-2 border-[#245D87]/70 pt-3.5 sm:pt-5">
-            <form onSubmit={lookupUser} className="flex items-end gap-3">
-              <label className="min-w-0 flex-1">
-                <span className="text-[11px] font-black uppercase tracking-[0.13em] text-stone-600">EPANTRY user ID</span>
+        <section className="roles-section roles-section-panel" id="assign-access">
+          <header className="roles-panel-header is-clay"><div><span className="roles-kicker">03 / ASSIGN ACCESS</span><h2>Choose a Host & assign access</h2><p>Select an account and manage its admin roles without changing Host access.</p></div><Search size={29} color="#9A4F30" aria-hidden="true" /></header>
+          <div className="roles-panel-inner">
+            <div className="roles-host-picker" ref={hostPickerRef}>
+              <label className="roles-host-label" htmlFor="admin-host-picker">Choose a Host</label>
+              <div className="roles-host-control">
+                <Search size={19} aria-hidden="true" />
                 <input
-                  value={userIdInput}
-                  onChange={(event) => setUserIdInput(event.target.value)}
-                  placeholder="Paste user ID"
-                  className="focus-ring mt-1.5 w-full border-0 border-b border-stone-400 bg-transparent px-0 py-2 text-[14px] font-semibold outline-none transition placeholder:text-stone-400 focus:border-[#245D87] sm:mt-2 sm:py-3 sm:text-[15px]"
+                  id="admin-host-picker"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-haspopup="listbox"
+                  aria-expanded={hostPickerOpen}
+                  aria-controls="admin-host-options"
+                  aria-activedescendant={hostPickerOpen && hostOptions[highlightedHost] ? `admin-host-${hostOptions[highlightedHost].id}` : undefined}
+                  value={hostQuery}
+                  placeholder="Choose a Host or type to search"
+                  autoComplete="off"
+                  onFocus={() => setHostPickerOpen(true)}
+                  onClick={() => setHostPickerOpen(true)}
+                  onChange={(event) => changeHostQuery(event.target.value)}
+                  onKeyDown={handleHostKeyboard}
                 />
-              </label>
-              <button type="submit" className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 bg-[#173A56] px-3.5 py-2.5 text-[12px] font-black text-white sm:px-5 sm:py-3 sm:text-[14px]">
-                <Search size={16} />
-                <span className="hidden sm:inline">Find user</span>
-                <span className="sm:hidden">Find</span>
-              </button>
-            </form>
-
-            {selectedUserId ? (
-              <div className="pt-4 sm:pt-8">
-                {isLoadingAssignment ? (
-                  <div className="py-9 text-center"><LoaderCircle size={24} className="mx-auto animate-spin text-[#245D87]" /></div>
-                ) : assignmentLoadError ? (
-                  <p className="border-l-2 border-red-500 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{getErrorMessage(assignmentLoadError)}</p>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between gap-3 border-b border-[#245D87]/20 pb-3 sm:gap-4 sm:pb-4">
-                      <div className="flex items-center gap-3">
-                        <ShieldCheck size={18} className="text-[#245D87]" />
-                        <div>
-                          <p className="text-[15px] font-black text-stone-950">Choose the admin role</p>
-                          <p className="mt-0.5 text-[12px] font-medium text-stone-500">Select only what this person needs.</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-500">{selectedRoleKeys.length} selected</span>
-                    </div>
-
-                    <div className="border-b border-[#245D87]/20">
-                      {assignableRoles.map((role) => {
-                        const roleKey = getRoleKey(role)
-                        const selected = selectedRoleKeys.includes(roleKey)
-                        return (
-                          <label key={roleKey} className={`group/role grid cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-[#245D87]/12 px-1 py-2.5 transition last:border-b-0 sm:grid-cols-[30px_220px_minmax(0,1fr)_auto] sm:gap-4 sm:px-2 sm:py-4 ${selected ? 'bg-white/55' : 'hover:bg-white/45'}`}>
-                            <input type="checkbox" checked={selected} onChange={() => toggleRole(roleKey)} className="accent-[#245D87]" />
-                            <span className="text-[13px] font-black leading-5 text-stone-900 sm:text-[14px]">{role.name || roleKey}</span>
-                            <span className="hidden truncate text-[12px] leading-5 text-stone-600 sm:block">{role.description || 'Admin access role'}</span>
-                            <span className={`text-[10px] font-black uppercase tracking-[0.12em] ${selected ? 'text-[#245D87]' : 'text-stone-400'}`}>{selected ? 'Selected' : 'Add'}</span>
-                          </label>
-                        )
-                      })}
-                    </div>
-
-                    {assignmentError ? (
-                      <p className="mt-5 border-l-2 border-red-500 bg-red-50 px-3 py-3 text-sm font-semibold text-red-700">{assignmentError}</p>
-                    ) : null}
-
-                    <div className="mt-3.5 flex flex-wrap gap-2.5 sm:mt-6 sm:gap-3">
+                <button type="button" className="roles-host-chevron" aria-label={hostPickerOpen ? 'Close Host list' : 'Show Host list'} aria-expanded={hostPickerOpen} onClick={() => setHostPickerOpen((current) => !current)}>
+                  <ChevronDown size={19} />
+                </button>
+              </div>
+              {hostPickerOpen ? (
+                <div className="roles-host-dropdown">
+                  <div className="roles-host-dropdown-head"><span>Host accounts</span><span>{hostTotal ? `${hostTotal} found` : ''}</span></div>
+                  <div id="admin-host-options" className="roles-host-scroll" role="listbox" aria-label="Select Host account">
+                    {hostOptions.map((host, index) => (
                       <button
                         type="button"
-                        onClick={saveAssignment}
-                        disabled={isMutatingAdminControlPlane || selectedRoleKeys.length === 0}
-                        className="focus-ring inline-flex flex-1 items-center justify-center gap-2 bg-[#173A56] px-3.5 py-2.5 text-[12px] font-black text-white disabled:opacity-40 sm:flex-none sm:px-4 sm:py-3 sm:text-[14px]"
+                        role="option"
+                        id={`admin-host-${host.id}`}
+                        key={host.id}
+                        aria-selected={index === highlightedHost}
+                        disabled={!host.canAssign}
+                        className={`roles-host-option${index === highlightedHost ? ' is-highlighted' : ''}`}
+                        onMouseEnter={() => setHighlightedHost(index)}
+                        onClick={() => selectHost(host)}
                       >
-                        {isMutatingAdminControlPlane ? <LoaderCircle size={16} className="animate-spin" /> : null}
-                        {assignment ? 'Save role changes' : 'Grant admin access'}
+                        <span className="roles-host-avatar">{String(host.name || 'H').charAt(0).toUpperCase()}</span>
+                        <span style={{flex:1,minWidth:0}}>
+                          <span className="roles-host-option-name">{host.name || 'Unnamed Host'}</span>
+                          <span className="roles-host-option-email">{host.email}</span>
+                        </span>
+                        <span className="roles-host-status">{host.canAssign ? host.hostAccessStatus : 'Inactive'}</span>
+                        {selectedHost?.id === host.id ? <Check size={16} /> : null}
                       </button>
-                      {assignment ? (
-                        <button
-                          type="button"
-                          onClick={revokeAssignment}
-                          disabled={isMutatingAdminControlPlane}
-                          className="focus-ring flex-1 border border-red-300 bg-white/60 px-3.5 py-2.5 text-[12px] font-black text-red-700 hover:bg-red-50 disabled:opacity-40 sm:flex-none sm:px-4 sm:py-3 sm:text-[14px]"
-                        >
-                          Remove admin access
-                        </button>
-                      ) : null}
-                    </div>
-                  </>
-                )}
+                    ))}
+                    {isLoadingHosts && hostPage === 1 ? <div className="roles-host-empty"><LoaderCircle size={17} className="animate-spin" /> Loading Hosts…</div> : null}
+                    {!isLoadingHosts && !hostDirectoryError && !hostOptions.length ? <div className="roles-host-empty">No matching Host accounts</div> : null}
+                    {hostDirectoryError ? <div className="roles-host-empty" role="alert">{hostDirectoryError} <button type="button" className="roles-button roles-button-secondary" onClick={() => setHostRetry((x) => x + 1)}>Try again</button></div> : null}
+                  </div>
+                  {hostTotal > 10 && !hostDirectoryError ? (
+                    <button type="button" className="roles-host-more" onClick={openAllHosts}>
+                      <Users size={16} /> View all Hosts ({hostTotal}) <span aria-hidden="true">↗</span>
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            {selectedHost ? (
+              <div className="roles-selected-host">
+                <div><strong>{selectedHost.name}</strong><span>{selectedHost.email}</span></div>
+                <span>Selected Host <Check size={15} style={{display:'inline',verticalAlign:'middle'}} /></span>
               </div>
             ) : null}
+            {selectedUserId ? <div className="roles-assign-panel">
+              {isLoadingAssignment ? <LoaderCircle className="animate-spin" size={23} color="#173F35" /> : assignmentLoadError ? (
+                <div className="roles-error" role="alert"><CircleAlert size={18} />{getErrorMessage(assignmentLoadError)}</div>
+              ) : <>
+                <div className="roles-assign-head"><strong>Choose admin roles for {selectedHost?.name || 'this Host'}</strong><span>{selectedRoleKeys.length} selected</span></div>
+                <div className="roles-assign-list">{assignableRoles.map((role) => {
+                  const roleKey = getRoleKey(role)
+                  const selected = selectedRoleKeys.includes(roleKey)
+                  return <label className="roles-assign-row" key={roleKey}>
+                    <input type="checkbox" checked={selected} onChange={() => toggleRole(roleKey)} />
+                    <span style={{flex:1,minWidth:0}}><strong>{role.name || roleKey}</strong>{role.description ? <p>{role.description}</p> : null}</span>
+                    <span className="roles-status">{selected ? 'Selected' : 'Add'}</span>
+                  </label>
+                })}
+                </div>
+                {assignmentError ? <div className="roles-error" role="alert"><CircleAlert size={18} />{assignmentError}</div> : null}
+                <div className="roles-form-actions" style={{justifyContent:'flex-start',flexWrap:'wrap'}}>
+                  <button type="button" className="roles-button roles-button-primary" onClick={saveAssignment} disabled={isMutatingAdminControlPlane || selectedRoleKeys.length === 0}>{isMutatingAdminControlPlane ? <LoaderCircle className="animate-spin" size={16} /> : <ShieldCheck size={17} />}{assignment ? 'Save role changes' : 'Grant admin access'}</button>
+                  {assignment ? <button type="button" className="roles-button roles-button-danger" onClick={revokeAssignment} disabled={isMutatingAdminControlPlane}>Remove admin access</button> : null}
+                </div>
+              </>}
+            </div> : null}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* AUDIT EXIT */}
-      <section className="bg-[#173A56] px-4 py-4 text-white sm:px-8 sm:py-6 lg:px-10">
-        <div className="flex items-center justify-between gap-5">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-200">04 · Verify</p>
-            <p className="mt-1 text-[12px] font-black leading-4 text-white sm:mt-1.5 sm:text-[15px] sm:leading-5">Important access changes should end in the audit history.</p>
-          </div>
-          <Link to="/admin/audit" className="focus-ring shrink-0 border-b border-sky-200 pb-1 text-[11px] font-black text-sky-100 transition hover:text-white sm:text-[12px]">
-            Open audit history →
-          </Link>
-        </div>
-      </section>
+        {typeof document !== 'undefined' && allHostsOpen ? createPortal(
+          <div className="ep-hosts-modal-scrim" onMouseDown={(event) => { if (event.target === event.currentTarget) setAllHostsOpen(false) }}>
+            <section className="ep-hosts-modal" role="dialog" aria-modal="true" aria-labelledby="ep-hosts-modal-title">
+              <div className="ep-hosts-modal-head">
+                <div><span>03 / ASSIGN ACCESS</span><h2 id="ep-hosts-modal-title">All Host accounts</h2></div>
+                <button type="button" className="ep-hosts-modal-close" aria-label="Close Host list" onClick={() => setAllHostsOpen(false)}><X size={20}/></button>
+              </div>
+              <div className="ep-hosts-modal-search"><Search size={19}/><input ref={allHostSearchRef} aria-label="Search Hosts" value={allHostQuery} onChange={(event) => changeAllHostQuery(event.target.value)} placeholder="Search Host name or email"/><span>{allHostTotal} Hosts</span></div>
+              <div className="ep-hosts-modal-list" onScroll={handleAllHostScroll}>
+                {allHostOptions.map((host) => (
+                  <button type="button" className="ep-hosts-modal-row" key={host.id} disabled={!host.canAssign} onClick={() => selectHost(host)}>
+                    <span className="ep-hosts-modal-avatar">{String(host.name || 'H').charAt(0).toUpperCase()}</span>
+                    <span className="ep-hosts-modal-identity"><strong>{host.name || 'Unnamed Host'}</strong><small>{host.email}</small></span>
+                    <span className="ep-hosts-modal-status">{host.canAssign ? host.hostAccessStatus : 'Inactive'}</span>
+                  </button>
+                ))}
+                {allHostLoading ? <div className="ep-hosts-modal-empty"><LoaderCircle className="animate-spin" size={18}/> Loading Hosts…</div> : null}
+                {!allHostLoading && !allHostOptions.length && !allHostError ? <div className="ep-hosts-modal-empty">No matching Hosts</div> : null}
+                {allHostError ? <div className="ep-hosts-modal-empty" role="alert">{allHostError}<button type="button" onClick={() => setAllHostRetry((x)=>x+1)}>Try again</button></div> : null}
+              </div>
+              {allHostMore && !allHostError ? <div className="ep-hosts-modal-foot"><button disabled={allHostLoading} type="button" onClick={() => { if (!allHostNextPageLock.current) { allHostNextPageLock.current = true; setAllHostPage((page) => page + 1) } }}>Load more Hosts ↓</button></div> : null}
+            </section>
+          </div>, document.body,
+        ) : null}
+
+        {typeof document !== 'undefined' && roleToDelete ? createPortal(
+          <div className="ep-hosts-modal-scrim" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleteBusy) setRoleToDelete(null) }}>
+            <section className="ep-role-delete-modal" role="alertdialog" aria-modal="true" aria-labelledby="ep-role-delete-title" aria-describedby="ep-role-delete-copy">
+              <div className="ep-role-delete-icon"><Trash2 size={24}/></div>
+              <h2 id="ep-role-delete-title">Delete custom role?</h2>
+              <p id="ep-role-delete-copy"><strong>{roleToDelete.name}</strong> will be removed from the role library. This cannot be undone. EPANTRY system roles and roles with assignment references cannot be deleted.</p>
+              {deleteError ? <div className="ep-role-delete-error" role="alert">{deleteError}</div> : null}
+              <div className="ep-role-delete-actions">
+                <button type="button" onClick={() => setRoleToDelete(null)} disabled={deleteBusy}>Cancel</button>
+                <button type="button" className="ep-role-delete-confirm" onClick={confirmDeleteRole} disabled={deleteBusy}>{deleteBusy ? 'Deleting…' : 'Delete role'}</button>
+              </div>
+            </section>
+          </div>, document.body,
+        ) : null}
+
+        <section className="roles-audit" aria-label="Audit history">
+          <div><span className="roles-kicker">04 / VERIFY</span><h3>Review access changes</h3></div>
+          <Link className="roles-audit-link" to="/admin/audit">Open audit history →</Link>
+        </section>
+      </div>
     </AdminShell>
   )
 }

@@ -279,49 +279,84 @@ import {
       .pb-workspace .pb-tool:last-child { border-bottom: 0; }
     }
     @media (max-width: 640px) {
-      .pb-workspace .pb-intro { grid-template-columns: 1fr; }
-      .pb-workspace .pb-intro-main { padding: 20px; }
-      .pb-workspace .pb-intro-main h2 { font-size: 25px !important; }
-      .pb-workspace .pb-intro-side { padding: 15px 20px; }
-      .pb-workspace .pb-block { margin-top: 22px; }
-      .pb-workspace .pb-heading { padding-bottom: 10px; }
-      .pb-workspace .pb-heading h2 { font-size: 22px !important; }
-      .pb-workspace .pb-metric { padding: 14px; min-height: 94px; }
-      .pb-workspace .pb-metric-number { font-size: 28px; }
-      .pb-workspace .pb-metric-icon { width: 29px; height: 29px; flex-basis: 29px; }
-      /* Mobile-only refinements: keep the desktop People & Businesses layout unchanged. */
-      .pb-workspace .pb-intro { border-radius: 12px; }
-      .pb-workspace .pb-intro-main { padding: 17px 18px 16px; }
+      /* Mobile layout only: preserve the approved palette and all desktop rules. */
+      .pb-workspace .pb-intro { grid-template-columns: minmax(0, 1fr); border-radius: 12px; }
+      .pb-workspace .pb-intro-main { padding: 16px 18px; }
       .pb-workspace .pb-intro-main .pb-kicker { font-size: 12px; }
-      .pb-workspace .pb-intro-main h2 { margin-top: 6px; font-size: 23px !important; line-height: 1.18 !important; }
-      .pb-workspace .pb-intro-main p:last-child { margin-top: 8px; font-size: 13.5px; line-height: 1.45; }
-      .pb-workspace .pb-intro-side { gap: 10px; padding: 10px 17px; }
-      .pb-workspace .pb-intro-side-icon { width: 34px; height: 34px; flex-basis: 34px; border-radius: 9px; }
+      .pb-workspace .pb-intro-main h2 { margin-top: 6px; font-size: 23px !important; line-height: 1.17 !important; }
+      .pb-workspace .pb-intro-main p:last-child { margin-top: 8px; font-size: 14px; line-height: 1.42; }
+      .pb-workspace .pb-intro-side { padding: 11px 17px; gap: 10px; }
+      .pb-workspace .pb-intro-side-icon { width: 35px; height: 35px; flex: 0 0 35px; border-radius: 9px; }
       .pb-workspace .pb-intro-side-icon svg { width: 18px; height: 18px; }
-      .pb-workspace .pb-intro-side strong { font-size: 14px; line-height: 1.35; }
+      .pb-workspace .pb-intro-side strong { font-size: 15px; line-height: 1.3; }
       .pb-workspace .pb-intro-side p { display: none; }
 
-      .pb-workspace .pb-block { margin-top: 20px; }
+      .pb-workspace .pb-block { margin-top: 22px; }
       .pb-workspace .pb-heading { padding-bottom: 10px; }
-      .pb-workspace .pb-heading h2 { font-size: 21px !important; }
+      .pb-workspace .pb-heading h2 { font-size: 22px !important; line-height: 1.2 !important; }
       .pb-workspace .pb-heading .pb-heading-note { display: none; }
-      .pb-workspace .pb-metrics { border-top: 1px solid #DDE4DA; border-radius: 12px; }
-      .pb-workspace .pb-metric { min-height: 0; padding: 12px 13px 11px; gap: 4px; }
-      .pb-workspace .pb-metric-label { font-size: 13.5px; line-height: 1.28; }
-      .pb-workspace .pb-metric-number { margin-top: 5px; font-size: 27px; line-height: 1; }
+
+      /* Give each of the eight clickable metrics its own complete row area.
+         The old content-driven compact cells could visually collide at 390px. */
+      .pb-workspace .pb-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-flow: row;
+        grid-auto-rows: minmax(119px, auto);
+        align-items: stretch;
+        border-top: 1px solid #DDE4DA;
+        border-radius: 12px;
+      }
+      .pb-workspace .pb-metric {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        height: auto !important;
+        min-height: 119px !important;
+        min-width: 0;
+        padding: 12px 13px;
+        gap: 0;
+      }
+      .pb-workspace .pb-metric > div:first-child {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .pb-workspace .pb-metric-label {
+        min-height: 33px;
+        font-size: 14px;
+        line-height: 1.18;
+        overflow-wrap: break-word;
+      }
+      .pb-workspace .pb-metric-number {
+        margin-top: 5px;
+        font-size: 28px;
+        line-height: 1.08;
+      }
       .pb-workspace .pb-metric-icon { display: none; }
-      .pb-workspace .pb-metric-cue { margin-top: 7px; font-size: 12px; line-height: 1.3; }
+      .pb-workspace .pb-metric-cue {
+        margin-top: auto;
+        padding-top: 9px;
+        font-size: 13px;
+        line-height: 1.15;
+      }
       .pb-workspace .pb-metric-cue .pb-cue-full { display: none; }
       .pb-workspace .pb-metric-cue .pb-cue-short { display: inline; }
-      .pb-workspace .pb-metric-disabled { font-size: 12px; }
+      .pb-workspace .pb-metric-disabled { margin-top: auto; padding-top: 8px; font-size: 12px; }
 
       .pb-workspace .pb-tool-list { border-top: 1px solid #D5DED5; border-radius: 12px; }
-      .pb-workspace .pb-tool { align-items: center; gap: 11px; padding: 13px 14px; }
-      .pb-workspace .pb-tool-icon { width: 38px; height: 38px; flex-basis: 38px; border-radius: 9px; }
+      .pb-workspace .pb-tool {
+        align-items: center;
+        gap: 11px;
+        padding: 13px 14px;
+        min-height: 72px;
+      }
+      .pb-workspace .pb-tool-icon { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 9px; }
       .pb-workspace .pb-tool-icon svg { width: 19px; height: 19px; }
-      .pb-workspace .pb-tool-title { font-size: 15.5px; line-height: 1.3; }
-      .pb-workspace .pb-tool-description { margin-top: 3px; font-size: 12.5px; line-height: 1.35; }
-      .pb-workspace .pb-tool-arrow { font-size: 18px; }
+      .pb-workspace .pb-tool-title { font-size: 16px; line-height: 1.28; }
+      .pb-workspace .pb-tool-description { margin-top: 3px; font-size: 13px; line-height: 1.36; }
+      .pb-workspace .pb-tool-arrow { font-size: 19px; }
       .pb-mobile-refresh { display: flex; margin-left: auto; }
     }
   `;
@@ -4858,7 +4893,7 @@ import {
                 section === 'trustSafety'
                     ? 'Trust, Safety & Claims'
                     : section === 'users'
-                    ? 'People & Businesses'
+                    ? <span className="text-[22px] leading-[1.18] sm:text-2xl sm:leading-tight">People &amp; Businesses</span>
                     : section === 'dataQuality'
                         ? 'Data Quality & Duplicate Review'
                         : section === 'recipeReview'
@@ -4875,7 +4910,7 @@ import {
                         : section === 'policy' ? <><span className="text-[13px] leading-[1.3] sm:hidden">Manage rules and features.</span><span className="hidden sm:inline">Create and review food safety rules, manage feature access, and track related admin work.</span></> : config.description
             }
             showWorkspaceBadge={section !== 'users'}
-            mobileStackHeader={section === 'users'}
+            mobileStackHeader={false}
             flushTop={section === 'users'}
             actions={
                 <button
@@ -4947,7 +4982,7 @@ import {
             ) : null}
   
             {section === 'users' ? (
-                <div className="pb-workspace mt-4 sm:mt-5">
+                <div className="pb-workspace mt-2 sm:mt-5">
                     <style>{peopleBusinessStyles}</style>
                     <section className="pb-intro" aria-labelledby="pb-welcome-title">
                         <div className="pb-intro-main">

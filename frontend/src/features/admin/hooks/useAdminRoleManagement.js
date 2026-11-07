@@ -11,6 +11,7 @@ import {
 import {
   ADMIN_REASON_CODES,
   createAdminRole,
+  deleteAdminRole,
   getAdminPermissionCatalog,
   getAdminRoles,
   getAdminUserRoles,
@@ -457,6 +458,18 @@ export function useAdminRoleManagementActions() {
         },
     })
 
+  /* Delete only unassigned, custom roles; backend rejects system/assigned roles. */
+  const deleteRoleMutation = useMutation({
+    mutationFn: ({ roleId, reasonDetails = null }) => deleteAdminRole({
+      roleId,
+      reasonCode: ADMIN_REASON_CODES.ROLE_DELETED,
+      reasonDetails,
+    }),
+    onSuccess: async () => {
+      await refreshAdminRoleCatalog(queryClient)
+    },
+  })
+
   /*
   |--------------------------------------------------------------------------
   | Grant Limited Internal-admin Access
@@ -625,7 +638,8 @@ export function useAdminRoleManagementActions() {
     updateRoleMutation
       .isPending ||
     disableRoleMutation
-      .isPending
+      .isPending ||
+    deleteRoleMutation.isPending
 
   const isMutatingAssignment =
     grantAssignmentMutation
@@ -666,6 +680,8 @@ export function useAdminRoleManagementActions() {
       disableRoleMutation
         .mutateAsync,
 
+    deleteRole: deleteRoleMutation.mutateAsync,
+
     /*
     |--------------------------------------------------------------------------
     | Assignment Actions
@@ -695,6 +711,7 @@ export function useAdminRoleManagementActions() {
     updateRoleMutation,
 
     disableRoleMutation,
+    deleteRoleMutation,
 
     grantAssignmentMutation,
 

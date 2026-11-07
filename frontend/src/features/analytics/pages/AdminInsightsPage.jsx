@@ -45,7 +45,26 @@ const insightsStyles = `
 .ai-insights .ai-no-access{margin-top:22px;padding:24px;background:#F7F6F2!important;border:1px solid #D7E0D6;border-radius:12px;font-size:16px;color:#465B4F}
 @media(max-width:1140px){.ai-insights .ai-tabs{gap:10px}.ai-insights .ai-tab{padding:14px 12px;gap:9px}.ai-insights .ai-tab-icon{width:36px;height:36px}.ai-insights .ai-tab-detail{font-size:12.5px}}
 @media(max-width:850px){.ai-insights .ai-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.ai-insights .ai-tab{min-height:88px;padding:13px}.ai-insights .ai-tab-detail{font-size:13px}}
-@media(max-width:520px){.ai-insights .ai-tabs{gap:9px}.ai-insights .ai-tab{min-height:82px;align-items:flex-start;flex-wrap:wrap;gap:8px;padding:13px 11px}.ai-insights .ai-tab-icon{width:33px;height:33px}.ai-insights .ai-tab-icon svg{width:17px;height:17px}.ai-insights .ai-tab-copy{flex-basis:calc(100% - 44px)}.ai-insights .ai-tab-label{font-size:14.5px}.ai-insights .ai-tab-detail{font-size:12.5px;margin-top:4px}.ai-insights .ai-tab-arrow{display:none}.ai-insights .ai-toolbar{align-items:flex-start;margin-top:13px}.ai-insights .ai-controls{width:100%;justify-content:space-between}.ai-insights .ai-view{margin-top:17px}}
+@media(max-width:520px){
+/* On mobile the four reports are unmistakably tappable without becoming four tall cards. */
+.ai-insights .ai-tabs{gap:8px}
+.ai-insights .ai-tab{min-height:58px;align-items:center;flex-wrap:nowrap;gap:9px;padding:10px;border-radius:11px;box-shadow:none}
+.ai-insights .ai-tab-icon{width:31px;height:31px;border-radius:8px}
+.ai-insights .ai-tab-icon svg{width:17px;height:17px}
+.ai-insights .ai-tab-copy{flex-basis:auto}
+.ai-insights .ai-tab-label{font-size:14px;line-height:1.25;overflow-wrap:anywhere}
+.ai-insights .ai-tab-detail,.ai-insights .ai-tab-arrow{display:none}
+.ai-insights .ai-tab[aria-selected='true']{box-shadow:0 3px 9px rgba(23,63,53,.13)}
+.ai-insights .ai-toolbar{align-items:center;margin-top:7px;padding:9px 0 10px}
+.ai-insights .ai-controls{width:100%;justify-content:space-between;gap:7px;flex-wrap:nowrap}
+.ai-insights .ai-range-label{display:none}
+.ai-insights .ai-periods{gap:2px;padding:2px;flex:none}
+.ai-insights .ai-period{min-height:40px;padding:7px 13px;font-size:14px}
+.ai-insights .ai-refresh{min-height:44px;padding:8px 12px;font-size:14px;white-space:nowrap}
+.ai-insights .ai-view{margin-top:11px}
+.ai-insights .ai-coverage{margin-top:11px;padding-top:11px;font-size:13px;line-height:1.5}
+.ai-insights .ai-coverage p{margin-top:7px}
+}
 @media(prefers-reduced-motion:reduce){.ai-insights .ai-tab{transition:none!important;transform:none!important}}
 `;
 
