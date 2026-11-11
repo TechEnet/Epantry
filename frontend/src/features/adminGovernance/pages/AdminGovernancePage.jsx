@@ -178,8 +178,8 @@ import {
     'Enabled feature flags': 'Active controls',
   });
   
-  // The People workspace is intentionally informational; account lookup lives in
-  // AdminShell's permission-aware global search, and decisions stay in their domain tools.
+  // The People workspace stays read-only. Account details are provided by
+  // permission-filtered governance search; decisions remain in domain workspaces.
   const PEOPLE_METRIC_DESTINATIONS = {
     'Host activation queue': { to: '/admin/host-operations', permission: 'marketplace.read' },
     'Order exceptions': { to: '/admin/orders-disputes', permission: 'marketplace.read' },
@@ -197,7 +197,6 @@ import {
     hasAdminPermission,
     isRootSuperAdmin,
   }) {
-    const [accountSearchOpen, setAccountSearchOpen] = useState(false);
     const [accountQuery, setAccountQuery] = useState('');
     const [accountSearchBusy, setAccountSearchBusy] = useState(false);
     const [accountSearchError, setAccountSearchError] = useState('');
@@ -210,17 +209,25 @@ import {
       if (q.length < 2 || accountSearchBusy) return;
       setAccountSearchBusy(true);
       setAccountSearchError('');
-      setSelectedAccount(null);
       setAccountResults(null);
+      setSelectedAccount(null);
       try {
         const data = await searchAdminGovernance({ q, limit: 30, types: ['user', 'organization'] });
-        setAccountResults(Array.isArray(data?.results) ? data.results.filter((item) =>
-          item?.type === 'user' || item?.type === 'organization') : []);
+        setAccountResults(Array.isArray(data?.results)
+          ? data.results.filter((item) => item?.type === 'user' || item?.type === 'organization')
+          : []);
       } catch (requestError) {
-        setAccountSearchError(getAdminGovernanceErrorMessage(requestError, 'Unable to find accounts.'));
+        setAccountSearchError(getAdminGovernanceErrorMessage(requestError, 'Account search is unavailable. Please try again.'));
       } finally {
         setAccountSearchBusy(false);
       }
+    }
+
+    function clearAccountSearch() {
+      setAccountQuery('');
+      setAccountSearchError('');
+      setAccountResults(null);
+      setSelectedAccount(null);
     }
 
     const canReviewHosts = hasAdminPermission('marketplace.read') ||
@@ -231,155 +238,169 @@ import {
     const hostReviewRoute = canReviewHosts ? '/admin/host-operations'
       : canReviewHostProfiles ? '/admin/hosts' : '';
     const canViewAudit = hasAdminPermission('admin.audit.read');
-    const positiveAttentionCount = entries
-      .filter(([key]) => key !== 'Enabled feature flags')
-      .reduce((total, [, value]) => total + (Number(value) > 0 ? Number(value) : 0), 0);
+    const queueEntries = entries.filter(([key]) => key !== 'Enabled feature flags');
+    const controlEntry = entries.find(([key]) => key === 'Enabled feature flags');
+    const positiveAttentionCount = queueEntries.reduce(
+      (total, [, value]) => total + (Number(value) > 0 ? Number(value) : 0), 0,
+    );
 
     const workspaces = [
-      {
-        number: '01',
-        eyebrow: 'Host & business requests',
-        title: 'Review business access',
-        description: 'Review Host requests and decide what can go live.',
-        to: hostReviewRoute,
-        icon: Building2,
-      },
-      {
-        number: '02',
-        eyebrow: 'Admin team',
-        title: 'Manage team permissions',
-        description: 'Control which internal tools other admins can use.',
-        to: isRootSuperAdmin ? '/admin/roles' : '',
-        icon: ShieldCheck,
-      },
-      {
-        number: '03',
-        eyebrow: 'Accountability',
-        title: 'View activity history',
-        description: 'See recorded admin actions and past decisions.',
-        to: canViewAudit ? '/admin/audit' : '',
-        icon: Database,
-      },
+      { number: '01', title: 'Host & business reviews', description: 'Check business access and Host requests.', to: hostReviewRoute, icon: Building2 },
+      { number: '02', title: 'Team permissions', description: 'Manage internal admin access.', to: isRootSuperAdmin ? '/admin/roles' : '', icon: ShieldCheck },
+      { number: '03', title: 'Activity history', description: 'Review past admin decisions.', to: canViewAudit ? '/admin/audit' : '', icon: History },
     ];
 
     return (
-      <div className="pbw-page mt-3 min-w-0 space-y-6 pb-2 sm:mt-5 sm:space-y-8">
-        <section aria-labelledby="pbw-intro-title" className="overflow-hidden border-y border-[#DCE2D8] bg-[#E8EDE5] sm:rounded-[16px] sm:border">
-          <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.5fr)_minmax(290px,.8fr)]">
-            <div className="min-w-0 px-4 py-6 sm:px-7 sm:py-8 lg:px-8 lg:py-9">
-              <p className="flex items-center gap-2 text-[13px] font-bold text-[#9D543B]">
-                <span className="h-[7px] w-[7px] rounded-full bg-[#C86C42]" aria-hidden="true" />
-                PEOPLE & BUSINESS ACCESS
+      <div className="pbw-page -mx-[10px] mt-0 w-[calc(100%+20px)] min-w-0 space-y-5 pb-0 sm:mx-0 sm:mt-4 sm:w-auto sm:space-y-8 sm:pb-5">
+        <section aria-labelledby="pbw-intro-title" className="min-w-0 overflow-hidden border-y border-[#E4DAD1] bg-[#F4ECE3] sm:rounded-[18px] sm:border">
+          <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.22fr)_minmax(310px,.78fr)]">
+            <div className="min-w-0 px-4 py-5 sm:px-7 sm:py-8 lg:px-9 lg:py-10">
+              <p className="flex items-center gap-2 text-[12px] font-bold tracking-[.06em] text-[#77645A] sm:text-[13px]">
+                <span className="h-[8px] w-[8px] rounded-full bg-[#C77A55]" aria-hidden="true" />
+                PEOPLE DIRECTORY
               </p>
-              <h2 id="pbw-intro-title" className="mt-3 max-w-[580px] text-[26px] font-bold leading-[1.14] tracking-[-.035em] text-[#173F35] sm:text-[34px] lg:text-[38px]">
-                The right account. The right decision.
+              <h2 id="pbw-intro-title" className="mt-2.5 max-w-[600px] text-[27px] font-bold leading-[1.14] tracking-[-.035em] text-[#202B27] sm:mt-3 sm:text-[36px] lg:text-[42px]">
+                Find an account.<br />
+                <span className="text-[#B36548]">Know the next step.</span>
               </h2>
-              <p className="mt-3 max-w-[530px] text-[15px] leading-[1.6] text-[#4B5D53] sm:text-[16px]">
-                Look up a Customer, Host or business, review available details and open the right admin tool.
+              <p className="mt-2 max-w-[515px] text-[14px] leading-[1.5] text-[#5D6159] sm:mt-3 sm:text-[16px] sm:leading-[1.6]">
+                Search a Customer, Host or business to see its available details.
               </p>
-              <button
-                type="button"
-                onClick={() => setAccountSearchOpen((current) => !current)}
-                aria-expanded={accountSearchOpen}
-                aria-controls="pbw-account-lookup"
-                className="focus-ring mt-5 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 py-2.5 text-[15px] font-bold text-white transition-colors hover:bg-[#245845]"
-              >
-                <SearchCheck size={18} aria-hidden="true" />
-                {accountSearchOpen ? 'Close account lookup' : 'Find an account'}
-                <ArrowUpRight size={16} aria-hidden="true" />
-              </button>
+              <form id="pbw-account-lookup" role="search" onSubmit={findAccounts} className="mt-4 max-w-[620px] sm:mt-6">
+                <label htmlFor="pbw-account-query" className="mb-1.5 block text-[14px] font-bold text-[#3B4A40] sm:mb-2">
+                  Name, email or business
+                </label>
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:gap-0 sm:rounded-[12px] sm:border sm:border-[#D8CFC6] sm:bg-white sm:p-[5px] sm:shadow-[0_5px_20px_rgba(28,65,51,0.04)]">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[10px] border border-[#D8CFC6] bg-white px-3.5 sm:border-0 sm:px-3">
+                    <SearchCheck size={20} className="shrink-0 text-[#71887B]" aria-hidden="true" />
+                    <input
+                      id="pbw-account-query"
+                      type="search"
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      autoComplete="off"
+                      value={accountQuery}
+                      onChange={(event) => setAccountQuery(event.target.value)}
+                      placeholder="Search people or organisations"
+                      className="focus-ring min-h-[48px] w-full min-w-0 border-0 bg-transparent py-2 text-[15px] font-medium text-[#1E3830] outline-none placeholder:text-[#7A8980] sm:min-h-[46px]"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={accountSearchBusy || accountQuery.trim().length < 2}
+                    className="focus-ring inline-flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#173F35] px-5 text-[15px] font-bold text-white transition-colors hover:bg-[#295E4B] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[46px]"
+                  >
+                    {accountSearchBusy ? <LoaderCircle size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <SearchCheck size={18} aria-hidden="true" />}
+                    {accountSearchBusy ? 'Searching…' : 'Find account'}
+                  </button>
+                </div>
+              </form>
+              <p className="mt-2 text-[12.5px] leading-[1.45] text-[#587366] sm:mt-3 sm:text-[13px] sm:leading-5">
+                Results are read-only. Decisions happen in the relevant admin workspace.
+              </p>
             </div>
-            <div className="border-t border-[#CED7CB] bg-[#F8F8F3] px-4 py-5 sm:px-7 lg:flex lg:flex-col lg:justify-center lg:border-l lg:border-t-0 lg:px-7">
-              <p className="text-[13px] font-bold text-[#8C5A41]">HOW IT WORKS</p>
-              <ol className="mt-3 divide-y divide-[#E0E5DB]">
-                {[
-                  ['01', 'Find an account', 'Open the account lookup.'],
-                  ['02', 'Review the details', 'Check the relevant work area.'],
-                  ['03', 'Take the next action', 'Open the appropriate admin tool.'],
-                ].map(([number, name, description]) => (
-                  <li key={number} className="flex items-start gap-4 py-3 first:pt-0 last:pb-0">
-                    <span className="mt-0.5 shrink-0 text-[14px] font-extrabold text-[#B86948]">{number}</span>
-                    <span className="min-w-0">
-                      <span className="block text-[15px] font-bold leading-5 text-[#173F35]">{name}</span>
-                      <span className="mt-1 block text-[13px] leading-5 text-[#626F64]">{description}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
+
+            <aside aria-label="Admin workspace shortcuts" className="min-w-0 border-t border-[#D1DFE2] bg-[#EAF2F4] px-4 py-4 sm:px-7 sm:py-7 lg:border-l lg:border-t-0 lg:px-7 lg:py-9">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] font-bold tracking-[.04em] text-[#5C7281]">YOUR WORKSPACES</p>
+                <ArrowUpRight size={17} className="text-[#8A9A8F]" aria-hidden="true" />
+              </div>
+              <div className="mt-2 divide-y divide-[#D4E1E4] border-t border-[#D4E1E4] sm:mt-3">
+                {workspaces.map(({ number, title, description, to, icon: WorkspaceIcon }) => {
+                  const content = (
+                    <div className="flex min-w-0 items-center gap-3 py-2.5 sm:py-4">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#D9E8ED] text-[#2B5662] sm:h-10 sm:w-10">
+                        <WorkspaceIcon size={19} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[11px] font-bold text-[#8D6C60] sm:text-[12px]">{number} / {to ? 'Open workspace' : 'Limited access'}</span>
+                        <span className="mt-0.5 block text-[15px] font-bold leading-5 text-[#233E43] sm:text-[16px]">{title}</span>
+                        <span className="mt-0.5 hidden text-[13px] leading-5 text-[#61767A] sm:block">{description}</span>
+                      </span>
+                      {to ? <ChevronRight size={19} className="shrink-0 text-[#355965] transition-transform group-hover:translate-x-1" aria-hidden="true" /> : <span className="shrink-0 text-[12px] font-semibold text-[#68808B]">Locked</span>}
+                    </div>
+                  );
+                  return to ? (
+                    <Link key={number} to={to} className="focus-ring group block transition-colors hover:bg-[#DFEBEF]" aria-label={`Open ${title}`}>{content}</Link>
+                  ) : (
+                    <div key={number} aria-label={`${title} is restricted`} className="opacity-75">{content}</div>
+                  );
+                })}
+              </div>
+            </aside>
           </div>
         </section>
 
-        {accountSearchOpen ? (
-          <section id="pbw-account-lookup" aria-labelledby="pbw-lookup-title" className="min-w-0 border border-[#D9E2D6] bg-white">
-            <div className="border-b border-[#E0E5DC] bg-[#F1F5EE] px-4 py-4 sm:px-6 sm:py-5">
-              <h3 id="pbw-lookup-title" className="text-[20px] font-bold leading-tight text-[#173F35] sm:text-[22px]">Find a person or business</h3>
-              <p className="mt-1 text-[14px] leading-5 text-[#56685B]">Search by name, email or organization. Select a result to inspect its available details.</p>
-              <form onSubmit={findAccounts} role="search" className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <label className="min-w-0 flex-1">
-                  <span className="sr-only">Account or business name, email, or ID</span>
-                  <input
-                    type="search"
-                    required
-                    minLength={2}
-                    maxLength={80}
-                    value={accountQuery}
-                    onChange={(event) => setAccountQuery(event.target.value)}
-                    placeholder="Name, email or business…"
-                    className="focus-ring min-h-[46px] w-full min-w-0 rounded-[9px] border border-[#CAD9CA] bg-white px-3.5 text-[15px] text-[#203A2F] outline-none placeholder:text-[#89978A]"
-                  />
-                </label>
-                <button type="submit" disabled={accountSearchBusy || accountQuery.trim().length < 2} className="focus-ring inline-flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-[9px] bg-[#173F35] px-5 text-[15px] font-bold text-white transition hover:bg-[#255846] disabled:cursor-not-allowed disabled:opacity-50">
-                  {accountSearchBusy ? <LoaderCircle size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <SearchCheck size={18} aria-hidden="true" />}
-                  {accountSearchBusy ? 'Searching…' : 'Search'}
-                </button>
-              </form>
+        {(accountSearchBusy || accountSearchError || accountResults !== null) ? (
+          <section aria-labelledby="pbw-results-title" className="min-w-0 overflow-hidden border-y border-[#D8E2DD] bg-white sm:rounded-[16px] sm:border">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E4E9E3] px-4 py-4 sm:px-6">
+              <div>
+                <p className="text-[12px] font-bold text-[#AE644B]">ACCOUNT LOOKUP</p>
+                <h3 id="pbw-results-title" className="mt-0.5 text-[20px] font-bold leading-tight text-[#193B30] sm:text-[23px]">Search results</h3>
+              </div>
+              <button type="button" onClick={clearAccountSearch} disabled={accountSearchBusy} className="focus-ring min-h-[40px] rounded-[8px] border border-[#D3DCD3] px-3.5 text-[14px] font-bold text-[#345648] hover:bg-[#F1F5F1] disabled:opacity-50">Clear search</button>
             </div>
-            {accountSearchError ? (
-              <div role="alert" className="border-b border-[#EDD8D0] bg-[#FFF3EE] px-4 py-3 text-[14px] leading-5 text-[#924531] sm:px-6">{accountSearchError}</div>
-            ) : null}
-            {accountResults !== null && !accountSearchBusy ? (
-              <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="min-w-0 lg:border-r lg:border-[#E1E6DD]">
-                  <p className="border-b border-[#E7EBE4] px-4 py-3 text-[13px] font-bold text-[#536B5B] sm:px-6">{accountResults.length} {accountResults.length === 1 ? 'result' : 'results'} shown</p>
+            {accountSearchError ? <p role="alert" className="border-b border-[#F0D9C9] bg-[#FFF1E7] px-4 py-3 text-[14px] leading-6 text-[#844B37] sm:px-6">{accountSearchError}</p> : null}
+            {accountSearchBusy ? (
+              <div role="status" className="flex min-h-[130px] items-center justify-center gap-3 text-[15px] text-[#4F695A]">
+                <LoaderCircle size={20} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Searching accounts…
+              </div>
+            ) : accountResults !== null ? (
+              <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,.95fr)]">
+                <div className="min-w-0 lg:border-r lg:border-[#E6EAE5]">
+                  <p className="border-b border-[#EBEEE9] px-4 py-3 text-[13px] font-semibold text-[#627569] sm:px-6">
+                    {accountResults.length} {accountResults.length === 1 ? 'match' : 'matches'} found
+                  </p>
                   {accountResults.length ? (
-                    <div className="max-h-[350px] overflow-y-auto">
-                      {accountResults.map((item) => (
-                        <button key={`${item.type}:${item.id}`} type="button" onClick={() => setSelectedAccount(item)} aria-pressed={selectedAccount?.id === item.id && selectedAccount?.type === item.type}
-                          className={`focus-ring flex min-h-[68px] w-full items-center justify-between gap-3 border-b border-[#E7EBE4] px-4 py-3 text-left transition hover:bg-[#F2F6EF] sm:px-6 ${selectedAccount?.id === item.id && selectedAccount?.type === item.type ? 'bg-[#EAF1E7]' : 'bg-white'}`}>
-                          <span className="min-w-0 flex-1">
-                            <span className="block break-words text-[15px] font-bold leading-5 text-[#173F35]">{item.title || 'Unnamed record'}</span>
-                            <span className="mt-1 block break-words text-[13px] leading-5 text-[#66756A]">{item.type === 'organization' ? 'Business' : 'Account'}{item.subtitle ? ` · ${item.subtitle}` : ''}</span>
-                          </span>
-                          <ChevronRight size={18} className="shrink-0 text-[#547464]" aria-hidden="true" />
-                        </button>
-                      ))}
+                    <div className="max-h-[265px] overflow-y-auto sm:max-h-[360px]">
+                      {accountResults.map((item) => {
+                        const isSelected = selectedAccount?.id === item.id && selectedAccount?.type === item.type;
+                        return (
+                          <button
+                            key={`${item.type}:${item.id}`}
+                            type="button"
+                            onClick={() => setSelectedAccount(item)}
+                            aria-pressed={isSelected}
+                            className={`focus-ring group flex min-h-[74px] w-full min-w-0 items-center gap-3 border-b border-[#EBEEE9] px-4 py-3 text-left transition-colors sm:px-6 ${isSelected ? 'bg-[#E9F3EE]' : 'hover:bg-[#F8FAF7]'}`}
+                          >
+                            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[8px] ${isSelected ? 'bg-[#CFE6DA]' : 'bg-[#F0F2EE]'} text-[#285B47]`}>
+                              {item.type === 'organization' ? <Building2 size={20} aria-hidden="true" /> : <UsersRound size={20} aria-hidden="true" />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block break-words text-[15px] font-bold leading-5 text-[#1C3B2F]">{item.title || 'Unnamed record'}</span>
+                              <span className="mt-1 block break-words text-[13px] leading-5 text-[#6B7C71]">{item.type === 'organization' ? 'Business' : 'Customer / account'}{item.subtitle ? ` · ${item.subtitle}` : ''}</span>
+                            </span>
+                            <ChevronRight size={18} className="shrink-0 text-[#5E7A6A]" aria-hidden="true" />
+                          </button>
+                        );
+                      })}
                     </div>
-                  ) : <p className="px-4 py-5 text-[14px] text-[#58695D] sm:px-6">No matching account or business was found. Try another name or email.</p>}
+                  ) : <p className="px-4 py-6 text-[15px] leading-6 text-[#68776D] sm:px-6">No matching account or business found. Try a different name or email.</p>}
                 </div>
-                <div className="min-w-0 bg-[#FAFBF8] px-4 py-5 sm:px-6 sm:py-6" aria-live="polite">
+                <div className="min-w-0 bg-[#F8FAF7] px-4 py-5 sm:px-6 sm:py-6" aria-live="polite">
                   {selectedAccount ? (
                     <div>
-                      <p className="text-[13px] font-bold text-[#A15E42]">SELECTED {selectedAccount.type === 'organization' ? 'BUSINESS' : 'ACCOUNT'}</p>
-                      <h4 className="mt-2 break-words text-[21px] font-bold leading-tight text-[#173F35]">{selectedAccount.title || 'Unnamed record'}</h4>
-                      <dl className="mt-4 divide-y divide-[#E0E7DD] border-y border-[#E0E7DD]">
-                        <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Type</dt><dd className="font-bold text-[#264839]">{selectedAccount.type === 'organization' ? 'Business' : 'User account'}</dd></div>
-                        <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Status</dt><dd className="break-words font-bold text-[#264839]">{titleize(selectedAccount.status || 'Not available')}</dd></div>
-                        {selectedAccount.subtitle ? <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Reference</dt><dd className="break-words text-[#405A4C]">{selectedAccount.subtitle}</dd></div> : null}
-                        {selectedAccount.type === 'user' ? <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-semibold text-[#6B7B6D]">Host access</dt><dd className="break-words font-semibold text-[#264839]">{selectedAccount.metadata?.hostEnabled ? 'Enabled' : selectedAccount.metadata?.hostAccessStatus ? titleize(selectedAccount.metadata.hostAccessStatus) : 'Not enabled'}</dd></div> : null}
+                      <p className="text-[12px] font-bold text-[#AE644B]">SELECTED {selectedAccount.type === 'organization' ? 'BUSINESS' : 'ACCOUNT'}</p>
+                      <h4 className="mt-2 break-words text-[23px] font-bold leading-tight tracking-[-.025em] text-[#193B30]">{selectedAccount.title || 'Unnamed record'}</h4>
+                      <dl className="mt-4 divide-y divide-[#DFE6DE] border-y border-[#DFE6DE]">
+                        <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-medium text-[#687A6E]">Type</dt><dd className="font-bold text-[#2D4E3E]">{selectedAccount.type === 'organization' ? 'Business' : 'User account'}</dd></div>
+                        <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-medium text-[#687A6E]">Status</dt><dd className="break-words font-bold text-[#2D4E3E]">{titleize(selectedAccount.status || 'Not available')}</dd></div>
+                        {selectedAccount.subtitle ? <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-medium text-[#687A6E]">Reference</dt><dd className="break-words text-[#496254]">{selectedAccount.subtitle}</dd></div> : null}
+                        {selectedAccount.type === 'user' ? <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 py-3 text-[14px]"><dt className="font-medium text-[#687A6E]">Host access</dt><dd className="break-words font-semibold text-[#2D4E3E]">{selectedAccount.metadata?.hostEnabled ? 'Enabled' : selectedAccount.metadata?.hostAccessStatus ? titleize(selectedAccount.metadata.hostAccessStatus) : 'Not enabled'}</dd></div> : null}
                       </dl>
                       {hostReviewRoute ? (
-                        <Link to={hostReviewRoute} className="focus-ring mt-5 inline-flex min-h-[44px] items-center gap-2 rounded-[9px] bg-[#173F35] px-4 py-2 text-[14px] font-bold text-white transition hover:bg-[#255846]">
-                          Go to Host approvals <ArrowUpRight size={16} aria-hidden="true" />
+                        <Link to={hostReviewRoute} className="focus-ring mt-5 inline-flex min-h-[44px] items-center gap-2 rounded-[9px] bg-[#173F35] px-4 py-2 text-[14px] font-bold text-white hover:bg-[#295E4B]">
+                          Open Host review workspace <ArrowUpRight size={16} aria-hidden="true" />
                         </Link>
                       ) : null}
-                      <p className="mt-3 text-[13px] leading-5 text-[#6D7B70]">Search results are read-only. Host approvals open in a separate queue; this account is not auto-selected there.</p>
+                      <p className="mt-3 text-[13px] leading-5 text-[#687B6D]">The review workspace opens separately. This account is not automatically selected there.</p>
                     </div>
                   ) : (
-                    <div className="flex min-h-[165px] flex-col items-start justify-center">
-                      <UsersRound size={24} className="text-[#789281]" aria-hidden="true" />
-                      <p className="mt-3 text-[15px] font-bold text-[#173F35]">Select a result to inspect it</p>
-                      <p className="mt-1 text-[14px] leading-5 text-[#637569]">Available account details will appear here.</p>
+                    <div className="flex min-h-[165px] flex-col justify-center">
+                      <UsersRound size={25} className="text-[#789789]" aria-hidden="true" />
+                      <p className="mt-3 text-[16px] font-bold text-[#234738]">Choose a result to see details</p>
+                      <p className="mt-1 text-[14px] leading-6 text-[#66796C]">Account status and available information will appear here.</p>
                     </div>
                   )}
                 </div>
@@ -389,100 +410,90 @@ import {
         ) : null}
 
         <section aria-labelledby="pbw-overview-title" className="min-w-0">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-5">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3 px-4 sm:mb-5 sm:px-0">
             <div>
-              <p className="text-[13px] font-bold text-[#B46646]">01 / WORKLOAD</p>
-              <h2 id="pbw-overview-title" className="mt-1 text-[24px] font-bold leading-tight tracking-[-.025em] text-[#173F35] sm:text-[28px]">
-                What needs attention
-              </h2>
-              <p className="mt-1 text-[14px] leading-6 text-[#58685C] sm:text-[15px]">Live counts from your permitted admin areas.</p>
+              <p className="text-[12px] font-bold tracking-[.05em] text-[#B46B4F]">LIVE WORKLOAD / 02</p>
+              <h2 id="pbw-overview-title" className="mt-1 text-[25px] font-bold tracking-[-.035em] text-[#213A31] sm:text-[31px]">At a glance</h2>
+              <p className="mt-1 text-[13px] leading-5 text-[#5E7064] sm:text-[15px] sm:leading-6">All the admin queues you can currently view.</p>
             </div>
             {!isLoading && !loadError && entries.length > 0 ? (
-              <p className="inline-flex items-center gap-2 rounded-full bg-[#E9EFE7] px-3 py-2 text-[13px] font-bold text-[#315544]">
-                <span className={`h-2 w-2 rounded-full ${positiveAttentionCount ? 'bg-[#C86C42]' : 'bg-[#398360]'}`} aria-hidden="true" />
-                {positiveAttentionCount ? 'Items awaiting action' : 'No reported open items'}
-              </p>
+              <div className="flex min-h-[38px] items-center gap-2 rounded-[8px] bg-[#F0E7DC] px-3 py-2 sm:min-h-[42px] sm:gap-3 sm:rounded-[9px] sm:px-4" role="status">
+                <span className="text-[23px] font-bold leading-none tabular-nums text-[#8F543C]">{positiveAttentionCount}</span>
+                <span className="max-w-[145px] text-[13px] font-semibold leading-4 text-[#6F594B]">{positiveAttentionCount === 1 ? 'item needs attention' : 'items need attention'}</span>
+              </div>
             ) : null}
           </div>
 
           {loadError ? (
-            <div role="alert" className="flex flex-col gap-3 border border-[#E8C9BE] bg-[#FFF2EC] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <div>
-                <p className="text-[15px] font-bold text-[#813E2D]">The overview could not load.</p>
-                <p className="mt-1 text-[14px] leading-5 text-[#774E42]">{loadError}</p>
-              </div>
-              <button type="button" onClick={onRefresh} className="focus-ring inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-[9px] border border-[#C99583] bg-white px-4 text-[14px] font-bold text-[#813E2D]">
-                <RefreshCw size={16} aria-hidden="true" /> Retry
-              </button>
+            <div role="alert" className="flex flex-col gap-3 border border-[#E5CABA] bg-[#FFF1E8] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div><p className="text-[15px] font-bold text-[#82452F]">Workload data could not load.</p><p className="mt-1 text-[14px] leading-5 text-[#815D4E]">{loadError}</p></div>
+              <button type="button" onClick={onRefresh} className="focus-ring inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-[8px] border border-[#CCA38E] bg-white px-4 text-[14px] font-bold text-[#82452F]"><RefreshCw size={16} aria-hidden="true" /> Retry</button>
             </div>
           ) : isLoading ? (
-            <div role="status" aria-live="polite" className="flex min-h-[140px] items-center justify-center gap-3 border-y border-[#E0E4DC] bg-[#F4F5F0] text-[15px] font-medium text-[#526158]">
-              <LoaderCircle size={20} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Loading overview…
-            </div>
+            <div role="status" className="flex min-h-[138px] items-center justify-center gap-3 border border-[#E2E7DF] bg-[#F7F9F5] text-[15px] text-[#597262]"><LoaderCircle size={19} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Loading workload…</div>
           ) : entries.length ? (
-            <div className="grid grid-cols-2 overflow-hidden rounded-[12px] border border-[#DDE3D8] bg-[#DDE3D8] gap-px md:grid-cols-4">
-              {entries.map(([label, value, MetricIcon]) => {
-                const destination = PEOPLE_METRIC_DESTINATIONS[label];
-                const to = destination && hasAdminPermission(destination.permission) ? destination.to : '';
-                const isActive = label !== 'Enabled feature flags' && Number(value) > 0;
-                const content = (
-                  <div className="flex h-full min-h-[114px] min-w-0 flex-col justify-between bg-[#FCFCF9] px-4 py-4 transition-colors group-hover:bg-[#F1F5EE] sm:min-h-[132px] sm:px-5 sm:py-5">
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <MetricIcon size={18} className={isActive ? 'text-[#BD6441]' : 'text-[#62776A]'} aria-hidden="true" />
-                      {to ? <ArrowUpRight size={16} className="text-[#62806D]" aria-hidden="true" /> : null}
-                    </div>
-                    <div className="mt-3">
-                      <p className={`text-[29px] font-extrabold leading-none tabular-nums tracking-tight sm:text-[34px] ${isActive ? 'text-[#AE5638]' : 'text-[#173F35]'}`}>{value}</p>
-                      <p className="mt-2 text-[13px] font-semibold leading-[1.3] text-[#465B4E] sm:text-[14px]">{USER_METRIC_LABELS[label] || label}</p>
-                    </div>
+            <div className={`grid min-w-0 overflow-hidden border-y border-[#E0E5DE] bg-white sm:rounded-[12px] sm:border ${controlEntry ? 'lg:grid-cols-[minmax(0,1.7fr)_minmax(240px,.7fr)]' : ''}`}>
+              <div className="min-w-0 px-0 py-0 sm:px-6 sm:py-5">
+                <p className="mb-0 border-b border-[#E6EAE4] px-4 py-3 text-[12px] font-bold tracking-[.04em] text-[#7C7066] sm:mb-2 sm:border-0 sm:px-0 sm:py-0">OPEN QUEUES</p>
+                {queueEntries.length ? (
+                  <div className="grid min-w-0 grid-cols-2 sm:gap-x-7">
+                    {queueEntries.map(([label, value, MetricIcon]) => {
+                      const destination = PEOPLE_METRIC_DESTINATIONS[label];
+                      const to = destination && hasAdminPermission(destination.permission) ? destination.to : '';
+                      const needsAttention = Number(value) > 0;
+                      const content = (
+                        <div className="flex h-full min-h-[88px] min-w-0 flex-wrap content-between items-start gap-x-2 gap-y-1 border-b border-r border-[#E9ECE6] px-3 py-3 transition-colors group-hover:bg-[#F5F8F5] sm:h-auto sm:min-h-[70px] sm:flex-nowrap sm:content-normal sm:items-center sm:gap-3 sm:border-r-0 sm:px-0">
+                          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[8px] sm:h-9 sm:w-9 ${needsAttention ? 'bg-[#F8E9E1] text-[#B46749]' : 'bg-[#EDF1EC] text-[#6D8977]'}`}>
+                            <MetricIcon size={18} aria-hidden="true" />
+                          </span>
+                          <span className="order-3 w-full min-w-0 flex-none text-[13px] font-semibold leading-[1.3] text-[#3C5447] sm:order-none sm:w-auto sm:flex-1 sm:text-[14px] sm:leading-5">{USER_METRIC_LABELS[label] || label}</span>
+                          <span className={`ml-auto shrink-0 text-[23px] font-bold leading-none tabular-nums sm:ml-0 sm:text-[24px] ${needsAttention ? 'text-[#A75A3D]' : 'text-[#244A3A]'}`}>{value ?? 0}</span>
+                          {to ? <ChevronRight size={16} className="hidden shrink-0 text-[#839789] sm:block" aria-hidden="true" /> : null}
+                        </div>
+                      );
+                      return to ? <Link key={label} to={to} className="focus-ring group block min-w-0" aria-label={`Open ${USER_METRIC_LABELS[label] || label}: ${value}`}>{content}</Link> : <div key={label} className="group min-w-0">{content}</div>;
+                    })}
+                    {controlEntry ? (
+                      hasAdminPermission('admin.dashboard.read') ? (
+                        <Link to="/admin/policy" className="focus-ring group block min-w-0 sm:hidden" aria-label={`Open Active controls: ${controlEntry[1] ?? 0}`}>
+                          <div className="flex h-full min-h-[88px] flex-wrap content-between items-start gap-x-2 gap-y-1 border-b border-[#E9ECE6] bg-[#E9F0EA] px-3 py-3">
+                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] bg-[#D7E6D9] text-[#315E47]"><ShieldCheck size={18} aria-hidden="true" /></span>
+                            <span className="ml-auto text-[23px] font-bold leading-none tabular-nums text-[#244A3A]">{controlEntry[1] ?? 0}</span>
+                            <span className="w-full text-[13px] font-semibold leading-[1.3] text-[#3C5447]">Active controls <span aria-hidden="true">↗</span></span>
+                          </div>
+                        </Link>
+                      ) : (
+                        <div className="min-w-0 sm:hidden">
+                          <div className="flex h-full min-h-[88px] flex-wrap content-between items-start gap-x-2 gap-y-1 border-b border-[#E9ECE6] bg-[#E9F0EA] px-3 py-3">
+                            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] bg-[#D7E6D9] text-[#315E47]"><ShieldCheck size={18} aria-hidden="true" /></span>
+                            <span className="ml-auto text-[23px] font-bold leading-none tabular-nums text-[#244A3A]">{controlEntry[1] ?? 0}</span>
+                            <span className="w-full text-[13px] font-semibold leading-[1.3] text-[#3C5447]">Active controls</span>
+                          </div>
+                        </div>
+                      )
+                    ) : null}
                   </div>
-                );
-                return to ? (
-                  <Link key={label} to={to} className="focus-ring group block min-w-0" aria-label={`Open ${USER_METRIC_LABELS[label] || label}: ${value}`}>
-                    {content}
-                  </Link>
-                ) : <div key={label} className="group min-w-0">{content}</div>;
-              })}
+                ) : (
+                  <p className="py-5 text-[14px] text-[#667A6B]">No review queues are available to your account.</p>
+                )}
+              </div>
+              {controlEntry ? (
+                <aside aria-label="Platform controls" className="hidden min-w-0 flex-col justify-between border-t border-[#DDE7E2] bg-[#E9F0EA] px-5 py-6 sm:flex sm:px-7 sm:py-7 lg:border-l lg:border-t-0">
+                  <div>
+                    <p className="text-[12px] font-bold tracking-[.06em] text-[#54715F]">PLATFORM SETTINGS</p>
+                    <p className="mt-5 text-[46px] font-bold leading-none tabular-nums tracking-[-.04em] text-[#214B3A] sm:text-[54px]">{controlEntry[1] ?? 0}</p>
+                    <p className="mt-2 text-[18px] font-bold text-[#264E3E]">Active controls</p>
+                    <p className="mt-2 max-w-[260px] text-[14px] leading-6 text-[#5A7161]">Enabled feature settings in your admin overview.</p>
+                  </div>
+                  {hasAdminPermission('admin.dashboard.read') ? (
+                    <Link to="/admin/policy" className="focus-ring mt-5 inline-flex min-h-[42px] items-center gap-2 self-start rounded-[9px] border border-[#B4C8B9] bg-white px-3.5 text-[14px] font-bold text-[#285340] transition-colors hover:bg-[#F9FCF9]">
+                      View controls <ArrowUpRight size={16} aria-hidden="true" />
+                    </Link>
+                  ) : null}
+                </aside>
+              ) : null}
             </div>
-          ) : (
-            <div className="border-y border-[#DDE3D8] bg-[#F4F5F0] px-5 py-5 text-[14px] leading-6 text-[#526158]">No overview metrics are available for your current access.</div>
-          )}
-        </section>
-
-        <section aria-labelledby="pbw-tools-title" className="min-w-0 border-t border-[#DDE2D9] pt-6 sm:pt-8">
-          <div className="mb-4 sm:mb-5">
-            <p className="text-[13px] font-bold text-[#B46646]">02 / ADMIN TOOLS</p>
-            <h2 id="pbw-tools-title" className="mt-1 text-[24px] font-bold leading-tight tracking-[-.025em] text-[#173F35] sm:text-[28px]">Choose your next action</h2>
-            <p className="mt-1 text-[14px] leading-6 text-[#58685C] sm:text-[15px]">Your access determines which tools you can open.</p>
-          </div>
-          <div className="divide-y divide-[#DDE3D9] overflow-hidden border-y border-[#DDE3D9] bg-[#F9F9F5]">
-            {workspaces.map(({ number, eyebrow, title, description, to, icon: Icon }) => {
-              const inner = (
-                <div className="flex min-w-0 items-center gap-3 px-4 py-4 transition-colors group-hover:bg-[#EAF0E8] sm:gap-5 sm:px-6 sm:py-5">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-[#E2E9DF] text-[#245745] sm:h-12 sm:w-12">
-                    <Icon size={22} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] font-bold text-[#9B5F46]">{number} / {eyebrow}</span>
-                    <span className="mt-1 block text-[17px] font-bold leading-[1.25] text-[#173F35] sm:text-[19px]">{title}</span>
-                    <span className="mt-1 block text-[14px] leading-5 text-[#53675A]">{description}</span>
-                  </span>
-                  {to ? (
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#CDD9CA] bg-white text-[#173F35] group-hover:border-[#173F35]">
-                      <ChevronRight size={20} aria-hidden="true" />
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-[12px] font-semibold text-[#78877A]">Restricted</span>
-                  )}
-                </div>
-              );
-              return to ? (
-                <Link key={number} to={to} className="focus-ring group block min-w-0" aria-label={`Open ${title}`}>{inner}</Link>
-              ) : (
-                <div key={number} className="group min-w-0 opacity-70" aria-label={`${title} is restricted`}>{inner}</div>
-              );
-            })}
-          </div>
+          ) : <div className="border border-[#E1E7DF] bg-[#F8F9F5] px-5 py-5 text-[15px] text-[#586E60]">No workload summary is available for your current permissions.</div>}
         </section>
       </div>
     );
