@@ -821,9 +821,8 @@ export default function AdminFoodIntelligencePage() {
     })
 
   const [selectedDecision, setSelectedDecision] = useState(null)
-  // Mobile work selector only. Desktop keeps every section in its original order.
+  // Mobile selector scrolls to the requested section; safety and dietary sections remain visible.
   const [mobileWorkSection, setMobileWorkSection] = useState('checks')
-  const mobileActiveSectionRef = useRef(null)
   const [resolvedFoodItems, setResolvedFoodItems] = useState({})
   const requestedFoodItemsRef = useRef(new Set())
   const decisionPanelRef = useRef(null)
@@ -833,9 +832,15 @@ export default function AdminFoodIntelligencePage() {
   function chooseMobileWorkSection(section) {
     setMobileWorkSection(section)
     if (typeof window === 'undefined' || window.matchMedia('(min-width: 640px)').matches) return
+    const sectionIds = {
+      product: 'food-review-product',
+      checks: 'food-review-checks',
+      relations: 'food-review-allergies',
+      rules: 'food-review-rules',
+    }
     window.requestAnimationFrame(() => {
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      mobileActiveSectionRef.current?.scrollIntoView({
+      document.getElementById(sectionIds[section])?.scrollIntoView({
         behavior: reduced ? 'auto' : 'smooth',
         block: 'start',
       })
@@ -1694,27 +1699,27 @@ export default function AdminFoodIntelligencePage() {
             .epantry-workspace-canvas:has(.foodint-reference-mobile) > header {
               background: #f7f6f2;
               border-color: #e3e5df;
-              padding: 18px 15px 23px;
+              padding: 15px 12px 17px;
             }
             .epantry-workspace-canvas:has(.foodint-reference-mobile) > header > div:last-child {
               position: relative;
               gap: 8px;
             }
             .epantry-workspace-canvas:has(.foodint-reference-mobile) > header h1 {
-              font-size: clamp(31px, 8.2vw, 39px);
-              line-height: 1.08;
-              letter-spacing: -0.045em;
-              max-width: 270px;
-              margin-top: 11px;
+              font-size: clamp(25px, 7.15vw, 30px);
+              line-height: 1.12;
+              letter-spacing: -0.038em;
+              max-width: 100%;
+              margin-top: 8px;
               font-weight: 800;
               color: #202421;
             }
             .epantry-workspace-canvas:has(.foodint-reference-mobile) > header h1 + p {
-              font-size: 14px;
-              line-height: 1.4;
+              font-size: 13.5px;
+              line-height: 1.43;
               font-weight: 500;
-              max-width: 310px;
-              margin-top: 7px;
+              max-width: 100%;
+              margin-top: 5px;
               color: #606a64;
             }
             .epantry-workspace-canvas:has(.foodint-reference-mobile) > header > div:last-child > div:first-child > div:first-child {
@@ -1762,18 +1767,18 @@ export default function AdminFoodIntelligencePage() {
               padding: 0;
             }
             .foodint-reference-mobile .foodint-hero-copy {
-              padding: 26px 18px 30px;
+              padding: 19px 15px 21px;
               background: #173f35;
             }
             .foodint-reference-mobile .foodint-hero-copy h2 {
-              font-size: clamp(28px, 7.4vw, 34px);
+              font-size: clamp(25px, 6.8vw, 30px);
               line-height: 1.17;
               letter-spacing: -0.042em;
             }
             .foodint-reference-mobile .foodint-hero-copy > p {
-              font-size: 15px;
-              line-height: 1.55;
-              margin-top: 11px;
+              font-size: 14px;
+              line-height: 1.48;
+              margin-top: 8px;
             }
             .foodint-reference-mobile .foodint-hero-metrics {
               display: grid;
@@ -1781,8 +1786,8 @@ export default function AdminFoodIntelligencePage() {
               gap: 0;
             }
             .foodint-reference-mobile .foodint-hero-metrics > div {
-              padding: 17px 15px;
-              min-height: 95px;
+              padding: 12px 13px;
+              min-height: 77px;
               border-right: 1px solid #d9ddd6;
               border-bottom: 1px solid #d9ddd6;
               border-radius: 0;
@@ -1792,38 +1797,64 @@ export default function AdminFoodIntelligencePage() {
             .foodint-reference-mobile .foodint-hero-metrics > div:nth-child(2) { background: #f7e6dc; }
             .foodint-reference-mobile .foodint-hero-metrics > div:nth-child(3) { background: #e2ebf5; }
             .foodint-reference-mobile .foodint-hero-metrics > div:nth-child(4) { background: #eee9f5; }
-            .foodint-reference-mobile .foodint-hero-metrics strong { font-size: 31px; color: #173f35; }
-            .foodint-reference-mobile .foodint-hero-metrics span { font-size: 14px; line-height: 1.4; color: #52675e; margin-top: 7px; }
+            .foodint-reference-mobile .foodint-hero-metrics strong { font-size: 27px; color: #173f35; }
+            .foodint-reference-mobile .foodint-hero-metrics span { font-size: 13px; line-height: 1.35; color: #52675e; margin-top: 4px; }
             .foodint-reference-mobile .foodint-work-grid button {
-              min-height: 137px;
-              border: 1px solid #d8e0d8;
-              border-radius: 11px;
-              background: #ecf0e9;
-              color: #183f33;
+              min-height: 62px;
+              border: 1px solid #dce4dc;
+              border-radius: 10px;
+              background: #fffefa;
+              color: #193e32;
               text-align: left;
-              padding: 15px 13px;
+              padding: 10px 11px;
               display: flex;
-              flex-direction: column;
+              flex-direction: row;
+              align-items: center;
               justify-content: space-between;
+              gap: 6px;
               min-width: 0;
               transition: background-color .16s ease, border-color .16s ease;
             }
             .foodint-reference-mobile .foodint-work-grid button[aria-pressed="true"] {
               background: #173f35;
               border-color: #173f35;
-              border-left: 4px solid #c56c43;
+              box-shadow: inset 3px 0 #d7855e;
               color: white;
             }
             .foodint-reference-mobile .foodint-work-grid button:focus-visible {
               outline: 3px solid #b06b42;
               outline-offset: 2px;
             }
-            .foodint-reference-mobile .foodint-work-grid button[aria-pressed="true"] .foodint-tile-count,
-            .foodint-reference-mobile .foodint-work-grid button[aria-pressed="true"] .foodint-tile-number { color: #d5eadd; }
+            .foodint-reference-mobile .foodint-work-grid .foodint-tile-label {
+              min-width: 0;
+              font-size: 14px;
+              line-height: 1.3;
+              font-weight: 750;
+              overflow-wrap: anywhere;
+            }
+            .foodint-reference-mobile .foodint-work-grid .foodint-tile-count {
+              flex: 0 0 auto;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              min-width: 27px;
+              height: 27px;
+              padding: 0 5px;
+              border-radius: 7px;
+              background: #eaf0e9;
+              color: #244e3f;
+              font-size: 14px;
+              font-weight: 800;
+              font-variant-numeric: tabular-nums;
+            }
+            .foodint-reference-mobile .foodint-work-grid button[aria-pressed="true"] .foodint-tile-count {
+              background: #2b6050;
+              color: #ffffff;
+            }
             .foodint-reference-mobile .foodint-decision-row { padding: 13px 12px; gap: 11px; }
             .foodint-reference-mobile .foodint-decision-list:not(.foodint-expanded) > button:nth-child(n+6) { display: none; }
-            .foodint-reference-mobile .foodint-panel-heading { margin-bottom: 18px; }
-            .foodint-reference-mobile .foodint-panel-heading h2 { font-size: 26px; line-height: 1.18; }
+            .foodint-reference-mobile .foodint-panel-heading { margin-bottom: 13px; }
+            .foodint-reference-mobile .foodint-panel-heading h2 { font-size: clamp(22px, 6.3vw, 25px); line-height: 1.2; }
             .foodint-reference-mobile .foodint-panel-heading > div:first-child > div:first-child > span {
               background: transparent; border-radius: 0; width: auto; height: auto;
               padding: 0; font-size: 14px;
@@ -1834,7 +1865,9 @@ export default function AdminFoodIntelligencePage() {
             .foodint-reference-mobile .foodint-queue-header > div { color: #285a71; font-size: 16px; }
             .foodint-reference-mobile .foodint-queue-header > span { color: #446779; }
             .foodint-reference-mobile .foodint-panel-heading p { font-size: 14px; }
-            .foodint-reference-mobile .foodint-content-anchor { scroll-margin-top: 24px; }
+            .foodint-reference-mobile .foodint-content-anchor { scroll-margin-top: 20px; }
+            .foodint-reference-mobile .foodint-content-anchor > div > section { padding: 19px 12px; }
+            .foodint-reference-mobile .foodint-work-selector { padding: 14px 12px 15px; }
           }
         `}</style>
 
@@ -1896,30 +1929,26 @@ export default function AdminFoodIntelligencePage() {
 
 
         {/* Mobile only: reference-style workspace selector; desktop section navigation unchanged. */}
-        <section aria-label="Choose Food Intelligence work" className="border-b border-[#D9DFD7] bg-[#F7F6F2] px-4 pb-5 pt-6 sm:hidden">
-          <p className="text-[14px] font-extrabold uppercase tracking-[0.02em] text-[#B65F3B]">01 / Work queue</p>
-          <h2 className="mt-2 text-[26px] font-extrabold leading-[1.18] tracking-[-0.035em] text-[#173F35]">Choose what to review</h2>
-          <p className="mt-2 text-[14px] leading-5 text-[#607166]">Open a workspace below to review its records.</p>
-          <div className="foodint-work-grid mt-5 grid grid-cols-2 gap-2.5">
+        <section aria-label="Choose Food Intelligence work" className="foodint-work-selector border-b border-[#D9DFD7] bg-[#F7F6F2] px-3 py-4 sm:hidden">
+          <p className="text-[12px] font-extrabold uppercase tracking-[0.045em] text-[#AF6243]">01 / Work queue</p>
+          <h2 className="mt-1 text-[22px] font-extrabold leading-[1.2] tracking-[-0.03em] text-[#173F35]">Choose a work area</h2>
+          <div className="foodint-work-grid mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Food Intelligence work areas">
             {[
-              ['checks', 'Food checks', stats.reviewRequired, '01'],
-              ['product', 'Product details', stats.products, '02'],
-              ['relations', 'Allergy links', stats.mappings, '03'],
-              ['rules', 'Dietary rules', stats.rules, '04'],
-            ].map(([section, label, count, number]) => (
+              ['checks', 'Food checks', stats.reviewRequired],
+              ['product', 'Product details', stats.products],
+              ['relations', 'Allergy links', stats.mappings],
+              ['rules', 'Dietary rules', stats.rules],
+            ].map(([section, label, count]) => (
               <button key={section} type="button" aria-pressed={mobileWorkSection === section}
                 onClick={() => chooseMobileWorkSection(section)}>
-                <span className="flex w-full items-center justify-between gap-3">
-                  <span className="foodint-tile-number text-[15px] font-extrabold text-[#B26343]">{number}</span>
-                  <span className="foodint-tile-count text-[17px] font-extrabold text-[#173F35]">{count}</span>
-                </span>
-                <span className="text-[16px] font-extrabold leading-5">{label}</span>
+                <span className="foodint-tile-label">{label}</span>
+                <span className="foodint-tile-count" aria-label={`${count} records`}>{count}</span>
               </button>
             ))}
           </div>
         </section>
 
-        <div ref={mobileActiveSectionRef} className="foodint-content-anchor scroll-mt-5">
+        <div className="foodint-content-anchor scroll-mt-5">
           <div className="px-0 pt-0 sm:px-6 sm:pt-8">
 
           <section id="food-review-product" className={`scroll-mt-24 px-4 py-6 sm:px-0 sm:pt-0 sm:pb-9 ${mobileWorkSection === 'product' ? 'block' : 'hidden sm:block'}`}>
@@ -2271,7 +2300,7 @@ export default function AdminFoodIntelligencePage() {
             </div>
           </section>
 
-          <section id="food-review-allergies" className={`scroll-mt-24 border-t border-[#E1E6E8] bg-[#EAF3F7] px-4 py-6 sm:-mx-6 sm:px-6 sm:py-9 ${mobileWorkSection === 'relations' ? 'block' : 'hidden sm:block'}`}>
+          <section id="food-review-allergies" className="scroll-mt-24 border-t border-[#E1E6E8] bg-[#EAF3F7] px-4 py-6 sm:-mx-6 sm:px-6 sm:py-9">
             <SectionHeading number="03" kicker="Safety links" title="Ingredient & allergen links"
               subtitle="Choose a saved link to examine its relationship before activation."
               total={`${relations.length} links`} tone="blue" />
@@ -2313,7 +2342,7 @@ export default function AdminFoodIntelligencePage() {
             </div>
           </section>
 
-          <section id="food-review-rules" className={`scroll-mt-24 border-t border-[#E1DEE9] bg-[#F4EFF9] px-4 py-6 sm:-mx-6 sm:px-6 sm:py-9 ${mobileWorkSection === 'rules' ? 'block' : 'hidden sm:block'}`}>
+          <section id="food-review-rules" className="scroll-mt-24 border-t border-[#E1DEE9] bg-[#F4EFF9] px-4 py-6 sm:-mx-6 sm:px-6 sm:py-9">
             <SectionHeading number="04" kicker="Policy rules" title="Dietary rules"
               subtitle="Select a rule to inspect its version and activation status."
               total={`${rules.length} rules`} tone="violet" />

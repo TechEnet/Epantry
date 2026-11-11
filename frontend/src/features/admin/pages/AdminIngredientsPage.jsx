@@ -431,84 +431,94 @@ export default function AdminIngredientsPage() {
           .ing-table-head,.ing-record-button { grid-template-columns:minmax(0,1fr) minmax(90px,.7fr) 80px 18px; gap:9px; padding-left:13px; padding-right:13px; }
         }
         @media(max-width:650px) {
-          /* Mobile-only: preserve desktop styles and the existing colour tokens. */
-          .ing-page { width:100%; min-width:0; padding-bottom:7px; }
-          .ing-refresh { min-height:36px; padding:8px 11px; font-size:12.5px; border-radius:8px; }
+          /* Keep the approved page full-bleed, without changing shared AdminShell styles elsewhere. */
+          .page-shell:has(.ing-page) { box-sizing:border-box; width:100%; max-width:none; margin-inline:0; padding:0; }
+          .page-shell:has(.ing-page) > div { border-inline:0; border-radius:0; box-shadow:none; }
+          .page-shell:has(.ing-page) .epantry-workspace-canvas > div:has(> .ing-page) { padding:0; }
+          .ing-page { width:100%; min-width:0; padding-bottom:8px; }
+          .ing-refresh { min-height:38px; padding:8px 12px; font-size:13px; border-radius:9px; }
           .ing-refresh svg { width:14px; height:14px; }
-          .ing-feature { grid-template-columns:minmax(0,1fr) 86px; margin:0 0 12px; border-radius:10px; }
-          .ing-feature-main { padding:15px 12px 16px; }
-          .ing-eyebrow { font-size:9px; gap:6px; }
-          .ing-eyebrow svg { width:13px; height:13px; }
-          .ing-feature-main h2 { font-size:20px; line-height:1.15; margin:7px 0 5px; letter-spacing:-.03em; }
-          .ing-feature-main p { font-size:12px; line-height:1.4; max-width:230px; }
-          .ing-feature-count { padding:10px 7px; text-align:center; align-items:center; }
-          .ing-count-label { font-size:9px; line-height:1.2; gap:3px; letter-spacing:0; text-align:center; }
-          .ing-count-label svg { width:11px; height:11px; }
-          .ing-feature-count strong { font-size:31px; margin-top:6px; }
-          .ing-feature-count > span:last-child { font-size:10px; line-height:1.25; }
-          .ing-directory-header { padding:12px 13px 11px; align-items:center; gap:7px; }
-          .ing-section-label { font-size:10px; }
-          .ing-directory-header h2 { font-size:21px; margin:3px 0 0; }
-          .ing-directory-meta { font-size:10px; line-height:1.35; white-space:normal; max-width:100px; justify-content:flex-end; text-align:right; gap:5px; }
-          .ing-meta-dot { width:5px; height:5px; flex:none; }
-          .ing-toolbar { padding:9px; display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:7px; align-items:stretch; }
-          .ing-searchbox { min-height:44px; gap:6px; padding:0 9px; }
-          .ing-searchbox > svg { width:16px; height:16px; flex:none; }
-          .ing-searchbox input { font-size:13px; }
-          .ing-filter-wrap { width:auto; min-width:0; min-height:44px; padding:0 8px; gap:6px; }
-          .ing-filter-wrap > svg:first-child { width:14px; height:14px; flex:none; }
-          .ing-filter-wrap label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
-          .ing-filter-wrap select { width:100%; font-size:12px; min-width:0; padding-right:15px; }
-          .ing-select-chevron { right:7px; width:12px; height:12px; }
-          .ing-results { display:flex; flex-direction:column; }
-          .ing-alphabet { padding:8px 10px; border-right:0; border-bottom:1px solid #D6CBEA; display:flex; align-items:center; gap:8px; min-width:0; }
-          .ing-alpha-title { white-space:nowrap; margin:0; font-size:10px; letter-spacing:0; }
-          .ing-letter-buttons { display:flex; flex:1; min-width:0; gap:4px; overflow-x:auto; overscroll-behavior-inline:contain; scrollbar-width:thin; padding:1px 0 2px; }
-          .ing-letter-buttons button { width:32px; min-width:32px; height:31px; font-size:12px; border-radius:5px; background:rgba(255,255,255,.6); }
+
+          /* Hero retains its two-tone identity, but gives both sides readable room. */
+          .ing-feature { grid-template-columns:minmax(0,1fr) 104px; border-radius:0; margin:0 0 16px; border-inline:0; }
+          .ing-feature-main { min-width:0; padding:18px 16px 19px; }
+          .ing-eyebrow { font-size:11px; letter-spacing:.02em; gap:7px; }
+          .ing-eyebrow svg { width:14px; height:14px; flex:none; }
+          .ing-feature-main h2 { font-size:23px; line-height:1.17; margin:9px 0 7px; letter-spacing:-.033em; }
+          .ing-feature-main p { font-size:13px; line-height:1.48; max-width:290px; }
+          .ing-feature-count { padding:12px 8px; align-items:center; text-align:center; }
+          .ing-count-label { font-size:10px; line-height:1.25; gap:4px; letter-spacing:0; justify-content:center; }
+          .ing-count-label svg { width:12px; height:12px; flex:none; }
+          .ing-feature-count strong { font-size:36px; line-height:1; margin-top:9px; letter-spacing:-.05em; }
+          .ing-feature-count > span:last-child { font-size:11.5px; line-height:1.25; margin-top:5px; }
+
+          /* More consistent section heading and progress label. */
+          .ing-directory-header { padding:16px 15px 14px; align-items:flex-end; gap:10px; }
+          .ing-section-label { font-size:11px; }
+          .ing-directory-header h2 { font-size:23px; line-height:1.18; margin:6px 0 0; }
+          .ing-directory-meta { font-size:11.5px; font-weight:700; line-height:1.3; max-width:110px; white-space:normal; justify-content:flex-end; text-align:right; gap:6px; }
+          .ing-meta-dot { width:6px; height:6px; flex:none; }
+
+          /* Let the search prompt breathe; keep the existing status filter underneath. */
+          .ing-toolbar { padding:12px 14px; display:flex; flex-wrap:wrap; gap:9px; align-items:stretch; }
+          .ing-searchbox { min-height:47px; flex:1 1 100%; gap:9px; padding:0 12px; }
+          .ing-searchbox > svg { width:17px; height:17px; flex:none; }
+          .ing-searchbox input { font-size:14px; }
+          .ing-filter-wrap { width:100%; min-width:0; min-height:43px; padding:0 12px; gap:9px; }
+          .ing-filter-wrap > svg:first-child { width:15px; height:15px; flex:none; }
+          .ing-filter-wrap label { position:static; width:auto; height:auto; overflow:visible; clip:auto; white-space:nowrap; font-size:12.5px; }
+          .ing-filter-wrap select { min-width:0; flex:1; width:100%; font-size:13px; padding-right:23px; text-align:right; }
+          .ing-select-chevron { right:12px; width:14px; height:14px; }
+
+          /* Mobile alphabetical navigation: a single accessible horizontal rail. */
+          .ing-results { display:flex; flex-direction:column; border-inline:0; }
+          .ing-alphabet { padding:11px 13px 12px; border-right:0; border-bottom:1px solid #D6CBEA; display:block; min-width:0; }
+          .ing-alpha-title { font-size:11px; letter-spacing:.025em; margin:0 0 8px; }
+          .ing-letter-buttons { display:flex; width:100%; min-width:0; gap:7px; overflow-x:auto; overscroll-behavior-inline:contain; scrollbar-width:thin; padding:1px 1px 5px; }
+          .ing-letter-buttons button { width:39px; min-width:39px; height:38px; font-size:13px; border-radius:8px; background:rgba(255,255,255,.72); border:1px solid rgba(23,63,53,.08); }
           .ing-letter-buttons button:disabled { display:none; }
           .ing-alpha-note,.ing-table-head { display:none; }
-          .ing-letter-section { scroll-margin-top:84px; grid-template-columns:32px minmax(0,1fr); }
-          .ing-group-marker { padding:11px 2px; }
-          .ing-group-marker span { font-size:17px; }
-          .ing-group-marker small { font-size:9px; }
+
+          /* Horizontal alphabet dividers replace the cramped 28px vertical gutter. */
+          .ing-letter-section { scroll-margin-top:85px; display:block; }
+          .ing-group-marker { display:flex; flex-direction:row; align-items:center; gap:10px; padding:8px 15px; border-right:0; border-left:3px solid #AFCAB7; border-bottom:1px solid #D2E2D8; }
+          .ing-group-marker span { font-size:17px; line-height:1; }
+          .ing-group-marker small { font-size:12px; margin:0; line-height:1; }
           .ing-group-rows { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
           .ing-record { min-width:0; border-right:0; border-bottom:1px solid #E7EAE4; }
           .ing-record:nth-child(odd) { border-right:1px solid #E7EAE4; }
-          .ing-record.is-open { grid-column:1/-1; border-right:0; }
-          .ing-record-button { width:100%; min-height:77px; display:grid; grid-template-columns:minmax(0,1fr) 13px; grid-template-rows:auto auto auto; align-content:center; align-items:center; gap:3px 2px; padding:9px 7px; }
-          .ing-record-name { grid-column:1; grid-row:1; align-items:center; gap:5px; }
-          .ing-name-icon { width:22px; height:22px; border-radius:6px; }
-          .ing-name-icon svg { width:12px; height:12px; }
-          .ing-record-name strong { font-size:12.5px; line-height:1.25; font-weight:750; overflow-wrap:anywhere; }
-          .ing-record-ref { grid-column:1; grid-row:2; margin-left:0; min-width:0; font-size:10.5px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-          .ing-status { grid-column:1; grid-row:3; justify-self:start; padding:0; font-size:10px; line-height:1.15; background:transparent !important; }
-          .ing-status svg { width:11px; height:11px; }
-          .ing-record-chevron { grid-column:2; grid-row:1 / span 3; width:13px; height:13px; align-self:center; }
-          .ing-record-details { grid-template-columns:repeat(2,minmax(0,1fr)); padding:10px 11px 12px; gap:10px; }
-          .ing-record-details small { font-size:10px; }
-          .ing-record-details strong,.ing-record-details span { font-size:12px; }
-          .ing-list-footer { padding:11px; gap:9px; flex-wrap:wrap; font-size:11.5px; }
-          .ing-list-footer button { min-height:44px; flex:1 1 100%; justify-content:center; padding:10px; }
-          .ing-empty { padding:35px 14px; }
-          .ing-skeleton { padding:6px 10px; }
+          .ing-record:last-child:nth-child(odd),.ing-record.is-open { grid-column:1/-1; border-right:0; }
+          .ing-record-button { width:100%; min-height:96px; display:grid; grid-template-columns:minmax(0,1fr) 15px; grid-template-rows:auto auto auto; align-content:center; align-items:center; gap:5px 5px; padding:13px 12px; }
+          .ing-record-name { grid-column:1; grid-row:1; align-items:center; gap:7px; }
+          .ing-name-icon { width:25px; height:25px; flex:none; border-radius:7px; }
+          .ing-name-icon svg { width:13px; height:13px; }
+          .ing-record-name strong { font-size:14px; line-height:1.3; font-weight:750; overflow-wrap:break-word; }
+          .ing-record-ref { grid-column:1; grid-row:2; min-width:0; font-size:12px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+          .ing-status { grid-column:1; grid-row:3; justify-self:start; padding:0; font-size:11.5px; line-height:1.25; background:transparent !important; }
+          .ing-status svg { width:12px; height:12px; }
+          .ing-record-chevron { grid-column:2; grid-row:1 / span 3; width:15px; height:15px; align-self:center; }
+          .ing-record-details { grid-template-columns:repeat(2,minmax(0,1fr)); padding:14px 15px 16px; gap:12px; }
+          .ing-record-details small { font-size:11px; }
+          .ing-record-details strong,.ing-record-details span { font-size:13px; line-height:1.4; }
+          .ing-list-footer { padding:13px 15px; gap:10px; flex-wrap:wrap; font-size:12.5px; }
+          .ing-list-footer button { min-height:45px; flex:1 1 100%; justify-content:center; padding:11px; font-size:13px; }
+          .ing-empty { padding:38px 16px; }
+          .ing-skeleton { padding:6px 12px; }
         }
         @media(max-width:360px) {
-          .ing-feature { grid-template-columns:minmax(0,1fr) 76px; }
-          .ing-feature-main h2 { font-size:19px; }
-          .ing-feature-main p { font-size:11.5px; }
-          .ing-feature-count strong { font-size:28px; }
-          .ing-directory-header h2 { font-size:19px; }
-          .ing-directory-meta { max-width:78px; }
-          .ing-toolbar { grid-template-columns:minmax(0,1fr) 102px; }
-          .ing-letter-section { grid-template-columns:28px minmax(0,1fr); }
-          .ing-group-rows { display:block; }
-          .ing-record:nth-child(odd) { border-right:0; }
-          .ing-record-button { min-height:56px; grid-template-columns:minmax(0,1fr) auto 13px; grid-template-rows:auto auto; gap:3px 7px; padding:7px 9px; }
-          .ing-record-name { grid-column:1; grid-row:1; }
-          .ing-record-name strong { font-size:13px; }
-          .ing-record-ref { grid-column:1; grid-row:2; font-size:11px; }
-          .ing-status { grid-column:2; grid-row:1 / span 2; font-size:10px; }
-          .ing-record-chevron { grid-column:3; grid-row:1 / span 2; }
+          .ing-feature { grid-template-columns:minmax(0,1fr) 91px; }
+          .ing-feature-main { padding:16px 12px; }
+          .ing-feature-main h2 { font-size:21px; }
+          .ing-feature-main p { font-size:12.5px; }
+          .ing-feature-count strong { font-size:33px; }
+          .ing-directory-header { padding-inline:12px; }
+          .ing-directory-header h2 { font-size:21px; }
+          .ing-directory-meta { max-width:91px; font-size:11px; }
+          .ing-toolbar { padding-inline:10px; }
+          .ing-record-button { padding-inline:9px; min-height:94px; }
+          .ing-record-name { gap:5px; }
+          .ing-record-name strong { font-size:13.5px; }
+          .ing-record-ref { font-size:11.5px; }
         }
         @media(prefers-reduced-motion:reduce) { .ing-spin,.ing-skeleton span { animation:none; } }
       `}</style>

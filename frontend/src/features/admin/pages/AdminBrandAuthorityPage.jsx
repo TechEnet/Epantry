@@ -532,60 +532,68 @@ const BRAND_REVIEW_STYLES = String.raw`
 @media (max-width:950px){#epantry-brand-review .br-intro{grid-template-columns:1fr}#epantry-brand-review .br-owner-layout{grid-template-columns:1fr}#epantry-brand-review .br-owner-list{max-height:255px;border-right:0;border-bottom:1px solid #d9dfd8}#epantry-brand-review .br-two-sections{grid-template-columns:1fr}#epantry-brand-review .br-intro-text{padding:22px}}
 @media (max-width:600px){#epantry-brand-review{padding:0 0 18px}#epantry-brand-review .br-intro{margin-bottom:21px;border-radius:8px}#epantry-brand-review .br-intro-text{padding:17px 17px 15px}#epantry-brand-review .br-intro h2{font-size:23px}#epantry-brand-review .br-intro-text p:last-child{font-size:13px}#epantry-brand-review .br-summary{padding:6px}#epantry-brand-review .br-summary a{padding:11px 12px}#epantry-brand-review .br-summary b{font-size:24px}#epantry-brand-review .br-summary small{font-size:12px}#epantry-brand-review .br-section{margin-bottom:22px}#epantry-brand-review .br-section-head{padding:14px 14px}#epantry-brand-review .br-section-title h2{font-size:21px}#epantry-brand-review .br-detail{padding:16px 14px}#epantry-brand-review .br-review-inputs{grid-template-columns:1fr}#epantry-brand-review .br-flat-row{padding:14px}#epantry-brand-review .br-empty{padding:16px 14px}#epantry-brand-review .br-note-strip{padding:12px 14px;flex-direction:column;align-items:stretch;gap:6px}#epantry-brand-review .br-claim-button{padding:13px 14px}}
 
-/* Mobile-only Brand Review adjustments. No palette, API or desktop changes. */
+/* Brand Review mobile presentation only: compact, full-width, and icon-free where decorative. */
 @media (max-width:600px){
-  /* Keep the shared AdminShell unchanged for every other admin page. */
-  main:has(#epantry-brand-review) .page-shell{padding-left:0 !important;padding-right:0 !important;padding-top:0 !important;padding-bottom:0 !important}
+  /* Only this page: do not change the common Super Admin navigation. */
+  main:has(#epantry-brand-review) .page-shell{padding:0 !important}
   main:has(#epantry-brand-review) .page-shell>div{border-radius:0 !important;border-left:0 !important;border-right:0 !important;box-shadow:none !important}
-  main:has(#epantry-brand-review) .epantry-workspace-canvas>header{padding:10px 12px 11px !important}
-  main:has(#epantry-brand-review) .epantry-workspace-canvas>header>div:first-child{margin-bottom:7px !important}
-  main:has(#epantry-brand-review) .epantry-workspace-canvas>header>div:nth-child(2){grid-template-columns:minmax(0,1fr) auto !important;align-items:center !important;gap:8px !important}
-  main:has(#epantry-brand-review) .epantry-workspace-canvas>header h1{font-size:clamp(20px,5.5vw,23px) !important;line-height:1.12 !important;letter-spacing:-.03em !important;overflow-wrap:normal}
+  main:has(#epantry-brand-review) .epantry-workspace-canvas>header{padding:11px 15px 13px !important}
+  main:has(#epantry-brand-review) .epantry-workspace-canvas>header>div:first-child{margin-bottom:9px !important}
+  main:has(#epantry-brand-review) .epantry-workspace-canvas>header>div:nth-child(2){grid-template-columns:minmax(0,1fr) auto !important;gap:10px !important;align-items:center !important}
+  main:has(#epantry-brand-review) .epantry-workspace-canvas>header h1{font-size:clamp(22px,5.8vw,26px) !important;line-height:1.15 !important;letter-spacing:-.035em !important;overflow-wrap:normal}
   main:has(#epantry-brand-review) .epantry-workspace-canvas>header div:nth-child(2) p{display:none}
-  main:has(#epantry-brand-review) .epantry-workspace-canvas>header div:nth-child(2) button{min-height:39px !important;padding:8px 10px !important;font-size:13px !important;white-space:nowrap}
-  main:has(#epantry-brand-review) .epantry-workspace-canvas>div:last-child{padding:10px 11px 14px !important}
-  #epantry-brand-review{padding:0 0 12px}
-  #epantry-brand-review .br-intro{margin-bottom:15px;border-radius:10px;border-top-width:2px}
-  #epantry-brand-review .br-intro-text{padding:14px 15px 13px}
-  #epantry-brand-review .br-eyebrow{font-size:11px;line-height:1.2;margin-bottom:5px}
-  #epantry-brand-review .br-intro h2{font-size:22px;line-height:1.13;margin-bottom:5px}
-  #epantry-brand-review .br-intro-text p:last-child{font-size:13px;line-height:1.36}
-  #epantry-brand-review .br-summary{padding:3px;gap:1px;grid-template-columns:repeat(2,minmax(0,1fr))}
-  #epantry-brand-review .br-summary a{gap:7px;min-height:62px;padding:8px 10px;align-items:center}
-  #epantry-brand-review .br-summary b{font-size:23px;line-height:1}
-  #epantry-brand-review .br-summary small{font-size:11px;line-height:1.2;margin-top:3px}
-  #epantry-brand-review .br-summary svg{width:16px;height:16px}
-  #epantry-brand-review .br-section{margin-bottom:14px;scroll-margin-top:82px}
-  #epantry-brand-review .br-two-sections{gap:0;grid-template-columns:1fr}
-  #epantry-brand-review .br-section-head{padding:11px 13px 12px;gap:9px;min-height:65px;align-items:center}
-  #epantry-brand-review .br-section-no{font-size:11px;margin-bottom:4px;line-height:1.1}
-  #epantry-brand-review .br-section-title h2{font-size:20px;line-height:1.15;letter-spacing:-.03em}
+  main:has(#epantry-brand-review) .epantry-workspace-canvas>header div:nth-child(2) button{min-height:40px !important;padding:8px 11px !important;font-size:13px !important;white-space:nowrap}
+  main:has(#epantry-brand-review) .epantry-workspace-canvas>div:last-child{padding:0 !important}
+  #epantry-brand-review{padding:0 0 12px;background:#f7f6f2;overflow-x:clip}
+  #epantry-brand-review .br-intro{display:block;margin:0 0 15px;border:0;border-top:2px solid var(--br-clay);border-radius:0;overflow:hidden}
+  #epantry-brand-review .br-intro-text{padding:19px 18px 18px}
+  #epantry-brand-review .br-eyebrow{font-size:12px;line-height:1.25;margin:0 0 8px}
+  #epantry-brand-review .br-intro h2{font-size:26px;line-height:1.12;letter-spacing:-.035em;margin:0 0 7px}
+  #epantry-brand-review .br-intro-text p:last-child{font-size:14px;line-height:1.48;max-width:33ch}
+  #epantry-brand-review .br-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:0;gap:1px;background:#dce3da}
+  #epantry-brand-review .br-summary a{min-height:77px;align-items:center;padding:12px 18px;background:#f3f5ef;gap:0}
+  #epantry-brand-review .br-summary a:hover{background:#e7eee5}
+  #epantry-brand-review .br-summary b{font-size:26px;line-height:1;font-weight:800}
+  #epantry-brand-review .br-summary small{font-size:13px;line-height:1.28;margin-top:5px;font-weight:650}
+  /* Summary symbols and empty-state inbox images carry no information. */
+  #epantry-brand-review .br-summary svg,#epantry-brand-review .br-empty svg{display:none !important}
+  #epantry-brand-review .br-section{margin:0;border-bottom:1px solid #e0e4dd;scroll-margin-top:78px}
+  #epantry-brand-review .br-two-sections{display:grid;grid-template-columns:1fr;gap:0}
+  #epantry-brand-review .br-section-head{padding:16px 18px 15px;gap:12px;align-items:center;min-height:0}
+  #epantry-brand-review .br-section-no{font-size:12px;line-height:1.25;margin-bottom:6px;letter-spacing:.015em}
+  #epantry-brand-review .br-section-title h2{font-size:23px;line-height:1.16;letter-spacing:-.025em;overflow-wrap:normal}
   #epantry-brand-review .br-heading-desktop{display:none}
   #epantry-brand-review .br-heading-mobile{display:inline}
-  #epantry-brand-review .br-section-count{min-width:31px;min-height:31px;padding:5px 8px;font-size:13px}
-  #epantry-brand-review .br-section-body{min-width:0}
-  #epantry-brand-review .br-empty{min-height:52px;padding:12px 13px;gap:10px;font-size:13px;line-height:1.4}
-  #epantry-brand-review .br-empty svg{width:19px;height:19px}
-  #epantry-brand-review .br-owner-list{max-height:220px}
-  #epantry-brand-review .br-claim-button{padding:12px 13px;min-height:56px}
-  #epantry-brand-review .br-claim-header{gap:7px;align-items:flex-start}
-  #epantry-brand-review .br-detail{padding:13px}
-  #epantry-brand-review .br-detail-heading h3{font-size:18px}
-  #epantry-brand-review .br-caption{font-size:13px}
-  #epantry-brand-review .br-review-inputs{grid-template-columns:1fr;gap:10px}
-  #epantry-brand-review .br-scope-row{gap:6px}
-  #epantry-brand-review .br-scope-option{font-size:13px;padding:9px;min-height:40px}
-  #epantry-brand-review .br-btn{min-height:44px;font-size:13px;padding:8px 11px}
-  #epantry-brand-review .br-flat-row{padding:13px;gap:10px}
-  #epantry-brand-review .br-flat-row strong{font-size:14px}
+  #epantry-brand-review .br-section-count{min-width:38px;min-height:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;padding:3px 9px;border:1px solid #d7dfd5;border-radius:9px;background:#fffefa;font-size:14px;line-height:1;font-weight:750;flex-shrink:0}
+  #epantry-brand-review .br-section-body{min-width:0;background:#fffefa;border:0}
+  #epantry-brand-review .br-empty{display:block;min-height:0;padding:16px 18px 18px;font-size:14px;line-height:1.5;font-weight:600;color:#4f695c}
+  #epantry-brand-review .br-owner-list{max-height:235px;border-right:0;border-bottom:1px solid #d9dfd8}
+  #epantry-brand-review .br-claim-button{min-height:56px;padding:13px 18px}
+  #epantry-brand-review .br-claim-header{gap:8px;align-items:flex-start}
+  #epantry-brand-review .br-detail{padding:17px 18px}
+  #epantry-brand-review .br-detail-heading h3{font-size:19px;line-height:1.25}
+  #epantry-brand-review .br-caption{font-size:13px;line-height:1.45}
+  #epantry-brand-review .br-review-inputs{grid-template-columns:1fr;gap:12px}
+  #epantry-brand-review .br-field input,#epantry-brand-review .br-field textarea{font-size:15px;min-height:46px}
+  #epantry-brand-review .br-scope-row{gap:8px}
+  #epantry-brand-review .br-scope-option{font-size:13px;padding:10px;min-height:44px}
+  #epantry-brand-review .br-btn{min-height:44px;font-size:14px;padding:9px 12px}
+  #epantry-brand-review .br-flat-row{padding:15px 18px;gap:10px}
+  #epantry-brand-review .br-flat-row strong{font-size:15px}
   #epantry-brand-review .br-flat-row-meta{font-size:13px}
-  #epantry-brand-review .br-note-strip{padding:10px 13px}
-  #epantry-brand-review .br-row-actions,#epantry-brand-review .br-flat-actions{gap:7px}
+  #epantry-brand-review .br-note-strip{padding:12px 18px;flex-direction:column;align-items:stretch;gap:8px}
+  #epantry-brand-review .br-note-strip input{min-height:44px;font-size:14px}
+  #epantry-brand-review .br-row-actions,#epantry-brand-review .br-flat-actions{gap:8px}
+  #epantry-brand-review .br-status{font-size:12px}
+  #epantry-brand-review .br-section-foot{padding:10px 18px;font-size:13px}
 }
-@media(max-width:350px){
-  main:has(#epantry-brand-review) .epantry-workspace-canvas>header h1{font-size:20px !important}
-  #epantry-brand-review .br-summary a{padding:8px}
-  #epantry-brand-review .br-section-title h2{font-size:18px}
+@media (max-width:350px){
+  main:has(#epantry-brand-review) .epantry-workspace-canvas>header h1{font-size:21px !important}
+  #epantry-brand-review .br-intro h2{font-size:24px}
+  #epantry-brand-review .br-summary a{padding:11px 13px}
+  #epantry-brand-review .br-section-title h2{font-size:21px}
+  #epantry-brand-review .br-section-head{padding:15px 14px}
 }
+
 
 `
