@@ -1,10 +1,11 @@
 import {
   BadgeCheck,
-  Boxes,
+  ArrowRight,
+  ChevronRight,
+  Layers3,
   CheckCircle2,
   CircleAlert,
   Download,
-  FileSearch,
   Image as ImageIcon,
   LoaderCircle,
   RefreshCw,
@@ -90,9 +91,12 @@ function reviewFieldLabel(fieldPath) {
 function reviewSourceLabel(source) {
   const value = String(source || "").toLowerCase();
 
-  if (value.includes("user") || value.includes("host")) return "Provided by Host";
-  if (value.includes("open_food") || value.includes("food_facts")) return "Open Food Facts";
-  if (value.includes("ai") || value.includes("extract")) return "Auto-read from evidence";
+  if (value.includes("user") || value.includes("host"))
+    return "Provided by Host";
+  if (value.includes("open_food") || value.includes("food_facts"))
+    return "Open Food Facts";
+  if (value.includes("ai") || value.includes("extract"))
+    return "Auto-read from evidence";
   if (value.includes("external")) return "External source";
 
   return "Submitted information";
@@ -104,7 +108,9 @@ function candidateValue(draft, fieldPath) {
 
 function candidateTitle(draft) {
   return String(
-    candidateValue(draft, "displayName") || draft?.barcode || "Provisional product"
+    candidateValue(draft, "displayName") ||
+      draft?.barcode ||
+      "Provisional product"
   );
 }
 
@@ -141,19 +147,6 @@ function statusClasses(status) {
   }
 }
 
-function batchStatusClasses(status) {
-  switch (status) {
-    case "completed":
-      return "bg-emerald-100 text-emerald-800";
-    case "in_review":
-      return "bg-blue-100 text-blue-800";
-    case "needs_attention":
-      return "bg-orange-100 text-orange-800";
-    default:
-      return "bg-slate-100 text-slate-700";
-  }
-}
-
 function commerceStatusClasses(status) {
   switch (status) {
     case "live":
@@ -163,14 +156,13 @@ function commerceStatusClasses(status) {
     case "action_required":
       return "bg-orange-100 text-orange-800";
     case "processing":
-      return "bg-sky-100 text-sky-800";
+      return "bg-[#E0EBE1] text-[#173F35]";
     case "skipped":
       return "bg-stone-100 text-stone-600";
     default:
-      return "bg-sky-100 text-sky-800";
+      return "bg-[#E0EBE1] text-[#173F35]";
   }
 }
-
 
 function nutritionReviewData(value) {
   let nutritionValue = value;
@@ -189,11 +181,19 @@ function nutritionReviewData(value) {
     }
   }
 
-  if (!nutritionValue || typeof nutritionValue !== "object" || Array.isArray(nutritionValue)) {
+  if (
+    !nutritionValue ||
+    typeof nutritionValue !== "object" ||
+    Array.isArray(nutritionValue)
+  ) {
     return { basis: "", serving: "", rows: [] };
   }
 
-  const basisRaw = nutritionValue.basis || nutritionValue.per || nutritionValue.reference || "";
+  const basisRaw =
+    nutritionValue.basis ||
+    nutritionValue.per ||
+    nutritionValue.reference ||
+    "";
   const basisMap = {
     per_100g: "Per 100 g",
     per_100ml: "Per 100 ml",
@@ -202,20 +202,33 @@ function nutritionReviewData(value) {
     serving: "Per serving",
   };
   const normalizedBasis = String(basisRaw).toLowerCase();
-  const basis = normalizedBasis === "unknown"
-    ? ""
-    : basisMap[normalizedBasis] ||
-      (basisRaw ? labelize(String(basisRaw).replace(/^per[_\s-]*/i, "Per ")) : "");
+  const basis =
+    normalizedBasis === "unknown"
+      ? ""
+      : basisMap[normalizedBasis] ||
+        (basisRaw
+          ? labelize(String(basisRaw).replace(/^per[_\s-]*/i, "Per "))
+          : "");
 
-  const servingSize = nutritionValue.servingSize || nutritionValue.serving || null;
+  const servingSize =
+    nutritionValue.servingSize || nutritionValue.serving || null;
   let serving = "";
-  if (servingSize && typeof servingSize === "object" && !Array.isArray(servingSize)) {
-    const amount = servingSize.value ?? servingSize.amount ?? servingSize.quantity;
+  if (
+    servingSize &&
+    typeof servingSize === "object" &&
+    !Array.isArray(servingSize)
+  ) {
+    const amount =
+      servingSize.value ?? servingSize.amount ?? servingSize.quantity;
     const unit = servingSize.unit || servingSize.unitText || "";
     if (amount !== null && amount !== undefined && amount !== "") {
       serving = `Serving size ${amount}${unit ? ` ${unit}` : ""}`;
     }
-  } else if (servingSize !== null && servingSize !== undefined && servingSize !== "") {
+  } else if (
+    servingSize !== null &&
+    servingSize !== undefined &&
+    servingSize !== ""
+  ) {
     serving = `Serving size ${servingSize}`;
   }
 
@@ -257,7 +270,13 @@ function nutritionReviewData(value) {
 
   const rows = [];
   const pushRow = (name, amount, unit = "") => {
-    if (amount === null || amount === undefined || amount === "" || typeof amount === "object") return;
+    if (
+      amount === null ||
+      amount === undefined ||
+      amount === "" ||
+      typeof amount === "object"
+    )
+      return;
     rows.push({
       label: formatNutrientLabel(name),
       value: `${amount}${unit ? ` ${unit}` : ""}`,
@@ -273,8 +292,18 @@ function nutritionReviewData(value) {
         return;
       }
 
-      const name = nutrient.name || nutrient.label || nutrient.nutrient || nutrient.key || "Nutrient";
-      const amount = nutrient.amount ?? nutrient.value ?? nutrient.quantity ?? nutrient.per100g ?? null;
+      const name =
+        nutrient.name ||
+        nutrient.label ||
+        nutrient.nutrient ||
+        nutrient.key ||
+        "Nutrient";
+      const amount =
+        nutrient.amount ??
+        nutrient.value ??
+        nutrient.quantity ??
+        nutrient.per100g ??
+        null;
       const unit = nutrient.unit || nutrient.unitText || "";
       pushRow(name, amount, unit);
     });
@@ -285,7 +314,18 @@ function nutritionReviewData(value) {
         : nutritionValue;
 
     Object.entries(nutrientSource).forEach(([key, item]) => {
-      if (["basis", "per", "reference", "servingSize", "serving", "nutrients", "confidence"].includes(key)) return;
+      if (
+        [
+          "basis",
+          "per",
+          "reference",
+          "servingSize",
+          "serving",
+          "nutrients",
+          "confidence",
+        ].includes(key)
+      )
+        return;
 
       if (item && typeof item === "object" && !Array.isArray(item)) {
         const amount = item.value ?? item.amount ?? item.quantity ?? null;
@@ -341,9 +381,10 @@ ${items.join(", ")}`;
     const basis = value.basis || value.per || value.reference;
     if (basis) lines.push(`Values ${String(basis).replace(/_/g, " ")}`);
 
-    const nutrients = value.nutrients && typeof value.nutrients === "object"
-      ? value.nutrients
-      : value;
+    const nutrients =
+      value.nutrients && typeof value.nutrients === "object"
+        ? value.nutrients
+        : value;
 
     Object.entries(nutrients).forEach(([key, item]) => {
       if (["basis", "per", "reference", "servingSize"].includes(key)) return;
@@ -370,7 +411,9 @@ ${items.join(", ")}`;
     const labels = items
       .map((item) => {
         if (item && typeof item === "object") {
-          return item.label || item.name || item.title || item.statement || null;
+          return (
+            item.label || item.name || item.title || item.statement || null
+          );
         }
         return item;
       })
@@ -501,6 +544,7 @@ export default function AdminBulkNpiReviewPage() {
   const [batchStatus, setBatchStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   const [selectedBatchId, setSelectedBatchId] = useState("");
@@ -519,17 +563,18 @@ export default function AdminBulkNpiReviewPage() {
   const [singleSubmitting, setSingleSubmitting] = useState(false);
   const [singleNotice, setSingleNotice] = useState("");
   const draftRequestIdRef = useRef(0);
+  const batchRequestIdRef = useRef(0);
+  const batchListRequestIdRef = useRef(0);
+  const reviewDeskRef = useRef(null);
 
+  // Keep server pagination and selection in sync; never silently truncate the queue.
   const loadBatches = useCallback(
     async (background = false) => {
-      if (background) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
+      const requestId = ++batchListRequestIdRef.current;
+      setLoadingMore(false);
+      if (background) setRefreshing(true);
+      else setLoading(true);
       setError("");
-
       try {
         const result = await listAdminNpiBulkBatches({
           page: 1,
@@ -537,67 +582,110 @@ export default function AdminBulkNpiReviewPage() {
           listingType: listingType || undefined,
           search: search || undefined,
         });
-
+        if (batchListRequestIdRef.current !== requestId) return;
         const nextBatches = result?.batches || [];
-
         setBatches(nextBatches);
         setSummary(result?.summary || {});
         setPagination(result?.pagination || null);
-
-        if (
-          selectedBatchId &&
-          !nextBatches.some((item) => item.id === selectedBatchId)
-        ) {
-          setSelectedBatchId("");
-          setBatchDetail(null);
-        }
-      } catch (requestError) {
-        setError(
-          getUniversalProductErrorMessage(
-            requestError,
-            "Unable to load bulk product review batches."
-          )
+        setSelectedBatchId((current) =>
+          nextBatches.some((item) => item.id === current) ? current : ""
         );
+      } catch (requestError) {
+        if (batchListRequestIdRef.current === requestId) {
+          setError(
+            getUniversalProductErrorMessage(
+              requestError,
+              "Unable to load Host submissions."
+            )
+          );
+        }
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (batchListRequestIdRef.current === requestId) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [listingType, search, selectedBatchId]
+    [listingType, search]
   );
 
   useEffect(() => {
     loadBatches();
   }, [loadBatches]);
 
+  async function loadMoreBatches() {
+    const nextPage = Number(pagination?.page || 1) + 1;
+    if (loadingMore || nextPage > Number(pagination?.pages || 1)) return;
+    const requestId = batchListRequestIdRef.current;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const result = await listAdminNpiBulkBatches({
+        page: nextPage,
+        limit: 50,
+        listingType: listingType || undefined,
+        search: search || undefined,
+      });
+      if (batchListRequestIdRef.current !== requestId) return;
+      setBatches((current) => {
+        const ids = new Set(current.map((item) => item.id));
+        return [
+          ...current,
+          ...(result?.batches || []).filter((item) => !ids.has(item.id)),
+        ];
+      });
+      setSummary((current) => {
+        const next = { ...current };
+        for (const [key, value] of Object.entries(result?.summary || {})) {
+          next[key] = (Number(current?.[key]) || 0) + (Number(value) || 0);
+        }
+        return next;
+      });
+      setPagination(result?.pagination || pagination);
+    } catch (requestError) {
+      if (batchListRequestIdRef.current === requestId) {
+        setError(
+          getUniversalProductErrorMessage(
+            requestError,
+            "Unable to load more submissions."
+          )
+        );
+      }
+    } finally {
+      if (batchListRequestIdRef.current === requestId) setLoadingMore(false);
+    }
+  }
+
   async function openBatch(batchId) {
+    const requestId = ++batchRequestIdRef.current;
     setSelectedBatchId(batchId);
+    setBatchDetail(null);
     setLoadingBatch(true);
     setError("");
     setBulkNotice("");
+    setBulkReason("");
     setSelectedDraftIds([]);
-    setSelectedDraft(null);
-
+    setRowFilter("all");
+    closeDraftReview();
     try {
       const result = await getAdminNpiBulkBatch(batchId);
-      setBatchDetail(result);
+      if (batchRequestIdRef.current === requestId) setBatchDetail(result);
     } catch (requestError) {
-      setError(
-        getUniversalProductErrorMessage(
-          requestError,
-          "Unable to load this product batch."
-        )
-      );
+      if (batchRequestIdRef.current === requestId) {
+        setError(
+          getUniversalProductErrorMessage(
+            requestError,
+            "Unable to load this Host submission."
+          )
+        );
+      }
     } finally {
-      setLoadingBatch(false);
+      if (batchRequestIdRef.current === requestId) setLoadingBatch(false);
     }
   }
 
   async function refreshSelectedBatch() {
-    if (!selectedBatchId) {
-      return;
-    }
-
+    if (!selectedBatchId) return;
     const result = await getAdminNpiBulkBatch(selectedBatchId);
     setBatchDetail(result);
   }
@@ -609,6 +697,22 @@ export default function AdminBulkNpiReviewPage() {
         : batches,
     [batchStatus, batches]
   );
+
+  useEffect(() => {
+    if (loading) return;
+    if (!visibleBatches.length) {
+      batchRequestIdRef.current += 1;
+      setSelectedBatchId("");
+      setBatchDetail(null);
+      setLoadingBatch(false);
+      return;
+    }
+    if (!visibleBatches.some((item) => item.id === selectedBatchId)) {
+      openBatch(visibleBatches[0].id);
+    }
+    // Selection is driven by loaded/filter results, never by the refresh state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, visibleBatches, selectedBatchId]);
 
   const filteredDrafts = useMemo(() => {
     const drafts = batchDetail?.drafts || [];
@@ -657,7 +761,11 @@ export default function AdminBulkNpiReviewPage() {
   function selectCleanRows() {
     setSelectedDraftIds(
       (batchDetail?.drafts || [])
-        .filter((draft) => draft.bulkReviewEligible)
+        .filter(
+          (draft) =>
+            draft.bulkReviewEligible &&
+            !["approved_for_catalog", "rejected"].includes(draft.status)
+        )
         .map((draft) => draft.id)
     );
   }
@@ -667,8 +775,10 @@ export default function AdminBulkNpiReviewPage() {
       return;
     }
 
-    if (!bulkReason.trim()) {
-      setBulkNotice("Add a short review note before applying this decision.");
+    if (bulkReason.trim().length < 3 || bulkReason.trim().length > 2000) {
+      setBulkNotice(
+        "Enter a reason of 3–2,000 characters before applying a decision."
+      );
       return;
     }
 
@@ -687,7 +797,6 @@ export default function AdminBulkNpiReviewPage() {
         chunks.push(selectedDraftIds.slice(index, index + 25));
       }
 
-      let latestResult = null;
       let processed = 0;
       let skipped = 0;
       let live = 0;
@@ -702,7 +811,6 @@ export default function AdminBulkNpiReviewPage() {
           reason: bulkReason.trim(),
         });
 
-        latestResult = result;
         processed += result?.processed?.length || 0;
         skipped += result?.skipped?.length || 0;
         live += (result?.processed || []).filter(
@@ -716,23 +824,27 @@ export default function AdminBulkNpiReviewPage() {
         ).length;
       }
 
-      setBatchDetail((current) => ({
-        ...(current || {}),
-        batch: latestResult?.batch || current?.batch,
-        drafts: latestResult?.drafts || current?.drafts || [],
-      }));
+      await refreshSelectedBatch();
 
       setBulkNotice(
         decision === "approve_for_catalog"
-          ? `${processed} product${processed === 1 ? "" : "s"} approved · ${live} customer-live${
+          ? `${processed} product${
+              processed === 1 ? "" : "s"
+            } approved · ${live} customer-live${
               prepared ? ` · ${prepared} prepared` : ""
             }${
-              commerceActionRequired ? ` · ${commerceActionRequired} need commerce action` : ""
+              commerceActionRequired
+                ? ` · ${commerceActionRequired} need commerce action`
+                : ""
             }${
-              skipped ? ` · ${skipped} skipped because they require individual attention` : ""
+              skipped
+                ? ` · ${skipped} skipped because they require individual attention`
+                : ""
             }.`
           : `${processed} product${processed === 1 ? "" : "s"} updated${
-              skipped ? ` · ${skipped} skipped because they require individual attention` : ""
+              skipped
+                ? ` · ${skipped} skipped because they require individual attention`
+                : ""
             }.`
       );
       setSelectedDraftIds([]);
@@ -833,13 +945,17 @@ export default function AdminBulkNpiReviewPage() {
       return;
     }
 
-    if (!singleReason.trim()) {
-      setSingleNotice("Add a short review note before recording the decision.");
+    if (singleReason.trim().length < 3 || singleReason.trim().length > 2000) {
+      setSingleNotice(
+        "Enter a reason of 3–2,000 characters before recording a decision."
+      );
       return;
     }
 
     if (decision === "approve_for_catalog" && !canCatalogMutate) {
-      setSingleNotice("You do not have permission to approve catalog products.");
+      setSingleNotice(
+        "You do not have permission to approve catalog products."
+      );
       return;
     }
 
@@ -890,762 +1006,1553 @@ export default function AdminBulkNpiReviewPage() {
   const reviewableFields = Object.entries(detailDraft?.candidateFields || {});
   const commercial = detailDraft?.commercialDraft || {};
 
+  // Read-only presentation helpers for the Product review dialog. API decisions stay unchanged.
+  const checkedFieldCount = reviewableFields.filter(
+    ([fieldPath]) =>
+      fieldStates[fieldPath] && fieldStates[fieldPath] !== "pending_review"
+  ).length;
+  const identityFields = reviewableFields.filter(
+    ([fieldPath]) => !SAFETY_FIELDS.has(fieldPath)
+  );
+  const safetyFields = reviewableFields.filter(([fieldPath]) =>
+    SAFETY_FIELDS.has(fieldPath)
+  );
+
+  const renderReviewField = ([fieldPath, item]) => {
+    const mutable = allowedFieldForMutation(fieldPath);
+    const safety = SAFETY_FIELDS.has(fieldPath);
+    const nutrition =
+      fieldPath === "nutrition" ? nutritionReviewData(item?.value) : null;
+
+    return (
+      <div
+        key={fieldPath}
+        className="grid min-w-0 gap-2 border-b border-[#E6E4DD] px-0 py-4 last:border-b-0 md:grid-cols-[minmax(125px,0.7fr)_minmax(0,1.4fr)_minmax(145px,0.85fr)] md:items-start md:gap-4"
+      >
+        <div className="min-w-0">
+          <div className="flex items-start gap-1.5">
+            <span className="text-[14px] font-bold leading-5 text-[#173F35]">
+              {reviewFieldLabel(fieldPath)}
+            </span>
+            {safety ? (
+              <ShieldAlert
+                size={15}
+                className="mt-0.5 shrink-0 text-[#AF6547]"
+                aria-label="Safety-sensitive field"
+              />
+            ) : null}
+          </div>
+          <p className="mt-1 text-[12px] leading-4 text-[#69746D]">
+            {reviewSourceLabel(item?.source)}
+          </p>
+        </div>
+        <div className="min-w-0">
+          {nutrition ? (
+            <div className="min-w-0">
+              {nutrition.basis || nutrition.serving ? (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {nutrition.basis ? (
+                    <span className="bg-[#E7EEE5] px-2 py-1 text-[12px] font-semibold text-[#173F35]">
+                      {nutrition.basis}
+                    </span>
+                  ) : null}
+                  {nutrition.serving ? (
+                    <span className="bg-[#F6EBE5] px-2 py-1 text-[12px] font-semibold text-[#774E3C]">
+                      {nutrition.serving}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {nutrition.rows.length ? (
+                <div className="grid grid-cols-2 gap-x-4">
+                  {nutrition.rows.map((nutrient) => (
+                    <div
+                      key={`${nutrient.label}-${nutrient.value}`}
+                      className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 border-b border-[#ECEAE4] py-1.5"
+                    >
+                      <span className="text-[12px] text-[#637168]">
+                        {nutrient.label}
+                      </span>
+                      <span className="text-[12px] font-bold text-[#202421]">
+                        {nutrient.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-[#657168]">
+                  Nutrition details not provided.
+                </p>
+              )}
+            </div>
+          ) : (
+            <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words font-sans text-[14px] font-medium leading-[1.55] text-[#27332C]">
+              {readableReviewValue(fieldPath, item?.value)}
+            </pre>
+          )}
+        </div>
+        <label className="min-w-0">
+          <span className="sr-only">Review {reviewFieldLabel(fieldPath)}</span>
+          <select
+            value={fieldStates[fieldPath] || "pending_review"}
+            disabled={!mutable || singleSubmitting}
+            onChange={(event) =>
+              setFieldStates((current) => ({
+                ...current,
+                [fieldPath]: event.target.value,
+              }))
+            }
+            className="focus-ring min-h-11 w-full border border-[#D9DED6] bg-white px-3 text-[13px] font-semibold text-[#173F35] outline-none disabled:bg-[#F1F2EF] disabled:text-[#8A918B]"
+          >
+            <option value="pending_review">Not reviewed</option>
+            <option value="accepted">Looks correct</option>
+            <option value="needs_evidence">Need more proof</option>
+            <option value="rejected">Mark incorrect</option>
+          </select>
+        </label>
+      </div>
+    );
+  };
+
   return (
     <AdminShell
       title="Bulk Product Review"
-      description={<>
-        <span className="sm:hidden">Review Host batches, fix issues, and approve clean products.</span>
-        <span className="hidden sm:inline">Review product batches submitted by Hosts, check issues and duplicates, and approve clean listings without opening the source spreadsheet.</span>
-      </>}
+      description="Review Host submissions, investigate issues and record product decisions."
       actions={
         <button
           type="button"
-          disabled={refreshing}
+          disabled={refreshing || loading}
           onClick={() => loadBatches(true)}
-          className="focus-ring inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 shadow-sm disabled:opacity-60"
+          className="focus-ring inline-flex min-h-11 items-center gap-2 border border-[#CFDBD0] bg-white px-4 text-sm font-semibold text-[#173F35] hover:bg-[#F0F5F0] disabled:opacity-50"
         >
-          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />{" "}
           Refresh
         </button>
       }
     >
-      <section className="overflow-hidden rounded-[18px] bg-[#0f5148] text-white sm:rounded-[22px]">
-        <div className="grid gap-3 px-4 py-4 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] lg:items-end">
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.04em] text-emerald-200 sm:text-[11px] sm:tracking-[0.08em]">
-              Batch review workspace
-            </p>
-            <h2 className="mt-1.5 max-w-3xl text-xl font-extrabold leading-[1.15] sm:mt-2 sm:text-3xl sm:leading-tight">
-              <span className="sm:hidden">Review Host batches faster.</span>
-              <span className="hidden sm:inline">Review Host product batches in one clear workflow.</span>
-            </h2>
-            <p className="mt-1.5 max-w-2xl text-xs font-medium leading-4 text-emerald-50/80 sm:mt-2 sm:text-sm sm:leading-6">
-              <span className="sm:hidden">Choose a batch, check issues, then decide.</span>
-              <span className="hidden sm:inline">Choose a submission, check anything that needs attention, then review or approve the products. Clean rows can be handled together.</span>
-            </p>
-          </div>
+      <section
+        aria-label="Bulk product review workspace"
+        className="bulk-review-redesign min-w-0 bg-[#F7F6F2] text-[#202421]"
+      >
+        <style>{`
+          @media (max-width: 639px) {
+            /* Scope these changes to the Bulk Review workspace on a phone. */
+            .page-shell:has(.bulk-review-redesign) {
+              box-sizing: border-box !important;
+              width: 100% !important;
+              max-width: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .page-shell:has(.bulk-review-redesign) .epantry-workspace-canvas > div:last-child {
+              padding: 0 !important;
+            }
+            .listing-approvals-mobile-root:has(.bulk-review-redesign) {
+              width: 100% !important;
+              max-width: 100% !important;
+              padding-bottom: 0 !important;
+            }
+            .bulk-review-redesign {
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 100%;
+              min-width: 0;
+              border-radius: 0;
+              overflow-x: clip;
+              background: #fffdfb;
+            }
+            .bulk-review-redesign .bulk-hero {
+              padding: 18px 16px;
+              border-bottom-width: 2px;
+            }
+            .bulk-review-redesign .bulk-hero-copy > p:last-child { display: none; }
+            .bulk-review-redesign .bulk-hero-count {
+              min-width: auto;
+              padding: 9px 12px;
+              gap: 9px;
+              align-self: flex-start;
+            }
+            .bulk-review-redesign .bulk-hero-count > span:first-child {
+              font-size: 24px;
+            }
+            .bulk-review-redesign .bulk-summary-grid,
+            .bulk-review-redesign .bulk-batch-summary {
+              grid-template-columns: repeat(2,minmax(0,1fr));
+            }
+            .bulk-review-redesign .bulk-summary-item {
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              gap: 9px;
+              min-height: 61px;
+              padding: 10px 13px;
+            }
+            .bulk-review-redesign .bulk-summary-item > div:first-child {
+              flex-shrink: 0;
+              font-size: 23px;
+              line-height: 1.1;
+            }
+            .bulk-review-redesign .bulk-summary-item > div:last-child {
+              font-size: 12px;
+              line-height: 1.3;
+            }
+            .bulk-review-redesign .bulk-directory-toolbar { padding: 15px 14px 7px; }
+            .bulk-review-redesign .bulk-directory-toolbar h3 { font-size: 20px; }
+            .bulk-review-redesign .bulk-directory-toolbar form { margin-top: 12px; }
+            .bulk-review-redesign .bulk-batch-filters { margin-top: 9px; }
+            .bulk-review-redesign .bulk-mobile-batch-picker {
+              padding: 0 14px 14px;
+              background: #f1f4ee;
+            }
+            .bulk-review-redesign .bulk-mobile-filters {
+              margin-top: 9px;
+              border-top: 1px solid #d6ded4;
+            }
+            .bulk-review-redesign .bulk-mobile-filters summary {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              min-height: 42px;
+              color: #173f35;
+              font-size: 13px;
+              font-weight: 700;
+              cursor: pointer;
+              list-style: none;
+            }
+            .bulk-review-redesign .bulk-mobile-filters summary::-webkit-details-marker { display: none; }
+            .bulk-review-redesign .bulk-mobile-filters[open] summary {
+              border-bottom: 1px solid #d6ded4;
+            }
+            .bulk-review-redesign .bulk-mobile-filters form { margin-top: 10px; }
+            .page-shell:has(.bulk-review-redesign) .epantry-workspace-canvas > header p {
+              display: none !important;
+            }
+            .bulk-review-redesign .bulk-mobile-batch-picker select {
+              display: block;
+              box-sizing: border-box;
+              width: 100%;
+              min-width: 0;
+              min-height: 46px;
+              padding: 10px 12px;
+              border: 1px solid #c5d4c7;
+              background: #fffdfb;
+              color: #173f35;
+              font-size: 14px;
+              font-weight: 700;
+            }
+            .bulk-review-redesign .bulk-batch-detail-header { padding: 17px 15px; }
+            .bulk-review-redesign .bulk-batch-detail-header h3 {
+              font-size: 22px;
+              line-height: 1.2;
+            }
+            .bulk-review-redesign .bulk-batch-stat {
+              display: flex;
+              align-items: center;
+              min-height: 53px;
+              gap: 10px;
+              padding: 9px 13px;
+            }
+            .bulk-review-redesign .bulk-batch-stat > div {
+              font-size: 22px;
+              line-height: 1;
+              flex-shrink: 0;
+            }
+            .bulk-review-redesign .bulk-batch-stat > p {
+              min-width: 0;
+              font-size: 12px;
+              line-height: 1.3;
+            }
+            .bulk-review-redesign .bulk-products-section {
+              padding: 18px 13px 15px;
+            }
+            .bulk-review-redesign .bulk-products-header h3 {
+              font-size: 21px;
+              line-height: 1.22;
+            }
+            .bulk-review-redesign .bulk-select-clean-button:disabled { display: none; }
+            .bulk-review-redesign .bulk-row-filters {
+              margin-top: 13px;
+              padding-bottom: 5px;
+              scrollbar-width: thin;
+            }
+            .bulk-review-redesign .bulk-row-filters button {
+              min-height: 38px;
+              font-size: 12px;
+              padding: 8px 12px;
+            }
+            .bulk-review-redesign .bulk-product-row {
+              display: grid;
+              grid-template-columns: 19px minmax(0,1fr) auto;
+              grid-template-rows: auto auto;
+              column-gap: 10px;
+              row-gap: 2px;
+              padding: 15px 0;
+              align-items: start;
+              background: #fffdfb;
+            }
+            .bulk-review-redesign .bulk-product-checkbox {
+              grid-column: 1;
+              grid-row: 1;
+              margin-top: 3px;
+            }
+            .bulk-review-redesign .bulk-product-copy {
+              grid-column: 2;
+              grid-row: 1;
+            }
+            .bulk-review-redesign .bulk-product-copy h4 {
+              font-size: 15px;
+              line-height: 1.4;
+              overflow-wrap: anywhere;
+            }
+            .bulk-review-redesign .bulk-product-copy > p,
+            .bulk-review-redesign .bulk-product-copy > div {
+              font-size: 13px;
+              line-height: 1.4;
+            }
+            .bulk-review-redesign .bulk-product-commercial {
+              grid-column: 2;
+              grid-row: 2;
+              display: flex;
+              align-items: center;
+              flex-wrap: wrap;
+              gap: 4px 12px;
+              font-size: 13px;
+              padding-top: 6px;
+            }
+            .bulk-review-redesign .bulk-product-commercial > span {
+              display: inline;
+              margin: 0;
+            }
+            .bulk-review-redesign .bulk-product-action {
+              grid-column: 3;
+              grid-row: 1 / span 2;
+              justify-self: end;
+              align-self: center;
+              min-height: 44px;
+              padding: 0 10px;
+              font-size: 13px;
+              white-space: nowrap;
+            }
+            .bulk-review-redesign .bulk-decision-section { padding: 19px 15px 21px; }
+            .bulk-review-redesign .bulk-decision-section h3 { font-size: 21px; }
+            .bulk-review-redesign .bulk-decision-hint { display: none; }
+            .bulk-review-redesign .bulk-decision-actions {
+              display: grid;
+              grid-template-columns: repeat(2,minmax(0,1fr));
+              gap: 8px;
+            }
+            .bulk-review-redesign .bulk-decision-actions button {
+              width: 100%;
+              min-width: 0;
+              min-height: 45px;
+              padding: 8px 10px;
+              font-size: 13px;
+              white-space: normal;
+              line-height: 1.3;
+            }
+            .bulk-review-redesign .bulk-decision-actions button:first-child {
+              grid-column: 1 / -1;
+            }
+          }
+          @media (max-width: 359px) {
+            .bulk-review-redesign .bulk-batch-filters { grid-template-columns: 1fr; }
+            .bulk-review-redesign .bulk-hero-count { width: 100%; }
+          }
+          .bulk-review-dialog [class*="text-[9px]"],
+          .bulk-review-dialog [class*="text-[10px]"] { font-size: 12px; line-height: 1.5; }
+          .bulk-review-dialog [class*="text-[11px]"] { font-size: 13px; line-height: 1.55; }
+          .bulk-review-dialog button, .bulk-review-dialog select { min-height: 38px; }
+        `}</style>
 
-          <div className="grid grid-cols-4 border-t border-white/15 sm:border-l sm:border-t-0">
-            {[
-              [summary.submitted || 0, "Submitted"],
-              [summary.reviewReady || 0, "Ready"],
-              [summary.issues || 0, "Need attention"],
-              [summary.potentialDuplicates || 0, "Duplicates"],
-            ].map(([value, label]) => (
-              <div key={label} className="border-r border-white/15 px-2 py-2 last:border-r-0 sm:px-4">
-                <p className="text-lg font-extrabold sm:text-2xl">{value}</p>
-                <p className="mt-0.5 text-[9px] font-semibold leading-3 text-emerald-100/70 sm:mt-1 sm:text-[11px]">
-                  <span className="sm:hidden">{label === "Need attention" ? "Issues" : label}</span>
-                  <span className="hidden sm:inline">{label}</span>
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/15 bg-[#0b433d] px-4 py-2 text-[10px] font-semibold text-emerald-50/85 sm:gap-x-6 sm:gap-y-2 sm:px-7 sm:py-3 sm:text-xs">
-          <span><span className="sm:hidden">{summary.live || 0} live</span><span className="hidden sm:inline">{summary.live || 0} customer live</span></span>
-          <span><span className="sm:hidden">{summary.commerceActionRequired || 0} need setup</span><span className="hidden sm:inline">{summary.commerceActionRequired || 0} need selling setup</span></span>
-          <span><span className="sm:hidden">{pagination?.total ?? batches.length} batches</span><span className="hidden sm:inline">{pagination?.total ?? batches.length} Host submissions</span></span>
-        </div>
-      </section>
-
-      <section className="mt-3 border-y border-[#c9dfdb] bg-[#eef7f5] px-3 py-3 sm:mt-5 sm:px-5 sm:py-4">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3 lg:grid-cols-[minmax(0,1fr)_190px_190px]">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              setSearch(searchInput.trim());
-            }}
-            className="col-span-2 flex min-w-0 items-center gap-2 border border-[#c7ddd9] bg-white px-2.5 py-1.5 sm:col-span-1 sm:border-x-0 sm:border-t-0 sm:border-b sm:border-[#a9cbc5] sm:px-3 sm:py-2.5 lg:border-b-0"
-          >
-            <SearchIcon size={17} className="shrink-0 text-[#176d62]" />
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search Host or file name..."
-              className="h-8 min-w-0 flex-1 bg-transparent text-sm font-medium text-stone-800 outline-none sm:h-9"
-            />
-            <button className="rounded-lg bg-[#155f57] px-4 py-2 text-xs font-bold text-white hover:bg-[#104f48]">
-              Search
-            </button>
-          </form>
-
-          <select
-            value={listingType}
-            onChange={(event) => setListingType(event.target.value)}
-            className="h-10 min-w-0 border border-[#bdd5e2] bg-[#edf5f8] px-2 text-xs font-semibold text-slate-800 outline-none sm:h-[52px] sm:px-3 sm:text-sm"
-          >
-            {LISTING_FILTERS.map(([value, label]) => (
-              <option key={value || "all"} value={value}>{label}</option>
-            ))}
-          </select>
-
-          <select
-            value={batchStatus}
-            onChange={(event) => setBatchStatus(event.target.value)}
-            className="h-10 min-w-0 border border-[#c8d2dc] bg-white px-2 text-xs font-semibold text-slate-800 outline-none sm:h-[52px] sm:px-3 sm:text-sm"
-          >
-            {BATCH_STATUS_FILTERS.map(([value, label]) => (
-              <option key={value || "all"} value={value}>{label}</option>
-            ))}
-          </select>
-        </div>
-      </section>
-
-      {error ? (
-        <div className="mt-4 flex items-start gap-3 border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          <CircleAlert size={18} className="mt-0.5 shrink-0" />
-          {error}
-        </div>
-      ) : null}
-
-      <section className="mt-3 border border-stone-200 bg-white sm:mt-5">
-        <div className="grid gap-2 border-b border-stone-200 bg-[#f7f6f2] px-3 py-3 sm:grid-cols-[220px_minmax(0,1fr)] sm:items-center sm:gap-3 sm:px-5 sm:py-4">
-          <div>
-            <p className="text-sm font-bold text-stone-900">Choose a Host submission</p>
-            <p className="mt-0.5 text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">Pick a batch to review.</p>
-          </div>
-
-          {loading ? (
-            <div className="flex h-12 items-center gap-2 border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-500">
-              <LoaderCircle size={17} className="animate-spin text-[#176d62]" />
-              Loading submissions...
+        <div className="bulk-hero border-b-[3px] border-[#C86C42] bg-[#EED7C8] px-4 py-6 sm:px-7 sm:py-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="bulk-hero-copy max-w-2xl">
+              <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#8C4C34]">
+                05 / Bulk review
+              </p>
+              <h2 className="mt-1 text-[27px] font-bold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[34px]">
+                Host submissions
+              </h2>
+              <p className="mt-2 text-[15px] leading-relaxed text-[#594B40]">
+                Choose a batch, check its products, then record the right
+                decision.
+              </p>
             </div>
-          ) : visibleBatches.length ? (
-            <select
-              value={selectedBatchId}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value) openBatch(value);
-              }}
-              className="h-10 w-full border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-800 outline-none focus:border-[#438d83] sm:h-12"
+            <div className="bulk-hero-count flex min-w-[170px] items-center gap-3 bg-[#173F35] px-4 py-3 sm:py-4">
+              <span className="text-[33px] font-bold tabular-nums leading-none text-white">
+                {pagination?.total ?? batches.length}
+              </span>
+              <span className="text-[13px] font-semibold leading-5 text-[#E7EFE7]">
+                Host
+                <br />
+                submissions
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bulk-summary-grid grid grid-cols-2 border-b border-[#D6DDD3] bg-[#FFFDFB] sm:grid-cols-4">
+          {[
+            [summary.submitted || 0, "Products submitted (loaded)"],
+            [summary.reviewReady || 0, "Ready to review"],
+            [summary.issues || 0, "Needs attention"],
+            [summary.potentialDuplicates || 0, "Possible duplicates"],
+          ].map(([value, label], index) => (
+            <div
+              key={label}
+              className={`bulk-summary-item min-w-0 px-4 py-4 sm:px-6 sm:py-5 bg-[#FFFDFB] ${
+                index % 2 ? "border-l border-[#E1DFD7]" : ""
+              } ${
+                index > 1 && index % 2 === 0
+                  ? "sm:border-l sm:border-[#E9DFD7]"
+                  : ""
+              } ${index > 1 ? "border-t sm:border-t-0 border-[#E9DFD7]" : ""}`}
             >
-              <option value="">Select a submission</option>
-              {visibleBatches.map((batch) => (
-                <option key={batch.id} value={batch.id}>
-                  {(batch.organization?.displayName || "Host organization")} · {labelize(batch.status)} · {batch.review?.submittedRows || 0} products
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div className="border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-500">
-              No submissions match these filters.
+              <div className="text-[27px] font-bold tabular-nums text-[#173F35] sm:text-[32px]">
+                {value}
+              </div>
+              <div className="text-[13px] font-medium leading-5 text-[#586A5E]">
+                {label}
+              </div>
             </div>
-          )}
+          ))}
         </div>
 
-        {loadingBatch ? (
-          <div className="grid min-h-[360px] place-items-center">
-            <LoaderCircle size={30} className="animate-spin text-[#176d62]" />
+        {error ? (
+          <div
+            role="alert"
+            className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-4 py-3 text-[14px] font-semibold text-red-800 sm:px-6"
+          >
+            <CircleAlert size={18} className="mt-0.5 shrink-0" />
+            {error}
           </div>
-        ) : batchDetail?.batch ? (
-          <>
-            <div className="border-b border-stone-200 bg-[#eaf4f7]">
-              <div className="flex flex-col gap-2 px-3 py-3 sm:gap-4 sm:px-5 sm:py-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${batchStatusClasses(batchDetail.batch.status)}`}>
-                      {labelize(batchDetail.batch.status)}
-                    </span>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-700">
-                      {labelize(batchDetail.batch.listingType)}
-                    </span>
-                  </div>
-                  <h2 className="mt-1.5 text-lg font-extrabold text-stone-950 sm:mt-2 sm:text-xl">
-                    {batchDetail.batch.organization?.displayName || "Host organization"}
-                  </h2>
-                  <p className="mt-0.5 truncate text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">
-                    {batchDetail.batch.sourceFileName || "Submitted file"}
+        ) : null}
+
+        <div className="bulk-workspace-layout grid min-w-0 lg:grid-cols-[minmax(270px,320px)_minmax(0,1fr)]">
+          <aside
+            aria-label="Host batch directory"
+            className="bulk-batch-directory min-w-0 border-b border-[#DAE1D9] bg-[#F1F4EE] lg:border-b-0 lg:border-r"
+          >
+            <div className="bulk-directory-toolbar px-4 pb-4 pt-5 sm:px-5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#99553C]">
+                    01 / Select
                   </p>
+                  <h3 className="mt-1 text-[22px] font-bold leading-tight text-[#173F35]">
+                    Choose a batch
+                  </h3>
+                </div>
+                <span className="hidden border border-[#E4D5CB] bg-white px-2.5 py-1.5 text-[13px] font-bold tabular-nums text-[#173F35] sm:inline-flex">
+                  {visibleBatches.length} loaded
+                </span>
+              </div>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setSearch(searchInput.trim());
+                }}
+                className="mt-4 hidden min-w-0 items-center border border-[#DED1C8] bg-white sm:flex"
+              >
+                <SearchIcon
+                  size={18}
+                  className="ml-3 shrink-0 text-[#8A7568]"
+                />
+                <input
+                  aria-label="Search Host or file"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Host or file name"
+                  className="h-11 min-w-0 flex-1 bg-transparent px-2 text-[14px] text-[#202421] outline-none"
+                />
+                <button
+                  type="submit"
+                  className="h-11 border-l border-[#E6DAD2] px-3 text-[13px] font-bold text-[#173F35]"
+                >
+                  Find
+                </button>
+              </form>
+              <div className="bulk-batch-filters mt-2 hidden grid-cols-2 gap-2 sm:grid">
+                <label className="min-w-0">
+                  <span className="sr-only">Product type</span>
+                  <select
+                    value={listingType}
+                    onChange={(event) => {
+                      setListingType(event.target.value);
+                      setSelectedBatchId("");
+                      setBatchDetail(null);
+                    }}
+                    className="h-11 w-full min-w-0 border border-[#DED1C8] bg-white px-2 text-[13px] font-semibold text-[#173F35] outline-none"
+                  >
+                    {LISTING_FILTERS.map(([value, label]) => (
+                      <option key={value || "all"} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-0">
+                  <span className="sr-only">Batch status</span>
+                  <select
+                    value={batchStatus}
+                    onChange={(event) => setBatchStatus(event.target.value)}
+                    className="h-11 w-full min-w-0 border border-[#DED1C8] bg-white px-2 text-[13px] font-semibold text-[#173F35] outline-none"
+                  >
+                    {BATCH_STATUS_FILTERS.map(([value, label]) => (
+                      <option key={value || "all"} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className="bulk-mobile-batch-picker sm:hidden">
+              <label htmlFor="bulk-mobile-batch-select" className="sr-only">
+                Select Host batch
+              </label>
+              <select
+                id="bulk-mobile-batch-select"
+                value={selectedBatchId}
+                onChange={(event) => {
+                  if (event.target.value) openBatch(event.target.value);
+                }}
+                disabled={loading || !visibleBatches.length}
+              >
+                <option value="" disabled>
+                  Choose a Host submission
+                </option>
+                {visibleBatches.map((batch, index) => (
+                  <option key={batch.id} value={batch.id}>
+                    {index + 1}.{" "}
+                    {batch.organization?.displayName || "Host organization"} —{" "}
+                    {labelize(batch.status)} ·{" "}
+                    {batch.review?.submittedRows ?? "—"} products
+                  </option>
+                ))}
+              </select>
+              <details className="bulk-mobile-filters">
+                <summary>
+                  Search or filter submissions{" "}
+                  <SearchIcon size={16} aria-hidden="true" />
+                </summary>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setSearch(searchInput.trim());
+                  }}
+                  className="flex min-w-0 items-center border border-[#DED1C8] bg-white"
+                >
+                  <SearchIcon
+                    size={17}
+                    className="ml-3 shrink-0 text-[#8A7568]"
+                    aria-hidden="true"
+                  />
+                  <input
+                    aria-label="Search Host or file name"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Host or file name"
+                    className="h-11 min-w-0 flex-1 bg-transparent px-2 text-[14px] text-[#202421] outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="h-11 border-l border-[#E6DAD2] px-3 text-[13px] font-bold text-[#173F35]"
+                  >
+                    Find
+                  </button>
+                </form>
+                <div className="bulk-batch-filters mt-2 grid grid-cols-2 gap-2">
+                  <label className="min-w-0">
+                    <span className="sr-only">Product type</span>
+                    <select
+                      value={listingType}
+                      onChange={(event) => {
+                        setListingType(event.target.value);
+                        setSelectedBatchId("");
+                        setBatchDetail(null);
+                      }}
+                      className="h-11 w-full min-w-0 border border-[#DED1C8] bg-white px-2 text-[13px] font-semibold text-[#173F35] outline-none"
+                    >
+                      {LISTING_FILTERS.map(([value, label]) => (
+                        <option key={value || "all"} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="min-w-0">
+                    <span className="sr-only">Batch status</span>
+                    <select
+                      value={batchStatus}
+                      onChange={(event) => setBatchStatus(event.target.value)}
+                      className="h-11 w-full min-w-0 border border-[#DED1C8] bg-white px-2 text-[13px] font-semibold text-[#173F35] outline-none"
+                    >
+                      {BATCH_STATUS_FILTERS.map(([value, label]) => (
+                        <option key={value || "all"} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </details>
+            </div>
+            <div className="bulk-batch-list hidden max-h-[480px] overflow-y-auto border-y border-[#E7DBD1] sm:block lg:max-h-[680px]">
+              {loading ? (
+                <div
+                  role="status"
+                  className="flex items-center gap-2 px-5 py-8 text-[15px] text-[#65574D]"
+                >
+                  <LoaderCircle size={19} className="animate-spin" /> Loading
+                  submissions…
+                </div>
+              ) : visibleBatches.length ? (
+                visibleBatches.map((batch) => {
+                  const active = batch.id === selectedBatchId;
+                  return (
+                    <button
+                      key={batch.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => {
+                        openBatch(batch.id);
+                        if (window.innerWidth < 1024)
+                          window.setTimeout(
+                            () =>
+                              reviewDeskRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              }),
+                            120
+                          );
+                      }}
+                      className={`focus-ring flex w-full items-start gap-3 border-b border-[#E9DED5] px-4 py-4 text-left transition-colors last:border-b-0 sm:px-5 ${
+                        active
+                          ? "border-l-[3px] border-l-[#C86C42] bg-[#173F35] text-white"
+                          : "bg-[#FFFDFB] text-[#173F35] hover:bg-[#F6E9DF]"
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center ${
+                          active
+                            ? "bg-[#E8C1AA] text-[#173F35]"
+                            : "bg-[#E9EEE7] text-[#173F35]"
+                        }`}
+                      >
+                        <Layers3 size={18} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-bold leading-5">
+                          {batch.organization?.displayName ||
+                            "Host organization"}
+                        </span>
+                        <span
+                          className={`mt-1 block truncate text-[12px] ${
+                            active ? "text-[#E2EDE5]" : "text-[#6B756B]"
+                          }`}
+                        >
+                          {batch.sourceFileName || "Submitted batch"}
+                        </span>
+                        <span
+                          className={`mt-2 flex flex-wrap items-center gap-2 text-[12px] font-semibold ${
+                            active ? "text-[#E2EDE5]" : "text-[#6B756B]"
+                          }`}
+                        >
+                          <span>
+                            {batch.review?.submittedRows || 0} products
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>{labelize(batch.status)}</span>
+                        </span>
+                      </span>
+                      <ChevronRight
+                        size={19}
+                        className={`mt-2 shrink-0 ${
+                          active ? "text-[#E7CAB6]" : "text-[#64776A]"
+                        }`}
+                      />
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="px-5 py-7 text-[14px] text-[#6D5D51]">
+                  No Host batches match the current filters.
+                </div>
+              )}
+            </div>
+            {Number(pagination?.page || 1) < Number(pagination?.pages || 0) ? (
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={loadMoreBatches}
+                className="focus-ring flex min-h-12 w-full items-center justify-center gap-2 border-b border-[#D4DFD6] bg-[#E0E9DF] px-4 text-[14px] font-bold text-[#173F35] disabled:opacity-50"
+              >
+                {loadingMore ? (
+                  <LoaderCircle size={16} className="animate-spin" />
+                ) : null}{" "}
+                Load more submissions ({batches.length} of {pagination?.total})
+              </button>
+            ) : null}
+            <div className="hidden px-4 py-3 text-[12px] leading-5 text-[#76695F] sm:block">
+              {pagination?.total > batches.length
+                ? "Load more to browse remaining submissions."
+                : `${batches.length} submissions available in this view.`}
+            </div>
+          </aside>
+
+          <main
+            ref={reviewDeskRef}
+            aria-label="Selected batch review"
+            className="min-w-0 bg-white"
+          >
+            {loadingBatch ? (
+              <div
+                role="status"
+                className="flex items-center gap-3 px-5 py-12 text-[16px] text-[#6D5D51]"
+              >
+                <LoaderCircle size={22} className="animate-spin" /> Opening
+                batch…
+              </div>
+            ) : batchDetail?.batch ? (
+              <>
+                <header className="bulk-batch-detail-header border-b border-[#D0DED0] bg-[#E4ECE3] px-4 py-5 sm:px-7 sm:py-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#416D58]">
+                        02 / Inspect batch
+                      </p>
+                      <h3 className="mt-1 text-[23px] font-bold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[28px]">
+                        {batchDetail.batch.organization?.displayName ||
+                          "Host organization"}
+                      </h3>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] font-semibold text-[#426452]">
+                        <span className="border border-[#C9D8CA] bg-white px-2.5 py-1">
+                          {labelize(batchDetail.batch.status)}
+                        </span>
+                        <span>{labelize(batchDetail.batch.listingType)}</span>
+                      </div>
+                      <p className="mt-2 break-words text-[13px] text-[#607568]">
+                        {batchDetail.batch.sourceFileName || "Submitted file"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadBatchReport(
+                          batchDetail.batch,
+                          batchDetail.drafts || []
+                        )
+                      }
+                      className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start border border-[#BCD0BF] bg-white px-4 text-[13px] font-bold text-[#173F35] hover:bg-[#F3F8F3]"
+                    >
+                      <Download size={16} /> Review report
+                    </button>
+                  </div>
+                </header>
+
+                <div className="bulk-batch-summary grid grid-cols-2 border-b border-[#EAE0D8] sm:grid-cols-4">
+                  {[
+                    [batchDetail.batch.review?.submittedRows || 0, "Products"],
+                    [
+                      batchDetail.batch.review?.reviewReady || 0,
+                      "Review-ready",
+                    ],
+                    [
+                      (batchDetail.batch.review?.validationIssues || 0) +
+                        (batchDetail.batch.review?.needsEvidence || 0),
+                      "Needs attention",
+                    ],
+                    [
+                      batchDetail.batch.review?.potentialDuplicates || 0,
+                      "Possible duplicates",
+                    ],
+                  ].map(([value, label], index) => (
+                    <div
+                      key={label}
+                      className={`bulk-batch-stat px-4 py-3 sm:px-6 ${
+                        index % 2 ? "border-l border-[#EAE0D8]" : ""
+                      } ${
+                        index > 1 && index % 2 === 0
+                          ? "sm:border-l sm:border-[#EAE0D8]"
+                          : ""
+                      } ${
+                        index > 1
+                          ? "border-t sm:border-t-0 border-[#EAE0D8]"
+                          : ""
+                      }`}
+                    >
+                      <div className="text-[25px] font-bold tabular-nums text-[#173F35]">
+                        {value}
+                      </div>
+                      <p className="text-[13px] leading-5 text-[#77695E]">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => downloadBatchReport(batchDetail.batch, batchDetail.drafts || [])}
-                  className="focus-ring inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[#165f75] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#104f62]"
-                >
-                  <Download size={14} />
-                  <span className="sm:hidden">Report</span><span className="hidden sm:inline">Download review report</span>
-                </button>
-              </div>
+                {batchDetail.validationIssues?.length ? (
+                  <details className="border-b border-[#E5D9CB] bg-[#F7E8DF] px-4 py-3 sm:px-6">
+                    <summary className="cursor-pointer text-[15px] font-bold text-[#704832]">
+                      Issues to inspect · {batchDetail.validationIssues.length}
+                    </summary>
+                    <div className="mt-3 max-h-40 space-y-2 overflow-y-auto">
+                      {batchDetail.validationIssues.map((item, i) => (
+                        <p
+                          key={`${item.rowNumber}-${item.merchantSku}-${i}`}
+                          className="text-[13px] leading-5 text-[#624A3B]"
+                        >
+                          Row {item.rowNumber} ·{" "}
+                          {item.merchantSku || item.productName || "Product"}:{" "}
+                          {(item.issues || []).join("; ")}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
 
-              <div className="grid grid-cols-2 border-t border-[#c9dce3] sm:grid-cols-4">
-                {[
-                  [batchDetail.batch.review?.submittedRows || 0, "Products"],
-                  [batchDetail.batch.review?.reviewReady || 0, "Ready"],
-                  [batchDetail.batch.review?.validationIssues || 0, "Need attention"],
-                  [batchDetail.batch.review?.potentialDuplicates || 0, "Duplicates"],
-                ].map(([value, label], index) => (
-                  <div key={label} className={["px-2 py-2 sm:px-4 sm:py-3", index ? "border-l border-[#c9dce3]" : ""].join(" ")}>
-                    <p className="text-lg font-extrabold text-stone-900 sm:text-xl">{value}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold leading-3 text-stone-500 sm:text-[11px]">
-                      <span className="sm:hidden">{label === "Products" ? "Items" : label === "Need attention" ? "Issues" : label === "Duplicates" ? "Dupes" : label}</span>
-                      <span className="hidden sm:inline">{label}</span>
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="px-3 py-3 sm:px-5 sm:py-5">
-              {batchDetail.validationIssues?.length ? (
-                <div className="mb-3 border-l-4 border-orange-500 bg-[#fff5ee] px-3 py-2.5 sm:mb-5 sm:px-4 sm:py-3">
-                  <div className="flex items-center gap-2 text-orange-900">
-                    <ShieldAlert size={17} />
-                    <p className="text-sm font-bold">Products that need attention</p>
-                  </div>
-                  <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
-                    {batchDetail.validationIssues.map((item) => (
-                      <p key={`${item.rowNumber}-${item.merchantSku}`} className="text-xs font-medium leading-5 text-orange-800">
-                        Row {item.rowNumber} · {item.merchantSku || item.productName || "Product"}: {(item.issues || []).join("; ")}
+                <section className="bulk-products-section min-w-0 bg-white px-4 pb-5 pt-5 sm:px-6 sm:pb-7 sm:pt-6">
+                  <div className="bulk-products-header flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#99553C]">
+                        03 / Review products
                       </p>
+                      <h3 className="mt-1 text-[23px] font-bold text-[#173F35]">
+                        Products in this batch
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={selectCleanRows}
+                      disabled={
+                        !batchDetail.drafts?.some(
+                          (draft) => draft.bulkReviewEligible
+                        )
+                      }
+                      className="bulk-select-clean-button focus-ring min-h-10 border border-[#C9D9CB] bg-[#F1F5EF] px-3 text-[13px] font-bold text-[#173F35] hover:bg-[#E4EDE2] disabled:opacity-40"
+                    >
+                      Select all clean products
+                    </button>
+                  </div>
+                  <div
+                    className="bulk-row-filters mt-4 flex gap-2 overflow-x-auto pb-2"
+                    role="group"
+                    aria-label="Filter products by review state"
+                  >
+                    {ROW_FILTERS.map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setRowFilter(value)}
+                        aria-pressed={rowFilter === value}
+                        className={`focus-ring min-h-10 shrink-0 border px-3 text-[13px] font-semibold ${
+                          rowFilter === value
+                            ? "border-[#173F35] bg-[#173F35] text-white"
+                            : "border-[#E7D8CE] bg-white text-[#5C4F45] hover:bg-[#F9EEE7]"
+                        }`}
+                      >
+                        {label}
+                      </button>
                     ))}
                   </div>
-                </div>
-              ) : null}
-
-              <div className="flex items-center justify-between gap-2 border-b border-stone-200 pb-2.5 sm:flex-col sm:items-start sm:gap-3 sm:pb-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-sm font-bold text-stone-900">Products in this batch</p>
-                  <p className="mt-1 hidden text-xs font-medium text-stone-500 sm:block">Filter the list or open a product when it needs a closer look.</p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={selectCleanRows}
-                  className="focus-ring shrink-0 self-start rounded-lg bg-[#dff3eb] px-2.5 py-1.5 text-[11px] font-bold text-[#176a55] hover:bg-[#d2ecdf] sm:px-3 sm:py-2 sm:text-xs"
-                >
-                  Select clean rows
-                </button>
-              </div>
-
-              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 sm:mt-3 sm:gap-2">
-                {ROW_FILTERS.map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setRowFilter(value)}
-                    className={[
-                      "focus-ring shrink-0 rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition sm:px-3 sm:py-2 sm:text-xs",
-                      rowFilter === value
-                        ? "bg-[#17364a] text-white"
-                        : "border border-stone-200 bg-white text-stone-600 hover:border-[#8cb6c5]",
-                    ].join(" ")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4 hidden overflow-x-auto border border-stone-200 lg:block">
-                <table className="min-w-[1080px] w-full border-collapse text-left">
-                  <thead className="bg-[#17364a] text-white">
-                    <tr className="text-[10px] font-semibold">
-                      <th className="px-3 py-3">Select</th>
-                      <th className="px-3 py-3">Row / SKU</th>
-                      <th className="px-3 py-3">Product</th>
-                      <th className="px-3 py-3">Price</th>
-                      <th className="px-3 py-3">Stock</th>
-                      <th className="px-3 py-3">Review</th>
-                      <th className="px-3 py-3">Customer</th>
-                      <th className="px-3 py-3">Needs attention</th>
-                      <th className="px-3 py-3">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-200">
+                  <div className="mt-2 border-y border-[#E9DFD6]">
                     {filteredDrafts.map((draft) => {
-                      const draftCommercial = draft.commercialDraft || {};
-                      const terminal = ["approved_for_catalog", "rejected"].includes(draft.status);
-
+                      const commercialInfo = draft.commercialDraft || {};
+                      const terminal = [
+                        "approved_for_catalog",
+                        "rejected",
+                      ].includes(draft.status);
                       return (
-                        <tr key={draft.id} className="bg-white text-xs hover:bg-[#fafaf8]">
-                          <td className="px-3 py-3">
-                            <input
-                              type="checkbox"
-                              disabled={terminal}
-                              checked={selectedDraftIds.includes(draft.id)}
-                              onChange={() => toggleDraftSelection(draft.id)}
-                              className="h-4 w-4 accent-[#176d62] disabled:opacity-40"
-                            />
-                          </td>
-                          <td className="px-3 py-3">
-                            <p className="font-bold text-stone-800">#{draft.bulkRowNumber || "—"}</p>
-                            <p className="mt-0.5 font-medium text-stone-500">{draft.merchantSku || "No SKU"}</p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <p className="max-w-[260px] font-bold text-stone-900">{candidateTitle(draft)}</p>
-                            <p className="mt-0.5 text-[10px] font-medium text-stone-500">{labelize(draft.listingType)}</p>
-                          </td>
-                          <td className="px-3 py-3 font-bold text-stone-800">
-                            {moneyFromMinor(draftCommercial.salePriceMinor || draftCommercial.listPriceMinor, draftCommercial.currency)}
-                          </td>
-                          <td className="px-3 py-3 font-bold text-stone-800">{draftCommercial.availableQuantity ?? "—"}</td>
-                          <td className="px-3 py-3">
-                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${statusClasses(draft.status)}`}>
-                              {labelize(draft.status)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${commerceStatusClasses(draft.commercializationStatus)}`}>
-                              {draft.commercializationStatus === "live" ? "Customer live" : labelize(draft.commercializationStatus || "pending")}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            {draft.duplicateCandidateProductVersionId ? (
-                              <span className="text-xs font-semibold text-red-700">Possible duplicate</span>
-                            ) : draft.bulkReviewEligible ? (
-                              <span className="text-xs font-semibold text-emerald-700">Ready for bulk review</span>
-                            ) : (
-                              <div>
-                                <span className="text-xs font-semibold text-orange-700">Review individually</span>
-                                {draft.bulkReviewBlockers?.length ? (
-                                  <p className="mt-1 max-w-[220px] text-[10px] font-medium leading-4 text-orange-700">
-                                    {draft.bulkReviewBlockers.join(" · ")}
-                                  </p>
+                        <article
+                          key={draft.id}
+                          className="bulk-product-row grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 border-b border-[#EAE0D8] bg-white px-1 py-4 last:border-b-0 hover:bg-[#F2F6F1] sm:grid-cols-[auto_minmax(0,1fr)_minmax(130px,0.45fr)_auto] sm:items-center sm:px-3"
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${candidateTitle(
+                              draft
+                            )} for bulk decision`}
+                            disabled={terminal}
+                            checked={selectedDraftIds.includes(draft.id)}
+                            onChange={() => toggleDraftSelection(draft.id)}
+                            className="bulk-product-checkbox mt-1 h-[18px] w-[18px] shrink-0 accent-[#173F35] disabled:opacity-40"
+                          />
+                          <div className="bulk-product-copy min-w-0">
+                            <h4 className="text-[15px] font-bold leading-5 text-[#173F35] sm:text-[16px]">
+                              {candidateTitle(draft)}
+                            </h4>
+                            <p className="mt-1 break-words text-[12px] leading-5 text-[#77695E]">
+                              Row {draft.bulkRowNumber || "—"} ·{" "}
+                              {draft.merchantSku || "No SKU"}
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[12px] font-semibold text-[#6D5D51]">
+                              <span>{labelize(draft.status)}</span>
+                              <span aria-hidden="true">·</span>
+                              <span>
+                                {draft.commercializationStatus === "live"
+                                  ? "Customer live"
+                                  : labelize(
+                                      draft.commercializationStatus || "pending"
+                                    )}
+                              </span>
+                            </div>
+                            {draft.duplicateCandidateProductVersionId ||
+                            draft.bulkReviewBlockers?.length ? (
+                              <>
+                                <p
+                                  className={`mt-1.5 text-[12px] font-semibold leading-4 text-[#985A3E] ${
+                                    terminal ? "hidden sm:block" : ""
+                                  }`}
+                                >
+                                  {draft.duplicateCandidateProductVersionId
+                                    ? "Possible duplicate — individual review"
+                                    : (draft.bulkReviewBlockers || []).join(
+                                        " · "
+                                      )}
+                                </p>
+                                {terminal ? (
+                                  <details className="mt-1.5 text-[12px] text-[#755B49] sm:hidden">
+                                    <summary className="cursor-pointer font-semibold">
+                                      Review notes
+                                    </summary>
+                                    <p className="mt-1 break-words leading-5">
+                                      {draft.duplicateCandidateProductVersionId
+                                        ? "Possible duplicate — individual review"
+                                        : (draft.bulkReviewBlockers || []).join(
+                                            " · "
+                                          )}
+                                    </p>
+                                  </details>
                                 ) : null}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-3">
-                            <button
-                              type="button"
-                              onClick={() => openDraft(draft.id)}
-                              className="focus-ring rounded-lg bg-[#126f9a] px-3 py-2 text-[11px] font-bold text-white hover:bg-[#0e5c80]"
-                            >
-                              Review product
-                            </button>
-                          </td>
-                        </tr>
+                              </>
+                            ) : null}
+                          </div>
+                          <div className="bulk-product-commercial col-start-2 text-[12px] font-semibold text-[#5F4C41] sm:col-auto sm:text-[13px]">
+                            <span className="block">
+                              {moneyFromMinor(
+                                commercialInfo.salePriceMinor ??
+                                  commercialInfo.listPriceMinor,
+                                commercialInfo.currency
+                              )}
+                            </span>
+                            <span className="mt-1 block text-[#77695E]">
+                              Stock {commercialInfo.availableQuantity ?? "—"}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openDraft(draft.id)}
+                            className="bulk-product-action focus-ring col-start-3 row-span-2 inline-flex min-h-10 items-center gap-1 self-center border border-[#C5D8C9] bg-[#E6EFE6] px-3 text-[13px] font-bold text-[#173F35] hover:bg-[#D5E5D7] sm:col-auto sm:row-auto"
+                          >
+                            Review <ArrowRight size={15} />
+                          </button>
+                        </article>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-3 space-y-2 sm:space-y-0 sm:divide-y sm:divide-stone-200 sm:border-y sm:border-stone-200 lg:hidden">
-                {filteredDrafts.map((draft) => {
-                  const draftCommercial = draft.commercialDraft || {};
-                  const terminal = ["approved_for_catalog", "rejected"].includes(draft.status);
-
-                  return (
-                    <div key={draft.id} className="border-l-4 border-[#b7ccd7] bg-[#f8fafb] px-3 py-2.5 sm:border-l-0 sm:bg-white sm:px-1 sm:py-3">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          disabled={terminal}
-                          checked={selectedDraftIds.includes(draft.id)}
-                          onChange={() => toggleDraftSelection(draft.id)}
-                          className="mt-1 h-4 w-4 shrink-0 accent-[#176d62] disabled:opacity-40"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-[13px] font-bold text-stone-900">{candidateTitle(draft)}</p>
-                              <p className="mt-0.5 truncate text-[10px] font-medium text-stone-500">#{draft.bulkRowNumber || "—"} · {draft.merchantSku || "No SKU"}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => openDraft(draft.id)}
-                              className="focus-ring shrink-0 rounded-md bg-[#126f9a] px-2.5 py-1.5 text-[10px] font-bold text-white"
-                            >
-                              Review
-                            </button>
-                          </div>
-
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-stone-600">
-                            <span>{moneyFromMinor(draftCommercial.salePriceMinor || draftCommercial.listPriceMinor, draftCommercial.currency)}</span>
-                            <span>Stock {draftCommercial.availableQuantity ?? "—"}</span>
-                            <span className={statusClasses(draft.status)}>{labelize(draft.status)}</span>
-                          </div>
-
-                          <p className="mt-1.5 text-[10px] font-medium leading-4 text-stone-500">
-                            {draft.duplicateCandidateProductVersionId
-                              ? "Possible duplicate — review individually."
-                              : draft.bulkReviewEligible
-                              ? "Clean and ready for bulk review."
-                              : "Needs an individual check before a decision."}
-                          </p>
-                        </div>
+                    {!filteredDrafts.length ? (
+                      <div className="px-4 py-8 text-[15px] text-[#77695E]">
+                        No products match this filter.
                       </div>
+                    ) : null}
+                  </div>
+                </section>
+
+                {canCatalogMutate || canTrustSafetyMutate ? (
+                  <section
+                    aria-label="Apply bulk decision"
+                    className="bulk-decision-section border-t-[3px] border-[#C86C42] bg-[#EFD7C8] px-4 py-5 sm:px-6 sm:py-6"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#995A3B]">
+                          04 / Record decision
+                        </p>
+                        <h3 className="mt-1 text-[21px] font-bold text-[#173F35]">
+                          Selected products{" "}
+                          <span className="tabular-nums">
+                            ({selectedDraftIds.length})
+                          </span>
+                        </h3>
+                      </div>
+                      <span className="bulk-decision-hint text-[12px] font-medium text-[#6B5D52]">
+                        Only eligible products can be bulk-approved
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-
-              {!filteredDrafts.length ? (
-                <div className="grid min-h-32 place-items-center border-b border-stone-200 bg-[#fafaf8] p-5 text-center">
-                  <p className="text-sm font-semibold text-stone-500">No products match this filter.</p>
-                </div>
-              ) : null}
-
-              {(canCatalogMutate || canTrustSafetyMutate) ? (
-                <section className="mt-3 border-t border-[#cbdde8] bg-[#edf5fa] px-3 py-3 sm:mt-5 sm:px-5 sm:py-4">
-                  <div className="grid gap-2 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-                    <label className="block min-w-0">
-                      <span className="text-sm font-bold text-[#17364a]"><span className="sm:hidden">Bulk decision</span><span className="hidden sm:inline">Apply one decision to selected products</span></span>
-                      <input
-                        value={bulkReason}
-                        onChange={(event) => setBulkReason(event.target.value)}
-                        placeholder="Why are you making this decision?"
-                        className="mt-1.5 h-10 w-full border border-[#bfd2df] bg-white px-3 text-sm font-medium outline-none focus:border-[#6aa0bd] sm:mt-2 sm:h-11"
-                      />
+                    <label
+                      className="mt-4 block text-[13px] font-bold text-[#4E483F]"
+                      htmlFor="bulk-review-reason"
+                    >
+                      Reason for this decision
                     </label>
-
-                    <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+                    <textarea
+                      id="bulk-review-reason"
+                      rows={2}
+                      maxLength={2000}
+                      value={bulkReason}
+                      onChange={(event) => setBulkReason(event.target.value)}
+                      placeholder="Record the reason for this batch decision"
+                      className="mt-1.5 w-full border border-[#D7B9A7] bg-white px-3 py-3 text-[15px] text-[#202421] outline-none focus:border-[#173F35]"
+                    />
+                    <div className="bulk-decision-actions mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={bulkSubmitting || !selectedDraftIds.length || !canCatalogMutate}
-                        onClick={() => submitBulkDecision("approve_for_catalog")}
-                        className="focus-ring rounded-lg bg-[#147554] px-4 py-3 text-xs font-bold text-white hover:bg-[#106346] disabled:opacity-40"
+                        disabled={
+                          bulkSubmitting ||
+                          !selectedDraftIds.length ||
+                          !canCatalogMutate
+                        }
+                        onClick={() =>
+                          submitBulkDecision("approve_for_catalog")
+                        }
+                        className="focus-ring min-h-11 bg-[#173F35] px-4 text-[14px] font-bold text-white hover:bg-[#0E3027] disabled:opacity-40"
                       >
-                        <span className="sm:hidden">Approve</span><span className="hidden sm:inline">Approve selected ({selectedDraftIds.length})</span>
+                        Approve selected
                       </button>
                       <button
                         type="button"
                         disabled={bulkSubmitting || !selectedDraftIds.length}
-                        onClick={() => submitBulkDecision("request_more_evidence")}
-                        className="focus-ring rounded-lg bg-[#d66a2c] px-4 py-3 text-xs font-bold text-white hover:bg-[#bd5821] disabled:opacity-40"
+                        onClick={() =>
+                          submitBulkDecision("request_more_evidence")
+                        }
+                        className="focus-ring min-h-11 border border-[#D5B99B] bg-[#FFF9F2] px-4 text-[14px] font-bold text-[#724B35] hover:bg-white disabled:opacity-40"
                       >
-                        <span className="sm:hidden">Need info</span><span className="hidden sm:inline">Ask for information</span>
+                        Ask for information
                       </button>
                       <button
                         type="button"
                         disabled={bulkSubmitting || !selectedDraftIds.length}
                         onClick={() => submitBulkDecision("reject")}
-                        className="focus-ring rounded-lg bg-red-600 px-4 py-3 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40"
+                        className="focus-ring min-h-11 border border-red-200 bg-white px-4 text-[14px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-40"
                       >
-                        <span className="sm:hidden">Reject</span><span className="hidden sm:inline">Reject selected</span>
+                        Reject selected
                       </button>
                     </div>
-                  </div>
-
-                  <p className="mt-2 text-[10px] font-medium leading-4 text-slate-600 sm:mt-3 sm:text-xs sm:leading-5">
-                    <span className="sm:hidden">Only clean rows can be approved together.</span>
-                    <span className="hidden sm:inline">Only clean products that are ready for review can be approved together. Products with duplicates or other checks stay available for individual review.</span>
+                    {bulkNotice ? (
+                      <p
+                        role="status"
+                        className="mt-3 border border-[#D9CFC2] bg-white px-3 py-3 text-[13px] font-semibold leading-5 text-[#173F35]"
+                      >
+                        {bulkNotice}
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
+              </>
+            ) : (
+              <div className="px-5 py-8 sm:px-7 sm:py-11">
+                <div className="border-l-[3px] border-[#173F35] pl-4">
+                  <h3 className="text-[19px] font-bold text-[#173F35]">
+                    No batch selected
+                  </h3>
+                  <p className="mt-1 text-[14px] leading-6 text-[#6D5D51]">
+                    Choose a Host submission to review its products.
                   </p>
-
-                  {bulkNotice ? (
-                    <p className="mt-3 border border-[#c9dce8] bg-white px-3 py-2.5 text-xs font-semibold text-[#17364a]">
-                      {bulkNotice}
-                    </p>
-                  ) : null}
-                </section>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <div className="grid min-h-[320px] place-items-center p-8 text-center">
-            <div>
-              <Boxes size={32} className="mx-auto text-stone-300" />
-              <p className="mt-3 text-base font-bold text-stone-700">Choose a submission to start review</p>
-              <p className="mt-1 text-sm font-medium text-stone-400">Select a Host batch above to see its products.</p>
-            </div>
-          </div>
-        )}
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
       </section>
 
       {selectedDraft || loadingDraft ? (
-        <div className="fixed inset-0 z-[200] bg-stone-950/55 p-0 backdrop-blur-sm sm:p-6">
-          <div className="relative mx-auto flex h-full max-w-6xl flex-col overflow-hidden bg-[#f7f5ef] shadow-2xl sm:rounded-[28px]">
-            <div className="sticky top-0 z-[205] flex items-start justify-between gap-3 border-b border-stone-200 bg-stone-950 px-4 py-3 text-white sm:static sm:gap-4 sm:p-5">
-              <div>
-                <p className="text-[10px] font-bold text-sky-300">Product review</p>
-                <h2 className="mt-0.5 text-base font-extrabold sm:mt-1 sm:text-xl sm:font-black">{detailDraft ? candidateTitle(detailDraft) : "Loading product..."}</h2>
-                {detailDraft ? (
-                  <p className="mt-1 text-xs font-semibold text-stone-300">
-                    Row #{detailDraft.bulkRowNumber || "—"} · SKU {detailDraft.merchantSku || "—"}
+        <div className="bulk-review-dialog fixed inset-0 z-[200] flex items-center justify-center bg-[#10251E]/70 backdrop-blur-[3px] sm:p-5">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-product-review-title"
+            className="flex h-[100dvh] w-full max-w-[1220px] flex-col overflow-hidden bg-[#F7F6F2] shadow-2xl sm:h-[92dvh] sm:max-h-[960px] sm:rounded-[18px]"
+          >
+            <header className="z-[205] shrink-0 border-b border-[#315E4D] bg-[#173F35] px-5 py-4 text-white sm:px-8 sm:py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.055em] text-[#D5E5D8]">
+                    Product review / Host submission
                   </p>
-                ) : null}
+                  <h2
+                    id="bulk-product-review-title"
+                    className="mt-1 break-words text-[24px] font-bold leading-tight tracking-[-0.025em] text-white sm:text-[30px]"
+                  >
+                    {detailDraft
+                      ? candidateTitle(detailDraft)
+                      : "Loading product..."}
+                  </h2>
+                  {detailDraft ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#DCE8DF]">
+                      <span>Row #{detailDraft.bulkRowNumber || "—"}</span>
+                      <span className="hidden h-1 w-1 rounded-full bg-[#AEC5B3] sm:inline-block" />
+                      <span className="break-all">
+                        SKU {detailDraft.merchantSku || "—"}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDraftReview}
+                  aria-label="Close product review"
+                  className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/25 bg-white/10 text-white transition-colors hover:bg-white/20"
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={closeDraftReview}
-                className="focus-ring relative z-[210] grid h-9 w-9 shrink-0 touch-manipulation place-items-center rounded-full bg-white/15 text-white hover:bg-white/25 sm:h-10 sm:w-10"
-                aria-label="Close product review"
-              >
-                <X size={18} />
-              </button>
-            </div>
+              {detailDraft && reviewableFields.length ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/20 pt-3">
+                  <span className="text-[13px] font-semibold text-white">
+                    {checkedFieldCount} of {reviewableFields.length} details
+                    checked
+                  </span>
+                  <div
+                    className="h-[5px] min-w-[100px] max-w-[260px] flex-1 overflow-hidden rounded-full bg-white/20"
+                    role="progressbar"
+                    aria-label="Product details reviewed"
+                    aria-valuenow={checkedFieldCount}
+                    aria-valuemin={0}
+                    aria-valuemax={reviewableFields.length}
+                  >
+                    <div
+                      className="h-full rounded-full bg-[#E6C0AA] transition-all"
+                      style={{
+                        width: `${
+                          (checkedFieldCount / reviewableFields.length) * 100
+                        }%`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[12px] text-[#D8E6DB]">
+                    Check details, then record your decision
+                  </span>
+                </div>
+              ) : null}
+            </header>
 
             {loadingDraft ? (
-              <div className="grid flex-1 place-items-center">
-                <LoaderCircle size={30} className="animate-spin text-violet-700" />
+              <div
+                role="status"
+                className="grid flex-1 place-items-center gap-3 p-8 text-[15px] text-[#173F35]"
+              >
+                <LoaderCircle size={30} className="animate-spin" />
+                Loading product review…
               </div>
             ) : detailDraft ? (
-              <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {detailDraft.duplicateCandidateProductVersionId ? (
-                  <div className="mb-3 flex items-start gap-2 border-l-4 border-rose-500 bg-rose-50 px-3 py-2.5 text-rose-900 sm:mb-5 sm:gap-3 sm:rounded-2xl sm:border sm:border-rose-200 sm:p-4">
-                    <ShieldAlert size={18} className="mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs font-bold"><span className="sm:hidden">Possible duplicate found</span><span className="hidden sm:inline">Potential canonical duplicate</span></p>
-                      <p className="mt-0.5 text-[11px] font-medium leading-4 sm:mt-1 sm:break-all sm:text-xs sm:font-semibold">
-                        <span className="sm:hidden">This product may already exist in the catalog. Compare it before approving.</span>
-                        <span className="hidden sm:inline">Existing ProductVersion candidate: {detailDraft.duplicateCandidateProductVersionId}</span>
+                  <div
+                    role="alert"
+                    className="flex gap-3 border-b border-[#E9CFB9] bg-[#FFF0E4] px-5 py-3 text-[#814A32] sm:px-8"
+                  >
+                    <ShieldAlert size={20} className="mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-bold">
+                        Possible duplicate — compare before approving
+                      </p>
+                      <p className="mt-1 break-all text-[12px]">
+                        Existing product version:{" "}
+                        {detailDraft.duplicateCandidateProductVersionId}
                       </p>
                     </div>
                   </div>
                 ) : null}
 
-                <div className="grid gap-3 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-                  <section className="border-y border-sky-200 bg-[#f3f8fb] px-3 py-3 sm:rounded-[24px] sm:border sm:bg-sky-50 sm:p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="grid min-w-0 gap-0 xl:grid-cols-[minmax(0,1fr)_320px]">
+                  <main className="min-w-0 bg-[#FFFDFB] px-5 py-5 sm:px-8 sm:py-7">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D9DED7] pb-4">
                       <div>
-                        <p className="text-[10px] font-bold text-sky-700">Product details</p>
-                        <p className="mt-0.5 text-sm font-bold text-sky-950 sm:mt-1 sm:font-black">Check each detail before approving</p>
+                        <p className="text-[12px] font-semibold uppercase tracking-[0.055em] text-[#8F5940]">
+                          01 / Verify
+                        </p>
+                        <h3 className="mt-1 text-[23px] font-bold tracking-[-0.025em] text-[#173F35]">
+                          Check product details
+                        </h3>
                       </div>
                       <button
                         type="button"
                         onClick={acceptAllVisibleFields}
                         disabled={!canCatalogMutate || singleSubmitting}
-                        className="focus-ring rounded-xl bg-sky-700 px-3 py-2 text-[10px] font-black text-white hover:bg-sky-800 disabled:opacity-40"
+                        className="focus-ring min-h-11 border border-[#173F35] bg-[#173F35] px-4 text-[13px] font-bold text-white hover:bg-[#0F3027] disabled:opacity-40"
                       >
-                        Mark all correct
+                        <BadgeCheck size={16} className="mr-1.5 inline" /> Mark
+                        all correct
                       </button>
                     </div>
 
-                    <div className="mt-2 grid gap-0 sm:mt-4 sm:gap-3 md:grid-cols-2">
-                      {reviewableFields.map(([fieldPath, item]) => {
-                        const mutable = allowedFieldForMutation(fieldPath);
-                        const safety = SAFETY_FIELDS.has(fieldPath);
-
-                        return (
-                          <div key={fieldPath} className="border-b border-sky-100 bg-transparent px-0 py-2.5 sm:rounded-2xl sm:border sm:bg-white sm:p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-xs font-bold text-stone-800 sm:font-black">{reviewFieldLabel(fieldPath)}</p>
-                                <p className="mt-0.5 text-[9px] font-medium text-stone-400 sm:mt-1 sm:font-semibold">{reviewSourceLabel(item?.source)}</p>
-                              </div>
-                              {safety ? <ShieldAlert size={15} className="shrink-0 text-amber-600" /> : null}
-                            </div>
-
-                            {fieldPath === "nutrition" ? (() => {
-                              const nutrition = nutritionReviewData(item?.value);
-
-                              return (
-                                <div className="mt-2 border-y border-sky-100 bg-white py-2 sm:mt-3 sm:rounded-xl sm:border sm:bg-stone-50 sm:p-3">
-                                  {(nutrition.basis || nutrition.serving) ? (
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {nutrition.basis ? (
-                                        <span className="rounded-md bg-sky-100 px-2 py-1 text-[9px] font-bold text-sky-800 sm:text-[10px]">
-                                          {nutrition.basis}
-                                        </span>
-                                      ) : null}
-                                      {nutrition.serving ? (
-                                        <span className="rounded-md bg-stone-100 px-2 py-1 text-[9px] font-bold text-stone-600 sm:text-[10px]">
-                                          {nutrition.serving}
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  ) : null}
-
-                                  {nutrition.rows.length ? (
-                                    <div className={`${nutrition.basis || nutrition.serving ? "mt-2" : ""} grid grid-cols-2 gap-x-3 sm:gap-x-4`}>
-                                      {nutrition.rows.map((nutrient) => (
-                                        <div
-                                          key={`${nutrient.label}-${nutrient.value}`}
-                                          className="flex min-w-0 items-center justify-between gap-2 border-b border-stone-100 py-1.5 last:border-b-0"
-                                        >
-                                          <span className="truncate text-[10px] font-semibold text-stone-500 sm:text-[11px]">
-                                            {nutrient.label}
-                                          </span>
-                                          <span className="shrink-0 text-[10px] font-black text-stone-900 sm:text-[11px]">
-                                            {nutrient.value}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-[10px] font-semibold text-stone-500 sm:text-[11px]">
-                                      Nutrition details not provided.
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })() : (
-                              <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-words bg-white p-2 text-[11px] font-medium leading-4 text-stone-700 sm:mt-3 sm:max-h-40 sm:rounded-xl sm:bg-stone-50 sm:p-3 sm:text-xs sm:font-semibold sm:leading-5">
-                                {readableReviewValue(fieldPath, item?.value)}
-                              </pre>
-                            )}
-
-                            <select
-                              value={fieldStates[fieldPath] || "pending_review"}
-                              disabled={!mutable || singleSubmitting}
-                              onChange={(event) =>
-                                setFieldStates((current) => ({ ...current, [fieldPath]: event.target.value }))
-                              }
-                              className="mt-2 h-9 w-full border border-stone-200 bg-white px-2.5 text-[11px] font-bold outline-none disabled:bg-stone-100 disabled:text-stone-400 sm:hidden"
-                            >
-                              <option value="pending_review">Not reviewed</option>
-                              <option value="accepted">Looks correct</option>
-                              <option value="needs_evidence">Need more proof</option>
-                              <option value="rejected">Mark incorrect</option>
-                            </select>
-
-                            <select
-                              value={fieldStates[fieldPath] || "pending_review"}
-                              disabled={!mutable || singleSubmitting}
-                              onChange={(event) =>
-                                setFieldStates((current) => ({ ...current, [fieldPath]: event.target.value }))
-                              }
-                              className="mt-3 hidden w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black outline-none disabled:bg-stone-100 disabled:text-stone-400 sm:block"
-                            >
-                              <option value="pending_review">Not reviewed</option>
-                              <option value="accepted">Looks correct</option>
-                              <option value="needs_evidence">Need more proof</option>
-                              <option value="rejected">Mark incorrect</option>
-                            </select>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-
-                  <div className="space-y-3 sm:space-y-5">
-                    <section className="bg-emerald-950 p-3 text-white sm:rounded-[24px] sm:p-5">
-                      <p className="text-[10px] font-bold text-emerald-300">Selling details from Host</p>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-3 py-1.5 text-[10px] font-black ${commerceStatusClasses(detailDraft.commercializationStatus)}`}>
-                          {detailDraft.commercializationStatus === "live"
-                            ? "Customer live"
-                            : labelize(detailDraft.commercializationStatus || "pending")}
-                        </span>
-                        {detailDraft.marketplaceOfferId ? (
-                          <span className="rounded-full bg-white/10 px-3 py-1.5 text-[9px] font-black text-emerald-100">
-                            Offer created
+                    {identityFields.length ? (
+                      <section
+                        aria-label="Identity and packaging review"
+                        className="mt-5"
+                      >
+                        <div className="flex items-baseline justify-between gap-3 bg-[#EEF1EA] px-4 py-3">
+                          <h4 className="text-[17px] font-bold text-[#173F35]">
+                            Identity & packaging
+                          </h4>
+                          <span className="text-[12px] font-semibold tabular-nums text-[#5D6A60]">
+                            {identityFields.length} details
                           </span>
-                        ) : null}
-                      </div>
+                        </div>
+                        <div className="px-1 sm:px-3">
+                          {identityFields.map(renderReviewField)}
+                        </div>
+                      </section>
+                    ) : null}
 
+                    {safetyFields.length ? (
+                      <section
+                        aria-label="Food safety and claims review"
+                        className="mt-6"
+                      >
+                        <div className="flex items-baseline justify-between gap-3 border-l-[3px] border-[#B76B4A] bg-[#F8EEE7] px-4 py-3">
+                          <h4 className="text-[17px] font-bold text-[#173F35]">
+                            Food safety & claims
+                          </h4>
+                          <span className="text-[12px] font-semibold tabular-nums text-[#8A5843]">
+                            {safetyFields.length} details
+                          </span>
+                        </div>
+                        <div className="px-1 sm:px-3">
+                          {safetyFields.map(renderReviewField)}
+                        </div>
+                      </section>
+                    ) : null}
+                    {!reviewableFields.length ? (
+                      <p className="mt-5 text-[14px] text-[#68766D]">
+                        No product details are available for verification.
+                      </p>
+                    ) : null}
+                  </main>
+
+                  <aside className="min-w-0 border-t border-[#E0E2DB] bg-[#F4F3EE] px-5 py-5 sm:px-8 sm:py-7 xl:border-l xl:border-t-0 xl:px-5">
+                    <section
+                      aria-label="Selling information"
+                      className="border border-[#DDE1DA] bg-white"
+                    >
+                      <div className="border-b border-[#DDE1DA] px-4 py-4">
+                        <p className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[#7A665A]">
+                          02 / Host information
+                        </p>
+                        <h3 className="mt-1 text-[19px] font-bold text-[#173F35]">
+                          Selling details
+                        </h3>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span
+                            className={`px-2.5 py-1 text-[12px] font-bold ${commerceStatusClasses(
+                              detailDraft.commercializationStatus
+                            )}`}
+                          >
+                            {detailDraft.commercializationStatus === "live"
+                              ? "Customer live"
+                              : labelize(
+                                  detailDraft.commercializationStatus ||
+                                    "pending"
+                                )}
+                          </span>
+                          {detailDraft.marketplaceOfferId ? (
+                            <span className="bg-[#E9EFE7] px-2.5 py-1 text-[12px] font-semibold text-[#173F35]">
+                              Offer created
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                       {detailDraft.commercializationError ? (
-                        <p className="mt-3 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-xs font-bold leading-5 text-amber-100">
+                        <p
+                          role="alert"
+                          className="m-4 bg-[#FFF1E7] p-3 text-[13px] leading-5 text-[#8A4934]"
+                        >
                           {detailDraft.commercializationError}
                         </p>
                       ) : null}
-
-                      <div className="mt-3 space-y-2 text-[11px] sm:mt-4 sm:space-y-3 sm:text-xs">
+                      <div className="grid grid-cols-2 gap-px bg-[#E7E9E3]">
                         {[
-                          ["Host product code", detailDraft.merchantSku || "—"],
-                          ["Regular price", moneyFromMinor(commercial.listPriceMinor, commercial.currency)],
-                          ["Selling price", commercial.salePriceMinor ? moneyFromMinor(commercial.salePriceMinor, commercial.currency) : "—"],
-                          ["Stock available", commercial.availableQuantity ?? "—"],
-                          ["Stock location", commercial.inventoryNodeName || "—"],
-                          ["Location type", labelize(commercial.inventoryNodeType || "") || "—"],
-                          ["Location", [commercial.city, commercial.state, commercial.pincode].filter(Boolean).join(", ") || "—"],
+                          [
+                            "Selling price",
+                            commercial.salePriceMinor
+                              ? moneyFromMinor(
+                                  commercial.salePriceMinor,
+                                  commercial.currency
+                                )
+                              : "—",
+                          ],
+                          [
+                            "Regular price",
+                            moneyFromMinor(
+                              commercial.listPriceMinor,
+                              commercial.currency
+                            ),
+                          ],
+                          [
+                            "Stock available",
+                            commercial.availableQuantity ?? "—",
+                          ],
                           ["Delivery area", commercial.serviceAreaName || "—"],
-                          ["Store listing", detailDraft.marketplaceOfferId ? "Created" : "Not created"],
-                          ["Pricing setup", detailDraft.marketplacePriceRuleId ? "Applied" : "Not set"],
-                          ["Stock sync", detailDraft.marketplaceInventorySnapshotId ? "Connected" : "Not connected"],
                         ].map(([label, value]) => (
-                          <div key={label} className="flex items-start justify-between gap-4 border-b border-white/10 pb-2 last:border-0 last:pb-0">
-                            <span className="font-semibold text-emerald-100/65">{label}</span>
-                            <span className="text-right font-black">{value}</span>
+                          <div
+                            key={label}
+                            className="min-w-0 bg-white px-3 py-3"
+                          >
+                            <p className="text-[12px] leading-4 text-[#68766D]">
+                              {label}
+                            </p>
+                            <p className="mt-1 break-words text-[16px] font-bold leading-5 text-[#173F35]">
+                              {value}
+                            </p>
                           </div>
                         ))}
                       </div>
-                    </section>
-
-                    <section className="border-y border-violet-200 bg-violet-50 p-3 sm:rounded-[24px] sm:border sm:p-5">
-                      <div className="flex items-center gap-2">
-                        <ImageIcon size={17} className="text-violet-700" />
-                        <p className="text-xs font-bold text-violet-950">Uploaded proof</p>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        {(selectedDraft.evidence || []).map((evidence) => (
-                          <a
-                            key={evidence.id}
-                            href={evidence.readUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="focus-ring overflow-hidden rounded-xl border border-violet-200 bg-white"
-                          >
-                            {evidence.readUrl ? (
-                              <img src={evidence.readUrl} alt={labelize(evidence.purpose)} className="aspect-square w-full object-cover" />
-                            ) : (
-                              <div className="grid aspect-square place-items-center text-stone-300"><ImageIcon size={24} /></div>
-                            )}
-                            <p className="truncate p-2 text-[9px] font-black text-stone-600">{labelize(evidence.purpose)}</p>
-                          </a>
-                        ))}
-                      </div>
-                      {!selectedDraft.evidence?.length ? (
-                        <p className="mt-3 text-xs font-semibold text-violet-700/60">No readable evidence is attached.</p>
-                      ) : null}
-                    </section>
-
-                    <section className="border-y border-slate-200 bg-slate-50 p-3 sm:rounded-[24px] sm:border sm:border-amber-200 sm:bg-amber-50 sm:p-5">
-                      <p className="text-[10px] font-bold text-slate-700 sm:font-black sm:text-amber-700">Review history</p>
-                      <div className="mt-2 space-y-1 text-[11px] font-medium text-slate-700 sm:mt-3 sm:space-y-2 sm:text-xs sm:font-semibold sm:text-amber-950">
-                        <p>How details were added: {selectedDraft.extraction?.status ? labelize(selectedDraft.extraction.status) : "Entered by Host"}</p>
-                        <p>Safety notes: {selectedDraft.extraction?.safetyFlags?.length ? selectedDraft.extraction.safetyFlags.map(labelize).join(", ") : "No safety concerns reported"}</p>
-                        <p>Previous decisions: {selectedDraft.decisions?.length || 0}</p>
-                      </div>
-
-                      {selectedDraft.decisions?.length ? (
-                        <div className="mt-3 max-h-36 space-y-2 overflow-y-auto">
-                          {selectedDraft.decisions.slice(0, 4).map((decision) => (
-                            <div key={decision.id} className="rounded-xl bg-white p-3">
-                              <p className="text-[10px] font-black text-stone-800">{labelize(decision.decision)}</p>
-                              <p className="mt-1 text-[10px] font-semibold leading-4 text-stone-500">{decision.reason || "No reason recorded."}</p>
+                      <details className="group px-4 py-3">
+                        <summary className="cursor-pointer text-[13px] font-bold text-[#173F35] underline-offset-4 hover:underline">
+                          View all Host selling details
+                        </summary>
+                        <dl className="mt-3 space-y-2 border-t border-[#E7E8E3] pt-3">
+                          {[
+                            [
+                              "Host product code",
+                              detailDraft.merchantSku || "—",
+                            ],
+                            [
+                              "Stock location",
+                              commercial.inventoryNodeName || "—",
+                            ],
+                            [
+                              "Location type",
+                              labelize(commercial.inventoryNodeType || "") ||
+                                "—",
+                            ],
+                            [
+                              "Location",
+                              [
+                                commercial.city,
+                                commercial.state,
+                                commercial.pincode,
+                              ]
+                                .filter(Boolean)
+                                .join(", ") || "—",
+                            ],
+                            [
+                              "Store listing",
+                              detailDraft.marketplaceOfferId
+                                ? "Created"
+                                : "Not created",
+                            ],
+                            [
+                              "Pricing setup",
+                              detailDraft.marketplacePriceRuleId
+                                ? "Applied"
+                                : "Not set",
+                            ],
+                            [
+                              "Stock sync",
+                              detailDraft.marketplaceInventorySnapshotId
+                                ? "Connected"
+                                : "Not connected",
+                            ],
+                          ].map(([label, value]) => (
+                            <div
+                              key={label}
+                              className="flex flex-wrap justify-between gap-x-3 gap-y-1 border-b border-[#ECEDE8] pb-2 last:border-b-0"
+                            >
+                              <dt className="text-[12px] text-[#647269]">
+                                {label}
+                              </dt>
+                              <dd className="max-w-full break-words text-right text-[12px] font-semibold text-[#173F35]">
+                                {value}
+                              </dd>
                             </div>
                           ))}
-                        </div>
-                      ) : null}
+                        </dl>
+                      </details>
                     </section>
-                  </div>
+
+                    <section
+                      aria-label="Submitted proof"
+                      className="mt-5 border border-[#E1C6B5] bg-[#F3E4D9] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="flex items-center gap-2 text-[17px] font-bold text-[#173F35]">
+                          <ImageIcon size={18} /> Uploaded proof
+                        </h3>
+                        <span className="text-[12px] font-semibold text-[#7F5948]">
+                          {selectedDraft.evidence?.length || 0} files
+                        </span>
+                      </div>
+                      {(selectedDraft.evidence || []).length ? (
+                        <div
+                          className={`mt-3 grid gap-2 ${
+                            (selectedDraft.evidence || []).length === 1
+                              ? "grid-cols-1"
+                              : "grid-cols-2"
+                          }`}
+                        >
+                          {(selectedDraft.evidence || []).map((evidence) => (
+                            <a
+                              key={evidence.id}
+                              href={evidence.readUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="focus-ring group min-w-0 overflow-hidden border border-[#E6D2C5] bg-white hover:border-[#B76B4A]"
+                            >
+                              {evidence.readUrl ? (
+                                <img
+                                  src={evidence.readUrl}
+                                  alt={labelize(evidence.purpose)}
+                                  className={`${
+                                    (selectedDraft.evidence || []).length === 1
+                                      ? "h-56"
+                                      : "h-40"
+                                  } w-full bg-white object-contain p-2`}
+                                />
+                              ) : (
+                                <div className="grid h-40 place-items-center text-[#85998B]">
+                                  <ImageIcon size={28} />
+                                </div>
+                              )}
+                              <p className="truncate border-t border-[#EAE8E2] px-3 py-2 text-[12px] font-semibold text-[#173F35]">
+                                {labelize(evidence.purpose)}
+                              </p>
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-[13px] leading-5 text-[#785B4F]">
+                          No readable evidence is attached.
+                        </p>
+                      )}
+                    </section>
+
+                    <details className="mt-5 border border-[#DDE2DA] bg-white px-4 py-4">
+                      <summary className="cursor-pointer text-[15px] font-bold text-[#173F35]">
+                        Review history & safety notes
+                      </summary>
+                      <div className="mt-3 space-y-2 border-t border-[#E4E8E1] pt-3 text-[13px] leading-5 text-[#4F6256]">
+                        <p>
+                          How details were added:{" "}
+                          {selectedDraft.extraction?.status
+                            ? labelize(selectedDraft.extraction.status)
+                            : "Entered by Host"}
+                        </p>
+                        <p>
+                          Safety notes:{" "}
+                          {selectedDraft.extraction?.safetyFlags?.length
+                            ? selectedDraft.extraction.safetyFlags
+                                .map(labelize)
+                                .join(", ")
+                            : "No safety concerns reported"}
+                        </p>
+                        <p>
+                          Previous decisions:{" "}
+                          {selectedDraft.decisions?.length || 0}
+                        </p>
+                        {(selectedDraft.decisions || [])
+                          .slice(0, 4)
+                          .map((decision) => (
+                            <div
+                              key={decision.id}
+                              className="border-t border-[#E8EAE5] pt-2"
+                            >
+                              <p className="font-bold text-[#173F35]">
+                                {labelize(decision.decision)}
+                              </p>
+                              <p className="mt-0.5">
+                                {decision.reason || "No reason recorded."}
+                              </p>
+                            </div>
+                          ))}
+                      </div>
+                    </details>
+                  </aside>
                 </div>
 
-                {(canCatalogMutate || canTrustSafetyMutate) && !["approved_for_catalog", "rejected"].includes(detailDraft.status) ? (
-                  <section className="mt-3 border-y border-stone-200 bg-white p-3 sm:mt-5 sm:rounded-[24px] sm:border sm:p-5">
-                    <div className="flex items-center gap-2">
-                      <BadgeCheck size={18} className="text-emerald-700" />
-                      <h3 className="text-sm font-bold text-stone-900">Make a decision</h3>
+                {(canCatalogMutate || canTrustSafetyMutate) &&
+                !["approved_for_catalog", "rejected"].includes(
+                  detailDraft.status
+                ) ? (
+                  <section
+                    aria-label="Record a product decision"
+                    className="border-t-[3px] border-[#B76B4A] bg-[#F7EAE1] px-5 py-5 sm:px-8 sm:py-7"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[#955A40]">
+                          03 / Decision
+                        </p>
+                        <h3 className="mt-1 text-[23px] font-bold text-[#173F35]">
+                          Record your decision
+                        </h3>
+                      </div>
+                      <span className="text-[12px] text-[#6B655E]">
+                        A reason is required (3–2,000 characters)
+                      </span>
                     </div>
-
+                    <label
+                      htmlFor="single-bulk-review-reason"
+                      className="mt-4 block text-[13px] font-bold text-[#173F35]"
+                    >
+                      Reason for {candidateTitle(detailDraft)}
+                    </label>
                     <textarea
+                      id="single-bulk-review-reason"
+                      maxLength={2000}
                       value={singleReason}
                       onChange={(event) => setSingleReason(event.target.value)}
-                      placeholder="Reason for this decision"
+                      placeholder="Explain why this product is ready, needs more information or should be rejected"
                       rows={3}
-                      className="mt-2 h-16 w-full border border-stone-200 bg-stone-50 p-2.5 text-sm font-medium outline-none focus:border-emerald-300 sm:mt-4 sm:h-auto sm:rounded-2xl sm:p-3 sm:font-semibold"
+                      className="focus-ring mt-2 block min-h-[100px] w-full border border-[#D7BEAE] bg-white p-3 text-[14px] leading-6 text-[#202421] outline-none focus:border-[#173F35]"
                     />
-
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
                         disabled={singleSubmitting || !canCatalogMutate}
-                        onClick={() => submitSingleDecision("approve_for_catalog")}
-                        className="focus-ring inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-xs font-black text-white hover:bg-emerald-800 disabled:opacity-40"
+                        onClick={() =>
+                          submitSingleDecision("approve_for_catalog")
+                        }
+                        className="focus-ring min-h-11 bg-[#173F35] px-5 text-[14px] font-bold text-white hover:bg-[#0F3027] disabled:opacity-40"
                       >
-                        <CheckCircle2 size={14} />
-                        <span className="sm:hidden">Approve</span><span className="hidden sm:inline">Approve for catalog</span>
+                        <CheckCircle2 size={16} className="mr-1.5 inline" />{" "}
+                        Approve for catalog
                       </button>
                       <button
                         type="button"
                         disabled={singleSubmitting}
-                        onClick={() => submitSingleDecision("request_more_evidence")}
-                        className="focus-ring rounded-xl bg-amber-400 px-4 py-3 text-xs font-black text-amber-950 hover:bg-amber-300 disabled:opacity-40"
+                        onClick={() =>
+                          submitSingleDecision("request_more_evidence")
+                        }
+                        className="focus-ring min-h-11 border border-[#D7BEAE] bg-white px-5 text-[14px] font-bold text-[#714A37] hover:bg-[#FFFDFB] disabled:opacity-40"
                       >
-                        <span className="sm:hidden">Need info</span><span className="hidden sm:inline">Request more information</span>
+                        Request more information
                       </button>
                       <button
                         type="button"
                         disabled={singleSubmitting}
                         onClick={() => submitSingleDecision("reject")}
-                        className="focus-ring rounded-xl bg-red-600 px-4 py-3 text-xs font-black text-white hover:bg-red-700 disabled:opacity-40"
+                        className="focus-ring min-h-11 border border-red-200 bg-white px-5 text-[14px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-40"
                       >
-                        <span className="sm:hidden">Reject</span><span className="hidden sm:inline">Reject product</span>
+                        Reject product
                       </button>
                     </div>
-
                     {singleNotice ? (
-                      <p className="mt-3 rounded-xl bg-stone-100 p-3 text-xs font-bold text-stone-700">{singleNotice}</p>
+                      <p
+                        role="status"
+                        className="mt-3 border border-[#E3C7B5] bg-white px-3 py-3 text-[13px] font-medium text-[#173F35]"
+                      >
+                        {singleNotice}
+                      </p>
                     ) : null}
                   </section>
                 ) : (
-                  <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 text-xs font-bold text-stone-600">
-                    Current decision: <span className={statusClasses(detailDraft.status)}>{labelize(detailDraft.status)}</span>
+                  <div className="border-t border-[#E3E5DF] bg-white px-5 py-5 sm:px-8">
+                    <p className="text-[14px] font-semibold text-[#173F35]">
+                      Current decision:{" "}
+                      <span className={statusClasses(detailDraft.status)}>
+                        {labelize(detailDraft.status)}
+                      </span>
+                    </p>
+                    {singleNotice ? (
+                      <p
+                        role="status"
+                        className="mt-2 text-[13px] text-[#173F35]"
+                      >
+                        {singleNotice}
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </div>

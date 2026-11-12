@@ -129,9 +129,57 @@ export default function AdminApprovalCenterPage() {
       description="Manage Host approvals, product evidence and catalog records."
       showWorkspaceBadge={false}
     >
-      <main className="listing-approvals-mobile-root min-w-0 bg-[#F7F6F2] pb-5 text-[#202421]">
+      <main className={`listing-approvals-mobile-root ${activeId === "recipes" && recipeView === "library" ? "listing-recipes-active" : ""} min-w-0 bg-[#F7F6F2] pb-5 text-[#202421]`}>
         <style>{`
           @media (max-width: 639px) {
+            /* Recipe governance ONLY: remove nested mobile headings and use the screen width. */
+            .page-shell:has(.listing-recipes-active) .epantry-workspace-canvas > header {
+              padding: 8px 12px !important;
+            }
+            .page-shell:has(.listing-recipes-active) .epantry-workspace-canvas > header > div.grid {
+              display: none !important;
+            }
+            .listing-recipes-active [aria-label="Recipe governance workspace"] > div:first-child {
+              padding: 0 !important;
+              background: #FFFFFF !important;
+              border-bottom: 1px solid #D8E1D8 !important;
+            }
+            .listing-recipes-active [aria-label="Recipe governance workspace"] > div:first-child > p {
+              display: none !important;
+            }
+            .listing-recipes-active [aria-label="Recipe governance workspace"] > div:first-child [role="group"] {
+              width: 100%;
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 0 !important;
+            }
+            .listing-recipes-active [aria-label="Recipe governance workspace"] > div:first-child [role="group"] button {
+              min-width: 0;
+              min-height: 48px;
+              text-align: center;
+              font-size: 15px;
+              padding: 10px 8px;
+            }
+            .listing-recipes-active [aria-label="Recipe Review & Creation"] > div:first-child {
+              display: none !important;
+            }
+            .listing-recipes-active [aria-label="Recipe Review & Creation"] > div:last-child {
+              padding: 0 !important;
+            }
+            .listing-recipes-active section[aria-label="Listing management work areas"] > div:nth-child(2) {
+              padding: 9px 12px !important;
+            }
+            .listing-recipes-active section[aria-label="Listing management work areas"] label > span,
+            .listing-recipes-active section[aria-label="Listing management work areas"] label + span {
+              display: none !important;
+            }
+            .listing-recipes-active select[aria-label="Choose listing review workspace"] {
+              height: 46px;
+            }
+            .listing-recipes-active select[aria-label="Choose listing review workspace"] + svg {
+              bottom: 12px;
+            }
+
             .page-shell:has(.listing-approvals-mobile-root) {
               box-sizing: border-box !important;
               width: 100% !important;
@@ -212,9 +260,9 @@ export default function AdminApprovalCenterPage() {
 
         {activePanel ? (
           <section aria-label={`${activePanel.label} workspace`} className="mt-0 min-w-0 sm:mt-4">
-            {activeId !== "evidence" && activeId !== "catalog" ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D2DED3] bg-[#ECF2EB] px-4 py-4 sm:px-6">
-                <h2 className="text-[23px] font-bold leading-tight text-[#173F35]">{activePanel.label}</h2>
+            {activeId !== "evidence" && activeId !== "catalog" && activeId !== "bulk" ? (
+              <div className={`flex flex-wrap items-center justify-between gap-3 border-b border-[#D2DED3] px-4 sm:px-6 ${activeId === "recipes" ? "bg-[#FCFBF8] py-3" : "bg-[#ECF2EB] py-4"}`}>
+                {activeId !== "recipes" ? <h2 className="text-[23px] font-bold leading-tight text-[#173F35]">{activePanel.label}</h2> : <p className="text-[14px] font-semibold text-[#476557]">Choose a recipe task</p>}
                 {activeId === "recipes" ? <div role="group" aria-label="Recipe tasks" className="flex flex-wrap gap-2"><button type="button" className={subButton(recipeView === "library")} aria-pressed={recipeView === "library"} onClick={() => setView("library")}>Recipe library</button><button type="button" className={subButton(recipeView === "review")} aria-pressed={recipeView === "review"} onClick={() => setView("review")}>Recipe checks</button></div> : null}
                 {activeId === "audit" ? <div role="group" aria-label="History views" className="flex flex-wrap gap-2"><button type="button" className={subButton(auditView === "listings")} aria-pressed={auditView === "listings"} onClick={() => setView("listings")}>Listing versions</button><button type="button" className={subButton(auditView === "admin")} aria-pressed={auditView === "admin"} onClick={() => setView("admin")}>Admin audit</button></div> : null}
               </div>
