@@ -1,525 +1,1281 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, CookingPot, Search } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
+
+import { useAuth } from "../../auth/context/AuthContext";
+import { listOrders } from "../../commerce/services/commerce.service";
+import { listPublicRecipes } from "../../recipes/services/recipe.service";
+import { getRecipeFoodIntelligence } from "../../foodIntelligence/services/foodIntelligence.service";
 import {
-  ArrowRight,
-  ChefHat,
-  CookingPot,
-  Search,
-  ShoppingBasket,
-} from 'lucide-react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useQuery } from '@tanstack/react-query'
+  RECIPE_VIEWED_EVENT,
+  getRecentRecipeViews,
+} from "../../recipes/utils/recipeEngagement";
+import { apiClient } from "../../../api/apiClient";
+import { publicImageProps } from "../../../lib/publicMediaDelivery";
+import {
+  normalizeName,
+  normalizeRecipeSources,
+  selectHeroRecipes,
+} from "../utils/heroRecipeSelection";
+import { useLandingFeaturedQuery } from "../hooks/useLandingFeaturedQuery";
 
-import { useAuth } from '../../auth/context/AuthContext'
-import { listOrders } from '../../commerce/services/commerce.service'
-import { listPublicRecipes } from '../../recipes/services/recipe.service'
-import { RECIPE_VIEWED_EVENT, getRecentRecipeViews } from '../../recipes/utils/recipeEngagement'
-import { apiClient } from '../../../api/apiClient'
-import { normalizeRecipeSources, selectHeroRecipes } from '../utils/heroRecipeSelection'
+const LANDING_COOK_QUERY_KEY = "epantry-cook-today-landing-input";
+const ROTATION_LIMIT = 4;
+const ROTATION_DELAYS = { main: 4200, drink: 5000, new: 5600 };
+const COMMON_WORDS = new Set([
+  "recipe",
+  "homemade",
+  "the",
+  "with",
+  "and",
+  "from",
+  "fresh",
+  "easy",
+  "quick",
+  "food",
+  "dish",
+  "style",
+]);
 
-import { landingHero } from '../content/landingContent'
-import { useLandingFeaturedQuery } from '../hooks/useLandingFeaturedQuery'
-
-/*
- * Hero photography: five optimized WebP files per breakpoint.
- * Desktop files: frontend/public/hero/1.webp ... 5.webp
- * Mobile files:  frontend/public/hero/1.1.webp ... 1.5.webp
- * Keep the matching desktop/mobile scene in the same slide position.
- */
-const desktopHeroSlides = [
-  '/hero/1.webp',
-  '/hero/2.webp',
-  '/hero/3.webp',
-  '/hero/4.webp',
-  '/hero/5.webp',
-]
-
-const mobileHeroSlides = [
-  '/hero/1.1.webp',
-  '/hero/1.2.webp',
-  '/hero/1.3.webp',
-  '/hero/1.4.webp',
-  '/hero/1.5.webp',
-]
-
-const SLIDE_INTERVAL_MS = 5000
-const LANDING_COOK_QUERY_KEY = 'epantry-cook-today-landing-input'
-
-// Never fade out a visible photo until its replacement is fully loaded.
-// If an asset is unavailable, skip it rather than showing the bare hero background.
-function nextReadyHeroSlide(slides, current, ready) {
-  const currentIndex = slides.indexOf(current)
-  if (currentIndex < 0) return current
-
-  for (let offset = 1; offset < slides.length; offset += 1) {
-    const candidate = slides[(currentIndex + offset) % slides.length]
-    if (ready.has(candidate)) return candidate
-  }
-
-  return current
+// Match only actual, published dietary declarations. Never infer vegetarian
+// status from a recipe name or from an empty dietary field.
+function declaredDietaryKind(values) {
+  const labels = values
+    .filter((value) => typeof value === "string")
+    .map((value) => value.trim().toLowerCase().replace(/[_-]+/g, " "));
+  if (
+    labels.some((value) =>
+      [
+        "non veg",
+        "non vegetarian",
+        "nonveg",
+        "eggitarian",
+        "eggetarian",
+      ].includes(value)
+    )
+  )
+    return "nonveg";
+  if (labels.some((value) => ["veg", "vegetarian", "vegan"].includes(value)))
+    return "veg";
+  return "unknown";
 }
 
-function useMobileHero() {
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined'
-      ? window.matchMedia('(max-width: 767px)').matches
-      : false,
+function publicRecipeDietaryKind(item) {
+  return declaredDietaryKind([
+    item?.dish?.dietaryType,
+    item?.recipe?.dietaryType,
+    item?.dish?.dietaryClassification,
+    item?.recipe?.dietaryClassification,
+    ...(Array.isArray(item?.dish?.tags) ? item.dish.tags : []),
+    ...(Array.isArray(item?.recipe?.tags) ? item.recipe.tags : []),
+  ]);
+}
+
+function intelligenceDietaryKind(intelligence) {
+  const labels = (
+    Array.isArray(intelligence?.dietary) ? intelligence.dietary : []
   )
+    .filter(
+      (entry) =>
+        entry?.eligible === true ||
+        String(entry?.status || "").toLowerCase() === "eligible"
+    )
+    .map((entry) => entry?.key);
+  return declaredDietaryKind(labels);
+}
+
+// Display only a duration explicitly recorded in the published recipe data.
+// Missing, default-zero or invalid fields must never become an invented time.
+function verifiedMinutes(...values) {
+  if (
+    !values.length ||
+    values.some(
+      (value) =>
+        value === null ||
+        value === undefined ||
+        (typeof value === "string" && !value.trim())
+    )
+  )
+    return null;
+  const minutes = values.map(Number);
+  if (minutes.some((value) => !Number.isSafeInteger(value) || value < 0))
+    return null;
+  const total = minutes.reduce((sum, value) => sum + value, 0);
+  return Number.isSafeInteger(total) && total > 0 ? total : null;
+}
+
+// Some catalog entries were created by the development seed with a blanket
+// 10-minute preparation + 20-minute cooking duration. Those values are test
+// fixtures, not timings verified for each dish, so never advertise them.
+function isDevelopmentSeedRecipe(item) {
+  return /\bdevelopment seed\b/i.test(String(item?.recipe?.source?.name || ""));
+}
+
+function publishedTimestamp(value) {
+  const stamp = Date.parse(value || "");
+  return Number.isFinite(stamp) ? stamp : 0;
+}
+
+function recipeKind(metadata) {
+  const values = metadata.map((value) => normalizeName(value)).filter(Boolean);
+  const tokens = new Set(values.flatMap((value) => value.split(" ")));
+  if (
+    [
+      "drink",
+      "drinks",
+      "beverage",
+      "beverages",
+      "smoothie",
+      "smoothies",
+      "mocktail",
+      "mocktails",
+      "cocktail",
+      "cocktails",
+      "juice",
+      "juices",
+      "shake",
+      "shakes",
+      "tea",
+      "coffee",
+      "latte",
+      "lemonade",
+      "lassi",
+      "milkshake",
+      "milkshakes",
+      "sherbet",
+      "sharbat",
+      "soda",
+      "sodas",
+      "kombucha",
+    ].some((key) => tokens.has(key))
+  )
+    return "drink";
+  if (
+    [
+      "sweet",
+      "sweets",
+      "dessert",
+      "desserts",
+      "mithai",
+      "pudding",
+      "puddings",
+      "cake",
+      "cakes",
+      "pastry",
+      "pastries",
+      "bakery",
+      "halwa",
+      "kheer",
+      "jalebi",
+      "barfi",
+      "brownie",
+      "brownies",
+    ].some((key) => tokens.has(key))
+  )
+    return "sweet";
+  return "meal";
+}
+
+function recipeWords(value) {
+  return normalizeName(value)
+    .split(" ")
+    .filter((word) => word.length > 2 && !COMMON_WORDS.has(word));
+}
+
+// Compact, consistent outlined food icons instead of OS-dependent emoji.
+// Matches the circular broccoli/drumstick thumb from the supplied video.
+function DietaryThumbIcon({ kind }) {
+  // Standard Indian food labels: green dot for vegetarian, brown-red
+  // triangle for non-vegetarian. The original circular switch motion stays.
+  const isVeg = kind === "veg";
+  return (
+    <svg
+      width="21"
+      height="21"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="2.7"
+        y="2.7"
+        width="18.6"
+        height="18.6"
+        rx="1.6"
+        stroke={isVeg ? "#14834B" : "#A83C32"}
+        strokeWidth="2.1"
+      />
+      {isVeg ? (
+        <circle cx="12" cy="12" r="5.3" fill="#14834B" />
+      ) : (
+        <path d="M12 6.4 18 16.9H6L12 6.4Z" fill="#A83C32" />
+      )}
+    </svg>
+  );
+}
+
+function RecipePhoto({ recipe, className = "", loading = "lazy" }) {
+  if (!recipe?.image) {
+    return (
+      <div
+        className={`flex items-center justify-center bg-[#E6EADD] text-[#557365] ${className}`}
+        aria-label="Recipe photo not available"
+      >
+        <CookingPot className="h-9 w-9" aria-hidden="true" />
+      </div>
+    );
+  }
+  return (
+    <img
+      {...publicImageProps(recipe.image, {
+        sizes:
+          loading === "eager"
+            ? "(max-width: 767px) 100vw, 54vw"
+            : "(max-width: 640px) 42vw, 96px",
+        priority: loading === "eager",
+      })}
+      alt={recipe.name}
+      className={`object-cover ${className}`}
+    />
+  );
+}
+
+function useRotatingIndex(items, delay, reduceMotion, paused) {
+  const [index, setIndex] = useState(0);
+  const keys = items.map((item) => item.id).join("|");
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 767px)')
-    const update = (event) => setIsMobile(event.matches)
+    setIndex(0);
+  }, [keys]);
 
-    setIsMobile(mediaQuery.matches)
+  useEffect(() => {
+    if (reduceMotion || paused || items.length <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible")
+        setIndex((current) => (current + 1) % items.length);
+    }, delay);
+    return () => window.clearInterval(timer);
+  }, [keys, items.length, delay, reduceMotion, paused]);
 
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', update)
-      return () => mediaQuery.removeEventListener('change', update)
-    }
+  return items.length ? items[index % items.length] : null;
+}
 
-    mediaQuery.addListener(update)
-    return () => mediaQuery.removeListener(update)
-  }, [])
+// This is an editorial ranking from published/featured records, NOT a claim of
+// measured platform-wide popularity. The existing public API has no public
+// recipe-view-count leaderboard. Account-specific signals are real recent views
+// and previously matched orders, read only for signed-in Customers.
+function rankRecipes(
+  recipes,
+  { featuredIds, recentViews, priorityIds, personalized, allRecipes = recipes }
+) {
+  const recentIds = recentViews.map((view) =>
+    view.listingId ? `host:${view.listingId}` : `recipe:${view.slug}`
+  );
+  const viewedRecipes = recentIds
+    .map((id) => allRecipes.find((item) => item.id === id))
+    .filter(Boolean);
+  const viewedWords = new Set(
+    viewedRecipes.slice(0, 5).flatMap((item) => recipeWords(item.name))
+  );
+  const viewedCuisines = new Set(
+    viewedRecipes
+      .slice(0, 5)
+      .map((item) => normalizeName(item.cuisine))
+      .filter(Boolean)
+  );
+  const now = Date.now();
 
-  return isMobile
+  return [...recipes].sort((a, b) => {
+    const score = (recipe) => {
+      const newest = publishedTimestamp(recipe.publishedAt);
+      const ageDays = newest
+        ? Math.max(0, (now - newest) / 86400000)
+        : Infinity;
+      let total =
+        (recipe.image ? 18 : 0) +
+        (featuredIds.has(recipe.id) ? 26 : 0) +
+        (Number.isFinite(ageDays) ? Math.max(0, 18 - ageDays / 7) : 0);
+      if (personalized) {
+        const viewedIndex = recentIds.indexOf(recipe.id);
+        if (viewedIndex >= 0) total += Math.max(65, 160 - viewedIndex * 15);
+        if (viewedCuisines.has(normalizeName(recipe.cuisine))) total += 40;
+        total +=
+          Math.min(
+            5,
+            recipeWords(recipe.name).filter((word) => viewedWords.has(word))
+              .length
+          ) * 12;
+        const priorityIndex = priorityIds.indexOf(recipe.id);
+        if (priorityIndex >= 0) total += Math.max(5, 45 - priorityIndex * 5);
+      }
+      return total;
+    };
+    return (
+      score(b) - score(a) ||
+      publishedTimestamp(b.publishedAt) - publishedTimestamp(a.publishedAt) ||
+      a.id.localeCompare(b.id)
+    );
+  });
+}
+
+function SmallRecipeSlot({ item, slot, isLoading, reduceMotion }) {
+  const title = slot === "drink" ? "DRINKS TO TRY" : "RECIPE DISCOVERY";
+  const emptyText =
+    slot === "drink"
+      ? "No published drinks yet."
+      : "Published recipes will appear here.";
+  return (
+    <div className="epantry-hero-related-slot flex min-w-0 flex-col border-t border-[#D6DED4] pt-2.5">
+      {item ? (
+        // The row itself never moves. Only its contents dissolve, without
+        // jumping vertically or leaving a blank gap between suggestions.
+        <div className="epantry-hero-related-content relative min-h-[72px] flex-1 overflow-hidden sm:min-h-[76px]">
+          <AnimatePresence initial={false}>
+            <motion.div
+              key={item.id}
+              className="absolute inset-0"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={reduceMotion ? undefined : { opacity: 0 }}
+              transition={{
+                duration: reduceMotion ? 0 : 0.55,
+                ease: "easeInOut",
+              }}
+            >
+              <Link
+                to={item.path}
+                className="focus-ring group flex min-w-0 items-center gap-3 rounded-[8px] transition-colors hover:text-[#173F35]"
+              >
+                <RecipePhoto
+                  recipe={item}
+                  className="h-[58px] w-[58px] shrink-0 rounded-[9px] sm:h-[65px] sm:w-[65px]"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-bold uppercase tracking-[.045em] text-[#69796F]">
+                    {title}
+                  </span>
+                  <span className="mt-0.5 block line-clamp-2 text-[13px] font-bold leading-[1.3] text-[#202421] group-hover:underline sm:text-[14px] lg:text-[15px]">
+                    {item.name}
+                  </span>
+                </span>
+              </Link>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div className="flex min-h-[72px] flex-1 items-center gap-2 text-[#53675C]">
+          <CookingPot size={20} className="shrink-0" aria-hidden="true" />
+          <span className="text-[13px] leading-5">
+            {isLoading ? "Checking published recipes…" : emptyText}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function HeroSection() {
-  const navigate = useNavigate()
-  const shouldReduceMotion = useReducedMotion()
-  const isMobile = useMobileHero()
-  // Keep the last visible image mounted even while another breakpoint's
-  // photos load (e.g. rotating a laptop or resizing its browser window).
-  const heroSlides = isMobile ? mobileHeroSlides : desktopHeroSlides
-  const [currentSlide, setCurrentSlide] = useState(() => heroSlides[0])
-  const readyHeroSlides = useRef(new Set())
-  const [cookInput, setCookInput] = useState('')
-  const [cookInputError, setCookInputError] = useState('')
+  const navigate = useNavigate();
+  const shouldReduceMotion = useReducedMotion();
+  const [selectedDiet, setSelectedDiet] = useState("veg");
+  const [cookInput, setCookInput] = useState("");
+  const [cookInputError, setCookInputError] = useState("");
+  const [intelligenceById, setIntelligenceById] = useState({});
+  const [checkingDietary, setCheckingDietary] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const checkedDietaryIds = useRef(new Set());
 
-  const { user, isAuthenticated, customerEnabled, isBootstrapping } = useAuth()
-  const accountId = isAuthenticated ? String(user?.id || user?._id || user?.uid || '') : ''
-  const [recentViews, setRecentViews] = useState([])
+  const { user, isAuthenticated, customerEnabled, isBootstrapping } = useAuth();
+  const accountId = isAuthenticated
+    ? String(user?.id || user?._id || user?.uid || "")
+    : "";
+  const personalize =
+    !isBootstrapping &&
+    isAuthenticated &&
+    customerEnabled === true &&
+    Boolean(accountId);
+  const [recentViews, setRecentViews] = useState([]);
 
-  // Observe real Recipe Detail visits. History stays separate per signed-in
-  // account (and separate from anonymous browsing on a shared computer).
   useEffect(() => {
-    if (isBootstrapping) return undefined
-    const refresh = () => setRecentViews(getRecentRecipeViews(accountId))
-    refresh()
-    window.addEventListener(RECIPE_VIEWED_EVENT, refresh)
-    window.addEventListener('storage', refresh)
+    if (isBootstrapping) return undefined;
+    const refresh = () =>
+      setRecentViews(personalize ? getRecentRecipeViews(accountId) : []);
+    refresh();
+    window.addEventListener(RECIPE_VIEWED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
     return () => {
-      window.removeEventListener(RECIPE_VIEWED_EVENT, refresh)
-      window.removeEventListener('storage', refresh)
-    }
-  }, [accountId, isBootstrapping])
+      window.removeEventListener(RECIPE_VIEWED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [accountId, personalize, isBootstrapping]);
 
-  const { data: featuredData, isLoading: featuredLoading } = useLandingFeaturedQuery()
+  const { data: featuredData, isLoading: featuredLoading } =
+    useLandingFeaturedQuery();
   const { data: publicData, isLoading: publicLoading } = useQuery({
-    queryKey: ['landing', 'hero', 'published-recipes'],
-    queryFn: () => listPublicRecipes({ page: 1, limit: 50 }),
+    queryKey: ["landing", "hero", "published-recipes"],
+    queryFn: async () => {
+      const first = await listPublicRecipes({ page: 1, limit: 50 });
+      if (Number(first?.pagination?.pages || 0) <= 1) return first;
+      const second = await listPublicRecipes({ page: 2, limit: 50 });
+      return {
+        ...first,
+        recipes: [...(first?.recipes || []), ...(second?.recipes || [])],
+      };
+    },
     staleTime: 5 * 60 * 1000,
     retry: 1,
-  })
-
-  // M3 public listing packets become visible here only AFTER approval.
-  // The endpoint may not yet exist in older deployments; keep the working
-  // canonical public recipes visible when that optional API returns 404.
-  const { data: approvedData } = useQuery({
-    queryKey: ['landing', 'hero', 'approved-food-listings'],
+  });
+  const { data: approvedData, isLoading: approvedLoading } = useQuery({
+    queryKey: ["landing", "hero", "approved-food-listings"],
     queryFn: async () => {
       try {
-        const response = await apiClient.get('/public/host-listings')
-        return response?.data?.data || { listings: [] }
+        const response = await apiClient.get("/public/host-listings");
+        return response?.data?.data || { listings: [] };
       } catch (error) {
-        if (error?.response?.status === 404) return { listings: [] }
-        throw error
+        if (error?.response?.status === 404) return { listings: [] };
+        throw error;
       }
     },
     staleTime: 5 * 60 * 1000,
     retry: false,
-  })
-
-  // Paid orders only. Grocery ingredient purchases are not labeled as
-  // a recipe order unless the ordered item name exactly matches a live
-  // published recipe / approved prepared-food listing.
+  });
   const { data: orderData } = useQuery({
-    queryKey: ['landing', 'hero', 'paid-order-recipe-matches', accountId],
+    queryKey: ["landing", "hero", "paid-order-recipe-matches", accountId],
     queryFn: () => listOrders({ page: 1, limit: 30 }),
-    enabled: !isBootstrapping && isAuthenticated && customerEnabled === true && Boolean(accountId),
+    enabled: personalize,
     staleTime: 0,
-    refetchOnMount: 'always',
+    refetchOnMount: "always",
     retry: false,
-  })
+  });
 
-  const featuredRecipes = Array.isArray(featuredData?.recipes) ? featuredData.recipes : []
-  const catalog = useMemo(() => normalizeRecipeSources({
-    publicRecipes: Array.isArray(publicData?.recipes) ? publicData.recipes : [],
-    featuredRecipes,
-    hostListings: Array.isArray(approvedData?.listings) ? approvedData.listings : [],
-  }), [publicData, featuredData, approvedData])
-  const personalizedRecipes = useMemo(() => selectHeroRecipes({
-    catalog,
-    orders: Array.isArray(orderData?.orders) ? orderData.orders : [],
-    recentViews,
-    maxItems: 9,
-  }), [catalog, orderData, recentViews])
-  const recipesLoading = (featuredLoading || publicLoading) && !personalizedRecipes.length
+  const featuredRecipes = useMemo(
+    () => (Array.isArray(featuredData?.recipes) ? featuredData.recipes : []),
+    [featuredData]
+  );
+  const publicRecipes = useMemo(
+    () => (Array.isArray(publicData?.recipes) ? publicData.recipes : []),
+    [publicData]
+  );
+  const hostListings = useMemo(
+    () => (Array.isArray(approvedData?.listings) ? approvedData.listings : []),
+    [approvedData]
+  );
 
-  // Decode the incoming slide before the timer can display it. Loading only
-  // after changing <motion.img src> could leave the hero blank for seconds on
-  // slow networks, because the previous photo has already faded away.
-  useEffect(() => {
-    let mounted = true
-    const preloads = heroSlides.map((src, index) => {
-      const photo = new window.Image()
-      photo.decoding = 'async'
-      if (index === 0) photo.fetchPriority = 'high'
+  const catalog = useMemo(
+    () =>
+      normalizeRecipeSources({
+        publicRecipes,
+        featuredRecipes,
+        hostListings,
+      }),
+    [publicRecipes, featuredRecipes, hostListings]
+  );
 
-      const markReady = () => {
-        if (!mounted) return
-        readyHeroSlides.current.add(src)
-        // On a responsive breakpoint change, retain the previous photo until
-        // the first new-viewport image is actually ready to display.
-        setCurrentSlide((visible) => (heroSlides.includes(visible) ? visible : src))
-      }
-      photo.onload = () => {
-        if (typeof photo.decode === 'function') {
-          photo.decode().then(markReady, markReady)
-        } else {
-          markReady()
-        }
-      }
-      // A failed/404 asset must never replace a working hero photo.
-      photo.onerror = () => {}
-      photo.src = src
-      return photo
-    })
+  const personalizedRecipes = useMemo(
+    () =>
+      selectHeroRecipes({
+        catalog,
+        orders:
+          personalize && Array.isArray(orderData?.orders)
+            ? orderData.orders
+            : [],
+        recentViews: personalize ? recentViews : [],
+        maxItems: 30,
+      }),
+    [catalog, orderData, recentViews, personalize]
+  );
 
-    return () => {
-      mounted = false
-      preloads.forEach((photo) => {
-        photo.onload = null
-        photo.onerror = null
-      })
+  const recipeDetails = useMemo(() => {
+    const details = new Map();
+    for (const item of publicRecipes) {
+      const slug = String(item?.dish?.slug || "").trim();
+      if (!slug) continue;
+      details.set(`recipe:${slug}`, {
+        diet: publicRecipeDietaryKind(item),
+        recipeVersionId: String(item?.recipe?.id || ""),
+        description: item?.dish?.description || item?.recipe?.description || "",
+        minutes: isDevelopmentSeedRecipe(item)
+          ? null
+          : verifiedMinutes(
+              item?.recipe?.preparationTimeMinutes,
+              item?.recipe?.cookingTimeMinutes
+            ),
+        servings:
+          Number(item?.recipe?.baseServings) > 0
+            ? Number(item.recipe.baseServings)
+            : null,
+        kind: recipeKind([
+          item?.dish?.course,
+          item?.recipe?.course,
+          item?.dish?.mealType,
+          item?.recipe?.mealType,
+          item?.dish?.category,
+          item?.recipe?.category,
+          ...(Array.isArray(item?.dish?.tags) ? item.dish.tags : []),
+          ...(Array.isArray(item?.recipe?.tags) ? item.recipe.tags : []),
+          item?.dish?.name,
+          item?.recipe?.title,
+        ]),
+      });
     }
-  }, [isMobile])
+    for (const item of featuredRecipes) {
+      const slug = String(item?.slug || "").trim();
+      if (!slug || details.has(`recipe:${slug}`)) continue;
+      details.set(`recipe:${slug}`, {
+        // /landing/featured uses dietaryType for course/difficulty; it cannot
+        // prove Veg/Non-Veg classification for these legacy cards.
+        diet: "unknown",
+        description: item?.description || "",
+        // Featured totalTime is a derived summary with no source metadata;
+        // the primary /recipes response supplies source-backed timings.
+        minutes: null,
+        servings: Number(item?.servings) > 0 ? Number(item.servings) : null,
+        kind: recipeKind([
+          item?.cuisine,
+          item?.course,
+          item?.name,
+          item?.title,
+        ]),
+      });
+    }
+    for (const item of hostListings) {
+      if (!item?.id) continue;
+      details.set(`host:${item.id}`, {
+        diet: declaredDietaryKind([item?.dietary]),
+        description: item?.description || "",
+        minutes: verifiedMinutes(
+          item?.preparationMinutes,
+          item?.cookingMinutes
+        ),
+        servings:
+          Number(item?.baseServings) > 0 ? Number(item.baseServings) : null,
+        kind: recipeKind([item?.category, item?.type, item?.title]),
+      });
+    }
+    return details;
+  }, [publicRecipes, featuredRecipes, hostListings]);
+
+  // Only one bounded read-only Food Intelligence batch. Shared results are
+  // reused for both switch modes and every carousel; no writes to the catalog.
+  const unresolvedIds = useMemo(() => {
+    const ids = [];
+    const prioritized = personalizedRecipes.concat(
+      catalog.filter(
+        (item) =>
+          !personalizedRecipes.some((priority) => priority.id === item.id)
+      )
+    );
+    // Bounded and balanced: verify up to 8 meal, 8 drink and 8 sweet
+    // versions, instead of making a request for every published recipe.
+    const firstPass = ["meal", "drink", "sweet"].flatMap((kind) =>
+      prioritized
+        .filter((item) => recipeDetails.get(item.id)?.kind === kind)
+        .slice(0, 8)
+    );
+    for (const recipe of firstPass.concat(prioritized)) {
+      if (ids.length >= 24) break;
+      const details = recipeDetails.get(recipe.id);
+      const id = details?.recipeVersionId;
+      if (id && details?.diet === "unknown" && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  }, [personalizedRecipes, catalog, recipeDetails]);
+  const unresolvedKey = unresolvedIds.join("|");
 
   useEffect(() => {
-    if (shouldReduceMotion || heroSlides.length < 2) return undefined
+    const pending = unresolvedIds.filter(
+      (id) => !checkedDietaryIds.current.has(id)
+    );
+    if (!pending.length) {
+      setCheckingDietary(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setCheckingDietary(true);
+    async function verifyDietary() {
+      for (let index = 0; index < pending.length; index += 3) {
+        if (cancelled) return;
+        const batch = pending.slice(index, index + 3);
+        const settled = await Promise.allSettled(
+          batch.map((id) => getRecipeFoodIntelligence(id))
+        );
+        if (cancelled) return;
+        const results = {};
+        settled.forEach((result, position) => {
+          checkedDietaryIds.current.add(batch[position]);
+          results[batch[position]] =
+            result.status === "fulfilled" ? result.value : null;
+        });
+        setIntelligenceById((current) => ({ ...current, ...results }));
+      }
+      if (!cancelled) setCheckingDietary(false);
+    }
+    void verifyDietary();
+    return () => {
+      cancelled = true;
+    };
+  }, [unresolvedKey]);
 
-    const interval = window.setInterval(() => {
-      setCurrentSlide((visible) =>
-        nextReadyHeroSlide(heroSlides, visible, readyHeroSlides.current),
+  const recipes = useMemo(() => {
+    const hostShared = new Set(
+      hostListings
+        .filter((item) => item?.shareRecipe === true)
+        .map((item) => `host:${item.id}`)
+    );
+    return catalog
+      .filter(
+        (item) => item.id.startsWith("recipe:") || hostShared.has(item.id)
       )
-    }, SLIDE_INTERVAL_MS)
+      .map((item) => {
+        const details = recipeDetails.get(item.id) || {};
+        const diet =
+          details.diet === "unknown" && details.recipeVersionId
+            ? intelligenceDietaryKind(intelligenceById[details.recipeVersionId])
+            : details.diet || "unknown";
+        return { ...item, ...details, diet, kind: details.kind || "meal" };
+      });
+  }, [catalog, recipeDetails, intelligenceById, hostListings]);
 
-    return () => window.clearInterval(interval)
-  }, [isMobile, shouldReduceMotion])
+  const displayed = useMemo(() => {
+    const eligible = recipes.filter((recipe) => recipe.diet === selectedDiet);
+    const featuredIds = new Set(
+      featuredRecipes.map((item) => `recipe:${item.slug}`)
+    );
+    const priorityIds = personalizedRecipes.map((item) => item.id);
+    const rank = (items) =>
+      rankRecipes(items, {
+        featuredIds,
+        recentViews,
+        priorityIds,
+        personalized: personalize,
+        allRecipes: recipes,
+      });
+
+    // Only the main course and fresh recipe recommendations depend on the
+    // Veg/Non-Veg switch. Drinks are a shared discovery rail in BOTH modes,
+    // so changing to Non-Veg never makes existing drinks disappear.
+    const main = rank(eligible.filter((item) => item.kind === "meal")).slice(
+      0,
+      ROTATION_LIMIT
+    );
+    const drink = rank(recipes.filter((item) => item.kind === "drink")).slice(
+      0,
+      ROTATION_LIMIT
+    );
+
+    // New approved Host recipe shares take priority when they arrive; until
+    // then show already published recipes. Never leave the slot empty merely
+    // because every eligible recipe is also in the main carousel.
+    const otherRecipes = eligible.filter((item) => item.kind !== "drink");
+    const latestFirst = (a, b) =>
+      publishedTimestamp(b.publishedAt) - publishedTimestamp(a.publishedAt) ||
+      a.id.localeCompare(b.id);
+    const newestPublished = [...otherRecipes].sort(latestFirst);
+    // A newly approved Host listing has approvedAt as publishedAt and rises to
+    // the top automatically. Before another listing arrives, the currently
+    // approved recipe pool remains available as a stable fallback.
+    const alternatives = newestPublished.filter(
+      (item) => !main.some((mainItem) => mainItem.id === item.id)
+    );
+    const freshest = newestPublished[0];
+    const hasNewHost =
+      freshest?.id.startsWith("host:") &&
+      publishedTimestamp(freshest.publishedAt) > 0;
+    const source = hasNewHost
+      ? newestPublished
+      : alternatives.length
+      ? alternatives
+      : newestPublished;
+    const rankedNew =
+      personalize && recentViews.length ? rank(source.slice(0, 12)) : source;
+    // A newly approved Host recipe stays in the fresh rail even when recent
+    // views would otherwise push it outside the top four recommendations.
+    const newest = (
+      hasNewHost &&
+      !rankedNew
+        .slice(0, ROTATION_LIMIT)
+        .some((item) => item.id === freshest.id)
+        ? [freshest, ...rankedNew.filter((item) => item.id !== freshest.id)]
+        : rankedNew
+    ).slice(0, ROTATION_LIMIT);
+
+    // If no alternate recipe exists, the one approved available recipe remains
+    // visible until another Host or public recipe is published.
+    return { main, drink, new: newest };
+  }, [
+    recipes,
+    selectedDiet,
+    featuredRecipes,
+    personalizedRecipes,
+    recentViews,
+    personalize,
+  ]);
+
+  const mainRecipe = useRotatingIndex(
+    displayed.main,
+    ROTATION_DELAYS.main,
+    shouldReduceMotion,
+    paused
+  );
+  const drinkRecipe = useRotatingIndex(
+    displayed.drink,
+    ROTATION_DELAYS.drink,
+    shouldReduceMotion,
+    paused
+  );
+  const newRecipe = useRotatingIndex(
+    displayed.new,
+    ROTATION_DELAYS.new,
+    shouldReduceMotion,
+    paused
+  );
+  const catalogLoading =
+    featuredLoading || publicLoading || approvedLoading || checkingDietary;
 
   const handleCookTodaySubmit = (event) => {
-    event.preventDefault()
-    const query = cookInput.trim()
-
+    event.preventDefault();
+    const query = cookInput.trim();
     if (!query) {
-      setCookInputError('Enter a dish or ingredients to get started.')
-      return
+      setCookInputError("Enter a dish or ingredient to get started.");
+      return;
     }
-
-    setCookInputError('')
+    setCookInputError("");
     try {
-      window.sessionStorage.setItem(LANDING_COOK_QUERY_KEY, query)
+      window.sessionStorage.setItem(LANDING_COOK_QUERY_KEY, query);
     } catch {
-      // Navigation state remains available when storage is disabled.
+      /* route state is enough */
     }
-
-    navigate('/cook-today', {
-      state: { landingCookQuery: query },
-    })
-  }
+    navigate("/cook-today", { state: { landingCookQuery: query } });
+  };
 
   return (
-    <section
-      aria-label="Discover food and recipes with EPANTRY"
-      className="epantry-hero-refined relative isolate flex min-h-[100svh] w-full flex-col overflow-hidden bg-[#F7F6F2] text-[#202421]"
+    <motion.section
+      aria-label="Discover recipes, drinks and food ideas"
+      className="epantry-recipe-hero relative isolate w-full overflow-hidden border-b border-[#DDE4DA] bg-[#F7F6F2] text-[#202421]"
+      initial={false}
+      animate={{
+        backgroundColor: selectedDiet === "veg" ? "#F2F6F0" : "#F9F0EB",
+      }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.7, ease: "easeInOut" }}
     >
-      {/* Overrides are scoped because global EPANTRY heading rules use !important. */}
       <style>{`
-        .epantry-hero-refined .epantry-hero-headline {
-          font-size: clamp(38px, 9.1vw, 47px) !important;
-          line-height: 1.105 !important;
-          letter-spacing: -.045em !important;
-          font-weight: 600 !important;
-          text-transform: none !important;
-          text-wrap: balance;
-        }
-        .epantry-hero-refined .epantry-hero-photo-overlay {
-          background:
-            linear-gradient(180deg,
-              rgba(247,246,242,.84) 0%,
-              rgba(247,246,242,.67) 31%,
-              rgba(247,246,242,.18) 67%,
-              rgba(247,246,242,.03) 100%);
-        }
-        .epantry-hero-refined .epantry-hero-recipe-rail {
-          scrollbar-width: none;
-          -webkit-overflow-scrolling: touch;
-        }
-        .epantry-hero-refined .epantry-hero-recipe-rail::-webkit-scrollbar {
-          display: none;
-        }
-        /* A low, porcelain editorial shelf rather than a dark dashboard slab.
-           The narrow desktop footprint keeps the food photograph unobscured. */
-        .epantry-hero-refined .epantry-hero-recipe-ribbon {
-          width: min(100%, clamp(790px, 55vw, 1080px)) !important;
-          max-width: 1080px !important;
-          background: linear-gradient(115deg,
-            rgba(247,246,242,.97) 0%,
-            rgba(247,246,242,.95) 52%,
-            rgba(232,238,229,.94) 100%);
-          -webkit-backdrop-filter: blur(18px);
-          backdrop-filter: blur(18px);
-          box-shadow: 0 14px 34px rgba(23,47,38,.17),
-                      inset 0 1px 0 rgba(255,255,255,.9);
-        }
-        /* EPANTRY global typography includes !important rules. Scope compact
-           sizes here so labels never collide or get truncated in the shelf. */
-        .epantry-hero-refined .epantry-hero-recipe-heading {
-          font-size: 16px !important;
-          line-height: 1.25 !important;
-          letter-spacing: -.024em !important;
-          font-weight: 700 !important;
+        .epantry-recipe-hero { font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; }
+        .epantry-recipe-hero .epantry-hero-title {
+          font-size: clamp(40px, 4.5vw, 68px) !important;
+          line-height: 1.06 !important;
+          letter-spacing: -.051em !important;
+          font-weight: 800 !important;
           text-transform: none !important;
         }
-        .epantry-hero-refined .epantry-hero-recipe-eyebrow {
-          font-size: 11.5px !important;
-          line-height: 1.25 !important;
-          letter-spacing: .065em !important;
+        .epantry-recipe-hero .epantry-hero-recipe-title {
+          font-size: clamp(18px, 1.65vw, 23px) !important;
+          line-height: 1.18 !important;
+          letter-spacing: -.025em !important;
+          font-weight: 750 !important;
+          text-transform: none !important;
         }
-        .epantry-hero-refined .epantry-hero-recipe-status {
-          font-size: 11.5px !important;
-          line-height: 1.25 !important;
-        }
-        .epantry-hero-refined .epantry-hero-recipe-name {
-          font-size: 14px !important;
-          line-height: 1.27 !important;
-          font-weight: 700 !important;
-          overflow-wrap: anywhere;
-        }
-        .epantry-hero-refined .epantry-hero-recipe-cuisine {
-          font-size: 11.5px !important;
-          line-height: 1.26 !important;
-        }
-        @media (min-width: 640px) {
-          .epantry-hero-refined .epantry-hero-headline {
-            font-size: clamp(49px, 5vw, 62px) !important;
-            line-height: 1.07 !important;
-          }
-        }
+        /* Desktop: the three annotated areas have independent, predictable
+           geometry. A: full recipe image, B: heading/search/links, C: two
+           complete suggestion rows. Never let A consume C's space. */
         @media (min-width: 768px) {
-          .epantry-hero-refined .epantry-hero-photo-overlay {
-            background:
-              linear-gradient(90deg,
-                rgba(247,246,242,.85) 0%,
-                rgba(247,246,242,.68) 21%,
-                rgba(247,246,242,.25) 43%,
-                rgba(247,246,242,.02) 66%),
-              linear-gradient(0deg,
-                rgba(17,48,37,.07) 0%,
-                rgba(17,48,37,0) 25%);
+          .epantry-recipe-hero { height: 100svh; min-height: 0; }
+          .epantry-hero-shell {
+            box-sizing: border-box;
+            display: grid;
+            grid-template-rows: 40px minmax(0, 1fr);
+            row-gap: clamp(9px, 1.3svh, 14px);
+            height: 100%;
+            min-height: 0;
+            padding-top: calc(70px + clamp(10px, 1.6svh, 16px));
+            padding-bottom: clamp(12px, 2svh, 20px);
+          }
+          .epantry-hero-toggle-row { margin-bottom: 0; align-items: center; }
+          .epantry-hero-layout {
+            display: grid;
+            grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr);
+            column-gap: clamp(28px, 4.6vw, 78px);
+            min-height: 0;
+            height: 100%;
+            align-items: stretch;
+          }
+          /* B: align near the start of the recipe composition, not at the
+             bottom or vertically centred inside an oversized grid cell. */
+          .epantry-hero-copy {
+            align-self: start;
+            margin-top: clamp(28px, 5.2svh, 52px);
+            padding-top: 0;
+          }
+          /* A + C: centred as one unit. Height stays inside the viewport and
+             the mini-card row gets its own space regardless of image size. */
+          .epantry-hero-feature-column {
+            display: flex;
+            flex-direction: column;
+            flex-wrap: nowrap;
+            justify-content: center;
+            align-self: stretch;
+            min-height: 0;
+            height: 100%;
+            gap: clamp(10px, 1.4svh, 14px);
+          }
+          .epantry-hero-visual {
+            display: block;
+            flex: 0 0 clamp(290px, 51svh, 465px);
+            width: 100%;
+            height: clamp(290px, 51svh, 465px) !important;
+            min-height: 0;
+          }
+          .epantry-hero-related {
+            flex: 0 0 clamp(98px, 12svh, 112px);
+            height: clamp(98px, 12svh, 112px);
+            min-height: 0;
+            margin-top: 0;
+            align-items: stretch;
+          }
+          .epantry-hero-related-slot { height: 100%; min-height: 0; }
+          .epantry-hero-related-content { min-height: 0; }
+        }
+        @media (min-width: 768px) and (max-width: 1100px) {
+          .epantry-recipe-hero .epantry-hero-title { font-size: clamp(36px, 4.5vw, 54px) !important; }
+          .epantry-hero-layout { column-gap: clamp(20px, 3vw, 34px); }
+        }
+        @media (max-width: 767px) {
+          /* The landing navbar is FIXED and 60px tall on mobile. Keep the
+             entire hero (including both suggestions) within one small
+             viewport; don't add 100svh worth of content under the navbar. */
+          .epantry-recipe-hero {
+            box-sizing: border-box;
+            height: 100svh !important;
+            min-height: 0 !important;
+            max-height: 100svh;
+          }
+          .epantry-hero-shell {
+            box-sizing: border-box;
+            height: 100%;
+            min-height: 0;
+            padding-top: 68px;
+            /* Reserve room for the existing floating Why EPANTRY control. */
+            padding-bottom: max(58px, calc(env(safe-area-inset-bottom, 0px) + 52px));
+          }
+          .epantry-hero-toggle-row {
+            flex: 0 0 auto;
+            margin: 0 0 5px;
+          }
+          .epantry-hero-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: auto minmax(0, 1fr);
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            gap: clamp(7px, 1.25svh, 12px);
+            align-items: stretch;
+          }
+          .epantry-hero-copy {
+            align-self: start;
+            min-width: 0;
+            margin: 0;
+          }
+          .epantry-hero-copy > p:first-child { font-size: 11px !important; line-height: 1.3; }
+          .epantry-recipe-hero .epantry-hero-title {
+            margin-top: 7px !important;
+            font-size: clamp(29px, 8.1vw, 40px) !important;
+            line-height: 1.055 !important;
+          }
+          .epantry-hero-copy form { margin-top: 11px; }
+          .epantry-hero-copy form > div:first-child {
+            min-height: 44px;
+            padding-block: 3px;
+          }
+          .epantry-hero-copy form button { min-height: 35px; padding-inline: 11px; }
+          .epantry-hero-copy > div:last-child { margin-top: 7px; font-size: 13px; }
+
+          .epantry-hero-feature-column {
+            display: grid;
+            grid-template-rows: minmax(0, 1fr) 152px;
+            min-height: 0;
+            height: 100%;
+            align-self: stretch;
+            gap: 7px;
+          }
+          /* Image receives exactly the height left after the small cards;
+             the 295px/345px Tailwind fallback is for other breakpoints. */
+          .epantry-hero-visual {
+            width: 100%;
+            height: 100% !important;
+            min-height: 0;
+            max-height: none;
+          }
+          .epantry-hero-visual .absolute.bottom-3.right-3 {
+            bottom: 8px;
+            right: 8px;
+            width: min(73%, 225px);
+            padding: 9px;
+          }
+          .epantry-hero-visual .absolute.bottom-3.right-3 > p:first-child {
+            font-size: 10px;
+            line-height: 1.25;
+          }
+          .epantry-recipe-hero .epantry-hero-recipe-title {
+            font-size: clamp(15px, 3.7vw, 18px) !important;
+            margin-top: 4px;
+            margin-bottom: 4px;
+          }
+          .epantry-hero-visual .absolute.bottom-3.right-3 > div { margin-bottom: 5px; }
+          .epantry-hero-visual .absolute.bottom-3.right-3 > a {
+            min-height: 31px;
+            padding: 6px 8px;
+            font-size: 12px;
+          }
+          .epantry-recipe-hero .epantry-hero-related {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: repeat(2, minmax(0, 1fr));
+            min-height: 0;
+            height: 152px;
+            margin-top: 0;
+            gap: 6px;
+            align-items: stretch;
+          }
+          .epantry-hero-related-slot {
+            height: 100%;
+            min-height: 0;
+            min-width: 0;
+            padding-top: 4px;
+          }
+          .epantry-hero-related-content {
+            height: 100%;
+            min-height: 0 !important;
+            flex: 1 1 auto;
+          }
+          .epantry-hero-related-content > div { width: 100%; }
+          .epantry-hero-related-content a { height: 100%; }
+          .epantry-hero-related-content img { height: 43px; width: 43px; }
+          .epantry-hero-related-slot span span:first-child { font-size: 10px; line-height: 1.1; }
+          .epantry-hero-related-slot span span:nth-child(2) {
+            font-size: 12px;
+            line-height: 1.2;
+            margin-top: 2px;
           }
         }
-        @media (min-width: 1024px) {
-          .epantry-hero-refined .epantry-hero-headline {
-            font-size: clamp(56px, 4.6vw, 88px) !important;
+        @media (max-width: 767px) and (max-height: 700px) {
+          .epantry-hero-shell {
+            padding-top: 65px;
+            padding-bottom: max(51px, calc(env(safe-area-inset-bottom, 0px) + 46px));
           }
+          .epantry-hero-toggle-row { margin-bottom: 3px; }
+          .epantry-hero-layout { gap: 6px; }
+          .epantry-recipe-hero .epantry-hero-title {
+            font-size: clamp(27px, 7.5vw, 35px) !important;
+            margin-top: 4px !important;
+          }
+          .epantry-hero-copy form { margin-top: 8px; }
+          .epantry-hero-copy > div:last-child { margin-top: 5px; }
+          .epantry-hero-feature-column {
+            grid-template-rows: minmax(0, 1fr) 126px;
+            gap: 5px;
+          }
+          .epantry-recipe-hero .epantry-hero-related { height: 126px; gap: 4px; }
+          .epantry-hero-related-content img { height: 40px; width: 40px; }
+          .epantry-hero-visual .absolute.bottom-3.right-3 { padding: 7px; }
+          .epantry-recipe-hero .epantry-hero-recipe-title { font-size: 14px !important; }
+          .epantry-hero-visual .absolute.bottom-3.right-3 > a { min-height: 28px; padding-block: 4px; }
         }
-        @media (prefers-reduced-motion: reduce) {
-          .epantry-hero-refined * {
-            scroll-behavior: auto !important;
+        @media (min-width: 768px) and (max-height: 670px) {
+          .epantry-hero-shell {
+            grid-template-rows: 36px minmax(0, 1fr);
+            row-gap: 8px;
+            padding-top: 78px;
+            padding-bottom: 10px;
           }
+          .epantry-hero-copy { margin-top: clamp(16px, 2.4svh, 24px); }
+          .epantry-hero-feature-column { gap: 9px; }
+          .epantry-hero-visual {
+            flex-basis: clamp(240px, 49svh, 325px);
+            height: clamp(240px, 49svh, 325px) !important;
+          }
+          .epantry-hero-related { flex-basis: 96px; height: 96px; }
+          .epantry-recipe-hero .epantry-hero-title { font-size: clamp(34px, 3.8vw, 54px) !important; }
         }
       `}</style>
 
-      {/* Full-bleed photos, five images per device and original crossfade behaviour. */}
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <AnimatePresence mode="sync" initial={false}>
-          <motion.img
-            key={currentSlide}
-            src={currentSlide}
-            alt=""
-            initial={shouldReduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={shouldReduceMotion ? undefined : { opacity: 0 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.8, ease: 'easeInOut' }}
-            className="absolute inset-0 h-full w-full object-cover object-[58%_center] md:object-center"
-            draggable={false}
-          />
-        </AnimatePresence>
-        <div className="epantry-hero-photo-overlay absolute inset-0" />
-      </div>
+      {/* A restrained editorial wash, rather than a flat colour swap. */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 55% 78% at 82% 37%, rgba(112,171,123,.24), transparent 78%), radial-gradient(ellipse 55% 70% at 4% 95%, rgba(206,225,202,.54), transparent 80%), linear-gradient(112deg, #F9FAF6 2%, #EEF4ED 98%)",
+        }}
+        initial={false}
+        animate={{ opacity: selectedDiet === "veg" ? 1 : 0 }}
+        transition={{
+          duration: shouldReduceMotion ? 0 : 0.7,
+          ease: "easeInOut",
+        }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 82% at 82% 38%, rgba(218,135,104,.22), transparent 78%), radial-gradient(ellipse 50% 65% at 3% 96%, rgba(241,208,191,.55), transparent 80%), linear-gradient(112deg, #FBF8F5 2%, #F8EAE2 98%)",
+        }}
+        initial={false}
+        animate={{ opacity: selectedDiet === "nonveg" ? 1 : 0 }}
+        transition={{
+          duration: shouldReduceMotion ? 0 : 0.7,
+          ease: "easeInOut",
+        }}
+      />
 
-      <div className="page-shell relative z-10 flex min-h-[100svh] w-full flex-1 flex-col justify-between gap-6 px-3.5 pb-[84px] pt-7 sm:px-5 sm:pb-[90px] sm:pt-12 lg:gap-7 lg:pb-[90px] lg:pt-[clamp(58px,9svh,112px)]">
-        <div className="w-full max-w-[720px] 2xl:max-w-[960px]">
-          <motion.div
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      <div className="epantry-hero-shell page-shell relative z-10 mx-auto flex w-full min-h-0 flex-col">
+        {/* Keep the video's sliding + rotating thumb, at a compact size. */}
+        <div className="epantry-hero-toggle-row mb-2 flex w-full shrink-0 justify-end sm:mb-3">
+          <div
+            className="relative h-[40px] w-[112px] rounded-full border border-[#D6DDD3] bg-white/90 shadow-[0_4px_12px_rgba(23,63,53,.09)]"
+            role="group"
+            aria-label="Choose Veg or Non-Veg recipes"
           >
-            <p className="mb-3 inline-flex items-center gap-2.5 text-[12px] font-semibold tracking-[.06em] text-[#173F35] sm:mb-4 sm:text-[13px]">
-              <span aria-hidden="true" className="h-[3px] w-6 rounded-full bg-[#C86C42]" />
-              Good food, made simpler
-            </p>
-
-            <h1 className="epantry-hero-headline max-w-[700px] text-[#202421]">
-              What shall we <span className="text-[#173F35]">cook today?</span>
-            </h1>
-
-            <p className="mt-3 max-w-[550px] text-[15px] font-normal leading-[1.55] text-[#3F4840] sm:mt-5 sm:text-[16px] sm:leading-[1.6]">
-              Find a recipe, check your pantry, and get what you need to make it.
-            </p>
-          </motion.div>
-
-          {/* Primary discovery search is always visible, never tied to a slide. */}
-          <form onSubmit={handleCookTodaySubmit} className="mt-5 max-w-[640px] sm:mt-7 2xl:max-w-[860px]">
-            <label htmlFor="landing-cook-today-input" className="sr-only">
-              What would you like to cook, or which ingredients do you have?
-            </label>
-            <div className="flex min-h-[54px] w-full items-center gap-1.5 rounded-[15px] border border-[#C9D2C6] bg-[#F7F6F2]/96 p-1.5 shadow-[0_12px_40px_rgba(30,48,38,.10)] sm:min-h-[62px] sm:gap-3 sm:p-2">
-              <Search size={19} aria-hidden="true" className="ml-2 shrink-0 text-[#173F35]" />
-              <input
-                id="landing-cook-today-input"
-                type="search"
-                autoComplete="off"
-                value={cookInput}
-                onChange={(event) => {
-                  setCookInput(event.target.value)
-                  if (cookInputError) setCookInputError('')
-                }}
-                placeholder="A dish, paneer, rice..."
-                className="min-w-0 flex-1 border-0 bg-transparent px-1 text-[14px] font-normal text-[#202421] outline-none placeholder:text-[#657069] sm:text-base"
-                aria-invalid={Boolean(cookInputError)}
-                aria-describedby={cookInputError ? 'landing-cook-error' : undefined}
-              />
-              <button
-                type="submit"
-                className="focus-ring inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-[11px] bg-[#173F35] px-3.5 text-[13px] font-semibold text-[#F7F6F2] transition-colors hover:bg-[#225946] sm:px-5 sm:text-[15px]"
-              >
-                <span>Find recipes</span>
-                <ArrowRight size={16} aria-hidden="true" />
-              </button>
+            <div
+              className="absolute inset-0 grid grid-cols-2 items-center justify-items-center"
+              aria-hidden="true"
+            >
+              <span className="opacity-40">
+                <DietaryThumbIcon kind="veg" />
+              </span>
+              <span className="opacity-40">
+                <DietaryThumbIcon kind="nonveg" />
+              </span>
             </div>
-            {cookInputError ? (
-              <p id="landing-cook-error" className="mt-2 text-sm font-semibold text-[#A23524]" role="alert">
-                {cookInputError}
-              </p>
-            ) : null}
-          </form>
-
-          {/* Same destinations, now a quieter editorial secondary-action row. */}
-          <nav aria-label="Explore EPANTRY" className="mt-4 grid w-full max-w-[640px] grid-cols-3 gap-2 sm:mt-5 sm:flex sm:flex-wrap sm:gap-2.5 2xl:max-w-[860px]">
-            <Link
-              to="/cook-today"
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-[#B8C5B5] bg-[#DCE0CF]/90 px-2.5 py-2 text-center text-[12px] font-semibold leading-tight text-[#173F35] transition-colors hover:border-[#173F35] hover:bg-[#DCE0CF] sm:px-4 sm:text-sm"
+            <motion.div
+              aria-hidden="true"
+              initial={false}
+              animate={{
+                x: selectedDiet === "veg" ? 0 : 56,
+                rotate: selectedDiet === "veg" ? 0 : 360,
+                backgroundColor: selectedDiet === "veg" ? "#E0F1E5" : "#FAE5DE",
+              }}
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0 }
+                  : { duration: 0.53, ease: [0.2, 0.8, 0.2, 1] }
+              }
+              className="pointer-events-none absolute left-[12px] top-[4px] flex h-[30px] w-[30px] items-center justify-center rounded-full shadow-[0_2px_7px_rgba(23,63,53,.12)] ring-1 ring-white"
             >
-              <ChefHat size={16} className="hidden shrink-0 sm:block" aria-hidden="true" />
-              Cook today
-            </Link>
-            <Link
-              to={landingHero.secondaryAction.path}
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-[#D1D7CC] bg-[#F7F6F2]/82 px-2.5 py-2 text-center text-[12px] font-semibold leading-tight text-[#202421] transition-colors hover:border-[#173F35]/55 hover:bg-[#F7F6F2] sm:px-4 sm:text-sm"
+              <DietaryThumbIcon kind={selectedDiet} />
+            </motion.div>
+            <button
+              type="button"
+              onClick={() => setSelectedDiet("veg")}
+              aria-label="Show vegetarian recipes"
+              aria-pressed={selectedDiet === "veg"}
+              title="Veg"
+              className="focus-ring absolute inset-y-0 left-0 z-10 w-1/2 rounded-l-full outline-offset-2"
             >
-              <CookingPot size={16} className="hidden shrink-0 sm:block" aria-hidden="true" />
-              {landingHero.secondaryAction.label}
-            </Link>
-            <Link
-              to={landingHero.primaryAction.path}
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-[#D1D7CC] bg-[#F7F6F2]/82 px-2.5 py-2 text-center text-[12px] font-semibold leading-tight text-[#202421] transition-colors hover:border-[#173F35]/55 hover:bg-[#F7F6F2] sm:px-4 sm:text-sm"
+              <span className="sr-only">Veg</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDiet("nonveg")}
+              aria-label="Show non-vegetarian recipes"
+              aria-pressed={selectedDiet === "nonveg"}
+              title="Non-Veg"
+              className="focus-ring absolute inset-y-0 right-0 z-10 w-1/2 rounded-r-full outline-offset-2"
             >
-              <ShoppingBasket size={16} className="hidden shrink-0 sm:block" aria-hidden="true" />
-              {landingHero.primaryAction.label}
-            </Link>
-          </nav>
+              <span className="sr-only">Non-Veg</span>
+            </button>
+          </div>
         </div>
 
-        {/* Photo-first, account-aware editorial shelf. Limit desktop width to
-            leave the right-hand hero dish visible; on mobile recipes swipe. */}
-        <section
-          aria-label="Your recipe discoveries"
-          className="epantry-hero-recipe-ribbon self-start overflow-hidden rounded-[18px] border border-[#E1E6DD]/90"
-        >
-          <div className="flex min-w-0 flex-col md:flex-row">
-            <div className="relative flex min-h-[53px] shrink-0 items-center justify-between gap-3 border-b border-[#D5DDD2] px-4 py-2.5 md:min-h-[116px] md:w-[176px] md:flex-col md:items-start md:justify-center md:gap-2 md:border-b-0 md:border-r md:py-3.5">
-              <span aria-hidden="true" className="absolute bottom-3 left-0 top-3 w-[3px] rounded-r-full bg-[#C86C42] md:bottom-5 md:top-5" />
-              <div className="min-w-0">
-                <p className="epantry-hero-recipe-eyebrow font-bold uppercase text-[#A55332]">
-                  From the kitchen
-                </p>
-                <h2 className="epantry-hero-recipe-heading mt-1 text-[#173F35]">
-                  Picked for you
-                </h2>
+        <div className="epantry-hero-layout grid min-w-0 items-center gap-5 md:items-stretch md:grid-cols-[minmax(0,.83fr)_minmax(0,1.17fr)] md:gap-7 lg:gap-[clamp(30px,4.8vw,82px)]">
+          <motion.div
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 9 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="epantry-hero-copy min-w-0"
+          >
+            <p className="text-[12px] font-bold uppercase tracking-[.09em] text-[#173F35] sm:text-[13px]">
+              Recipes for every moment
+            </p>
+            <h1 className="epantry-hero-title mb-0 mt-4 max-w-[570px] text-[#173F35] lg:mt-5">
+              Discover what
+              <br className="hidden sm:block" /> to make next.
+            </h1>
+
+            <form
+              onSubmit={handleCookTodaySubmit}
+              className="mt-6 max-w-[500px] sm:mt-8"
+            >
+              <label className="sr-only" htmlFor="landing-cook-today-input">
+                What would you like to make?
+              </label>
+              <div className="flex min-h-[54px] items-center gap-2 rounded-[12px] border border-[#CFDAD0] bg-white/95 px-2.5 py-1.5 shadow-[0_8px_22px_rgba(23,63,53,.07)]">
+                <Search
+                  size={18}
+                  aria-hidden="true"
+                  className="ml-1 shrink-0 text-[#173F35]"
+                />
+                <input
+                  id="landing-cook-today-input"
+                  type="search"
+                  autoComplete="off"
+                  value={cookInput}
+                  onChange={(event) => {
+                    setCookInput(event.target.value);
+                    if (cookInputError) setCookInputError("");
+                  }}
+                  placeholder="Search recipes or ingredients"
+                  aria-invalid={Boolean(cookInputError)}
+                  aria-describedby={
+                    cookInputError ? "landing-cook-error" : undefined
+                  }
+                  className="min-w-0 flex-1 border-0 bg-transparent px-1 text-[14px] text-[#202421] outline-none placeholder:text-[#69756E] sm:text-[15px]"
+                />
+                <button
+                  type="submit"
+                  className="focus-ring inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-[8px] bg-[#173F35] px-3.5 text-[14px] font-bold text-white transition-colors hover:bg-[#225846]"
+                >
+                  Search <ArrowRight size={16} aria-hidden="true" />
+                </button>
               </div>
+              {cookInputError && (
+                <p
+                  id="landing-cook-error"
+                  role="alert"
+                  className="mt-2 text-[14px] font-semibold text-[#A23524]"
+                >
+                  {cookInputError}
+                </p>
+              )}
+            </form>
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[14px] font-semibold text-[#173F35]">
               <Link
-                to="/recipes"
-                className="focus-ring inline-flex min-h-9 shrink-0 items-center gap-1.5 text-[12px] font-semibold text-[#173F35] underline-offset-4 transition-colors hover:text-[#A55332] hover:underline"
+                to="/cook-today"
+                className="focus-ring underline-offset-4 hover:underline"
               >
-                All recipes <ArrowRight size={15} aria-hidden="true" />
+                Use what I have
               </Link>
             </div>
+          </motion.div>
 
-            {personalizedRecipes.length ? (
+          <div
+            className="epantry-hero-feature-column min-w-0"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+            onFocusCapture={() => setPaused(true)}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget))
+                setPaused(false);
+            }}
+          >
+            {mainRecipe ? (
               <div
-                className="epantry-hero-recipe-rail flex min-w-0 flex-1 snap-x snap-mandatory overflow-x-auto"
-                role="list"
-                aria-label="Ordered, recently viewed and recommended food"
+                className={`epantry-hero-visual relative isolate h-[295px] overflow-hidden rounded-[15px] border bg-[#E5EADD] shadow-[0_18px_44px_rgba(23,63,53,.16)] sm:h-[345px] ${
+                  selectedDiet === "veg"
+                    ? "border-[#BBD1C0]"
+                    : "border-[#E5BDAB]"
+                }`}
               >
-                {personalizedRecipes.map((recipe) => (
-                  <Link
-                    key={recipe.id}
-                    to={recipe.path}
-                    role="listitem"
-                    aria-label={`${recipe.label}: ${recipe.name} (${recipe.cuisine})`}
-                    className="focus-ring group flex min-h-[108px] w-[218px] shrink-0 snap-start items-center gap-2.5 border-r border-[#D5DDD2]/75 px-2.5 py-3 transition-colors hover:bg-[#E2EADD]/70 last:border-r-0 sm:w-[218px] md:min-h-[116px] md:w-[204px]"
+                <AnimatePresence initial={false}>
+                  <motion.div
+                    key={`${selectedDiet}:${mainRecipe.id}`}
+                    initial={
+                      shouldReduceMotion ? false : { opacity: 0, scale: 1.025 }
+                    }
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={
+                      shouldReduceMotion ? undefined : { opacity: 0, scale: 1 }
+                    }
+                    transition={{
+                      duration: shouldReduceMotion ? 0 : 0.75,
+                      ease: "easeInOut",
+                    }}
+                    className="absolute inset-0"
                   >
-                    {recipe.image ? (
-                      <img
-                        src={recipe.image}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="h-[72px] w-[68px] shrink-0 rounded-[10px] object-cover shadow-[0_4px_12px_rgba(31,48,36,.13)] transition-transform duration-300 group-hover:scale-[1.035] motion-reduce:transform-none"
-                      />
-                    ) : (
-                      <span aria-hidden="true" className="flex h-[72px] w-[68px] shrink-0 items-center justify-center rounded-[10px] bg-[#D7DDCF] text-[#173F35]">
-                        <CookingPot size={22} />
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className={`epantry-hero-recipe-status block font-semibold ${recipe.label === 'Ordered' ? 'text-[#173F35]' : 'text-[#A55332]'}`}>
-                        {recipe.label}
-                      </span>
-                      <span className="epantry-hero-recipe-name mt-1 block text-[#202421]">
-                        {recipe.name}
-                      </span>
-                      <span className="epantry-hero-recipe-cuisine mt-1 block font-medium text-[#52675C]">
-                        {recipe.cuisine}
-                      </span>
-                    </span>
-                  </Link>
-                ))}
+                    <RecipePhoto
+                      recipe={mainRecipe}
+                      loading="eager"
+                      className="absolute inset-0 h-full w-full"
+                    />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                    <div className="absolute bottom-3 right-3 w-[min(80%,280px)] rounded-[13px] border border-white/75 bg-[#F7F6F2]/95 p-3 shadow-[0_12px_30px_rgba(22,40,32,.21)] backdrop-blur-md sm:bottom-4 sm:right-4 sm:p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[.055em] text-[#A84F28]">
+                        {personalize && recentViews.length
+                          ? "Picked for you"
+                          : "Featured recipe"}
+                      </p>
+                      <h2 className="epantry-hero-recipe-title mb-1.5 mt-1.5 line-clamp-2 text-[#202421]">
+                        {mainRecipe.name}
+                      </h2>
+                      {mainRecipe.servings && (
+                        <div className="mb-2.5 text-[12px] text-[#61716A]">
+                          {mainRecipe.servings} servings
+                        </div>
+                      )}
+                      <Link
+                        to={mainRecipe.path}
+                        className="focus-ring inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[9px] bg-[#173F35] px-3 py-2 text-center text-[13px] font-bold text-white transition-colors hover:bg-[#225846]"
+                      >
+                        Let&apos;s make this{" "}
+                        <ArrowRight size={15} aria-hidden="true" />
+                      </Link>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
               </div>
             ) : (
-              <div className="flex min-h-[108px] min-w-0 flex-1 items-center px-4 py-3 text-sm text-[#334D41]">
-                {recipesLoading ? 'Finding recipes for you…' : (
-                  <Link to="/recipes" className="focus-ring inline-flex min-h-11 items-center gap-2 font-semibold text-[#173F35] hover:underline">
-                    Discover published recipes <ArrowRight size={15} aria-hidden="true" />
+              <div className="epantry-hero-visual flex h-[295px] flex-col items-center justify-center rounded-[15px] border border-[#D7DED5] bg-[#EDF0E9] px-6 py-5 text-center sm:h-[345px]">
+                <CookingPot
+                  size={34}
+                  aria-hidden="true"
+                  className="text-[#527161]"
+                />
+                <h2 className="mt-3 text-[18px] font-bold text-[#173F35]">
+                  {catalogLoading
+                    ? "Finding published recipes..."
+                    : `No ${
+                        selectedDiet === "veg" ? "Veg" : "Non-Veg"
+                      } recipes available yet`}
+                </h2>
+                <p className="mt-2 max-w-sm text-[13px] leading-5 text-[#536559]">
+                  {catalogLoading
+                    ? "Checking available recipes and their dietary information."
+                    : "Only approved, publicly shared recipes with a declared dietary type can appear here."}
+                </p>
+                {!catalogLoading && (
+                  <Link
+                    to="/recipes"
+                    className="focus-ring mt-4 inline-flex min-h-10 items-center gap-2 rounded-[9px] bg-[#173F35] px-5 text-[13px] font-bold text-white hover:bg-[#225846]"
+                  >
+                    Browse recipes <ArrowRight size={15} aria-hidden="true" />
                   </Link>
                 )}
               </div>
             )}
+            <div
+              className="epantry-hero-related mt-3 grid grid-cols-2 gap-3 sm:gap-4"
+              aria-label="More recipe discoveries"
+            >
+              <SmallRecipeSlot
+                item={drinkRecipe}
+                slot="drink"
+                isLoading={catalogLoading}
+                reduceMotion={shouldReduceMotion}
+              />
+              <SmallRecipeSlot
+                key={`new:${selectedDiet}`}
+                item={newRecipe}
+                slot="new"
+                isLoading={catalogLoading}
+                reduceMotion={shouldReduceMotion}
+              />
+            </div>
           </div>
-        </section>
+        </div>
       </div>
-    </section>
-  )
+    </motion.section>
+  );
 }
