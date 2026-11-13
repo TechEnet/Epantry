@@ -1022,6 +1022,36 @@ import {
     return value ? value.slice(-8).toUpperCase() : '—';
   }
 
+  function MarketplaceOrderThumbnail({ imageUrl, name, small = false }) {
+    const [failedUrl, setFailedUrl] = useState('');
+    const showImage = Boolean(imageUrl && failedUrl !== imageUrl);
+    return (
+      <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#ECEFE8] text-[#547063] ${small ? 'h-12 w-12' : 'h-[60px] w-[60px] sm:h-[68px] sm:w-[68px]'}`}>
+        {showImage ? (
+          <img
+            src={imageUrl}
+            alt={name ? `${name} product` : 'Order item'}
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailedUrl(imageUrl)}
+            className="h-full w-full object-contain"
+          />
+        ) : <ShoppingBag size={small ? 19 : 24} aria-label="Product image unavailable" />}
+      </span>
+    );
+  }
+
+  function marketplaceOrderStatusClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value.includes('pending') || value.includes('failed') || value.includes('return')) {
+      return 'bg-[#F5E7DB] text-[#8B503A]';
+    }
+    if (value.includes('delivered') || value.includes('confirmed') || value.includes('completed')) {
+      return 'bg-[#E7EEE4] text-[#254F3D]';
+    }
+    return 'bg-[#EBEEE8] text-[#31574B]';
+  }
+
 
   function integrationHealthLabel(item) {
     if (item?.status === 'disabled') {
@@ -1208,6 +1238,9 @@ import {
     const [ordersWorkspace, setOrdersWorkspace] =
         useState({
             orders: [],
+            recentOrders: [],
+            recentOrdersTotal: 0,
+            recentOrdersAvailable: false,
             summary: {
                 total: 0,
                 deliveryFailed: 0,
@@ -1220,8 +1253,18 @@ import {
     const [selectedOrderId, setSelectedOrderId] =
         useState('');
 
+    const [showAllRecentOrders, setShowAllRecentOrders] = useState(false);
+
     const [showAllOrderCases, setShowAllOrderCases] =
         useState(false);
+
+    // Keep marketplace dispute cases separate from the shared cross-domain Admin queues.
+    const [orderReviewCases, setOrderReviewCases] = useState([]);
+    const [orderCasesError, setOrderCasesError] = useState('');
+    const [orderCasesPage, setOrderCasesPage] = useState(1);
+    const [orderCasesTotal, setOrderCasesTotal] = useState(0);
+    const [orderCasesMoreBusy, setOrderCasesMoreBusy] = useState(false);
+    const [ordersFocus, setOrdersFocus] = useState('order');
 
 
     const [integrationLoading, setIntegrationLoading] =
@@ -1233,6 +1276,8 @@ import {
     const [integrationWorkspace, setIntegrationWorkspace] =
         useState({
             webhooks: [],
+            serviceAccounts: [],
+            hosts: [],
             summary: {
                 total: 0,
                 active: 0,
@@ -1241,6 +1286,8 @@ import {
                 neverUsed: 0,
                 disabled: 0,
                 organizations: 0,
+                serviceAccounts: 0,
+                connections: 0,
             },
             pagination: {},
         });
@@ -1250,6 +1297,20 @@ import {
 
     const [showAllIntegrationCases, setShowAllIntegrationCases] =
         useState(false);
+
+    // Integration reviews are paged independently: the generic Marketplace
+    // dashboard queue contains many unrelated cases and only its first page.
+    const [integrationReviewRows, setIntegrationReviewRows] = useState([]);
+    const [integrationReviewPage, setIntegrationReviewPage] = useState(1);
+    const [integrationReviewTotal, setIntegrationReviewTotal] = useState(0);
+    const [integrationReviewsError, setIntegrationReviewsError] = useState('');
+    const [integrationReviewsLoading, setIntegrationReviewsLoading] = useState(false);
+    const [integrationReviewsMoreBusy, setIntegrationReviewsMoreBusy] = useState(false);
+    const [integrationSearch, setIntegrationSearch] = useState('');
+    const [integrationHealthFilter, setIntegrationHealthFilter] = useState('all');
+    const [selectedIntegrationHostId, setSelectedIntegrationHostId] = useState('');
+    const [showAllIntegrationHosts, setShowAllIntegrationHosts] = useState(false);
+    const [integrationDetailTab, setIntegrationDetailTab] = useState('overview');
 
     const [financeLoading, setFinanceLoading] =
         useState(false);
@@ -1759,145 +1820,179 @@ import {
     const loadOrdersWorkspace =
         useCallback(
             async () => {
-                if (section !== 'orders') {
-                    return;
-                }
+                if (section !== 'orders') return;
 
                 setOrdersLoading(true);
                 setOrdersError('');
+                setOrderCasesError('');
 
-                try {
-                    const result =
-                        await listAdminMarketplaceOrderExceptions();
+                // The exception and dispute endpoints are independent: a failure in one
+                // must not silently turn the other queue into an empty success state.
+                const [ordersResult, casesResult] = await Promise.allSettled([
+                    listAdminMarketplaceOrderExceptions(),
+                    listAdminReviewCases({ page: 1, limit: 100, domain: 'marketplace' }),
+                ]);
 
-                    const orders =
-                        Array.isArray(result?.orders)
-                            ? result.orders
-                            : [];
-
+                if (ordersResult.status === 'fulfilled') {
+                    const result = ordersResult.value;
+                    const orders = Array.isArray(result?.orders) ? result.orders : [];
                     setOrdersWorkspace({
                         orders,
+                        recentOrders: Array.isArray(result?.recentOrders) ? result.recentOrders : [],
+                        recentOrdersTotal: Number(result?.recentOrdersTotal ?? 0),
+                        recentOrdersAvailable: Array.isArray(result?.recentOrders) && Number.isFinite(Number(result?.recentOrdersTotal)),
                         summary: {
-                            total: Number(result?.summary?.total || orders.length || 0),
+                            total: Number(result?.summary?.total ?? orders.length),
                             deliveryFailed: Number(result?.summary?.deliveryFailed || 0),
                             returnsRequested: Number(result?.summary?.returnsRequested || 0),
                             itemsUnavailable: Number(result?.summary?.itemsUnavailable || 0),
                             substitutionsRequested: Number(result?.summary?.substitutionsRequested || 0),
                         },
                     });
-
-                    setSelectedOrderId((current) =>
-                        orders.some((item) => item.id === current)
-                            ? current
-                            : orders[0]?.id || '',
+                    setSelectedOrderId(current =>
+                        orders.some(item => item.id === current) ? current : orders[0]?.id || '',
                     );
-                } catch (requestError) {
-                    setOrdersWorkspace({
-                        orders: [],
-                        summary: {
-                            total: 0,
-                            deliveryFailed: 0,
-                            returnsRequested: 0,
-                            itemsUnavailable: 0,
-                            substitutionsRequested: 0,
-                        },
-                    });
-                    setSelectedOrderId('');
-                    setOrdersError(
-                        getAdminGovernanceErrorMessage(
-                            requestError,
-                            'Unable to load current order issues.',
-                        ),
-                    );
-                } finally {
-                    setOrdersLoading(false);
+                } else {
+                    setOrdersError(getAdminGovernanceErrorMessage(
+                        ordersResult.reason, 'Unable to load current order issues.',
+                    ));
                 }
+
+                if (casesResult.status === 'fulfilled') {
+                    const result = casesResult.value;
+                    setOrderReviewCases(Array.isArray(result?.reviewCases) ? result.reviewCases : []);
+                    setOrderCasesPage(1);
+                    setOrderCasesTotal(Number(result?.pagination?.total || 0));
+                } else {
+                    setOrderCasesError(getAdminGovernanceErrorMessage(
+                        casesResult.reason, 'Unable to load dispute cases.',
+                    ));
+                }
+                setOrdersLoading(false);
             },
             [section],
         );
 
-    useEffect(
-        () => {
-            loadOrdersWorkspace();
-        },
-        [loadOrdersWorkspace],
-    );
+    useEffect(() => {
+        loadOrdersWorkspace();
+    }, [loadOrdersWorkspace]);
+
+    const loadMoreOrderCases = useCallback(async () => {
+        if (section !== 'orders' || orderCasesMoreBusy || orderReviewCases.length >= orderCasesTotal) return;
+        setOrderCasesMoreBusy(true);
+        setOrderCasesError('');
+        try {
+            const nextPage = orderCasesPage + 1;
+            const result = await listAdminReviewCases({ page: nextPage, limit: 100, domain: 'marketplace' });
+            const additional = Array.isArray(result?.reviewCases) ? result.reviewCases : [];
+            setOrderReviewCases(previous => {
+                const seen = new Set(previous.map(item => item.id));
+                return [...previous, ...additional.filter(item => !seen.has(item.id))];
+            });
+            setOrderCasesPage(nextPage);
+            setOrderCasesTotal(Number(result?.pagination?.total || 0));
+        } catch (requestError) {
+            setOrderCasesError(getAdminGovernanceErrorMessage(requestError, 'Could not load more dispute cases.'));
+        } finally {
+            setOrderCasesMoreBusy(false);
+        }
+    }, [section, orderCasesMoreBusy, orderCasesPage, orderCasesTotal, orderReviewCases.length]);
 
 
-    const loadIntegrationWorkspace =
-        useCallback(
-            async () => {
-                if (section !== 'integrations') {
-                    return;
-                }
+    const loadIntegrationWorkspace = useCallback(async () => {
+        if (section !== 'integrations') return;
+        setIntegrationLoading(true);
+        setIntegrationReviewsLoading(true);
+        setIntegrationError('');
+        setIntegrationReviewsError('');
 
-                setIntegrationLoading(true);
-                setIntegrationError('');
+        // The overview and review queue must not mask each other's failures.
+        const [overviewResult, reviewsResult] = await Promise.allSettled([
+            getAdminIntegrationOverview({ limit: 500 }),
+            listAdminReviewCases({ page: 1, limit: 100, domain: 'marketplace' }),
+        ]);
 
-                try {
-                    const result =
-                        await getAdminIntegrationOverview({
-                            limit: 250,
-                        });
+        if (overviewResult.status === 'fulfilled') {
+            const result = overviewResult.value || {};
+            const webhooks = Array.isArray(result.webhooks) ? result.webhooks : [];
+            const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+            const hosts = Array.isArray(result.hosts) ? result.hosts : [];
+            const serviceAccounts = Array.isArray(result.serviceAccounts) ? result.serviceAccounts : [];
+            setIntegrationWorkspace({
+                webhooks,
+                hosts,
+                serviceAccounts,
+                summary: {
+                    total: number(result.summary?.total, webhooks.length),
+                    active: number(result.summary?.active),
+                    failed: number(result.summary?.failed),
+                    healthy: number(result.summary?.healthy),
+                    neverUsed: number(result.summary?.neverUsed),
+                    disabled: number(result.summary?.disabled),
+                    organizations: number(result.summary?.organizations, hosts.length),
+                    serviceAccounts: number(result.summary?.serviceAccounts, serviceAccounts.length),
+                    connections: number(result.summary?.connections, webhooks.length + serviceAccounts.length),
+                },
+                pagination: result.pagination || {},
+            });
+            setSelectedIntegrationHostId(current => hosts.some(row => row.id === current)
+                ? current : (hosts[0]?.id || ''));
+            setSelectedIntegrationId(current => webhooks.some(row => row.id === current)
+                ? current : (webhooks[0]?.id || ''));
+        } else {
+            setIntegrationWorkspace(previous => ({ ...previous, webhooks: [], hosts: [], serviceAccounts: [], summary: {
+                total: 0, active: 0, failed: 0, healthy: 0, neverUsed: 0, disabled: 0,
+                organizations: 0, serviceAccounts: 0, connections: 0,
+            }, pagination: {} }));
+            setSelectedIntegrationHostId('');
+            setSelectedIntegrationId('');
+            setIntegrationError(getAdminGovernanceErrorMessage(
+                overviewResult.reason, 'Could not load Host connections.',
+            ));
+        }
+        if (reviewsResult.status === 'fulfilled') {
+            const result = reviewsResult.value || {};
+            setIntegrationReviewRows(Array.isArray(result.reviewCases) ? result.reviewCases : []);
+            setIntegrationReviewPage(1);
+            setIntegrationReviewTotal(Number(result.pagination?.total ?? 0));
+        } else {
+            setIntegrationReviewRows([]);
+            setIntegrationReviewPage(1);
+            setIntegrationReviewTotal(0);
+            setIntegrationReviewsError(getAdminGovernanceErrorMessage(
+                reviewsResult.reason, 'Could not load integration reviews.',
+            ));
+        }
+        setIntegrationReviewsLoading(false);
+        setIntegrationLoading(false);
+    }, [section]);
 
-                    const webhooks =
-                        Array.isArray(result?.webhooks)
-                            ? result.webhooks
-                            : [];
+    useEffect(() => { loadIntegrationWorkspace(); }, [loadIntegrationWorkspace]);
 
-                    setIntegrationWorkspace({
-                        webhooks,
-                        summary: {
-                            total: Number(result?.summary?.total || webhooks.length || 0),
-                            active: Number(result?.summary?.active || 0),
-                            failed: Number(result?.summary?.failed || 0),
-                            healthy: Number(result?.summary?.healthy || 0),
-                            neverUsed: Number(result?.summary?.neverUsed || 0),
-                            disabled: Number(result?.summary?.disabled || 0),
-                            organizations: Number(result?.summary?.organizations || 0),
-                        },
-                        pagination: result?.pagination || {},
-                    });
-
-                    setSelectedIntegrationId((current) =>
-                        webhooks.some((item) => item.id === current)
-                            ? current
-                            : webhooks[0]?.id || '',
-                    );
-                } catch (requestError) {
-                    setIntegrationWorkspace({
-                        webhooks: [],
-                        summary: {
-                            total: 0,
-                            active: 0,
-                            failed: 0,
-                            healthy: 0,
-                            neverUsed: 0,
-                            disabled: 0,
-                            organizations: 0,
-                        },
-                        pagination: {},
-                    });
-                    setSelectedIntegrationId('');
-                    setIntegrationError(
-                        getAdminGovernanceErrorMessage(
-                            requestError,
-                            'Unable to load integration health.',
-                        ),
-                    );
-                } finally {
-                    setIntegrationLoading(false);
-                }
-            },
-            [section],
-        );
-
-    useEffect(
-        () => {
-            loadIntegrationWorkspace();
-        },
-        [loadIntegrationWorkspace],
-    );
+    const loadMoreIntegrationReviews = useCallback(async () => {
+        if (section !== 'integrations' || integrationReviewsMoreBusy ||
+            integrationReviewRows.length >= integrationReviewTotal) return;
+        setIntegrationReviewsMoreBusy(true);
+        setIntegrationReviewsError('');
+        try {
+            const page = integrationReviewPage + 1;
+            const result = await listAdminReviewCases({ page, limit: 100, domain: 'marketplace' });
+            const added = Array.isArray(result?.reviewCases) ? result.reviewCases : [];
+            setIntegrationReviewRows(previous => {
+                const seen = new Set(previous.map(item => item.id));
+                return [...previous, ...added.filter(item => !seen.has(item.id))];
+            });
+            setIntegrationReviewPage(page);
+            setIntegrationReviewTotal(Number(result?.pagination?.total ?? 0));
+        } catch (requestError) {
+            setIntegrationReviewsError(getAdminGovernanceErrorMessage(
+                requestError, 'Could not load more reviews.',
+            ));
+        } finally {
+            setIntegrationReviewsMoreBusy(false);
+        }
+    }, [section, integrationReviewsMoreBusy, integrationReviewRows.length,
+        integrationReviewTotal, integrationReviewPage]);
 
     const loadFinanceWorkspace =
         useCallback(
@@ -2319,27 +2414,25 @@ import {
 
     const orderDisputeCases =
         useMemo(
-            () =>
-                (reviewCases || []).filter(
-                    (item) => item?.caseType === 'marketplace_dispute',
-                ),
-            [reviewCases],
+            () => (orderReviewCases || []).filter(item => item?.caseType === 'marketplace_dispute'),
+            [orderReviewCases],
         );
 
-    const visibleOrderDisputeCases =
-        showAllOrderCases
-            ? orderDisputeCases
-            : orderDisputeCases.slice(0, 10);
+    const activeOrderDisputeCases = orderDisputeCases.filter(
+        item => !['resolved', 'dismissed'].includes(item?.status),
+    );
+    const closedOrderDisputeCases = orderDisputeCases.filter(
+        item => ['resolved', 'dismissed'].includes(item?.status),
+    );
+    const visibleOrderDisputeCases = showAllOrderCases
+        ? activeOrderDisputeCases
+        : activeOrderDisputeCases.slice(0, 6);
 
-    const selectedOrderCase =
-        selectedOrder
-            ? orderDisputeCases.find(
-                (item) =>
-                    item?.entity?.type === 'seller_order' &&
-                    item?.entity?.id === selectedOrder.id &&
-                    !['resolved', 'dismissed'].includes(item?.status),
-            ) || null
-            : null;
+    const selectedOrderCase = selectedOrder
+        ? activeOrderDisputeCases.find(
+            item => item?.entity?.type === 'seller_order' && item?.entity?.id === selectedOrder.id,
+        ) || null
+        : null;
 
 
     const selectedFinanceSettlement =
@@ -2363,12 +2456,12 @@ import {
     const integrationReviewCases =
         useMemo(
             () =>
-                (reviewCases || []).filter(
+                (integrationReviewRows || []).filter(
                     (item) =>
                         item?.caseType === 'integration_failure' ||
                         item?.entity?.type === 'organization_webhook',
                 ),
-            [reviewCases],
+            [integrationReviewRows],
         );
 
     const visibleIntegrationCases =
@@ -3678,7 +3771,17 @@ import {
 
     if (section === 'orders') {
         const summary = ordersWorkspace.summary || {};
+        const openOrders = ordersWorkspace.orders || [];
+        const recentOrders = ordersWorkspace.recentOrders || [];
+        const visibleRecentOrders = showAllRecentOrders ? recentOrders : recentOrders.slice(0, 8);
         const refreshing = loading || ordersLoading;
+        const activeCaseCount = activeOrderDisputeCases.length;
+        const orderMetricUnavailable = Boolean(ordersError && !openOrders.length);
+        const caseMetricUnavailable = Boolean(orderCasesError && !orderReviewCases.length);
+        const chosenOrder = ordersFocus === 'order' ? selectedOrder : null;
+        const chosenCase = ordersFocus === 'case' && selectedReviewCase?.caseType === 'marketplace_dispute' ? selectedReviewCase : null;
+        const chosenCaseClosed = ['resolved', 'dismissed'].includes(chosenCase?.status);
+        const visibleOrderList = openOrders;
 
         const refreshOrdersPage = () => {
             load();
@@ -3686,387 +3789,552 @@ import {
         };
 
         const createDisputeForSelectedOrder = async () => {
-            if (!selectedOrder || reason.trim().length < 5) {
-                return;
-            }
-
-            const itemLabel =
-                selectedOrder.itemNames?.[0] ||
-                selectedOrder.sellerName ||
-                'Order';
-
+            if (!selectedOrder || reason.trim().length < 5) return;
+            const itemLabel = selectedOrder.itemNames?.[0] || selectedOrder.sellerName || 'Order';
             const result = await run(
-                () =>
-                    createAdminReviewCase({
-                        domain: 'marketplace',
-                        caseType: 'marketplace_dispute',
-                        entity: {
-                            type: 'seller_order',
-                            id: selectedOrder.id,
-                            label: itemLabel,
-                        },
-                        severity: 'medium',
-                        priority: 'p2',
-                        summary: `${orderIssueLabel(selectedOrder.status)} — ${itemLabel}`,
-                        details: reason.trim(),
-                        evidence: [],
-                    }),
+                () => createAdminReviewCase({
+                    domain: 'marketplace',
+                    caseType: 'marketplace_dispute',
+                    entity: { type: 'seller_order', id: selectedOrder.id, label: itemLabel },
+                    severity: 'medium',
+                    priority: 'p2',
+                    summary: `${orderIssueLabel(selectedOrder.status)} — ${itemLabel}`,
+                    details: reason.trim(),
+                    evidence: [],
+                }),
                 'Dispute review started.',
             );
-
             if (result?.reviewCase) {
                 setSelectedReviewCase(result.reviewCase);
+                setOrdersFocus('case');
+                setReason('');
+                await loadOrdersWorkspace();
             }
         };
 
         const decideSelectedOrderCase = async (decision) => {
-            if (!selectedReviewCase || reason.trim().length < 5) {
-                return;
-            }
-
+            if (!selectedReviewCase || reason.trim().length < 5 ||
+                ['resolved', 'dismissed'].includes(selectedReviewCase.status)) return;
             const result = await run(
-                () =>
-                    decideAdminReviewCase(
-                        selectedReviewCase.id,
-                        {
-                            decision,
-                            reason: reason.trim(),
-                            evidence: evidence(),
-                        },
-                    ),
-                decision === 'resolve'
-                    ? 'Dispute resolved.'
-                    : decision === 'dismiss'
-                        ? 'Dispute closed without action.'
-                        : 'Dispute marked for follow-up.',
+                () => decideAdminReviewCase(selectedReviewCase.id, {
+                    decision,
+                    reason: reason.trim(),
+                    evidence: evidence(),
+                }),
+                decision === 'resolve' ? 'Dispute resolved.' :
+                    decision === 'dismiss' ? 'Dispute closed without action.' : 'Dispute marked for follow-up.',
             );
-
             if (result) {
                 setSelectedReviewCase(null);
                 setReason('');
+                await loadOrdersWorkspace();
             }
         };
 
         return (
             <AdminShell
                 title="Orders & Disputes"
-                description="Review order problems and coordinate disputes without changing the recorded order history."
+                description="Review order issues and manage dispute decisions."
                 actions={
-                    <button
-                        type="button"
-                        onClick={refreshOrdersPage}
-                        disabled={refreshing}
-                        className="focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50"
-                    >
-                        <RefreshCw
-                            size={14}
-                            className={refreshing ? 'animate-spin' : ''}
-                            aria-hidden="true"
-                        />
-                        Refresh
+                    <button type="button" onClick={refreshOrdersPage} disabled={refreshing}
+                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#D6DDD3] bg-white px-4 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+                        <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" /> Refresh
                     </button>
                 }
             >
-                <div className="min-h-[100svh] bg-[#f6f4ee]">
-                    <section className="border-b border-[#0d332b] bg-[#123e32] text-white">
-                        <div className="grid lg:grid-cols-[minmax(0,1fr)_460px]">
-                            <div className="px-4 py-5 sm:px-7 sm:py-7">
-                                <p className="text-xs font-bold text-emerald-200">Order support workspace</p>
-                                <h2 className="mt-1.5 max-w-3xl text-2xl font-black leading-tight sm:text-3xl">
-                                    Fix order problems with a clear review trail.
-                                </h2>
-                                <p className="mt-2 line-clamp-2 max-w-2xl text-xs font-semibold leading-5 text-emerald-50/80 sm:hidden">
-                                    Check the order, open a dispute when needed, then record the decision.
-                                </p>
-                                <p className="mt-2 hidden max-w-2xl text-sm font-semibold leading-6 text-emerald-50/80 sm:block">
-                                    Use this page for failed deliveries, returns, unavailable items and replacement requests that need Super Admin attention.
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 border-t border-white/15 lg:border-l lg:border-t-0">
-                                {[
-                                    ['Open issues', summary.total || 0],
-                                    ['Delivery failed', summary.deliveryFailed || 0],
-                                    ['Returns', summary.returnsRequested || 0],
-                                    ['Item changes', (summary.itemsUnavailable || 0) + (summary.substitutionsRequested || 0)],
-                                ].map(([label, value], index) => (
-                                    <div
-                                        key={label}
-                                        className={`px-4 py-3 sm:px-5 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15' : ''}`}
-                                    >
-                                        <p className="text-xl font-black sm:text-2xl">{value}</p>
-                                        <p className="mt-0.5 text-[10px] font-semibold text-emerald-100 sm:text-xs">{label}</p>
-                                    </div>
-                                ))}
+                {/* Order page only: mobile edge-to-edge layout, without modifying shared AdminShell. */}
+                <style>{`
+                  @media (max-width: 639px) {
+                    .page-shell:has(#admin-orders-disputes-mobile) {
+                      width: 100% !important;
+                      max-width: none !important;
+                      margin: 0 !important;
+                      padding: 0 !important;
+                    }
+                    .page-shell:has(#admin-orders-disputes-mobile) > div {
+                      border: 0 !important;
+                      border-radius: 0 !important;
+                      box-shadow: none !important;
+                    }
+                    .page-shell:has(#admin-orders-disputes-mobile) .epantry-workspace-canvas > div {
+                      padding: 0 !important;
+                    }
+                    .page-shell:has(#admin-orders-disputes-mobile) .epantry-workspace-canvas > header {
+                      padding: 12px 14px 14px !important;
+                    }
+                    .page-shell:has(#admin-orders-disputes-mobile) .epantry-workspace-canvas > header h1 {
+                      font-size: 26px !important;
+                      line-height: 1.12 !important;
+                      letter-spacing: -0.03em;
+                    }
+                    .page-shell:has(#admin-orders-disputes-mobile) .epantry-workspace-canvas > header p {
+                      font-size: 12px !important;
+                      line-height: 1.45 !important;
+                    }
+                    #admin-orders-disputes-mobile { width: 100%; overflow-x: clip; }
+                    #admin-orders-disputes-mobile .orders-hero-primary { padding: 18px 16px 20px; }
+                    #admin-orders-disputes-mobile .orders-hero-kicker,
+                    #admin-orders-disputes-mobile .orders-hero-support,
+                    #admin-orders-disputes-mobile .orders-hero-steps,
+                    #admin-orders-disputes-mobile .orders-hero-dispute-summary { display: none; }
+                    #admin-orders-disputes-mobile .orders-hero-title {
+                      font-size: 25px;
+                      line-height: 1.14;
+                      letter-spacing: -0.035em;
+                      margin-top: 0;
+                    }
+                    #admin-orders-disputes-mobile .orders-metrics > div {
+                      padding: 12px 14px;
+                      min-height: 72px;
+                    }
+                    #admin-orders-disputes-mobile .orders-metrics > div > p:first-child {
+                      font-size: 25px;
+                    }
+                    #admin-orders-disputes-mobile .orders-metrics > div > p:last-child {
+                      font-size: 12px;
+                      line-height: 1.25;
+                      margin-top: 5px;
+                    }
+                    #admin-orders-disputes-mobile .orders-workqueue {
+                      padding: 17px 0 14px;
+                    }
+                    #admin-orders-disputes-mobile .orders-workqueue-heading {
+                      padding: 0 15px;
+                      margin-bottom: 12px;
+                    }
+                    #admin-orders-disputes-mobile .orders-workqueue-kicker,
+                    #admin-orders-disputes-mobile .orders-queue-subtitle,
+                    #admin-orders-disputes-mobile .orders-empty-subtitle { display: none; }
+                    #admin-orders-disputes-mobile .orders-workqueue-title {
+                      font-size: 21px;
+                      margin-top: 0;
+                      line-height: 1.2;
+                    }
+                    #admin-orders-disputes-mobile .orders-workqueue-grid { gap: 9px; padding: 0 12px; }
+                    #admin-orders-disputes-mobile .orders-queue-section {
+                      border: 1px solid #DFE4DB;
+                      border-radius: 12px;
+                      overflow: hidden;
+                    }
+                    #admin-orders-disputes-mobile .orders-queue-head { padding: 11px 13px; }
+                    #admin-orders-disputes-mobile .orders-queue-head h3 { font-size: 16px; }
+                    #admin-orders-disputes-mobile .orders-empty-wrap { padding: 0; }
+                    #admin-orders-disputes-mobile .orders-empty { padding: 12px 13px; gap: 9px; }
+                    #admin-orders-disputes-mobile .orders-empty svg { width: 17px; height: 17px; }
+                    #admin-orders-disputes-mobile .orders-empty p { font-size: 13px; line-height: 1.4; }
+                    #admin-orders-disputes-mobile .orders-activity {
+                      margin: 15px 12px 0;
+                      border: 1px solid #E0E4DC;
+                      border-radius: 14px;
+                    }
+                    #admin-orders-disputes-mobile .orders-activity-heading {
+                      padding: 14px 14px;
+                      gap: 8px;
+                    }
+                    #admin-orders-disputes-mobile .orders-activity-kicker { display: none; }
+                    #admin-orders-disputes-mobile .orders-activity-heading h3 {
+                      font-size: 19px;
+                      margin-top: 0;
+                      line-height: 1.2;
+                    }
+                    #admin-orders-disputes-mobile .orders-activity-count {
+                      font-size: 12px;
+                      padding: 6px 9px;
+                      white-space: nowrap;
+                    }
+                    #admin-orders-disputes-mobile .orders-recent-row {
+                      display: grid !important;
+                      grid-template-columns: 52px minmax(0, 1fr) 28px;
+                      grid-template-rows: auto auto;
+                      gap: 5px 10px;
+                      align-items: center;
+                      padding: 12px 11px !important;
+                      min-width: 0;
+                    }
+                    #admin-orders-disputes-mobile .orders-recent-row > :first-child {
+                      grid-column: 1;
+                      grid-row: 1 / span 2;
+                      width: 52px !important;
+                      height: 52px !important;
+                      border-radius: 9px;
+                    }
+                    #admin-orders-disputes-mobile .orders-recent-identity {
+                      grid-column: 2;
+                      grid-row: 1;
+                      align-self: end;
+                    }
+                    #admin-orders-disputes-mobile .orders-recent-identity > span:first-child {
+                      display: -webkit-box;
+                      -webkit-line-clamp: 2;
+                      -webkit-box-orient: vertical;
+                      overflow: hidden;
+                      font-size: 14px;
+                      line-height: 1.25;
+                      overflow-wrap: anywhere;
+                    }
+                    #admin-orders-disputes-mobile .orders-recent-identity > span:nth-child(2) {
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      font-size: 11px;
+                      line-height: 1.4;
+                      margin-top: 3px;
+                    }
+                    #admin-orders-disputes-mobile .orders-recent-controls { display: contents !important; }
+                    #admin-orders-disputes-mobile .orders-recent-badge {
+                      grid-column: 2;
+                      grid-row: 2;
+                      justify-self: start;
+                      max-width: 100%;
+                      min-width: 0;
+                      font-size: 11px;
+                      padding: 4px 8px;
+                      line-height: 1.3;
+                      text-align: left;
+                    }
+                    #admin-orders-disputes-mobile .orders-recent-arrow {
+                      grid-column: 3;
+                      grid-row: 1 / span 2;
+                      width: 28px;
+                      height: 28px;
+                    }
+                    #admin-orders-disputes-mobile .orders-expanded-details {
+                      padding: 12px 12px 15px;
+                    }
+                    #admin-orders-disputes-mobile .orders-expanded-heading h4 { font-size: 15px; }
+                    #admin-orders-disputes-mobile .orders-expanded-heading > span {
+                      font-size: 11px;
+                    }
+                    #admin-orders-disputes-mobile .orders-expanded-facts {
+                      display: grid;
+                      grid-template-columns: repeat(3, minmax(0, 1fr));
+                      border-radius: 9px;
+                      margin-top: 10px;
+                    }
+                    #admin-orders-disputes-mobile .orders-expanded-facts > div {
+                      padding: 9px 8px;
+                    }
+                    #admin-orders-disputes-mobile .orders-expanded-facts > div dt {
+                      font-size: 10px;
+                      line-height: 1.2;
+                    }
+                    #admin-orders-disputes-mobile .orders-expanded-facts > div dd {
+                      font-size: 12px;
+                      line-height: 1.4;
+                      overflow-wrap: anywhere;
+                    }
+                    /* Status is already on the selected order row: don't repeat it. */
+                    #admin-orders-disputes-mobile .orders-expanded-facts > div:last-child { display: none; }
+                    #admin-orders-disputes-mobile .orders-expanded-products {
+                      margin-top: 12px;
+                      padding-top: 12px;
+                    }
+                    #admin-orders-disputes-mobile .orders-expanded-products h5 { font-size: 13px; }
+                    #admin-orders-disputes-mobile .orders-expanded-products > div { margin-top: 4px; }
+                    #admin-orders-disputes-mobile .orders-expanded-products > div > div { gap: 9px; }
+                    #admin-orders-disputes-mobile .orders-expanded-products p { font-size: 13px; line-height: 1.3; }
+                    #admin-orders-disputes-mobile .orders-expanded-products [class*="shrink-0"] { font-size: 12px; }
+                    #admin-orders-disputes-mobile .orders-readonly-note,
+                    #admin-orders-disputes-mobile .orders-footer-note,
+                    #admin-orders-disputes-mobile .orders-orders-help { display: none; }
+                    #admin-orders-disputes-mobile .orders-more-button { padding: 13px; }
+                    #admin-orders-disputes-mobile .orders-more-button button { min-height: 40px; }
+                    #admin-orders-disputes-mobile .orders-selected-review { margin: 15px 12px 0; border-radius: 12px; }
+                    #admin-orders-disputes-mobile .orders-selected-review textarea { width: 100%; }
+                  }
+                `}</style>
+                <div id="admin-orders-disputes-mobile" className="min-w-0 bg-[#F7F6F2] text-[#202421]">
+                    {/* A single editorial header replaces the old four-step dark dashboard. */}
+                    <section className="orders-hero grid overflow-hidden border-b border-[#DCE1D7] lg:grid-cols-[minmax(0,1fr)_260px]">
+                        <div className="orders-hero-primary bg-[#EFE5DC] px-4 py-6 sm:px-8 sm:py-9">
+                            <p className="orders-hero-kicker text-[13px] font-semibold text-[#965B42]">ORDER SUPPORT / REVIEW DESK</p>
+                            <h2 className="orders-hero-title mt-2 max-w-3xl text-[27px] font-bold leading-[1.13] tracking-[-0.035em] text-[#173F35] sm:text-[36px]">
+                                <span className="sm:hidden">Review orders. Resolve disputes.</span>
+                                <span className="hidden sm:inline">Resolve order issues. Keep every decision clear.</span>
+                            </h2>
+                            <p className="orders-hero-support mt-3 max-w-xl text-[15px] leading-6 text-[#4F5B52]">
+                                Review the order, open a dispute when needed, and record the outcome.
+                            </p>
+                            <div className="orders-hero-steps mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-[#DDCFC3] pt-3 text-[13px] font-semibold text-[#31574A] sm:text-[14px]">
+                                <span>01 Select</span><span>02 Inspect</span><span>03 Decide</span>
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-2 border-t border-white/15 lg:grid-cols-4">
-                            {[
-                                ['01', 'Find the issue', 'Open an order that needs attention.'],
-                                ['02', 'Check the order', 'Review the Host, items and current status.'],
-                                ['03', 'Open a dispute', 'Start a case when an admin decision is needed.'],
-                                ['04', 'Record the outcome', 'Resolve, close or send the case for follow-up.'],
-                            ].map(([number, title, body], index) => (
-                                <div
-                                    key={number}
-                                    className={`px-4 py-3 sm:px-5 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l lg:border-white/15' : ''}`}
-                                >
-                                    <p className="text-[10px] font-black text-emerald-200 sm:text-xs">{number}</p>
-                                    <p className="mt-1 text-sm font-black">{title}</p>
-                                    <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-emerald-50/75 sm:text-xs sm:leading-5">{body}</p>
-                                </div>
-                            ))}
+                        <div className="orders-hero-dispute-summary flex items-center justify-between gap-3 bg-[#173F35] px-5 py-5 text-white lg:flex-col lg:items-start lg:justify-center lg:px-7">
+                            <div>
+                                <p className="text-[14px] font-medium text-[#D6E6DC]">Open dispute cases</p>
+                                <p className="mt-1 text-[34px] font-bold leading-none tabular-nums sm:text-[42px]">{caseMetricUnavailable ? '—' : activeCaseCount}</p>
+                            </div>
+                            <p className="max-w-[150px] text-right text-[13px] leading-5 text-[#D9E7DF] lg:mt-3 lg:max-w-none lg:text-left">Decisions awaiting an admin</p>
                         </div>
                     </section>
 
-                    {ordersError ? (
-                        <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700 sm:px-7 sm:text-sm">
-                            {ordersError}
-                        </div>
-                    ) : null}
-
-                    {error ? (
-                        <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700 sm:px-7 sm:text-sm">
-                            {error}
-                        </div>
-                    ) : null}
-
-                    {notice ? (
-                        <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800 sm:px-7 sm:text-sm">
-                            {notice}
-                        </div>
-                    ) : null}
-
-                    <section className="border-b border-stone-200 bg-white">
-                        <div className="flex items-end justify-between gap-4 border-b border-stone-200 bg-[#e7f2ee] px-4 py-4 sm:px-7 sm:py-5">
-                            <div>
-                                <p className="text-xs font-bold text-emerald-700">01 · Order issues</p>
-                                <h2 className="mt-0.5 text-xl font-black text-stone-950">Orders that need attention</h2>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">
-                                    Select an order to see what happened and decide whether a dispute case is needed.
-                                </p>
+                    <section aria-label="Order issue overview" className="orders-metrics grid grid-cols-2 divide-x divide-y divide-[#E1E5DD] border-b border-[#E1E5DD] bg-white lg:grid-cols-4 lg:divide-y-0">
+                        {[
+                            ['Open order issues', summary.total || 0],
+                            ['Failed delivery', summary.deliveryFailed || 0],
+                            ['Returns', summary.returnsRequested || 0],
+                            ['Item changes', (summary.itemsUnavailable || 0) + (summary.substitutionsRequested || 0)],
+                        ].map(([label, value]) => (
+                            <div key={label} className="min-w-0 px-4 py-4 sm:px-7 sm:py-5">
+                                <p className="text-[29px] font-bold leading-none tabular-nums text-[#173F35] sm:text-[34px]">{orderMetricUnavailable ? '—' : value}</p>
+                                <p className="mt-2 text-[14px] font-medium leading-5 text-[#52645A]">{label}</p>
                             </div>
-                            <p className="shrink-0 text-sm font-black text-emerald-800">{summary.total || 0} open</p>
-                        </div>
+                        ))}
+                    </section>
 
-                        {ordersLoading ? (
-                            <div className="flex min-h-36 items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-stone-500 sm:px-7">
-                                <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />
-                                Loading order issues…
-                            </div>
-                        ) : !(ordersWorkspace.orders || []).length ? (
-                            <div className="px-4 py-6 sm:px-7">
-                                <p className="text-sm font-black text-stone-900">No order issues need admin review right now.</p>
-                                <p className="mt-1 text-xs font-semibold text-stone-500">Failed deliveries, returns and item problems will appear here automatically.</p>
-                            </div>
-                        ) : (
-                            <div className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-                                <aside className="border-b border-stone-200 lg:border-b-0 lg:border-r">
-                                    <div className="px-4 py-3 sm:hidden">
-                                        <label className="text-xs font-bold text-stone-600">
-                                            Choose an order issue
-                                            <select
-                                                value={selectedOrderId}
-                                                onChange={(event) => setSelectedOrderId(event.target.value)}
-                                                className="mt-2 h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm font-bold text-stone-800 outline-none focus:border-emerald-500"
+                    {ordersError ? <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700 sm:px-7">Order issues: {ordersError}</div> : null}
+                    {orderCasesError ? <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700 sm:px-7">Dispute cases: {orderCasesError}</div> : null}
+                    {error ? <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700 sm:px-7">{error}</div> : null}
+                    {notice ? <div role="status" className="border-b border-[#C7DED0] bg-[#E8F2EB] px-4 py-3 text-[14px] font-medium text-[#173F35] sm:px-7">{notice}</div> : null}
+
+                    <div className="orders-workqueue px-0 pb-5 pt-6 sm:px-6 sm:pb-8 sm:pt-8">
+                        <div className="orders-workqueue-heading mb-4 px-4 sm:px-0">
+                            <p className="orders-workqueue-kicker text-[13px] font-semibold text-[#A25F43]">01 / WORK QUEUE</p>
+                            <h2 className="orders-workqueue-title mt-1 text-[23px] font-bold tracking-tight text-[#173F35] sm:text-[28px]">
+                                <span className="sm:hidden">Work queue</span><span className="hidden sm:inline">Choose what to review</span>
+                            </h2>
+                        </div>
+                        <div className="orders-workqueue-grid grid gap-4 lg:grid-cols-2 lg:gap-5">
+                            <section className="orders-queue-section min-w-0 border-y border-[#DAE0D6] bg-white sm:border sm:rounded-xl sm:overflow-hidden">
+                                <div className="orders-queue-head flex items-center justify-between gap-3 bg-[#E8EFE7] px-4 py-4 sm:px-5">
+                                    <div className="min-w-0">
+                                        <h3 className="text-[19px] font-bold text-[#173F35]">Order issues</h3>
+                                        <p className="orders-queue-subtitle mt-1 text-[13px] text-[#52645A]">Orders that need attention</p>
+                                    </div>
+                                    <span className="rounded-md bg-white px-3 py-1.5 text-[15px] font-bold tabular-nums text-[#173F35]">{orderMetricUnavailable ? '—' : (summary.total || 0)}</span>
+                                </div>
+                                {ordersLoading ? (
+                                    <div role="status" className="flex items-center gap-2 px-4 py-5 text-[14px] text-[#53655B]"><LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> Loading issues…</div>
+                                ) : ordersError && !openOrders.length ? (
+                                    <div className="px-4 py-5 text-[14px] text-[#53655B]">Issue list unavailable. Use Refresh to try again.</div>
+                                ) : openOrders.length ? (
+                                    <div className="max-h-[400px] overflow-y-auto">
+                                        {visibleOrderList.map(order => (
+                                            <button key={order.id} type="button"
+                                                onClick={() => { setSelectedOrderId(order.id); setSelectedReviewCase(null); setReason(''); setOrdersFocus('order'); }}
+                                                className={`focus-ring flex w-full min-w-0 items-start justify-between gap-3 border-t border-[#E9ECE7] px-4 py-4 text-left transition-colors hover:bg-[#F3F7F2] sm:px-5 ${ordersFocus === 'order' && selectedOrderId === order.id ? 'bg-[#EDF4EE]' : ''}`}
                                             >
-                                                {(ordersWorkspace.orders || []).map((order) => (
-                                                    <option key={order.id} value={order.id}>
-                                                        {orderIssueLabel(order.status)} · {order.itemNames?.[0] || order.sellerName}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block break-words text-[15px] font-semibold leading-5 text-[#173F35]">{order.itemNames?.[0] || order.sellerName || 'Order issue'}</span>
+                                                    <span className="mt-1 block text-[13px] text-[#607068]">{order.sellerName || 'Host'} · {orderReference(order)}</span>
+                                                    <span className="mt-2 inline-block text-[12px] font-semibold text-[#A45D40]">{orderIssueLabel(order.status)}</span>
+                                                </span>
+                                                <ChevronRight size={19} className="mt-1 shrink-0 text-[#386A55]" aria-hidden="true" />
+                                            </button>
+                                        ))}
+                                        {Number(summary.total || 0) > openOrders.length ? (
+                                            <p className="border-t border-[#E9ECE7] px-4 py-3 text-[13px] text-[#66746A]">Showing latest {openOrders.length} of {summary.total} issues.</p>
+                                        ) : null}
                                     </div>
-
-                                    <div className="hidden max-h-[560px] overflow-y-auto sm:block">
-                                        {(ordersWorkspace.orders || []).map((order, index) => {
-                                            const active = selectedOrderId === order.id;
-                                            return (
-                                                <button
-                                                    key={order.id}
-                                                    type="button"
-                                                    onClick={() => setSelectedOrderId(order.id)}
-                                                    className={`block w-full border-t border-stone-100 px-5 py-3 text-left first:border-t-0 ${active ? 'bg-[#eef6f2]' : 'bg-white hover:bg-stone-50'}`}
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-black text-stone-950">{order.itemNames?.[0] || order.sellerName}</p>
-                                                            <p className="mt-0.5 text-xs font-semibold text-stone-500">{order.sellerName} · {order.itemCount || 0} item{Number(order.itemCount || 0) === 1 ? '' : 's'}</p>
-                                                        </div>
-                                                        <span className="shrink-0 text-[10px] font-black text-[#a2543c]">{orderIssueLabel(order.status)}</span>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </aside>
-
-                                <div className="min-w-0 px-4 py-4 sm:px-6 sm:py-5">
-                                    {selectedOrder ? (
-                                        <>
-                                            <div className="flex flex-col gap-2 border-b border-stone-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                                                <div className="min-w-0">
-                                                    <p className="text-xs font-bold text-[#a2543c]">{orderIssueLabel(selectedOrder.status)}</p>
-                                                    <h3 className="mt-1 truncate text-lg font-black text-stone-950 sm:text-xl">
-                                                        {selectedOrder.itemNames?.[0] || 'Order issue'}
-                                                    </h3>
-                                                    <p className="mt-1 text-xs font-semibold text-stone-500">Host: {selectedOrder.sellerName}</p>
-                                                </div>
-                                                <p className="text-xs font-bold text-stone-500">Order reference {orderReference(selectedOrder)}</p>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 border-b border-stone-200 sm:grid-cols-3">
-                                                {[
-                                                    ['Items', selectedOrder.itemNames?.length ? selectedOrder.itemNames.join(', ') : `${selectedOrder.itemCount || 0} items`],
-                                                    ['Order value', formatOrderMoney(selectedOrder.totalMinor, selectedOrder.currency)],
-                                                    ['Fulfillment', selectedOrder.fulfillmentType ? titleize(selectedOrder.fulfillmentType) : 'Not set'],
-                                                ].map(([label, value], index) => (
-                                                    <div key={label} className={`min-w-0 py-3 ${index > 0 ? 'border-l border-stone-200 pl-3 sm:pl-4' : 'pr-3 sm:pr-4'} ${index === 2 ? 'col-span-2 border-l-0 border-t border-stone-200 pl-0 sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-4' : ''}`}>
-                                                        <p className="text-[10px] font-bold text-stone-400">{label}</p>
-                                                        <p className="mt-1 line-clamp-2 text-xs font-black leading-5 text-stone-800 sm:text-sm">{value}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            <div className="pt-4">
-                                                {selectedOrderCase ? (
-                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div>
-                                                            <p className="text-sm font-black text-stone-900">A dispute case is already open.</p>
-                                                            <p className="mt-0.5 text-xs font-semibold text-stone-500">Open the case below to continue the review.</p>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedReviewCase(selectedOrderCase)}
-                                                            className="focus-ring inline-flex min-h-10 items-center justify-center rounded-xl bg-[#173b4f] px-4 text-xs font-black text-white"
-                                                        >
-                                                            Open dispute case
-                                                        </button>
-                                                    </div>
-                                                ) : canMutateDomain ? (
-                                                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                                                        <label className="text-xs font-bold text-stone-600">
-                                                            Why does this order need admin review?
-                                                            <textarea
-                                                                value={reason}
-                                                                onChange={(event) => setReason(event.target.value)}
-                                                                rows={2}
-                                                                placeholder="Briefly explain the problem."
-                                                                className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none focus:border-emerald-500"
-                                                            />
-                                                        </label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={createDisputeForSelectedOrder}
-                                                            disabled={busy || reason.trim().length < 5}
-                                                            className="focus-ring inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-black text-white disabled:opacity-50"
-                                                        >
-                                                            Start dispute review
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-xs font-semibold text-stone-500">You can review this issue, but you do not have permission to open a dispute case.</p>
-                                                )}
-                                            </div>
-                                        </>
-                                    ) : null}
-                                </div>
-                            </div>
-                        )}
-                    </section>
-
-                    <section className="border-b border-stone-200 bg-[#eef3f7]">
-                        <div className="flex items-end justify-between gap-4 border-b border-[#d6e0e7] px-4 py-4 sm:px-7 sm:py-5">
-                            <div>
-                                <p className="text-xs font-bold text-[#315f7a]">02 · Dispute cases</p>
-                                <h2 className="mt-0.5 text-xl font-black text-stone-950">Admin decisions in progress</h2>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">Cases keep the reason and decision history together.</p>
-                            </div>
-                            <p className="shrink-0 text-sm font-black text-[#315f7a]">{orderDisputeCases.length} cases</p>
-                        </div>
-
-                        {orderDisputeCases.length ? (
-                            <div className="bg-white/70">
-                                {visibleOrderDisputeCases.map((item, index) => (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        onClick={() => setSelectedReviewCase(item)}
-                                        className={`grid w-full gap-2 px-4 py-3 text-left transition hover:bg-white sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-center sm:px-7 ${index > 0 ? 'border-t border-stone-200' : ''}`}
-                                    >
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-black text-stone-950">{item.summary}</p>
-                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold text-stone-500">{item.details || 'No additional note.'}</p>
+                                ) : (
+                                    <div className="orders-empty-wrap px-4 py-5 sm:px-5">
+                                        <div className="orders-empty flex items-center gap-3">
+                                            <CheckCircle2 size={22} className="shrink-0 text-[#5C846E]" aria-hidden="true" />
+                                            <div><p className="text-[15px] font-semibold text-[#173F35]">No order issues waiting</p><p className="orders-empty-subtitle mt-1 text-[14px] text-[#627267]">New issues will appear here.</p></div>
                                         </div>
-                                        <p className="text-xs font-bold text-stone-600">{titleize(item.status)}</p>
-                                        <span className="text-xs font-black text-[#315f7a]">Review</span>
-                                    </button>
-                                ))}
+                                    </div>
+                                )}
+                            </section>
 
-                                {orderDisputeCases.length > 10 ? (
-                                    <div className="border-t border-stone-200 py-3 text-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAllOrderCases((current) => !current)}
-                                            className="focus-ring rounded-lg border border-[#bfd3df] bg-white px-4 py-2 text-xs font-black text-[#315f7a]"
-                                        >
-                                            {showAllOrderCases ? 'Show fewer' : `View all ${orderDisputeCases.length}`}
+                            <section className="orders-queue-section min-w-0 border-y border-[#E5DAD0] bg-white sm:overflow-hidden sm:rounded-xl sm:border">
+                                <div className="orders-queue-head flex items-center justify-between gap-3 bg-[#F2E6DC] px-4 py-4 sm:px-5">
+                                    <div className="min-w-0"><h3 className="text-[19px] font-bold text-[#173F35]">Dispute cases</h3><p className="orders-queue-subtitle mt-1 text-[13px] text-[#6D6258]">Decisions and follow-ups</p></div>
+                                    <span className="rounded-md bg-white px-3 py-1.5 text-[15px] font-bold tabular-nums text-[#173F35]">{caseMetricUnavailable ? '—' : activeCaseCount}</span>
+                                </div>
+                                {ordersLoading && !orderReviewCases.length ? (
+                                    <div role="status" className="flex items-center gap-2 px-4 py-5 text-[14px] text-[#53655B]"><LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> Loading cases…</div>
+                                ) : orderCasesError && !orderReviewCases.length ? (
+                                    <p className="px-4 py-5 text-[14px] text-[#53655B]">Case list unavailable. Use Refresh to try again.</p>
+                                ) : activeOrderDisputeCases.length ? (
+                                    <div className="max-h-[400px] overflow-y-auto">
+                                        {visibleOrderDisputeCases.map(item => (
+                                            <button key={item.id} type="button" onClick={() => { setSelectedReviewCase(item); setReason(''); setOrdersFocus('case'); }}
+                                                className={`focus-ring flex w-full items-start justify-between gap-3 border-t border-[#ECE6E0] px-4 py-4 text-left transition-colors hover:bg-[#FCF5EF] sm:px-5 ${ordersFocus === 'case' && selectedReviewCase?.id === item.id ? 'bg-[#FBF1E8]' : ''}`}
+                                            >
+                                                <span className="min-w-0 flex-1"><span className="block break-words text-[15px] font-semibold leading-5 text-[#173F35]">{item.summary || 'Dispute case'}</span><span className="mt-1 block text-[13px] text-[#647169]">{titleize(item.status)} · {titleize(item.priority || 'p2')}</span></span>
+                                                <ChevronRight size={19} className="mt-1 shrink-0 text-[#A26445]" aria-hidden="true" />
+                                            </button>
+                                        ))}
+                                        {activeOrderDisputeCases.length > 6 ? (
+                                            <div className="border-t border-[#ECE6E0] px-4 py-3 text-center"><button type="button" onClick={() => setShowAllOrderCases(value => !value)} className="focus-ring rounded-lg border border-[#D9D3C9] px-4 py-2 text-[14px] font-semibold text-[#173F35]">{showAllOrderCases ? 'Show fewer' : `View all ${activeOrderDisputeCases.length} loaded`}</button></div>
+                                        ) : null}
+                                    </div>
+                                ) : (
+                                    <div className="orders-empty flex items-center gap-3 px-4 py-5 sm:px-5"><CheckCircle2 size={22} className="shrink-0 text-[#B37D60]" aria-hidden="true" /><div><p className="text-[15px] font-semibold text-[#173F35]">No open disputes</p><p className="orders-empty-subtitle mt-1 text-[14px] text-[#627267]">No case needs a decision now.</p></div></div>
+                                )}
+                                {closedOrderDisputeCases.length ? (
+                                    <details className="border-t border-[#ECE6E0] px-4 py-3 sm:px-5">
+                                        <summary className="cursor-pointer text-[14px] font-semibold text-[#173F35]">Past decisions ({closedOrderDisputeCases.length})</summary>
+                                        <div className="mt-3 divide-y divide-[#ECE6E0]">
+                                            {closedOrderDisputeCases.map(item => (
+                                                <button type="button" key={item.id} onClick={() => { setSelectedReviewCase(item); setReason(''); setOrdersFocus('case'); }} className="focus-ring flex w-full items-center justify-between gap-3 py-3 text-left text-[14px] text-[#375448] hover:text-[#173F35]">
+                                                    <span className="min-w-0 break-words">{item.summary || 'Dispute'} · {titleize(item.status)}</span><ChevronRight size={17} className="shrink-0" aria-hidden="true" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </details>
+                                ) : null}
+                                {orderReviewCases.length < orderCasesTotal ? (
+                                    <div className="border-t border-[#ECE6E0] px-4 py-3 text-center">
+                                        <button type="button" onClick={loadMoreOrderCases} disabled={orderCasesMoreBusy} className="focus-ring rounded-lg border border-[#D9D3C9] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+                                            {orderCasesMoreBusy ? 'Loading…' : 'Load more cases'}
                                         </button>
                                     </div>
                                 ) : null}
-                            </div>
-                        ) : (
-                            <div className="px-4 py-5 sm:px-7">
-                                <p className="text-sm font-black text-stone-900">No dispute cases are open.</p>
-                                <p className="mt-1 text-xs font-semibold text-stone-500">Start a dispute from an order issue when admin review is needed.</p>
-                            </div>
-                        )}
-                    </section>
+                            </section>
+                        </div>
 
-                    {selectedReviewCase ? (
-                        <section className="border-b border-stone-200 bg-white">
-                            <div className="grid lg:grid-cols-[300px_minmax(0,1fr)]">
-                                <div className="border-b border-stone-200 bg-[#173b4f] px-4 py-4 text-white sm:px-7 sm:py-5 lg:border-b-0 lg:border-r">
-                                    <p className="text-xs font-bold text-sky-200">Selected dispute</p>
-                                    <h2 className="mt-1 text-lg font-black">Record the next decision</h2>
-                                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-sky-50/80">Add a short reason, then resolve, close or send the case for follow-up.</p>
+                        {/* Recent seller orders are read-only, separate from actual issues and disputes. */}
+                        <section aria-labelledby="recent-marketplace-orders-heading" className="orders-activity mt-5 min-w-0 overflow-hidden border-y border-[#E2E4DC] bg-white sm:rounded-2xl sm:border">
+                            <div className="orders-activity-heading flex flex-wrap items-center justify-between gap-3 bg-[#EFE5DC] px-4 py-4 sm:px-6 sm:py-5">
+                                <div className="min-w-0">
+                                    <p className="orders-activity-kicker text-[12px] font-semibold uppercase tracking-[0.035em] text-[#9A644C]">ORDER ACTIVITY</p>
+                                    <h3 id="recent-marketplace-orders-heading" className="mt-1 text-[21px] font-bold tracking-tight text-[#173F35] sm:text-[25px]">Recent marketplace orders</h3>
                                 </div>
-                                <div className="px-4 py-4 sm:px-7 sm:py-5">
-                                    <div className="flex flex-col gap-2 border-b border-stone-200 pb-3 sm:flex-row sm:items-start sm:justify-between">
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-black text-stone-950">{selectedReviewCase.summary}</p>
-                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold text-stone-500">{selectedReviewCase.details || 'No additional note.'}</p>
-                                        </div>
-                                        <span className="text-xs font-black text-[#315f7a]">{titleize(selectedReviewCase.status)}</span>
+                                {ordersWorkspace.recentOrdersAvailable && !ordersError ? (
+                                    <span className="orders-activity-count rounded-lg bg-white/80 px-3 py-2 text-[14px] font-semibold tabular-nums text-[#173F35]">{ordersWorkspace.recentOrdersTotal} orders</span>
+                                ) : null}
+                            </div>
+                            {ordersLoading && !ordersWorkspace.recentOrdersAvailable ? (
+                                <p role="status" className="px-4 py-5 text-[14px] text-[#53655B]">Loading order activity…</p>
+                            ) : ordersError ? (
+                                <p role="alert" className="px-4 py-5 text-[14px] text-[#53655B]">Recent orders could not be loaded. Use Refresh to retry.</p>
+                            ) : !ordersWorkspace.recentOrdersAvailable ? (
+                                <p className="px-4 py-5 text-[14px] text-[#53655B]">Recent orders need the updated backend API. Restart the backend to load them.</p>
+                            ) : recentOrders.length ? (
+                                <>
+                                    <div className="divide-y divide-[#E8EAE3]">
+                                        {visibleRecentOrders.map(order => {
+                                            const firstItem = order.items?.[0];
+                                            const itemCount = Number(order.itemCount || order.items?.length || 0);
+                                            return (
+                                                <details key={order.id} className="group min-w-0 bg-white open:bg-[#FBF9F6]">
+                                                    <summary className="orders-recent-row focus-ring flex min-w-0 cursor-pointer list-none items-center gap-3 border-l-[3px] border-transparent px-3 py-3.5 transition-colors hover:bg-[#F7F7F2] group-open:border-[#B96C49] group-open:bg-[#F7F2EC] sm:gap-4 sm:px-5 sm:py-4 [&::-webkit-details-marker]:hidden">
+                                                        <MarketplaceOrderThumbnail imageUrl={firstItem?.imageUrl} name={firstItem?.name || order.itemNames?.[0]} />
+                                                        <span className="orders-recent-identity min-w-0 flex-1">
+                                                            <span className="block break-words text-[15px] font-bold leading-snug text-[#173F35] sm:text-[17px]">{order.itemNames?.[0] || order.sellerName || 'Seller order'}</span>
+                                                            <span className="mt-1 block text-[13px] leading-5 text-[#6A756D]">{order.sellerName || 'Host'} <span aria-hidden="true">·</span> #{orderReference(order)}</span>
+                                                            {itemCount > 1 ? <span className="mt-0.5 block text-[12px] font-medium text-[#587163]">+{itemCount - 1} more {itemCount === 2 ? 'item' : 'items'}</span> : null}
+                                                        </span>
+                                                        <span className="orders-recent-controls flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
+                                                            <span className={`orders-recent-badge max-w-[105px] rounded-lg px-2 py-1.5 text-center text-[11px] font-semibold leading-tight sm:max-w-none sm:px-3 sm:text-[13px] ${marketplaceOrderStatusClass(order.status)}`}>{titleize(order.status)}</span>
+                                                            <span className="orders-recent-arrow flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EFF2EC] text-[#31574B] group-open:bg-[#E3E9DE]" aria-hidden="true"><ChevronRight size={18} className="transition-transform duration-200 group-open:rotate-90" /></span>
+                                                        </span>
+                                                    </summary>
+                                                    <div className="orders-expanded-details border-t border-[#E8E5DE] px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+                                                        <div className="orders-expanded-heading flex flex-wrap items-center justify-between gap-2">
+                                                            <h4 className="text-[16px] font-bold text-[#173F35] sm:text-[18px]">Order details</h4>
+                                                            <span className="text-[12px] font-medium text-[#66756B]">Placed {financeDate(order.createdAt)}</span>
+                                                        </div>
+                                                        <dl className="orders-expanded-facts mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[#E4E8E0] bg-[#E4E8E0] sm:grid-cols-4">
+                                                            {[
+                                                                ['Order total', formatOrderMoney(order.totalMinor, order.currency)],
+                                                                ['Items', String(itemCount)],
+                                                                ['Fulfillment', order.fulfillmentType ? titleize(order.fulfillmentType) : 'Not specified'],
+                                                                ['Status', titleize(order.status)],
+                                                            ].map(([label, value]) => (
+                                                                <div key={label} className="min-w-0 bg-white px-3 py-3 sm:px-4">
+                                                                    <dt className="text-[12px] font-medium text-[#6B776C]">{label}</dt>
+                                                                    <dd className="mt-1 break-words text-[14px] font-semibold text-[#173F35]">{value}</dd>
+                                                                </div>
+                                                            ))}
+                                                        </dl>
+                                                        <div className="orders-expanded-products mt-4 border-t border-[#E8E8E1] pt-4">
+                                                            <h5 className="text-[14px] font-bold text-[#173F35]">Products in this order</h5>
+                                                            <div className="mt-2 divide-y divide-[#E7EAE3]">
+                                                                {(order.items?.length ? order.items : (order.itemNames || []).map(name => ({ name }))).map((item, itemIndex) => (
+                                                                    <div key={`${order.id}-line-${itemIndex}`} className="flex min-w-0 items-center gap-3 py-2.5">
+                                                                        <MarketplaceOrderThumbnail imageUrl={item.imageUrl} name={item.name} small />
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <p className="break-words text-[14px] font-semibold text-[#173F35]">{item.name || 'Product'}</p>
+                                                                            {item.packCount > 0 ? <p className="mt-0.5 text-[12px] text-[#67776B]">{item.packCount} {item.packCount === 1 ? 'pack' : 'packs'}{item.packQuantity > 0 && item.packUnit ? ` · ${item.packQuantity} ${item.packUnit}` : ''}</p> : null}
+                                                                        </div>
+                                                                        {item.lineTotalMinor !== null && item.lineTotalMinor !== undefined ? <span className="shrink-0 text-[13px] font-semibold text-[#173F35]">{formatOrderMoney(item.lineTotalMinor, order.currency)}</span> : null}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <p className="orders-readonly-note mt-3 text-[12px] leading-5 text-[#728075]">Order details are read-only. Disputes and order issues are reviewed separately above.</p>
+                                                    </div>
+                                                </details>
+                                            );
+                                        })}
                                     </div>
-
-                                    {canMutateDomain ? (
-                                        <div className="pt-3">
-                                            <textarea
-                                                value={reason}
-                                                onChange={(event) => setReason(event.target.value)}
-                                                rows={2}
-                                                placeholder="Reason for this decision"
-                                                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none focus:border-[#315f7a]"
-                                            />
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideSelectedOrderCase('resolve')} className="focus-ring rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">Resolve</button>
-                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideSelectedOrderCase('needs_action')} className="focus-ring rounded-xl border border-[#bfd3df] bg-[#edf5f9] px-4 py-2.5 text-xs font-black text-[#315f7a] disabled:opacity-50">Needs follow-up</button>
-                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideSelectedOrderCase('dismiss')} className="focus-ring rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-xs font-black text-stone-700 disabled:opacity-50">Close without action</button>
-                                            </div>
+                                    {recentOrders.length > 8 || ordersWorkspace.recentOrdersTotal > recentOrders.length ? (
+                                        <div className="orders-more-button border-t border-[#E7E7E1] px-4 py-4 text-center sm:px-6">
+                                            {recentOrders.length > 8 ? (
+                                                <button type="button" onClick={() => setShowAllRecentOrders(current => !current)} className="focus-ring min-h-10 rounded-lg border border-[#BCCDBD] bg-white px-5 py-2.5 text-[14px] font-semibold text-[#173F35] hover:bg-[#EDF2EB]">
+                                                    {showAllRecentOrders ? 'Show fewer' : `View latest ${recentOrders.length} orders`}
+                                                </button>
+                                            ) : null}
+                                            {ordersWorkspace.recentOrdersTotal > recentOrders.length ? <p className="mt-2 text-[12px] text-[#607068]">Showing the latest {recentOrders.length} of {ordersWorkspace.recentOrdersTotal} orders.</p> : null}
                                         </div>
                                     ) : null}
-                                </div>
-                            </div>
+                                </>
+                            ) : (
+                                <p className="px-4 py-5 text-[14px] text-[#53655B]">No marketplace orders yet. New orders will appear here after checkout.</p>
+                            )}
                         </section>
-                    ) : null}
 
-                    <section className="bg-[#102f2a] px-4 py-4 text-white sm:px-7 sm:py-5">
-                        <p className="text-sm font-black">Order history stays intact.</p>
-                        <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-emerald-50/70">Admin decisions are recorded separately, so the original order and payment history remain unchanged.</p>
-                    </section>
+                        {chosenOrder || chosenCase ? (
+                            <section className="orders-selected-review mt-5 min-w-0 border-y border-[#DADFD6] bg-white sm:overflow-hidden sm:rounded-xl sm:border">
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E3E7E0] bg-[#E9EEE8] px-4 py-4 sm:px-6">
+                                    <div className="min-w-0">
+                                        <p className="text-[13px] font-semibold text-[#A25F43]">02 / INSPECT & DECIDE</p>
+                                        <h3 className="mt-1 break-words text-[21px] font-bold text-[#173F35] sm:text-[25px]">{chosenOrder ? 'Review this order' : 'Review this dispute'}</h3>
+                                    </div>
+                                    <button type="button" onClick={() => { setSelectedReviewCase(null); setSelectedOrderId(''); setReason(''); }} className="focus-ring rounded-lg border border-[#D4DCD2] bg-white px-3 py-2 text-[14px] font-semibold text-[#486257]">Close details</button>
+                                </div>
+                                {chosenOrder ? (
+                                    <div className="px-4 py-5 sm:px-6 sm:py-6">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div className="min-w-0"><p className="text-[13px] font-semibold text-[#A25F43]">{orderIssueLabel(chosenOrder.status)}</p><h4 className="mt-1 break-words text-[20px] font-bold text-[#173F35]">{chosenOrder.itemNames?.[0] || 'Order issue'}</h4><p className="mt-1 text-[14px] text-[#657368]">{chosenOrder.sellerName || 'Host'} · Order {orderReference(chosenOrder)}</p></div>
+                                        </div>
+                                        <dl className="mt-5 grid gap-0 border-y border-[#E7EAE5] sm:grid-cols-3 sm:divide-x sm:divide-[#E7EAE5]">
+                                            {[
+                                                ['Items', chosenOrder.itemNames?.length ? chosenOrder.itemNames.join(', ') : `${chosenOrder.itemCount || 0} items`],
+                                                ['Order value', formatOrderMoney(chosenOrder.totalMinor, chosenOrder.currency)],
+                                                ['Fulfillment', chosenOrder.fulfillmentType ? titleize(chosenOrder.fulfillmentType) : 'Not set'],
+                                            ].map(([label, value]) => (
+                                                <div key={label} className="min-w-0 border-b border-[#E7EAE5] py-3 last:border-b-0 sm:border-b-0 sm:px-4 sm:first:pl-0"><dt className="text-[13px] text-[#67756C]">{label}</dt><dd className="mt-1 break-words text-[15px] font-semibold text-[#173F35]">{value}</dd></div>
+                                            ))}
+                                        </dl>
+                                        {selectedOrderCase ? (
+                                            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 bg-[#F2E7DE] px-4 py-4">
+                                                <p className="text-[14px] font-medium text-[#173F35]">A dispute is already open for this order.</p>
+                                                <button type="button" onClick={() => { setSelectedReviewCase(selectedOrderCase); setReason(''); setOrdersFocus('case'); }} className="focus-ring rounded-lg bg-[#173F35] px-4 py-2.5 text-[14px] font-semibold text-white">Open dispute</button>
+                                            </div>
+                                        ) : canMutateDomain ? (
+                                            <div className="mt-5 max-w-3xl">
+                                                <label className="block text-[14px] font-semibold text-[#173F35]" htmlFor="admin-order-dispute-reason">Reason for dispute</label>
+                                                <textarea id="admin-order-dispute-reason" value={reason} onChange={event => setReason(event.target.value)} rows={3} maxLength={5000} placeholder="Explain what needs admin review." className="focus-ring mt-2 w-full rounded-lg border border-[#CED7CD] bg-white px-4 py-3 text-[15px] text-[#202421] outline-none" />
+                                                <button type="button" onClick={createDisputeForSelectedOrder} disabled={busy || reason.trim().length < 5} className="focus-ring mt-3 min-h-11 rounded-lg bg-[#173F35] px-5 py-2.5 text-[15px] font-semibold text-white disabled:opacity-50">Start dispute review</button>
+                                            </div>
+                                        ) : <p className="mt-4 text-[14px] text-[#657368]">You can inspect this order but cannot start a dispute.</p>}
+                                    </div>
+                                ) : (
+                                    <div className="px-4 py-5 sm:px-6 sm:py-6">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div className="min-w-0"><h4 className="break-words text-[20px] font-bold text-[#173F35]">{chosenCase.summary || 'Dispute case'}</h4><p className="mt-2 max-w-3xl break-words text-[14px] leading-6 text-[#627066]">{chosenCase.details || 'No further notes provided.'}</p></div>
+                                            <span className="shrink-0 rounded-lg bg-[#F2E7DE] px-3 py-2 text-[13px] font-semibold text-[#81563F]">{titleize(chosenCase.status)}</span>
+                                        </div>
+                                        {canMutateDomain && !chosenCaseClosed ? (
+                                            <div className="mt-5 max-w-3xl border-t border-[#E7EAE5] pt-5">
+                                                <label className="block text-[14px] font-semibold text-[#173F35]" htmlFor="admin-order-case-reason">Reason for this decision</label>
+                                                <textarea id="admin-order-case-reason" value={reason} onChange={event => setReason(event.target.value)} rows={3} maxLength={4000} placeholder="Record why you are making this decision." className="focus-ring mt-2 w-full rounded-lg border border-[#CED7CD] bg-white px-4 py-3 text-[15px] text-[#202421] outline-none" />
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideSelectedOrderCase('resolve')} className="focus-ring min-h-11 rounded-lg bg-[#173F35] px-4 py-2.5 text-[14px] font-semibold text-white disabled:opacity-50">Resolve case</button>
+                                                    <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideSelectedOrderCase('needs_action')} className="focus-ring min-h-11 rounded-lg border border-[#BBD0C0] bg-[#EDF4EE] px-4 py-2.5 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">Needs follow-up</button>
+                                                    <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideSelectedOrderCase('dismiss')} className="focus-ring min-h-11 rounded-lg border border-[#DAD6D1] bg-white px-4 py-2.5 text-[14px] font-semibold text-[#564D47] disabled:opacity-50">Close without action</button>
+                                                </div>
+                                            </div>
+                                        ) : <p className="mt-4 text-[14px] text-[#657368]">{chosenCaseClosed ? 'This case is closed. Its decision is preserved in history.' : 'You can inspect this case but cannot record a decision.'}</p>}
+                                    </div>
+                                )}
+                            </section>
+                        ) : null}
+                        <p className="orders-footer-note px-4 pt-5 text-[13px] leading-5 text-[#6C786E] sm:px-0">Decisions are recorded separately. Original order and payment history stays unchanged.</p>
+                    </div>
                 </div>
             </AdminShell>
         );
@@ -4505,405 +4773,407 @@ import {
 
     if (section === 'integrations') {
         const summary = integrationWorkspace.summary || {};
-        const refreshing = loading || integrationLoading;
-
-        const refreshIntegrationPage = () => {
-            load();
-            loadIntegrationWorkspace();
-        };
+        const hosts = integrationWorkspace.hosts || [];
+        const webhooks = integrationWorkspace.webhooks || [];
+        const serviceAccounts = integrationWorkspace.serviceAccounts || [];
+        const refreshing = integrationLoading || integrationReviewsLoading;
+        const totalHosts = Number(summary.organizations || hosts.length);
+        const totalConnections = Number(summary.connections ?? (webhooks.length + serviceAccounts.length));
+        const configuredHostCount = hosts.filter(host =>
+            webhooks.some(item => item.organizationId === host.id) ||
+            serviceAccounts.some(item => item.organizationId === host.id)).length;
+        const filteredHosts = hosts.filter(host => {
+            const hooks = webhooks.filter(item => item.organizationId === host.id);
+            const accounts = serviceAccounts.filter(item => item.organizationId === host.id);
+            const configured = hooks.length + accounts.length > 0;
+            const failed = hooks.some(item => item.status !== 'disabled' && item.lastDeliveryStatus === 'failed');
+            const matchesFilter = integrationHealthFilter === 'all' ||
+                (integrationHealthFilter === 'connected' && configured) ||
+                (integrationHealthFilter === 'setup' && !configured) ||
+                (integrationHealthFilter === 'failed' && failed);
+            const query = integrationSearch.trim().toLowerCase();
+            return matchesFilter && (!query || [host.name, host.organizationType,
+                ...hooks.map(item => item.name), ...accounts.map(item => item.name)]
+                .some(value => String(value || '').toLowerCase().includes(query)));
+        });
+        const shownHosts = showAllIntegrationHosts ? filteredHosts : filteredHosts.slice(0, 8);
+        const selectedHost = filteredHosts.find(item => item.id === selectedIntegrationHostId) || filteredHosts[0] || null;
+        const hostWebhooks = selectedHost ? webhooks.filter(item => item.organizationId === selectedHost.id) : [];
+        const hostAccounts = selectedHost ? serviceAccounts.filter(item => item.organizationId === selectedHost.id) : [];
+        const chosenConnection = hostWebhooks.find(item => item.id === selectedIntegrationId) || hostWebhooks[0] || null;
+        const selectedHostHasFailure = hostWebhooks.some(item => item.status !== 'disabled' && item.lastDeliveryStatus === 'failed');
+        const selectedHostConfigured = hostWebhooks.length + hostAccounts.length > 0;
+        const activeConnectionCases = integrationReviewCases.filter(item =>
+            !['resolved', 'dismissed'].includes(String(item.status || '').toLowerCase()));
+        const pastConnectionCases = integrationReviewCases.filter(item =>
+            ['resolved', 'dismissed'].includes(String(item.status || '').toLowerCase()));
+        const shownConnectionCases = showAllIntegrationCases ? activeConnectionCases : activeConnectionCases.slice(0, 5);
+        const selectedConnectionCase = chosenConnection
+            ? activeConnectionCases.find(item => item?.entity?.id === chosenConnection.id && item?.entity?.type === 'organization_webhook') || null
+            : null;
+        const selectedCase = selectedReviewCase?.caseType === 'integration_failure' ? selectedReviewCase : selectedConnectionCase;
+        const moreReviewsAvailable = integrationReviewRows.length < integrationReviewTotal;
+        const refreshIntegrationPage = () => loadIntegrationWorkspace();
 
         const createIntegrationReview = async () => {
-            if (!selectedIntegration || reason.trim().length < 5) {
-                return;
-            }
-
-            const result = await run(
-                () =>
-                    createAdminReviewCase({
-                        domain: 'marketplace',
-                        caseType: 'integration_failure',
-                        entity: {
-                            type: 'organization_webhook',
-                            id: selectedIntegration.id,
-                            label: `${selectedIntegration.organizationName} — ${selectedIntegration.name}`,
-                        },
-                        severity: 'medium',
-                        priority: 'p2',
-                        summary: `Connection issue — ${selectedIntegration.organizationName}`,
-                        details: reason.trim(),
-                        evidence: [],
-                    }),
-                'Connection review started.',
-            );
-
+            if (!chosenConnection || reason.trim().length < 5) return;
+            const result = await run(() => createAdminReviewCase({
+                domain: 'marketplace', caseType: 'integration_failure',
+                entity: { type: 'organization_webhook', id: chosenConnection.id,
+                    label: `${chosenConnection.organizationName} — ${chosenConnection.name}` },
+                severity: 'medium', priority: 'p2',
+                summary: `Connection issue — ${chosenConnection.organizationName}`,
+                details: reason.trim(), evidence: [],
+            }), 'Connection review started.');
             if (result?.reviewCase) {
                 setSelectedReviewCase(result.reviewCase);
+                setReason('');
+                await loadIntegrationWorkspace();
             }
         };
-
-        const decideIntegrationCase = async (decision) => {
-            const activeCase = selectedReviewCase || selectedIntegrationCase;
-            if (!activeCase || reason.trim().length < 5) {
-                return;
-            }
-
-            const result = await run(
-                () =>
-                    decideAdminReviewCase(
-                        activeCase.id,
-                        {
-                            decision,
-                            reason: reason.trim(),
-                            evidence: evidence(),
-                        },
-                    ),
-                decision === 'resolve'
-                    ? 'Connection review resolved.'
-                    : decision === 'dismiss'
-                        ? 'Connection review closed.'
-                        : 'Connection review marked for follow-up.',
-            );
-
+        const decideIntegrationCase = async decision => {
+            const caseToDecide = selectedReviewCase?.caseType === 'integration_failure' ? selectedReviewCase : selectedConnectionCase;
+            if (!caseToDecide || reason.trim().length < 5) return;
+            const result = await run(() => decideAdminReviewCase(caseToDecide.id, {
+                decision, reason: reason.trim(), evidence: evidence(),
+            }), decision === 'resolve' ? 'Connection review resolved.'
+                : decision === 'dismiss' ? 'Connection review closed.' : 'Connection review marked for follow-up.');
             if (result) {
                 setSelectedReviewCase(null);
                 setReason('');
+                await loadIntegrationWorkspace();
             }
         };
-
-        const selectedCase =
-            selectedReviewCase?.caseType === 'integration_failure'
-                ? selectedReviewCase
-                : selectedIntegrationCase;
 
         return (
             <AdminShell
                 title="Integrations & Connections"
-                description="Monitor Host connections and review delivery failures from one place."
+                description="Host integrations and delivery health."
                 actions={
-                    <button
-                        type="button"
-                        onClick={refreshIntegrationPage}
-                        disabled={refreshing}
-                        className="focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50"
-                    >
-                        <RefreshCw
-                            size={14}
-                            className={refreshing ? 'animate-spin' : ''}
-                            aria-hidden="true"
-                        />
-                        Refresh
+                    <button type="button" onClick={refreshIntegrationPage} disabled={refreshing}
+                        className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#D8D9D0] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+                        <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" /> Refresh
                     </button>
                 }
             >
-                <div className="min-h-[100svh] bg-[#f4f5f1] pb-6 sm:pb-8">
-                    <section className="border-b border-[#123f35] bg-[#123f35] text-white">
-                        <div className="grid lg:grid-cols-[minmax(0,1fr)_460px]">
-                            <div className="px-4 py-5 sm:px-7 sm:py-7">
-                                <p className="text-xs font-bold text-emerald-200">Connection workspace</p>
-                                <h2 className="mt-1.5 max-w-3xl text-2xl font-black leading-tight sm:text-3xl">
-                                    See which Host connections are working and which need attention.
-                                </h2>
-                                <p className="mt-2 line-clamp-2 max-w-2xl text-xs font-semibold leading-5 text-emerald-50/80 sm:hidden">
-                                    Open a connection, check its latest delivery, and start a review when something fails.
-                                </p>
-                                <p className="mt-2 hidden max-w-2xl text-sm font-semibold leading-6 text-emerald-50/80 sm:block">
-                                    This page shows webhook connections already configured by Hosts. Use it to spot failures and record the admin follow-up without exposing signing secrets.
-                                </p>
+                <div className="min-w-0 bg-[#FFFDFB] pb-5 text-[#173F35] sm:pb-8">
+                    {/* Host-first navigation replaces the old hero / counter / sidebar dashboard. */}
+                    <section className="min-w-0 bg-[#173F35] px-3 py-5 text-white sm:px-6 sm:py-6" aria-labelledby="integrations-hosts-heading">
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                            <div>
+                                <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#D5B6A0]">Connection workspace</p>
+                                <h2 id="integrations-hosts-heading" className="mt-1 text-[24px] font-bold tracking-[-0.03em] sm:text-[29px]">Select a Host</h2>
                             </div>
-
-                            <div className="grid grid-cols-2 border-t border-white/15 lg:border-l lg:border-t-0">
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[#DCE9E0]">
+                                <span><strong className="text-[18px] text-white">{integrationLoading || integrationError ? '—' : totalHosts}</strong> Hosts</span>
+                                <span><strong className="text-[18px] text-white">{integrationLoading || integrationError ? '—' : totalConnections}</strong> Connections</span>
+                                <span><strong className="text-[18px] text-white">{integrationLoading || integrationError ? '—' : Number(summary.failed || 0)}</strong> Failures</span>
+                            </div>
+                        </div>
+                        {integrationError && (
+                            <div role="alert" className="mt-4 bg-[#FFF0E8] px-4 py-3 text-[14px] text-[#813E2E]">
+                                <strong>Could not load Host connections.</strong> {integrationError}
+                                <button type="button" onClick={refreshIntegrationPage} className="focus-ring ml-2 font-bold underline">Retry</button>
+                            </div>
+                        )}
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                            <label className="flex h-11 min-w-[155px] flex-1 items-center gap-2 bg-white px-3 text-[#173F35] sm:max-w-[330px]">
+                                <SearchCheck size={18} className="shrink-0 text-[#657568]" aria-hidden="true" />
+                                <span className="sr-only">Search Hosts</span>
+                                <input type="search" value={integrationSearch} onChange={event => { setIntegrationSearch(event.target.value); setShowAllIntegrationHosts(false); }}
+                                    placeholder="Find a Host" className="min-w-0 w-full bg-transparent text-[14px] outline-none" />
+                            </label>
+                            <div className="flex max-w-full gap-1 overflow-x-auto" aria-label="Host filters">
                                 {[
-                                    ['Connections', summary.total || 0],
-                                    ['Working', summary.healthy || 0],
-                                    ['Need attention', summary.failed || 0],
-                                    ['Not used yet', summary.neverUsed || 0],
-                                ].map(([label, value], index) => (
-                                    <div
-                                        key={label}
-                                        className={`px-4 py-3 sm:px-5 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15' : ''}`}
-                                    >
-                                        <p className="text-xl font-black sm:text-2xl">{value}</p>
-                                        <p className="mt-0.5 text-[10px] font-semibold text-emerald-100 sm:text-xs">{label}</p>
-                                    </div>
+                                    ['all', 'All'], ['connected', 'Connected'], ['setup', 'Setup needed'], ['failed', 'Failed'],
+                                ].map(([value, label]) => (
+                                    <button key={value} type="button" aria-pressed={integrationHealthFilter === value}
+                                        onClick={() => { setIntegrationHealthFilter(value); setShowAllIntegrationHosts(false); }}
+                                        className={`focus-ring shrink-0 px-3 py-3 text-[12px] font-bold ${integrationHealthFilter === value
+                                            ? 'bg-[#F0DDD0] text-[#173F35]' : 'bg-white/10 text-white hover:bg-white/20'}`}>{label}</button>
                                 ))}
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-2 border-t border-white/15 lg:grid-cols-4">
-                            {[
-                                ['01', 'Choose a connection', 'Open the Host connection you want to check.'],
-                                ['02', 'Check delivery', 'See whether its latest delivery worked or failed.'],
-                                ['03', 'Review a failure', 'Record the problem when admin follow-up is needed.'],
-                                ['04', 'Close the review', 'Resolve it or keep it open for follow-up.'],
-                            ].map(([number, title, body], index) => (
-                                <div
-                                    key={number}
-                                    className={`px-4 py-3 sm:px-5 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l lg:border-white/15' : ''}`}
-                                >
-                                    <p className="text-[10px] font-black text-emerald-200 sm:text-xs">{number}</p>
-                                    <p className="mt-1 text-sm font-black">{title}</p>
-                                    <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-emerald-50/75 sm:text-xs sm:leading-5">{body}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    {integrationError ? (
-                        <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700 sm:px-7 sm:text-sm">
-                            {integrationError}
-                        </div>
-                    ) : null}
-
-                    {error ? (
-                        <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700 sm:px-7 sm:text-sm">
-                            {error}
-                        </div>
-                    ) : null}
-
-                    {notice ? (
-                        <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800 sm:px-7 sm:text-sm">
-                            {notice}
-                        </div>
-                    ) : null}
-
-                    <section className="border-b border-stone-200 bg-white">
-                        <div className="flex items-end justify-between gap-4 border-b border-stone-200 bg-[#e7f2ee] px-4 py-4 sm:px-7 sm:py-5">
-                            <div>
-                                <p className="text-xs font-bold text-emerald-700">01 · Host connections</p>
-                                <h2 className="mt-0.5 text-xl font-black text-stone-950">Check connection health</h2>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">
-                                    Select a connection to see the Host, destination and latest delivery result.
-                                </p>
-                            </div>
-                            <p className="shrink-0 text-sm font-black text-emerald-800">{summary.total || 0} total</p>
-                        </div>
-
                         {integrationLoading ? (
-                            <div className="flex min-h-36 items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-stone-500 sm:px-7">
-                                <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />
-                                Loading connections…
-                            </div>
-                        ) : !(integrationWorkspace.webhooks || []).length ? (
-                            <div className="px-4 py-6 sm:px-7">
-                                <p className="text-sm font-black text-stone-900">No Host connections are configured yet.</p>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold text-stone-500">Connections will appear here after a Host adds a webhook in its integration settings.</p>
-                            </div>
-                        ) : (
-                            <div className="grid lg:grid-cols-[360px_minmax(0,1fr)]">
-                                <aside className="border-b border-stone-200 lg:border-b-0 lg:border-r">
-                                    <div className="px-4 py-3 sm:hidden">
-                                        <label className="text-xs font-bold text-stone-600">
-                                            Choose a connection
-                                            <select
-                                                value={selectedIntegrationId}
-                                                onChange={(event) => setSelectedIntegrationId(event.target.value)}
-                                                className="mt-2 h-11 w-full rounded-xl border border-stone-300 bg-white px-3 text-sm font-bold text-stone-800 outline-none focus:border-emerald-500"
-                                            >
-                                                {(integrationWorkspace.webhooks || []).map((item) => (
-                                                    <option key={item.id} value={item.id}>
-                                                        {item.organizationName} — {item.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
-                                    </div>
-
-                                    <div className="hidden max-h-[540px] overflow-y-auto sm:block">
-                                        {(integrationWorkspace.webhooks || []).map((item, index) => {
-                                            const active = selectedIntegrationId === item.id;
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    onClick={() => setSelectedIntegrationId(item.id)}
-                                                    className={`block w-full border-t border-stone-100 px-5 py-3 text-left first:border-t-0 ${active ? 'bg-[#eef6f2]' : 'bg-white hover:bg-stone-50'}`}
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-black text-stone-950">{item.organizationName}</p>
-                                                            <p className="mt-0.5 truncate text-xs font-semibold text-stone-500">{item.name}</p>
-                                                        </div>
-                                                        <span className={`shrink-0 text-[10px] font-black ${integrationHealthClass(item)}`}>{integrationHealthLabel(item)}</span>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </aside>
-
-                                <div className="min-w-0 px-4 py-4 sm:px-6 sm:py-5">
-                                    {selectedIntegration ? (
-                                        <>
-                                            <div className="flex flex-col gap-2 border-b border-stone-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                                                <div className="min-w-0">
-                                                    <p className={`text-xs font-bold ${integrationHealthClass(selectedIntegration)}`}>{integrationHealthLabel(selectedIntegration)}</p>
-                                                    <h3 className="mt-1 truncate text-lg font-black text-stone-950 sm:text-xl">{selectedIntegration.organizationName}</h3>
-                                                    <p className="mt-1 truncate text-xs font-semibold text-stone-500">{selectedIntegration.name}</p>
-                                                </div>
-                                                <p className="text-xs font-bold text-stone-500">{selectedIntegration.endpointHost}</p>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 border-b border-stone-200 sm:grid-cols-3">
-                                                {[
-                                                    ['Latest delivery', integrationLastSeen(selectedIntegration.lastDeliveryAt)],
-                                                    ['Events', selectedIntegration.eventTypes?.length ? `${selectedIntegration.eventTypes.length} selected` : 'No events selected'],
-                                                    ['Connection', selectedIntegration.status === 'disabled' ? 'Paused' : 'Active'],
-                                                ].map(([label, value], index) => (
-                                                    <div key={label} className={`min-w-0 py-3 ${index > 0 ? 'border-l border-stone-200 pl-3 sm:pl-4' : 'pr-3 sm:pr-4'} ${index === 2 ? 'col-span-2 border-l-0 border-t border-stone-200 pl-0 sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-4' : ''}`}>
-                                                        <p className="text-[10px] font-bold text-stone-400">{label}</p>
-                                                        <p className="mt-1 line-clamp-2 text-xs font-black leading-5 text-stone-800 sm:text-sm">{value}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            <div className="pt-4">
-                                                {selectedIntegrationCase ? (
-                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div>
-                                                            <p className="text-sm font-black text-stone-900">An admin review is already open.</p>
-                                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold text-stone-500">Continue the review below and record the next decision.</p>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedReviewCase(selectedIntegrationCase)}
-                                                            className="focus-ring inline-flex min-h-10 items-center justify-center rounded-xl bg-[#173b4f] px-4 text-xs font-black text-white"
-                                                        >
-                                                            Continue review
-                                                        </button>
-                                                    </div>
-                                                ) : selectedIntegration.lastDeliveryStatus === 'failed' && canMutateDomain ? (
-                                                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                                                        <label className="text-xs font-bold text-stone-600">
-                                                            What needs attention?
-                                                            <textarea
-                                                                value={reason}
-                                                                onChange={(event) => setReason(event.target.value)}
-                                                                rows={2}
-                                                                placeholder="Briefly explain the connection problem."
-                                                                className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none focus:border-emerald-500"
-                                                            />
-                                                        </label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={createIntegrationReview}
-                                                            disabled={busy || reason.trim().length < 5}
-                                                            className="focus-ring inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-black text-white disabled:opacity-50"
-                                                        >
-                                                            Start review
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-xs font-semibold text-stone-500">
-                                                        {selectedIntegration.lastDeliveryStatus === 'failed'
-                                                            ? 'You can see this failure, but you do not have permission to start an admin review.'
-                                                            : 'No admin action is needed for this connection right now.'}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </>
-                                    ) : null}
+                            <p role="status" className="mt-4 flex items-center gap-2 text-[14px]"><LoaderCircle size={18} className="animate-spin" /> Loading Hosts…</p>
+                        ) : !integrationError && (
+                            <>
+                                <div className="mt-3 flex min-w-0 gap-2 overflow-x-auto pb-2" role="group" aria-label="Choose a Host">
+                                    {shownHosts.map(host => {
+                                        const active = selectedHost?.id === host.id;
+                                        const configured = host.webhookCount + host.serviceAccountCount > 0;
+                                        return (
+                                            <button key={host.id} type="button" aria-pressed={active}
+                                                onClick={() => { setSelectedIntegrationHostId(host.id); setSelectedIntegrationId(''); setSelectedReviewCase(null); setReason(''); setIntegrationDetailTab('overview'); }}
+                                                className={`focus-ring flex w-[215px] shrink-0 items-center gap-3 border-b-[3px] px-3 py-3 text-left transition-colors sm:w-[260px] ${active
+                                                    ? 'border-[#CA7B54] bg-white text-[#173F35]' : 'border-transparent bg-[#31594B] text-white hover:bg-[#3C6555]'}`}>
+                                                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${active
+                                                    ? 'bg-[#F0DDD0] text-[#173F35]' : 'bg-white/15 text-white'}`} aria-hidden="true">{String(host.name || 'H').trim().charAt(0).toUpperCase()}</span>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate text-[15px] font-bold">{host.name}</span>
+                                                    <span className={`mt-0.5 block text-[12px] ${active ? 'text-[#667365]' : 'text-[#D2E0D7]'}`}>
+                                                        {host.hasDeliveryFailure ? 'Delivery failed' : configured ? 'Configured' : 'Setup needed'}
+                                                    </span>
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                    {!hosts.length && <p className="px-2 py-4 text-[14px] text-[#DDE7E0]">No Host organizations returned by this environment.</p>}
+                                    {hosts.length > 0 && !shownHosts.length && <p className="px-2 py-4 text-[14px] text-[#DDE7E0]">No Hosts match this filter.</p>}
                                 </div>
-                            </div>
+                                {filteredHosts.length > 8 && (
+                                    <button type="button" onClick={() => setShowAllIntegrationHosts(value => !value)}
+                                        className="focus-ring mt-2 border border-white/35 px-4 py-2 text-[13px] font-semibold text-white">
+                                        {showAllIntegrationHosts ? 'Show fewer' : `View all ${filteredHosts.length} Hosts`}
+                                    </button>
+                                )}
+                                {totalHosts > hosts.length && (
+                                    <p className="mt-2 text-[12px] text-[#D6E2D9]">Showing {hosts.length} of {totalHosts} registered Hosts.</p>
+                                )}
+                            </>
+                        )}
+                    </section>
+                    {error && <p role="alert" className="bg-[#FFF0EA] px-4 py-3 text-[14px] text-[#8A4034]">{error}</p>}
+                    {notice && <p role="status" className="bg-[#EAF0E9] px-4 py-3 text-[14px] text-[#173F35]">{notice}</p>}
+
+                    {/* Selected Host occupies the page, with separate focused tasks instead of a split dashboard. */}
+                    <section className="min-w-0 border-b border-[#E4E5DE] bg-white" aria-labelledby="selected-host-workspace">
+                        {selectedHost ? (
+                            <>
+                                <div className="flex flex-wrap items-center justify-between gap-3 bg-[#F0DDD0] px-4 py-5 sm:px-7 sm:py-6">
+                                    <div className="min-w-0">
+                                        <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#8A563E]">Host inspection</p>
+                                        <h3 id="selected-host-workspace" className="mt-1 break-words text-[24px] font-bold tracking-[-0.03em] sm:text-[30px]">{selectedHost.name}</h3>
+                                        <p className="mt-1 text-[14px] text-[#5D6A5C]">{titleize(selectedHost.organizationType)} · {titleize(selectedHost.status)}</p>
+                                    </div>
+                                    <span className={`rounded-full px-3 py-2 text-[13px] font-bold ${selectedHostHasFailure
+                                        ? 'bg-[#F7F1E8] text-[#934E36]' : selectedHostConfigured
+                                            ? 'bg-[#E5EEE5] text-[#245640]' : 'bg-white text-[#8B573F]'}`}>
+                                        {selectedHostHasFailure ? 'Needs attention' : selectedHostConfigured ? 'Configured' : 'Setup needed'}
+                                    </span>
+                                </div>
+                                <div className="flex gap-0 overflow-x-auto border-b border-[#E0E5DC] bg-[#FCFBF9]" role="tablist" aria-label="Integration details">
+                                    {[
+                                        ['overview', 'Setup overview'],
+                                        ['webhooks', `Webhooks (${hostWebhooks.length})`],
+                                        ['api', `API access (${hostAccounts.length})`],
+                                    ].map(([value, label]) => (
+                                        <button key={value} type="button" role="tab" aria-selected={integrationDetailTab === value}
+                                            onClick={() => setIntegrationDetailTab(value)}
+                                            className={`focus-ring shrink-0 border-b-[3px] px-4 py-3.5 text-[14px] font-bold sm:px-7 ${integrationDetailTab === value
+                                                ? 'border-[#173F35] bg-white text-[#173F35]' : 'border-transparent text-[#667467] hover:bg-[#F4F5EF]'}`}>
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {integrationDetailTab === 'overview' && (
+                                    <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.85fr)]">
+                                        <div className="border-b border-[#E7E5DC] px-4 py-5 sm:px-7 sm:py-7 lg:border-b-0 lg:border-r">
+                                            <h4 className="text-[21px] font-bold">Connection setup</h4>
+                                            <div className="mt-4 divide-y divide-[#E7E9E2]">
+                                                {[
+                                                    ['Host registered', 'Host organization is available', true],
+                                                    ['API access', hostAccounts.length ? `${hostAccounts.length} account${hostAccounts.length === 1 ? '' : 's'} configured` : 'Not configured', hostAccounts.length > 0],
+                                                    ['Webhooks', hostWebhooks.length ? `${hostWebhooks.length} endpoint${hostWebhooks.length === 1 ? '' : 's'} configured` : 'Not configured', hostWebhooks.length > 0],
+                                                ].map(([label, detail, ready], index) => (
+                                                    <div key={label} className="flex items-center gap-3 py-3.5">
+                                                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${ready
+                                                            ? 'bg-[#173F35] text-white' : 'border border-[#D9C3B4] bg-[#FAEFE8] text-[#955B3E]'}`}>
+                                                            {ready ? <CheckCircle2 size={18} aria-hidden="true" /> : String(index + 1).padStart(2, '0')}
+                                                        </span>
+                                                        <span className="min-w-0 flex-1">
+                                                            <span className="block text-[15px] font-bold">{label}</span>
+                                                            <span className="mt-0.5 block text-[13px] text-[#667567]">{detail}</span>
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col justify-between bg-[#F5F6F1] px-4 py-5 sm:px-7 sm:py-7">
+                                            <div>
+                                                <p className="text-[12px] font-bold uppercase tracking-[0.05em] text-[#98624B]">Current status</p>
+                                                <h4 className="mt-2 text-[22px] font-bold leading-tight">
+                                                    {selectedHostHasFailure ? 'Delivery needs a review' : selectedHostConfigured ? 'Integration setup found' : 'Waiting for Host setup'}
+                                                </h4>
+                                                <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-[#56675A]">
+                                                    {selectedHostHasFailure ? 'Inspect the failed webhook and open a review if needed.' : selectedHostConfigured
+                                                        ? 'Open the connected endpoints or API accounts to inspect their status.'
+                                                        : 'The Host can add a webhook endpoint or API account from Host integration settings.'}
+                                                </p>
+                                            </div>
+                                            <div className="mt-5 flex flex-wrap gap-2">
+                                                <button type="button" onClick={() => setIntegrationDetailTab('webhooks')}
+                                                    className="focus-ring bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white">Inspect webhooks</button>
+                                                <button type="button" onClick={() => setIntegrationDetailTab('api')}
+                                                    className="focus-ring border border-[#CFD8CD] bg-white px-4 py-2.5 text-[14px] font-bold">API access</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {integrationDetailTab === 'webhooks' && (
+                                    <div className="px-4 py-5 sm:px-7 sm:py-6">
+                                        {hostWebhooks.length ? (
+                                            <div className="divide-y divide-[#E5E9E2] border-y border-[#E5E9E2]">
+                                                {hostWebhooks.map(webhook => (
+                                                    <button key={webhook.id} type="button" aria-pressed={chosenConnection?.id === webhook.id}
+                                                        onClick={() => { setSelectedIntegrationId(webhook.id); setSelectedReviewCase(null); setReason(''); }}
+                                                        className={`focus-ring flex w-full flex-wrap items-center justify-between gap-3 px-3 py-4 text-left ${chosenConnection?.id === webhook.id ? 'bg-[#F4F0E9]' : 'hover:bg-[#F9F9F5]'}`}>
+                                                        <span className="min-w-0 flex-1">
+                                                            <span className="block break-words text-[16px] font-bold">{webhook.name}</span>
+                                                            <span className="mt-1 block break-words text-[13px] text-[#647468]">{webhook.endpointHost} · Last delivery: {integrationLastSeen(webhook.lastDeliveryAt)}</span>
+                                                        </span>
+                                                        <span className={`text-[13px] font-bold ${integrationHealthClass(webhook)}`}>{integrationHealthLabel(webhook)}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-start gap-4 bg-[#F7F7F2] px-4 py-6">
+                                                <Webhook size={25} className="shrink-0 text-[#94664D]" aria-hidden="true" />
+                                                <div><h4 className="text-[18px] font-bold">No webhooks configured</h4><p className="mt-1 text-[14px] text-[#637065]">No delivery events are available for this Host.</p></div>
+                                            </div>
+                                        )}
+                                        {chosenConnection?.lastDeliveryStatus === 'failed' && (
+                                            <div className="mt-5 border-l-[3px] border-[#B5674E] bg-[#F8EBE2] px-4 py-5">
+                                                <h4 className="text-[17px] font-bold">Failed delivery · {chosenConnection.name}</h4>
+                                                {selectedConnectionCase ? (
+                                                    <button type="button" onClick={() => { setSelectedReviewCase(selectedConnectionCase); setReason(''); }}
+                                                        className="focus-ring mt-3 bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white">Open existing review</button>
+                                                ) : canMutateDomain ? (
+                                                    <div className="mt-3 max-w-xl">
+                                                        <label htmlFor="webhook-failure-reason" className="text-[14px] font-semibold">Reason for review</label>
+                                                        <textarea id="webhook-failure-reason" value={reason} onChange={event => setReason(event.target.value)} rows={2}
+                                                            placeholder="Describe the failed delivery" className="focus-ring mt-2 w-full border border-[#D8BFB0] bg-white px-3 py-2.5 text-[15px]" />
+                                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={createIntegrationReview}
+                                                            className="focus-ring mt-3 bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white disabled:opacity-50">Create review</button>
+                                                    </div>
+                                                ) : <p className="mt-2 text-[14px] text-[#637164]">Read-only access for this role.</p>}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {integrationDetailTab === 'api' && (
+                                    <div className="px-4 py-5 sm:px-7 sm:py-6">
+                                        {hostAccounts.length ? (
+                                            <div className="divide-y divide-[#E5E9E2] border-y border-[#E5E9E2]">
+                                                {hostAccounts.map(account => (
+                                                    <div key={account.id} className="flex items-start justify-between gap-3 px-3 py-4">
+                                                        <div className="min-w-0">
+                                                            <p className="break-words text-[16px] font-bold">{account.name}</p>
+                                                            <p className="mt-1 text-[13px] text-[#68766C]">{account.scopeCount} access scopes</p>
+                                                        </div>
+                                                        <span className="shrink-0 text-[13px] font-bold text-[#3E6A4B]">{titleize(account.status)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-start gap-4 bg-[#F7F7F2] px-4 py-6">
+                                                <ShieldCheck size={25} className="shrink-0 text-[#94664D]" aria-hidden="true" />
+                                                <div><h4 className="text-[18px] font-bold">No API accounts configured</h4><p className="mt-1 text-[14px] text-[#637065]">API access has not been set up for this Host.</p></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="px-4 py-8 text-[15px] text-[#667367]">{integrationLoading ? 'Loading Host details…' : 'Select a Host above to inspect its connections.'}</div>
                         )}
                     </section>
 
-                    <section className="border-b border-stone-200 bg-[#eef3f7]">
-                        <div className="flex items-end justify-between gap-4 border-b border-[#d6e0e7] px-4 py-4 sm:px-7 sm:py-5">
-                            <div>
-                                <p className="text-xs font-bold text-[#315f7a]">02 · Admin reviews</p>
-                                <h2 className="mt-0.5 text-xl font-black text-stone-950">Connection problems being followed up</h2>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">Reviews keep the problem and decision history together.</p>
+                    {/* Keep follow-ups compact when there are no cases, with full decision tools when needed. */}
+                    <section className="border-b border-[#E1E5DE] bg-[#FFFDFB]" aria-labelledby="integration-followups-title">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E7DF] px-4 py-4 sm:px-6">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F0DDD0] text-[#8D583F]"><History size={20} aria-hidden="true" /></span>
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#915940]">03 / Follow up</p>
+                                    <h3 id="integration-followups-title" className="text-[20px] font-bold">Delivery reviews</h3>
+                                </div>
                             </div>
-                            <p className="shrink-0 text-sm font-black text-[#315f7a]">{integrationReviewCases.length} open</p>
+                            <span className="rounded-md bg-[#EFF1E9] px-3 py-1.5 text-[13px] font-bold">{integrationReviewsLoading ? 'Loading…' : integrationReviewsError && !integrationReviewRows.length ? 'Unavailable' : `${activeConnectionCases.length} open`}</span>
                         </div>
-
-                        {integrationReviewCases.length ? (
-                            <div className="bg-white/70">
-                                {visibleIntegrationCases.map((item, index) => (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        onClick={() => setSelectedReviewCase(item)}
-                                        className={`grid w-full gap-2 px-4 py-3 text-left transition hover:bg-white sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-center sm:px-7 ${index > 0 ? 'border-t border-stone-200' : ''}`}
-                                    >
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-black text-stone-950">{item.entity?.label || item.summary}</p>
-                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold text-stone-500">{item.details || item.summary}</p>
-                                        </div>
-                                        <p className="text-xs font-bold text-stone-600">{titleize(item.status)}</p>
-                                        <span className="text-xs font-black text-[#315f7a]">Review</span>
+                        {integrationReviewsError && (
+                            <div role="alert" className="bg-[#FFF0E9] px-4 py-3 text-[14px] text-[#874836] sm:px-6">
+                                {integrationReviewsError} <button type="button" onClick={refreshIntegrationPage} className="focus-ring ml-2 font-semibold underline">Retry</button>
+                            </div>
+                        )}
+                        {integrationReviewsLoading ? (
+                            <p role="status" className="flex items-center gap-2 px-4 py-5 text-[14px] sm:px-6"><LoaderCircle className="animate-spin" size={17} /> Loading reviews…</p>
+                        ) : activeConnectionCases.length ? (
+                            <div className="divide-y divide-[#E7E9E1]">
+                                {shownConnectionCases.map(item => (
+                                    <button key={item.id} type="button" onClick={() => { setSelectedReviewCase(item); setReason(''); }}
+                                        className="focus-ring flex w-full items-center justify-between gap-3 px-4 py-4 text-left hover:bg-[#F8F8F3] sm:px-6">
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block break-words text-[15px] font-bold">{item.entity?.label || item.summary}</span>
+                                            <span className="mt-1 block text-[13px] text-[#607065]">{item.summary}</span>
+                                        </span>
+                                        <span className="shrink-0 text-[13px] font-semibold text-[#955D43]">{titleize(item.status)} <ChevronRight size={15} className="inline" /></span>
                                     </button>
                                 ))}
-
-                                {integrationReviewCases.length > 10 ? (
-                                    <div className="border-t border-stone-200 py-3 text-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAllIntegrationCases((current) => !current)}
-                                            className="focus-ring rounded-lg border border-[#bfd3df] bg-white px-4 py-2 text-xs font-black text-[#315f7a]"
-                                        >
-                                            {showAllIntegrationCases ? 'Show fewer' : `View all ${integrationReviewCases.length}`}
+                                {activeConnectionCases.length > 5 && (
+                                    <div className="py-4 text-center">
+                                        <button type="button" onClick={() => setShowAllIntegrationCases(value => !value)}
+                                            className="focus-ring border border-[#CFDACD] px-4 py-2 text-[14px] font-bold">
+                                            {showAllIntegrationCases ? 'Show fewer' : `View all ${activeConnectionCases.length} reviews`}
                                         </button>
                                     </div>
-                                ) : null}
+                                )}
                             </div>
-                        ) : (
-                            <div className="px-4 py-5 sm:px-7">
-                                <p className="text-sm font-black text-stone-900">No connection reviews are open.</p>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold text-stone-500">A failed connection can be opened for admin review from the section above.</p>
+                        ) : !integrationReviewsError ? (
+                            <div className="flex items-center gap-3 px-4 py-5 sm:px-6">
+                                <CheckCircle2 size={19} className="shrink-0 text-[#54836C]" aria-hidden="true" />
+                                <p className="text-[14px] text-[#586A5D]">{moreReviewsAvailable ? 'No active reviews in the loaded results.' : 'No open delivery reviews.'}</p>
+                            </div>
+                        ) : null}
+                        {moreReviewsAvailable && !integrationReviewsLoading && (
+                            <div className="border-t border-[#E7E9E2] px-4 py-4 text-center">
+                                <button type="button" onClick={loadMoreIntegrationReviews} disabled={integrationReviewsMoreBusy}
+                                    className="focus-ring border border-[#CED9CC] bg-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-50">
+                                    {integrationReviewsMoreBusy ? 'Loading…' : `Load more reviews (${integrationReviewRows.length} / ${integrationReviewTotal})`}
+                                </button>
                             </div>
                         )}
-                    </section>
-
-                    {selectedCase ? (
-                        <section className="border-b border-stone-200 bg-white">
-                            <div className="grid lg:grid-cols-[300px_minmax(0,1fr)]">
-                                <div className="border-b border-stone-200 bg-[#173b4f] px-4 py-4 text-white sm:px-7 sm:py-5 lg:border-b-0 lg:border-r">
-                                    <p className="text-xs font-bold text-sky-200">Selected review</p>
-                                    <h2 className="mt-1 text-lg font-black">Record the next decision</h2>
-                                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-sky-50/80">Resolve it, close it, or keep it open for follow-up.</p>
+                        {pastConnectionCases.length > 0 && (
+                            <details className="border-t border-[#E7E9E2] px-4 py-4 sm:px-6">
+                                <summary className="focus-ring cursor-pointer text-[14px] font-semibold">Past decisions ({pastConnectionCases.length})</summary>
+                                <div className="mt-3 divide-y divide-[#E8E9E2]">
+                                    {pastConnectionCases.map(item => (
+                                        <button key={item.id} type="button" onClick={() => { setSelectedReviewCase(item); setReason(''); }}
+                                            className="focus-ring flex w-full items-center justify-between gap-3 py-3 text-left text-[14px]">
+                                            <span className="min-w-0 break-words">{item.entity?.label || item.summary}</span>
+                                            <span className="shrink-0">{titleize(item.status)}</span>
+                                        </button>
+                                    ))}
                                 </div>
-                                <div className="px-4 py-4 sm:px-7 sm:py-5">
-                                    <div className="flex flex-col gap-2 border-b border-stone-200 pb-3 sm:flex-row sm:items-start sm:justify-between">
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-black text-stone-950">{selectedCase.entity?.label || selectedCase.summary}</p>
-                                            <p className="mt-0.5 line-clamp-2 text-xs font-semibold text-stone-500">{selectedCase.details || 'No additional note.'}</p>
-                                        </div>
-                                        <span className="text-xs font-black text-[#315f7a]">{titleize(selectedCase.status)}</span>
+                            </details>
+                        )}
+                    </section>
+                    {selectedCase && (
+                        <section className="border-t border-[#E7DACD] bg-[#F7EFE9] px-4 py-5 sm:px-6" aria-labelledby="integration-decision-title">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <h3 id="integration-decision-title" className="text-[21px] font-bold">Review decision</h3>
+                                <button type="button" onClick={() => { setSelectedReviewCase(null); setReason(''); }}
+                                    className="focus-ring border border-[#D5C3B4] px-3 py-2 text-[13px] font-semibold">Close</button>
+                            </div>
+                            <p className="mt-2 break-words text-[15px] font-bold">{selectedCase.entity?.label || selectedCase.summary}</p>
+                            <p className="mt-1 text-[14px] text-[#667064]">{selectedCase.details || selectedCase.summary}</p>
+                            {canMutateDomain && !['resolved', 'dismissed'].includes(String(selectedCase.status || '').toLowerCase()) ? (
+                                <div className="mt-4 max-w-3xl">
+                                    <label htmlFor="integration-decision-reason" className="text-[14px] font-bold">Decision reason</label>
+                                    <textarea id="integration-decision-reason" rows={3} value={reason} onChange={event => setReason(event.target.value)}
+                                        className="focus-ring mt-2 w-full border border-[#D9CABB] bg-white px-4 py-3 text-[15px]" placeholder="Explain the decision" />
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('resolve')}
+                                            className="focus-ring bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white disabled:opacity-50">Resolve</button>
+                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('needs_action')}
+                                            className="focus-ring border border-[#C5D4C2] bg-white px-4 py-2.5 text-[14px] font-bold disabled:opacity-50">Follow up</button>
+                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('dismiss')}
+                                            className="focus-ring border border-[#E5BCAC] bg-[#F6E1D4] px-4 py-2.5 text-[14px] font-bold text-[#8D513D] disabled:opacity-50">Close case</button>
                                     </div>
-
-                                    {canMutateDomain ? (
-                                        <div className="pt-3">
-                                            <textarea
-                                                value={reason}
-                                                onChange={(event) => setReason(event.target.value)}
-                                                rows={2}
-                                                placeholder="Reason for this decision"
-                                                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none focus:border-[#315f7a]"
-                                            />
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('resolve')} className="focus-ring rounded-lg bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50">Resolve</button>
-                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('needs_action')} className="focus-ring rounded-lg border border-[#bfd3df] bg-[#edf5f9] px-3 py-2 text-xs font-black text-[#315f7a] disabled:opacity-50">Needs follow-up</button>
-                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('dismiss')} className="focus-ring rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-black text-stone-600 disabled:opacity-50">Close</button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="pt-3 text-xs font-semibold text-stone-500">You can read this review, but you cannot change its decision.</p>
-                                    )}
                                 </div>
-                            </div>
+                            ) : <p className="mt-4 text-[14px] text-[#5F6F61]">{['resolved', 'dismissed'].includes(String(selectedCase.status || '').toLowerCase()) ? 'Review completed.' : 'Read-only for your role.'}</p>}
                         </section>
-                    ) : null}
-
-                    <section className="bg-[#eceeea] px-4 py-4 sm:px-7 sm:py-5">
-                        <div className="flex items-start gap-3">
-                            <Webhook size={18} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
-                            <div>
-                                <p className="text-sm font-black text-stone-900">Connection settings stay with the Host.</p>
-                                <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-5 text-stone-600">This page monitors delivery health and records admin follow-up. Signing secrets are never shown here.</p>
-                            </div>
-                        </div>
-                    </section>
+                    )}
                 </div>
             </AdminShell>
         );

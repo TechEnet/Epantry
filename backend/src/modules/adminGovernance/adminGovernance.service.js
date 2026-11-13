@@ -53,6 +53,7 @@ import {
 
 import {
   HostWebhookEndpoint,
+  HostServiceAccount,
 } from '../hostOperations/hostOperations.integration.models.js'
 
 import {
@@ -965,235 +966,145 @@ export async function getAdminIntegrationOverview({
   adminAuthorization,
   limit = 250,
 }) {
-  const canRead =
-    adminAuthorizationHasAnyPermission(
-      adminAuthorization,
-      [
-        'marketplace.read',
-        'host.review.read',
-        'admin.dashboard.read',
-      ],
-    )
+  const canRead = adminAuthorizationHasAnyPermission(
+    adminAuthorization,
+    ['marketplace.read', 'host.review.read', 'admin.dashboard.read'],
+  )
 
   if (!canRead) {
-    throw new ApiError(
-      403,
-      'You do not have permission to review integration health.',
-      [
-        {
-          code:
-            'ADMIN_INTEGRATION_READ_FORBIDDEN',
-        },
-      ],
-    )
+    throw new ApiError(403, 'You do not have permission to review integration health.', [
+      { code: 'ADMIN_INTEGRATION_READ_FORBIDDEN' },
+    ])
   }
 
-  const safeLimit =
-    Math.min(
-      500,
-      Math.max(
-        1,
-        Number(limit) ||
-          250,
-      ),
-    )
+  const safeLimit = Math.min(500, Math.max(1, Number(limit) || 250))
 
-  const [
-    records,
-    total,
-  ] =
-    await Promise.all([
-      HostWebhookEndpoint.find({})
-        .select(
-          '_id organizationId name endpointUrl eventTypes status lastDeliveryAt lastDeliveryStatus createdAt updatedAt',
-        )
-        .sort({
-          lastDeliveryAt: -1,
-          updatedAt: -1,
-          createdAt: -1,
-        })
-        .limit(
-          safeLimit,
-        )
-        .lean(),
+  // An organization is NOT automatically a configured webhook. Show the
+  // real Host directory and API service accounts in addition to webhooks,
+  // so an empty webhook collection cannot masquerade as an empty workspace.
+  // Never fetch API tokens, signing secrets, or full destination URLs.
+  const [webhookRecords, webhookTotal, serviceAccountRecords, serviceAccountTotal,
+    hostRecords, hostTotal] = await Promise.all([
+    HostWebhookEndpoint.find({})
+      .select('_id organizationId name endpointUrl eventTypes status lastDeliveryAt lastDeliveryStatus createdAt updatedAt')
+      .sort({ lastDeliveryAt: -1, updatedAt: -1, createdAt: -1 })
+      .limit(safeLimit).lean(),
+    HostWebhookEndpoint.countDocuments({}),
+    HostServiceAccount.find({})
+      .select('_id organizationId name scopes status createdAt updatedAt')
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(safeLimit).lean(),
+    HostServiceAccount.countDocuments({}),
+    MarketplaceOrganization.find({})
+      .select('_id displayName organizationType status updatedAt createdAt')
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(safeLimit).lean(),
+    MarketplaceOrganization.countDocuments({}),
+  ])
 
-      HostWebhookEndpoint.countDocuments({}),
-    ])
+  const organizationIds = [...new Set([
+    ...webhookRecords.map(item => id(item.organizationId)),
+    ...serviceAccountRecords.map(item => id(item.organizationId)),
+  ].filter(Boolean))]
+  const referencedOrganizations = organizationIds.length
+    ? await MarketplaceOrganization.find({ _id: { $in: organizationIds } })
+      .select('_id displayName organizationType status').lean()
+    : []
+  const organizationMap = new Map([
+    ...hostRecords,
+    ...referencedOrganizations,
+  ].map(organization => [id(organization._id), organization]))
 
-  const organizationIds = [
-    ...new Set(
-      records
-        .map(
-          (item) =>
-            id(
-              item.organizationId,
-            ),
-        )
-        .filter(Boolean),
-    ),
-  ]
+  const webhooks = webhookRecords.map(item => {
+    const organization = organizationMap.get(id(item.organizationId)) || null
+    let endpointHost = 'Endpoint configured'
+    try {
+      endpointHost = new URL(item.endpointUrl).host || endpointHost
+    } catch { /* A malformed historical URL is not a reason to hide a webhook. */ }
+    return {
+      id: id(item._id),
+      name: item.name || 'Webhook connection',
+      organizationId: id(item.organizationId),
+      organizationName: organization?.displayName || 'Host organization',
+      organizationType: organization?.organizationType || '',
+      organizationStatus: organization?.status || '',
+      endpointHost,
+      eventTypes: Array.isArray(item.eventTypes) ? item.eventTypes : [],
+      status: item.status || 'active',
+      lastDeliveryStatus: item.lastDeliveryStatus || 'never',
+      lastDeliveryAt: item.lastDeliveryAt || null,
+      updatedAt: item.updatedAt || null,
+      createdAt: item.createdAt || null,
+    }
+  })
 
-  const organizations =
-    organizationIds.length
-      ? await MarketplaceOrganization.find({
-          _id: {
-            $in:
-              organizationIds,
-          },
-        })
-          .select(
-            '_id displayName organizationType status',
-          )
-          .lean()
-      : []
+  const serviceAccounts = serviceAccountRecords.map(item => {
+    const organization = organizationMap.get(id(item.organizationId)) || null
+    return {
+      id: id(item._id),
+      organizationId: id(item.organizationId),
+      organizationName: organization?.displayName || 'Host organization',
+      name: item.name || 'API service account',
+      status: item.status || 'active',
+      scopeCount: Array.isArray(item.scopes) ? item.scopes.length : 0,
+      updatedAt: item.updatedAt || null,
+    }
+  })
 
-  const organizationMap =
-    new Map(
-      organizations.map(
-        (organization) => [
-          id(
-            organization._id,
-          ),
-          organization,
-        ],
-      ),
-    )
+  const webhooksByHost = new Map()
+  const accountsByHost = new Map()
+  for (const webhook of webhooks) {
+    const list = webhooksByHost.get(webhook.organizationId) || []
+    list.push(webhook)
+    webhooksByHost.set(webhook.organizationId, list)
+  }
+  for (const account of serviceAccounts) {
+    const list = accountsByHost.get(account.organizationId) || []
+    list.push(account)
+    accountsByHost.set(account.organizationId, list)
+  }
+  const hosts = hostRecords.map(organization => {
+    const organizationId = id(organization._id)
+    const hostWebhooks = webhooksByHost.get(organizationId) || []
+    const hostAccounts = accountsByHost.get(organizationId) || []
+    return {
+      id: organizationId,
+      name: organization.displayName || 'Host organization',
+      organizationType: organization.organizationType || 'seller',
+      status: organization.status || 'pending',
+      webhookCount: hostWebhooks.length,
+      serviceAccountCount: hostAccounts.length,
+      hasDeliveryFailure: hostWebhooks.some(item =>
+        item.status === 'active' && item.lastDeliveryStatus === 'failed'),
+      updatedAt: organization.updatedAt || null,
+    }
+  })
 
-  const webhooks =
-    records.map(
-      (item) => {
-        const organization =
-          organizationMap.get(
-            id(
-              item.organizationId,
-            ),
-          ) ||
-          null
-
-        let endpointHost =
-          'Endpoint configured'
-
-        try {
-          endpointHost =
-            new URL(
-              item.endpointUrl,
-            ).host ||
-            endpointHost
-        } catch {
-          endpointHost =
-            'Endpoint configured'
-        }
-
-        return {
-          id:
-            id(
-              item._id,
-            ),
-          name:
-            item.name ||
-            'Webhook connection',
-          organizationId:
-            id(
-              item.organizationId,
-            ),
-          organizationName:
-            organization?.displayName ||
-            'Host organization',
-          organizationType:
-            organization?.organizationType ||
-            '',
-          organizationStatus:
-            organization?.status ||
-            '',
-          endpointHost,
-          eventTypes:
-            Array.isArray(
-              item.eventTypes,
-            )
-              ? item.eventTypes
-              : [],
-          status:
-            item.status ||
-            'active',
-          lastDeliveryStatus:
-            item.lastDeliveryStatus ||
-            'never',
-          lastDeliveryAt:
-            item.lastDeliveryAt ||
-            null,
-          updatedAt:
-            item.updatedAt ||
-            null,
-          createdAt:
-            item.createdAt ||
-            null,
-        }
-      },
-    )
-
-  const active =
-    webhooks.filter(
-      (item) =>
-        item.status ===
-        'active',
-    )
-
-  const failed =
-    active.filter(
-      (item) =>
-        item.lastDeliveryStatus ===
-        'failed',
-    )
-
-  const healthy =
-    active.filter(
-      (item) =>
-        item.lastDeliveryStatus ===
-        'success',
-    )
-
-  const neverUsed =
-    active.filter(
-      (item) =>
-        item.lastDeliveryStatus ===
-        'never',
-    )
-
+  const active = webhooks.filter(item => item.status === 'active')
   return {
     summary: {
-      total,
-      active:
-        active.length,
-      failed:
-        failed.length,
-      healthy:
-        healthy.length,
-      neverUsed:
-        neverUsed.length,
-      disabled:
-        webhooks.filter(
-          (item) =>
-            item.status ===
-            'disabled',
-        ).length,
-      organizations:
-        new Set(
-          webhooks
-            .map(
-              (item) =>
-                item.organizationId,
-            )
-            .filter(Boolean),
-        ).size,
+      // `total` keeps its pre-existing meaning (webhooks), for old clients.
+      total: webhookTotal,
+      active: active.length,
+      failed: active.filter(item => item.lastDeliveryStatus === 'failed').length,
+      healthy: active.filter(item => item.lastDeliveryStatus === 'success').length,
+      neverUsed: active.filter(item => item.lastDeliveryStatus === 'never').length,
+      disabled: webhooks.filter(item => item.status === 'disabled').length,
+      organizations: hostTotal,
+      serviceAccounts: serviceAccountTotal,
+      connections: webhookTotal + serviceAccountTotal,
     },
     webhooks,
+    serviceAccounts,
+    hosts,
     pagination: {
-      total,
-      limit:
-        safeLimit,
-      hasMore:
-        total >
-        safeLimit,
+      total: webhookTotal,
+      limit: safeLimit,
+      hasMore: webhookTotal > webhookRecords.length,
+      hostTotal,
+      hostsLoaded: hosts.length,
+      serviceAccountTotal,
+      serviceAccountsLoaded: serviceAccounts.length,
     },
   }
 }
@@ -1608,7 +1519,7 @@ export async function listAdminMarketplaceOrderExceptions({
     'substitution_requested',
   ]
 
-  const [orders, counts] =
+  const [orders, counts, recentSellerOrders, recentOrdersTotal] =
     await Promise.all([
       SellerOrder
         .find({
@@ -1644,6 +1555,15 @@ export async function listAdminMarketplaceOrderExceptions({
           },
         },
       ]),
+      // Show genuine SellerOrder records alongside exception-only metrics.
+      // This list is read-only; ordinary orders are not treated as disputes.
+      SellerOrder
+        .find({})
+        .select('_id parentOrderId organizationId sellerName items commercialSnapshot fulfillment status createdAt updatedAt')
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(20)
+        .lean(),
+      SellerOrder.countDocuments({}),
     ])
 
   const summary = {
@@ -1669,8 +1589,26 @@ export async function listAdminMarketplaceOrderExceptions({
     }
   }
 
-  return {
-    orders: orders.map((order) => {
+  // SellerOrder stores a ProductVersion reference per line, not an image snapshot.
+  // Resolve the real approved catalog images in one bounded query for recent orders.
+  const recentProductVersionIds = [
+    ...new Set(recentSellerOrders.flatMap((order) =>
+      (order.items || []).map((item) => id(item?.productVersionId)).filter(Boolean))),
+  ]
+  const recentProductVersions = recentProductVersionIds.length
+    ? await ProductVersion.find({ _id: { $in: recentProductVersionIds } })
+        .select('_id images')
+        .lean()
+    : []
+  const productImageByVersionId = new Map(recentProductVersions.map((version) => {
+    const candidate = (version.images || [])
+      .find((image) => typeof image?.url === 'string' && image.url.trim())?.url?.trim() || ''
+    // Only allow real web/first-party image paths through the read-only API.
+    const safeUrl = /^(https?:\/\/|\/(?!\/))/i.test(candidate) ? candidate : ''
+    return [id(version._id), safeUrl]
+  }))
+
+  const serializeOrder = (order) => {
       const itemNames = (order.items || [])
         .map((item) => String(item?.displayName || '').trim())
         .filter(Boolean)
@@ -1688,15 +1626,30 @@ export async function listAdminMarketplaceOrderExceptions({
         status: order.status,
         itemCount: itemNames.length || (order.items || []).length,
         itemNames,
+        // Original order-line names and quantities stay attached to their own photos.
+        items: (order.items || []).map((item) => ({
+          name: String(item?.displayName || '').trim() || 'Product',
+          imageUrl: productImageByVersionId.get(id(item?.productVersionId)) || '',
+          packCount: Number(item?.packCount || 0),
+          packQuantity: Number(item?.packQuantity || 0),
+          packUnit: String(item?.packUnit || ''),
+          lineTotalMinor: item?.lineTotal?.amountMinor ?? null,
+        })),
         totalMinor,
         currency: order?.commercialSnapshot?.currency || 'INR',
         fulfillmentType: order?.fulfillment?.fulfillmentType || null,
         createdAt: order.createdAt || null,
         updatedAt: order.updatedAt || null,
       }
-    }),
+    }
+
+  return {
+    orders: orders.map(serializeOrder),
     summary,
     limitedTo: 100,
+    recentOrders: recentSellerOrders.map(serializeOrder),
+    recentOrdersTotal,
+    recentOrdersLimitedTo: 20,
   }
 }
 
