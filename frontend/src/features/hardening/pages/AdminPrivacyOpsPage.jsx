@@ -6,6 +6,7 @@ import MediaPrivacyReviewQueue from '../components/MediaPrivacyReviewQueue'
 import {
   createRegulatoryProfile,
   createRetentionPolicy,
+  executeEligiblePrivacyErasure,
   getHardeningErrorMessage,
   listPrivacyRequests,
   listRegulatoryProfiles,
@@ -15,6 +16,15 @@ import {
   updatePrivacyRequest,
 } from '../services/hardening.service'
 
+const COMPLETION_CLASSES = ['account_profile','addresses','saved_content','preferences','orders_payments',
+  'host_business','consents','logs_security','external_processors']
+const COMPLETION_DISPOSITIONS = ['provided','corrected','erased','restricted','retained_lawfully','not_held','not_applicable']
+function initChecklist(entries = []) {
+  return COMPLETION_CLASSES.map(dataClass => {
+    const found = entries.find(e => e.dataClass === dataClass) || {}
+    return { dataClass, disposition: found.disposition || 'not_applicable', evidenceRef: found.evidenceRef || '', note: found.note || '' }
+  })
+}
 const inputClass = 'pp-input focus-ring min-w-0 w-full'
 const buttonClass = 'pp-button pp-button-primary focus-ring'
 const secondaryButton = 'pp-button pp-button-secondary focus-ring'
@@ -254,6 +264,12 @@ export default function AdminPrivacyOpsPage() {
   const [workflowStatus, setWorkflowStatus] = useState('in_review')
   const [blockedReasonCode, setBlockedReasonCode] = useState('')
   const [exportArtifactStatus, setExportArtifactStatus] = useState('not_generated')
+  const [identityVerificationStatus, setIdentityVerificationStatus] = useState('pending')
+  const [retentionDecision, setRetentionDecision] = useState('not_reviewed')
+  const [resolutionEvidenceRef, setResolutionEvidenceRef] = useState('')
+  const [responseNote, setResponseNote] = useState('')
+  const [fulfilmentChecklist, setFulfilmentChecklist] = useState(() => initChecklist())
+  const [erasureReason, setErasureReason] = useState('')
   const [workflowReason, setWorkflowReason] = useState('Reviewed customer privacy request.')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -303,6 +319,12 @@ export default function AdminPrivacyOpsPage() {
     setWorkflowStatus(selectedPrivacy.status === 'submitted' ? 'in_review' : selectedPrivacy.status)
     setBlockedReasonCode(selectedPrivacy.blockedReasonCode || '')
     setExportArtifactStatus(selectedPrivacy.exportArtifactStatus || 'not_generated')
+    setIdentityVerificationStatus(selectedPrivacy.identityVerificationStatus || 'pending')
+    setRetentionDecision(selectedPrivacy.retentionDecision || 'not_reviewed')
+    setResolutionEvidenceRef(selectedPrivacy.resolutionEvidenceRef || '')
+    setResponseNote(selectedPrivacy.responseNote || '')
+    setFulfilmentChecklist(initChecklist(selectedPrivacy.fulfilmentChecklist))
+    setErasureReason('')
   }, [selectedPrivacy])
 
   async function savePrivacyWorkflow() {
@@ -311,6 +333,8 @@ export default function AdminPrivacyOpsPage() {
     try {
       await updatePrivacyRequest(selectedPrivacy.id, {
         status: workflowStatus, blockedReasonCode, exportArtifactStatus, reason: workflowReason,
+        identityVerificationStatus, retentionDecision, resolutionEvidenceRef, responseNote,
+        fulfilmentChecklist: fulfilmentChecklist.filter(item => item.evidenceRef.trim().length >= 6),
       })
       setNotice('Privacy request updated. The decision has been recorded.')
       await load()
@@ -319,6 +343,17 @@ export default function AdminPrivacyOpsPage() {
     } finally { setBusy(false) }
   }
 
+  async function eraseEligibleData() {
+    if (!selectedPrivacy || erasureReason.trim().length < 30 ||
+        !window.confirm('Delete eligible personal addresses, saved bookmarks and preferences for this verified request? This action cannot be undone.')) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const result = await executeEligiblePrivacyErasure(selectedPrivacy.id, erasureReason.trim())
+      setNotice(`Personal-data cleanup saved with evidence ${result.evidenceRef || 'reference'}. Other data classes still need review.`)
+      await load()
+    } catch (requestError) { setError(getHardeningErrorMessage(requestError, 'Unable to erase scoped data.')) }
+    finally { setBusy(false) }
+  }
   async function runLifecycle(kind, record, action) {
     setBusy(true); setError(''); setNotice('')
     try {
@@ -447,14 +482,44 @@ export default function AdminPrivacyOpsPage() {
                 <div className="pp-selected-request">
                   <p className="pp-row-title">{titleize(selectedPrivacy.requestType)}</p>
                   <p className="pp-muted mt-1 break-all">{selectedPrivacy.user?.email || selectedPrivacy.userId}</p>
-                  <p className="pp-muted mt-1">Submitted {formatDate(selectedPrivacy.requestedAt)} · Retention checks: {selectedPrivacy.retentionEvaluation?.length || 0}</p>
+                  <p className="pp-muted mt-1">Submitted {formatDate(selectedPrivacy.requestedAt)} · Due {formatDate(selectedPrivacy.dueAt)} · Retention checks: {selectedPrivacy.retentionEvaluation?.length || 0}</p>
+                  {selectedPrivacy.requestMessage && <p className="pp-muted mt-1">Requester: {selectedPrivacy.requestMessage}</p>}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Request status"><select className={inputClass} value={workflowStatus} onChange={(event) => setWorkflowStatus(event.target.value)}>{['submitted','in_review','blocked','processing','completed','rejected','cancelled'].map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></Field>
                   <Field label="Data export"><select className={inputClass} value={exportArtifactStatus} onChange={(event) => setExportArtifactStatus(event.target.value)}>{['not_generated','available','expired'].map((value) => <option key={value} value={value}>{titleize(value)}</option>)}</select></Field>
+                  <Field label="Identity check"><select className={inputClass} value={identityVerificationStatus} onChange={(event) => setIdentityVerificationStatus(event.target.value)}>{['pending', 'additional_information', 'verified'].map((item) => <option key={item} value={item}>{titleize(item)}</option>)}</select></Field>
+                  <Field label="Retention decision"><select className={inputClass} value={retentionDecision} onChange={(event) => setRetentionDecision(event.target.value)}>{['not_reviewed','retain_required','eligible_action_completed','mixed'].map((item) => <option key={item} value={item}>{titleize(item)}</option>)}</select></Field>
+                  <Field label="Evidence / completed action reference" span><input className={inputClass} value={resolutionEvidenceRef} onChange={(event) => setResolutionEvidenceRef(event.target.value)} placeholder="Internal evidence ID; required on completion" /></Field>
+                  <Field label="Response shown to requester" span><textarea rows={2} className={inputClass} value={responseNote} onChange={(event) => setResponseNote(event.target.value)} placeholder="Explain the decision clearly" /></Field>
                   <Field label="Reason if blocked" span><input className={inputClass} value={blockedReasonCode} onChange={(event) => setBlockedReasonCode(event.target.value)} placeholder="Reason code, if applicable" /></Field>
                   <Field label="Decision note" span><textarea className={inputClass} rows={3} value={workflowReason} onChange={(event) => setWorkflowReason(event.target.value)} /></Field>
                 </div>
+                <details className="mt-4 border-t border-[#dce3dd] pt-3" open={workflowStatus === 'completed'}>
+                  <summary className="cursor-pointer text-[15px] font-bold text-[#173f35]">Fulfilment evidence / nine data classes</summary>
+                  <p className="pp-muted my-3">A request cannot be completed until every category has a reviewed disposition and evidence reference. For retained records, include the legal-hold basis.</p>
+                  <div className="grid gap-3">
+                    {fulfilmentChecklist.map((entry, index) => <div key={entry.dataClass} className="grid gap-2 border-b border-[#e4e8e0] pb-3 sm:grid-cols-[1fr_1fr]">
+                      <label className="text-sm font-semibold">{titleize(entry.dataClass)}<select className={`${inputClass} mt-1`} value={entry.disposition}
+                        onChange={e => setFulfilmentChecklist(old => old.map((x,i) => i === index ? { ...x, disposition:e.target.value } : x))}>
+                          {COMPLETION_DISPOSITIONS.map(d => <option key={d} value={d}>{titleize(d)}</option>)}
+                      </select></label>
+                      <label className="text-sm font-semibold">Evidence / operation reference<input className={`${inputClass} mt-1`} maxLength={500} value={entry.evidenceRef}
+                        onChange={e => setFulfilmentChecklist(old => old.map((x,i) => i === index ? { ...x, evidenceRef:e.target.value } : x))} /></label>
+                      <label className="text-sm font-semibold sm:col-span-2">Review note / legal-hold basis<input className={`${inputClass} mt-1`} maxLength={500} value={entry.note}
+                        onChange={e => setFulfilmentChecklist(old => old.map((x,i) => i === index ? { ...x, note:e.target.value } : x))} /></label>
+                    </div>)}
+                  </div>
+                </details>
+                {selectedPrivacy.requestType === 'deletion' && !selectedPrivacy.scopedErasureRunRef &&
+                  selectedPrivacy.status === 'processing' && selectedPrivacy.identityVerificationStatus === 'verified' &&
+                  selectedPrivacy.retentionDecision !== 'not_reviewed' && <div className="mt-4 border-t border-[#dce3dd] pt-4">
+                    <strong className="text-sm text-[#173f35]">Eligible personal-data cleanup</strong>
+                    <p className="pp-muted my-2">Deletes only this customer's saved bookmarks, delivery addresses and preferences. Financial, Host KYB, consent and audit records are never auto-deleted.</p>
+                    <textarea className={inputClass} rows={2} placeholder="Describe verified retention review and the specific reason (30+ characters)" value={erasureReason} onChange={e => setErasureReason(e.target.value)} maxLength={1200}/>
+                    <button type="button" onClick={eraseEligibleData} disabled={busy || erasureReason.trim().length < 30} className={`${secondaryButton} mt-2`}>Execute verified scoped cleanup</button>
+                  </div>}
+                {selectedPrivacy.scopedErasureRunRef && <p className="pp-muted mt-3 break-all">Executed cleanup evidence: {selectedPrivacy.scopedErasureRunRef}</p>}
                 <button type="button" disabled={busy} onClick={savePrivacyWorkflow} className={`${buttonClass} mt-4`}>Save decision</button>
               </div> : <p className="pp-muted rounded-lg border border-[#D9E5EA] bg-white p-4">Select a request to review.</p>}
             </div>

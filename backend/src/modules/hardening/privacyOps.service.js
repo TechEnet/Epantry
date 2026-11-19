@@ -6,9 +6,7 @@ import {
   recordAdminAuditEvent,
 } from '../admin/adminAudit.service.js'
 
-import {
-  PrivacyRightsRequest,
-} from './hardening.models.js'
+import { PrivacyRightsRequest, PRIVACY_COMPLETION_CLASSES, PRIVACY_COMPLETION_DISPOSITIONS } from './hardening.models.js'
 
 const PRIVACY_WORKFLOW_TRANSITIONS =
   Object.freeze({
@@ -164,8 +162,18 @@ function serializePrivacyRequest(
     status:
       item.status,
 
-    requestedAt:
-      item.requestedAt,
+    requestedAt: item.requestedAt,
+    dueAt: item.dueAt || null,
+    requestMessage: item.requestMessage || '',
+    identityVerificationStatus: item.identityVerificationStatus || 'pending',
+    identityVerifiedAt: item.identityVerifiedAt || null,
+    retentionDecision: item.retentionDecision || 'not_reviewed',
+    resolutionEvidenceRef: item.resolutionEvidenceRef || '',
+    fulfilmentChecklist: item.fulfilmentChecklist || [],
+    scopedErasureRunRef: item.scopedErasureRunRef || '',
+    scopedErasureCounts: item.scopedErasureCounts || null,
+    scopedErasureAt: item.scopedErasureAt || null,
+    responseNote: item.responseNote || '',
 
     retentionEvaluation:
       item.retentionEvaluation ||
@@ -403,6 +411,47 @@ export async function updatePrivacyRequestForAdmin({
       ],
     )
   }
+
+  if (['processing', 'completed'].includes(input.status) &&
+      input.identityVerificationStatus !== 'verified') {
+    throw new ApiError(409, 'Identity must be verified before a request is processed or completed.')
+  }
+  if (input.status === 'completed') {
+    const entries = input.fulfilmentChecklist || request.fulfilmentChecklist || []
+    const covered = new Set(entries.map(e => e.dataClass))
+    if (entries.length !== PRIVACY_COMPLETION_CLASSES.length || covered.size !== PRIVACY_COMPLETION_CLASSES.length ||
+        PRIVACY_COMPLETION_CLASSES.some(key => !covered.has(key)) ||
+        entries.some(e => !PRIVACY_COMPLETION_DISPOSITIONS.includes(e.disposition) ||
+          String(e.evidenceRef || '').trim().length < 6 ||
+          (e.disposition === 'retained_lawfully' && String(e.note || '').trim().length < 12))) {
+      throw new ApiError(409, 'Completion requires evidence for all nine personal-data classes; lawful retention needs a reason.')
+    }
+  }
+  if (input.status === 'completed' && (!input.resolutionEvidenceRef || !input.responseNote)) {
+    throw new ApiError(400, 'Completion requires evidence reference and a response to the requester.')
+  }
+  if (input.status === 'completed' && request.requestType === 'deletion' &&
+      input.retentionDecision === 'not_reviewed') {
+    throw new ApiError(400, 'Deletion completion requires a documented retention/legal-hold decision.')
+  }
+  if (input.exportArtifactStatus === 'available' &&
+      (request.requestType !== 'access_export' || input.identityVerificationStatus !== 'verified')) {
+    throw new ApiError(409, 'Only identity-verified access requests may offer an export.')
+  }
+
+  if (input.identityVerificationStatus === 'verified' && request.identityVerificationStatus !== 'verified') {
+    request.identityVerifiedAt = new Date()
+    request.identityVerifiedByUserId = actorId(actorUser)
+  }
+  if (input.identityVerificationStatus !== 'verified') {
+    request.identityVerifiedAt = null
+    request.identityVerifiedByUserId = null
+  }
+  request.identityVerificationStatus = input.identityVerificationStatus
+  request.retentionDecision = input.retentionDecision
+  request.resolutionEvidenceRef = input.resolutionEvidenceRef
+  request.responseNote = input.responseNote
+  if (input.fulfilmentChecklist) request.fulfilmentChecklist = input.fulfilmentChecklist
 
   request.status =
     input.status

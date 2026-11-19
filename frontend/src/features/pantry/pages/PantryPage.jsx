@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowRight, RefreshCw, Search, X } from "lucide-react";
 
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { useAppStore } from "../../../store/app.store";
 
@@ -571,6 +571,11 @@ const PANTRY_STYLES = `
 `;
 
 export default function PantryPage() {
+  const [searchParams] = useSearchParams();
+  const candidateReturn = searchParams.get("returnTo") || "";
+  const returnTo = /^\/recipes\/[a-z0-9_-]{1,180}(?:\?[^#]*)?(?:#[a-z0-9_-]+)?$/i.test(candidateReturn) ||
+    /^\/outcome-plans\/[a-f0-9]{24}(?:\/basket)?$/i.test(candidateReturn)
+      ? candidateReturn : "";
   const advancedPantryEnabled = useAppStore(
     (state) => state.featureFlags?.["m21.advanced_pantry"] === true
   );
@@ -804,6 +809,12 @@ export default function PantryPage() {
   return (
     <main className="page-shell pk-page">
       <style>{PANTRY_STYLES}</style>
+      {returnTo && (
+        <div className="pk-container flex flex-wrap items-center justify-between gap-3 border-b border-[#C9D6CA] bg-[#E7F1E7] px-4 py-3 sm:px-6" aria-label="Cooking journey return">
+          <Link to={returnTo} className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] underline underline-offset-4">← Back to your recipe plan</Link>
+          <span className="text-sm text-[#52645A]">After changing Pantry quantities, recheck the recipe requirements.</span>
+        </div>
+      )}
 
       <header className="pk-header" aria-labelledby="pantry-page-heading">
         <div className="pk-container pk-header__grid">
@@ -1037,7 +1048,7 @@ export default function PantryPage() {
                           <>
                             <Link
                               className="pk-item__action-link"
-                              to={`/pantry/items/${encodeURIComponent(id)}`}
+                              to={`/pantry/items/${encodeURIComponent(id)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
                             >
                               Check &amp; update{" "}
                               <ArrowRight size={15} aria-hidden="true" />
@@ -1194,7 +1205,7 @@ export default function PantryPage() {
                           <>
                             <Link
                               className="pk-btn pk-btn--main"
-                              to={`/pantry/items/${encodeURIComponent(id)}`}
+                              to={`/pantry/items/${encodeURIComponent(id)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
                               onClick={() => setShowAllItems(false)}
                             >
                               Check &amp; update

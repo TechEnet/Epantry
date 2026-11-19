@@ -3304,6 +3304,27 @@ export async function createExternalHandoffFromQuote({
     )
   }
 
+  const outcome =
+    await getOutcomePlan({
+      planId:
+        quote.outcomePlanId,
+
+      actorUser,
+    })
+
+  // A quote is tied to an exact basket revision. Never hand off shortage
+  // quantities from an old revision after pantry or servings change.
+  if (
+    Number(outcome.plan.revision) !==
+    Number(quote.outcomePlanRevision)
+  ) {
+    throw new ApiError(
+      409,
+      'This comparison is outdated. Refresh the basket comparison before leaving EPANTRY.',
+      [{ code: 'EXTERNAL_HANDOFF_QUOTE_STALE' }],
+    )
+  }
+
   const existing =
     await ExternalHandoff
       .findOne({
@@ -3343,14 +3364,6 @@ export async function createExternalHandoffFromQuote({
       },
     }
   }
-
-  const outcome =
-    await getOutcomePlan({
-      planId:
-        quote.outcomePlanId,
-
-      actorUser,
-    })
 
   const items =
     (

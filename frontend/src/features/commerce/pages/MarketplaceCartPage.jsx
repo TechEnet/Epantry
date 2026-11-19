@@ -55,6 +55,8 @@ import {
   getOutcomePlanErrorMessage,
 } from '../../outcomes/services/outcomePlan.service'
 
+import { attachRecipeCart, getCookingReturnPath } from '../../recipes/utils/cookingJourney'
+
 const RECIPE_CART_PENDING_KEY =
   'epantry-pending-recipe-cart'
 
@@ -711,7 +713,7 @@ export default function MarketplaceCartPage() {
         const selectedIds = [...new Set(recipeIngredientSignature.split('|'))]
         const outcome = await createRecipeOutcomePlan(recipeCart.slug, {
           targetServings: Number(recipeCart.servings || 1),
-          purchaseMode: 'full_recipe',
+          purchaseMode: 'missing_only',
           selectedCanonicalIngredientIds: selectedIds,
           idempotencyKey: createOutcomePlanIdempotencyKey('recipe-pin-availability'),
         })
@@ -741,7 +743,7 @@ export default function MarketplaceCartPage() {
         setRecipePinCoverage({
           status: required > 0
             ? (option && matched === required ? 'available' : 'unavailable')
-            : 'error',
+            : 'covered',
           pincode: pin,
           unmatchedNames,
         })
@@ -941,7 +943,7 @@ export default function MarketplaceCartPage() {
                   ),
 
                 purchaseMode:
-                  'full_recipe',
+                  'missing_only',
 
                 selectedCanonicalIngredientIds:
                   selectedIngredientIds,
@@ -1025,6 +1027,12 @@ export default function MarketplaceCartPage() {
               0 &&
             matchedRequirementCount ===
               totalRequirementCount
+
+          if (totalRequirementCount === 0) {
+            setRecipeCoverageIssue(null)
+            setError('Your confirmed Pantry now covers these ingredients. No purchase is needed. Return to your recipe or update your basket if you want other items.')
+            return
+          }
 
           if (
             !selectedOption ||
@@ -1189,6 +1197,7 @@ export default function MarketplaceCartPage() {
             // Server checkout remains authoritative if browser storage fails.
           }
 
+          attachRecipeCart(recipeCart?.slug, finalCartId)
           navigate(
             `/checkout/${finalCartId}`,
             {
@@ -1396,6 +1405,12 @@ export default function MarketplaceCartPage() {
               <span className="sm:hidden">{hasRecipe ? 'Recipe' : 'Continue shopping'}</span>
               <span className="hidden sm:inline">{hasRecipe ? 'Back to recipe' : 'Continue shopping'}</span>
             </Link>
+            {(isRecipeCart ? getCookingReturnPath({ slug: recipeCart?.slug }) : getCookingReturnPath({ cartId })) && (
+              <Link to={isRecipeCart ? getCookingReturnPath({ slug: recipeCart?.slug }) : getCookingReturnPath({ cartId })}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-3 text-sm font-semibold text-[#173F35]">
+                Continue cooking <ArrowRight size={15} aria-hidden="true" />
+              </Link>
+            )}
             <Link to="/grocery" className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-[#173F35] hover:underline">
               <span className="sm:hidden">Grocery</span><span className="hidden sm:inline">Browse grocery</span> <ArrowRight size={15} aria-hidden="true" />
             </Link>
@@ -1604,6 +1619,8 @@ export default function MarketplaceCartPage() {
                               ? `Recipe ingredients can be delivered to PIN ${selectedRecipePincode}.`
                               : recipePinCoverage.status === 'unavailable'
                                 ? `Some ingredients are unavailable for PIN ${selectedRecipePincode}${recipePinCoverage.unmatchedNames?.length ? `: ${recipePinCoverage.unmatchedNames.join(', ')}` : ''}.`
+                                : recipePinCoverage.status === 'covered'
+                                  ? 'Your confirmed Pantry covers these ingredients. Nothing additional is needed for this recipe.'
                                 : recipePinCoverage.status === 'error'
                                   ? (recipePinCoverage.message || 'Unable to check delivery right now.')
                                   : 'Enter your delivery PIN to check current Hosts.'}

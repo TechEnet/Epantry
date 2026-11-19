@@ -41,6 +41,7 @@ import {
   listPrivacyRequestsForAdmin,
   updatePrivacyRequestForAdmin,
 } from '../hardening/privacyOps.service.js'
+import { executeEligiblePrivacyErasure } from '../hardening/privacyFulfilment.service.js'
 
 import {
   getDeploymentSecurityOverview,
@@ -100,6 +101,9 @@ const listQuerySchema = z
       z.enum([
         'access_export',
         'deletion',
+        'rectification',
+        'restriction',
+        'objection',
       ])
         .optional(),
   })
@@ -312,11 +316,18 @@ const privacyRequestUpdateSchema = z
       ])
         .optional(),
 
-    reason:
-      z.string()
-        .trim()
-        .min(1)
-        .max(2000),
+    reason: z.string().trim().min(1).max(2000),
+    fulfilmentChecklist: z.array(z.strictObject({
+      dataClass: z.enum(['account_profile','addresses','saved_content','preferences','orders_payments',
+        'host_business','consents','logs_security','external_processors']),
+      disposition: z.enum(['provided','corrected','erased','restricted','retained_lawfully','not_held','not_applicable']),
+      evidenceRef: z.string().trim().min(6).max(500),
+      note: z.string().trim().max(500).default(''),
+    })).max(9).optional(),
+    identityVerificationStatus: z.enum(['pending', 'verified', 'additional_information']),
+    retentionDecision: z.enum(['not_reviewed', 'retain_required', 'eligible_action_completed', 'mixed']),
+    resolutionEvidenceRef: z.string().trim().max(500),
+    responseNote: z.string().trim().max(1200),
   })
   .strict()
 
@@ -414,6 +425,24 @@ adminReliabilityRouter.use(
   requireMfaAssurance,
   loadAdminAuthorization,
   requireAdminAccess,
+)
+
+// Destructive actions are strictly user-scoped, reviewed and recorded. No orders,
+// business KYB, audit records or payment histories are ever deleted here.
+adminReliabilityRouter.post('/privacy-requests/:id/erase-eligible',
+  requireAnyAdminPermission('trust_safety.mutate'),
+  requireCsrfToken, requireRecentMfaAuthentication,
+  wrap(async (req, res) => {
+    const { id } = parseOrThrow(privacyRequestParamsSchema, req.params, 'PRIVACY_ERASE_ID_INVALID')
+    const data = parseOrThrow(z.strictObject({
+      confirmation: z.literal('ERASE ELIGIBLE PERSONAL DATA'),
+      reason: z.string().trim().min(30).max(1200),
+    }), req.body, 'PRIVACY_ERASE_INPUT_INVALID')
+    return send(req, res, await executeEligiblePrivacyErasure({
+      privacyRequestId: id, actorUser: actorUser(req), adminAuthorization: req.adminAuthorization,
+      reason: data.reason, requestId: req.requestId,
+    }), 'Scoped personal data cleanup completed.')
+  }),
 )
 
 adminReliabilityRouter.get(

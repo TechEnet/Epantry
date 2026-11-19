@@ -2,6 +2,8 @@ import {
   Router,
 } from 'express'
 
+import { rateLimit } from 'express-rate-limit'
+
 import {
   sensitiveResponseNoStoreMiddleware,
 } from '../../middlewares/security.middleware.js'
@@ -25,6 +27,7 @@ import {
   checkItemAvailability,
   createAvailabilityWatch,
   getNotificationPreferences,
+  listCustomerDemandBoard,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -182,8 +185,18 @@ router.post(
   ),
 )
 
+const customerRequestRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 12,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => String(actorUser(req)?._id || 'unresolved-account'),
+  message: { message: 'Too many requests. Please try again shortly.' },
+})
+
 router.post(
   '/availability-watches',
+  customerRequestRateLimit,
   requireCsrfToken,
 
   wrap(
@@ -197,6 +210,11 @@ router.post(
           req.body,
           'AVAILABILITY_WATCH_INPUT_INVALID',
         )
+
+      if (input.source === 'search' && (actorUser(req)?.customerEnabled !== true ||
+          actorUser(req)?.activeMode === 'host' || actorUser(req)?.superAdminEnabled === true)) {
+        throw new ApiError(403, 'Customer access is required to request an item.')
+      }
 
       return res
         .status(200)
@@ -220,6 +238,24 @@ router.post(
     },
   ),
 )
+
+router.get('/customer-demand', wrap(async (req, res) => {
+  const user = actorUser(req)
+  if (!(user?.superAdminEnabled === true ||
+    (user?.hostEnabled === true && user?.hostAccessStatus === 'active' &&
+      (user?.activeMode === 'host' || user?.customerEnabled !== true)))) {
+    throw new ApiError(403, 'Host or Super Admin access is required.')
+  }
+  const status = String(req.query.status || 'active')
+  const query = String(req.query.query || '').trim()
+  const page = Number(req.query.page || 1)
+  if (!['active', 'notified'].includes(status) ||
+      query.length > 80 || !Number.isInteger(page) || page < 1 || page > 50) {
+    throw new ApiError(400, 'Invalid customer demand filters.')
+  }
+  const board = await listCustomerDemandBoard({ status, query, page, limit: 30 })
+  return res.status(200).json(new ApiResponse(200, { ...board, requestId: req.requestId }, 'Customer requests loaded.'))
+}))
 
 router.get(
   '/preferences',

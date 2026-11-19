@@ -39,6 +39,9 @@ import { countryFlag, countryExplorePath } from '../../countries/utils/country.u
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 import { publicImageProps, publicImageVariant } from '../../../lib/publicMediaDelivery'
 import { apiClient } from '../../../api/apiClient'
+import GuidedCookingMode from '../components/GuidedCookingMode'
+import { getCookingJourney, saveCookingJourney } from '../utils/cookingJourney'
+import { createOutcomePlanIdempotencyKey, createRecipeOutcomePlan, getOutcomePlanErrorMessage } from '../../outcomes/services/outcomePlan.service'
 
 import {
   useAuth,
@@ -1130,6 +1133,11 @@ export default function RecipeDetailPage() {
       1,
     )
 
+  const [cookingOpen, setCookingOpen] = useState(false)
+  const [creatingCookingPlan, setCreatingCookingPlan] = useState(false)
+  const cookingPlanLockRef = useRef(false)
+  const [cookingPlanError, setCookingPlanError] = useState('')
+
   const [
     loading,
     setLoading,
@@ -1325,10 +1333,7 @@ export default function RecipeDetailPage() {
             )
 
           setServings(
-            Math.max(
-              1,
-              baseServings,
-            ),
+            getCookingJourney(slug)?.servings || Math.max(1, baseServings),
           )
         } catch (loadError) {
           setError(
@@ -1600,6 +1605,18 @@ export default function RecipeDetailPage() {
     canUseCustomerFeatures ||
     customerContextBlocked
 
+  function changeRecipeServings(delta) {
+    const next = Math.max(1, Math.min(1000, Number(servings) + delta))
+    if (next === Number(servings)) return
+    const saved = readPendingRecipeCart()
+    if (saved?.slug === slug && Array.isArray(saved.items) && saved.items.length > 0) {
+      savePendingRecipeCart({ slug, servings: next, items: [] })
+      setShoppingTray([])
+      notifyFloatingCartUpdated()
+    }
+    setServings(next)
+  }
+
   function openCustomerAccessRequired() {
     const returnTo =
       `${location.pathname}${location.search}${location.hash}`
@@ -1609,6 +1626,75 @@ export default function RecipeDetailPage() {
         returnTo,
       )}`,
     )
+  }
+
+
+  // Preserve the selected serving size when a customer returns from the
+  // authoritative Outcome Plan, Cart or Checkout. Never persist Pantry stock.
+  useEffect(() => {
+    if (!data?.recipe?.id || !slug) return
+    const current = getCookingJourney(slug)
+    if (current && current.servings !== Number(servings)) {
+      saveCookingJourney({
+        slug, servings,
+        stepIndex: current.stepIndex,
+        planId: null, cartId: null, orderId: null,
+      })
+    }
+  }, [data?.recipe?.id, servings, slug])
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('cook') !== '1') return
+    if (Array.isArray(data?.steps) && data.steps.length > 0) setCookingOpen(true)
+  }, [data?.steps, location.search])
+
+  function closeGuidedCooking() {
+    setCookingOpen(false)
+    const params = new URLSearchParams(location.search)
+    if (params.get('cook') === '1') {
+      params.delete('cook')
+      const remaining = params.toString()
+      navigate(`${location.pathname}${remaining ? `?${remaining}` : ''}${location.hash}`, { replace: true })
+    }
+  }
+
+  function openGuidedCooking() {
+    if (!Array.isArray(data?.steps) || data.steps.length === 0) return
+    const current = getCookingJourney(slug)
+    saveCookingJourney({ slug, servings, stepIndex: current?.stepIndex || 0 })
+    setCookingOpen(true)
+  }
+
+  async function createMissingOnlyCookingPlan() {
+    if (cookingPlanLockRef.current || hostListingMode || !data?.recipe?.id) return
+    if (!canUseCustomerFeatures) {
+      // Preserve the recipe and servings through the existing access flow.
+      saveCookingJourney({ slug, servings, stepIndex: getCookingJourney(slug)?.stepIndex || 0 })
+      openCustomerAccessRequired()
+      return
+    }
+    cookingPlanLockRef.current = true
+    setCreatingCookingPlan(true)
+    setCookingPlanError('')
+    try {
+      saveCookingJourney({ slug, servings, stepIndex: getCookingJourney(slug)?.stepIndex || 0,
+        planId: null, cartId: null, orderId: null })
+      const result = await createRecipeOutcomePlan(slug, {
+        targetServings: Number(servings),
+        purchaseMode: 'missing_only',
+        idempotencyKey: createOutcomePlanIdempotencyKey('cooking-missing'),
+      })
+      const planId = result?.plan?.id
+      if (!planId) throw new Error('The Pantry plan did not return an ID.')
+      saveCookingJourney({ slug, servings, planId, cartId: null, orderId: null })
+      setCookingOpen(false)
+      navigate(`/outcome-plans/${encodeURIComponent(planId)}`)
+    } catch (err) {
+      setCookingPlanError(getOutcomePlanErrorMessage(err, 'Unable to compare your Pantry for this recipe.'))
+    } finally {
+      cookingPlanLockRef.current = false
+      setCreatingCookingPlan(false)
+    }
   }
 
 
@@ -2168,26 +2254,23 @@ export default function RecipeDetailPage() {
 
   useEffect(
     () => {
-      const savedCart =
-        readPendingRecipeCart()
-
-      if (
-        savedCart?.slug ===
-          slug &&
-        Array.isArray(
-          savedCart.items,
-        )
-      ) {
-        setShoppingTray(
-          savedCart.items,
-        )
+      // A prior ingredient basket must never be carried into a different
+      // serving size. Server reconciliation is the source for new amounts.
+      if (!data?.recipe?.id) return
+      const savedCart = readPendingRecipeCart()
+      if (savedCart?.slug === slug && Array.isArray(savedCart.items) &&
+        Number(savedCart.servings) === Number(servings)) {
+        setShoppingTray(savedCart.items)
       } else {
         setShoppingTray([])
+        if (savedCart?.slug === slug && Array.isArray(savedCart.items) &&
+          savedCart.items.length > 0) {
+          savePendingRecipeCart({ slug, servings, items: [] })
+          notifyFloatingCartUpdated()
+        }
       }
     },
-    [
-      slug,
-    ],
+    [slug, servings, data?.recipe?.id],
   )
 
 
@@ -2410,6 +2493,22 @@ export default function RecipeDetailPage() {
       return false
     }
 
+    const reconciliationLine = pantryByIngredientId.get(canonicalIngredientId)
+    const state = getPantryLineStatus(reconciliationLine)
+    const required = Number(reconciliationLine?.requiredQuantity)
+    const confirmed = reconciliationLine?.confirmedAvailableQuantity
+    const available = confirmed == null ? NaN : Number(confirmed)
+    const quantity = Math.round((required - available) * 1000000) / 1000000
+    const sameCanonicalIdCount = ingredientRows.filter(
+      item => getRecipeIngredientCanonicalId(item) === canonicalIngredientId,
+    ).length
+    if (sameCanonicalIdCount !== 1 || !['missing', 'partial'].includes(state) ||
+        !Number.isFinite(required) || !Number.isFinite(available) ||
+        !Number.isFinite(quantity) || quantity <= 0 ||
+        !String(reconciliationLine?.requiredUnit || '').trim()) {
+      setCartError('An exact, unique missing quantity could not be confirmed for this line. Use “Check missing & shop” for the server-verified basket; uncertain Pantry amounts are not guessed.')
+      return false
+    }
     setCartError('')
 
     try {
@@ -2454,8 +2553,8 @@ export default function RecipeDetailPage() {
       const nextItem = {
         canonicalIngredientId,
         name,
-        quantity: ingredient.displayQuantity,
-        unit: ingredient.displayUnit,
+        quantity,
+        unit: reconciliationLine.requiredUnit,
       }
       const next = existingIndex >= 0
         ? current.map((item, index) => (index === existingIndex ? nextItem : item))
@@ -5576,7 +5675,19 @@ export default function RecipeDetailPage() {
                   </span>
                 </div>
 
-                <p className="mt-3 max-w-2xl text-xs font-semibold leading-5 text-[#202421]">
+                <div className="mt-4 max-w-2xl border-l-4 border-[#1F7A55] bg-[#F7F6F2] px-4 py-3">
+                  <h3 className="text-[16px] font-bold text-[#173F35]">Recipe creator & attribution</h3>
+                  <p className="mt-1 text-[15px] leading-6 text-[#314B3C]">
+                    Submitted by <strong>{restaurant.restaurantName}</strong> for its restaurant recipe collection and published after Super Admin review.
+                  </p>
+                  <p className="mt-2 text-[14px] leading-5 text-[#50665A]">
+                    Classification: restaurant-submitted recipe. This record does not independently verify another chef's endorsement or whether the preparation is adapted from an outside source.
+                  </p>
+                  <p className="mt-2 text-[14px] leading-5 text-[#50665A]">
+                    Servings update below; ingredients, pantry availability, allergens, dietary information and guided cooking remain in the recipe sections that follow.
+                  </p>
+                </div>
+                <p className="mt-3 max-w-2xl text-[15px] font-medium leading-6 text-[#202421]">
                   Adjust people below. Recipe ingredient quantities and the prepared-dish order price update together.
                 </p>
               </div>
@@ -5612,11 +5723,7 @@ export default function RecipeDetailPage() {
                   <div className="flex shrink-0 items-center rounded-xl border border-[#C86C42]/40 bg-white p-1">
                     <button
                       type="button"
-                      onClick={() =>
-                        setServings((current) =>
-                          Math.max(1, current - 1),
-                        )
-                      }
+                      onClick={() => changeRecipeServings(-1)}
                       disabled={servings <= 1 || restaurantOrderSubmitting}
                       className="focus-ring grid h-9 w-9 place-items-center rounded-lg text-[#173F35] transition hover:bg-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-35"
                       aria-label="Decrease Restaurant order servings"
@@ -5638,11 +5745,7 @@ export default function RecipeDetailPage() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setServings((current) =>
-                          Math.min(1000, current + 1),
-                        )
-                      }
+                      onClick={() => changeRecipeServings(1)}
                       disabled={restaurantOrderSubmitting}
                       className="focus-ring grid h-9 w-9 place-items-center rounded-lg text-[#173F35] transition hover:bg-[#F7F6F2] disabled:cursor-not-allowed disabled:opacity-35"
                       aria-label="Increase Restaurant order servings"
@@ -5704,86 +5807,7 @@ export default function RecipeDetailPage() {
           </section>
         ) : null}
 
-        {isReadyMade && (
-          <section className="epantry-ready-market" aria-label="Ready-made food delivery and price">
-            <div className="epantry-ready-market-header">
-              <span className="epantry-ready-market-icon"><ShoppingCart size={19} aria-hidden="true" /></span>
-              <div>
-                <h2>Check price by pincode</h2>
-                <p>Enter your PIN to check where this Host delivers.</p>
-              </div>
-            </div>
-            <div className="epantry-ready-checker">
-              <form onSubmit={checkReadyDelivery}>
-                <label htmlFor="ready-made-delivery-pin">Delivery PIN code</label>
-                <div className="epantry-ready-input-row">
-                  <input id="ready-made-delivery-pin" inputMode="numeric" autoComplete="postal-code"
-                    maxLength={6} pattern="[0-9]{6}" value={readyPinDraft}
-                    onChange={event => {
-                      // Never show a result for a PIN the customer is no longer entering.
-                      readyQuoteRequestIdRef.current += 1
-                      setReadyPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))
-                      setReadyQuote(null)
-                      setReadyQuoteError('')
-                      setReadyQuoteBusy(false)
-                      setReadyPin('')
-                      setReadyOffers([])
-                      setReadyOrderError('')
-                    }}
-                    placeholder="Enter 6-digit pincode" aria-label="Delivery PIN code" required />
-                  <button type="submit" disabled={readyQuoteBusy} aria-busy={readyQuoteBusy}>
-                    <MapPin size={15} /> {readyQuoteBusy ? 'Checking…' : 'Check delivery'}
-                  </button>
-                </div>
-              </form>
-              <div>
-                <span className="epantry-ready-price-label">Listed price · per prepared pack</span>
-                <strong className="epantry-ready-price-value">{hostDeclaredMoney(declaredReadyPrice)}</strong>
-              </div>
-            </div>
-            {readyQuoteBusy && <p role="status" className="epantry-ready-status">Checking delivery to {readyPinDraft}…</p>}
-            {!readyQuoteBusy && readyQuoteError && (
-              <p role="alert" className="epantry-ready-status epantry-ready-error">{readyQuoteError}</p>
-            )}
-            {!readyQuoteBusy && readyQuote && (
-              <div className="epantry-ready-cart-result" aria-live="polite">
-                <div className="epantry-ready-cart-message">
-                  <strong>{readyQuote.pickupOnly
-                    ? 'Pickup only'
-                    : readyQuote.declaredCoverage
-                      ? `Delivery available to ${readyPin}`
-                      : `Delivery unavailable to ${readyPin}`}</strong>
-                  {readyQuote.declaredCoverage && !readyQuote.pickupOnly ? (
-                    <span>{readyCheckoutOffer
-                      ? `Online price: ${formatMoney({ amountMinor: readyCheckoutOffer.price?.effectiveAmountMinor, currency: readyCheckoutOffer.price?.currency || 'INR' })} per pack.`
-                      : 'Online ordering is not active for this dish yet.'}</span>
-                  ) : (
-                    <span>{readyQuote.pickupOnly
-                      ? 'This Host currently offers collection instead of home delivery.'
-                      : 'Try another delivery PIN.'}</span>
-                  )}
-                </div>
-                {readyQuote.declaredCoverage && !readyQuote.pickupOnly && (
-                  <div className="epantry-ready-cart-actions">
-                    {readyCheckoutOffer && (
-                      <div className="epantry-ready-pack-count">
-                        <button type="button" aria-label="Decrease prepared food packs" disabled={readyQuantity <= 1 || Boolean(readyOrderBusy)} onClick={() => setReadyQuantity(v => Math.max(1, v-1))}><Minus size={16}/></button>
-                        <span aria-label={`${readyQuantity} prepared packs`}>{readyQuantity}</span>
-                        <button type="button" aria-label="Increase prepared food packs" disabled={readyQuantity >= 100 || Boolean(readyOrderBusy)} onClick={() => setReadyQuantity(v => Math.min(100, v+1))}><Plus size={16}/></button>
-                      </div>
-                    )}
-                    <button type="button" className="epantry-ready-cart-button" disabled={Boolean(readyOrderBusy)}
-                      onClick={() => orderVerifiedReadyFood(readyCheckoutOffer)}>
-                      {readyOrderBusy ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> : <ShoppingCart size={16} aria-hidden="true" />}
-                      {readyOrderBusy ? 'Adding…' : 'Add to cart'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            {readyOrderError && <p role="alert" className="epantry-ready-status epantry-ready-error">{readyOrderError}</p>}
-          </section>
-        )}
+
 
         {recipeDiscovery?.origin?.country ? (() => {
           const origin = recipeDiscovery.origin
@@ -5881,7 +5905,7 @@ export default function RecipeDetailPage() {
                     </button>}
 
                     <Link
-                      to="/pantry"
+                      to={`/pantry?returnTo=${encodeURIComponent(`${location.pathname}${location.search}${location.hash}`)}`}
                       className="focus-ring min-h-10 whitespace-nowrap sm:whitespace-normal rounded-lg border border-[#DCE0CF] bg-[#DCE0CF]/55 px-3 py-2 text-[14px] font-semibold text-[#173F35] transition hover:bg-[#DCE0CF] sm:rounded-xl sm:px-3 sm:py-2 sm:text-sm sm:font-semibold"
                     >
                       Open Living Pantry →
@@ -5908,6 +5932,29 @@ export default function RecipeDetailPage() {
 
             </div>
 
+
+            {!hostListingMode && !hostRecipeNotShared && (
+              <div className="my-4 flex flex-col gap-3 border-y border-[#9AB5A4] bg-[#E7F0E6] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#B85B3B]">From ingredients to cooking</p>
+                  <p className="mt-1 text-[15px] font-medium leading-6 text-[#173F35]">Check your selected {servings} servings against your Pantry, then shop only confirmed shortages.</p>
+                  <p className="mt-1 text-[12px] leading-5 text-[#526A5C]">Uncertain Pantry amounts stay unconfirmed; unavailable products cannot be added to a paid cart.</p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button type="button" onClick={createMissingOnlyCookingPlan} disabled={creatingCookingPlan || scaling}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    {creatingCookingPlan ? <LoaderCircle size={16} className="animate-spin" /> : <ShoppingCart size={16} />}
+                    {creatingCookingPlan ? 'Checking Pantry…' : 'Check missing & shop'}
+                  </button>
+                  {(data?.steps || []).length > 0 && (
+                    <button type="button" onClick={openGuidedCooking} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#8DAD96] bg-white px-4 py-2 text-sm font-semibold text-[#173F35]">
+                      <ChefHat size={16} /> {getCookingJourney(slug) ? 'Resume cooking' : 'Guided cooking'}
+                    </button>
+                  )}
+                </div>
+                {cookingPlanError && <p role="alert" className="w-full text-sm font-semibold text-red-700">{cookingPlanError}</p>}
+              </div>
+            )}
 
             <div className="epantry-recipe-ingredients-body">
               <div className="epantry-prep-list-heading">
@@ -5942,11 +5989,7 @@ export default function RecipeDetailPage() {
               <div className="flex items-center gap-0.5 rounded-lg border border-[#DCE0CF] bg-white p-0.5 sm:gap-1 sm:rounded-xl sm:p-1">
                 <button
                   type="button"
-                  onClick={() =>
-                    setServings((current) =>
-                      Math.max(1, current - 1),
-                    )
-                  }
+                  onClick={() => changeRecipeServings(-1)}
                   disabled={servings <= 1}
                   className="focus-ring grid h-7 w-7 place-items-center rounded-md text-[#173F35] transition hover:bg-[#DCE0CF]/55 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8 sm:rounded-lg"
                   aria-label="Decrease servings"
@@ -5962,11 +6005,7 @@ export default function RecipeDetailPage() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setServings((current) =>
-                      Math.min(1000, current + 1),
-                    )
-                  }
+                  onClick={() => changeRecipeServings(1)}
                   className="focus-ring grid h-7 w-7 place-items-center rounded-md text-[#173F35] transition hover:bg-[#DCE0CF]/55 sm:h-8 sm:w-8 sm:rounded-lg"
                   aria-label="Increase servings"
                 >
@@ -6272,7 +6311,7 @@ export default function RecipeDetailPage() {
 
             <div className="epantry-recipe-checkout-note mt-2 flex shrink-0 flex-col gap-2 rounded-xl border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 text-[13px] leading-4 text-[#202421]/70 sm:flex-row sm:items-center sm:justify-between">
               <p className="max-w-xl">
-                Missing adds the ingredient to your Recipe Cart. Choose or add a delivery address only when you place your order from the Cart.
+                Confirmed missing quantities can be saved to your Recipe Cart. For partial or uncertain Pantry amounts, use “Check missing & shop” for the verified requirement basket. Address is chosen at checkout.
               </p>
 
               {shoppingTray.length > 0 ? (
@@ -6460,6 +6499,18 @@ export default function RecipeDetailPage() {
         </div>
 
       </div>
+
+      {cookingOpen && Array.isArray(data?.steps) && data.steps.length > 0 && (
+        <GuidedCookingMode
+          slug={slug}
+          title={dish?.name || recipe?.name || 'Recipe'}
+          servings={servings}
+          steps={data.steps}
+          ingredients={ingredientRows}
+          onClose={closeGuidedCooking}
+          onShop={!hostListingMode ? createMissingOnlyCookingPlan : undefined}
+        />
+      )}
 
       {pantrySetupItem ? (
         <div

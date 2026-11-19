@@ -521,10 +521,20 @@ function notifyFloatingCartFly({ name, sourceElement }) {
   );
 }
 
+function formatOfferObservedAt(value) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return "Not supplied";
+  return new Date(value).toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 function formatMoney(amountMinor, currency = "INR") {
   if (amountMinor === null || amountMinor === undefined) {
     return "Price unavailable";
   }
+
+  if (!Number.isInteger(Number(amountMinor))) return "Price unavailable";
 
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -921,6 +931,17 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   const verifiedForCurrentPin =
     checked && checkedPincode === `${packId || ""}:${pincode.trim()}:${fulfillmentType}`;
   const visibleOffers = verifiedForCurrentPin && !error ? offers : [];
+  // Every row comes from the same canonical pack ID and selected PIN.
+  // Rank by the known item price only; delivery charges are not yet quoted.
+  const comparisonOffers = [...visibleOffers].sort((left, right) => {
+    const leftPrice = Number(left.price?.effectiveAmountMinor);
+    const rightPrice = Number(right.price?.effectiveAmountMinor);
+    const safeLeft = Number.isFinite(leftPrice) && left.price?.effectiveAmountMinor != null
+      ? leftPrice : Number.POSITIVE_INFINITY;
+    const safeRight = Number.isFinite(rightPrice) && right.price?.effectiveAmountMinor != null
+      ? rightPrice : Number.POSITIVE_INFINITY;
+    return safeLeft - safeRight || String(left.seller?.name || "").localeCompare(String(right.seller?.name || ""));
+  });
   const needsManualPin = !pincode || manualEditorOpen;
 
   function handleManualPinCheck(event) {
@@ -1077,7 +1098,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
             </p>
           ) : !error && visibleOffers.length > 0 ? (
             <p role="status" className="border-l-[3px] border-[#2F856D] bg-white/65 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-[#285E50]">
-              {visibleOffers.length} seller option{visibleOffers.length === 1 ? "" : "s"} available for PIN {pincode}.
+              {visibleOffers.length} eligible EPANTRY seller{visibleOffers.length === 1 ? "" : "s"} for PIN {pincode}. Compare the same pack below.
             </p>
           ) : !error ? (
             <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
@@ -1171,13 +1192,22 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       )}
 
       {!manualEditorOpen && visibleOffers.length > 0 && (
-        <div
-          className="max-h-[300px] divide-y divide-[#C5D8D4] overflow-y-auto overscroll-y-auto border-t border-[#C5D8D4] [scrollbar-width:thin]"
-          role="region"
-          aria-label="Available delivery offers"
-          tabIndex={0}
-        >
-          {visibleOffers.map((offer) => (
+        <div className="mt-3 min-w-0">
+          <div className="border-t border-[#B7D1CB] py-3">
+            <h3 className="text-base font-semibold text-[#173F35]">Compare EPANTRY sellers</h3>
+            <p className="mt-1 text-[13px] leading-5 text-[#4E655B]">
+              Same {formatQuantity(product?.netQuantity)} pack · lowest known item price first.
+              External retailer prices are not shown without verified feeds.
+              Delivery charges and any other checkout fees are not included.
+            </p>
+          </div>
+          <div
+            className="max-h-[340px] divide-y divide-[#C5D8D4] overflow-y-auto overscroll-y-auto border-t border-[#C5D8D4] [scrollbar-width:thin]"
+            role="region"
+            aria-label="EPANTRY sellers for the same product pack"
+            tabIndex={0}
+          >
+          {comparisonOffers.map((offer) => (
             <article
               key={offer.id}
               className="grid min-w-0 gap-x-4 gap-y-3 bg-white/75 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-4"
@@ -1193,6 +1223,10 @@ function MarketplaceOffers({ product, onOffersResolved }) {
                 </div>
                 <p className="mt-0.5 text-[13px] font-medium capitalize leading-5 text-[#66746D]">
                   {offer.fulfillmentTypes?.join(" · ") || "Delivery"}
+                </p>
+                <p className="mt-1 text-[12px] leading-5 text-[#556D63]">
+                  Price recorded: {formatOfferObservedAt(offer.price?.recordedAt)}
+                  {" · "}Stock checked: {formatOfferObservedAt(offer.inventoryObservedAt)}
                 </p>
               </div>
 
@@ -1220,6 +1254,15 @@ function MarketplaceOffers({ product, onOffersResolved }) {
               </div>
 
               <div className="flex min-w-0 flex-wrap items-end gap-3 border-t border-[#E1E9E5] pt-2.5 sm:col-span-2 sm:justify-end">
+                <div className="min-w-0 sm:mr-auto">
+                  <p className="text-[12px] font-semibold text-[#66746D]">Known item subtotal</p>
+                  <p className="text-[17px] font-semibold text-[#173F35]">
+                    {offer.price?.effectiveAmountMinor == null
+                      ? "Price unavailable"
+                      : formatMoney(Number(offer.price.effectiveAmountMinor) * getOfferQuantity(offer), offer.price?.currency || "INR")}
+                  </p>
+                  <p className="text-[12px] text-[#66746D]">Final cost shown at checkout</p>
+                </div>
                 <div className="shrink-0">
                   <p className="mb-1 text-[12px] font-semibold text-[#66746D]">Quantity</p>
                   <div className="inline-flex items-center overflow-hidden border border-[#D4DAD2] bg-white">
@@ -1291,6 +1334,7 @@ function MarketplaceOffers({ product, onOffersResolved }) {
               </div>
             </article>
           ))}
+          </div>
         </div>
       )}
     </section>
@@ -2174,9 +2218,15 @@ export default function ProductDetailPage() {
           <Link to="/grocery" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9">
             <ArrowLeft size={17} aria-hidden="true" /> Back to Grocery
           </Link>
+          <div className="flex flex-wrap items-center justify-end gap-4">
+            <Link
+              to={`/report-listing?listingUrl=${encodeURIComponent(`/grocery/product/${product.slug}`)}`}
+              className="focus-ring inline-flex min-h-11 items-center text-sm font-semibold text-[#955338] hover:underline sm:min-h-9"
+            >Report listing</Link>
           <a href="#ep-product-facts" className="focus-ring inline-flex min-h-11 items-center gap-2 text-sm font-medium text-[#35463B] transition hover:text-[#C86C42] sm:min-h-9">
             Product information <ArrowRight size={16} aria-hidden="true" />
           </a>
+          </div>
         </div>
 
         <section className="ep-product-hero relative grid min-w-0 gap-0 border-b border-[#E2E5DE] lg:min-h-[calc(100svh-120px)] lg:items-stretch lg:grid-cols-[minmax(0,1.07fr)_minmax(0,0.93fr)]">

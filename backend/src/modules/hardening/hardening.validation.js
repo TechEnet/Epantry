@@ -49,6 +49,9 @@ export const privacyRequestBodySchema = z
       z.enum([
         'access_export',
         'deletion',
+        'rectification',
+        'restriction',
+        'objection',
       ]),
 
     scope:
@@ -58,6 +61,8 @@ export const privacyRequestBodySchema = z
         .min(2)
         .max(120)
         .default('account'),
+
+    requestMessage: z.string().trim().max(500).default(''),
   })
   .strict()
 

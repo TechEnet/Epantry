@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 import { createHash } from 'node:crypto'
 import { rejectPrivilegedImpersonation } from '../admin/adminSafety.middleware.js'
 import { loadAdminAuthorization, requireAdminAccess, requireAdminPermission } from '../admin/adminPermission.middleware.js'
-import { createNotificationIntentBestEffort, notifyActiveSuperAdminsBestEffort } from '../notifications/notification.service.js'
+import { createNotificationIntentBestEffort, notifyActiveSuperAdminsBestEffort, fulfillCustomerDemandForApprovedListingBestEffort } from '../notifications/notification.service.js'
 import { createHostListingImageUploadIntent, createHostListingVideoUploadIntent } from '../../integrations/media/cloudinary.provider.js'
 import { ApiError } from '../../utils/ApiError.js'
 import { authenticateSession, loadCurrentUser, requireActiveAccount, requireCsrfToken, requireMfaAssurance, requireRecentMfaAuthentication } from '../auth/auth.middleware.js'
@@ -26,6 +26,8 @@ import { publicListing, publicHostSlug, publishedHostRecord, publicHostListingFi
 import { getHostRecipeDiscovery } from '../recipes/recipe.discovery.service.js'
 import { normalizeListingWorkspace, normalizeListingPacket, validateListingPacket, calculateListingEstimate, isValidGtin } from './hostUnifiedListing.logic.js'
 import { importHostListingRemoteImage } from './hostListingMediaImport.service.js'
+import { assertEuTraderReady, publicTrader } from '../dsa/dsa.trader.service.js'
+import { DsaTraderProfile } from '../dsa/dsa.models.js'
 import { needsCommercialPublication, publishApprovedListingForSale } from './hostUnifiedListing.autoPublish.service.js'
 
 const router = Router()
@@ -158,7 +160,8 @@ async function resolveRecordPublishedCatalog(record) {
 async function approvedPublicProjection(record) {
   const approved = publishedHostRecord(record)
   const catalog = await resolveRecordPublishedCatalog(record)
-  return publicListing({ ...record,
+  const trader = await DsaTraderProfile.findOne({ ownerUserId: record.ownerUserId, status: 'verified' }).lean()
+  return publicListing({ ...record, publicTrader: publicTrader(trader),
     verifiedPackId: catalog?.packId || null,
     verifiedProductPath: catalog?.productPath || null,
   })
@@ -794,6 +797,7 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
     const candidate = await HostUnifiedListingPacket.findOne({ _id: req.params.id,
       status: 'submitted_for_review', deletedAt: null })
     if (!candidate) problem('Only a submitted listing can be approved. Refresh the queue.', 409)
+    if (candidate.moderationStatus === 'restricted') problem('This listing is restricted by Trust & Safety and cannot be approved.', 409)
     const reviewedPacket = cleanIncoming(candidate.packet, candidate.workspaceType, true)
     // The Host should not have to re-enter the same canonical identity when
     // resubmitting an already-approved listing with a price or stock update.
@@ -817,19 +821,21 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
         await session.withTransaction(async () => {
           const pending = await HostUnifiedListingPacket.findOne({ _id: candidate._id,
             status: 'submitted_for_review', deletedAt: null }).session(session)
-          if (!pending || pending.reviewRevision !== candidate.reviewRevision) {
+          if (!pending || pending.moderationStatus === 'restricted' || pending.reviewRevision !== candidate.reviewRevision) {
             problem('Listing changed during approval. Refresh and review again.', 409)
           }
           const approvedPacket = cleanIncoming(pending.packet, pending.workspaceType, true)
+          await assertEuTraderReady({ ownerUserId: pending.ownerUserId, session })
           // Recheck prior catalog identity within this exact submitted revision.
           if (reviewedPacket.catalogProductVersionId) approvedPacket.catalogProductVersionId = reviewedPacket.catalogProductVersionId
           const published = await publishApprovedListingForSale({ listing: pending,
             packet: approvedPacket, reviewerId, now, session })
           record = await HostUnifiedListingPacket.findOneAndUpdate({ _id: pending._id,
-            status: 'submitted_for_review', reviewRevision: pending.reviewRevision, deletedAt: null },
+            status: 'submitted_for_review', reviewRevision: pending.reviewRevision, deletedAt: null, moderationStatus: { $ne: 'restricted' } },
           { $set: { status: 'approved', reviewedAt: now, reviewedByUserId: reviewerId,
               reviewNote: note, correctionSection: '', approvedAt: now, publicSlug: publicHostSlug(pending),
               packet: published.packet, publishedPacket: published.packet, publishedTitle: pending.title,
+              euTraderVerifiedAtPublication: process.env.EPANTRY_EU_MARKET_ENABLED === 'true',
               publishedType: pending.type, catalogLinkedAt: now, catalogLinkedByUserId: reviewerId },
             $inc: { reviewRevision: 1, publishedRevision: 1 },
             $push: { reviewHistory: { decision: 'approved', actorUserId: reviewerId,
@@ -844,10 +850,11 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
     // Recipe-only and rejection/correction decisions keep the existing simple
     // review path; they must never generate a commercial offer.
     const pendingForSlug = decision === 'approved' ? await HostUnifiedListingPacket.findOne(
-      { _id: req.params.id, status: 'submitted_for_review', deletedAt: null }) : null
+      { _id: req.params.id, status: 'submitted_for_review', deletedAt: null, moderationStatus: { $ne: 'restricted' } }) : null
+    if (decision === 'approved' && !pendingForSlug) problem('This listing cannot be approved while Trust & Safety restriction is active.', 409)
     const approvedPublicSlug = pendingForSlug ? publicHostSlug(pendingForSlug) : ''
     record = await HostUnifiedListingPacket.findOneAndUpdate(
-      { _id: req.params.id, status: 'submitted_for_review', deletedAt: null },
+      { _id: req.params.id, status: 'submitted_for_review', deletedAt: null, ...(decision === 'approved' ? { moderationStatus: { $ne: 'restricted' } } : {}) },
       { $set: { status: decision, reviewedAt: now, reviewedByUserId: reviewerId,
           reviewNote: note, correctionSection: decision === 'changes_requested' ? section : '',
           ...(decision === 'approved' ? { approvedAt: now, publicSlug: approvedPublicSlug,
@@ -871,6 +878,10 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
     actions: ['dismiss'], requestedChannels: ['in_app'],
     dedupeKey: `host-unified-decision:${record.id}:${record.reviewRevision}`,
   })
+  if (decision === 'approved' && commercial) {
+    // Only the successful Super Admin publication can fulfill customer demand.
+    await fulfillCustomerDemandForApprovedListingBestEffort(record)
+  }
   respond(res, { listing: serialize(record), sellingActivated: decision === 'approved' && commercial })
 }))
 
@@ -1129,11 +1140,15 @@ router.get('/public/host-listings', wrap(async (req, res) => {
     ownerUserId: { $in: ownerIds }, status: 'active',
   }).select('ownerUserId displayName').lean() : []
   const nameByOwner = new Map(organizations.map(org => [String(org.ownerUserId), String(org.displayName || '').trim()]))
+  const verifiedTraders = ownerIds.length ? await DsaTraderProfile.find({
+    ownerUserId: { $in: ownerIds }, status: 'verified',
+  }).lean() : []
+  const traderByOwner = new Map(verifiedTraders.map(t => [String(t.ownerUserId), publicTrader(t)]))
   const listings = await Promise.all(rows.map(async row => {
     const ownerId = String(row.ownerUserId || '')
     const key = createHash('sha256').update(`epantry-public-host:${ownerId}`).digest('hex').slice(0, 20)
     const hostName = nameByOwner.get(ownerId) || `EPANTRY Host ${key.slice(0, 4).toUpperCase()}`
-    return approvedPublicProjection({ ...row, publicHost: { id: key, name: hostName } })
+    return approvedPublicProjection({ ...row, publicHost: { id: key, name: hostName }, publicTrader: traderByOwner.get(ownerId) || null })
   }))
   respond(res, { listings })
 }))

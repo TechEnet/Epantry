@@ -34,6 +34,8 @@ import {
   InventorySnapshot,
 } from '../marketplace/marketplace.models.js'
 
+import { matchesCustomerDemand } from './customerDemandMatch.js'
+
 import {
   AvailabilityWatch,
   Notification,
@@ -176,6 +178,14 @@ function resolveNotificationDeepLink(
       return entityId
         ? `/orders/${entityId}`
         : '/orders'
+
+    case 'customer_demand_new_host':
+    case 'customer_demand_listed_host':
+      return '/host/customer-requests'
+
+    case 'customer_demand_new_admin':
+    case 'customer_demand_listed_admin':
+      return '/admin/customer-requests'
 
     case 'item_available':
       return entityId
@@ -954,6 +964,10 @@ export async function createAvailabilityWatch({
       input.query,
     )
 
+  if ((input.source || 'search') === 'search' && normalizedQuery.length < 2) {
+    throw new ApiError(400, 'Enter a valid product name to make a request.')
+  }
+
   const watchKey =
     input.packId
       ? `pack:${input.packId}`
@@ -961,6 +975,9 @@ export async function createAvailabilityWatch({
         ? `ingredient:${input.canonicalIngredientId}`
         : `query:${normalizedQuery}`
 
+  const priorWatch = await AvailabilityWatch.exists({ userId, watchKey })
+  const firstCustomerDemand = (input.source || 'search') === 'search' &&
+    !await AvailabilityWatch.exists({ source: 'search', status: 'active', normalizedQuery })
   const watch =
     await AvailabilityWatch.findOneAndUpdate(
       {
@@ -1006,6 +1023,11 @@ export async function createAvailabilityWatch({
           true,
       },
     )
+
+  if (!priorWatch && firstCustomerDemand) {
+    // Best effort; a notification failure cannot lose the customer's request.
+    try { await notifyDemandAudience({ query: input.query, kind: 'new' }) } catch { /* no-op */ }
+  }
 
   return {
     alreadyAvailable:
@@ -1053,6 +1075,12 @@ function watchMatchesPack(
     return false
   }
 
+  // Customer search requests must match the actual published product name,
+  // not a loosely related ingredient/brand label.
+  if (watch.source === 'search') {
+    return matchesCustomerDemand(term, profile.displayName)
+  }
+
   return (
     profile.searchText.includes(
       term,
@@ -1064,6 +1092,173 @@ function watchMatchesPack(
         ),
     )
   )
+}
+
+/*
+ * A search request is an explicit customer opt-in using the existing
+ * AvailabilityWatch collection. The board is aggregated and never exposes
+ * the requester's email, user ID, postcode or delivery location to Hosts.
+ */
+export async function listCustomerDemandBoard({ status = 'active', query = '', page = 1, limit = 30 }) {
+  const match = {
+    source: 'search',
+    status: status === 'notified' ? 'notified' : 'active',
+  }
+  const term = normalizeAvailabilityTerm(query)
+  if (term) match.normalizedQuery = { $regex: escapeRegex(term) }
+
+  const take = Math.min(50, Math.max(1, Number(limit) || 30))
+  const currentPage = Math.min(50, Math.max(1, Number(page) || 1))
+  const rows = await AvailabilityWatch.aggregate([
+    { $match: match },
+    { $sort: { updatedAt: -1 } },
+    { $group: {
+      _id: '$normalizedQuery',
+      name: { $first: '$query' },
+      customers: { $sum: 1 },
+      lastRequestedAt: { $max: '$updatedAt' },
+      matchedProductName: { $first: '$matchedProductName' },
+      notifiedAt: { $max: '$notifiedAt' },
+    } },
+    { $sort: { customers: -1, lastRequestedAt: -1 } },
+    { $skip: (currentPage - 1) * take },
+    { $limit: take + 1 },
+  ])
+  return {
+    status: match.status,
+    page: currentPage,
+    hasMore: rows.length > take,
+    items: rows.slice(0, take).map((row) => ({
+      query: row.name,
+      customers: row.customers,
+      lastRequestedAt: row.lastRequestedAt,
+      matchedProductName: row.matchedProductName || '',
+      notifiedAt: row.notifiedAt || null,
+    })),
+  }
+}
+
+async function notifyDemandAudience({ query, kind, listingId = '', sellerUserId = null }) {
+  const isListed = kind === 'listed'
+  const activeHosts = await User.find({
+    hostEnabled: true,
+    hostAccessStatus: 'active',
+    accountStatus: 'active',
+    superAdminEnabled: { $ne: true },
+    ...(sellerUserId ? { _id: { $ne: sellerUserId } } : {}),
+  }).select('_id').lean()
+  const admins = await User.find({
+    superAdminEnabled: true,
+    accountStatus: 'active',
+  }).select('_id').lean()
+  const scope = isListed ? `listed:${listingId}` : `requested:${normalizeAvailabilityTerm(query)}`
+  let hostName = 'A Host'
+  if (isListed && sellerUserId) {
+    const { MarketplaceOrganization } = await import('../marketplace/marketplace.models.js')
+    const business = await MarketplaceOrganization.findOne({ ownerUserId: sellerUserId })
+      .select('displayName').lean()
+    hostName = String(business?.displayName || hostName).trim().slice(0, 100)
+  }
+  const explanation = isListed
+    ? `${hostName} has made ${query} available on EPANTRY. See fulfilled customer requests.`
+    : `A customer is looking for ${query}. View requested products on the demand board.`
+  const common = {
+    category: 'operations',
+    reasonCode: isListed ? 'customer_requested_product_listed' : 'customer_product_requested',
+    explanation,
+    relatedEntityType: 'customer_demand',
+    relatedEntityId: normalizeAvailabilityTerm(query).slice(0, 150),
+    sourceDomain: 'search',
+    sourceVersion: 'customer-demand-v1',
+    actions: ['dismiss'],
+    requestedChannels: ['in_app'],
+  }
+  // Dedupe by user + role on repeated submissions/approval retries.
+  await Promise.all([
+    ...activeHosts.map((user) => createNotificationIntentBestEffort({
+      ...common,
+      userId: user._id,
+      triggerType: isListed ? 'customer_demand_listed_host' : 'customer_demand_new_host',
+      dedupeKey: `demand:host:${scope}:${id(user._id)}`,
+    })),
+    ...admins.map((user) => createNotificationIntentBestEffort({
+      ...common,
+      userId: user._id,
+      triggerType: isListed ? 'customer_demand_listed_admin' : 'customer_demand_new_admin',
+      dedupeKey: `demand:admin:${scope}:${id(user._id)}`,
+    })),
+  ])
+}
+
+/*
+ * Called only after an approved HOST listing's commercial publication commits.
+ * Notification of a draft, approval submission or out-of-stock listing is forbidden.
+ */
+export async function fulfillCustomerDemandForApprovedListingBestEffort(listing) {
+  try {
+    const packet = listing?.publishedPacket || listing?.packet || {}
+    const name = String(listing?.publishedTitle || packet.title || listing?.title || '').trim()
+    const normalizedName = normalizeAvailabilityTerm(name)
+    const listingId = id(listing?._id)
+    if (listing?.status !== 'approved' || listing?.deletedAt ||
+        !(['grocery', 'prepared_food'].includes(listing?.publishedType || listing?.type) ||
+          ((listing?.publishedType || listing?.type) === 'kitchen_recipe' && packet.sellReadyMade === true)) ||
+        !normalizedName || !listingId) return { notified: 0 }
+
+    // Do not notify if a paused/unavailable offer cannot actually be purchased.
+    const { HostUnifiedListingPacket } = await import('../hostOperations/hostUnifiedListing.models.js')
+    const current = await HostUnifiedListingPacket.findOne({
+      _id: listingId, status: 'approved', deletedAt: null,
+    }).select('ownerUserId publishedTitle publishedType publishedPacket').lean()
+    if (!current || Number(current.publishedPacket?.selling?.stockQuantity || 0) < 1) return { notified: 0 }
+    const { MarketplaceOrganization } = await import('../marketplace/marketplace.models.js')
+    const organization = await MarketplaceOrganization.findOne({
+      ownerUserId: current.ownerUserId, status: 'active',
+    }).select('_id').lean()
+    if (!organization) return { notified: 0 }
+    const sellableOffer = await HostOffer.exists({
+      organizationId: organization._id,
+      status: 'active',
+      // Match only the exact approved listing's offer.
+      merchantSku: `epantry-${listingId}`, 
+    })
+    if (!sellableOffer) return { notified: 0 }
+
+    const watches = AvailabilityWatch.find({ source: 'search', status: 'active' })
+      .select('_id query normalizedQuery userId').cursor()
+    let notified = 0
+    for await (const watch of watches) {
+      if (!matchesCustomerDemand(watch.normalizedQuery || watch.query, normalizedName)) continue
+
+      const result = await createNotificationIntentBestEffort({
+        userId: watch.userId,
+        category: 'planning',
+        triggerType: 'item_available',
+        reasonCode: 'requested_product_published',
+        explanation: `${name} is now available on EPANTRY. You requested ${watch.query}.`,
+        relatedEntityType: 'availability_query',
+        relatedEntityId: watch.query,
+        sourceDomain: 'marketplace',
+        sourceVersion: 'customer-demand-v1',
+        actions: ['dismiss'],
+        requestedChannels: ['in_app', 'email'],
+        dedupeKey: `demand:customer:${id(watch._id)}:${listingId}`,
+      })
+      if (!result || result.notification?.status === 'suppressed') continue
+      const updated = await AvailabilityWatch.updateOne({ _id: watch._id, status: 'active' }, {
+        $set: { status: 'notified', notifiedAt: new Date(), matchedProductName: name },
+      })
+      if (updated.modifiedCount) notified += 1
+    }
+    // A published product is news to other Hosts and admins even when there
+    // are zero matching requests, but only notify for customer-requested items.
+    if (notified > 0) {
+      await notifyDemandAudience({ query: name, kind: 'listed', listingId, sellerUserId: current.ownerUserId })
+    }
+    return { notified }
+  } catch {
+    return { notified: 0, failed: true }
+  }
 }
 
 export async function fulfillAvailabilityWatchesForPack(
@@ -1095,17 +1290,13 @@ export async function fulfillAvailabilityWatchesForPack(
     }
   }
 
-  const watches =
-    await AvailabilityWatch.find({
-      status:
-        'active',
-    })
-      .limit(5000)
+  const watches = AvailabilityWatch.find({ status: 'active' }).cursor()
 
   let notified =
     0
+  let demandNotified = 0
 
-  for (
+  for await (
     const watch of
     watches
   ) {
@@ -1118,7 +1309,7 @@ export async function fulfillAvailabilityWatchesForPack(
       continue
     }
 
-    await createNotificationIntent({
+    const delivery = await createNotificationIntent({
       userId:
         watch.userId,
       category:
@@ -1150,6 +1341,10 @@ export async function fulfillAvailabilityWatchesForPack(
         )}:${profile.packId}`,
     })
 
+    // Keep the request open if the customer's notification settings suppress delivery.
+    if (delivery?.notification?.status === 'suppressed') continue
+    if (watch.source === 'search') demandNotified += 1
+
     watch.status =
       'notified'
     watch.matchedPackId =
@@ -1165,6 +1360,16 @@ export async function fulfillAvailabilityWatchesForPack(
       1
   }
 
+  if (demandNotified > 0) {
+    try {
+      const offer = await HostOffer.findOne({ packId, status: 'active' }).select('organizationId').lean()
+      const { MarketplaceOrganization } = await import('../marketplace/marketplace.models.js')
+      const seller = offer ? await MarketplaceOrganization.findById(offer.organizationId)
+        .select('ownerUserId').lean() : null
+      await notifyDemandAudience({ query: profile.displayName, kind: 'listed',
+        listingId: `pack-${profile.packId}`, sellerUserId: seller?.ownerUserId || null })
+    } catch { /* Customer notifications were already recorded. */ }
+  }
   return {
     notified,
   }
@@ -1657,6 +1862,8 @@ export async function notifyActiveSuperAdminsBestEffort({
  * already stored and can be matched in MongoDB.
  */
 const ADMIN_NOTIFICATION_TRIGGERS = [
+  'customer_demand_new_admin',
+  'customer_demand_listed_admin',
   'retail_media_campaign_review_requested',
   'host_commercial_profile_request',
   'hospitality_approval_requested',
@@ -1668,6 +1875,8 @@ const ADMIN_NOTIFICATION_TRIGGERS = [
 ]
 
 const HOST_NOTIFICATION_TRIGGERS = [
+  'customer_demand_new_host',
+  'customer_demand_listed_host',
   'retail_media_campaign_review_result',
   'host_inventory_low',
   'host_unified_listing_review',

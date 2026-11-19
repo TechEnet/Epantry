@@ -1812,6 +1812,9 @@ adminRouter.post(
             'restaurant_recipe',
           decision:
             input.decision,
+          // Durable Super Admin audit evidence of the rights check.
+          sourceRightsVerified:
+            input.decision === 'approve' && input.rightsVerified === true,
           source:
             'admin_host_operations',
         },

@@ -1,13 +1,128 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useLandingFeaturedQuery } from '../hooks/useLandingFeaturedQuery'
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
+import { getCatalogProducts } from '../../grocery/services/catalog.service'
+import { getProductFoodIntelligence } from '../../foodIntelligence/services/foodIntelligence.service'
 
-export default function FeaturedContentSection() {
+// Only explicit, approved dietary outcomes establish a product's group.
+// Names, photos, categories, and missing classifications are NOT evidence.
+function approvedProductDiet(intelligence) {
+  if (!intelligence || intelligence.available === false) return null
+  const eligible = (Array.isArray(intelligence.dietary) ? intelligence.dietary : [])
+    .filter((item) => item?.eligible === true || String(item?.status || '').toLowerCase() === 'eligible')
+    .map((item) => String(item?.key || item?.ruleKey || '').trim().toLowerCase().replace(/[\s-]+/g, '_'))
+  const veg = eligible.some((key) => key === 'vegetarian' || key === 'vegan')
+  const nonveg = eligible.some((key) => key === 'non_vegetarian' || key === 'eggitarian' || key === 'eggetarian')
+  return veg === nonveg ? null : (veg ? 'veg' : 'nonveg')
+}
+
+// Convert additional published catalog browse results into the same existing
+// landing-card shape. Featured rows retain priority; no sample records are used.
+function publicProductAsFeatured(product) {
+  const quantity = product?.netQuantity || {}
+  return {
+    id: product?.productVersionId || product?.id || product?.slug || '',
+    productVersionId: product?.productVersionId || product?.id || null,
+    slug: product?.slug || '',
+    path: product?.slug ? `/grocery/product/${encodeURIComponent(product.slug)}` : '/grocery',
+    name: product?.displayName || product?.family?.name || 'Grocery Product',
+    image: product?.image?.url || '',
+    subCategory: product?.category?.name || product?.variant?.name || 'Grocery',
+    quantity: quantity?.value ?? null,
+    unit: quantity?.unit || '',
+    brand: product?.brand?.name || '',
+  }
+}
+
+function featuredRecipesForDiet(featuredItems, verifiedRecipes, selectedDiet) {
+  const published = (Array.isArray(verifiedRecipes) ? verifiedRecipes : [])
+    .filter((recipe) => recipe?.image && recipe?.path)
+  const confirmed = published.filter((recipe) => recipe?.diet === selectedDiet)
+  // The public recipe API can omit dietary evidence for otherwise published
+  // recipes. Show unclassified recipes ONLY as a clearly marked neutral
+  // discovery fallback, never as proven Veg/Non-Veg options.
+  const eligible = confirmed.length ? confirmed : published.filter((recipe) => recipe?.diet === 'unknown')
+  const eligibleBySlug = new Map(eligible.filter((recipe) => recipe.slug)
+    .map((recipe) => [String(recipe.slug).toLowerCase(), recipe]))
+  const rows = []
+  const seen = new Set()
+  const add = (recipe) => {
+    const key = String(recipe?.path || recipe?.slug || '')
+    if (!key || seen.has(key) || !recipe?.image) return
+    seen.add(key)
+    rows.push(recipe)
+  }
+  // Keep featured ordering for confirmed matches. Do not use the featured
+  // API's `dietaryType`, which is currently a COURSE/difficulty field.
+  for (const item of Array.isArray(featuredItems) ? featuredItems : []) {
+    const verified = eligibleBySlug.get(String(item?.slug || '').toLowerCase())
+    if (verified) add(item)
+  }
+  // Fill remaining spots from the same published, diet-verified Hero catalog.
+  for (const item of eligible) {
+    if (rows.length >= 8) break
+    add(item)
+  }
+  return rows.slice(0, 8)
+}
+
+export default function FeaturedContentSection({ selectedDiet = 'veg', verifiedRecipes = [] }) {
   const navigate = useNavigate()
   const [selectedBrandFilter, setSelectedBrandFilter] = useState('all')
   const { data, isLoading, isError, error } = useLandingFeaturedQuery()
+
+  // One cached, read-only classification pass for both modes. The public
+  // landing endpoint only contains eight groceries and no dietary labels;
+  // widen the candidate set with the existing published catalog API so a
+  // non-veg switch is not limited to whichever eight products came first.
+  const { data: groceryByDiet, isPending: checkingGroceryDiet } = useQuery({
+    queryKey: ['landing', 'featured', 'approved-grocery-dietary',
+      (data?.grocery || []).map((item) => item.id || item.slug).join('|')],
+    enabled: Boolean(data) && !isError,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    queryFn: async () => {
+      const first = Array.isArray(data?.grocery) ? data.grocery : []
+      const catalogResult = await getCatalogProducts({ page: 1, limit: 40 })
+        .catch(() => ({ products: [] }))
+      const candidates = [...first, ...(catalogResult.products || []).map(publicProductAsFeatured)]
+      const seen = new Set()
+      const unique = candidates.filter((item) => {
+        const id = String(item?.productVersionId || item?.id || item?.slug || '')
+        if (!id || seen.has(id)) return false
+        seen.add(id)
+        return true
+      })
+      const grouped = { veg: [], nonveg: [] }
+      // Bounded concurrency to avoid a burst of Food Intelligence requests.
+      for (let index = 0; index < unique.length; index += 5) {
+        const batch = unique.slice(index, index + 5)
+        const results = await Promise.allSettled(batch.map(async (item) => {
+          const id = item?.productVersionId || item?.id
+          if (!id) return null
+          return getProductFoodIntelligence(id)
+        }))
+        results.forEach((result, offset) => {
+          if (result.status !== 'fulfilled') return
+          const diet = approvedProductDiet(result.value)
+          if (diet && grouped[diet].length < 8) grouped[diet].push(batch[offset])
+        })
+        if (grouped.veg.length >= 8 && grouped.nonveg.length >= 8) break
+      }
+      return grouped
+    },
+  })
+
+  const visibleFeaturedRecipes = useMemo(() =>
+    featuredRecipesForDiet(data?.recipes, verifiedRecipes, selectedDiet),
+    [data?.recipes, verifiedRecipes, selectedDiet])
+  const neutralRecipeFallback = visibleFeaturedRecipes.length > 0 &&
+    !(Array.isArray(verifiedRecipes) ? verifiedRecipes : []).some(
+      (recipe) => recipe?.diet === selectedDiet && recipe?.image && recipe?.path
+    )
 
   if (isLoading) return <FeaturedLoading />
   if (isError) {
@@ -23,8 +138,8 @@ export default function FeaturedContentSection() {
     )
   }
 
-  const grocery = data?.grocery || []
-  const recipes = data?.recipes || []
+  const grocery = groceryByDiet?.[selectedDiet] || []
+  const recipes = visibleFeaturedRecipes
   const brands = data?.brands || []
   const brandFilterGroups = buildBrandFilterGroups(brands)
   const visibleBrands = getVisibleBrands({ brands, brandFilterGroups, selectedBrandFilter })
@@ -39,8 +154,14 @@ export default function FeaturedContentSection() {
 
   return (
     <>
-      <FeaturedGroceryScrollStory products={grocery} onAddToCart={handleAddToCart} />
-      <FeaturedDiscoverySection kind="recipes" items={recipes} />
+      <FeaturedGroceryScrollStory
+        products={grocery}
+        onAddToCart={handleAddToCart}
+        emptyMessage={checkingGroceryDiet
+          ? 'Checking approved dietary information for published grocery products…'
+          : `No verified ${selectedDiet === 'nonveg' ? 'Non-Veg' : 'Veg'} grocery products are available in Featured Grocery yet.`}
+      />
+      <FeaturedDiscoverySection kind="recipes" items={recipes} neutralDietaryFallback={neutralRecipeFallback} />
       <FeaturedDiscoverySection
         kind="brands"
         items={visibleBrands}
@@ -70,7 +191,7 @@ const GROCERY_COLORS = {
   clay: '#C86C42',
 }
 
-function FeaturedGroceryScrollStory({ products, onAddToCart }) {
+function FeaturedGroceryScrollStory({ products, onAddToCart, emptyMessage }) {
   const items = Array.isArray(products) ? products.slice(0, 8) : []
   const grocerySectionRef = useRef(null)
   const groceryHeroRef = useRef(null)
@@ -635,7 +756,7 @@ function FeaturedGroceryScrollStory({ products, onAddToCart }) {
         <div className="ep-landing-grocery-gallery__grid">
           {items.length === 0 ? (
             <div className="ep-landing-grocery-gallery__empty">
-              <p>Published grocery products will appear here when available.</p>
+              <p>{emptyMessage || 'Published grocery products will appear here when available.'}</p>
               <Link to="/grocery">Browse Grocery <ArrowRight size={16} aria-hidden="true" /></Link>
             </div>
           ) : (
@@ -751,6 +872,7 @@ function FeaturedDiscoverySection({
   groups = [],
   selectedFilter = 'all',
   onSelectFilter,
+  neutralDietaryFallback = false,
 }) {
   const config = FEATURED_DISCOVERY_CONFIG[kind]
   const sectionRef = useRef(null)
@@ -1147,6 +1269,11 @@ function FeaturedDiscoverySection({
             </div>
             <Link className="ep-recipe-showcase__explore" to="/recipes">Explore Recipes <ArrowRight size={16} /></Link>
           </div>
+          {neutralDietaryFallback && (
+            <p role="status" className="px-1 pb-3 text-[14px] font-medium text-[#53665B]">
+              General published recipes are shown; their Veg/Non-Veg status has not been verified. Check each recipe before cooking.
+            </p>
+          )}
           <div className="ep-recipe-showcase__grid">
             {displayItems.length === 0 ? (
               <div className="ep-recipe-showcase__empty">

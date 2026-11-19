@@ -7,19 +7,23 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  Inbox,
   LoaderCircle,
   PackageCheck,
+  Package,
   RefreshCw,
   Settings2,
   ShoppingBag,
+  Truck,
+  Warehouse,
+  UsersRound,
+  ShieldCheck,
+  Layers3,
   X,
 } from "lucide-react";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/context/AuthContext";
-
 import {
   getAnalyticsErrorMessage,
   getNotificationPreferences,
@@ -48,166 +52,118 @@ const PREFERENCE_KEYS = [
   "marketingEnabled",
 ];
 
-const notificationThemes = {
-  recipe: {
-    shell:
-      "border-[#e3d7c2] bg-gradient-to-br from-[#fff7ed] via-[#fffdf8] to-[#f4efe6]",
-    badge: "bg-[#9a3412] text-white",
-    status: "border-[#e3d7c2] bg-white/85 text-[#7c2d12]",
-    title: "text-[#163b2a]",
-    why: "text-[#9a3412]",
-    primary:
-      "border-[#9a3412] bg-[#9a3412] text-white hover:bg-[#7c2d12]",
-    secondary:
-      "border-[#e3d7c2] bg-white/85 text-[#7c2d12] hover:bg-[#fff7ed]",
-    dot: "bg-[#c2410c]",
+// Group existing notification evidence; do not infer a delivery from an ordinary order update.
+const NOTIFICATION_GROUPS = [
+  {
+    id: "orders",
+    title: "Orders",
+    description: "Order confirmations, preparation and item changes",
+    Icon: Package,
+    surface: "bg-[#E7EEF8]",
+    iconSurface: "bg-[#CFDEF4] text-[#254A75]",
+    accent: "bg-[#4777AF]",
+    count: "text-[#254A75]",
+    mobileSurface: "bg-[#EDF4FF]",
+    mobileUnreadBorder: "border-l-[#5283C4]",
   },
-  pantry: {
-    shell:
-      "border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50 to-white",
-    badge: "bg-emerald-700 text-white",
-    status: "border-emerald-200 bg-white/80 text-emerald-900",
-    title: "text-emerald-950",
-    why: "text-emerald-800",
-    primary:
-      "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800",
-    secondary:
-      "border-emerald-200 bg-white/80 text-emerald-900 hover:bg-emerald-100",
-    dot: "bg-emerald-600",
+  {
+    id: "delivery",
+    title: "Delivery updates",
+    description: "Dispatch, handoff and delivery progress",
+    Icon: Truck,
+    surface: "bg-[#E4F2EA]",
+    iconSurface: "bg-[#C7E8D6] text-[#15563D]",
+    accent: "bg-[#27845A]",
+    count: "text-[#15563D]",
+    mobileSurface: "bg-[#EAF8F0]",
+    mobileUnreadBorder: "border-l-[#25986A]",
   },
-  order: {
-    shell:
-      "border-sky-200 bg-gradient-to-br from-sky-50 via-blue-50 to-white",
-    badge: "bg-sky-700 text-white",
-    status: "border-sky-200 bg-white/80 text-sky-900",
-    title: "text-sky-950",
-    why: "text-sky-800",
-    primary: "border-sky-700 bg-sky-700 text-white hover:bg-sky-800",
-    secondary:
-      "border-sky-200 bg-white/80 text-sky-900 hover:bg-sky-100",
-    dot: "bg-sky-600",
+  {
+    id: "pantry",
+    title: "Pantry & meal planning",
+    description: "Ingredient reminders and meal-plan activity",
+    Icon: Warehouse,
+    surface: "bg-[#FFF1CE]",
+    iconSurface: "bg-[#F9E3A6] text-[#815418]",
+    accent: "bg-[#CB8A32]",
+    count: "text-[#815418]",
+    mobileSurface: "bg-[#FFF7E2]",
+    mobileUnreadBorder: "border-l-[#D99B33]",
   },
-  invitation: {
-    shell:
-      "border-violet-200 bg-gradient-to-br from-violet-50 via-purple-50 to-white",
-    badge: "bg-violet-700 text-white",
-    status: "border-violet-200 bg-white/80 text-violet-900",
-    title: "text-violet-950",
-    why: "text-violet-800",
-    primary:
-      "border-violet-700 bg-violet-700 text-white hover:bg-violet-800",
-    secondary:
-      "border-violet-200 bg-white/80 text-violet-900 hover:bg-violet-100",
-    dot: "bg-violet-600",
+  {
+    id: "household",
+    title: "Household & invitations",
+    description: "Invites and shared-household activity",
+    Icon: UsersRound,
+    surface: "bg-[#EEE7FA]",
+    iconSurface: "bg-[#DDD0F3] text-[#594083]",
+    accent: "bg-[#8A6ABB]",
+    count: "text-[#594083]",
+    mobileSurface: "bg-[#F5F0FF]",
+    mobileUnreadBorder: "border-l-[#9469C7]",
   },
-  household: {
-    shell:
-      "border-cyan-200 bg-gradient-to-br from-cyan-50 via-sky-50 to-white",
-    badge: "bg-cyan-800 text-white",
-    status: "border-cyan-200 bg-white/80 text-cyan-950",
-    title: "text-cyan-950",
-    why: "text-cyan-800",
-    primary: "border-cyan-800 bg-cyan-800 text-white hover:bg-cyan-900",
-    secondary:
-      "border-cyan-200 bg-white/80 text-cyan-950 hover:bg-cyan-100",
-    dot: "bg-cyan-700",
+  {
+    id: "account",
+    title: "Account & operations",
+    description: "Security, account and work-related updates",
+    Icon: ShieldCheck,
+    surface: "bg-[#FBE7DF]",
+    iconSurface: "bg-[#F6D4C6] text-[#924931]",
+    accent: "bg-[#D47D5A]",
+    count: "text-[#924931]",
+    mobileSurface: "bg-[#FFF1E9]",
+    mobileUnreadBorder: "border-l-[#D27F54]",
   },
-  planning: {
-    shell:
-      "border-indigo-200 bg-gradient-to-br from-indigo-50 via-blue-50 to-white",
-    badge: "bg-indigo-700 text-white",
-    status: "border-indigo-200 bg-white/80 text-indigo-900",
-    title: "text-indigo-950",
-    why: "text-indigo-800",
-    primary:
-      "border-indigo-700 bg-indigo-700 text-white hover:bg-indigo-800",
-    secondary:
-      "border-indigo-200 bg-white/80 text-indigo-900 hover:bg-indigo-100",
-    dot: "bg-indigo-600",
+  {
+    id: "other",
+    title: "More updates",
+    description: "Prices, learning and other EPANTRY news",
+    Icon: Layers3,
+    surface: "bg-[#E5EDF0]",
+    iconSurface: "bg-[#D1DFE4] text-[#385766]",
+    accent: "bg-[#6B90A2]",
+    count: "text-[#385766]",
+    mobileSurface: "bg-[#EDF7FA]",
+    mobileUnreadBorder: "border-l-[#5694A6]",
   },
-  price: {
-    shell:
-      "border-teal-200 bg-gradient-to-br from-teal-50 via-cyan-50 to-white",
-    badge: "bg-teal-700 text-white",
-    status: "border-teal-200 bg-white/80 text-teal-900",
-    title: "text-teal-950",
-    why: "text-teal-800",
-    primary: "border-teal-700 bg-teal-700 text-white hover:bg-teal-800",
-    secondary:
-      "border-teal-200 bg-white/80 text-teal-900 hover:bg-teal-100",
-    dot: "bg-teal-600",
-  },
-  class: {
-    shell:
-      "border-purple-200 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-white",
-    badge: "bg-purple-700 text-white",
-    status: "border-purple-200 bg-white/80 text-purple-900",
-    title: "text-purple-950",
-    why: "text-purple-800",
-    primary:
-      "border-purple-700 bg-purple-700 text-white hover:bg-purple-800",
-    secondary:
-      "border-purple-200 bg-white/80 text-purple-900 hover:bg-purple-100",
-    dot: "bg-purple-600",
-  },
-  security: {
-    shell:
-      "border-rose-200 bg-gradient-to-br from-rose-50 via-pink-50 to-white",
-    badge: "bg-rose-700 text-white",
-    status: "border-rose-200 bg-white/80 text-rose-900",
-    title: "text-rose-950",
-    why: "text-rose-800",
-    primary: "border-rose-700 bg-rose-700 text-white hover:bg-rose-800",
-    secondary:
-      "border-rose-200 bg-white/80 text-rose-900 hover:bg-rose-100",
-    dot: "bg-rose-600",
-  },
-  marketing: {
-    shell:
-      "border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 via-pink-50 to-white",
-    badge: "bg-fuchsia-700 text-white",
-    status: "border-fuchsia-200 bg-white/80 text-fuchsia-900",
-    title: "text-fuchsia-950",
-    why: "text-fuchsia-800",
-    primary:
-      "border-fuchsia-700 bg-fuchsia-700 text-white hover:bg-fuchsia-800",
-    secondary:
-      "border-fuchsia-200 bg-white/80 text-fuchsia-900 hover:bg-fuchsia-100",
-    dot: "bg-fuchsia-600",
-  },
-  operations: {
-    shell:
-      "border-slate-200 bg-gradient-to-br from-slate-100 via-slate-50 to-white",
-    badge: "bg-slate-800 text-white",
-    status: "border-slate-200 bg-white/80 text-slate-800",
-    title: "text-slate-950",
-    why: "text-slate-700",
-    primary:
-      "border-slate-800 bg-slate-800 text-white hover:bg-slate-900",
-    secondary:
-      "border-slate-200 bg-white/80 text-slate-800 hover:bg-slate-100",
-    dot: "bg-slate-600",
-  },
-  default: {
-    shell:
-      "border-stone-200 bg-gradient-to-br from-stone-50 via-white to-stone-100",
-    badge: "bg-stone-800 text-white",
-    status: "border-stone-200 bg-white/80 text-stone-700",
-    title: "text-stone-950",
-    why: "text-stone-600",
-    primary:
-      "border-stone-800 bg-stone-800 text-white hover:bg-stone-950",
-    secondary:
-      "border-stone-200 bg-white/80 text-stone-800 hover:bg-stone-100",
-    dot: "bg-stone-500",
-  },
-};
+];
+
+function notificationGroupId(notification) {
+  const category = String(notification?.category || "").toLowerCase();
+  const reason = String(notification?.reasonCode || "").toLowerCase();
+  const trigger = String(notification?.triggerType || "").toLowerCase();
+
+  if (
+    category === "delivery" ||
+    reason === "customer_order_out_for_delivery" ||
+    reason === "customer_order_carrier_handoff" ||
+    reason === "customer_order_delivery_failed" ||
+    reason === "customer_order_delivered" ||
+    trigger.includes("delivery_milestone")
+  )
+    return "delivery";
+  if (
+    category === "order" ||
+    reason.startsWith("customer_order_") ||
+    reason === "host_new_paid_order"
+  ) {
+    return "orders";
+  }
+  if (["pantry", "planning", "recipe"].includes(category)) return "pantry";
+  if (category === "household") return "household";
+  if (["security", "operations"].includes(category)) return "account";
+  return "other";
+}
+
+const ATTENTION_REASON_CODES = new Set([
+  "customer_order_rejected",
+  "customer_order_partial_unavailable",
+  "customer_order_seller_cancelled",
+  "customer_order_delivery_failed",
+]);
 
 function isUnreadNotification(notification) {
-  return (
-    !notification?.readAt &&
-    UNREAD_STATUSES.has(notification?.status)
-  );
+  return !notification?.readAt && UNREAD_STATUSES.has(notification?.status);
 }
 
 function broadcastNotificationChange() {
@@ -220,38 +176,6 @@ function titleize(value) {
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
-}
-
-function getNotificationTheme(notification) {
-  const triggerType = String(notification?.triggerType || "");
-  const reasonCode = String(notification?.reasonCode || "");
-
-  if (
-    reasonCode === "pantry_details_incomplete" ||
-    triggerType === "pantry_setup_reminder"
-  ) {
-    return notificationThemes.recipe;
-  }
-
-  if (
-    [
-      "customer_order_rejected",
-      "customer_order_partial_unavailable",
-      "customer_order_seller_cancelled",
-      "customer_order_delivery_failed",
-    ].includes(reasonCode)
-  ) {
-    return notificationThemes.security;
-  }
-
-  if (
-    notification?.category === "household" &&
-    (triggerType.includes("invitation") || reasonCode.includes("invitation"))
-  ) {
-    return notificationThemes.invitation;
-  }
-
-  return notificationThemes[notification?.category] || notificationThemes.default;
 }
 
 function getPantryItemName(explanation) {
@@ -475,7 +399,8 @@ function getNotificationCopy(notification) {
     title: titleize(reasonCode) || "Useful update",
     description:
       explanation || "There is a useful EPANTRY update ready for you.",
-    why: whyByCategory[notification?.category] || "EPANTRY found a useful update",
+    why:
+      whyByCategory[notification?.category] || "EPANTRY found a useful update",
     openLabel: openLabelByCategory[notification?.category] || "Open",
   };
 }
@@ -488,207 +413,206 @@ function PreferenceToggle({
   onChange,
 }) {
   return (
-    <label className="flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.07] p-4 transition hover:bg-white/[0.1]">
-      <span>
-        <span className="block text-sm font-black text-white">{label}</span>
-
-        <span className="mt-1 block text-xs leading-5 text-stone-300">
+    <label className="flex items-center justify-between gap-4 border-b border-[#DFE5DD] bg-white/75 px-4 py-4 transition last:border-b-0 hover:bg-white sm:px-5">
+      <span className="min-w-0">
+        <span className="block text-[15px] font-semibold text-[#173E32]">
+          {label}
+        </span>
+        <span className="mt-0.5 block text-[13px] leading-5 text-[#65746B]">
           {description}
         </span>
       </span>
-
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 h-4 w-4 shrink-0 accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+        className="size-5 shrink-0 accent-[#185943] disabled:cursor-not-allowed disabled:opacity-40"
       />
     </label>
   );
 }
 
-function NotificationCard({ notification, busy, onAction, onMarkRead }) {
+function NotificationRow({
+  notification,
+  category,
+  busy,
+  onAction,
+  onMarkRead,
+}) {
   const available = new Set(notification.actions || []);
-  const theme = getNotificationTheme(notification);
   const copy = getNotificationCopy(notification);
   const unread = isUnreadNotification(notification);
-
+  const needsReview = ATTENTION_REASON_CODES.has(
+    String(notification?.reasonCode || "")
+  );
   const deepLinkPath =
     typeof notification?.deepLink?.path === "string" &&
     notification.deepLink.path.startsWith("/") &&
     !notification.deepLink.path.startsWith("//")
       ? notification.deepLink.path
       : "";
-
-  const statusLabel = notification.readAt
-    ? "Read"
-    : titleize(notification.status) || "New";
-
-  const categoryLabel =
-    notification?.category === "household" &&
-    (String(notification?.triggerType || "").includes("invitation") ||
-      String(notification?.reasonCode || "").includes("invitation"))
-      ? "Invitation"
-      : titleize(notification.category) || "Update";
-
-  const actionBase =
-    "focus-ring inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50";
+  const created = notification.createdAt
+    ? new Date(notification.createdAt)
+    : null;
+  const displayDate =
+    created && !Number.isNaN(created.valueOf())
+      ? created.toLocaleString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "—";
+  const GroupIcon = category.Icon;
+  const actionClass =
+    "focus-ring inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[#C7DDF1] bg-[#F1F7FF] px-2.5 py-1.5 text-[13px] font-semibold text-[#2A5575] transition hover:border-[#88B5DA] hover:bg-[#E5F1FF] disabled:cursor-not-allowed disabled:opacity-50 sm:border-[#D9E1D9] sm:bg-white sm:px-3 sm:text-[#335848] sm:hover:border-[#93B7A1] sm:hover:bg-[#F2F7F3]";
 
   return (
     <article
-      className={[
-        "relative overflow-hidden rounded-[24px] border p-5 transition",
+      className={`group relative border-b border-[#E4E9E2] last:border-b-0 ${
         unread
-          ? "shadow-[0_14px_34px_rgba(15,23,42,0.12)] ring-1 ring-inset ring-white/75 hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(15,23,42,0.16)]"
-          : "shadow-sm saturate-[0.68] opacity-[0.92] ring-1 ring-inset ring-white/55 hover:opacity-100 hover:saturate-100 hover:shadow-md",
-        theme.shell,
-      ].join(" ")}
+          ? `${category.mobileSurface} sm:bg-[#F7FAF6]`
+          : "bg-[#FFFDFC] sm:bg-white"
+      } ${
+        needsReview
+          ? "border-l-[3px] border-l-[#C86E51]"
+          : unread
+          ? `border-l-[3px] ${category.mobileUnreadBorder} sm:border-l-[#27845A]`
+          : "border-l-[3px] border-l-transparent"
+      }`}
     >
-      <div
-        className={`absolute bottom-0 left-0 top-0 w-1.5 ${theme.dot} ${
-          unread ? "opacity-100" : "opacity-45"
-        }`}
-        aria-hidden="true"
-      />
-
-      <div className="relative z-20 flex flex-col gap-4 pl-1 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="relative block min-w-0 px-3 py-3.5 sm:flex sm:gap-4 sm:px-5 sm:py-5 xl:px-7">
+        <span
+          className={`absolute left-3 top-3.5 grid size-8 shrink-0 place-items-center rounded-[10px] sm:relative sm:left-auto sm:top-auto sm:mt-0.5 sm:size-11 sm:rounded-[12px] ${category.iconSurface}`}
+          aria-hidden="true"
+        >
+          <GroupIcon size={20} strokeWidth={1.9} />
+          {unread ? (
             <span
-              className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${theme.badge}`}
-            >
-              {categoryLabel}
+              className={`absolute -right-1 -top-1 size-3 rounded-full border-2 border-white ${
+                needsReview ? "bg-[#C86E51]" : "bg-[#238659]"
+              }`}
+            />
+          ) : null}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1.5 pl-10 sm:min-h-0 sm:pl-0">
+            <span className={`text-[12px] font-bold ${category.count}`}>
+              {category.title}
             </span>
-
-            <span
-              className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${theme.status}`}
-            >
-              {statusLabel}
-            </span>
-
-            {unread ? (
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-stone-600">
-                <span className={`size-2 rounded-full ${theme.dot}`} />
+            {needsReview ? (
+              <span className="rounded-full bg-[#FCE6DC] px-2 py-0.5 text-[12px] font-bold sm:text-[11px] text-[#9A4637]">
+                Needs attention
+              </span>
+            ) : unread ? (
+              <span className="rounded-full bg-[#DDEFE3] px-2 py-0.5 text-[12px] font-bold sm:text-[11px] text-[#246547]">
                 New
               </span>
             ) : null}
+            <time
+              dateTime={notification.createdAt || undefined}
+              className="ml-auto text-[12px] font-medium text-[#77857B] sm:text-[13px]"
+            >
+              {displayDate}
+            </time>
           </div>
-
-          <h3 className={`mt-3 text-base font-black sm:text-lg ${theme.title}`}>
+          <p
+            className={`mt-1.5 text-[16px] leading-snug text-[#193C30] sm:text-[18px] ${
+              unread ? "font-bold" : "font-semibold"
+            }`}
+          >
             {copy.title}
-          </h3>
-
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-700">
+          </p>
+          <p className="mt-1 max-w-[84ch] text-[14px] leading-[1.6] text-[#56695D] sm:text-[15px]">
             {copy.description}
           </p>
-
-          <p className={`mt-3 text-xs font-bold ${theme.why}`}>
-            Why this alert: {copy.why}
+          <p className="mt-1 text-[13px] leading-5 text-[#76877B]">
+            {copy.why}
           </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
+            {deepLinkPath ? (
+              <Link
+                to={deepLinkPath}
+                className="focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#217C57] px-2.5 py-1.5 text-[13px] font-bold text-white transition hover:bg-[#146548] sm:bg-[#194D3B] sm:px-3.5 sm:hover:bg-[#103C2C]"
+              >
+                {copy.openLabel}
+                <ArrowUpRight size={15} />
+              </Link>
+            ) : null}
+            {unread ? (
+              <button
+                type="button"
+                className={actionClass}
+                disabled={busy}
+                onClick={() => onMarkRead(notification.id)}
+              >
+                <CheckCheck size={15} /> Mark as read
+              </button>
+            ) : null}
+            {available.has("accept") ? (
+              <button
+                type="button"
+                className={actionClass}
+                disabled={busy}
+                onClick={() => onAction(notification.id, "accept")}
+              >
+                <Check size={15} /> Done
+              </button>
+            ) : null}
+            {available.has("snooze") ? (
+              <button
+                type="button"
+                className={actionClass}
+                disabled={busy}
+                onClick={() => onAction(notification.id, "snooze")}
+              >
+                <Clock3 size={15} /> Snooze 24h
+              </button>
+            ) : null}
+            {available.has("still_have") ? (
+              <button
+                type="button"
+                className={actionClass}
+                disabled={busy}
+                onClick={() => onAction(notification.id, "still_have")}
+              >
+                <PackageCheck size={15} /> Still have
+              </button>
+            ) : null}
+            {available.has("bought_elsewhere") ? (
+              <button
+                type="button"
+                className={actionClass}
+                disabled={busy}
+                onClick={() => onAction(notification.id, "bought_elsewhere")}
+              >
+                <ShoppingBag size={15} /> Bought elsewhere
+              </button>
+            ) : null}
+            {available.has("stop_suggesting") ? (
+              <button
+                type="button"
+                className={actionClass}
+                disabled={busy}
+                onClick={() => onAction(notification.id, "stop_suggesting")}
+              >
+                <BellOff size={15} /> Stop suggesting
+              </button>
+            ) : null}
+            {available.has("dismiss") ? (
+              <button
+                type="button"
+                className="focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-[13px] font-semibold text-[#A95641] transition hover:bg-[#FFE9DF] hover:text-[#954335] disabled:cursor-not-allowed disabled:opacity-50 sm:px-2 sm:text-[#93706A] sm:hover:bg-[#FDF0ED]"
+                disabled={busy}
+                onClick={() => onAction(notification.id, "dismiss")}
+              >
+                <X size={15} /> Dismiss
+              </button>
+            ) : null}
+          </div>
         </div>
-
-        <time className="shrink-0 text-[11px] font-semibold text-stone-500">
-          {notification.createdAt
-            ? new Date(notification.createdAt).toLocaleString()
-            : "—"}
-        </time>
-      </div>
-
-      <div className="relative z-20 mt-4 flex flex-wrap gap-2 pl-1">
-        {deepLinkPath ? (
-          <Link
-            to={deepLinkPath}
-            className={`${actionBase} ${theme.primary}`}
-          >
-            <ArrowUpRight size={14} />
-            {copy.openLabel}
-          </Link>
-        ) : null}
-
-        {unread ? (
-          <button
-            type="button"
-            className={`${actionBase} ${theme.secondary}`}
-            disabled={busy}
-            onClick={() => onMarkRead(notification.id)}
-          >
-            <CheckCheck size={14} />
-            Mark as read
-          </button>
-        ) : null}
-
-        {available.has("accept") ? (
-          <button
-            type="button"
-            className={`${actionBase} ${theme.secondary}`}
-            disabled={busy}
-            onClick={() => onAction(notification.id, "accept")}
-          >
-            <Check size={14} />
-            Done
-          </button>
-        ) : null}
-
-        {available.has("snooze") ? (
-          <button
-            type="button"
-            className={`${actionBase} ${theme.secondary}`}
-            disabled={busy}
-            onClick={() => onAction(notification.id, "snooze")}
-          >
-            <Clock3 size={14} />
-            Snooze 24h
-          </button>
-        ) : null}
-
-        {available.has("still_have") ? (
-          <button
-            type="button"
-            className={`${actionBase} ${theme.secondary}`}
-            disabled={busy}
-            onClick={() => onAction(notification.id, "still_have")}
-          >
-            <PackageCheck size={14} />
-            Still have
-          </button>
-        ) : null}
-
-        {available.has("bought_elsewhere") ? (
-          <button
-            type="button"
-            className={`${actionBase} ${theme.secondary}`}
-            disabled={busy}
-            onClick={() => onAction(notification.id, "bought_elsewhere")}
-          >
-            <ShoppingBag size={14} />
-            Bought elsewhere
-          </button>
-        ) : null}
-
-        {available.has("stop_suggesting") ? (
-          <button
-            type="button"
-            className={`${actionBase} ${theme.secondary}`}
-            disabled={busy}
-            onClick={() => onAction(notification.id, "stop_suggesting")}
-          >
-            <BellOff size={14} />
-            Stop suggesting
-          </button>
-        ) : null}
-
-        {available.has("dismiss") ? (
-          <button
-            type="button"
-            className={`${actionBase} border-stone-200 bg-white/70 text-stone-600 hover:bg-white hover:text-red-700`}
-            disabled={busy}
-            onClick={() => onAction(notification.id, "dismiss")}
-          >
-            <X size={14} />
-            Dismiss
-          </button>
-        ) : null}
       </div>
     </article>
   );
@@ -704,6 +628,9 @@ export default function NotificationCenterPage() {
   const [notice, setNotice] = useState("");
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedGroupId, setSelectedGroupId] = useState("all");
+  const [mobileTopicsOpen, setMobileTopicsOpen] = useState(false);
   const generation = useRef(0);
 
   const load = useCallback(async () => {
@@ -711,15 +638,11 @@ export default function NotificationCenterPage() {
     setLoading(true);
     setError("");
     setNotifications([]);
-
     try {
       const [preferenceData, notificationData] = await Promise.all([
         getNotificationPreferences(),
-        listNotifications({
-          limit: 60,
-        }),
+        listNotifications({ limit: 60 }),
       ]);
-
       if (requestId === generation.current) {
         setPreferences(preferenceData?.preferences || null);
         setNotifications(notificationData?.notifications || []);
@@ -736,18 +659,18 @@ export default function NotificationCenterPage() {
 
   useEffect(() => {
     load();
-    return () => { generation.current += 1; };
+    return () => {
+      generation.current += 1;
+    };
   }, [load]);
 
   async function markOneAsRead(notificationId) {
     setBusy(true);
     setError("");
     setNotice("");
-
     try {
       const data = await markNotificationRead(notificationId);
       const updated = data?.notification || null;
-
       setNotifications((current) =>
         current.map((item) =>
           item.id === notificationId
@@ -759,7 +682,6 @@ export default function NotificationCenterPage() {
             : item
         )
       );
-
       setNotice("Notification marked as read.");
       broadcastNotificationChange();
     } catch (requestError) {
@@ -777,32 +699,24 @@ export default function NotificationCenterPage() {
   async function markEveryNotificationAsRead() {
     setError("");
     setNotice("");
-
     const unreadNow = notifications.filter(isUnreadNotification).length;
-
     if (unreadNow === 0) {
-      setNotice("You’re already caught up — every visible notification is read.");
+      setNotice(
+        "You’re already caught up — every visible notification is read."
+      );
       return;
     }
-
     setBusy(true);
-
     try {
       const data = await markAllNotificationsRead();
       const readAt = data?.readAt || new Date().toISOString();
-
       setNotifications((current) =>
         current.map((item) =>
           isUnreadNotification(item)
-            ? {
-                ...item,
-                status: "read",
-                readAt,
-              }
+            ? { ...item, status: "read", readAt }
             : item
         )
       );
-
       setNotice(
         data?.markedReadCount
           ? `${data.markedReadCount} notification${
@@ -827,12 +741,8 @@ export default function NotificationCenterPage() {
     setBusy(true);
     setError("");
     setNotice("");
-
     try {
-      const data = await updateNotificationPreferences({
-        [key]: value,
-      });
-
+      const data = await updateNotificationPreferences({ [key]: value });
       setPreferences(data?.preferences || null);
       setNotice("Notification preference updated.");
     } catch (requestError) {
@@ -851,7 +761,6 @@ export default function NotificationCenterPage() {
     setBusy(true);
     setError("");
     setNotice("");
-
     try {
       await performNotificationAction(notificationId, {
         action: actionName,
@@ -860,13 +769,11 @@ export default function NotificationCenterPage() {
             ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
             : null,
       });
-
       setNotice(
         actionName === "still_have" || actionName === "bought_elsewhere"
           ? "Feedback recorded through the Pantry evidence workflow."
           : "Notification updated."
       );
-
       await load();
     } catch (requestError) {
       setError(
@@ -884,284 +791,632 @@ export default function NotificationCenterPage() {
     () => notifications.filter(isUnreadNotification).length,
     [notifications]
   );
+  const enabledPreferenceCount = useMemo(
+    () =>
+      preferences
+        ? PREFERENCE_KEYS.filter((key) => preferences[key] === true).length
+        : 0,
+    [preferences]
+  );
+  const categoryBuckets = useMemo(
+    () =>
+      NOTIFICATION_GROUPS.map((group) => {
+        const items = notifications.filter(
+          (notification) => notificationGroupId(notification) === group.id
+        );
+        return {
+          ...group,
+          items,
+          unread: items.filter(isUnreadNotification).length,
+        };
+      }).filter((group) => group.items.length > 0),
+    [notifications]
+  );
+  const selectedCategory =
+    NOTIFICATION_GROUPS.find((group) => group.id === selectedGroupId) || null;
+  const filteredNotifications = useMemo(
+    () =>
+      notifications
+        .filter(
+          (notification) =>
+            selectedGroupId === "all" ||
+            notificationGroupId(notification) === selectedGroupId
+        )
+        .filter(
+          (notification) =>
+            activeFilter === "all" || isUnreadNotification(notification)
+        )
+        .slice()
+        .sort(
+          (a, b) =>
+            (Date.parse(b.createdAt || "") || 0) -
+            (Date.parse(a.createdAt || "") || 0)
+        ),
+    [notifications, activeFilter, selectedGroupId]
+  );
+  const displayNotifications = showAll
+    ? filteredNotifications
+    : filteredNotifications.slice(0, 8);
 
-  const enabledPreferenceCount = useMemo(() => {
-    if (!preferences) {
-      return 0;
-    }
+  function chooseCategory(groupId) {
+    setSelectedGroupId(groupId);
+    setMobileTopicsOpen(false);
+    setShowAll(false);
+  }
 
-    return PREFERENCE_KEYS.filter((key) => preferences[key] === true).length;
-  }, [preferences]);
-
-  const visibleNotifications = showAll
-    ? notifications
-    : notifications.slice(0, 6);
+  function chooseFilter(filter) {
+    setActiveFilter(filter);
+    setShowAll(false);
+  }
 
   return (
-    <main className="epantry-workspace-canvas min-h-screen bg-[#f3f7f5] py-8">
-      <div className="page-shell max-w-6xl">
-        <header className="overflow-hidden rounded-[28px] border border-emerald-900/20 bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 text-white shadow-lg shadow-emerald-950/10">
-          <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+    <main className="epantry-workspace-canvas min-h-screen w-full min-w-0 bg-[#FFF9F1] pb-12 text-[#193F32] sm:bg-[#F7F6F1]">
+      <header className="w-full border-b border-[#B9DCC8] bg-[#DDF3E7] sm:border-[#D8DFD6] sm:bg-[#EAF0E8]">
+        <div className="w-full px-3 pb-4 pt-4 sm:px-7 sm:pb-6 sm:pt-7 lg:px-10 xl:px-12">
+          <div className="flex flex-col gap-3 sm:gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-200">
-                <Bell size={14} />
-                Notification Center
-              </div>
-
-              <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-[28px]">
-                Know what changed. Act on what matters.
+              <p className="flex items-center gap-2 text-[13px] font-bold text-[#247B57] sm:text-[#3D765E]">
+                <Bell size={16} /> EPANTRY / Your inbox
+              </p>
+              <h1 className="mt-1 text-[28px] font-bold tracking-[-0.045em] text-[#143D2F] sm:text-[44px]">
+                Notifications
               </h1>
-
-              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-stone-300">
-                Pantry reminders, order movement, household invites and other useful updates — organised so the next action is obvious.
+              <p className="mt-1 text-[14px] leading-[1.5] text-[#596F61] sm:text-[15px] sm:leading-6">
+                Orders, delivery progress and the updates that matter to you.
               </p>
             </div>
-
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setPreferencesOpen((current) => !current)}
-                className="focus-ring inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-black text-white transition hover:bg-white/15"
-                aria-expanded={preferencesOpen}
-              >
-                <Settings2 size={15} />
-                Preferences
-                {preferences ? (
-                  <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] text-emerald-100">
-                    {enabledPreferenceCount} on
-                  </span>
-                ) : null}
-                {preferencesOpen ? (
-                  <ChevronUp size={14} />
-                ) : (
-                  <ChevronDown size={14} />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={load}
-                disabled={loading || busy}
-                className="focus-ring inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-stone-900 transition hover:bg-emerald-50 disabled:opacity-50"
-              >
-                <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-                Refresh
-              </button>
-            </div>
-          </div>
-
-          {preferencesOpen ? (
-            <div className="border-t border-white/10 bg-black/10 p-5 sm:p-6">
-              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-6 lg:justify-end">
+              <div className="flex items-center gap-4 border-r border-[#C6D5C7] pr-4 sm:gap-7 sm:pr-7">
                 <div>
-                  <h2 className="text-base font-black text-white">
-                    Alert preferences
-                  </h2>
-                  <p className="mt-1 text-xs leading-5 text-stone-300">
-                    Choose which useful EPANTRY updates can reach you. Marketing consent remains controlled separately.
-                  </p>
+                  <strong className="block text-[26px] font-bold leading-none tabular-nums text-[#154533] sm:text-[34px]">
+                    {notifications.length}
+                  </strong>
+                  <span className="mt-1 block text-[12px] font-semibold text-[#5C7665]">
+                    Total
+                  </span>
+                </div>
+                <div>
+                  <strong className="block text-[26px] font-bold leading-none tabular-nums text-[#C65C39] sm:text-[34px] sm:text-[#BA6543]">
+                    {unreadCount}
+                  </strong>
+                  <span className="mt-1 block text-[12px] font-semibold text-[#5C7665]">
+                    Unread
+                  </span>
                 </div>
               </div>
-
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {preferences ? (
-                  <>
-                    <PreferenceToggle
-                      label="In-app"
-                      description="Show useful alerts inside EPANTRY."
-                      checked={preferences.inAppEnabled === true}
-                      onChange={(value) =>
-                        patchPreference("inAppEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Email"
-                      description="Send eligible account and order updates by email."
-                      checked={preferences.emailEnabled === true}
-                      onChange={(value) =>
-                        patchPreference("emailEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Planning"
-                      description="Meal-plan shortages and planning reminders."
-                      checked={preferences.planningEnabled === true}
-                      onChange={(value) =>
-                        patchPreference("planningEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Pantry"
-                      description="Use-soon and Pantry detail reminders."
-                      checked={preferences.pantryEnabled === true}
-                      onChange={(value) =>
-                        patchPreference("pantryEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Household"
-                      description="Invites and shared-household updates."
-                      checked={preferences.householdEnabled === true}
-                      onChange={(value) =>
-                        patchPreference("householdEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Orders"
-                      description="Order preparation and delivery milestones."
-                      checked={preferences.orderEnabled === true}
-                      onChange={(value) =>
-                        patchPreference("orderEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Operations"
-                      description="Host and operational account notices."
-                      checked={preferences.operationsEnabled !== false}
-                      onChange={(value) =>
-                        patchPreference("operationsEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Price"
-                      description="Meaningful price-change alerts."
-                      checked={preferences.priceEnabled === true}
-                      onChange={(value) =>
-                        patchPreference("priceEnabled", value)
-                      }
-                    />
-
-                    <PreferenceToggle
-                      label="Marketing"
-                      description="Optional marketing delivery preference."
-                      checked={preferences.marketingEnabled === true}
-                      disabled={preferences.marketingEnabled !== true}
-                      onChange={(value) =>
-                        patchPreference("marketingEnabled", value)
-                      }
-                    />
-                  </>
-                ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreferencesOpen((current) => !current)}
+                  aria-expanded={preferencesOpen}
+                  className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#BDD5E7] bg-[#F4F9FF] px-3 text-[13px] font-semibold text-[#225D7A] transition hover:bg-[#E9F3FF] sm:min-h-11 sm:border-[#BFCFC1] sm:bg-white sm:px-3.5 sm:text-[14px] sm:text-[#22513B] sm:hover:bg-[#F8FCF8]"
+                >
+                  <Settings2 size={17} /> Preferences
+                  {preferences ? (
+                    <span className="text-[12px] text-[#6B8271]">
+                      {enabledPreferenceCount} on
+                    </span>
+                  ) : null}
+                  {preferencesOpen ? (
+                    <ChevronUp size={15} />
+                  ) : (
+                    <ChevronDown size={15} />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={load}
+                  disabled={loading || busy}
+                  className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#23805A] px-3 text-[13px] font-semibold text-white transition hover:bg-[#196847] disabled:opacity-50 sm:min-h-11 sm:bg-[#184E3A] sm:px-4 sm:text-[14px] sm:hover:bg-[#0F382A]"
+                >
+                  <RefreshCw
+                    size={16}
+                    className={loading ? "animate-spin" : ""}
+                  />{" "}
+                  Refresh
+                </button>
               </div>
             </div>
-          ) : null}
-        </header>
+          </div>
+        </div>
+      </header>
 
+      <div className="w-full px-3 sm:px-7 lg:px-10 xl:px-12">
+        {preferencesOpen ? (
+          <section
+            className="mt-5 overflow-hidden rounded-2xl border border-[#D2DDD1] bg-[#F0F6EF]"
+            aria-label="Notification preferences"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D7E2D8] px-4 py-4 sm:px-6">
+              <div>
+                <h2 className="text-[20px] font-bold text-[#163F31]">
+                  Notification preferences
+                </h2>
+                <p className="mt-1 text-[13px] leading-5 text-[#69796F]">
+                  Manage how you receive updates. Marketing consent is managed
+                  separately.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="focus-ring inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#285F48]"
+                onClick={() => setPreferencesOpen(false)}
+              >
+                Close <X size={15} />
+              </button>
+            </div>
+            {preferences ? (
+              <div className="grid gap-px bg-[#DFE5DD] md:grid-cols-2">
+                <div className="bg-white/70">
+                  <PreferenceToggle
+                    label="In-app"
+                    description="Show useful alerts inside EPANTRY."
+                    checked={preferences.inAppEnabled === true}
+                    disabled={busy}
+                    onChange={(value) => patchPreference("inAppEnabled", value)}
+                  />
+                  <PreferenceToggle
+                    label="Email"
+                    description="Send eligible account and order updates by email."
+                    checked={preferences.emailEnabled === true}
+                    disabled={busy}
+                    onChange={(value) => patchPreference("emailEnabled", value)}
+                  />
+                  <PreferenceToggle
+                    label="Planning"
+                    description="Meal-plan shortages and planning reminders."
+                    checked={preferences.planningEnabled === true}
+                    disabled={busy}
+                    onChange={(value) =>
+                      patchPreference("planningEnabled", value)
+                    }
+                  />
+                  <PreferenceToggle
+                    label="Pantry"
+                    description="Use-soon and Pantry detail reminders."
+                    checked={preferences.pantryEnabled === true}
+                    disabled={busy}
+                    onChange={(value) =>
+                      patchPreference("pantryEnabled", value)
+                    }
+                  />
+                  <PreferenceToggle
+                    label="Household"
+                    description="Invites and shared-household updates."
+                    checked={preferences.householdEnabled === true}
+                    disabled={busy}
+                    onChange={(value) =>
+                      patchPreference("householdEnabled", value)
+                    }
+                  />
+                </div>
+                <div className="bg-white/70">
+                  <PreferenceToggle
+                    label="Orders"
+                    description="Order preparation and delivery milestones."
+                    checked={preferences.orderEnabled === true}
+                    disabled={busy}
+                    onChange={(value) => patchPreference("orderEnabled", value)}
+                  />
+                  <PreferenceToggle
+                    label="Operations"
+                    description="Host and operational account notices."
+                    checked={preferences.operationsEnabled !== false}
+                    disabled={busy}
+                    onChange={(value) =>
+                      patchPreference("operationsEnabled", value)
+                    }
+                  />
+                  <PreferenceToggle
+                    label="Price"
+                    description="Meaningful price-change alerts."
+                    checked={preferences.priceEnabled === true}
+                    disabled={busy}
+                    onChange={(value) => patchPreference("priceEnabled", value)}
+                  />
+                  <PreferenceToggle
+                    label="Marketing"
+                    description="Optional marketing delivery preference."
+                    checked={preferences.marketingEnabled === true}
+                    disabled={busy || preferences.marketingEnabled !== true}
+                    onChange={(value) =>
+                      patchPreference("marketingEnabled", value)
+                    }
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="px-6 py-5 text-[14px] text-[#63766A]">
+                Preferences are currently unavailable.
+              </p>
+            )}
+          </section>
+        ) : null}
         {error ? (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">
+          <div
+            role="alert"
+            className="mt-5 border-l-4 border-[#B74239] bg-[#FFF1EE] px-4 py-3 text-[14px] font-medium text-[#8F332B]"
+          >
             {error}
           </div>
         ) : null}
-
         {notice ? (
-          <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 shadow-sm">
+          <div
+            role="status"
+            className="mt-5 flex items-center justify-between gap-3 border-l-4 border-[#358765] bg-[#E5F4E9] px-4 py-3 text-[14px] font-medium text-[#1C5D40]"
+          >
             <span>{notice}</span>
-
             <button
               type="button"
               onClick={() => setNotice("")}
-              className="focus-ring grid size-8 shrink-0 place-items-center rounded-full border border-emerald-200 bg-white/80 text-emerald-800 transition hover:bg-white"
+              className="focus-ring grid size-8 shrink-0 place-items-center rounded-lg hover:bg-white/60"
               aria-label="Dismiss message"
             >
-              <X size={15} />
+              <X size={16} />
             </button>
           </div>
         ) : null}
 
-        {loading ? (
-          <div className="mt-5 grid min-h-72 place-items-center rounded-[24px] border border-emerald-100 bg-emerald-50/70">
-            <LoaderCircle className="animate-spin text-emerald-700" />
-          </div>
-        ) : (
-          <section className="mt-5">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-black tracking-tight text-stone-950 sm:text-3xl">
-                    Your alerts
-                  </h2>
-
-                  {unreadCount > 0 ? (
-                    <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-white">
-                      {unreadCount} new
-                    </span>
-                  ) : (
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-emerald-800">
-                      All caught up
-                    </span>
-                  )}
-                </div>
-
-                <p className="mt-1 text-xs text-stone-500">
-                  {notifications.length} visible notification
-                  {notifications.length === 1 ? "" : "s"} · colour shows what kind of update it is
+        <div className="grid min-w-0 gap-3 pt-3 sm:gap-5 sm:pt-5 lg:grid-cols-[268px_minmax(0,1fr)] lg:gap-7 xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-9">
+          <aside
+            className="min-w-0 lg:border-r lg:border-[#D7DDD4] lg:pr-6 xl:pr-7"
+            aria-label="Notification categories"
+          >
+            <div className="lg:sticky lg:top-5">
+              <h2 className="mb-3 hidden text-[20px] font-bold text-[#174231] lg:block">
+                Browse by topic
+              </h2>
+              <p className="mb-4 hidden text-[13px] leading-5 text-[#718074] lg:block">
+                Choose a category to focus on specific updates.
+              </p>
+              {/* Mobile uses a full-width topic selector rather than clipped horizontal tabs. */}
+              <div className="lg:hidden">
+                <p className="mb-2 text-[13px] font-bold text-[#A75E36] sm:text-[#456D56]">
+                  Browse notifications
                 </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={markEveryNotificationAsRead}
-                disabled={busy || unreadCount === 0}
-                className={[
-                  "focus-ring inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-black transition",
-                  unreadCount > 0
-                    ? "border-emerald-700 bg-emerald-700 text-white shadow-sm hover:-translate-y-0.5 hover:bg-emerald-800 hover:shadow-md"
-                    : "cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400 opacity-70",
-                ].join(" ")}
-              >
-                <CheckCheck size={15} />
-                Mark all as read
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {notifications.length ? (
-                visibleNotifications.map((notification) => (
-                  <NotificationCard
-                    key={notification.id}
-                    notification={notification}
-                    busy={busy}
-                    onAction={action}
-                    onMarkRead={markOneAsRead}
-                  />
-                ))
-              ) : (
-                <div className="rounded-[24px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50 to-white p-8 text-center shadow-sm">
-                  <BellOff className="mx-auto text-emerald-400" />
-
-                  <p className="mt-3 text-base font-black text-emerald-950">
-                    Nothing needs your attention right now
-                  </p>
-
-                  <p className="mx-auto mt-1 max-w-lg text-sm leading-6 text-stone-600">
-                    When Pantry details, household activity, planning or an order needs you, the useful update will appear here.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {notifications.length > 6 ? (
-              <div className="mt-5 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => setShowAll((current) => !current)}
-                  className="focus-ring inline-flex items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-5 py-2.5 text-xs font-black text-teal-900 shadow-sm transition hover:bg-teal-100"
+                  onClick={() => setMobileTopicsOpen((current) => !current)}
+                  aria-expanded={mobileTopicsOpen}
+                  aria-controls="epantry-mobile-notification-topics"
+                  className="focus-ring flex min-h-14 w-full items-center gap-3 rounded-xl border border-[#B8D5F0] bg-[#EAF3FF] px-3 py-2.5 text-left shadow-sm transition hover:border-[#80ADDA]"
                 >
-                  {showAll
-                    ? "View less"
-                    : `View all ${notifications.length} notifications`}
+                  <span
+                    className={`grid size-9 shrink-0 place-items-center rounded-[10px] ${
+                      selectedCategory
+                        ? selectedCategory.iconSurface
+                        : "bg-[#CFE7F9] text-[#20577B]"
+                    }`}
+                  >
+                    {selectedCategory ? (
+                      <selectedCategory.Icon size={19} strokeWidth={1.9} />
+                    ) : (
+                      <Inbox size={19} />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[15px] font-bold leading-5 text-[#193F32] [overflow-wrap:anywhere]">
+                    {selectedCategory ? selectedCategory.title : "All activity"}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-[#FFF1CE] px-2.5 py-1 text-[12px] font-bold tabular-nums text-[#855B28]">
+                    {selectedCategory
+                      ? categoryBuckets.find(
+                          (group) => group.id === selectedGroupId
+                        )?.items.length || 0
+                      : notifications.length}
+                  </span>
+                  <span
+                    className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#D8E9FF] text-[#285C89]"
+                    aria-hidden="true"
+                  >
+                    {mobileTopicsOpen ? (
+                      <ChevronUp size={18} />
+                    ) : (
+                      <ChevronDown size={18} />
+                    )}
+                  </span>
+                </button>
+                {mobileTopicsOpen ? (
+                  <div
+                    id="epantry-mobile-notification-topics"
+                    className="mt-2 overflow-hidden rounded-xl border border-[#C7DDF0] bg-[#F8FBFF]"
+                    aria-label="Choose notification category"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => chooseCategory("all")}
+                      aria-pressed={selectedGroupId === "all"}
+                      className={`focus-ring flex min-h-12 w-full items-center gap-3 border-b border-[#E4EBE2] px-3 py-2.5 text-left ${
+                        selectedGroupId === "all"
+                          ? "bg-[#DFF0E6]"
+                          : "bg-[#F8FBFF] hover:bg-[#EDF5FF]"
+                      }`}
+                    >
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#E0EDE3] text-[#205A41]">
+                        <Inbox size={18} />
+                      </span>
+                      <span className="min-w-0 flex-1 text-[14px] font-semibold leading-5 text-[#1B4635]">
+                        All activity
+                      </span>
+                      <span className="shrink-0 text-[13px] font-bold tabular-nums text-[#597365]">
+                        {notifications.length}
+                      </span>
+                      {selectedGroupId === "all" ? (
+                        <Check size={17} className="shrink-0 text-[#1D6A45]" />
+                      ) : null}
+                    </button>
+                    {categoryBuckets.map((group) => {
+                      const GroupIcon = group.Icon;
+                      const active = selectedGroupId === group.id;
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => chooseCategory(group.id)}
+                          aria-pressed={active}
+                          className={`focus-ring flex min-h-12 w-full items-center gap-3 border-b border-[#E4EBE2] px-3 py-2.5 text-left last:border-b-0 ${
+                            active
+                              ? "bg-[#DFF0E6]"
+                              : "bg-[#F8FBFF] hover:bg-[#EDF5FF]"
+                          }`}
+                        >
+                          <span
+                            className={`grid size-8 shrink-0 place-items-center rounded-lg ${group.iconSurface}`}
+                          >
+                            <GroupIcon size={18} strokeWidth={1.9} />
+                          </span>
+                          <span className="min-w-0 flex-1 text-[14px] font-semibold leading-5 text-[#1B4635] [overflow-wrap:anywhere]">
+                            {group.title}
+                          </span>
+                          {group.unread > 0 ? (
+                            <span className="shrink-0 rounded-full bg-[#FBE9DB] px-2 py-0.5 text-[11px] font-semibold text-[#9B562D]">
+                              {group.unread} new
+                            </span>
+                          ) : null}
+                          <span className="shrink-0 text-[13px] font-bold tabular-nums text-[#597365]">
+                            {group.items.length}
+                          </span>
+                          {active ? (
+                            <Check
+                              size={17}
+                              className="shrink-0 text-[#1D6A45]"
+                            />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              {/* Desktop topic navigation is unchanged. */}
+              <div className="hidden lg:block">
+                <nav
+                  className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0"
+                  aria-label="Choose a notification category"
+                >
+                  <button
+                    type="button"
+                    onClick={() => chooseCategory("all")}
+                    aria-pressed={selectedGroupId === "all"}
+                    className={`focus-ring flex min-h-11 w-[55%] min-w-max shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left transition sm:min-h-12 sm:w-auto sm:min-w-0 sm:gap-3 sm:px-3 sm:py-2.5 lg:w-full ${
+                      selectedGroupId === "all"
+                        ? "border-[#1B5740] bg-[#174F39] text-white shadow-sm"
+                        : "border-[#DCE3DA] bg-white text-[#315744] hover:bg-[#EDF4EE]"
+                    }`}
+                  >
+                    <span
+                      className={`grid size-7 shrink-0 place-items-center rounded-lg sm:size-9 ${
+                        selectedGroupId === "all"
+                          ? "bg-white/15"
+                          : "bg-[#E7EFE7]"
+                      }`}
+                    >
+                      <Inbox size={19} />
+                    </span>
+                    <span className="min-w-0 flex-1 whitespace-nowrap text-[13px] font-bold sm:truncate sm:text-[14px]">
+                      All activity
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[12px] font-bold tabular-nums ${
+                        selectedGroupId === "all"
+                          ? "bg-white/20 text-white"
+                          : "bg-[#EDF3EC] text-[#45624D]"
+                      }`}
+                    >
+                      {notifications.length}
+                    </span>
+                  </button>
+                  {categoryBuckets.map((group) => {
+                    const active = selectedGroupId === group.id;
+                    const GroupIcon = group.Icon;
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => chooseCategory(group.id)}
+                        aria-pressed={active}
+                        className={`focus-ring flex min-h-11 ${
+                          group.id === "orders" ? "w-[71%]" : "w-[48%]"
+                        } shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left transition sm:min-h-12 sm:w-auto sm:gap-3 sm:px-3 sm:py-2.5 lg:w-full ${
+                          active
+                            ? "border-[#B0CEB8] bg-white text-[#173E2E] shadow-sm"
+                            : "border-transparent bg-transparent text-[#355748] hover:border-[#D9E3DA] hover:bg-white"
+                        }`}
+                      >
+                        <span
+                          className={`grid size-7 shrink-0 place-items-center rounded-lg sm:size-9 ${group.iconSurface}`}
+                        >
+                          <GroupIcon size={19} strokeWidth={1.9} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate whitespace-nowrap text-[13px] font-semibold sm:text-[14px]">
+                          {group.title}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          {group.unread > 0 ? (
+                            <span
+                              className="size-1.5 rounded-full bg-[#D17851]"
+                              aria-label={`${group.unread} unread`}
+                            />
+                          ) : null}
+                          <span className="text-[13px] font-bold tabular-nums text-[#677D6F]">
+                            {group.items.length}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+              {unreadCount > 0 ? (
+                <div className="mt-6 hidden border-t border-[#D9E1D6] pt-5 lg:block">
+                  <p className="text-[13px] font-bold text-[#3D7758]">
+                    {unreadCount} unread update{unreadCount === 1 ? "" : "s"}
+                  </p>
+                  <p className="mt-1 text-[13px] leading-5 text-[#728174]">
+                    Open a topic or use the unread filter to focus on what’s
+                    new.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </aside>
+
+          <section className="min-w-0 pb-12" aria-label="Notification inbox">
+            <div className="flex flex-col gap-3 border-b border-[#D5DCD2] pb-3 sm:gap-4 sm:pb-4 xl:flex-row xl:items-end xl:justify-between">
+              <div className="min-w-0">
+                <p className="mb-1 hidden text-[12px] font-bold uppercase tracking-[0.08em] text-[#C16C48] sm:block">
+                  Activity feed
+                </p>
+                <h2 className="text-[24px] font-bold leading-tight tracking-[-0.035em] text-[#153E30] sm:text-[31px]">
+                  {selectedCategory ? selectedCategory.title : "All activity"}
+                </h2>
+                <p className="mt-1 text-[14px] text-[#657668]">
+                  {selectedCategory
+                    ? selectedCategory.description
+                    : "Your latest notifications, in one clear feed."}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
+                <div
+                  className="inline-flex items-center rounded-xl border border-[#C3DBED] bg-[#EDF6FF] p-1 sm:border-[#D6E0D6] sm:bg-white"
+                  aria-label="Filter notifications"
+                >
+                  <button
+                    type="button"
+                    onClick={() => chooseFilter("all")}
+                    aria-pressed={activeFilter === "all"}
+                    className={`focus-ring rounded-lg px-3 py-2 text-[13px] font-semibold transition ${
+                      activeFilter === "all"
+                        ? "bg-[#1C533D] text-white"
+                        : "text-[#41614F] hover:bg-[#F0F5EF]"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => chooseFilter("unread")}
+                    aria-pressed={activeFilter === "unread"}
+                    className={`focus-ring rounded-lg px-3 py-2 text-[13px] font-semibold transition ${
+                      activeFilter === "unread"
+                        ? "bg-[#1C533D] text-white"
+                        : "text-[#41614F] hover:bg-[#F0F5EF]"
+                    }`}
+                  >
+                    Unread{unreadCount ? ` (${unreadCount})` : ""}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={markEveryNotificationAsRead}
+                  disabled={loading || busy || unreadCount === 0}
+                  className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#B7D9C1] bg-[#DFF4E5] px-3.5 text-[13px] font-semibold text-[#176644] transition hover:bg-[#D0EBD8] disabled:cursor-not-allowed disabled:opacity-45 sm:border-[#B9CFBF] sm:bg-[#E9F3E9] sm:text-[#225741] sm:hover:bg-[#DCEBDC]"
+                >
+                  <CheckCheck size={17} /> Mark all as read
                 </button>
               </div>
-            ) : null}
+            </div>
+
+            {loading ? (
+              <div className="mt-5 flex min-h-56 items-center justify-center gap-3 rounded-2xl border border-[#DBE2D8] bg-white text-[15px] text-[#496B56]">
+                <LoaderCircle size={22} className="animate-spin" /> Loading
+                notifications…
+              </div>
+            ) : filteredNotifications.length ? (
+              <>
+                <div className="mt-3 overflow-hidden rounded-xl border border-[#C9DFD1] bg-white sm:mt-4 sm:rounded-[18px] sm:border-[#DCE4DA]">
+                  {displayNotifications.map((notification) => {
+                    const group =
+                      NOTIFICATION_GROUPS.find(
+                        (item) => item.id === notificationGroupId(notification)
+                      ) || NOTIFICATION_GROUPS[NOTIFICATION_GROUPS.length - 1];
+                    return (
+                      <NotificationRow
+                        key={notification.id}
+                        notification={notification}
+                        category={group}
+                        busy={busy}
+                        onAction={action}
+                        onMarkRead={markOneAsRead}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[13px] text-[#748276]">
+                  <span>
+                    Showing {displayNotifications.length} of{" "}
+                    {filteredNotifications.length} update
+                    {filteredNotifications.length === 1 ? "" : "s"}
+                  </span>
+                  {filteredNotifications.length > 8 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAll((current) => !current)}
+                      className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#C2D7F0] bg-[#EAF3FF] px-4 text-[13px] font-bold text-[#245A72] transition hover:bg-[#DCEBFC] sm:border-[#CBDCCF] sm:bg-white sm:text-[#245A42] sm:hover:bg-[#EDF5EF]"
+                    >
+                      {showAll
+                        ? "Show fewer"
+                        : `Show all ${filteredNotifications.length} updates`}
+                      {showAll ? (
+                        <ChevronUp size={16} />
+                      ) : (
+                        <ChevronDown size={16} />
+                      )}
+                    </button>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 flex min-h-64 flex-col items-center justify-center rounded-[18px] border border-[#DAE3D9] bg-white px-6 py-10 text-center">
+                <span className="grid size-14 place-items-center rounded-2xl bg-[#E2F0E4] text-[#347052]">
+                  {activeFilter === "unread" ? (
+                    <CheckCheck size={26} />
+                  ) : (
+                    <Inbox size={26} />
+                  )}
+                </span>
+                <p className="mt-4 text-[19px] font-bold text-[#194332]">
+                  {activeFilter === "unread"
+                    ? "You're all caught up"
+                    : "No updates in this category"}
+                </p>
+                <p className="mt-1 max-w-md text-[14px] leading-6 text-[#64786A]">
+                  {activeFilter === "unread"
+                    ? "There are no unread notifications here. Switch to All to see your history."
+                    : "Try another topic or All activity to see the notifications available to you."}
+                </p>
+                {selectedGroupId !== "all" ? (
+                  <button
+                    type="button"
+                    onClick={() => chooseCategory("all")}
+                    className="focus-ring mt-4 rounded-lg bg-[#1A513C] px-4 py-2 text-[13px] font-bold text-white"
+                  >
+                    View all activity
+                  </button>
+                ) : null}
+              </div>
+            )}
           </section>
-        )}
+        </div>
       </div>
     </main>
   );

@@ -29,6 +29,7 @@ import {
 } from '../services/commerce.service'
 
 import SponsoredCampaignSlot from '../../retailMedia/components/SponsoredCampaignSlot'
+import { attachCookingCart, getCookingReturnPath } from '../../recipes/utils/cookingJourney'
 
 const FLOATING_MARKETPLACE_CART_KEY =
   'epantry-floating-marketplace-cart'
@@ -109,7 +110,7 @@ const OBJECTIVES =
         'Best Value',
 
       description:
-        'Lowest known item total per requirement, with pack surplus as a deterministic tie-breaker.',
+        'Compare known item prices; delivery and other fees are excluded.',
     },
 
     {
@@ -120,7 +121,7 @@ const OBJECTIVES =
         'Minimum Waste',
 
       description:
-        'Prioritizes lower surplus quantity before known item price.',
+        'Choose packs that leave less extra product.',
     },
 
     {
@@ -131,7 +132,7 @@ const OBJECTIVES =
         'One Retailer',
 
       description:
-        'Uses one Host organization only when it can cover every requirement.',
+        'Choose one EPANTRY seller if they can supply every item.',
     },
   ])
 
@@ -141,6 +142,8 @@ function formatMoney(
     'INR',
 ) {
   if (
+    amountMinor === null ||
+    amountMinor === undefined ||
     !Number.isInteger(
       Number(
         amountMinor,
@@ -713,6 +716,8 @@ export default function FulfillmentComparePage() {
         sourceElement,
       })
 
+      attachCookingCart(planId, cartId)
+
       navigate(
         `/cart/${cartId}`,
       )
@@ -747,6 +752,13 @@ export default function FulfillmentComparePage() {
           Back to Requirement Basket
         </Link>
 
+        {getCookingReturnPath({ planId }) && (
+          <Link to={getCookingReturnPath({ planId })}
+            className="mb-2 ml-3 inline-flex min-h-10 items-center gap-2 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-4 text-sm font-semibold text-[#173F35] hover:bg-[#D8EBD9]">
+            Return to guided cooking
+          </Link>
+        )}
+
         <section className="mt-3 overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-sm">
           <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div>
@@ -756,17 +768,18 @@ export default function FulfillmentComparePage() {
                   aria-hidden="true"
                 />
 
-                <p className="text-xs font-black uppercase tracking-[0.14em]">
-                  P19 · Fulfillment Compare
+                <p className="text-sm font-semibold">
+                  EPANTRY Marketplace
                 </p>
               </div>
 
               <h1 className="mt-3 text-3xl font-black tracking-tight text-stone-950 sm:text-4xl">
-                Compare real Marketplace coverage
+                Compare where to buy
               </h1>
 
               <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600 sm:text-base">
-                EPANTRY matches M10 genuine shortages to active Packs and serviceable Host offers. Ranking stays deterministic and unmatched requirements remain visible.
+                Find eligible sellers for your missing ingredients. Compare matching pack sizes,
+                known item prices and availability before adding anything to your cart.
               </p>
             </div>
 
@@ -1221,6 +1234,62 @@ export default function FulfillmentComparePage() {
               </section>
             )}
 
+            {Object.values(quoteData.candidatesByRequirement || {}).some(
+              (candidates) => candidates.length > 1,
+            ) && (
+              <section className="mt-5 border-y border-[#BDD2CA] bg-[#E9F2EC] px-4 py-5 sm:px-6">
+                <h2 className="text-xl font-bold text-[#173F35]">Other eligible pack offers</h2>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-[#4B6257]">
+                  See real options for each missing ingredient. Each row shows the required
+                  quantity and the pack you would buy. Change the comparison choice above
+                  to select a different purchasing strategy; these rows do not alter your cart.
+                </p>
+                <div className="mt-4 space-y-3">
+                  {Object.entries(quoteData.candidatesByRequirement || {})
+                    .filter(([, candidates]) => candidates.length > 1)
+                    .map(([requirementId, candidates]) => {
+                      const ranked = [...candidates].sort((left, right) =>
+                        (Number(left.lineTotal?.amountMinor) || 0) -
+                        (Number(right.lineTotal?.amountMinor) || 0) ||
+                        String(left.sellerName || '').localeCompare(String(right.sellerName || '')),
+                      );
+                      return (
+                        <details key={requirementId} className="group border border-[#C1D7CB] bg-white">
+                          <summary className="cursor-pointer px-4 py-3 text-[15px] font-semibold text-[#173F35]">
+                            {ranked[0].requirementLabel || 'Ingredient'} · Need {formatQuantity(
+                              ranked[0].requirementQuantity, ranked[0].requirementUnit,
+                            )} · {ranked.length} eligible offers
+                          </summary>
+                          <div className="divide-y divide-[#E1EAE3] border-t border-[#D5E4DA]">
+                            {ranked.map((candidate) => (
+                              <div key={candidate.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                                <div>
+                                  <p className="font-semibold text-[#193E31]">{candidate.sellerName}</p>
+                                  <p className="mt-1 text-[#54675B]">
+                                    {candidate.packCount} × {formatQuantity(candidate.packQuantity, candidate.packUnit)}
+                                    {' · '}Extra {formatQuantity(candidate.surplusQuantity, candidate.requirementUnit)}
+                                  </p>
+                                  <p className="mt-1 text-[13px] text-[#68756C]">
+                                    Price recorded: {formatObservedAt(candidate.priceRecordedAt)}
+                                    {' · '}Stock checked: {formatObservedAt(candidate.inventoryObservedAt)}
+                                  </p>
+                                </div>
+                                <div className="sm:text-right">
+                                  <p className="font-bold text-[#173F35]">
+                                    {formatMoney(candidate.lineTotal?.amountMinor, candidate.lineTotal?.currency)}
+                                  </p>
+                                  <p className="text-[12px] text-[#68756C]">Item subtotal only</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      );
+                    })}
+                </div>
+              </section>
+            )}
+
             {(quoteData.unmatchedRequirementLineIds || []).length >
               0 && (
               <section className="mt-5 rounded-[24px] border border-amber-200 bg-amber-50 p-5">
@@ -1250,7 +1319,7 @@ export default function FulfillmentComparePage() {
                       to={`/outcome-plans/${planId}/handoff/${quoteData.quote.id}`}
                       className="mt-4 inline-flex items-center justify-center rounded-xl bg-amber-900 px-4 py-2.5 text-sm font-black text-white transition hover:bg-amber-800"
                     >
-                      Continue with external handoff
+                      Browse an external retailer
                     </Link>
                   </div>
                 </div>
@@ -1262,8 +1331,8 @@ export default function FulfillmentComparePage() {
                 Cost transparency:
               </strong>{' '}
               {hasAnyCoverage
-                ? 'the comparison currently shows known Marketplace item prices. Delivery fees are not yet governed at the comparison stage, so total landed cost is intentionally not claimed.'
-                : 'no known Marketplace item subtotal exists because no items matched. EPANTRY does not present an empty selection as a ₹0 basket, and total landed cost is intentionally not claimed.'}
+                ? 'Prices shown are eligible EPANTRY item prices, not final totals. Delivery and other fees are unknown at this stage. Stock and prices are checked again when you create a cart. External retailer prices are not compared without verified feeds.'
+                : 'No eligible EPANTRY item price is available for these requirements. External prices, stock and delivery costs cannot be verified without an authorized retailer feed.'}
             </section>
           </>
         )}

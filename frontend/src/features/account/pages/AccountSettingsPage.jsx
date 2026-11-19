@@ -20,6 +20,8 @@ import {
   X,
 } from 'lucide-react'
 
+import { Link } from 'react-router-dom'
+
 import {
   useAuth,
 } from '../../auth/context/AuthContext'
@@ -1411,6 +1413,7 @@ export default function AccountSettingsPage() {
                     <p className="mt-1 text-[13px] leading-5 text-[#647067] sm:mt-1.5 sm:text-[14px] sm:leading-6">
                       <span className="sm:hidden">{consentType === 'terms_of_service' ? 'Using EPANTRY.' : 'How your data is used.'} {item?.currentVersion ? `Version: ${item.currentVersion}` : ''}</span>
                       <span className="hidden sm:inline">{consentType === 'terms_of_service' ? 'The terms for using EPANTRY.' : 'How we handle your personal information.'} {item?.currentVersion ? `Current version: ${item.currentVersion}` : ''}</span></p>
+                    <Link to={consentType === 'terms_of_service' ? '/terms' : '/privacy-policy'} className="mt-2 inline-flex text-[14px] font-semibold text-[#174D38] underline underline-offset-4 hover:text-[#27634E]">Read {consentType === 'terms_of_service' ? 'Terms & Conditions' : 'Privacy Policy'} before accepting</Link>
                   </div>
                   {!item?.granted && (
                     <button type="button" disabled={activeConsentType === consentType} onClick={() => handleConsentDecision(consentType, 'granted')} className="focus-ring inline-flex min-h-11 w-fit shrink-0 items-center justify-center gap-1 rounded-xl bg-[#173F35] px-3 text-[13px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:gap-2 sm:px-5 sm:text-[14px]">

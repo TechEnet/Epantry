@@ -32,7 +32,9 @@ import {
 
 import {
   openAvailabilityNotifyModal,
+  rememberAvailabilityRequestForLogin,
 } from '../../notifications/components/AvailabilityNotifyModal'
+import { useAuth } from '../../auth/context/AuthContext'
 
 import SponsoredCampaignSlot from '../../retailMedia/components/SponsoredCampaignSlot'
 import { getPublicPackOffers } from '../../marketplace/services/marketplace.service'
@@ -326,6 +328,7 @@ function SimilarProductRow({ product }) {
 
 export default function ProductSearchResultsPage() {
   const [searchParams] = useSearchParams()
+  const { isAuthenticated, customerEnabled } = useAuth()
 
   const query = normalizeString(searchParams.get('q'))
 
@@ -381,13 +384,15 @@ export default function ProductSearchResultsPage() {
             if (active) {
               setError('No matching product, recipe or brand was found.')
 
-              openAvailabilityNotifyModal({
-                query,
-                displayName:
+              // Guests see an inline login CTA; do not auto-open the popup.
+              // Signed-in Customers keep the existing request dialog.
+              if (isAuthenticated && customerEnabled === true) {
+                openAvailabilityNotifyModal({
                   query,
-                source:
-                  'search',
-              })
+                  displayName: query,
+                  source: 'search',
+                })
+              }
             }
             return
           }
@@ -533,7 +538,7 @@ export default function ProductSearchResultsPage() {
         active = false
       }
     },
-    [query],
+    [query, isAuthenticated, customerEnabled],
   )
 
   const canonicalPackId = getCanonicalPackId(primaryProduct)
@@ -640,15 +645,133 @@ export default function ProductSearchResultsPage() {
   }
 
   if (error || !primaryResult) {
+    const noMatch = error === 'No matching product, recipe or brand was found.'
+    const searchedPath = `/grocery/search-results?q=${encodeURIComponent(query)}`
+
     return (
-      <main className="bg-[#F7F6F2] px-4 py-8 sm:px-7" style={{ fontFamily: "'Plus Jakarta Sans', Inter, system-ui, sans-serif" }}>
-        <section className="mx-auto max-w-[920px] border-t-[3px] border-[#173F35] bg-[#EDF1E9] px-5 py-8 sm:px-9">
-          <Search size={29} strokeWidth={1.6} className="text-[#173F35]" aria-hidden="true" />
-          <h1 className="mt-3 !text-[26px] !font-bold !leading-[1.2] text-[#173F35] sm:!text-[32px]">We couldn't find a close match</h1>
-          <p className="mt-2 text-[15px] leading-[1.55] text-[#435649] sm:text-[16px]">{error || 'Try another product, recipe or brand name.'}</p>
-          <Link to="/grocery" className="focus-ring mt-5 inline-flex min-h-11 items-center gap-2 bg-[#173F35] px-5 text-[15px] font-bold text-[#F7F6F2] hover:bg-[#245547]">
-            <ArrowLeft size={17} aria-hidden="true" /> Explore grocery
-          </Link>
+      <main
+        className="relative isolate flex min-h-[calc(100svh-76px)] items-center justify-center overflow-hidden bg-[#F6F5F0] px-4 py-6 text-[#173F35] sm:px-7 sm:py-9"
+        style={{ fontFamily: "'Plus Jakarta Sans', Inter, system-ui, sans-serif" }}
+      >
+        {/* Only this search-empty state is redesigned. Global Navbar and Footer stay untouched. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: 'radial-gradient(ellipse at 12% 15%, rgba(217,235,219,.78), transparent 43%), radial-gradient(ellipse at 88% 90%, rgba(248,223,207,.65), transparent 44%)',
+          }}
+        />
+        <section
+          aria-labelledby="ep-search-empty-heading"
+          className="relative z-10 grid w-full max-w-[1040px] overflow-hidden rounded-[24px] border border-[#D8E1D6] bg-[#FFFEFB] shadow-[0_28px_70px_-42px_rgba(20,60,42,0.38)] sm:rounded-[30px] md:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]"
+        >
+          <div className="relative flex min-w-0 flex-col justify-center px-6 py-8 sm:px-10 sm:py-11 lg:px-14 lg:py-14">
+            <div className="pointer-events-none absolute -right-12 -top-16 size-36 rounded-full border-[24px] border-[#EDF4EB] opacity-60 md:hidden" aria-hidden="true" />
+            <div className="relative mb-6 flex items-center gap-2.5 sm:mb-7">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#E8F1E7] text-[#174936]">
+                <Search size={19} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#A75D42] sm:text-[12px]">
+                {noMatch ? 'A little help finding it' : 'Search update'}
+              </span>
+            </div>
+
+            <h1
+              id="ep-search-empty-heading"
+              className="relative !m-0 max-w-[530px] !text-[38px] !font-extrabold !leading-[1.1] tracking-[-0.055em] text-[#173F35] sm:!text-[49px] lg:!text-[57px]"
+            >
+              {noMatch ? (
+                <>Not here.<br /><span className="text-[#BC694B]">Yet.</span></>
+              ) : (
+                <>Let's try<br /><span className="text-[#BC694B]">again.</span></>
+              )}
+            </h1>
+
+            <p className="relative mt-5 max-w-[435px] break-words text-[15px] leading-[1.75] text-[#52665A] sm:mt-6 sm:text-[16px]">
+              {noMatch ? (
+                <>We couldn't find <strong className="font-extrabold text-[#173F35]">“{query}”</strong> on EPANTRY. Tell our Hosts what you're looking for, and we'll let you know when it's available.</>
+              ) : (
+                error || 'We could not load the results right now. Please try searching again.'
+              )}
+            </p>
+
+            {query.length >= 2 && noMatch ? (
+              <div className="relative mt-7 flex flex-col items-start gap-3 sm:mt-8">
+                {!isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/login"
+                      onClick={() => rememberAvailabilityRequestForLogin({ query, displayName: query, source: 'search' })}
+                      className="focus-ring group inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-[13px] bg-[#173F35] px-5 py-3 text-center text-[14px] font-extrabold text-white shadow-[0_8px_20px_-11px_rgba(23,63,53,.9)] transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-[#285746] motion-reduce:transform-none sm:w-auto sm:px-7 sm:text-[15px]"
+                    >
+                      Log in to suggest this product
+                      <ArrowRight size={18} strokeWidth={2.1} className="shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" aria-hidden="true" />
+                    </Link>
+                    <p className="text-[12px] leading-[1.55] text-[#6E7B70] sm:text-[13px]">
+                      Your request will be saved after Customer login.
+                    </p>
+                  </>
+                ) : customerEnabled === true ? (
+                  <button
+                    type="button"
+                    onClick={() => openAvailabilityNotifyModal({ query, displayName: query, source: 'search' })}
+                    className="focus-ring group inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-[13px] bg-[#173F35] px-5 py-3 text-[15px] font-extrabold text-white transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-[#285746] motion-reduce:transform-none sm:w-auto sm:px-7"
+                  >
+                    Request this product
+                    <ArrowRight size={18} className="shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <Link
+                    to={`/customer-access-required?returnTo=${encodeURIComponent(searchedPath)}`}
+                    className="focus-ring group inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-[13px] bg-[#173F35] px-5 py-3 text-center text-[14px] font-extrabold text-white transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-[#285746] motion-reduce:transform-none sm:w-auto sm:px-7 sm:text-[15px]"
+                  >
+                    Switch to Customer to suggest
+                    <ArrowRight size={18} className="shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
+            ) : null}
+
+            <div className="relative mt-7 border-t border-[#E2E8DE] pt-5 sm:mt-9">
+              <Link
+                to="/grocery"
+                className="focus-ring group inline-flex min-h-10 items-center gap-2 text-[14px] font-extrabold text-[#173F35] transition-colors hover:text-[#A75D42]"
+              >
+                <ArrowLeft size={17} className="transition-transform group-hover:-translate-x-1 motion-reduce:transform-none" aria-hidden="true" />
+                Explore grocery instead
+              </Link>
+            </div>
+          </div>
+
+          <div
+            className="relative isolate hidden min-h-[460px] items-center justify-center overflow-hidden bg-[#E5EEE4] px-8 py-10 md:flex"
+            aria-hidden="true"
+          >
+            <div className="pointer-events-none absolute -right-28 -top-28 size-[380px] rounded-full border-[72px] border-[#D5E5D7] opacity-80" />
+            <div className="pointer-events-none absolute -bottom-32 -left-28 size-[340px] rounded-full bg-[#F0DCCB] blur-[2px]" />
+            <div className="pointer-events-none absolute right-[11%] top-[12%] size-5 rounded-full bg-[#C67B61] opacity-75" />
+            <div className="pointer-events-none absolute bottom-[13%] right-[19%] size-3 rounded-full bg-[#6E9B7E]" />
+
+            <div className="relative z-10 w-full max-w-[320px] -rotate-[5deg] rounded-[20px] border border-[#E3E7DF] bg-[#FFFEFA] p-6 shadow-[0_25px_48px_-21px_rgba(36,75,50,.32)] lg:p-8">
+              <div className="flex items-center justify-between gap-3 border-b border-[#E5E9E1] pb-4">
+                <span className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8A9A8B]">Your next find</span>
+                <span className="grid size-9 place-items-center rounded-full bg-[#F5E2D6] text-[#B56548]">
+                  <Search size={17} strokeWidth={2} />
+                </span>
+              </div>
+              <div className="py-8">
+                <div className="mb-5 h-1 w-11 rounded-full bg-[#C77F62]" />
+                <span className="block text-[12px] font-semibold tracking-[0.06em] text-[#64816E]">LOOKING FOR</span>
+                <span className="mt-2 block break-words text-[clamp(25px,3vw,38px)] font-extrabold leading-[1.1] tracking-[-0.045em] text-[#173F35]">
+                  {query || 'Your next favourite'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t border-dashed border-[#CED7CB] pt-4 text-[12px] font-bold text-[#597364]">
+                <span>Tell EPANTRY Hosts</span>
+                <ArrowRight size={17} strokeWidth={2} className="text-[#BB674C]" />
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     )
@@ -687,6 +810,14 @@ export default function ProductSearchResultsPage() {
         </header>
 
         <SearchJourney />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-[#DCE3DA] pb-3">
+          <p className="text-[14px] text-[#52675A]">Not seeing the exact product you wanted?</p>
+          <button type="button"
+            onClick={() => openAvailabilityNotifyModal({ query, displayName: query, source: 'search' })}
+            className="focus-ring inline-flex min-h-10 items-center gap-2 text-[14px] font-bold text-[#16533C] underline-offset-4 hover:underline">
+            Request this product <ArrowRight size={16} aria-hidden="true" />
+          </button>
+        </div>
         <SponsoredCampaignSlot placement="search" slotKey="search_top" embedded />
 
         <section className="mt-5 sm:mt-6" aria-labelledby="ep-search-best-title">

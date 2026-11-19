@@ -398,7 +398,29 @@ function AboutPageBody({ children }) {
   return (
     <main className="ep-about min-w-0 overflow-x-clip py-6 sm:py-9 lg:py-12">
       <style>{ABOUT_STYLE}</style>
-      <div className="page-shell"><div className="mx-auto max-w-7xl px-1 sm:px-3 lg:px-5">{children}</div></div>
+      <div className="page-shell"><div className="mx-auto max-w-7xl px-1 sm:px-3 lg:px-5">
+        {children}
+        <section aria-labelledby="ep-marketplace-trust-heading" className="mt-12 border-t border-[#dce0cf] bg-[#eef2e9] px-6 py-8 sm:mt-16 sm:px-10 sm:py-10">
+          <p className="text-xs font-bold uppercase tracking-[.15em] text-[#a95735]">Marketplace transparency</p>
+          <h2 id="ep-marketplace-trust-heading" className="mt-2 text-[28px] font-bold text-[#173f35] sm:text-[32px]">How listings reach EPANTRY</h2>
+          <div className="mt-6 grid gap-5 border-t border-[#cad6ca] pt-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ['01', 'Host submits', 'The seller submits their product details and evidence.'],
+              ['02', 'Admin reviews', 'EPANTRY reviews the submission under its listing and account policies.'],
+              ['03', 'Item appears', 'Approved listings may become visible to shoppers; approval is not a guarantee of safety.'],
+              ['04', 'Order fulfilment', 'Availability, payment and delivery depend on the order and participating seller.'],
+            ].map(([number,title,description]) => <div key={number} className="min-w-0 border-t border-[#cbd9cc] pt-3">
+              <span className="text-xs font-bold text-[#a95735]">{number}</span>
+              <h3 className="mt-2 text-lg font-bold text-[#173f35]">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[#496154]">{description}</p>
+            </div>)}
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-[#cad6ca] pt-5">
+            <AboutLink to="/report-listing">Report a listing</AboutLink>
+            <p className="max-w-xl text-sm leading-6 text-[#496154]">Found a potentially illegal or misleading listing? Anyone can submit a report. Our review team records decisions and allows eligible appeals; restrictions are handled by authorized governance staff.</p>
+          </div>
+        </section>
+      </div></div>
     </main>
   )
 }

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ArrowRight, ClipboardList, ShieldCheck } from "lucide-react";
 
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "../../auth/context/AuthContext";
+import { getCookingJourney, saveCookingJourney } from "../../recipes/utils/cookingJourney";
 
 import {
   createOutcomePlanIdempotencyKey,
@@ -19,13 +20,23 @@ export default function RecipeOutcomePlanBridge() {
 
   const { isAuthenticated, customerEnabled } = useAuth();
 
-  const [targetServings, setTargetServings] = useState(2);
+  const [targetServings, setTargetServings] = useState(() => getCookingJourney(slug)?.servings || 2);
 
   const [creating, setCreating] = useState(false);
 
   const [error, setError] = useState("");
 
   const canCreate = isAuthenticated && customerEnabled === true;
+
+  // Recipe Detail may change servings while this appended bridge stays mounted.
+  useEffect(() => {
+    const sync = () => {
+      const current = getCookingJourney(slug);
+      if (current) setTargetServings(current.servings);
+    };
+    window.addEventListener('epantry-cooking-journey-updated', sync);
+    return () => window.removeEventListener('epantry-cooking-journey-updated', sync);
+  }, [slug]);
 
   if (!canCreate) {
     return null;
@@ -41,12 +52,16 @@ export default function RecipeOutcomePlanBridge() {
     setError("");
 
     try {
+      if (!Number.isInteger(Number(targetServings)) || Number(targetServings) < 1 || Number(targetServings) > 1000) {
+        throw new Error('Choose a whole serving count between 1 and 1000.');
+      }
       const result = await createRecipeOutcomePlan(
         slug,
 
         {
-          targetServings,
+          targetServings: Number(targetServings),
 
+          purchaseMode: "missing_only",
           idempotencyKey: createOutcomePlanIdempotencyKey(
             "recipe-outcome-plan"
           ),
@@ -61,6 +76,7 @@ export default function RecipeOutcomePlanBridge() {
         );
       }
 
+      saveCookingJourney({ slug, servings: Number(targetServings), planId, cartId: null, orderId: null });
       navigate(`/outcome-plans/${planId}`);
     } catch (createError) {
       setError(
@@ -133,7 +149,7 @@ export default function RecipeOutcomePlanBridge() {
                 disabled={creating}
                 className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#194d38] px-3 py-2 text-[10px] font-semibold text-white shadow-sm transition hover:bg-[#123b2b] disabled:cursor-not-allowed disabled:opacity-60 sm:mt-3 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-3 sm:text-sm sm:font-black"
               >
-                {creating ? "Building plan…" : "Create Outcome Plan"}
+                {creating ? "Checking your Pantry…" : "Plan missing ingredients"}
 
                 {!creating && <ArrowRight size={17} aria-hidden="true" />}
               </button>

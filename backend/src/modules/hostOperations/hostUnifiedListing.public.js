@@ -13,10 +13,19 @@ export function publicHostSlug(record) {
 // Existing approved records without snapshots remain publicly accessible.
 // A newer submitted/draft/rejected revision NEVER changes the last approved read model.
 export function publicHostListingFilter(extra = {}) {
-  return { ...extra, deletedAt: null, $or: [
+  // EU trader traceability applies to sellable listings, not recipe-only Host content.
+  const published = { $or: [
     { status: 'approved' },
     { publishedPacket: { $exists: true, $ne: null } },
   ] }
+  const euSellerGate = { $or: [
+    { euTraderVerifiedAtPublication: true },
+    { type: { $nin: ['grocery', 'prepared_food'] },
+      'packet.sellReadyMade': { $ne: true },
+      'publishedPacket.sellReadyMade': { $ne: true } },
+  ] }
+  return { ...extra, deletedAt: null, moderationStatus: { $ne: 'restricted' },
+    $and: [published, ...(process.env.EPANTRY_EU_MARKET_ENABLED === 'true' ? [euSellerGate] : [])] }
 }
 export function publishedHostRecord(record) {
   if (!record?.publishedPacket) return record
@@ -35,6 +44,7 @@ export function publicListing(record) {
   return {
     id: String(record._id), slug: publicHostSlug(record), title: approved.title, type: approved.type,
     host: record.publicHost || null,
+    verifiedTrader: record.publicTrader || null,
     category: packet.category,
     grocerySubcategory: approved.type === 'grocery' ? (packet.grocerySubcategory || '') : '',
     packagingType: approved.type === 'grocery' ? (packet.packagingType || '') : '',

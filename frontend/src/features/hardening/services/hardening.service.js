@@ -171,6 +171,13 @@ export async function updatePrivacyRequest(
   })
 }
 
+export async function executeEligiblePrivacyErasure(requestId, reason) {
+  return mutate({ method: 'post',
+    url: `/admin/reliability/privacy-requests/${encodeURIComponent(String(requestId))}/erase-eligible`,
+    data: { confirmation: 'ERASE ELIGIBLE PERSONAL DATA', reason },
+  })
+}
+
 export async function listRetentionPolicies() {
   return unwrap(
     await apiClient.get(
@@ -334,4 +341,11 @@ export async function getDeploymentSecurityOverview() {
       '/admin/reliability/deployment-security',
     ),
   )
+}
+
+export async function downloadOwnPrivacyExport(requestId) {
+  const response = await apiClient.get(`/privacy/requests/${encodeURIComponent(requestId)}/download`, {
+    responseType: 'blob', timeout: 65000,
+  })
+  return response.data
 }

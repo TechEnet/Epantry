@@ -83,9 +83,17 @@ function readRegistry() {
           id,
         )
 
+        // The registry contains destinations, not live product or price feeds.
+        // Disclose only relationships explicitly declared by the operator.
+        const relationship =
+          ['affiliate', 'commercial', 'none'].includes(item?.relationship)
+            ? item.relationship
+            : 'unknown'
+
         return {
           id,
           label,
+          relationship,
 
           destinationUrl:
             url.toString(),
@@ -107,6 +115,9 @@ export function listExternalCommercePartners() {
 
       label:
         partner.label,
+
+      relationship:
+        partner.relationship,
     }),
   )
 }

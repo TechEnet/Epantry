@@ -26,6 +26,11 @@ import {
 } from '../src/modules/commerce/commerce.routes.js'
 
 import {
+  listExternalCommercePartners,
+  resolveExternalCommercePartner,
+} from '../src/modules/commerce/commerce.partner.provider.js'
+
+import {
   hostCommercePolicyBodySchema,
   hostSellerOrderStatusBodySchema,
 } from '../src/modules/commerce/commerce.host.routes.js'
@@ -651,3 +656,49 @@ test(
     )
   },
 )
+/*
+|--------------------------------------------------------------------------
+| M3A / Retailer Comparison Truth & Handoff
+|--------------------------------------------------------------------------
+*/
+
+test('M3A partner registry exposes only approved HTTPS partners and declared relationship', () => {
+  const previous = process.env.COMMERCE_EXTERNAL_PARTNERS_JSON
+
+  try {
+    process.env.COMMERCE_EXTERNAL_PARTNERS_JSON = JSON.stringify([
+      { id: 'one', label: 'Retailer One', url: 'https://shop.example/items', relationship: 'affiliate' },
+      { id: 'two', label: 'Retailer Two', url: 'https://store.example', relationship: 'none' },
+      { id: 'bad', label: 'Invalid URL', url: 'http://unsafe.example' },
+      { id: 'one', label: 'Duplicate', url: 'https://duplicate.example' },
+      { id: 'three', label: 'Not declared', url: 'https://other.example' },
+    ])
+
+    assert.deepEqual(listExternalCommercePartners(), [
+      { id: 'one', label: 'Retailer One', relationship: 'affiliate' },
+      { id: 'two', label: 'Retailer Two', relationship: 'none' },
+      { id: 'three', label: 'Not declared', relationship: 'unknown' },
+    ])
+    assert.equal(resolveExternalCommercePartner('one').destinationUrl, 'https://shop.example/items')
+    assert.throws(() => resolveExternalCommercePartner('bad'))
+  } finally {
+    if (previous === undefined) delete process.env.COMMERCE_EXTERNAL_PARTNERS_JSON
+    else process.env.COMMERCE_EXTERNAL_PARTNERS_JSON = previous
+  }
+})
+
+test('M3A external handoff validates basket revision before idempotent redirect', () => {
+  const source = readBackend('src/modules/commerce/commerce.final.service.js')
+  const method = source.slice(source.indexOf('export async function createExternalHandoffFromQuote'))
+  assert.ok(method.includes('EXTERNAL_HANDOFF_QUOTE_STALE'))
+  assert.ok(method.indexOf('EXTERNAL_HANDOFF_QUOTE_STALE') < method.indexOf('const existing'))
+})
+
+test('M3A external handoff displays actual missing quantities and refuses stale basket', () => {
+  const apiSource = readBackend('src/modules/commerce/commerce.service.js')
+  const uiSource = readFrontend('src/features/commerce/pages/ExternalHandoffPage.jsx')
+  assert.match(apiSource, /unmatchedRequirements:/)
+  assert.match(apiSource, /Number\(outcome\.plan\.revision\)/)
+  assert.match(uiSource, /quoteDetails\.quote\?\.stale/)
+  assert.match(uiSource, /quoteDetails\.unmatchedRequirements\.map/)
+})

@@ -2347,6 +2347,14 @@ export default function RegisterPage() {
 
         </div>
 
+        <p className="text-[12px] leading-5 text-[#55635B]">
+          Before registering, read our{' '}
+          <Link to="/terms" className="font-semibold text-[#174D38] underline underline-offset-2 hover:text-[#27694E]">Terms &amp; Conditions</Link>
+          {' '}and{' '}
+          <Link to="/privacy-policy" className="font-semibold text-[#174D38] underline underline-offset-2 hover:text-[#27694E]">Privacy Policy</Link>.
+          Optional cookies and marketing have separate choices.
+        </p>
+
         <button
           type="submit"
           disabled={

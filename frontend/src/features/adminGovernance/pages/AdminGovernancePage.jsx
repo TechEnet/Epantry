@@ -44,6 +44,7 @@ import {
   } from '../../admin/context/AdminContext';
   
   import AdminAiQualityPanel from '../../search/components/AdminAiQualityPanel';
+  import AdminDsaReportsPanel from '../../dsa/components/AdminDsaReportsPanel';
 
   import {
     getLandingFeaturedContent,
@@ -6265,6 +6266,8 @@ import {
                             ))}
                           </div>
                         </section>
+
+                        <AdminDsaReportsPanel canDecide={isRootSuperAdmin || hasAdminPermission('trust_safety.mutate')} />
 
                         {/* Restore the complete platform overview from the original A17 page.
                             These are real Command Center metrics, not calculated from the 3 queues. */}

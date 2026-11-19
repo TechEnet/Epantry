@@ -980,6 +980,10 @@ const APPLICATION_ACCESS_TYPES =
 const LandingPage = lazy(() => import('../features/landing/pages/LandingPage'))
 const PromotionDetailPage = lazy(() => import('../features/retailMedia/pages/PromotionDetailPage'))
 const AboutPage = lazy(() => import('../features/about/pages/AboutPage'))
+const ReportListingPage = lazy(() => import('../features/dsa/pages/ReportListingPage'))
+const HostDsaNoticesPage = lazy(() => import('../features/dsa/pages/HostDsaNoticesPage'))
+const PrivacyPolicyPage = lazy(() => import('../features/legal/pages/PrivacyPolicyPage'))
+const TermsPage = lazy(() => import('../features/legal/pages/TermsPage'))
 const GroceryPage = lazy(() => import('../features/grocery/pages/GroceryPage'))
 const CategoryPage = lazy(() => import('../features/grocery/pages/CategoryPage'))
 const ProductDetailPage = lazy(() => import('../features/grocery/pages/ProductDetailPage'))
@@ -989,6 +993,7 @@ const BrandsPage = lazy(() => import('../features/brands/pages/BrandsPage'))
 const BrandDetailPage = lazy(() => import('../features/brands/pages/BrandDetailPage'))
 const BrandProductHistoryPage = lazy(() => import('../features/brands/pages/BrandProductHistoryPage'))
 const RecipesPage = lazy(() => import('../features/recipes/pages/RecipesPage'))
+const BeveragesPage = lazy(() => import('../features/beverages/pages/BeveragesPage'))
 const RecipeDetailPage = lazy(() => import('../features/recipes/pages/RecipeDetailPage'))
 const IngredientKnowledgePage = lazy(() => import('../features/ingredients/pages/IngredientKnowledgePage'))
 const RecipeHistoryPage = lazy(() => import('../features/recipes/pages/RecipeHistoryPage'))
@@ -1074,6 +1079,7 @@ const AdminRolesPage = lazy(() => import('../features/admin/pages/AdminRolesPage
 const AdminProMembershipPage = lazy(() => import('../features/admin/pages/AdminProMembershipPage'))
 const AdminAuditPage = lazy(() => import('../features/admin/pages/AdminAuditPage'))
 const AdminInsightsPage = lazy(() => import('../features/analytics/pages/AdminInsightsPage'))
+const CustomerRequestsBoardPage = lazy(() => import('../features/search/pages/CustomerRequestsBoardPage'))
 
 const SystemDebugPage = lazy(() => import('../features/system/pages/SystemDebugPage'))
 
@@ -2457,6 +2463,9 @@ export default function AppRoutes() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/promotions/:campaignId" element={<PromotionDetailPage />} />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/report-listing" element={<ReportListingPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="/grocery" element={<GroceryPage />} />
             <Route path="/grocery/category/:slug" element={<CategoryPage />} />
             <Route path="/grocery/search-results" element={<ProductSearchResultsPage />} />
@@ -2476,6 +2485,7 @@ export default function AppRoutes() {
             <Route path="/brands/:brandKey/products/:packId/history" element={<BrandProductHistoryPage />} />
 
             <Route path="/recipes" element={<RecipesPage />} />
+            <Route path="/beverages" element={<BeveragesPage />} />
             <Route path="/ingredients/:ref" element={<IngredientKnowledgePage />} />
             <Route path="/explore/countries/:countryName" element={<CountryExplorePage />} />
             <Route path="/explore/host-listings" element={<PublicApprovedHostListingsPage />} />
@@ -2691,6 +2701,33 @@ export default function AppRoutes() {
                   <CustomerShell>
                     <PurchaseIntelligencePage />
                   </CustomerShell>
+                </ApplicationAccessRoute>
+              }
+            />
+
+            <Route
+              path="/host/customer-requests"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
+                  <HostShell><CustomerRequestsBoardPage /></HostShell>
+                </ApplicationAccessRoute>
+              }
+            />
+
+            <Route
+              path="/host/listing-notices"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
+                  <HostShell><HostDsaNoticesPage /></HostShell>
+                </ApplicationAccessRoute>
+              }
+            />
+
+            <Route
+              path="/host/privacy"
+              element={
+                <ApplicationAccessRoute access={APPLICATION_ACCESS_TYPES.HOST}>
+                  <HostShell><CustomerPrivacyPage /></HostShell>
                 </ApplicationAccessRoute>
               }
             />
@@ -3192,6 +3229,15 @@ export default function AppRoutes() {
                   ]}
                 >
                   <AdminEarningsPage />
+                </AdminPermissionRoute>
+              }
+            />
+
+            <Route
+              path="/admin/customer-requests"
+              element={
+                <AdminPermissionRoute rootOnly>
+                  <CustomerRequestsBoardPage isAdmin />
                 </AdminPermissionRoute>
               }
             />

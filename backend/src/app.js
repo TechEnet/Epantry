@@ -40,6 +40,7 @@ import {
 } from './modules/analytics/analytics.batch2.routes.js'
 
 import authRoutes from './modules/auth/auth.routes.js'
+import dsaRoutes from './modules/dsa/dsa.routes.js'
 import cookieConsentRoutes from './modules/cookieConsent/cookieConsent.routes.js'
 import websiteAnalyticsRoutes from './modules/websiteAnalytics/websiteAnalytics.routes.js'
 import websiteAnalyticsAdminRoutes from './modules/websiteAnalytics/websiteAnalytics.admin.routes.js'
@@ -291,6 +292,9 @@ app.use(
 
   authRoutes,
 )
+
+/* M2: public marketplace notice-and-action and permissioned Trust & Safety review. */
+app.use('/api/v1/dsa', dsaRoutes)
 
 /* M1-A: public and authenticated browser cookie choices (not account consents). */
 app.use('/api/v1/privacy/consent', cookieConsentRoutes)

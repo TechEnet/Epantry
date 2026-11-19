@@ -17,7 +17,12 @@ const normalize = value => String(value || '').trim().toLowerCase()
 function parseKey(source = {}) {
   const kind = normalize(source.kind)
   const slug = normalize(source.slug)
-  if (!['recipe', 'grocery'].includes(kind) || !/^[a-z0-9][a-z0-9-]{0,199}$/.test(slug)) {
+  // Canonical grocery product URLs include underscores in variant and pack keys.
+  // Recipe and Host-friendly slugs keep their existing hyphen-only format.
+  const validSlug = kind === 'grocery'
+    ? /^[a-z0-9][a-z0-9_-]{0,199}$/.test(slug)
+    : /^[a-z0-9][a-z0-9-]{0,199}$/.test(slug)
+  if (!['recipe', 'grocery'].includes(kind) || !validSlug) {
     throw new ApiError(400, 'Choose a valid published recipe or grocery item.')
   }
   return { kind, slug }

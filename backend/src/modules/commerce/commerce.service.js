@@ -1715,9 +1715,53 @@ export async function getBasketQuote({
       actorUser,
     })
 
-  return serializeBasketQuote(
-    quote,
-  )
+  const serialized =
+    await serializeBasketQuote(
+      quote,
+    )
+
+  // Return the owner's actual unmatched ingredients for an external lookup.
+  // A changed plan cannot reuse stale quantities.
+  const outcome =
+    await getOutcomePlan({
+      planId: quote.outcomePlanId,
+      actorUser,
+    })
+
+  const stale =
+    Number(outcome.plan.revision) !==
+    Number(quote.outcomePlanRevision)
+
+  const unmatchedIds =
+    new Set(
+      serialized.unmatchedRequirementLineIds,
+    )
+
+  return {
+    ...serialized,
+    quote: {
+      ...serialized.quote,
+      stale,
+    },
+    unmatchedRequirements: stale
+      ? []
+      : (outcome.productMatchingInput || [])
+          .filter((requirement) =>
+            unmatchedIds.has(
+              stringifyId(requirement.requirementLineId),
+            ),
+          )
+          .map((requirement) => ({
+            requirementLineId:
+              stringifyId(requirement.requirementLineId),
+            label:
+              requirement.label || 'Missing ingredient',
+            quantity:
+              requirement.quantity,
+            unit:
+              requirement.unit,
+          })),
+  }
 }
 
 /*

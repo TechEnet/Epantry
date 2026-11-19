@@ -32,6 +32,7 @@ import {
 
 import {
   requireCustomerAccess,
+  requireHostAccess,
 } from '../auth/authorization.middleware.js'
 
 import {
@@ -46,6 +47,8 @@ import {
   listRegulatoryProfiles,
   listRetentionPolicies,
 } from './hardening.service.js'
+
+import { getApprovedOwnPrivacyExport } from './privacyExport.service.js'
 
 import {
   lifecycleBodySchema,
@@ -151,13 +154,22 @@ function send(
     )
 }
 
+function requireCustomerOrHostPrivacyAccess(req, res, next) {
+  if (req.currentUser?.customerEnabled === true) return requireCustomerAccess(req, res, next)
+  if (req.currentUser?.hostEnabled === true && req.currentUser?.hostAccessStatus === 'active') {
+    return requireHostAccess(req, res, next)
+  }
+  return next(new ApiError(403, 'An active Customer or Host account is required.'))
+}
+
 privacyRouter.use(
   sensitiveResponseNoStoreMiddleware,
   authenticateSession,
   loadCurrentUser,
   requireActiveAccount,
-  requireCustomerAccess,
+  requireCustomerOrHostPrivacyAccess,
 )
+
 
 privacyRouter.get(
   '/context',
@@ -234,6 +246,15 @@ privacyRouter.get(
     },
   ),
 )
+
+privacyRouter.get('/requests/:id/download', requireRecentAuthentication, wrap(async (req, res) => {
+  const params = parseOrThrow(privacyRequestParamsSchema, req.params, 'PRIVACY_REQUEST_ID_INVALID')
+  const payload = await getApprovedOwnPrivacyExport({ requestObjectId: params.id, actorUser: actorUser(req) })
+  res.set('Cache-Control', 'no-store, private')
+  res.set('X-Content-Type-Options', 'nosniff')
+  res.set('Content-Disposition', `attachment; filename="epantry-privacy-${params.id}.json"`)
+  return res.status(200).type('application/json').send(JSON.stringify(payload, null, 2))
+}))
 
 privacyRouter.post(
   '/requests',

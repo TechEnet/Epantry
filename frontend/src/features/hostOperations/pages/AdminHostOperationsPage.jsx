@@ -369,6 +369,7 @@ export default function AdminHostOperationsPage() {
   })
   const [selectedId, setSelectedId] = useState('')
   const [reason, setReason] = useState('')
+  const [restaurantRightsVerified, setRestaurantRightsVerified] = useState(false)
   const [testOrderReference, setTestOrderReference] = useState('')
   const [settlementForm, setSettlementForm] = useState({
     organizationId: '',
@@ -556,6 +557,11 @@ export default function AdminHostOperationsPage() {
     hospitalityQueue,
   ])
 
+  useEffect(() => {
+    // The attestation is for one request only; never carry it to another Host.
+    setRestaurantRightsVerified(false)
+  }, [selectedId])
+
   const hospitalityCount = hospitalityQueue.length
   const pendingSettlements = settlements.filter((item) =>
     ['draft', 'pending_approval', 'approved'].includes(item.status),
@@ -570,6 +576,7 @@ export default function AdminHostOperationsPage() {
       await action()
       setNotice(message)
       setReason('')
+      setRestaurantRightsVerified(false)
       await load()
     } catch (operationError) {
       setError(getHostOperationsErrorMessage(operationError))
@@ -633,6 +640,7 @@ export default function AdminHostOperationsPage() {
           reviewAdminHospitalityRestaurantRecipe(selected.item.id, {
             decision: 'approve',
             reason: cleanReason,
+            rightsVerified: restaurantRightsVerified,
           }),
         'Restaurant recipe approved and published.',
       )
@@ -1318,6 +1326,32 @@ export default function AdminHostOperationsPage() {
                             ['Outlet', selected.item.outletName || selected.item.snapshot?.outlet?.name || 'Not provided'],
                             ['Status', hospitalityStatus(selected)],
                           ]} />
+                          {selected.kind === 'restaurant_recipe' && (
+                            <section className="mt-5 border-l-4 border-[#C86C42] bg-[#FFF1E7] px-4 py-5" aria-label="Restaurant recipe source rights verification">
+                              <h4 className="text-[18px] font-bold text-[#173F35]">Check recipe source & rights</h4>
+                              <p className="mt-2 text-[15px] leading-6 text-[#465A4D]">
+                                Review the restaurant name, recipe image, dish name and any chef or other source claim before publication. Confirm ownership, permission or a suitable license from the submitted evidence. Do not infer endorsement from a restaurant-inspired description.
+                              </p>
+                              {selected.item.heroImageUrl ? (
+                                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                                  <img src={selected.item.heroImageUrl} alt={`Submitted image for ${selected.item.title || 'restaurant recipe'}`} loading="lazy" className="h-36 w-full max-w-48 rounded-[9px] border border-[#DBBCA6] bg-white object-cover" />
+                                  <div className="min-w-0 text-[15px] leading-6 text-[#314B3C]">
+                                    <p><strong>Submitted dish:</strong> {selected.item.title || selected.item.dishName || 'Not provided'}</p>
+                                    <p><strong>Business:</strong> {selected.item.organizationName || 'Not provided'}</p>
+                                    <p><strong>Cuisine:</strong> {selected.item.cuisine || 'Not specified'}</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="mt-3 text-[14px] font-medium text-[#8B4A31]">No dish image provided. Verify any names, descriptions and outside-source claims before approval.</p>
+                              )}
+                              <label className="mt-4 flex cursor-pointer items-start gap-3 border-t border-[#DBBCA6] pt-4 text-[15px] font-semibold leading-6 text-[#173F35]">
+                                <input type="checkbox" checked={restaurantRightsVerified} onChange={(event) => setRestaurantRightsVerified(event.target.checked)}
+                                  className="focus-ring mt-1 h-5 w-5 shrink-0 accent-[#173F35]" />
+                                <span>I checked the rights for the recipe image, names and source claims and confirmed that the submitted materials can be published. Record my decision in the review audit.</span>
+                              </label>
+                              <p className="mt-2 text-[13px] leading-5 text-[#6B655B]">Approval is blocked until this confirmation is checked. Return the recipe for changes if evidence is missing.</p>
+                            </section>
+                          )}
                           {selected.kind === 'change_case' && selected.item.status === 'blocked' ? (
                             <p className="mt-5 rounded-xl border border-[#DDA99E] bg-[#FFF1EB] px-4 py-3 text-[15px] leading-6 text-[#A04139]">This change has a safety or verification issue. The Host must fix it before approval.</p>
                           ) : (
@@ -1325,7 +1359,7 @@ export default function AdminHostOperationsPage() {
                               <ReviewNote value={reason} onChange={setReason} placeholder={`Explain the decision for ${hospitalityTitle(selected)}`} />
                               {isRootSuperAdmin ? (
                                 <div className="mt-4 flex flex-wrap gap-3">
-                                  <button type="button" disabled={busy || reason.trim().length < 10} onClick={approveHospitality} className={primaryButton}><BadgeCheck size={18} aria-hidden="true" /> Approve request</button>
+                                  <button type="button" disabled={busy || reason.trim().length < 10 || (selected.kind === 'restaurant_recipe' && !restaurantRightsVerified)} onClick={approveHospitality} className={primaryButton}><BadgeCheck size={18} aria-hidden="true" /> Approve request</button>
                                   {selected.kind === 'restaurant_recipe' ? (
                                     <button type="button" disabled={busy || reason.trim().length < 10} onClick={returnHospitalityRecipe} className={warningButton}>Return for changes</button>
                                   ) : null}

@@ -126,7 +126,11 @@ export default function Footer() {
           <p>
             © {currentYear} EPANTRY. All rights reserved.
           </p>
-          <button type="button" onClick={openCookieSettings} className="mt-1 w-fit text-left text-[14px] font-semibold normal-case tracking-normal text-[#F7F6F2] underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Cookie settings</button>
+          <nav aria-label="Legal information" className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[14px] font-semibold normal-case tracking-normal">
+            <Link to="/privacy-policy" className="underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Privacy policy</Link>
+            <Link to="/terms" className="underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Terms & conditions</Link>
+            <button type="button" onClick={openCookieSettings} className="text-left underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Cookie settings</button>
+          </nav>
         </div>
       </div>
 
@@ -227,13 +231,17 @@ export default function Footer() {
           </motion.div>
 
           <motion.div
-            className="absolute bottom-0 left-8 right-8 z-20 flex flex-row items-center justify-center gap-2 border-t border-white/20 py-3 text-[14px] uppercase tracking-[0.12em] text-[#F7F6F2]/65 lg:left-[4vw] lg:right-[4vw]"
+            className="absolute bottom-0 left-8 right-8 z-20 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-white/20 py-3 text-[12px] uppercase tracking-[0.1em] text-[#F7F6F2]/65 lg:left-[4vw] lg:right-[4vw]"
           >
             <p>
               © {currentYear} EPANTRY. All rights reserved.
             </p>
             <span aria-hidden="true" className="text-white/35">·</span>
-            <button type="button" onClick={openCookieSettings} className="text-[14px] font-semibold normal-case tracking-normal text-[#F7F6F2] underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Cookie settings</button>
+            <nav aria-label="Legal information" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[13px] font-semibold normal-case tracking-normal">
+              <Link to="/privacy-policy" className="underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Privacy policy</Link>
+              <Link to="/terms" className="underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Terms & conditions</Link>
+              <button type="button" onClick={openCookieSettings} className="underline decoration-[#E67275] underline-offset-4 hover:text-[#DCE0CF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E67275]">Cookie settings</button>
+            </nav>
           </motion.div>
         </div>
       </div>

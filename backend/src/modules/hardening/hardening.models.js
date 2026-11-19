@@ -25,6 +25,9 @@ export const SECURITY_EVENT_SEVERITIES = Object.freeze([
 export const PRIVACY_RIGHT_TYPES = Object.freeze([
   'access_export',
   'deletion',
+  'rectification',
+  'restriction',
+  'objection',
 ])
 
 export const PRIVACY_REQUEST_STATUSES = Object.freeze([
@@ -408,6 +411,20 @@ const privacyPolicyDecisionSchema = new Schema(
   },
 )
 
+export const PRIVACY_COMPLETION_CLASSES = Object.freeze([
+  'account_profile', 'addresses', 'saved_content', 'preferences', 'orders_payments',
+  'host_business', 'consents', 'logs_security', 'external_processors',
+])
+export const PRIVACY_COMPLETION_DISPOSITIONS = Object.freeze([
+  'provided', 'corrected', 'erased', 'restricted', 'retained_lawfully', 'not_held', 'not_applicable',
+])
+const privacyCompletionItemSchema = new Schema({
+  dataClass: { type: String, required: true, enum: PRIVACY_COMPLETION_CLASSES },
+  disposition: { type: String, required: true, enum: PRIVACY_COMPLETION_DISPOSITIONS },
+  evidenceRef: { type: String, required: true, trim: true, maxlength: 500 },
+  note: { type: String, trim: true, maxlength: 500, default: '' },
+}, { _id: false })
+
 const privacyRightsRequestSchema = new Schema(
   {
     requestId: {
@@ -443,6 +460,28 @@ const privacyRightsRequestSchema = new Schema(
       default: 'account',
       immutable: true,
     },
+
+    requestMessage: { type: String, trim: true, maxlength: 500, default: '', immutable: true },
+    dueAt: { type: Date, default: null, index: true, immutable: true },
+    identityVerificationStatus: {
+      type: String, enum: ['pending', 'verified', 'additional_information'],
+      default: 'pending',
+    },
+    identityVerifiedAt: { type: Date, default: null },
+    identityVerifiedByUserId: { type: objectId, ref: 'User', default: null },
+    retentionDecision: {
+      type: String,
+      enum: ['not_reviewed', 'retain_required', 'eligible_action_completed', 'mixed'],
+      default: 'not_reviewed',
+    },
+    resolutionEvidenceRef: { type: String, trim: true, maxlength: 500, default: '' },
+    fulfilmentChecklist: { type: [privacyCompletionItemSchema], default: [] },
+    scopedErasureRunRef: { type: String, trim: true, maxlength: 120, default: '' },
+    scopedErasureByUserId: { type: objectId, ref: 'User', default: null },
+    scopedErasureAt: { type: Date, default: null },
+    scopedErasureReason: { type: String, trim: true, maxlength: 1200, default: '' },
+    scopedErasureCounts: { type: Schema.Types.Mixed, default: null },
+    responseNote: { type: String, trim: true, maxlength: 1200, default: '' },
 
     status: {
       type: String,

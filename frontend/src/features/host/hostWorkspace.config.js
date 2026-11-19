@@ -16,9 +16,12 @@ const KNOWN_HOST_WORKSPACE_TYPES = new Set([
 const COMMON_HOST_PATHS = Object.freeze([
   '/host/operations',
   '/host/operations-center',
+  '/host/customer-requests',
   '/host/listings',
   '/host/business-profile',
   '/host/profile',
+  '/host/privacy',
+  '/host/listing-notices',
   '/host/settings',
   '/account/security/mfa',
 ])

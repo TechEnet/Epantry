@@ -1649,6 +1649,7 @@ function HostUnifiedListingEditor() {
   // Preserve editing of previous records while permitting all account-eligible types.
   const allowed = types.filter(
     (item) =>
+      item.value !== "prepared_food" &&
       item.allowed.includes(workspace) &&
       (workspace !== "hybrid" ||
         ["grocery", "kitchen_recipe", "brand_recipe", "prepared_food"].includes(
@@ -2294,6 +2295,10 @@ function HostUnifiedListingEditor() {
       setError("Import between 1 and 25 listings at once.");
       return;
     }
+    if (packets.some((packet) => packet?.type === "prepared_food")) {
+      setError("Ready-made food listings can no longer be created here.");
+      return;
+    }
     setBusy(true);
     setError("");
     setNotice("");
@@ -2440,8 +2445,8 @@ function HostUnifiedListingEditor() {
               <em>worth sharing.</em>
             </h1>
             <p className="uel-hero-description">
-              Add groceries, recipes or ready-made food with photos, ingredients
-              and selling details.
+              Add groceries or recipes with photos, ingredients
+              and listing details.
             </p>
             <div className="uel-hero-foot">
               <span className="uel-status">

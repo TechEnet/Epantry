@@ -26,6 +26,9 @@ export function normalizeRecipeSources({
       ...card,
       image: card.image || existing.image,
       cuisine: card.cuisine || existing.cuisine,
+      courseLabels: card.courseLabels?.length ? card.courseLabels : existing.courseLabels,
+      tags: card.tags?.length ? card.tags : existing.tags,
+      originCountry: card.originCountry || existing.originCountry,
       publishedAt: card.publishedAt || existing.publishedAt,
     } : card)
   }
@@ -42,6 +45,9 @@ export function normalizeRecipeSources({
       name: dish.name || recipe.title || '',
       image: dish.heroImageUrl || '',
       cuisine: dish.cuisine || dish.course || 'Recipe',
+      courseLabels: [dish.course, recipe.course, dish.mealType, recipe.mealType].filter(Boolean),
+      tags: Array.isArray(dish.tags) ? dish.tags : [],
+      originCountry: dish.countryOfOrigin || dish.originCountry || '',
       path: `/recipes/${encodeURIComponent(slug)}`,
       publishedAt: recipe.publishedAt || '',
     })
@@ -57,6 +63,9 @@ export function normalizeRecipeSources({
       name: item?.name || item?.title || '',
       image: item?.image || '',
       cuisine: item?.cuisine || item?.dietaryType || 'Recipe',
+      courseLabels: [item?.course, item?.mealType].filter(Boolean),
+      tags: Array.isArray(item?.tags) ? item.tags : [],
+      originCountry: item?.countryOfOrigin || '',
       path: `/recipes/${encodeURIComponent(slug)}`,
       publishedAt: '',
     })
@@ -85,7 +94,10 @@ export function normalizeRecipeSources({
       image: Array.isArray(item.images)
         ? String(item.images[0] || '')
         : '',
-      cuisine: kind,
+      cuisine: item?.cuisine || kind,
+      courseLabels: [item?.course, item?.mealType].filter(Boolean),
+      tags: Array.isArray(item?.tags) ? item.tags : [],
+      originCountry: item?.countryOfOrigin || item?.originCountry || '',
       path: hostDetailPath(item),
       publishedAt: item.approvedAt || '',
     })

@@ -308,72 +308,109 @@ const GUIDE_STYLES = String.raw`
     .epg-step-visual img { height: 145px; }
     .epg-benefit { grid-template-columns: 105px minmax(0,1fr); gap: 11px; }
   }
+  /* Mobile guide: a contained, centred dialog, never a fullscreen page. */
   @media (max-width: 700px) {
-    .epg-overlay { padding: 0; align-items: stretch; }
-    .epg-shell { width: 100%; height: 100svh; max-height: none;
-      border-radius: 0; border: 0; }
-    .epg-shell--prompt { width: min(430px, 94vw); height: auto;
-      margin: auto; border-radius: 17px; }
-    .epg-header-main { padding: 13px 16px 11px; }
-    .epg-title { font-size: 25px !important; }
-    .epg-header-label { gap: 9px; }
-    .epg-chapter-count { font-size: 13px; }
-    .epg-close { width: 42px; height: 42px; flex-basis: 42px; }
+    .epg-overlay {
+      padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+      align-items: center; justify-content: center;
+    }
+    .epg-shell {
+      width: min(430px, 100%);
+      height: min(84svh, 720px);
+      max-height: calc(100dvh - 28px);
+      min-height: 0;
+      margin: auto;
+      border: 1px solid rgba(255,255,255,.65);
+      border-radius: 18px;
+      box-shadow: 0 24px 66px rgba(6,18,12,.36);
+    }
+    .epg-shell--prompt {
+      width: min(420px, 100%);
+      height: auto;
+      max-height: calc(100dvh - 28px);
+      overflow-y: auto;
+      border-radius: 18px;
+    }
+    .epg-header-main { padding: 13px 16px 9px; gap: 9px; }
+    .epg-header-label { gap: 7px 10px; }
+    .epg-header .epg-eyebrow { font-size: 11px; line-height: 17px; }
+    .epg-header .epg-eyebrow::before { width: 17px; flex-basis: 17px; height: 2px; }
+    .epg-chapter-count { font-size: 11px; line-height: 16px; }
+    .epg-title { margin-top: 4px !important; font-size: 22px !important; line-height: 1.16 !important; }
+    .epg-close { width: 36px; height: 36px; flex-basis: 36px; }
     .epg-tabs { padding: 0 16px; }
-    .epg-tab-group { gap: 16px; }
-    .epg-tab { font-size: 14px; min-height: 42px; }
+    .epg-tab-group { gap: 17px; }
+    .epg-tab { min-height: 39px; padding: 8px 2px 7px; gap: 5px; font-size: 12px; line-height: 17px; }
     .epg-scroll-hint { display: none; }
-    .epg-content { padding: 15px 15px 24px; }
-    .epg-feature { grid-template-columns: minmax(0,1fr); }
-    .epg-feature-copy { padding: 22px 21px 21px; }
-    .epg-feature h3 { margin-top: 10px !important; font-size: 28px !important; }
-    .epg-feature-copy > p:not(.epg-eyebrow) { font-size: 15px; margin-top: 8px; }
-    .epg-feature-points { margin-top: 14px; padding-top: 11px; }
-    .epg-feature-visual { padding: 8px 12px; }
-    .epg-feature-visual img { height: 186px; }
-    .epg-section-heading { align-items: start; margin: 21px 0 12px; }
-    .epg-section-heading h3 { font-size: 23px !important; }
+    .epg-scroll-area { flex: 1 1 auto; min-height: 0; }
+    .epg-content { padding: 14px 16px 19px; }
+    .epg-feature { grid-template-columns: minmax(0,1fr); min-height: 0; border-radius: 13px; }
+    .epg-feature-copy { padding: 17px 18px 16px; }
+    .epg-feature .epg-eyebrow { font-size: 11px; line-height: 17px; }
+    .epg-feature h3 { max-width: none; margin-top: 7px !important; font-size: 23px !important; line-height: 1.15 !important; }
+    .epg-feature-copy > p:not(.epg-eyebrow) { margin-top: 7px; font-size: 13px; line-height: 1.45; }
+    .epg-feature-points { margin-top: 11px; padding-top: 10px; gap: 7px 12px; }
+    .epg-feature-points span { font-size: 12px; line-height: 18px; }
+    .epg-feature-visual { padding: 5px 12px 7px; }
+    .epg-feature-visual img { max-width: 100%; height: 102px; }
+    .epg-section-heading { align-items: start; margin: 17px 0 10px; }
+    .epg-section-heading h3 { margin-top: 4px !important; font-size: 20px !important; }
     .epg-section-side { display: none; }
-    .epg-step-grid { grid-template-columns: 1fr; gap: 11px; }
-    .epg-step { grid-template-columns: minmax(0,1fr) minmax(125px,.65fr);
-      min-height: 172px; }
-    .epg-step-copy { padding: 17px 2px 17px 18px; }
-    .epg-step-number { font-size: 23px; }
-    .epg-step h4 { margin-top: 8px !important; font-size: 18px !important; }
-    .epg-step-description { font-size: 14px; margin-top: 5px !important; }
-    .epg-step-visual img { height: 151px; }
-    .epg-section-divider { margin: 23px 0; }
-    .epg-why-intro { grid-template-columns: 1fr; }
-    .epg-why-copy { padding: 22px 21px; }
-    .epg-why-copy h3 { margin-top: 10px !important; font-size: 27px !important; }
-    .epg-why-copy > p:not(.epg-eyebrow) { font-size: 15px; margin-top: 9px; }
-    .epg-why-visual img { height: 176px; }
-    .epg-benefits-heading { margin: 22px 0 11px; }
-    .epg-benefits-heading h3 { font-size: 23px !important; }
-    .epg-benefits { grid-template-columns: 1fr; }
-    .epg-benefit { grid-template-columns: 107px minmax(0,1fr); gap: 13px; padding: 13px 0; }
-    .epg-benefit:first-child { grid-column: auto; grid-template-columns: 107px minmax(0,1fr);
-      gap: 13px; padding: 13px; }
-    .epg-benefit:first-child .epg-benefit-art { height: 110px; }
-    .epg-benefit-art { height: 105px; }
-    .epg-benefit h4 { font-size: 17px !important; }
-    .epg-benefit-description { font-size: 14px; margin-top: 5px !important; }
-    .epg-start { margin-top: 22px; padding: 20px; }
-    .epg-start h3 { font-size: 22px !important; }
-    .epg-footer { padding: 11px 14px; min-height: 67px; }
-    .epg-footer-button { padding: 10px 13px; font-size: 14px; }
+    .epg-step-grid { grid-template-columns: 1fr; gap: 9px; }
+    .epg-step { grid-template-columns: minmax(0,1fr) 102px; min-height: 120px; border-radius: 11px; }
+    .epg-step-copy { padding: 12px 2px 12px 15px; }
+    .epg-step-number { font-size: 18px; }
+    .epg-step h4 { margin-top: 6px !important; font-size: 16px !important; line-height: 1.2 !important; }
+    .epg-step-description { margin-top: 5px !important; font-size: 12px; line-height: 1.42; }
+    .epg-step-visual { padding: 6px 8px 6px 0; }
+    .epg-step-visual img { height: 100px; }
+    .epg-section-divider { margin: 19px 0; }
+    .epg-why-intro { grid-template-columns: 1fr; border-radius: 12px; }
+    .epg-why-copy { padding: 17px 18px 13px; }
+    .epg-why-copy h3 { margin-top: 7px !important; font-size: 23px !important; }
+    .epg-why-copy > p:not(.epg-eyebrow) { margin-top: 7px; font-size: 13px; line-height: 1.45; }
+    .epg-why-visual { padding: 5px 12px 8px; }
+    .epg-why-visual img { height: 102px; }
+    .epg-benefits-heading { margin: 17px 0 8px; }
+    .epg-benefits-heading h3 { font-size: 20px !important; }
+    .epg-benefits { grid-template-columns: 1fr; gap: 0; }
+    .epg-benefit { grid-template-columns: 90px minmax(0,1fr); gap: 12px; padding: 11px 0; }
+    .epg-benefit:first-child {
+      grid-column: auto; grid-template-columns: 90px minmax(0,1fr);
+      gap: 12px; padding: 11px; margin-bottom: 4px;
+    }
+    .epg-benefit-art, .epg-benefit:first-child .epg-benefit-art { height: 86px; }
+    .epg-benefit h4 { font-size: 16px !important; line-height: 1.25 !important; }
+    .epg-benefit-description { margin-top: 5px !important; font-size: 12px; line-height: 1.4; }
+    .epg-start { margin-top: 18px; padding: 16px; gap: 13px; border-radius: 12px; }
+    .epg-start h3 { font-size: 20px !important; }
+    .epg-start p { font-size: 13px; }
+    .epg-start-actions { width: 100%; gap: 8px; }
+    .epg-start-actions .epg-action { flex: 1 1 auto; min-height: 41px; padding: 8px 10px; font-size: 12px; }
+    .epg-footer { padding: 8px 12px; min-height: 59px; gap: 7px; }
+    .epg-footer-status { gap: 8px; flex: 1 1 auto; }
+    .epg-footer-icon { width: 30px; height: 30px; flex-basis: 30px; }
+    .epg-footer-title { font-size: 12px; line-height: 16px; }
     .epg-footer-sub { display: none; }
+    .epg-footer-button { flex: 0 1 auto; min-height: 42px; padding: 9px 10px; gap: 5px; font-size: 12px; line-height: 17px; }
   }
   @media (max-width: 380px) {
-    .epg-header .epg-eyebrow { font-size: 12px; }
+    .epg-header .epg-eyebrow { font-size: 10px; }
     .epg-chapter-count { display: none; }
-    .epg-tab { font-size: 13px; }
-    .epg-step { grid-template-columns: minmax(0,1fr) 120px; }
-    .epg-step-copy { padding-left: 14px; }
-    .epg-step-visual img { height: 125px; }
+    .epg-tab-group { gap: 12px; }
+    .epg-tab { font-size: 11px; }
+    .epg-content { padding-inline: 13px; }
+    .epg-step { grid-template-columns: minmax(0,1fr) 86px; }
+    .epg-step-copy { padding-left: 12px; }
+    .epg-step-visual img { height: 88px; }
     .epg-footer-icon { display: none; }
-    .epg-footer-title { font-size: 14px; }
-    .epg-footer-button { font-size: 13px; min-height: 43px; padding-inline: 11px; }
+    .epg-footer-title { max-width: 110px; font-size: 11px; }
+    .epg-footer-button { font-size: 11px; padding-inline: 8px; }
+  }
+  @media (max-height: 620px) and (max-width: 700px) {
+    .epg-shell { height: min(88svh, 510px); }
+    .epg-header-main { padding-top: 9px; padding-bottom: 7px; }
+    .epg-footer { min-height: 53px; padding-block: 6px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .epg-root *, .epg-root *::before, .epg-root *::after {

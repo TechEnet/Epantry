@@ -23,6 +23,7 @@ import {
 
 import {
   Link,
+  useNavigate,
   useParams,
 } from 'react-router-dom'
 
@@ -30,8 +31,10 @@ import {
   createOutcomePlanIdempotencyKey,
   getOutcomePlan,
   getOutcomePlanErrorMessage,
+  createRecipeOutcomePlan,
   updateOutcomePlanRequirements,
 } from '../services/outcomePlan.service'
+import { getCookingJourney, getCookingReturnPath, saveCookingJourney } from '../../recipes/utils/cookingJourney'
 
 const GROUPS =
   Object.freeze([
@@ -493,6 +496,16 @@ function RequirementBasketView({
   )
 }
 
+function syncActiveCookingServings(result, planId) {
+  const current = getCookingJourney()
+  const plan = result?.plan
+  if (!current || !plan || current.planId !== String(planId) ||
+      current.slug !== String(plan.sourceRecipeSlug || '')) return
+  if (Number.isInteger(Number(plan.targetServings)) && current.servings !== Number(plan.targetServings)) {
+    saveCookingJourney({ ...current, servings: Number(plan.targetServings), cartId: null, orderId: null })
+  }
+}
+
 export default function OutcomePlanPage({
   view =
     'plan',
@@ -501,6 +514,8 @@ export default function OutcomePlanPage({
     planId,
   } =
     useParams()
+
+  const navigate = useNavigate()
 
   const [
     data,
@@ -599,6 +614,7 @@ export default function OutcomePlanPage({
           setData(
             result,
           )
+          syncActiveCookingServings(result, planId)
 
           setTargetServings(
             String(
@@ -756,6 +772,7 @@ export default function OutcomePlanPage({
         setData(
           result,
         )
+        syncActiveCookingServings(result, planId)
 
         setTargetServings(
           String(
@@ -859,6 +876,32 @@ export default function OutcomePlanPage({
       })
     }
 
+  async function recheckPantryNow() {
+    const plan = data?.plan
+    if (!plan?.sourceRecipeSlug || !plan?.targetServings || refreshing || actionKey) return
+    setRefreshing(true)
+    setError('')
+    try {
+      const result = await createRecipeOutcomePlan(plan.sourceRecipeSlug, {
+        targetServings: Number(plan.targetServings),
+        purchaseMode: 'missing_only',
+        idempotencyKey: createOutcomePlanIdempotencyKey('pantry-recheck'),
+      })
+      const nextPlanId = result?.plan?.id
+      if (!nextPlanId) throw new Error('The updated Pantry plan did not return its ID.')
+      const current = getCookingJourney()
+      if (current?.planId === String(planId)) {
+        saveCookingJourney({ ...current, planId: nextPlanId,
+          servings: Number(plan.targetServings), cartId: null, orderId: null })
+      }
+      navigate(`/outcome-plans/${encodeURIComponent(nextPlanId)}${view === 'basket' ? '/basket' : ''}`, { replace: true })
+    } catch (err) {
+      setError(getOutcomePlanErrorMessage(err, 'Unable to recheck current Pantry quantities.'))
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f7f5ef]">
@@ -919,6 +962,13 @@ export default function OutcomePlanPage({
 
           Back to Recipe
         </Link>
+
+        {getCookingReturnPath({ planId }) && (
+          <Link to={getCookingReturnPath({ planId })}
+            className="ml-3 inline-flex min-h-10 items-center gap-2 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-4 text-sm font-semibold text-[#173F35] hover:bg-[#D8EBD9]">
+            <ChefHat size={17} aria-hidden="true" /> Continue guided cooking
+          </Link>
+        )}
 
         <section className="mt-3 overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-sm">
           <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
@@ -1065,6 +1115,16 @@ export default function OutcomePlanPage({
                 </Link>
               </div>
 
+              <div className="flex flex-wrap items-center gap-2">
+                <Link to={`/pantry?returnTo=${encodeURIComponent(`/outcome-plans/${planId}${view === 'basket' ? '/basket' : ''}`)}`}
+                  className="inline-flex min-h-10 items-center rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-[#173F35] hover:bg-[#E7F1E7]">
+                  Update Living Pantry
+                </Link>
+                <button type="button" onClick={recheckPantryNow} disabled={refreshing || Boolean(actionKey)}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#173F35] px-3 text-xs font-semibold text-white disabled:opacity-50">
+                  <RefreshCw size={14} aria-hidden="true" /> Recheck Pantry quantities
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() =>
@@ -1096,6 +1156,8 @@ export default function OutcomePlanPage({
             </div>
           </div>
         </section>
+
+        <p className="mt-3 text-sm leading-5 text-stone-600">Changed your Pantry? Choose <strong>Recheck Pantry quantities</strong> to create a fresh, server-verified missing list. Optional choices on the previous plan are not copied automatically.</p>
 
         {error && (
           <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
@@ -17,6 +17,8 @@ import {
 import FeaturedContentSection from "../components/FeaturedContentSection";
 
 import HeroSection from "../components/HeroSection";
+
+import CookTodayDiscoverySection from "../components/CookTodayDiscoverySection";
 
 import HowEpantryGuidePopup from "../components/HowEpantryGuidePopup";
 
@@ -66,6 +68,12 @@ export default function LandingPage() {
   // preventDefault + scripted scrollTo snap conflicted with momentum scrolling
   // and the pinned Featured sections, making the page visibly jerk.
   // Explore's motion progress and gallery reveal still follow native scroll.
+
+  const [selectedDiet, setSelectedDiet] = useState('veg');
+  const [discoveryRecipes, setDiscoveryRecipes] = useState([]);
+  const syncDiscoveryRecipes = useCallback((recipes) => {
+    setDiscoveryRecipes(recipes);
+  }, []);
 
   const experienceSectionRef = useRef(null);
 
@@ -292,7 +300,7 @@ export default function LandingPage() {
       ============================================================= */}
 
       <div className="relative">
-        <HeroSection />
+        <HeroSection selectedDiet={selectedDiet} onDietChange={setSelectedDiet} onCatalogChange={syncDiscoveryRecipes} />
 
         <SponsoredCampaignSlot
           placement="home"
@@ -301,6 +309,8 @@ export default function LandingPage() {
           previewLabel="Hero section"
         />
       </div>
+
+      <CookTodayDiscoverySection selectedDiet={selectedDiet} recipes={discoveryRecipes} />
 
       {/* =============================================================
           START YOUR FOOD JOURNEY
@@ -581,6 +591,8 @@ export default function LandingPage() {
           slides over Explore, while the product gallery follows normally. */}
       <div ref={featuredEntranceRef} className="relative z-30 -mt-[100svh]">
         <FeaturedContentSection
+          selectedDiet={selectedDiet}
+          verifiedRecipes={discoveryRecipes}
           groceryEntranceEdgeOpacity={groceryEdgeOpacity}
           groceryEntranceScale={groceryEntranceScale}
           groceryEntranceLift={groceryEntranceLift}

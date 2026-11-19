@@ -19,6 +19,7 @@ import { publicImageProps } from "../../../lib/publicMediaDelivery";
 import BookmarkButton from "../../bookmarks/components/BookmarkButton";
 
 import { listPublicRecipes } from "../services/recipe.service";
+import { getLocalMeal, getSmartRecipes, getCuisineOptions, editorialEvidence } from "../utils/smartDiscovery";
 
 import { getRecipeFoodIntelligence } from "../../foodIntelligence/services/foodIntelligence.service";
 
@@ -367,7 +368,7 @@ function RecipeTile({ item, restaurant = false, host = false, foodIntelligence =
   const price = restaurant ? formatRestaurantPrice(item?.restaurant?.pricePerServing) : "";
   const sourceLabel = host
     ? item.type === "prepared_food" ? "Ready-made food" : "Host recipe"
-    : restaurant ? "Restaurant pick" : course;
+    : restaurant ? "Restaurant-submitted" : course;
 
   return (
     <article className="relative isolate flex h-full min-w-0 flex-col rounded-[18px] border border-[#D9DFD5] bg-[#FFFCF8] p-2 shadow-[0_2px_12px_rgba(23,63,53,0.045)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:border-[#AFC5B4] hover:shadow-[0_14px_32px_rgba(23,63,53,0.12)] focus-within:border-[#173F35]">
@@ -396,6 +397,11 @@ function RecipeTile({ item, restaurant = false, host = false, foodIntelligence =
           <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-[1.3] tracking-[-0.025em] text-[#173F35] sm:text-[18px]">
             {title}
           </h3>
+          {restaurant && item?.restaurant?.restaurantName ? (
+            <p className="mt-1 line-clamp-1 text-[13px] font-medium text-[#4D6658]" title={item.restaurant.restaurantName}>
+              Submitted by {item.restaurant.restaurantName}
+            </p>
+          ) : null}
           <div className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-[#E6EAE2] pt-3">
             <span className="line-clamp-1 min-w-0 text-[12px] font-medium capitalize leading-[1.4] text-[#5F6C62] sm:text-[13px]">
               {price ? `${price} / serving` : course}
@@ -711,8 +717,15 @@ export default function RecipesPage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState("all");
   const [selectedDiet, setSelectedDiet] = useState("all");
+  // Editorial discovery is a preview of actual approved listings; the original
+  // collection/search/diet filters and pagination remain authoritative.
+  const [smartMode, setSmartMode] = useState("now");
+  const [smartMeal, setSmartMeal] = useState(() => getLocalMeal());
+  const [smartRegion, setSmartRegion] = useState("");
   const [recipes, setRecipes] = useState([]);
   const [restaurantRecipes, setRestaurantRecipes] = useState([]);
+  const [restaurantCuisineFilter, setRestaurantCuisineFilter] = useState("");
+  const [restaurantRegionFilter, setRestaurantRegionFilter] = useState("");
   const [approvedHostListings, setApprovedHostListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1011,6 +1024,67 @@ export default function RecipesPage() {
     return mixed;
   }, [recipes, restaurantRecipes, collectionQuery, selectedCollection,
       selectedDiet, modalDietaryByRecipeId, standardHasMore, matchingHostListings]);
+
+  // Restaurant Icons uses the existing public Chef-source endpoint. The API
+  // already requires a published version, approved Hospitality overlay and
+  // public visibility. Never create a fictitious chef or endorsement here.
+  const eligibleRestaurantRecipes = useMemo(() => restaurantRecipes.filter((item) =>
+    item?.recipe?.source?.type === "chef" &&
+    Boolean(item?.restaurant?.restaurantName) &&
+    Boolean(item?.dish?.slug)
+  ), [restaurantRecipes]);
+
+  const restaurantCuisines = useMemo(() => [...new Set(
+    eligibleRestaurantRecipes.map((item) => recipeCuisine(item).trim()).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b)), [eligibleRestaurantRecipes]);
+
+  // Region is a grouping of the declared cuisine (e.g. Indian -> India),
+  // NOT a statement that the individual dish originated in that country.
+  const restaurantCuisineRegions = useMemo(() => [...new Set(
+    eligibleRestaurantRecipes.map((item) => recipeCountry(item))
+      .filter((country) => country && country !== "Country not listed")
+  )].sort((a, b) => a.localeCompare(b)), [eligibleRestaurantRecipes]);
+
+  const restaurantSpotlight = useMemo(() => {
+    const query = collectionQuery.trim().toLowerCase();
+    const matching = eligibleRestaurantRecipes.filter((item) => {
+      if (query && !searchableRecipeText(item).includes(query)) return false;
+      if (restaurantCuisineFilter && recipeCuisine(item).toLowerCase() !== restaurantCuisineFilter.toLowerCase()) return false;
+      if (restaurantRegionFilter && recipeCountry(item) !== restaurantRegionFilter) return false;
+      if (selectedDiet !== "all") {
+        const intelligence = modalDietaryByRecipeId[String(item?.recipe?.id || "")] || null;
+        if (recipeDietaryKind(item, intelligence) !== selectedDiet) return false;
+      }
+      return true;
+    });
+    // Put distinct approved restaurant kitchens first, while keeping each
+    // actual published recipe link and retaining all results for the main grid.
+    const leading = [];
+    const remaining = [];
+    const restaurants = new Set();
+    for (const item of matching) {
+      const restaurantId = item.restaurant?.organizationId || item.restaurant?.restaurantName;
+      if (!restaurants.has(restaurantId)) {
+        restaurants.add(restaurantId);
+        leading.push(item);
+      } else {
+        remaining.push(item);
+      }
+    }
+    return [...leading, ...remaining].slice(0, 4);
+  }, [eligibleRestaurantRecipes, collectionQuery, restaurantCuisineFilter,
+    restaurantRegionFilter, selectedDiet, modalDietaryByRecipeId]);
+
+  const smartRegions = useMemo(() => getCuisineOptions(matchedRecipes), [matchedRecipes]);
+  const smartDiscovery = useMemo(() => getSmartRecipes(matchedRecipes, {
+    mode: smartMode,
+    meal: smartMeal,
+    region: smartRegion,
+    limit: 4,
+  }), [matchedRecipes, smartMode, smartMeal, smartRegion]);
+  // Never label ordinary recipes as seasonal or trending when there is no
+  // published, date-valid editorial metadata. The original grid remains visible.
+  const smartPreview = smartDiscovery.items;
 
   const visibleRecipes = matchedRecipes.slice(0, revealSize);
 
@@ -1438,6 +1512,65 @@ export default function RecipesPage() {
                 </button>
               ))}
             </div>
+
+            {/* M2 discovery belongs with the existing type and diet controls,
+                rather than repeating the collection as a separate card grid. */}
+            <div className="mt-4 border-t border-[#173F35]/15 pt-3" aria-label="Contextual recipe suggestions">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-1 text-[14px] font-semibold text-[#173F35]">Explore more</span>
+                {[
+                  { id: 'now', label: 'Meal time' },
+                  { id: 'seasonal', label: 'Seasonal / festivals' },
+                  { id: 'region', label: 'Country / cuisine' },
+                  { id: 'editorial', label: 'Editor picks' },
+                ].map((choice) => (
+                  <button key={choice.id} type="button" aria-pressed={smartMode === choice.id}
+                    onClick={() => setSmartMode(choice.id)}
+                    className={`focus-ring min-h-9 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition ${smartMode === choice.id ? 'border-[#173F35] bg-[#173F35] text-white' : 'border-[#BFCDBD] bg-[#F7F6F2] text-[#173F35] hover:border-[#173F35]'}`}
+                  >{choice.label}</button>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                {smartMode === 'now' && (
+                  <label className="text-[13px] font-semibold text-[#173F35]">Meal
+                    <select value={smartMeal} onChange={(event) => setSmartMeal(event.target.value)}
+                      className="focus-ring ml-2 min-h-10 rounded-[9px] border border-[#BFCDBD] bg-white px-3 text-[13px]">
+                      {['Breakfast', 'Lunch', 'Snacks', 'Dinner'].map((meal) => <option key={meal}>{meal}</option>)}
+                    </select>
+                  </label>
+                )}
+                {(smartMode === 'region' || smartMode === 'seasonal') && smartRegions.length > 0 && (
+                  <label className="text-[13px] font-semibold text-[#173F35]">Country / cuisine
+                    <select value={smartRegion} onChange={(event) => setSmartRegion(event.target.value)}
+                      className="focus-ring ml-2 min-h-10 max-w-[240px] rounded-[9px] border border-[#BFCDBD] bg-white px-3 text-[13px]">
+                      <option value="">{smartMode === 'region' ? 'Select one' : 'All regions'}</option>
+                      {smartRegions.map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </label>
+                )}
+                <span className="text-[13px] text-[#526B5B]">Suggestions use published recipes and respect your search and food preference.</span>
+              </div>
+              {!loading && smartPreview.length > 0 ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Matching recipe suggestions">
+                  <span className="mr-1 text-[13px] font-semibold text-[#526B5B]">Suggested:</span>
+                  {smartPreview.map(({ item, host }, index) => {
+                    const reason = smartMode === 'seasonal'
+                      ? editorialEvidence({ item }, new Date(), smartRegion).label
+                      : smartMode === 'region' ? smartRegion
+                        : smartMode === 'editorial' ? 'Editor pick' : smartMeal;
+                    return (
+                      <Link key={`smart-${host ? 'host' : 'recipe'}-${recipeKey(item, index)}`}
+                        to={host ? hostDetailPath(item) : recipePath(item)}
+                        className="focus-ring inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-[#C5D3C3] bg-[#F7F6F2] px-3 py-1.5 text-[13px] font-semibold text-[#173F35] hover:border-[#173F35] hover:bg-white"
+                        title={reason ? `${reason}: ${host ? item.title : recipeName(item)}` : (host ? item.title : recipeName(item))}>
+                        <span className="max-w-[210px] truncate">{host ? item.title : recipeName(item)}</span>
+                        <ArrowUpRight size={15} aria-hidden="true" className="shrink-0" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {/* Category-aware search; query and diet filter the same results. */}
@@ -1475,6 +1608,65 @@ export default function RecipesPage() {
               )}
             </label>
           </div>
+
+          {(selectedCollection === "all" || selectedCollection === "restaurant") && eligibleRestaurantRecipes.length > 0 && (
+            <section aria-labelledby="restaurant-icons-heading" className="mt-7 border-y-[3px] border-[#C6A88D] bg-[#FFE9DD] px-4 py-6 sm:px-6 sm:py-8">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold text-[#9A4E34]">Restaurant Icons / Approved kitchens</p>
+                  <h2 id="restaurant-icons-heading" className="mt-1 text-[24px] font-bold leading-tight tracking-[-0.035em] text-[#173F35] sm:text-[30px]">
+                    Recipes shared by restaurants
+                  </h2>
+                  <p className="mt-2 max-w-[660px] text-[15px] leading-6 text-[#40594B]">
+                    Explore recipes submitted by restaurant businesses and approved for public viewing. Restaurant names identify the submitting business, not a celebrity-chef endorsement.
+                  </p>
+                </div>
+                <button type="button" onClick={() => {
+                  chooseCollection("restaurant");
+                  browseRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }} className="focus-ring inline-flex min-h-11 items-center gap-2 border-b-2 border-[#173F35] px-1 text-[15px] font-bold text-[#173F35] hover:text-[#2A7A55]">
+                  Browse restaurant recipes <ArrowRight size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3" role="group" aria-label="Restaurant recipe filters">
+                <label className="flex min-w-0 flex-col gap-1 text-[13px] font-semibold text-[#173F35]">
+                  Cuisine
+                  <select value={restaurantCuisineFilter} onChange={(event) => setRestaurantCuisineFilter(event.target.value)}
+                    className="focus-ring min-h-11 max-w-[230px] rounded-[9px] border border-[#C5A797] bg-[#FFFCF8] px-3 text-[15px] font-medium text-[#202421]">
+                    <option value="">All cuisines</option>
+                    {restaurantCuisines.map((cuisine) => <option key={cuisine} value={cuisine}>{cuisine}</option>)}
+                  </select>
+                </label>
+                <label className="flex min-w-0 flex-col gap-1 text-[13px] font-semibold text-[#173F35]">
+                  Cuisine region
+                  <select value={restaurantRegionFilter} onChange={(event) => setRestaurantRegionFilter(event.target.value)}
+                    className="focus-ring min-h-11 max-w-[230px] rounded-[9px] border border-[#C5A797] bg-[#FFFCF8] px-3 text-[15px] font-medium text-[#202421]">
+                    <option value="">All regions</option>
+                    {restaurantCuisineRegions.map((region) => <option key={region} value={region}>{region}</option>)}
+                  </select>
+                </label>
+              </div>
+              <p className="mt-2 text-[13px] leading-5 text-[#556858]">
+                Regions group declared cuisine styles, not verified dish origins. Filters cover the published recipes loaded in this collection.
+              </p>
+              {restaurantSpotlight.length > 0 ? (
+                <div className="mt-5 grid grid-cols-2 items-stretch gap-3 lg:grid-cols-4 lg:gap-4">
+                  {restaurantSpotlight.map((item, index) => (
+                    <RecipeTile key={`restaurant-icon-${recipeKey(item, index)}`} item={item} restaurant
+                      foodIntelligence={modalDietaryByRecipeId[String(item?.recipe?.id || "")] || null} />
+                  ))}
+                </div>
+              ) : (
+                <div role="status" className="mt-5 border-t border-[#C5A797] pt-4 text-[15px] text-[#40594B]">
+                  No approved restaurant recipes match these filters in the loaded collection.
+                  <button type="button" className="focus-ring ml-2 font-bold underline underline-offset-4" onClick={() => {
+                    setRestaurantCuisineFilter("");
+                    setRestaurantRegionFilter("");
+                  }}>Clear restaurant filters</button>
+                </div>
+              )}
+            </section>
+          )}
 
           <SponsoredCampaignSlot
             placement="recipe"

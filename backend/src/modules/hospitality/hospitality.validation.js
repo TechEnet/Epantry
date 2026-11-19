@@ -939,5 +939,17 @@ export const restaurantRecipeReviewBodySchema = z
       .trim()
       .min(3)
       .max(1500),
+
+    // Only the root Super Admin can confirm rights after reviewing evidence.
+    rightsVerified: z.boolean().optional(),
   })
   .strict()
+  .superRefine((value, context) => {
+    if (value.decision === 'approve' && value.rightsVerified !== true) {
+      context.addIssue({
+        code: 'custom',
+        path: ['rightsVerified'],
+        message: 'Confirm image, name and source rights before approving this restaurant recipe.',
+      })
+    }
+  })

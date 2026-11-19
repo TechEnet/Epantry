@@ -102,6 +102,22 @@ export function openAvailabilityNotifyModal(
   )
 }
 
+export function rememberAvailabilityRequestForLogin(detail) {
+  const normalized = normalizeDetail(detail)
+  if (!normalized || typeof window === 'undefined') return false
+
+  try {
+    window.sessionStorage.setItem(
+      PENDING_AVAILABILITY_WATCH_KEY,
+      JSON.stringify(normalized),
+    )
+    return true
+  } catch {
+    // If session storage is unavailable, the user can request again after login.
+    return false
+  }
+}
+
 function readPendingWatch() {
   if (
     typeof window ===
@@ -244,7 +260,9 @@ export default function AvailabilityNotifyModal() {
             )
           } else {
             setSuccess(
-              `We’ll notify you when ${normalized.displayName} becomes available on EPANTRY.`,
+              normalized.source === 'search'
+                ? `Request received. EPANTRY Hosts can now see demand for ${normalized.displayName}. We’ll notify you when a matching product is available to buy.`
+                : `We’ll notify you when ${normalized.displayName} becomes available on EPANTRY.`,
             )
           }
 
@@ -443,8 +461,8 @@ export default function AvailabilityNotifyModal() {
             style={{ color: '#AA573B' }}
           >
             {success
-              ? 'Notification saved'
-              : 'Availability update'}
+              ? 'Request saved'
+              : detail.source === 'search' ? 'Customer request' : 'Availability update'}
           </p>
         </div>
 
@@ -454,7 +472,7 @@ export default function AvailabilityNotifyModal() {
           style={{ color: '#173F35' }}
         >
           {success
-            ? 'We’ll keep an eye on it.'
+            ? 'Your request is shared.'
             : detail.displayName}
         </h2>
 
@@ -468,8 +486,9 @@ export default function AvailabilityNotifyModal() {
           className="mt-2 text-[13px] font-medium leading-[1.5] text-[#52665C]"
           style={{ color: '#52665C' }}
         >
-          {success ||
-            'Tap Notify Me to get an alert when this item is available to buy.'}
+          {success || (detail.source === 'search'
+            ? 'Request this product. Verified Hosts can see demand for it; you’ll get a notification only when it is available to buy.'
+            : 'Tap Notify Me to get an alert when this item is available to buy.')}
         </p>
 
         {error ? (
@@ -502,8 +521,8 @@ export default function AvailabilityNotifyModal() {
               {saving
                 ? 'Saving...'
                 : isAuthenticated
-                  ? 'Notify Me'
-                  : 'Sign in & Notify'}
+                  ? detail.source === 'search' ? 'Request product' : 'Notify Me'
+                  : 'Sign in to request'}
             </button>
           </div>
         ) : (

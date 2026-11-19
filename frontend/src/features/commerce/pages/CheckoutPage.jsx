@@ -41,6 +41,8 @@ import {
   useLocationStore,
 } from '../../location/store/location.store'
 
+import { attachCookingOrder, getCookingReturnPath } from '../../recipes/utils/cookingJourney'
+
 const RAZORPAY_CHECKOUT_URL =
   'https://checkout.razorpay.com/v1/checkout.js'
 
@@ -713,6 +715,10 @@ export default function CheckoutPage() {
                   verified?.order?.id ||
                   order.id
 
+                // Only a verified payment attaches the order to an existing
+                // recipe journey; the receipt remains the first success screen.
+                attachCookingOrder(cartId, confirmedOrderId)
+
                 clearFloatingCartCompanion(cartId)
 
                 navigate(
@@ -861,6 +867,13 @@ export default function CheckoutPage() {
 
           Back to Cart
         </Link>
+
+        {getCookingReturnPath({ cartId }) && (
+          <Link to={getCookingReturnPath({ cartId })}
+            className="mb-2 ml-3 inline-flex min-h-10 items-center gap-2 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-4 text-sm font-semibold text-[#173F35]">
+            Continue guided cooking (your checkout will remain available)
+          </Link>
+        )}
 
         <section className="relative mt-3 overflow-hidden rounded-[32px] border border-emerald-100 bg-white shadow-[0_24px_70px_rgba(15,118,110,0.09)]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.13),transparent_34%),linear-gradient(120deg,rgba(236,253,245,0.72),transparent_48%)]" />
@@ -1288,6 +1301,11 @@ export default function CheckoutPage() {
 
               EPANTRY never stores raw card number, CVV or card expiry.
             </div>
+            <p className="mt-3 text-[13px] leading-5 text-stone-600">
+              Review <Link to="/terms" className="font-semibold text-[#174D38] underline underline-offset-2">Terms &amp; Conditions</Link> and{' '}
+              <Link to="/privacy-policy" className="font-semibold text-[#174D38] underline underline-offset-2">Privacy Policy</Link>.
+              Order-specific delivery, charges and cancellation information remain the details shown at checkout.
+            </p>
           </aside>
         </div>
       </div>

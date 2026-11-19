@@ -9,8 +9,11 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { COOKIE_SETTINGS_EVENT } from '../../cookieConsent/cookieConsent.service'
 import {
   createPrivacyRequest,
+  downloadOwnPrivacyExport,
   getHardeningErrorMessage,
   getPrivacyContext,
   listOwnPrivacyRequests,
@@ -47,6 +50,9 @@ function formatDate(value) {
 function requestLabel(type) {
   if (type === 'access_export') return 'Data copy requested'
   if (type === 'deletion') return 'Deletion review requested'
+  if (type === 'rectification') return 'Data correction requested'
+  if (type === 'restriction') return 'Processing restriction requested'
+  if (type === 'objection') return 'Objection to processing recorded'
   return humanize(type) || 'Privacy request'
 }
 
@@ -58,6 +64,8 @@ export default function CustomerPrivacyPage() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [requestMessage, setRequestMessage] = useState('')
+  const [downloading, setDownloading] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -97,6 +105,7 @@ export default function CustomerPrivacyPage() {
       const result = await createPrivacyRequest({
         requestType,
         scope: 'account',
+        requestMessage,
       })
 
       setNotice(
@@ -104,6 +113,7 @@ export default function CustomerPrivacyPage() {
           ? 'You already have an open request for this. You can track it below.'
           : 'Your request has been sent. You can follow its progress below.',
       )
+      setRequestMessage('')
       await load()
     } catch (requestError) {
       setError(
@@ -114,6 +124,27 @@ export default function CustomerPrivacyPage() {
       )
     } finally {
       setSubmitting('')
+    }
+  }
+
+  async function downloadData(request) {
+    if (!request?.id || downloading) return
+    setDownloading(request.id)
+    setError('')
+    try {
+      const blob = await downloadOwnPrivacyExport(request.id)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `epantry-privacy-${request.requestId || request.id}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (caught) {
+      setError(getHardeningErrorMessage(caught, 'Export unavailable. Complete security verification and try again.'))
+    } finally {
+      setDownloading('')
     }
   }
 
@@ -207,6 +238,37 @@ export default function CustomerPrivacyPage() {
           </article>
         </section>
 
+        <section aria-labelledby="other-rights-heading" className="mt-5 border-t border-[#D4DACF] pt-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-[#A15836]">MORE DATA RIGHTS</p>
+              <h2 id="other-rights-heading" className="mt-1 text-[22px] font-bold text-[#173F35]">Manage your data</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/account/settings" className="focus-ring rounded-lg border border-[#B9C9BA] px-3 py-2 text-[13px] font-bold text-[#173F35]">Edit profile</Link>
+              <button type="button" className="focus-ring rounded-lg border border-[#B9C9BA] px-3 py-2 text-[13px] font-bold text-[#173F35]" onClick={() => window.dispatchEvent(new Event(COOKIE_SETTINGS_EVENT))}>Cookie settings</button>
+            </div>
+          </div>
+          <label className="mt-4 block max-w-3xl text-[14px] font-semibold text-[#173F35]">
+            Optional details for your request
+            <textarea rows={2} maxLength={500} value={requestMessage} onChange={(event) => setRequestMessage(event.target.value)}
+              placeholder="What should we correct, limit or review? (Do not include passwords.)"
+              className="focus-ring mt-2 block w-full rounded-xl border border-[#C9D4C9] bg-white p-3 text-[15px] font-normal text-[#283C32]" />
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              ['rectification', 'Correct my data'],
+              ['restriction', 'Restrict processing'],
+              ['objection', 'Object to processing'],
+            ].map(([type, label]) => (
+              <button key={type} type="button" disabled={Boolean(submitting)} onClick={() => submit(type)}
+                className="focus-ring min-h-11 rounded-xl border border-[#BDCFBE] bg-[#E8EFE5] px-4 text-[14px] font-bold text-[#173F35] hover:bg-[#D5E4D5] disabled:opacity-60">
+                {submitting === type ? 'Submitting…' : label}
+              </button>
+            ))}
+          </div>
+        </section>
+
         <aside className="mt-4 flex items-start gap-3 rounded-[15px] bg-[#E4E9DA] px-4 py-4 sm:mt-5 sm:gap-4 sm:px-6 sm:py-5">
           <ShieldCheck size={22} className="mt-0.5 shrink-0 text-[#173F35]" aria-hidden="true" />
           <div className="min-w-0">
@@ -270,7 +332,14 @@ export default function CustomerPrivacyPage() {
                         <h3 className="text-[16px] font-bold text-[#202421] sm:text-[17px]">{requestLabel(request.requestType)}</h3>
                         <p className="mt-1 text-[13px] leading-relaxed text-[#60675E] sm:text-[14px]">
                           {formatDate(request.requestedAt)}
+                          {request.dueAt && <span className="ml-2 text-[#566B5B]">· Response target: {formatDate(request.dueAt)}</span>}
                         </p>
+                        {request.requestMessage && (
+                          <p className="mt-1 text-[13px] text-[#56645B]">Your note: {request.requestMessage}</p>
+                        )}
+                        {request.responseNote && (
+                          <p className="mt-1 text-[13px] font-medium text-[#365A45]">Response: {request.responseNote}</p>
+                        )}
                         {request.requestId && (
                           <p className="mt-1 break-all text-[12px] leading-relaxed text-[#747A71] sm:text-[13px]">
                             Reference: {request.requestId}
@@ -283,6 +352,12 @@ export default function CustomerPrivacyPage() {
                         {request.status === 'completed' && <CheckCircle2 size={14} className="mr-1.5" aria-hidden="true" />}
                         {status.label}
                       </span>
+                      {isExport && request.status === 'completed' && request.exportArtifactStatus === 'available' && (
+                        <button type="button" disabled={Boolean(downloading)} onClick={() => downloadData(request)}
+                          className="focus-ring mt-2 rounded-lg bg-[#173F35] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50">
+                          {downloading === request.id ? 'Preparing…' : 'Download data JSON'}
+                        </button>
+                      )}
                       <p className="mt-2 text-[13px] leading-relaxed text-[#60675E]">
                         {request.retentionEvaluation?.length || 0} record-keeping {request.retentionEvaluation?.length === 1 ? 'check' : 'checks'}
                         {isExport && request.exportArtifactStatus

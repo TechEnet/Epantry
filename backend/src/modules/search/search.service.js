@@ -2090,7 +2090,7 @@ async function createDecisionArtifacts({
         intent.normalizedQuery,
 
       area:
-        sanitizeSearchArea(area),
+        sanitizeSearchArea(session.area || {}),
 
       mode:
         intent.mode,

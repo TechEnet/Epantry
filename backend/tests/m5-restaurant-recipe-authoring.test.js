@@ -82,3 +82,36 @@ test('Final product evidence corrections are submitted as separately reviewed dr
   assert.match(routes, /'\/universal-product\/npi\/drafts\/:id\/revisions'/)
   assert.match(routes, /requireRecentMfaAuthentication/)
 })
+
+
+test('M3B public Restaurant Icons uses approved recipe identities rather than fabricated endorsements', () => {
+  const browse = read('frontend/src/features/recipes/pages/RecipesPage.jsx')
+  const detail = read('frontend/src/features/recipes/pages/RecipeDetailPage.jsx')
+  const publicService = read('backend/src/modules/recipes/recipe.public.service.js')
+
+  assert.match(browse, /eligibleRestaurantRecipes/)
+  assert.match(browse, /Restaurant Icons \/ Approved kitchens/)
+  assert.match(browse, /restaurantCuisineFilter/)
+  assert.match(browse, /restaurantRegionFilter/)
+  assert.match(browse, /Submitted by.*restaurant\.restaurantName/)
+  assert.match(detail, /Recipe creator & attribution/)
+  assert.match(detail, /Classification: restaurant-submitted recipe/)
+  assert.match(publicService, /sourceType\s*===\s*'chef'/)
+  assert.match(publicService, /customerVisibility:\s*'public_candidate'/)
+  assert.match(publicService, /status:\s*'approved'/)
+})
+
+test('M3B restaurant publication requires auditable Super Admin rights verification', () => {
+  const validation = read('backend/src/modules/hospitality/hospitality.validation.js')
+  const service = read('backend/src/modules/hospitality/hospitality.service.js')
+  const routes = read('backend/src/modules/hostOperations/hostOperations.routes.js')
+  const admin = read('frontend/src/features/hostOperations/pages/AdminHostOperationsPage.jsx')
+
+  assert.match(validation, /rightsVerified:\s*z\.boolean\(\)\.optional\(\)/)
+  assert.match(validation, /value\.decision === 'approve' && value\.rightsVerified !== true/)
+  assert.match(service, /RESTAURANT_RECIPE_SOURCE_RIGHTS_REQUIRED/)
+  assert.match(routes, /sourceRightsVerified:/)
+  assert.match(admin, /restaurantRightsVerified/)
+  assert.match(admin, /Check recipe source & rights/)
+  assert.match(admin, /reviewAdminHospitalityRestaurantRecipe\(selected\.item\.id/)
+})

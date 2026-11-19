@@ -21,6 +21,8 @@ import {
   useNavigate,
 } from 'react-router-dom'
 
+import { buildEditorialTags } from '../../recipes/utils/smartDiscovery'
+
 import AdminShell from '../components/AdminShell'
 
 import {
@@ -391,6 +393,17 @@ function IngredientPicker({
       !canonicalName ||
       creating
     ) {
+      return
+    }
+
+    try {
+      buildEditorialTags({
+        season: form.discoverySeason, festival: form.discoveryFestival,
+        region: form.discoveryRegion, from: form.discoveryStart,
+        until: form.discoveryEnd, featured: form.editorialPick,
+      })
+    } catch (curationError) {
+      setError(curationError.message)
       return
     }
 
@@ -824,6 +837,12 @@ export default function AdminRecipesPage() {
 
       sourceName:
         'EPANTRY Editorial',
+      discoverySeason: '',
+      discoveryFestival: '',
+      discoveryRegion: '',
+      discoveryStart: '',
+      discoveryEnd: '',
+      editorialPick: false,
 
       ingredients: [
         createIngredientRow(),
@@ -1320,6 +1339,11 @@ export default function AdminRecipesPage() {
               : form.dietaryType === 'nonveg'
                 ? 'non-vegetarian'
                 : '',
+            ...buildEditorialTags({
+              season: form.discoverySeason, festival: form.discoveryFestival,
+              region: form.discoveryRegion, from: form.discoveryStart,
+              until: form.discoveryEnd, featured: form.editorialPick,
+            }),
           ]
             .map(
               (
@@ -1973,6 +1997,39 @@ export default function AdminRecipesPage() {
                 />
 
               </label>
+
+              <fieldset className="md:col-span-2 rounded-[14px] border border-[#C8D6CB] bg-[#F2F6F0] p-4">
+                <legend className="px-2 text-[14px] font-bold text-[#173F35]">Smart discovery (optional)</legend>
+                <p className="mb-3 text-[13px] text-[#526B5B]">Only approved recipes are shown. Seasonal and festival collections need real dates; expired collections disappear automatically.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-[13px] font-semibold text-[#173F35]">Season
+                    <select value={form.discoverySeason} onChange={(event) => setForm((previous) => ({ ...previous, discoverySeason: event.target.value }))}
+                      className="mt-1 block min-h-11 w-full rounded-[9px] border border-[#C8D6CB] bg-white px-3">
+                      <option value="">None</option><option value="spring">Spring</option><option value="summer">Summer</option><option value="autumn">Autumn</option><option value="winter">Winter</option>
+                    </select>
+                  </label>
+                  <label className="text-[13px] font-semibold text-[#173F35]">Festival name
+                    <input value={form.discoveryFestival} maxLength={55} onChange={(event) => setForm((previous) => ({ ...previous, discoveryFestival: event.target.value }))}
+                      placeholder="Only for a curated festival collection" className="mt-1 block min-h-11 w-full rounded-[9px] border border-[#C8D6CB] bg-white px-3" />
+                  </label>
+                  <label className="text-[13px] font-semibold text-[#173F35]">Show from
+                    <input type="date" value={form.discoveryStart} onChange={(event) => setForm((previous) => ({ ...previous, discoveryStart: event.target.value }))}
+                      className="mt-1 block min-h-11 w-full rounded-[9px] border border-[#C8D6CB] bg-white px-3" />
+                  </label>
+                  <label className="text-[13px] font-semibold text-[#173F35]">Show until
+                    <input type="date" value={form.discoveryEnd} onChange={(event) => setForm((previous) => ({ ...previous, discoveryEnd: event.target.value }))}
+                      className="mt-1 block min-h-11 w-full rounded-[9px] border border-[#C8D6CB] bg-white px-3" />
+                  </label>
+                  <label className="text-[13px] font-semibold text-[#173F35]">Eligible country / region (optional)
+                    <input value={form.discoveryRegion} maxLength={60} onChange={(event) => setForm((previous) => ({ ...previous, discoveryRegion: event.target.value }))}
+                      placeholder="e.g. India" className="mt-1 block min-h-11 w-full rounded-[9px] border border-[#C8D6CB] bg-white px-3" />
+                  </label>
+                  <label className="flex min-h-11 items-center gap-2 self-end text-[13px] font-semibold text-[#173F35]">
+                    <input type="checkbox" checked={form.editorialPick} onChange={(event) => setForm((previous) => ({ ...previous, editorialPick: event.target.checked }))} />
+                    Mark as editorial pick
+                  </label>
+                </div>
+              </fieldset>
 
               <label className="text-xs font-black text-stone-700 md:col-span-2">
                 Food type

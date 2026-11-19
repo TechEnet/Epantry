@@ -180,6 +180,14 @@ import {
   
     {
         label:
+            'Beverages',
+
+        to:
+            '/beverages',
+    },
+
+    {
+        label:
             'About',
 
         to:

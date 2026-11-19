@@ -394,6 +394,10 @@ function serializePrivacyRequest(
       item.requestType,
     scope:
       item.scope,
+    dueAt: item.dueAt || privacyRequestDueDate(item.requestedAt),
+    requestMessage: item.requestMessage || '',
+    identityVerificationStatus: item.identityVerificationStatus || 'pending',
+    responseNote: item.responseNote || '',
     status:
       item.status,
     requestedAt:
@@ -453,6 +457,18 @@ export async function getPrivacyContext({
         true,
     },
   }
+}
+
+export function privacyRequestDueDate(requestedAt) {
+  const date = new Date(requestedAt)
+  const due = new Date(date)
+  // Calendar-month deadline with end-of-month clamping; extensions require separate review.
+  const day = due.getUTCDate()
+  due.setUTCDate(1)
+  due.setUTCMonth(due.getUTCMonth() + 1)
+  const last = new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth() + 1, 0)).getUTCDate()
+  due.setUTCDate(Math.min(day, last))
+  return due
 }
 
 export async function createPrivacyRightsRequest({
@@ -533,6 +549,8 @@ export async function createPrivacyRightsRequest({
         input.requestType,
       scope:
         input.scope,
+      requestMessage: input.requestMessage || '',
+      dueAt: privacyRequestDueDate(new Date()),
       status:
         'submitted',
       requestedAt:

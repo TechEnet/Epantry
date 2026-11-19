@@ -9677,6 +9677,15 @@ export async function reviewHospitalityRestaurantRecipeAsSuperAdmin({
   }
 
   if (input.decision === 'approve') {
+    // Defensive enforcement for service callers beyond the HTTP validator.
+    // Never publish a new restaurant/chef reference without an explicit
+    // Super Admin source-rights confirmation.
+    if (input.rightsVerified !== true) {
+      throw new ApiError(400, 'Restaurant recipe image and attribution rights must be verified before approval.', [
+        { code: 'RESTAURANT_RECIPE_SOURCE_RIGHTS_REQUIRED' },
+      ])
+    }
+
     const food = await getLatestRecipeFoodIntelligenceDeclaration(version._id)
 
     if (food?.latest?.declaration && !food?.latestApproved) {
@@ -9732,5 +9741,6 @@ export async function reviewHospitalityRestaurantRecipeAsSuperAdmin({
     status: version.status,
     operationalStatus: overlay.status,
     reason: input.reason,
+    rightsVerified: input.decision === 'approve' && input.rightsVerified === true,
   }
 }

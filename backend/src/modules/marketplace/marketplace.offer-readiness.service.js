@@ -2,6 +2,8 @@ import {
   ApiError,
 } from '../../utils/ApiError.js'
 
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+
 import {
   fulfillAvailabilityWatchesForPackBestEffort,
 } from '../notifications/notification.service.js'
@@ -112,6 +114,22 @@ export async function inspectHostOfferReadiness(
         },
       ],
     )
+  }
+
+  // A Host can never bypass a DSA restriction by manually reactivating an offer.
+  // Only EPANTRY-generated SKUs are governed by the Host unified listing.
+  const linked = /^epantry-([a-f\d]{24})$/i.exec(String(offer.merchantSku || ''))
+  if (linked) {
+    const listing = await HostUnifiedListingPacket.findOne({
+      _id: linked[1], ownerUserId: actorIdFromUser(actorUser), deletedAt: null,
+    }).select('moderationStatus euTraderVerifiedAtPublication').lean()
+    if (!listing || listing.moderationStatus === 'restricted') {
+      throw new ApiError(409, 'Trust & Safety has restricted this Host listing; its offer cannot be activated.')
+    }
+    if (process.env.EPANTRY_EU_MARKET_ENABLED === 'true' &&
+        listing.euTraderVerifiedAtPublication !== true) {
+      throw new ApiError(409, 'EU selling requires a verified trader and governed listing approval.')
+    }
   }
 
   await validateOfferCanonicalPack(

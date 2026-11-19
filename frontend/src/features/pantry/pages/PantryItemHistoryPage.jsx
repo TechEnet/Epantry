@@ -12,7 +12,7 @@ import {
   Save,
   ShoppingBag,
 } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { getPantryStatePresentation } from '../components/PantryStateBadge'
 import { getCatalogProducts } from '../../grocery/services/catalog.service'
@@ -192,6 +192,12 @@ function SummaryFact({ Icon, title, value }) {
 
 export default function PantryItemHistoryPage() {
   const { itemId } = useParams()
+  const [searchParams] = useSearchParams()
+  const candidateReturn = searchParams.get('returnTo') || ''
+  const returnTo = /^\/recipes\/[a-z0-9_-]{1,180}(?:\?[^#]*)?(?:#[a-z0-9_-]+)?$/i.test(candidateReturn) ||
+    /^\/outcome-plans\/[a-f0-9]{24}(?:\/basket)?$/i.test(candidateReturn)
+      ? candidateReturn : ''
+  const pantryBackPath = returnTo ? `/pantry?returnTo=${encodeURIComponent(returnTo)}` : '/pantry' 
 
   const [item, setItem] = useState(null)
   const [observations, setObservations] = useState([])
@@ -348,7 +354,7 @@ export default function PantryItemHistoryPage() {
       <div className="w-full min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
-            to="/pantry"
+            to={pantryBackPath}
             className="inline-flex min-h-11 items-center gap-2 text-[15px] font-semibold text-[#173F35] transition-colors hover:text-[#A95B38] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F35]"
           >
             <ArrowLeft size={18} aria-hidden="true" /> Back to pantry

@@ -27,6 +27,7 @@ import {
 } from "../services/commerce.service";
 
 import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaignSlot";
+import { getCookingReturnPath } from "../../recipes/utils/cookingJourney";
 
 function formatMoney(amountMinor, currency = "INR") {
   if (!Number.isInteger(Number(amountMinor))) {
@@ -1162,6 +1163,12 @@ export default function OrderDetailPage() {
           <Link to="/orders" className="focus-ring inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] transition-colors hover:text-[#C56C42]">
             <ArrowLeft size={17} aria-hidden="true" /> Back to Orders
           </Link>
+          {getCookingReturnPath({ orderId }) && (
+            <Link to={getCookingReturnPath({ orderId })}
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-4 text-sm font-semibold text-[#173F35]">
+              Continue guided cooking
+            </Link>
+          )}
           <p className="min-w-0 break-all text-xs text-[#626A63] sm:text-sm">
             {order.createdAt ? `Placed ${formatTimestamp(order.createdAt)}` : "Order details"}
           </p>

@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Banknote,
   BarChart3,
+  MessageCircleMore,
   Barcode,
   Building2,
   BookOpenCheck,
@@ -138,6 +139,11 @@ const navigationGroups = [
         icon: BarChart3,
       },
       {
+        label: "Customer Requests",
+        to: "/host/customer-requests",
+        icon: MessageCircleMore,
+      },
+      {
         label: "Business Analytics",
         to: "/host/analytics",
         icon: BarChart3,
@@ -184,6 +190,16 @@ const navigationGroups = [
         icon: UserRound,
       },
       {
+        label: "Privacy Rights",
+        to: "/host/privacy",
+        icon: LockKeyhole,
+      },
+      {
+        label: "Listing Notices & Appeals",
+        to: "/host/listing-notices",
+        icon: FileSearch,
+      },
+      {
         label: "Login & Security",
         to: "/account/security/mfa",
         icon: LockKeyhole,
@@ -205,10 +221,13 @@ const mobileNavigationOrder = [
   "/host/settings",
   "/host/hospitality",
   "/host/creator-studio",
+  "/host/customer-requests",
   "/host/analytics",
   "/host/brands",
   "/host/business-profile",
   "/account/security/mfa",
+  "/host/privacy",
+  "/host/listing-notices",
 ];
 
 function routeMatchesItem(item, pathname) {

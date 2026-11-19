@@ -3,6 +3,7 @@ import { createContext, useContext, useState } from "react";
 import {
   BadgeCheck,
   BarChart3,
+  MessageCircleMore,
   Bot,
   Boxes,
   ChefHat,
@@ -253,6 +254,12 @@ export default function AdminShell({
       label: "Insights & Demand",
       icon: BarChart3,
       items: [
+        {
+          label: "Customer Requests",
+          to: "/admin/customer-requests",
+          icon: MessageCircleMore,
+          visible: isRootSuperAdmin,
+        },
         {
           label: "Analytics & Insights",
           to: "/admin/analytics",
