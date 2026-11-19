@@ -398,6 +398,27 @@ function recipeDetailLabel(
     )
 }
 
+// The published RecipeVersion API returns preparationTimeMinutes and
+// cookingTimeMinutes separately. Never turn an absent/zero default into a
+// guessed time, or advertise the development seed's placeholder timings.
+function getPublishedRecipeTimeLabels(recipe) {
+  if (/\bdevelopment seed\b/i.test(String(recipe?.source?.name || ''))) {
+    return { prep: 'Not verified', cook: 'Not verified', total: 'Not verified' }
+  }
+  const positive = (value) => {
+    if (value === null || value === undefined || String(value).trim() === '') return null
+    const minutes = Number(value)
+    return Number.isSafeInteger(minutes) && minutes > 0 ? minutes : null
+  }
+  const prep = positive(recipe?.preparationTimeMinutes)
+  const cook = positive(recipe?.cookingTimeMinutes)
+  return {
+    prep: prep === null ? 'Not provided' : `${prep} min`,
+    cook: cook === null ? 'Not provided' : `${cook} min`,
+    total: prep !== null && cook !== null ? `${prep + cook} min` : 'Not provided',
+  }
+}
+
 function resolveRecipeDietaryBadge(foodIntelligence) {
   const dietaryRows = Array.isArray(foodIntelligence?.dietary)
     ? foodIntelligence.dietary
@@ -461,6 +482,7 @@ function RecipeDetailsSheet({
   foodIntelligence,
   discoveryOrigin,
 }) {
+  const recipeTimeLabels = getPublishedRecipeTimeLabels(recipe)
   const ingredientRows =
     Array.isArray(
       ingredients,
@@ -538,13 +560,9 @@ function RecipeDetailsSheet({
               recipe?.baseServings ??
                 '—',
             ],
-            [
-              'Cook time',
-              `${Number(
-                recipe?.cookingTimeMinutes ||
-                  0,
-              )} min`,
-            ],
+            ['Prep time', recipeTimeLabels.prep],
+            ['Cook time', recipeTimeLabels.cook],
+            ['Total time', recipeTimeLabels.total],
             [
               'Difficulty',
               recipeDetailLabel(
@@ -2060,6 +2078,7 @@ export default function RecipeDetailPage() {
   const recipe =
     data?.recipe ||
     {}
+  const recipeTimeLabels = getPublishedRecipeTimeLabels(recipe)
 
   const restaurant =
     data?.restaurant ||
@@ -5550,7 +5569,9 @@ export default function RecipeDetailPage() {
               <div className="epantry-recipe-metrics mt-5 grid grid-cols-3 gap-x-3 gap-y-2">
                 {[
                   ['Base servings', hostRecipeNotShared ? 'Not shared' : (recipe.baseServings || '—')],
-                  ['Cook time', hostRecipeNotShared ? 'Not shared' : `${Number(recipe.cookingTimeMinutes || 0)} min`],
+                  ['Prep time', hostRecipeNotShared ? 'Not shared' : recipeTimeLabels.prep],
+                  ['Cook time', hostRecipeNotShared ? 'Not shared' : recipeTimeLabels.cook],
+                  ['Total time', hostRecipeNotShared ? 'Not shared' : recipeTimeLabels.total],
                   ['Difficulty', recipe.difficulty || '—'],
                   ['Cuisine', dish.cuisine || '—'],
                   ['Course', dish.course || '—'],
@@ -5605,7 +5626,9 @@ export default function RecipeDetailPage() {
               <div className="epantry-recipe-metrics mt-7 grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
                 {[
                   ['Base servings', hostRecipeNotShared ? 'Not shared' : (recipe.baseServings || '—')],
-                  ['Cook time', hostRecipeNotShared ? 'Not shared' : `${Number(recipe.cookingTimeMinutes || 0)} min`],
+                  ['Prep time', hostRecipeNotShared ? 'Not shared' : recipeTimeLabels.prep],
+                  ['Cook time', hostRecipeNotShared ? 'Not shared' : recipeTimeLabels.cook],
+                  ['Total time', hostRecipeNotShared ? 'Not shared' : recipeTimeLabels.total],
                   ['Difficulty', recipe.difficulty || '—'],
                   ['Cuisine', dish.cuisine || '—'],
                   ['Course', dish.course || '—'],

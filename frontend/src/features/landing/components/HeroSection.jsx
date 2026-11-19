@@ -59,6 +59,14 @@ function verifiedMinutes(...values) {
   return Number.isSafeInteger(total) && total > 0 ? total : null
 }
 
+// Separate published preparation and cooking durations. A zero default is
+// not proof of a measured time, so show a component only when positive.
+function publishedTimePart(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return null
+  const minutes = Number(value)
+  return Number.isSafeInteger(minutes) && minutes > 0 ? minutes : null
+}
+
 // Some catalog entries were created by the development seed with a blanket
 // 10-minute preparation + 20-minute cooking duration. Those values are test
 // fixtures, not timings verified for each dish, so never advertise them.
@@ -309,6 +317,8 @@ export default function HeroSection({ selectedDiet = 'veg', onDietChange, onCata
         minutes: isDevelopmentSeedRecipe(item)
           ? null
           : verifiedMinutes(item?.recipe?.preparationTimeMinutes, item?.recipe?.cookingTimeMinutes),
+        prepMinutes: isDevelopmentSeedRecipe(item) ? null : publishedTimePart(item?.recipe?.preparationTimeMinutes),
+        cookMinutes: isDevelopmentSeedRecipe(item) ? null : publishedTimePart(item?.recipe?.cookingTimeMinutes),
         servings: Number(item?.recipe?.baseServings) > 0 ? Number(item.recipe.baseServings) : null,
         kind: recipeKind([
           item?.dish?.course, item?.recipe?.course, item?.dish?.mealType,
@@ -330,6 +340,8 @@ export default function HeroSection({ selectedDiet = 'veg', onDietChange, onCata
         // Featured totalTime is a derived summary with no source metadata;
         // the primary /recipes response supplies source-backed timings.
         minutes: null,
+        prepMinutes: null,
+        cookMinutes: null,
         servings: Number(item?.servings) > 0 ? Number(item.servings) : null,
         kind: recipeKind([item?.cuisine, item?.course, item?.name, item?.title]),
       })
@@ -340,6 +352,8 @@ export default function HeroSection({ selectedDiet = 'veg', onDietChange, onCata
         diet: declaredDietaryKind([item?.dietary]),
         description: item?.description || '',
         minutes: verifiedMinutes(item?.preparationMinutes, item?.cookingMinutes),
+        prepMinutes: publishedTimePart(item?.preparationMinutes),
+        cookMinutes: publishedTimePart(item?.cookingMinutes),
         servings: Number(item?.baseServings) > 0 ? Number(item.baseServings) : null,
         kind: recipeKind([item?.category, item?.type, item?.title]),
       })
@@ -893,9 +907,10 @@ export default function HeroSection({ selectedDiet = 'veg', onDietChange, onCata
                         {personalize && recentViews.length ? 'Picked for you' : 'Featured recipe'}
                       </p>
                       <h2 className="epantry-hero-recipe-title line-clamp-2">{mainRecipe.name}</h2>
-                      {(mainRecipe.minutes || mainRecipe.servings) && (
+                      {(mainRecipe.prepMinutes || mainRecipe.cookMinutes || mainRecipe.servings) && (
                         <div className="epantry-hero-feature-meta">
-                          {mainRecipe.minutes ? <span>{mainRecipe.minutes} min</span> : null}
+                          {mainRecipe.prepMinutes ? <span>Prep {mainRecipe.prepMinutes} min</span> : null}
+                          {mainRecipe.cookMinutes ? <span>Cook {mainRecipe.cookMinutes} min</span> : null}
                           {mainRecipe.servings ? <span>{mainRecipe.servings} servings</span> : null}
                         </div>
                       )}

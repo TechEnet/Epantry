@@ -103,6 +103,13 @@ function RecipeTile({ recipe }) {
       ? `${recipe.minutes} min`
       : `${Math.floor(recipe.minutes / 60)} hr${recipe.minutes % 60 ? ` ${recipe.minutes % 60} min` : ''}`
     : null
+  // These parts come from the published RecipeVersion/approved Host listing;
+  // the aggregate minutes alone cannot tell a customer what prep requires.
+  const timeParts = [
+    Number.isSafeInteger(recipe.prepMinutes) && recipe.prepMinutes > 0 ? `Prep ${recipe.prepMinutes} min` : null,
+    Number.isSafeInteger(recipe.cookMinutes) && recipe.cookMinutes > 0 ? `Cook ${recipe.cookMinutes} min` : null,
+  ].filter(Boolean)
+  const timeLabel = timeParts.length ? timeParts.join(' · ') : (duration ? `Total ${duration}` : null)
 
   return (
     <Link
@@ -123,7 +130,7 @@ function RecipeTile({ recipe }) {
             <CookingPot size={29} aria-hidden="true" />
           </div>
         )}
-        {duration && <span className="epantry-cook-time">{duration}</span>}
+        {timeLabel && <span className="epantry-cook-time">{timeLabel}</span>}
       </div>
       <div className="epantry-cook-card-body">
         <h3 className="epantry-cook-card-title">{recipe.name}</h3>
@@ -627,7 +634,9 @@ export default function CookTodayDiscoverySection({ recipes = [], selectedDiet =
           position:absolute; bottom:10px; left:11px; padding:6px 10px;
           border:1px solid rgba(255,255,255,.8); border-radius:30px;
           background:rgba(250,250,248,.96); color:#203F34;
-          font-size:12px; font-weight:700; line-height:1;
+          font-size:12px; font-weight:700; line-height:1.25;
+          max-width:calc(100% - 22px); box-sizing:border-box;
+          overflow-wrap:anywhere;
           box-shadow:0 2px 8px rgba(0,0,0,.06);
         }
         .epantry-cook-discovery .epantry-cook-card-body {
@@ -639,6 +648,15 @@ export default function CookTodayDiscoverySection({ recipes = [], selectedDiet =
           -webkit-line-clamp:2; overflow:hidden; max-height:2.55em;
           font-size:16px; font-weight:700;
           letter-spacing:-.023em; line-height:1.28; color:#202421;
+        }
+        /* Dessert and drink names can be genuinely long. Keep their complete
+           published names visible instead of forcing a two-line ellipsis. */
+        .epantry-cook-discovery:is([data-destination="desserts"], [data-destination="drinks"]) .epantry-todays-recipe-card {
+          height:auto; min-height:315px; max-height:none;
+        }
+        .epantry-cook-discovery:is([data-destination="desserts"], [data-destination="drinks"]) .epantry-cook-card-title {
+          display:block; max-height:none; overflow:visible;
+          -webkit-line-clamp:unset; overflow-wrap:anywhere;
         }
         .epantry-cook-card-footer {
           display:flex; align-items:center; justify-content:space-between;
@@ -739,6 +757,9 @@ export default function CookTodayDiscoverySection({ recipes = [], selectedDiet =
           }
           .epantry-cook-discovery .epantry-cook-card-media {
             flex-basis:178px; height:178px; min-height:178px;
+          }
+          .epantry-cook-discovery:is([data-destination="desserts"], [data-destination="drinks"]) .epantry-todays-recipe-card {
+            height:auto; min-height:290px; max-height:none;
           }
         }
         @media (max-width:420px) {
