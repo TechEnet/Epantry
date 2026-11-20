@@ -1074,14 +1074,14 @@ import {
     const label = integrationHealthLabel(item);
 
     if (label === 'Needs attention') {
-      return 'text-[#a2543c]';
+      return 'text-[#173F35]';
     }
 
     if (label === 'Working') {
-      return 'text-emerald-700';
+      return 'text-[#173F35]';
     }
 
-    return 'text-stone-500';
+    return 'text-[#202421]';
   }
 
   function integrationLastSeen(value) {
@@ -1310,7 +1310,6 @@ import {
     const [integrationSearch, setIntegrationSearch] = useState('');
     const [integrationHealthFilter, setIntegrationHealthFilter] = useState('all');
     const [selectedIntegrationHostId, setSelectedIntegrationHostId] = useState('');
-    const [showAllIntegrationHosts, setShowAllIntegrationHosts] = useState(false);
     const [integrationDetailTab, setIntegrationDetailTab] = useState('overview');
 
     const [financeLoading, setFinanceLoading] =
@@ -4343,48 +4342,24 @@ import {
 
 
     if (section === 'finance') {
-        const actionSettlements =
-            financeSettlements.filter(
-                (item) => ['pending_approval', 'approved'].includes(item?.status),
-            );
-
-        const displayedSettlements =
-            financeView === 'action'
-                ? actionSettlements
-                : financeSettlements;
-
-        const selected =
-            displayedSettlements.find(
-                (item) => item?.id === selectedFinanceSettlementId,
-            ) ||
-            displayedSettlements[0] ||
-            null;
-
-        const canFinanceMutate =
-            hasAdminPermission('finance.mutate');
-
-        const refreshFinancePage = () => {
-            loadFinanceWorkspace();
-        };
-
+        const actionSettlements = financeSettlements.filter((item) =>
+            ['pending_approval', 'approved'].includes(item?.status));
+        const displayedSettlements = financeView === 'action' ? actionSettlements : financeSettlements;
+        const selected = displayedSettlements.find((item) => item?.id === selectedFinanceSettlementId)
+            || displayedSettlements[0] || null;
+        const canFinanceMutate = hasAdminPermission('finance.mutate');
+        const refreshFinancePage = () => loadFinanceWorkspace();
         const selectFinanceView = (nextView) => {
             setFinanceView(nextView);
-
-            const nextRows =
-                nextView === 'action'
-                    ? actionSettlements
-                    : financeSettlements;
-
+            const nextRows = nextView === 'action' ? actionSettlements : financeSettlements;
             if (!nextRows.some((item) => item?.id === selectedFinanceSettlementId)) {
                 setSelectedFinanceSettlementId(nextRows[0]?.id || '');
             }
         };
-
         const runFinanceAction = async (action, successMessage) => {
             setBusy(true);
             setFinanceError('');
             setNotice('');
-
             try {
                 await action();
                 setNotice(successMessage);
@@ -4392,225 +4367,210 @@ import {
                 setFinancePayoutReference('');
                 await loadFinanceWorkspace();
             } catch (requestError) {
-                setFinanceError(
-                    getAdminGovernanceErrorMessage(
-                        requestError,
-                        'Unable to update this payout.',
-                    ),
-                );
+                setFinanceError(getAdminGovernanceErrorMessage(requestError, 'Unable to update this payout.'));
             } finally {
                 setBusy(false);
             }
         };
-
-        const financeSummaryCards = [
-            {
-                label: 'Needs approval',
-                value: financeSummary.pendingApproval || 0,
-                icon: Clock3,
-                tone: 'border-[#c8d8e6] bg-[#edf4f9] text-[#315f7a]',
-            },
-            {
-                label: 'Ready to pay',
-                value: financeSummary.approved || 0,
-                icon: CheckCircle2,
-                tone: 'border-[#d8d0eb] bg-[#f2eff8] text-[#5b4b85]',
-            },
-            {
-                label: 'Paid',
-                value: financeSummary.paid || 0,
-                icon: History,
-                tone: 'border-stone-200 bg-white text-stone-700',
-            },
+        const financePillTone = (status) => {
+            if (status === 'approved' || status === 'paid') return 'bg-[#D7DDCF] text-[#173F35]';
+            if (status === 'pending_approval') return 'bg-[#C56C42]/15 text-[#202421]';
+            return 'bg-[#202421]/10 text-[#202421]';
+        };
+        const payoutStages = [
+            { step: '01', title: 'Review', detail: 'Check the Host and order totals' },
+            { step: '02', title: 'Decide', detail: 'Approve or return the request' },
+            { step: '03', title: 'Record', detail: 'Save the completed transfer' },
         ];
 
         return (
             <AdminShell
                 title="Finance & Payouts"
-                description="Approve Host payouts and record completed transfers."
+                description="Review Host payouts, approve requests and record completed transfers."
                 actions={
                     <button
                         type="button"
                         onClick={refreshFinancePage}
                         disabled={financeLoading}
-                        className="focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50"
+                        className="focus-ring inline-flex items-center gap-2 rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3.5 py-2.5 text-[13px] font-semibold text-[#173F35] transition hover:bg-[#D7DDCF] disabled:opacity-50"
                     >
-                        <RefreshCw
-                            size={14}
-                            className={financeLoading ? 'animate-spin' : ''}
-                            aria-hidden="true"
-                        />
+                        <RefreshCw size={15} className={financeLoading ? 'animate-spin' : ''} aria-hidden="true" />
                         Refresh
                     </button>
                 }
             >
-                <div className="min-h-[100svh] bg-[#f4f5f7] pb-5 sm:pb-7">
-                    <section className="border-b border-[#243849] bg-[#172a3a] text-white">
-                        <div className="grid lg:grid-cols-[minmax(0,1fr)_390px]">
-                            <div className="px-4 py-4 sm:px-7 sm:py-6">
-                                <p className="text-[11px] font-bold text-[#9fc5dd] sm:text-xs">Payout control</p>
-                                <h2 className="mt-1 max-w-3xl text-[23px] font-black leading-[1.08] sm:text-[32px]">
-                                    Review the payout. Approve it. Record the transfer.
-                                </h2>
-                                <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-white/70 sm:text-sm sm:leading-6">
-                                    <span className="sm:hidden">Check the Host, amount and payment status.</span>
-                                    <span className="hidden sm:inline">See each Host payout from approval through completed payment.</span>
+                <div className="min-w-0 bg-[#F7F6F2] pb-7 text-[#202421] sm:pb-10">
+                    {/* Financial summary: the numbers always come from the payout workspace. */}
+                    <section aria-label="Payout overview" className="overflow-hidden border-b border-[#202421]/10">
+                        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
+                            <div className="relative bg-[#C56C42] px-5 py-6 sm:px-8 sm:py-8">
+                                <p className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.07em] text-[#202421]">
+                                    <span className="h-px w-8 bg-[#202421]" /> Payout overview
                                 </p>
-                                <div className="mt-3 flex items-center gap-3 text-xs font-bold text-[#bed3e2] sm:mt-4">
-                                    <span>{financeMoney(financeSummary.waitingAmountMinor || 0)} waiting</span>
-                                    <span className="h-1 w-1 rounded-full bg-white/35" />
-                                    <span>{financeMoney(financeSummary.paidAmountMinor || 0)} paid</span>
+                                <h2 className="mt-3 max-w-[630px] text-[28px] font-bold leading-[1.11] tracking-tight text-[#202421] sm:text-[36px]">
+                                    Every Host payout, under control.
+                                </h2>
+                                <div className="mt-5 flex flex-wrap items-end gap-x-5 gap-y-2 border-t border-[#202421]/25 pt-4">
+                                    <div>
+                                        <p className="text-[12px] font-semibold text-[#202421]/85">Waiting to be paid</p>
+                                        <p className="mt-1 text-[30px] font-extrabold leading-none tracking-tight text-[#202421] sm:text-[38px] tabular-nums">
+                                            {financeMoney(financeSummary.waitingAmountMinor || 0)}
+                                        </p>
+                                    </div>
+                                    <p className="max-w-[210px] text-[13px] font-medium leading-5 text-[#202421]/85">
+                                        Review the request before recording a completed transfer.
+                                    </p>
                                 </div>
                             </div>
-
-                            <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3 sm:gap-3 sm:p-4 lg:border-l lg:border-t-0">
-                                {financeSummaryCards.map(({ label, value, icon: CardIcon, tone }) => (
-                                    <div
-                                        key={label}
-                                        className={`rounded-[16px] border p-3 ${tone}`}
-                                    >
-                                        <CardIcon size={15} aria-hidden="true" />
-                                        <p className="mt-2 text-xl font-black leading-none sm:text-2xl">{value}</p>
-                                        <p className="mt-1 text-[9px] font-bold leading-3 sm:text-[10px]">{label}</p>
-                                    </div>
-                                ))}
+                            <div className="flex flex-col justify-between bg-[#D7DDCF] px-5 py-5 sm:px-8 sm:py-7">
+                                <div className="flex items-center justify-between gap-3">
+                                    <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#173F35]">Current payout status</p>
+                                    <WalletCards size={19} className="text-[#173F35]" aria-hidden="true" />
+                                </div>
+                                <div className="mt-6 grid grid-cols-3 divide-x divide-[#202421]/15">
+                                    {[
+                                        { label: 'To approve', value: financeSummary.pendingApproval || 0 },
+                                        { label: 'Ready to pay', value: financeSummary.approved || 0 },
+                                        { label: 'Paid', value: financeSummary.paid || 0 },
+                                    ].map(({ label, value }, index) => (
+                                        <div key={label} className={index === 0 ? 'pr-2' : 'px-3 sm:px-5'}>
+                                            <p className="text-[30px] font-bold leading-none tabular-nums text-[#173F35] sm:text-[38px]">{value}</p>
+                                            <p className="mt-2 text-[12px] font-semibold leading-4 text-[#202421]">{label}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="mt-6 border-t border-[#202421]/15 pt-3 text-[13px] font-medium text-[#173F35]">
+                                    <span className="font-bold">{financeMoney(financeSummary.paidAmountMinor || 0)}</span> recorded as paid
+                                </p>
                             </div>
                         </div>
                     </section>
 
-                    <section className="grid grid-cols-2 border-b border-[#d9e1e7] bg-[#eaf0f4] lg:grid-cols-4">
-                        {[
-                            ['01', 'Choose payout', 'Open the Host payout.'],
-                            ['02', 'Check amount', 'Confirm orders and total.'],
-                            ['03', 'Approve', 'Approve or return it.'],
-                            ['04', 'Record payment', 'Save the transfer reference.'],
-                        ].map(([number, title, body], index) => (
-                            <div
-                                key={number}
-                                className={`px-4 py-3 sm:px-5 sm:py-3.5 ${index % 2 === 1 ? 'border-l border-[#d9e1e7]' : ''} ${index >= 2 ? 'border-t border-[#d9e1e7] lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l lg:border-[#d9e1e7]' : ''}`}
-                            >
-                                <p className="text-[10px] font-black text-[#58758a]">{number}</p>
-                                <p className="mt-0.5 text-sm font-black text-[#172a3a]">{title}</p>
-                                <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:text-xs">{body}</p>
-                            </div>
-                        ))}
+                    {/* A quiet process guide, rather than a row of oversized cards. */}
+                    <section aria-label="Payout steps" className="border-b border-[#D7DDCF] px-4 py-3 sm:px-7 sm:py-4">
+                        <div className="grid gap-3 sm:grid-cols-3 sm:gap-6">
+                            {payoutStages.map(({ step, title, detail }) => (
+                                <div key={step} className="flex min-w-0 items-center gap-3">
+                                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[#C56C42] text-[12px] font-bold text-[#202421]">{step}</span>
+                                    <p className="min-w-0 text-[13px] leading-5 text-[#202421]">
+                                        <span className="font-bold">{title}</span>
+                                        <span className="hidden text-[#202421]/65 sm:inline"> — {detail}</span>
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
                     </section>
 
                     {financeError ? (
-                        <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700 sm:px-7 sm:text-sm">
+                        <div role="alert" className="mx-4 mt-4 border-l-4 border-[#C56C42] bg-[#C56C42]/15 px-4 py-3 text-[14px] font-semibold text-[#202421] sm:mx-7">
                             {financeError}
                         </div>
                     ) : null}
-
                     {notice ? (
-                        <div className="border-b border-sky-200 bg-sky-50 px-4 py-3 text-xs font-bold text-sky-800 sm:px-7 sm:text-sm">
+                        <div role="status" className="mx-4 mt-4 border-l-4 border-[#173F35] bg-[#D7DDCF] px-4 py-3 text-[14px] font-semibold text-[#173F35] sm:mx-7">
                             {notice}
                         </div>
                     ) : null}
 
-                    <section className="border-b border-stone-200 bg-white">
-                        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-7 sm:py-4">
+                    <section aria-labelledby="finance-payouts-heading" className="px-4 pt-6 sm:px-7 sm:pt-8">
+                        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#202421]/15 pb-4">
                             <div>
-                                <p className="text-xs font-black text-[#315f7a]">Payouts</p>
-                                <p className="mt-0.5 text-xs font-semibold text-stone-500">
-                                    {financeView === 'action' ? 'Only payouts that need action.' : 'Complete payout history.'}
-                                </p>
+                                <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#173F35]">01 / Payout activity</p>
+                                <h2 id="finance-payouts-heading" className="mt-1 text-[27px] font-bold tracking-tight text-[#202421] sm:text-[32px]">Payout requests</h2>
+                                <p className="mt-1 text-[14px] text-[#202421]/70">Select a request to see its amount, status and available actions.</p>
                             </div>
-
-                            <div className="inline-flex shrink-0 rounded-xl border border-stone-200 bg-[#f3f4f5] p-1">
+                            <div role="group" aria-label="Filter payouts" className="inline-flex w-full gap-1 rounded-lg border border-[#D7DDCF] bg-[#D7DDCF]/45 p-1 sm:w-auto">
                                 <button
                                     type="button"
+                                    aria-pressed={financeView === 'action'}
                                     onClick={() => selectFinanceView('action')}
-                                    className={`focus-ring rounded-lg px-3 py-2 text-[11px] font-black transition ${financeView === 'action' ? 'bg-[#315f7a] text-white shadow-sm' : 'text-stone-600'}`}
+                                    className={`focus-ring flex-1 rounded-md px-3 py-2.5 text-[13px] font-bold transition sm:flex-none ${financeView === 'action' ? 'bg-[#173F35] text-[#F7F6F2]' : 'text-[#173F35] hover:bg-[#D7DDCF]'}`}
                                 >
-                                    Action ({actionSettlements.length})
+                                    Needs action <span className="ml-1 opacity-80">{actionSettlements.length}</span>
                                 </button>
                                 <button
                                     type="button"
+                                    aria-pressed={financeView === 'all'}
                                     onClick={() => selectFinanceView('all')}
-                                    className={`focus-ring rounded-lg px-3 py-2 text-[11px] font-black transition ${financeView === 'all' ? 'bg-[#315f7a] text-white shadow-sm' : 'text-stone-600'}`}
+                                    className={`focus-ring flex-1 rounded-md px-3 py-2.5 text-[13px] font-bold transition sm:flex-none ${financeView === 'all' ? 'bg-[#173F35] text-[#F7F6F2]' : 'text-[#173F35] hover:bg-[#D7DDCF]'}`}
                                 >
-                                    All ({financeSettlements.length})
+                                    All payouts <span className="ml-1 opacity-80">{financeSettlements.length}</span>
                                 </button>
                             </div>
-                        </div>
-                    </section>
-
-                    <section className="border-b border-stone-200 bg-[#f8f9fa]">
-                        <div className="flex items-end justify-between gap-4 border-b border-stone-200 px-4 py-3 sm:px-7 sm:py-4">
-                            <div>
-                                <p className="text-xs font-bold text-[#5b4b85]">Host payout queue</p>
-                                <h2 className="mt-0.5 text-lg font-black text-stone-950 sm:text-xl">
-                                    {financeView === 'action' ? 'Waiting for your decision' : 'Payout history'}
-                                </h2>
-                            </div>
-                            <p className="shrink-0 text-sm font-black text-[#315f7a]">{displayedSettlements.length}</p>
                         </div>
 
                         {financeLoading ? (
-                            <div className="flex min-h-28 items-center justify-center gap-2 bg-white px-4 py-6 text-sm font-semibold text-stone-500 sm:px-7">
-                                <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />
-                                Loading payouts…
+                            <div role="status" className="flex items-center gap-3 border-b border-[#D7DDCF] py-8 text-[14px] font-medium text-[#173F35]">
+                                <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> Loading Host payouts…
                             </div>
                         ) : displayedSettlements.length === 0 ? (
-                            <div className="bg-white px-4 py-5 sm:px-7 sm:py-6">
-                                <p className="text-sm font-black text-stone-900">
-                                    {financeView === 'action' ? 'No payouts need action.' : 'No payout records yet.'}
-                                </p>
-                                <p className="mt-1 text-xs font-semibold text-stone-500">
-                                    {financeView === 'action'
-                                        ? 'Create a payout batch when delivered Host orders are ready.'
-                                        : 'Payouts will appear here after a batch is created.'}
-                                </p>
-                                <Link
-                                    to="/admin/host-operations?tab=finance"
-                                    className="focus-ring mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#315f7a] px-4 text-xs font-black text-white"
-                                >
-                                    Prepare payout batch
-                                </Link>
+                            <div className="mt-5 grid overflow-hidden rounded-xl border border-[#D7DDCF] lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.56fr)]">
+                                <div className="bg-[#F7F6F2] px-5 py-7 sm:px-8 sm:py-10">
+                                    <div className="mb-4 inline-flex size-12 items-center justify-center rounded-full bg-[#D7DDCF] text-[#173F35]">
+                                        <CheckCircle2 size={25} aria-hidden="true" />
+                                    </div>
+                                    <h3 className="max-w-xl text-[22px] font-bold tracking-tight text-[#202421] sm:text-[27px]">
+                                        {financeView === 'action' ? 'No payouts waiting for action' : 'No payout records yet'}
+                                    </h3>
+                                    <p className="mt-2 max-w-xl text-[14px] leading-6 text-[#202421]/70">
+                                        {financeView === 'action'
+                                            ? 'When a Host payout is ready for review, it will appear here.'
+                                            : 'Once payout batches are prepared, you can review their history here.'}
+                                    </p>
+                                    <Link
+                                        to="/admin/host-operations?tab=finance"
+                                        className="focus-ring mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#173F35] px-5 text-[14px] font-bold text-[#F7F6F2] transition hover:bg-[#202421]"
+                                    >
+                                        Prepare payout batch <ArrowUpRight size={16} aria-hidden="true" />
+                                    </Link>
+                                </div>
+                                <div className="flex flex-col justify-center border-t border-[#D7DDCF] bg-[#D7DDCF]/55 px-5 py-6 sm:px-8 lg:border-l lg:border-t-0">
+                                    <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#173F35]">What happens next</p>
+                                    <p className="mt-2 text-[19px] font-bold leading-6 text-[#173F35]">Review first. Record payment after transfer.</p>
+                                    <p className="mt-2 text-[14px] leading-6 text-[#202421]/70">Approving a request and recording a transfer are separate steps.</p>
+                                </div>
                             </div>
                         ) : (
-                            <div className="grid bg-white lg:grid-cols-[330px_minmax(0,1fr)]">
-                                <aside className="border-b border-stone-200 lg:border-b-0 lg:border-r">
-                                    <div className="px-4 py-3 lg:hidden">
-                                        <label className="text-xs font-bold text-stone-600">
-                                            Choose payout
-                                            <select
-                                                value={selected?.id || ''}
-                                                onChange={(event) => setSelectedFinanceSettlementId(event.target.value)}
-                                                className="mt-2 h-11 w-full rounded-xl border border-[#c8d8e6] bg-white px-3 text-sm font-bold text-stone-800 outline-none focus:border-[#315f7a]"
-                                            >
-                                                {displayedSettlements.map((item) => (
-                                                    <option key={item.id} value={item.id}>
-                                                        {(item.organization?.displayName || 'Host business')} — {financeMoney(item?.totals?.netPayableMinor || 0, item.currency)}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
+                            <div className="mt-5 grid overflow-hidden rounded-xl border border-[#D7DDCF] bg-[#F7F6F2] lg:grid-cols-[minmax(250px,0.37fr)_minmax(0,1fr)]">
+                                <aside aria-label="Host payout list" className="min-w-0 border-b border-[#D7DDCF] lg:border-b-0 lg:border-r">
+                                    <div className="border-b border-[#D7DDCF] bg-[#D7DDCF]/55 px-4 py-3 sm:px-5">
+                                        <p className="text-[13px] font-bold text-[#173F35]">Choose a payout</p>
+                                        <p className="text-[12px] text-[#202421]/65">{displayedSettlements.length} records</p>
                                     </div>
-
-                                    <div className="hidden max-h-[560px] overflow-y-auto lg:block">
-                                        {displayedSettlements.map((item, index) => {
+                                    <div className="px-4 py-3 lg:hidden">
+                                        <label htmlFor="finance-mobile-payout" className="text-[13px] font-semibold text-[#202421]">Host payout</label>
+                                        <select
+                                            id="finance-mobile-payout"
+                                            value={selected?.id || ''}
+                                            onChange={(event) => setSelectedFinanceSettlementId(event.target.value)}
+                                            className="focus-ring mt-1 block h-12 w-full min-w-0 rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 text-[14px] font-semibold text-[#173F35]"
+                                        >
+                                            {displayedSettlements.map((item) => (
+                                                <option key={item.id} value={item.id}>
+                                                    {item.organization?.displayName || 'Host business'} — {financeMoney(item?.totals?.netPayableMinor || 0, item.currency)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="hidden max-h-[540px] overflow-y-auto overscroll-y-contain lg:block">
+                                        {displayedSettlements.map((item) => {
                                             const active = selected?.id === item.id;
                                             return (
                                                 <button
                                                     key={item.id}
                                                     type="button"
+                                                    aria-pressed={active}
                                                     onClick={() => setSelectedFinanceSettlementId(item.id)}
-                                                    className={`w-full px-5 py-3.5 text-left transition ${index > 0 ? 'border-t border-stone-100' : ''} ${active ? 'bg-[#edf4f9]' : 'hover:bg-stone-50'}`}
+                                                    className={`focus-ring w-full border-b border-[#D7DDCF] px-4 py-4 text-left transition sm:px-5 ${active ? 'bg-[#173F35] text-[#F7F6F2]' : 'bg-[#F7F6F2] text-[#202421] hover:bg-[#D7DDCF]/55'}`}
                                                 >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-black text-stone-950">{item.organization?.displayName || 'Host business'}</p>
-                                                            <p className="mt-0.5 text-xs font-semibold text-stone-500">{financePeriod(item)}</p>
-                                                        </div>
-                                                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-black ${financeStatusClass(item.status)}`}>
-                                                            {financeStatusLabel(item.status)}
-                                                        </span>
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <p className="min-w-0 break-words text-[14px] font-bold">{item.organization?.displayName || 'Host business'}</p>
+                                                        <ChevronRight size={17} className="shrink-0" aria-hidden="true" />
                                                     </div>
-                                                    <div className="mt-2 flex items-center justify-between gap-3">
-                                                        <span className="text-xs font-semibold text-stone-500">{item.lineCount || 0} orders</span>
-                                                        <span className="text-sm font-black text-[#315f7a]">{financeMoney(item?.totals?.netPayableMinor || 0, item.currency)}</span>
+                                                    <p className={`mt-1 text-[12px] ${active ? 'text-[#F7F6F2]/80' : 'text-[#202421]/65'}`}>{financePeriod(item)}</p>
+                                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                                        <span className={`text-[12px] font-medium ${active ? 'text-[#F7F6F2]/85' : 'text-[#202421]/70'}`}>{financeStatusLabel(item.status)}</span>
+                                                        <span className="text-[14px] font-bold tabular-nums">{financeMoney(item?.totals?.netPayableMinor || 0, item.currency)}</span>
                                                     </div>
                                                 </button>
                                             );
@@ -4618,152 +4578,154 @@ import {
                                     </div>
                                 </aside>
 
-                                <div className="min-w-0 px-4 py-4 sm:px-7 sm:py-5">
-                                    {selected ? (
-                                        <>
-                                            <div className="flex items-start justify-between gap-3 border-b border-stone-200 pb-3">
-                                                <div className="min-w-0">
-                                                    <p className="text-xs font-bold text-[#315f7a]">Selected payout</p>
-                                                    <h3 className="mt-0.5 truncate text-xl font-black text-stone-950 sm:text-2xl">
-                                                        {selected.organization?.displayName || 'Host business'}
-                                                    </h3>
-                                                    <p className="mt-0.5 text-xs font-semibold text-stone-500">{financePeriod(selected)}</p>
-                                                </div>
-                                                <span className={`w-fit shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-black ${financeStatusClass(selected.status)}`}>
-                                                    {financeStatusLabel(selected.status)}
-                                                </span>
+                                {selected ? (
+                                    <article className="min-w-0 bg-[#F7F6F2]">
+                                        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#D7DDCF] px-4 py-5 sm:px-7">
+                                            <div className="min-w-0">
+                                                <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#173F35]">02 / Payout details</p>
+                                                <h3 className="mt-1 break-words text-[23px] font-bold leading-tight tracking-tight text-[#202421] sm:text-[27px]">
+                                                    {selected.organization?.displayName || 'Host business'}
+                                                </h3>
+                                                <p className="mt-1 text-[13px] text-[#202421]/65">{financePeriod(selected)}</p>
                                             </div>
+                                            <span className={`inline-flex rounded-full px-3 py-1.5 text-[12px] font-bold ${financePillTone(selected.status)}`}>
+                                                {financeStatusLabel(selected.status)}
+                                            </span>
+                                        </div>
 
-                                            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1.15fr)_repeat(3,minmax(110px,0.7fr))]">
-                                                <div className="rounded-2xl border border-[#c8d8e6] bg-[#edf4f9] p-4">
-                                                    <p className="text-[10px] font-bold text-[#315f7a]">Host receives</p>
-                                                    <p className="mt-1 text-2xl font-black text-[#172a3a]">{financeMoney(selected?.totals?.netPayableMinor || 0, selected.currency)}</p>
-                                                    <p className="mt-1 text-[10px] font-semibold text-stone-500">{selected.lineCount || 0} delivered orders</p>
-                                                </div>
-
+                                        <div className="grid gap-0 border-b border-[#D7DDCF] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                                            <div className="bg-[#173F35] px-4 py-5 text-[#F7F6F2] sm:px-7">
+                                                <p className="text-[13px] font-semibold text-[#F7F6F2]/80">Host receives</p>
+                                                <p className="mt-2 text-[30px] font-bold leading-none tracking-tight tabular-nums sm:text-[35px]">
+                                                    {financeMoney(selected?.totals?.netPayableMinor || 0, selected.currency)}
+                                                </p>
+                                                <p className="mt-2 text-[12px] text-[#F7F6F2]/80">{selected.lineCount || 0} delivered orders</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-[#D7DDCF]/55 px-4 py-4 sm:px-6">
                                                 {[
                                                     ['Order value', financeMoney(selected?.totals?.grossMerchandiseMinor || 0, selected.currency)],
                                                     ['Platform fee', financeMoney(selected?.totals?.platformFeeMinor || 0, selected.currency)],
                                                     ['Tax held', financeMoney(selected?.totals?.taxWithheldMinor || 0, selected.currency)],
+                                                    ['Created', financeDate(selected.createdAt)],
                                                 ].map(([label, value]) => (
-                                                    <div key={label} className="border-t border-stone-200 pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-                                                        <p className="text-[10px] font-bold text-stone-500">{label}</p>
-                                                        <p className="mt-1 text-sm font-black text-stone-900">{value}</p>
+                                                    <div key={label} className="min-w-0">
+                                                        <p className="text-[12px] font-medium text-[#202421]/70">{label}</p>
+                                                        <p className="mt-1 break-words text-[14px] font-bold text-[#202421]">{value}</p>
                                                     </div>
                                                 ))}
                                             </div>
+                                        </div>
 
-                                            <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-stone-200 pt-3 sm:grid-cols-2">
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-stone-500">Created</p>
-                                                    <p className="mt-0.5 text-sm font-bold text-stone-900">{financeDate(selected.createdAt)}</p>
-                                                </div>
-                                                {selected.payoutReference ? (
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-stone-500">Payment reference</p>
-                                                        <p className="mt-0.5 break-all text-sm font-bold text-stone-900">{selected.payoutReference}</p>
-                                                    </div>
-                                                ) : null}
+                                        {selected.payoutReference ? (
+                                            <div className="border-b border-[#D7DDCF] px-4 py-3 sm:px-7">
+                                                <p className="text-[12px] font-semibold text-[#202421]/70">Payment reference</p>
+                                                <p className="mt-1 break-all text-[14px] font-bold text-[#173F35]">{selected.payoutReference}</p>
                                             </div>
+                                        ) : null}
 
-                                            {selected.status === 'pending_approval' ? (
-                                                <div className="mt-4 border-t border-[#c8d8e6] bg-[#eef4f8] px-4 py-4 sm:px-5">
-                                                    <p className="text-xs font-black text-[#315f7a]">Approve or return</p>
-                                                    {canFinanceMutate ? (
-                                                        <>
-                                                            <textarea
-                                                                value={financeReason}
-                                                                onChange={(event) => setFinanceReason(event.target.value)}
-                                                                rows={2}
-                                                                placeholder="Short decision note"
-                                                                className="mt-2 w-full rounded-xl border border-[#c8d8e6] bg-white px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none focus:border-[#315f7a]"
-                                                            />
-                                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={busy || financeReason.trim().length < 3}
-                                                                    onClick={() => runFinanceAction(
-                                                                        () => decideAdminSettlement(selected.id, { decision: 'approve', reason: financeReason.trim() }),
-                                                                        'Payout approved.',
-                                                                    )}
-                                                                    className="focus-ring rounded-xl bg-[#315f7a] px-4 py-2.5 text-xs font-black text-white disabled:opacity-50"
-                                                                >
-                                                                    Approve payout
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={busy || financeReason.trim().length < 3}
-                                                                    onClick={() => runFinanceAction(
-                                                                        () => decideAdminSettlement(selected.id, { decision: 'reject', reason: financeReason.trim() }),
-                                                                        'Payout returned for changes.',
-                                                                    )}
-                                                                    className="focus-ring inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-xs font-black text-rose-700 disabled:opacity-50"
-                                                                >
-                                                                    <XCircle size={14} aria-hidden="true" />
-                                                                    Return
-                                                                </button>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <p className="mt-2 text-xs font-semibold text-stone-500">You can review this payout, but you cannot change it.</p>
-                                                    )}
-                                                </div>
-                                            ) : null}
+                                        {selected.status === 'pending_approval' ? (
+                                            <section aria-label="Payout approval" className="px-4 py-5 sm:px-7">
+                                                <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#173F35]">03 / Decision</p>
+                                                <h4 className="mt-1 text-[19px] font-bold text-[#202421]">Approve or return</h4>
+                                                {canFinanceMutate ? (
+                                                    <>
+                                                        <label htmlFor="finance-decision-note" className="mt-3 block text-[13px] font-semibold text-[#202421]">Decision note</label>
+                                                        <textarea
+                                                            id="finance-decision-note"
+                                                            value={financeReason}
+                                                            onChange={(event) => setFinanceReason(event.target.value)}
+                                                            rows={2}
+                                                            placeholder="Why is this payout approved or returned?"
+                                                            className="focus-ring mt-1 w-full rounded-lg border border-[#D7DDCF] bg-white px-3 py-3 text-[14px] text-[#202421] outline-none focus:border-[#173F35]"
+                                                        />
+                                                        <div className="mt-3 flex flex-wrap gap-2">
+                                                            <button
+                                                                type="button"
+                                                                disabled={busy || financeReason.trim().length < 3}
+                                                                onClick={() => runFinanceAction(
+                                                                    () => decideAdminSettlement(selected.id, { decision: 'approve', reason: financeReason.trim() }),
+                                                                    'Payout approved.',
+                                                                )}
+                                                                className="focus-ring min-h-11 rounded-lg bg-[#173F35] px-5 text-[14px] font-bold text-[#F7F6F2] disabled:opacity-50"
+                                                            >Approve payout</button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={busy || financeReason.trim().length < 3}
+                                                                onClick={() => runFinanceAction(
+                                                                    () => decideAdminSettlement(selected.id, { decision: 'reject', reason: financeReason.trim() }),
+                                                                    'Payout returned for changes.',
+                                                                )}
+                                                                className="focus-ring min-h-11 rounded-lg border border-[#C56C42] bg-[#F7F6F2] px-5 text-[14px] font-bold text-[#202421] disabled:opacity-50"
+                                                            >Return for changes</button>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <p className="mt-3 text-[14px] text-[#202421]/70">You can review this payout but cannot change its approval.</p>
+                                                )}
+                                            </section>
+                                        ) : null}
 
-                                            {selected.status === 'approved' ? (
-                                                <div className="mt-4 border-t border-[#d8d0eb] bg-[#f2eff8] px-4 py-4 sm:px-5">
-                                                    <p className="text-xs font-black text-[#5b4b85]">Record payment</p>
-                                                    {canFinanceMutate ? (
-                                                        <>
-                                                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                        {selected.status === 'approved' ? (
+                                            <section aria-label="Record Host payment" className="px-4 py-5 sm:px-7">
+                                                <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#173F35]">03 / Complete payout</p>
+                                                <h4 className="mt-1 text-[19px] font-bold text-[#202421]">Record the completed transfer</h4>
+                                                {canFinanceMutate ? (
+                                                    <>
+                                                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                                            <label className="block text-[13px] font-semibold text-[#202421]">
+                                                                Transfer reference
                                                                 <input
                                                                     value={financePayoutReference}
                                                                     onChange={(event) => setFinancePayoutReference(event.target.value)}
                                                                     placeholder="Payment reference"
-                                                                    className="h-11 rounded-xl border border-[#d8d0eb] bg-white px-3 text-sm font-semibold text-stone-800 outline-none focus:border-[#5b4b85]"
+                                                                    className="focus-ring mt-1 block h-11 w-full min-w-0 rounded-lg border border-[#D7DDCF] bg-white px-3 text-[14px] text-[#202421]"
                                                                 />
+                                                            </label>
+                                                            <label className="block text-[13px] font-semibold text-[#202421]">
+                                                                Payment note
                                                                 <input
                                                                     value={financeReason}
                                                                     onChange={(event) => setFinanceReason(event.target.value)}
-                                                                    placeholder="Payment note"
-                                                                    className="h-11 rounded-xl border border-[#d8d0eb] bg-white px-3 text-sm font-semibold text-stone-800 outline-none focus:border-[#5b4b85]"
+                                                                    placeholder="Short payment note"
+                                                                    className="focus-ring mt-1 block h-11 w-full min-w-0 rounded-lg border border-[#D7DDCF] bg-white px-3 text-[14px] text-[#202421]"
                                                                 />
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                disabled={busy || financePayoutReference.trim().length < 3 || financeReason.trim().length < 3}
-                                                                onClick={() => runFinanceAction(
-                                                                    () => markAdminSettlementPaid(selected.id, { payoutReference: financePayoutReference.trim(), reason: financeReason.trim() }),
-                                                                    'Payment recorded.',
-                                                                )}
-                                                                className="focus-ring mt-2 inline-flex items-center gap-2 rounded-xl bg-[#5b4b85] px-4 py-2.5 text-xs font-black text-white disabled:opacity-50"
-                                                            >
-                                                                <Banknote size={15} aria-hidden="true" />
-                                                                Mark as paid
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <p className="mt-2 text-xs font-semibold text-stone-500">You can review this payout, but you cannot record payment.</p>
-                                                    )}
-                                                </div>
-                                            ) : null}
+                                                            </label>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            disabled={busy || financePayoutReference.trim().length < 3 || financeReason.trim().length < 3}
+                                                            onClick={() => runFinanceAction(
+                                                                () => markAdminSettlementPaid(selected.id, { payoutReference: financePayoutReference.trim(), reason: financeReason.trim() }),
+                                                                'Payment recorded.',
+                                                            )}
+                                                            className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#173F35] px-5 text-[14px] font-bold text-[#F7F6F2] disabled:opacity-50"
+                                                        >
+                                                            <Banknote size={17} aria-hidden="true" /> Mark as paid
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <p className="mt-3 text-[14px] text-[#202421]/70">You can review this payout but cannot record its transfer.</p>
+                                                )}
+                                            </section>
+                                        ) : null}
 
-                                            {selected.status === 'paid' ? (
-                                                <div className="mt-4 border-t border-[#d8d0eb] bg-[#f4f1f8] px-4 py-4 sm:px-5">
-                                                    <p className="text-xs font-black text-[#5b4b85]">Payment complete</p>
-                                                    <p className="mt-1 text-sm font-black text-stone-900">Paid {financeDate(selected.paidAt)}</p>
+                                        {selected.status === 'paid' ? (
+                                            <div className="flex items-start gap-3 bg-[#D7DDCF]/55 px-4 py-5 sm:px-7">
+                                                <CheckCircle2 size={21} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+                                                <div>
+                                                    <p className="text-[15px] font-bold text-[#173F35]">Payment recorded</p>
+                                                    <p className="mt-1 text-[13px] text-[#202421]/70">Paid on {financeDate(selected.paidAt)}</p>
                                                 </div>
-                                            ) : null}
-
-                                            {selected.status === 'rejected' ? (
-                                                <div className="mt-4 border-t border-rose-200 bg-rose-50 px-4 py-4 sm:px-5">
-                                                    <p className="text-xs font-black text-rose-700">Returned</p>
-                                                    <p className="mt-1 line-clamp-2 text-xs font-semibold text-stone-600">{selected.reason || 'This payout needs to be prepared again.'}</p>
-                                                </div>
-                                            ) : null}
-                                        </>
-                                    ) : null}
-                                </div>
+                                            </div>
+                                        ) : null}
+                                        {selected.status === 'rejected' ? (
+                                            <div className="bg-[#C56C42]/12 px-4 py-5 sm:px-7">
+                                                <p className="text-[15px] font-bold text-[#202421]">Returned for changes</p>
+                                                <p className="mt-1 text-[13px] text-[#202421]/70">{selected.reason || 'This payout must be prepared again.'}</p>
+                                            </div>
+                                        ) : null}
+                                    </article>
+                                ) : null}
                             </div>
                         )}
                     </section>
@@ -4797,7 +4759,7 @@ import {
                 ...hooks.map(item => item.name), ...accounts.map(item => item.name)]
                 .some(value => String(value || '').toLowerCase().includes(query)));
         });
-        const shownHosts = showAllIntegrationHosts ? filteredHosts : filteredHosts.slice(0, 8);
+        const shownHosts = filteredHosts;
         const selectedHost = filteredHosts.find(item => item.id === selectedIntegrationHostId) || filteredHosts[0] || null;
         const hostWebhooks = selectedHost ? webhooks.filter(item => item.organizationId === selectedHost.id) : [];
         const hostAccounts = selectedHost ? serviceAccounts.filter(item => item.organizationId === selectedHost.id) : [];
@@ -4848,333 +4810,394 @@ import {
 
         return (
             <AdminShell
-                title="Integrations & Connections"
-                description="Host integrations and delivery health."
+                title={<><span className="sm:hidden">Host setup</span><span className="hidden sm:inline">Host Setup & Updates</span></>}
+                description={<span className="hidden sm:inline">See which Hosts are ready, check update activity and handle connection problems.</span>}
                 actions={
                     <button type="button" onClick={refreshIntegrationPage} disabled={refreshing}
-                        className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#D8D9D0] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35] disabled:opacity-50">
+                        className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D7DDCF] bg-[#F7F6F2] px-4 py-2 text-[14px] font-semibold text-[#173F35] disabled:opacity-50 hover:bg-[#D7DDCF]">
                         <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" /> Refresh
                     </button>
                 }
             >
-                <div className="min-w-0 bg-[#FFFDFB] pb-5 text-[#173F35] sm:pb-8">
-                    {/* Host-first navigation replaces the old hero / counter / sidebar dashboard. */}
-                    <section className="min-w-0 bg-[#173F35] px-3 py-5 text-white sm:px-6 sm:py-6" aria-labelledby="integrations-hosts-heading">
-                        <div className="flex flex-wrap items-end justify-between gap-3">
-                            <div>
-                                <p className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#D5B6A0]">Connection workspace</p>
-                                <h2 id="integrations-hosts-heading" className="mt-1 text-[24px] font-bold tracking-[-0.03em] sm:text-[29px]">Select a Host</h2>
-                            </div>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[#DCE9E0]">
-                                <span><strong className="text-[18px] text-white">{integrationLoading || integrationError ? '—' : totalHosts}</strong> Hosts</span>
-                                <span><strong className="text-[18px] text-white">{integrationLoading || integrationError ? '—' : totalConnections}</strong> Connections</span>
-                                <span><strong className="text-[18px] text-white">{integrationLoading || integrationError ? '—' : Number(summary.failed || 0)}</strong> Failures</span>
-                            </div>
+                <div className="-mx-2 min-w-0 space-y-3 bg-[#F7F6F2] pb-5 text-[#202421] sm:mx-0 sm:space-y-7 sm:pb-10">
+                    <section className="grid min-w-0 overflow-hidden rounded-[14px] border border-[#D7DDCF] sm:rounded-[20px] lg:grid-cols-[minmax(0,1.28fr)_minmax(360px,0.82fr)]" aria-labelledby="integrations-intro-title">
+                        <div className="relative border-l-[4px] border-[#C56C42] bg-[#C56C42]/30 px-3 py-3 text-[#202421] sm:border-l-[7px] sm:px-8 sm:py-8">
+                            <span className="mb-2 block h-[3px] w-8 rounded-full bg-[#C56C42] sm:mb-4 sm:w-12" aria-hidden="true" />
+                            <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#173F35] sm:text-[13px]">Business connections</p>
+                            <h2 id="integrations-intro-title" className="mt-1 max-w-2xl text-[20px] font-bold leading-[1.2] tracking-[-0.03em] sm:mt-2 sm:text-[32px] sm:leading-[1.17] sm:tracking-[-0.035em]"><span className="sm:hidden">Host connection status</span><span className="hidden sm:inline">Know who's connected. See what needs attention.</span></h2>
+                            <p className="mt-3 hidden max-w-2xl text-[15px] leading-[1.55] text-[#202421] sm:block">Choose a Host to review its setup, latest updates and any issues that need your decision.</p>
                         </div>
-                        {integrationError && (
-                            <div role="alert" className="mt-4 bg-[#FFF0E8] px-4 py-3 text-[14px] text-[#813E2E]">
-                                <strong>Could not load Host connections.</strong> {integrationError}
-                                <button type="button" onClick={refreshIntegrationPage} className="focus-ring ml-2 font-bold underline">Retry</button>
-                            </div>
-                        )}
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
-                            <label className="flex h-11 min-w-[155px] flex-1 items-center gap-2 bg-white px-3 text-[#173F35] sm:max-w-[330px]">
-                                <SearchCheck size={18} className="shrink-0 text-[#657568]" aria-hidden="true" />
-                                <span className="sr-only">Search Hosts</span>
-                                <input type="search" value={integrationSearch} onChange={event => { setIntegrationSearch(event.target.value); setShowAllIntegrationHosts(false); }}
-                                    placeholder="Find a Host" className="min-w-0 w-full bg-transparent text-[14px] outline-none" />
-                            </label>
-                            <div className="flex max-w-full gap-1 overflow-x-auto" aria-label="Host filters">
-                                {[
-                                    ['all', 'All'], ['connected', 'Connected'], ['setup', 'Setup needed'], ['failed', 'Failed'],
-                                ].map(([value, label]) => (
-                                    <button key={value} type="button" aria-pressed={integrationHealthFilter === value}
-                                        onClick={() => { setIntegrationHealthFilter(value); setShowAllIntegrationHosts(false); }}
-                                        className={`focus-ring shrink-0 px-3 py-3 text-[12px] font-bold ${integrationHealthFilter === value
-                                            ? 'bg-[#F0DDD0] text-[#173F35]' : 'bg-white/10 text-white hover:bg-white/20'}`}>{label}</button>
-                                ))}
-                            </div>
-                        </div>
-                        {integrationLoading ? (
-                            <p role="status" className="mt-4 flex items-center gap-2 text-[14px]"><LoaderCircle size={18} className="animate-spin" /> Loading Hosts…</p>
-                        ) : !integrationError && (
-                            <>
-                                <div className="mt-3 flex min-w-0 gap-2 overflow-x-auto pb-2" role="group" aria-label="Choose a Host">
-                                    {shownHosts.map(host => {
-                                        const active = selectedHost?.id === host.id;
-                                        const configured = host.webhookCount + host.serviceAccountCount > 0;
-                                        return (
-                                            <button key={host.id} type="button" aria-pressed={active}
-                                                onClick={() => { setSelectedIntegrationHostId(host.id); setSelectedIntegrationId(''); setSelectedReviewCase(null); setReason(''); setIntegrationDetailTab('overview'); }}
-                                                className={`focus-ring flex w-[215px] shrink-0 items-center gap-3 border-b-[3px] px-3 py-3 text-left transition-colors sm:w-[260px] ${active
-                                                    ? 'border-[#CA7B54] bg-white text-[#173F35]' : 'border-transparent bg-[#31594B] text-white hover:bg-[#3C6555]'}`}>
-                                                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${active
-                                                    ? 'bg-[#F0DDD0] text-[#173F35]' : 'bg-white/15 text-white'}`} aria-hidden="true">{String(host.name || 'H').trim().charAt(0).toUpperCase()}</span>
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-[15px] font-bold">{host.name}</span>
-                                                    <span className={`mt-0.5 block text-[12px] ${active ? 'text-[#667365]' : 'text-[#D2E0D7]'}`}>
-                                                        {host.hasDeliveryFailure ? 'Delivery failed' : configured ? 'Configured' : 'Setup needed'}
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                    {!hosts.length && <p className="px-2 py-4 text-[14px] text-[#DDE7E0]">No Host organizations returned by this environment.</p>}
-                                    {hosts.length > 0 && !shownHosts.length && <p className="px-2 py-4 text-[14px] text-[#DDE7E0]">No Hosts match this filter.</p>}
+                        <div className="flex flex-col justify-center bg-[#D7DDCF] px-2 py-3 sm:px-6 sm:py-6" aria-label="Connection summary">
+                            <div className="grid grid-cols-3 divide-x divide-[#173F35]/20">
+                                <div className="min-w-0 px-1 text-center sm:px-4">
+                                    <p className="text-[24px] font-bold leading-tight text-[#202421] sm:text-[37px]">{integrationLoading || integrationError ? '—' : totalHosts}</p>
+                                    <p className="mt-0.5 text-[12px] font-semibold text-[#173F35] sm:mt-1 sm:text-[14px]">Hosts</p>
                                 </div>
-                                {filteredHosts.length > 8 && (
-                                    <button type="button" onClick={() => setShowAllIntegrationHosts(value => !value)}
-                                        className="focus-ring mt-2 border border-white/35 px-4 py-2 text-[13px] font-semibold text-white">
-                                        {showAllIntegrationHosts ? 'Show fewer' : `View all ${filteredHosts.length} Hosts`}
-                                    </button>
-                                )}
-                                {totalHosts > hosts.length && (
-                                    <p className="mt-2 text-[12px] text-[#D6E2D9]">Showing {hosts.length} of {totalHosts} registered Hosts.</p>
-                                )}
-                            </>
-                        )}
+                                <div className="min-w-0 px-1 text-center sm:px-4">
+                                    <p className="text-[24px] font-bold leading-tight text-[#173F35] sm:text-[37px]">{integrationLoading || integrationError ? '—' : totalConnections}</p>
+                                    <p className="mt-0.5 text-[12px] font-semibold text-[#173F35] sm:mt-1 sm:text-[14px]"><span className="sm:hidden">Links</span><span className="hidden sm:inline">Connections</span></p>
+                                </div>
+                                <div className="min-w-0 px-1 text-center sm:px-4">
+                                    <p className="text-[24px] font-bold leading-tight text-[#202421] sm:text-[37px]">{integrationLoading || integrationError ? '—' : Number(summary.failed || 0)}</p>
+                                    <p className="mt-0.5 text-[12px] font-semibold text-[#173F35] sm:mt-1 sm:text-[14px]"><span className="sm:hidden">Failed</span><span className="hidden sm:inline">Failed updates</span></p>
+                                </div>
+                            </div>
+                            <div className="mt-5 hidden items-center gap-2 border-t border-[#173F35]/20 pt-3 text-[13px] font-semibold text-[#173F35] sm:flex">
+                                <span className="h-2.5 w-2.5 rounded-full bg-[#C56C42]" aria-hidden="true" />
+                                Select a business below to inspect its status
+                            </div>
+                        </div>
                     </section>
-                    {error && <p role="alert" className="bg-[#FFF0EA] px-4 py-3 text-[14px] text-[#8A4034]">{error}</p>}
-                    {notice && <p role="status" className="bg-[#EAF0E9] px-4 py-3 text-[14px] text-[#173F35]">{notice}</p>}
 
-                    {/* Selected Host occupies the page, with separate focused tasks instead of a split dashboard. */}
-                    <section className="min-w-0 border-b border-[#E4E5DE] bg-white" aria-labelledby="selected-host-workspace">
-                        {selectedHost ? (
-                            <>
-                                <div className="flex flex-wrap items-center justify-between gap-3 bg-[#F0DDD0] px-4 py-5 sm:px-7 sm:py-6">
-                                    <div className="min-w-0">
-                                        <p className="text-[12px] font-bold uppercase tracking-[0.055em] text-[#8A563E]">Host inspection</p>
-                                        <h3 id="selected-host-workspace" className="mt-1 break-words text-[24px] font-bold tracking-[-0.03em] sm:text-[30px]">{selectedHost.name}</h3>
-                                        <p className="mt-1 text-[14px] text-[#5D6A5C]">{titleize(selectedHost.organizationType)} · {titleize(selectedHost.status)}</p>
+                    {integrationError && (
+                        <div role="alert" className="rounded-xl border border-[#C56C42] bg-[#F7F6F2] px-4 py-3 text-[14px] text-[#173F35]">
+                            <strong>Host information couldn't be loaded.</strong> {integrationError}
+                            <button type="button" onClick={refreshIntegrationPage} className="focus-ring ml-2 font-bold underline">Try again</button>
+                        </div>
+                    )}
+                    {error && <p role="alert" className="rounded-xl bg-[#F7F6F2] px-4 py-3 text-[14px] text-[#173F35]">{error}</p>}
+                    {notice && <p role="status" className="rounded-xl bg-[#D7DDCF] px-4 py-3 text-[14px] text-[#173F35]">{notice}</p>}
+
+                    <div className="grid min-w-0 items-start gap-3 sm:gap-5 lg:grid-cols-[minmax(280px,0.31fr)_minmax(0,1fr)] lg:gap-6">
+                        <aside className="min-w-0 overflow-hidden rounded-[14px] border border-[#D7DDCF] bg-[#F7F6F2] shadow-[0_10px_30px_-26px_#202421] sm:rounded-[18px]" aria-labelledby="integrations-hosts-heading">
+                            <div className="border-t-[4px] border-[#C56C42] bg-[#F7F6F2] px-3 py-3 text-[#202421] sm:px-5 sm:py-5">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#C56C42] sm:text-[13px]">01 / Select a business</p>
+                                <h3 id="integrations-hosts-heading" className="mt-1 text-[19px] font-bold tracking-[-0.03em] sm:text-[23px]">Choose a Host</h3>
+                                <p className="mt-1 hidden text-[14px] text-[#173F35] sm:block">Find and select the business to review.</p>
+                            </div>
+                            <div className="space-y-2 px-3 py-3 sm:space-y-3 sm:px-4 sm:py-4">
+                                <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3">
+                                    <SearchCheck size={18} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+                                    <span className="sr-only">Search Hosts</span>
+                                    <input type="search" value={integrationSearch} onChange={event => { setIntegrationSearch(event.target.value); }}
+                                        placeholder="Search business names" className="min-w-0 w-full bg-transparent py-2.5 text-[14px] text-[#202421] outline-none placeholder:text-[#173F35]/70" />
+                                </label>
+                                <div className="sm:hidden">
+                                    <label htmlFor="integration-mobile-status" className="sr-only">Filter Hosts by setup status</label>
+                                    <select id="integration-mobile-status" value={integrationHealthFilter}
+                                        onChange={event => setIntegrationHealthFilter(event.target.value)}
+                                        className="focus-ring w-full rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 py-2.5 text-[13px] font-semibold text-[#173F35]">
+                                        <option value="all">All businesses</option>
+                                        <option value="connected">Set up</option>
+                                        <option value="setup">Not set up</option>
+                                        <option value="failed">Needs help</option>
+                                    </select>
+                                </div>
+                                <div className="hidden max-w-full gap-2 overflow-x-auto pb-1 sm:flex" aria-label="Filter Hosts by setup status">
+                                    {[
+                                        ['all', 'All'], ['connected', 'Set up'], ['setup', 'Not set up'], ['failed', 'Needs help'],
+                                    ].map(([value, label]) => (
+                                        <button key={value} type="button" aria-pressed={integrationHealthFilter === value}
+                                            onClick={() => { setIntegrationHealthFilter(value); }}
+                                            className={`focus-ring min-h-9 shrink-0 rounded-full px-3 text-[13px] font-semibold ${integrationHealthFilter === value
+                                                ? 'bg-[#173F35] text-[#F7F6F2]' : 'border border-[#D7DDCF] bg-[#F7F6F2] text-[#173F35] hover:bg-[#D7DDCF]'}`}>{label}</button>
+                                    ))}
+                                </div>
+                                <p className="text-[12px] text-[#173F35] sm:text-[13px]" aria-live="polite">
+                                    {integrationLoading ? 'Loading businesses…' : <><span className="sm:hidden">{filteredHosts.length} Hosts · {configuredHostCount} set up</span><span className="hidden sm:inline">{`${filteredHosts.length} ${filteredHosts.length === 1 ? 'business' : 'businesses'} found · ${configuredHostCount} with setup`}</span></>}
+                                </p>
+                            </div>
+                            {integrationLoading ? (
+                                <p role="status" className="flex items-center gap-2 px-4 pb-5 text-[14px]"><LoaderCircle size={17} className="animate-spin" /> Loading Hosts…</p>
+                            ) : !integrationError && (
+                                <div className="border-t border-[#D7DDCF] px-2 py-2 sm:px-3">
+                                    <div
+                                        className={`space-y-1 ${filteredHosts.length > 8 ? 'max-h-[542px] overflow-y-auto overscroll-y-auto pr-1 sm:max-h-[814px]' : ''}`}
+                                        role="group"
+                                        key={`${integrationHealthFilter}:${integrationSearch}`}
+                                        aria-label={filteredHosts.length > 8 ? 'Choose a Host; scroll for more businesses' : 'Choose a Host'}
+                                        tabIndex={filteredHosts.length > 8 ? 0 : undefined}
+                                    >
+                                        {shownHosts.map(host => {
+                                            const active = selectedHost?.id === host.id;
+                                            const configured = webhooks.some(item => item.organizationId === host.id) || serviceAccounts.some(item => item.organizationId === host.id);
+                                            const failed = webhooks.some(item => item.organizationId === host.id && item.status !== 'disabled' && item.lastDeliveryStatus === 'failed');
+                                            return (
+                                                <button key={host.id} type="button" aria-pressed={active} title={host.name}
+                                                    onClick={() => { setSelectedIntegrationHostId(host.id); setSelectedIntegrationId(''); setSelectedReviewCase(null); setReason(''); setIntegrationDetailTab('overview'); }}
+                                                    className={`focus-ring flex w-full min-w-0 items-center gap-2 rounded-xl border-l-[3px] px-2 text-left transition-colors sm:gap-3 sm:px-3 ${filteredHosts.length > 8 ? 'h-[60px] py-1.5 sm:h-[92px] sm:py-2' : 'min-h-[58px] py-2 sm:min-h-[70px] sm:py-3'} ${active
+                                                        ? 'border-[#C56C42] bg-[#173F35] text-[#F7F6F2]' : 'border-transparent text-[#202421] hover:bg-[#D7DDCF]/60'}`}>
+                                                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[15px] font-bold sm:h-10 sm:w-10 sm:text-[17px] ${active ? 'bg-[#F7F6F2] text-[#173F35]' : 'bg-[#D7DDCF] text-[#173F35]'}`} aria-hidden="true">
+                                                        {String(host.name || 'H').trim().charAt(0).toUpperCase()}
+                                                    </span>
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className={`block break-words text-[14px] font-bold leading-snug sm:text-[15px] ${filteredHosts.length > 8 ? 'line-clamp-2 sm:line-clamp-3' : ''}`}>{host.name}</span>
+                                                        <span className={`mt-0.5 block text-[12px] font-semibold sm:mt-1 ${active ? 'text-[#F7F6F2]' : 'text-[#173F35]'}`}>
+                                                            {failed ? 'Needs attention' : configured ? 'Setup found' : 'Not set up'}
+                                                        </span>
+                                                    </span>
+                                                    {active && <ChevronRight size={18} className="shrink-0 text-[#F7F6F2]" aria-hidden="true" />}
+                                                </button>
+                                            );
+                                        })}
+                                        {!hosts.length && <p className="px-3 py-5 text-[14px] text-[#173F35]">No Host businesses are available yet.</p>}
+                                        {hosts.length > 0 && !shownHosts.length && <p className="px-3 py-5 text-[14px] text-[#173F35]">No businesses match this search or filter.</p>}
                                     </div>
-                                    <span className={`rounded-full px-3 py-2 text-[13px] font-bold ${selectedHostHasFailure
-                                        ? 'bg-[#F7F1E8] text-[#934E36]' : selectedHostConfigured
-                                            ? 'bg-[#E5EEE5] text-[#245640]' : 'bg-white text-[#8B573F]'}`}>
-                                        {selectedHostHasFailure ? 'Needs attention' : selectedHostConfigured ? 'Configured' : 'Setup needed'}
+                                    {totalHosts > hosts.length && <p className="px-3 py-3 text-[12px] text-[#173F35]">Showing {hosts.length} of {totalHosts} registered Hosts.</p>}
+                                </div>
+                            )}
+                        </aside>
+
+                        <div className="min-w-0 space-y-3 sm:space-y-5">
+                            <section className="min-w-0 overflow-hidden rounded-[14px] border border-[#D7DDCF] bg-[#F7F6F2] shadow-[0_10px_30px_-26px_#202421] sm:rounded-[18px]" aria-labelledby="selected-host-workspace">
+                                {selectedHost ? (
+                                    <>
+                                        <div className="flex flex-wrap items-center justify-between gap-2 border-l-[4px] border-[#C56C42] bg-[#202421] px-3 py-3 text-[#F7F6F2] sm:gap-4 sm:border-l-[5px] sm:px-6 sm:py-7">
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#D7DDCF] sm:text-[13px]">02 / Selected business</p>
+                                                <h3 id="selected-host-workspace" className="mt-1 break-words text-[19px] font-bold tracking-[-0.035em] text-[#F7F6F2] sm:text-[31px]">{selectedHost.name}</h3>
+                                                <p className="mt-0.5 text-[12px] text-[#D7DDCF] sm:mt-1 sm:text-[14px]">{titleize(selectedHost.organizationType)} · {titleize(selectedHost.status)}</p>
+                                            </div>
+                                            <span className={`rounded-full px-2.5 py-1 text-[12px] font-bold sm:px-3 sm:py-2 sm:text-[13px] ${selectedHostHasFailure
+                                                ? 'border border-[#C56C42] bg-[#F7F6F2] text-[#202421]' : selectedHostConfigured
+                                                    ? 'bg-[#D7DDCF] text-[#173F35]' : 'bg-[#D7DDCF] text-[#173F35]'}`}>
+                                                {selectedHostHasFailure ? 'Needs attention' : selectedHostConfigured ? 'Has connection setup' : 'Setup not started'}
+                                            </span>
+                                        </div>
+                                        <div className="grid min-w-0 grid-cols-3 gap-0.5 border-y border-[#D7DDCF] bg-[#D7DDCF]/35 px-1 pt-1 sm:flex sm:max-w-full sm:gap-1 sm:overflow-x-auto sm:px-5 sm:pt-1.5" role="tablist" aria-label="Business connection details">
+                                            {[
+                                                ['overview', 'Overview', 'Summary'],
+                                                ['webhooks', `Automatic updates (${hostWebhooks.length})`, `Updates (${hostWebhooks.length})`],
+                                                ['api', `System access (${hostAccounts.length})`, `Access (${hostAccounts.length})`],
+                                            ].map(([value, label, mobileLabel]) => (
+                                                <button key={value} type="button" role="tab" aria-selected={integrationDetailTab === value} aria-label={label}
+                                                    onClick={() => setIntegrationDetailTab(value)}
+                                                    className={`focus-ring min-w-0 border-b-[3px] px-1 py-3 text-[12px] font-semibold sm:shrink-0 sm:px-4 sm:py-3.5 sm:text-[14px] ${integrationDetailTab === value
+                                                        ? 'border-[#C56C42] bg-[#F7F6F2] text-[#173F35]' : 'border-transparent text-[#173F35] hover:bg-[#D7DDCF]/50'}`}><span className="sm:hidden">{mobileLabel}</span><span className="hidden sm:inline">{label}</span></button>
+                                            ))}
+                                        </div>
+                                        {integrationDetailTab === 'overview' && (
+                                            <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.05fr)_minmax(250px,0.85fr)]">
+                                                <div className="px-3 py-3 sm:px-6 sm:py-6">
+                                                    <h4 className="text-[18px] font-bold text-[#202421] sm:text-[22px]">Setup at a glance</h4>
+                                                    <p className="mt-1 hidden text-[14px] text-[#173F35] sm:block">What this business has already configured.</p>
+                                                    <div className="mt-2 divide-y divide-[#D7DDCF] border-t border-b border-[#D7DDCF] sm:mt-4">
+                                                        {[
+                                                            ['Business account', 'The Host is registered on EPANTRY', true, 'Registered'],
+                                                            ['Software access', hostAccounts.length ? `${hostAccounts.length} connected ${hostAccounts.length === 1 ? 'account' : 'accounts'}` : 'No software access added', hostAccounts.length > 0, hostAccounts.length ? `${hostAccounts.length} connected` : 'Not added'],
+                                                            ['Automatic updates', hostWebhooks.length ? `${hostWebhooks.length} update ${hostWebhooks.length === 1 ? 'destination' : 'destinations'} added` : 'No update destination added', hostWebhooks.length > 0, hostWebhooks.length ? `${hostWebhooks.length} connected` : 'Not added'],
+                                                        ].map(([label, detail, ready, mobileDetail], index) => (
+                                                            <div key={label} className="flex items-center gap-2 py-2.5 sm:gap-3 sm:py-4">
+                                                                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl ${ready ? 'bg-[#D7DDCF] text-[#173F35]' : 'border border-[#C56C42] bg-[#F7F6F2] text-[#C56C42]'}`}>
+                                                                    {ready ? <CheckCircle2 size={20} aria-hidden="true" /> : <span className="text-[14px] font-bold">{String(index + 1).padStart(2, '0')}</span>}
+                                                                </span>
+                                                                <span className="min-w-0 flex-1">
+                                                                    <span className="block text-[14px] font-bold sm:text-[15px]">{label}</span>
+                                                                    <span className="mt-0.5 block text-[12px] text-[#173F35] sm:hidden">{mobileDetail}</span>
+                                                                    <span className="mt-0.5 hidden text-[13px] text-[#173F35] sm:block">{detail}</span>
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col justify-between border-t-[4px] border-[#C56C42] bg-[#173F35] px-3 py-4 text-[#F7F6F2] lg:border-l-[4px] lg:border-t-0 sm:px-6 sm:py-7">
+                                                    <div>
+                                                        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#D7DDCF] sm:text-[13px]">Next step</p>
+                                                        <h4 className="mt-1 text-[18px] font-bold leading-tight sm:mt-2 sm:text-[22px]">
+                                                            <span className="sm:hidden">{selectedHostHasFailure ? 'Check failed updates' : selectedHostConfigured ? 'Review setup' : 'Host setup needed'}</span>
+                                                            <span className="hidden sm:inline">{selectedHostHasFailure ? 'Check the failed update' : selectedHostConfigured ? 'Review the existing setup' : 'The Host needs to set up a connection'}</span>
+                                                        </h4>
+                                                        <p className="mt-2 text-[13px] leading-[1.5] text-[#F7F6F2] sm:hidden">
+                                                            {selectedHostHasFailure ? 'A recent update failed. Check its details.' : selectedHostConfigured
+                                                                ? 'Review connected services and recent updates.'
+                                                                : 'The Host can connect its system from Host settings.'}
+                                                        </p>
+                                                        <p className="mt-3 hidden text-[15px] leading-relaxed text-[#F7F6F2] sm:block">
+                                                            {selectedHostHasFailure ? 'One or more updates did not reach their destination. Check the activity and open a review if needed.' : selectedHostConfigured
+                                                                ? 'This business has at least one connection method. Check the details to see whether updates have been sent successfully.'
+                                                                : 'No connection method has been added yet. The Host can add one in their own integration settings.'}
+                                                        </p>
+                                                        <p className="mt-4 hidden border-l-[3px] border-[#C56C42] pl-3 text-[13px] leading-relaxed text-[#D7DDCF] sm:block">Software access and automatic updates can be set up independently.</p>
+                                                    </div>
+                                                    <div className="mt-3 flex flex-wrap gap-2 sm:mt-5">
+                                                        <button type="button" onClick={() => setIntegrationDetailTab('webhooks')}
+                                                            className="focus-ring min-h-10 flex-1 rounded-lg bg-[#F7F6F2] px-2 py-2 text-[12px] font-bold text-[#173F35] hover:bg-[#D7DDCF] sm:flex-none sm:px-4 sm:py-2.5 sm:text-[14px]">Check updates</button>
+                                                        <button type="button" onClick={() => setIntegrationDetailTab('api')}
+                                                            className="focus-ring min-h-10 flex-1 rounded-lg border border-[#D7DDCF] bg-transparent px-2 py-2 text-[12px] font-bold text-[#F7F6F2] hover:bg-[#F7F6F2]/10 sm:flex-none sm:px-4 sm:py-2.5 sm:text-[14px]"><span className="sm:hidden">Software access</span><span className="hidden sm:inline">View software access</span></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {integrationDetailTab === 'webhooks' && (
+                                            <div className="px-4 py-5 sm:px-6 sm:py-6">
+                                                <h4 className="text-[20px] font-bold">Automatic update delivery</h4>
+                                                <p className="mt-1 hidden text-[14px] text-[#173F35] sm:block">See whether updates sent to this Host's connected system have reached it.</p>
+                                                {hostWebhooks.length ? (
+                                                    <div className="mt-4 divide-y divide-[#D7DDCF] border-y border-[#D7DDCF]">
+                                                        {hostWebhooks.map(webhook => (
+                                                            <button key={webhook.id} type="button" aria-pressed={chosenConnection?.id === webhook.id}
+                                                                onClick={() => { setSelectedIntegrationId(webhook.id); setSelectedReviewCase(null); setReason(''); }}
+                                                                className={`focus-ring flex w-full flex-wrap items-center justify-between gap-3 px-3 py-4 text-left ${chosenConnection?.id === webhook.id ? 'bg-[#D7DDCF]' : 'hover:bg-[#D7DDCF]'}`}>
+                                                                <span className="min-w-0 flex-1">
+                                                                    <span className="block break-words text-[16px] font-bold">{webhook.name}</span>
+                                                                    <span className="mt-1 block text-[13px] text-[#173F35]">Last attempt: {integrationLastSeen(webhook.lastDeliveryAt)}</span>
+                                                                </span>
+                                                                <span className={`rounded-full bg-[#F7F6F2] px-3 py-1.5 text-[13px] font-bold ${integrationHealthClass(webhook)}`}>{integrationHealthLabel(webhook)}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-4 flex items-start gap-3 rounded-xl border-l-[4px] border-[#C56C42] bg-[#D7DDCF]/65 px-4 py-5">
+                                                        <Webhook size={23} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+                                                        <div><h5 className="text-[17px] font-bold">No automatic updates set up</h5><p className="mt-1 hidden text-[14px] text-[#173F35] sm:block">This Host has not added a destination for system updates.</p></div>
+                                                    </div>
+                                                )}
+                                                {chosenConnection && (
+                                                    <details className="mt-4 rounded-lg bg-[#F7F6F2] px-4 py-3 text-[13px] text-[#173F35]">
+                                                        <summary className="focus-ring cursor-pointer font-semibold">Technical connection address</summary>
+                                                        <p className="mt-2 break-all">{chosenConnection.endpointHost || 'Address unavailable'}</p>
+                                                    </details>
+                                                )}
+                                                {chosenConnection?.lastDeliveryStatus === 'failed' && (
+                                                    <div className="mt-5 rounded-xl border-l-[4px] border-[#C56C42] bg-[#F7F6F2] px-4 py-5">
+                                                        <h5 className="text-[17px] font-bold">An update could not be delivered</h5>
+                                                        <p className="mt-1 text-[14px] text-[#173F35]">{chosenConnection.name} needs a closer look.</p>
+                                                        {selectedConnectionCase ? (
+                                                            <button type="button" onClick={() => { setSelectedReviewCase(selectedConnectionCase); setReason(''); }}
+                                                                className="focus-ring mt-3 rounded-lg bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-[#F7F6F2]">Open existing review</button>
+                                                        ) : canMutateDomain ? (
+                                                            <div className="mt-3 max-w-xl">
+                                                                <label htmlFor="webhook-failure-reason" className="text-[14px] font-semibold">What went wrong?</label>
+                                                                <textarea id="webhook-failure-reason" value={reason} onChange={event => setReason(event.target.value)} rows={2}
+                                                                    placeholder="Describe what needs checking" className="focus-ring mt-2 w-full rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 py-2.5 text-[15px]" />
+                                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={createIntegrationReview}
+                                                                    className="focus-ring mt-3 rounded-lg bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-[#F7F6F2] disabled:opacity-50">Start a review</button>
+                                                            </div>
+                                                        ) : <p className="mt-2 text-[14px] text-[#173F35]">Your role can view this issue but cannot change it.</p>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {integrationDetailTab === 'api' && (
+                                            <div className="px-4 py-5 sm:px-6 sm:py-6">
+                                                <h4 className="text-[20px] font-bold">Software accounts</h4>
+                                                <p className="mt-1 hidden text-[14px] text-[#173F35] sm:block">View the accounts this Host has authorised to access its system.</p>
+                                                {hostAccounts.length ? (
+                                                    <div className="mt-4 divide-y divide-[#D7DDCF] border-y border-[#D7DDCF]">
+                                                        {hostAccounts.map(account => (
+                                                            <div key={account.id} className="flex flex-wrap items-start justify-between gap-3 px-3 py-4">
+                                                                <div className="min-w-0">
+                                                                    <p className="break-words text-[16px] font-bold">{account.name}</p>
+                                                                    <p className="mt-1 text-[13px] text-[#173F35]">{account.scopeCount} permitted {account.scopeCount === 1 ? 'area' : 'areas'}</p>
+                                                                </div>
+                                                                <span className="rounded-full bg-[#D7DDCF] px-3 py-1.5 text-[13px] font-bold text-[#173F35]">{titleize(account.status)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="mt-4 flex items-start gap-3 rounded-xl border-l-[4px] border-[#C56C42] bg-[#D7DDCF]/65 px-4 py-5">
+                                                        <ShieldCheck size={23} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+                                                        <div><h5 className="text-[17px] font-bold">No software accounts added</h5><p className="mt-1 hidden text-[14px] text-[#173F35] sm:block">This Host has not set up access for another system.</p></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="px-5 py-10 text-[15px] text-[#173F35]" role="status">
+                                        {integrationLoading ? 'Loading business details…' : 'Choose a Host from the list to see its setup and updates.'}
+                                    </div>
+                                )}
+                            </section>
+
+                            <section className="min-w-0 overflow-hidden rounded-[14px] border border-[#D7DDCF] bg-[#F7F6F2] sm:rounded-[18px]" aria-labelledby="integration-followups-title">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-t-[4px] border-[#C56C42] bg-[#D7DDCF]/45 px-3 py-3 sm:gap-3 sm:px-6 sm:py-5">
+                                    <div>
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#C56C42] sm:text-[13px]">03 / Follow up</p>
+                                        <h3 id="integration-followups-title" className="mt-1 text-[18px] font-bold text-[#202421] sm:text-[22px]">Issues to review</h3>
+                                        <p className="mt-1 hidden text-[14px] text-[#173F35] sm:block">Updates awaiting an admin decision.</p>
+                                    </div>
+                                    <span className="rounded-full bg-[#173F35] px-3 py-1.5 text-[13px] font-bold text-[#F7F6F2]">
+                                        {integrationReviewsLoading ? 'Loading…' : integrationReviewsError && !integrationReviewRows.length ? 'Unavailable' : `${activeConnectionCases.length} open`}
                                     </span>
                                 </div>
-                                <div className="flex gap-0 overflow-x-auto border-b border-[#E0E5DC] bg-[#FCFBF9]" role="tablist" aria-label="Integration details">
-                                    {[
-                                        ['overview', 'Setup overview'],
-                                        ['webhooks', `Webhooks (${hostWebhooks.length})`],
-                                        ['api', `API access (${hostAccounts.length})`],
-                                    ].map(([value, label]) => (
-                                        <button key={value} type="button" role="tab" aria-selected={integrationDetailTab === value}
-                                            onClick={() => setIntegrationDetailTab(value)}
-                                            className={`focus-ring shrink-0 border-b-[3px] px-4 py-3.5 text-[14px] font-bold sm:px-7 ${integrationDetailTab === value
-                                                ? 'border-[#173F35] bg-white text-[#173F35]' : 'border-transparent text-[#667467] hover:bg-[#F4F5EF]'}`}>
-                                            {label}
+                                {integrationReviewsError && (
+                                    <div role="alert" className="bg-[#F7F6F2] px-4 py-3 text-[14px] text-[#173F35] sm:px-6">
+                                        {integrationReviewsError} <button type="button" onClick={refreshIntegrationPage} className="focus-ring ml-2 font-semibold underline">Try again</button>
+                                    </div>
+                                )}
+                                {integrationReviewsLoading ? (
+                                    <p role="status" className="flex items-center gap-2 px-4 py-5 text-[14px] sm:px-6"><LoaderCircle className="animate-spin" size={17} /> Loading issues…</p>
+                                ) : activeConnectionCases.length ? (
+                                    <div className="divide-y divide-[#D7DDCF]">
+                                        {shownConnectionCases.map(item => (
+                                            <button key={item.id} type="button" onClick={() => { setSelectedReviewCase(item); setReason(''); }}
+                                                className="focus-ring flex w-full items-center justify-between gap-3 px-4 py-4 text-left hover:bg-[#D7DDCF] sm:px-6">
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block break-words text-[15px] font-bold">{item.entity?.label || item.summary}</span>
+                                                    <span className="mt-1 block text-[13px] text-[#173F35]">{item.summary}</span>
+                                                </span>
+                                                <span className="shrink-0 text-[13px] font-semibold text-[#173F35]">{titleize(item.status)} <ChevronRight size={15} className="inline" /></span>
+                                            </button>
+                                        ))}
+                                        {activeConnectionCases.length > 5 && (
+                                            <div className="py-4 text-center">
+                                                <button type="button" onClick={() => setShowAllIntegrationCases(value => !value)}
+                                                    className="focus-ring rounded-lg border border-[#D7DDCF] px-4 py-2 text-[14px] font-bold">
+                                                    {showAllIntegrationCases ? 'Show fewer' : `View all ${activeConnectionCases.length} reviews`}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : !integrationReviewsError ? (
+                                    <div className="flex items-center gap-2 px-3 py-3 sm:gap-3 sm:px-6 sm:py-5">
+                                        <CheckCircle2 size={18} className="shrink-0 text-[#173F35] sm:h-[21px] sm:w-[21px]" aria-hidden="true" />
+                                        <p className="text-[13px] text-[#173F35] sm:hidden">{moreReviewsAvailable ? 'No open issues in loaded results.' : 'No issues to review.'}</p>
+                                        <p className="hidden text-[14px] text-[#173F35] sm:block">{moreReviewsAvailable ? 'No open issues in the results loaded so far.' : 'No issues need an admin review right now.'}</p>
+                                    </div>
+                                ) : null}
+                                {moreReviewsAvailable && !integrationReviewsLoading && (
+                                    <div className="border-t border-[#D7DDCF] px-4 py-4 text-center">
+                                        <button type="button" onClick={loadMoreIntegrationReviews} disabled={integrationReviewsMoreBusy}
+                                            className="focus-ring rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-4 py-2.5 text-[14px] font-semibold disabled:opacity-50">
+                                            {integrationReviewsMoreBusy ? 'Loading…' : `Load more issues (${integrationReviewRows.length} / ${integrationReviewTotal})`}
                                         </button>
-                                    ))}
-                                </div>
-                                {integrationDetailTab === 'overview' && (
-                                    <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.85fr)]">
-                                        <div className="border-b border-[#E7E5DC] px-4 py-5 sm:px-7 sm:py-7 lg:border-b-0 lg:border-r">
-                                            <h4 className="text-[21px] font-bold">Connection setup</h4>
-                                            <div className="mt-4 divide-y divide-[#E7E9E2]">
-                                                {[
-                                                    ['Host registered', 'Host organization is available', true],
-                                                    ['API access', hostAccounts.length ? `${hostAccounts.length} account${hostAccounts.length === 1 ? '' : 's'} configured` : 'Not configured', hostAccounts.length > 0],
-                                                    ['Webhooks', hostWebhooks.length ? `${hostWebhooks.length} endpoint${hostWebhooks.length === 1 ? '' : 's'} configured` : 'Not configured', hostWebhooks.length > 0],
-                                                ].map(([label, detail, ready], index) => (
-                                                    <div key={label} className="flex items-center gap-3 py-3.5">
-                                                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${ready
-                                                            ? 'bg-[#173F35] text-white' : 'border border-[#D9C3B4] bg-[#FAEFE8] text-[#955B3E]'}`}>
-                                                            {ready ? <CheckCircle2 size={18} aria-hidden="true" /> : String(index + 1).padStart(2, '0')}
-                                                        </span>
-                                                        <span className="min-w-0 flex-1">
-                                                            <span className="block text-[15px] font-bold">{label}</span>
-                                                            <span className="mt-0.5 block text-[13px] text-[#667567]">{detail}</span>
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                    </div>
+                                )}
+                                {pastConnectionCases.length > 0 && (
+                                    <details className="border-t border-[#D7DDCF] px-4 py-4 sm:px-6">
+                                        <summary className="focus-ring cursor-pointer text-[14px] font-semibold">Past decisions ({pastConnectionCases.length})</summary>
+                                        <div className="mt-3 divide-y divide-[#D7DDCF]">
+                                            {pastConnectionCases.map(item => (
+                                                <button key={item.id} type="button" onClick={() => { setSelectedReviewCase(item); setReason(''); }}
+                                                    className="focus-ring flex w-full items-center justify-between gap-3 py-3 text-left text-[14px]">
+                                                    <span className="min-w-0 break-words">{item.entity?.label || item.summary}</span>
+                                                    <span className="shrink-0">{titleize(item.status)}</span>
+                                                </button>
+                                            ))}
                                         </div>
-                                        <div className="flex flex-col justify-between bg-[#F5F6F1] px-4 py-5 sm:px-7 sm:py-7">
-                                            <div>
-                                                <p className="text-[12px] font-bold uppercase tracking-[0.05em] text-[#98624B]">Current status</p>
-                                                <h4 className="mt-2 text-[22px] font-bold leading-tight">
-                                                    {selectedHostHasFailure ? 'Delivery needs a review' : selectedHostConfigured ? 'Integration setup found' : 'Waiting for Host setup'}
-                                                </h4>
-                                                <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-[#56675A]">
-                                                    {selectedHostHasFailure ? 'Inspect the failed webhook and open a review if needed.' : selectedHostConfigured
-                                                        ? 'Open the connected endpoints or API accounts to inspect their status.'
-                                                        : 'The Host can add a webhook endpoint or API account from Host integration settings.'}
-                                                </p>
-                                            </div>
-                                            <div className="mt-5 flex flex-wrap gap-2">
-                                                <button type="button" onClick={() => setIntegrationDetailTab('webhooks')}
-                                                    className="focus-ring bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white">Inspect webhooks</button>
-                                                <button type="button" onClick={() => setIntegrationDetailTab('api')}
-                                                    className="focus-ring border border-[#CFD8CD] bg-white px-4 py-2.5 text-[14px] font-bold">API access</button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    </details>
                                 )}
-                                {integrationDetailTab === 'webhooks' && (
-                                    <div className="px-4 py-5 sm:px-7 sm:py-6">
-                                        {hostWebhooks.length ? (
-                                            <div className="divide-y divide-[#E5E9E2] border-y border-[#E5E9E2]">
-                                                {hostWebhooks.map(webhook => (
-                                                    <button key={webhook.id} type="button" aria-pressed={chosenConnection?.id === webhook.id}
-                                                        onClick={() => { setSelectedIntegrationId(webhook.id); setSelectedReviewCase(null); setReason(''); }}
-                                                        className={`focus-ring flex w-full flex-wrap items-center justify-between gap-3 px-3 py-4 text-left ${chosenConnection?.id === webhook.id ? 'bg-[#F4F0E9]' : 'hover:bg-[#F9F9F5]'}`}>
-                                                        <span className="min-w-0 flex-1">
-                                                            <span className="block break-words text-[16px] font-bold">{webhook.name}</span>
-                                                            <span className="mt-1 block break-words text-[13px] text-[#647468]">{webhook.endpointHost} · Last delivery: {integrationLastSeen(webhook.lastDeliveryAt)}</span>
-                                                        </span>
-                                                        <span className={`text-[13px] font-bold ${integrationHealthClass(webhook)}`}>{integrationHealthLabel(webhook)}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-start gap-4 bg-[#F7F7F2] px-4 py-6">
-                                                <Webhook size={25} className="shrink-0 text-[#94664D]" aria-hidden="true" />
-                                                <div><h4 className="text-[18px] font-bold">No webhooks configured</h4><p className="mt-1 text-[14px] text-[#637065]">No delivery events are available for this Host.</p></div>
-                                            </div>
-                                        )}
-                                        {chosenConnection?.lastDeliveryStatus === 'failed' && (
-                                            <div className="mt-5 border-l-[3px] border-[#B5674E] bg-[#F8EBE2] px-4 py-5">
-                                                <h4 className="text-[17px] font-bold">Failed delivery · {chosenConnection.name}</h4>
-                                                {selectedConnectionCase ? (
-                                                    <button type="button" onClick={() => { setSelectedReviewCase(selectedConnectionCase); setReason(''); }}
-                                                        className="focus-ring mt-3 bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white">Open existing review</button>
-                                                ) : canMutateDomain ? (
-                                                    <div className="mt-3 max-w-xl">
-                                                        <label htmlFor="webhook-failure-reason" className="text-[14px] font-semibold">Reason for review</label>
-                                                        <textarea id="webhook-failure-reason" value={reason} onChange={event => setReason(event.target.value)} rows={2}
-                                                            placeholder="Describe the failed delivery" className="focus-ring mt-2 w-full border border-[#D8BFB0] bg-white px-3 py-2.5 text-[15px]" />
-                                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={createIntegrationReview}
-                                                            className="focus-ring mt-3 bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white disabled:opacity-50">Create review</button>
-                                                    </div>
-                                                ) : <p className="mt-2 text-[14px] text-[#637164]">Read-only access for this role.</p>}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                {integrationDetailTab === 'api' && (
-                                    <div className="px-4 py-5 sm:px-7 sm:py-6">
-                                        {hostAccounts.length ? (
-                                            <div className="divide-y divide-[#E5E9E2] border-y border-[#E5E9E2]">
-                                                {hostAccounts.map(account => (
-                                                    <div key={account.id} className="flex items-start justify-between gap-3 px-3 py-4">
-                                                        <div className="min-w-0">
-                                                            <p className="break-words text-[16px] font-bold">{account.name}</p>
-                                                            <p className="mt-1 text-[13px] text-[#68766C]">{account.scopeCount} access scopes</p>
-                                                        </div>
-                                                        <span className="shrink-0 text-[13px] font-bold text-[#3E6A4B]">{titleize(account.status)}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-start gap-4 bg-[#F7F7F2] px-4 py-6">
-                                                <ShieldCheck size={25} className="shrink-0 text-[#94664D]" aria-hidden="true" />
-                                                <div><h4 className="text-[18px] font-bold">No API accounts configured</h4><p className="mt-1 text-[14px] text-[#637065]">API access has not been set up for this Host.</p></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div className="px-4 py-8 text-[15px] text-[#667367]">{integrationLoading ? 'Loading Host details…' : 'Select a Host above to inspect its connections.'}</div>
-                        )}
-                    </section>
+                            </section>
 
-                    {/* Keep follow-ups compact when there are no cases, with full decision tools when needed. */}
-                    <section className="border-b border-[#E1E5DE] bg-[#FFFDFB]" aria-labelledby="integration-followups-title">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E7DF] px-4 py-4 sm:px-6">
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F0DDD0] text-[#8D583F]"><History size={20} aria-hidden="true" /></span>
-                                <div>
-                                    <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#915940]">03 / Follow up</p>
-                                    <h3 id="integration-followups-title" className="text-[20px] font-bold">Delivery reviews</h3>
-                                </div>
-                            </div>
-                            <span className="rounded-md bg-[#EFF1E9] px-3 py-1.5 text-[13px] font-bold">{integrationReviewsLoading ? 'Loading…' : integrationReviewsError && !integrationReviewRows.length ? 'Unavailable' : `${activeConnectionCases.length} open`}</span>
+                            {selectedCase && (
+                                <section className="rounded-2xl border border-[#C56C42] bg-[#F7F6F2] px-4 py-5 sm:px-6" aria-labelledby="integration-decision-title">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <h3 id="integration-decision-title" className="text-[21px] font-bold">Review this issue</h3>
+                                        <button type="button" onClick={() => { setSelectedReviewCase(null); setReason(''); }}
+                                            className="focus-ring rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 py-2 text-[13px] font-semibold">Close</button>
+                                    </div>
+                                    <p className="mt-2 break-words text-[15px] font-bold">{selectedCase.entity?.label || selectedCase.summary}</p>
+                                    <p className="mt-1 text-[14px] text-[#173F35]">{selectedCase.details || selectedCase.summary}</p>
+                                    {canMutateDomain && !['resolved', 'dismissed'].includes(String(selectedCase.status || '').toLowerCase()) ? (
+                                        <div className="mt-4 max-w-3xl">
+                                            <label htmlFor="integration-decision-reason" className="text-[14px] font-bold">Reason for your decision</label>
+                                            <textarea id="integration-decision-reason" rows={3} value={reason} onChange={event => setReason(event.target.value)}
+                                                className="focus-ring mt-2 w-full rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-4 py-3 text-[15px]" placeholder="Explain your decision" />
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('resolve')}
+                                                    className="focus-ring rounded-lg bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-[#F7F6F2] disabled:opacity-50">Mark resolved</button>
+                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('needs_action')}
+                                                    className="focus-ring rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-4 py-2.5 text-[14px] font-bold disabled:opacity-50">Needs more work</button>
+                                                <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('dismiss')}
+                                                    className="focus-ring rounded-lg border border-[#C56C42] bg-[#F7F6F2] px-4 py-2.5 text-[14px] font-bold text-[#173F35] disabled:opacity-50">Close without action</button>
+                                            </div>
+                                        </div>
+                                    ) : <p className="mt-4 text-[14px] text-[#173F35]">{['resolved', 'dismissed'].includes(String(selectedCase.status || '').toLowerCase()) ? 'This review is complete.' : 'Your role can view this issue but cannot change it.'}</p>}
+                                </section>
+                            )}
                         </div>
-                        {integrationReviewsError && (
-                            <div role="alert" className="bg-[#FFF0E9] px-4 py-3 text-[14px] text-[#874836] sm:px-6">
-                                {integrationReviewsError} <button type="button" onClick={refreshIntegrationPage} className="focus-ring ml-2 font-semibold underline">Retry</button>
-                            </div>
-                        )}
-                        {integrationReviewsLoading ? (
-                            <p role="status" className="flex items-center gap-2 px-4 py-5 text-[14px] sm:px-6"><LoaderCircle className="animate-spin" size={17} /> Loading reviews…</p>
-                        ) : activeConnectionCases.length ? (
-                            <div className="divide-y divide-[#E7E9E1]">
-                                {shownConnectionCases.map(item => (
-                                    <button key={item.id} type="button" onClick={() => { setSelectedReviewCase(item); setReason(''); }}
-                                        className="focus-ring flex w-full items-center justify-between gap-3 px-4 py-4 text-left hover:bg-[#F8F8F3] sm:px-6">
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block break-words text-[15px] font-bold">{item.entity?.label || item.summary}</span>
-                                            <span className="mt-1 block text-[13px] text-[#607065]">{item.summary}</span>
-                                        </span>
-                                        <span className="shrink-0 text-[13px] font-semibold text-[#955D43]">{titleize(item.status)} <ChevronRight size={15} className="inline" /></span>
-                                    </button>
-                                ))}
-                                {activeConnectionCases.length > 5 && (
-                                    <div className="py-4 text-center">
-                                        <button type="button" onClick={() => setShowAllIntegrationCases(value => !value)}
-                                            className="focus-ring border border-[#CFDACD] px-4 py-2 text-[14px] font-bold">
-                                            {showAllIntegrationCases ? 'Show fewer' : `View all ${activeConnectionCases.length} reviews`}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        ) : !integrationReviewsError ? (
-                            <div className="flex items-center gap-3 px-4 py-5 sm:px-6">
-                                <CheckCircle2 size={19} className="shrink-0 text-[#54836C]" aria-hidden="true" />
-                                <p className="text-[14px] text-[#586A5D]">{moreReviewsAvailable ? 'No active reviews in the loaded results.' : 'No open delivery reviews.'}</p>
-                            </div>
-                        ) : null}
-                        {moreReviewsAvailable && !integrationReviewsLoading && (
-                            <div className="border-t border-[#E7E9E2] px-4 py-4 text-center">
-                                <button type="button" onClick={loadMoreIntegrationReviews} disabled={integrationReviewsMoreBusy}
-                                    className="focus-ring border border-[#CED9CC] bg-white px-4 py-2.5 text-[14px] font-semibold disabled:opacity-50">
-                                    {integrationReviewsMoreBusy ? 'Loading…' : `Load more reviews (${integrationReviewRows.length} / ${integrationReviewTotal})`}
-                                </button>
-                            </div>
-                        )}
-                        {pastConnectionCases.length > 0 && (
-                            <details className="border-t border-[#E7E9E2] px-4 py-4 sm:px-6">
-                                <summary className="focus-ring cursor-pointer text-[14px] font-semibold">Past decisions ({pastConnectionCases.length})</summary>
-                                <div className="mt-3 divide-y divide-[#E8E9E2]">
-                                    {pastConnectionCases.map(item => (
-                                        <button key={item.id} type="button" onClick={() => { setSelectedReviewCase(item); setReason(''); }}
-                                            className="focus-ring flex w-full items-center justify-between gap-3 py-3 text-left text-[14px]">
-                                            <span className="min-w-0 break-words">{item.entity?.label || item.summary}</span>
-                                            <span className="shrink-0">{titleize(item.status)}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </details>
-                        )}
-                    </section>
-                    {selectedCase && (
-                        <section className="border-t border-[#E7DACD] bg-[#F7EFE9] px-4 py-5 sm:px-6" aria-labelledby="integration-decision-title">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <h3 id="integration-decision-title" className="text-[21px] font-bold">Review decision</h3>
-                                <button type="button" onClick={() => { setSelectedReviewCase(null); setReason(''); }}
-                                    className="focus-ring border border-[#D5C3B4] px-3 py-2 text-[13px] font-semibold">Close</button>
-                            </div>
-                            <p className="mt-2 break-words text-[15px] font-bold">{selectedCase.entity?.label || selectedCase.summary}</p>
-                            <p className="mt-1 text-[14px] text-[#667064]">{selectedCase.details || selectedCase.summary}</p>
-                            {canMutateDomain && !['resolved', 'dismissed'].includes(String(selectedCase.status || '').toLowerCase()) ? (
-                                <div className="mt-4 max-w-3xl">
-                                    <label htmlFor="integration-decision-reason" className="text-[14px] font-bold">Decision reason</label>
-                                    <textarea id="integration-decision-reason" rows={3} value={reason} onChange={event => setReason(event.target.value)}
-                                        className="focus-ring mt-2 w-full border border-[#D9CABB] bg-white px-4 py-3 text-[15px]" placeholder="Explain the decision" />
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('resolve')}
-                                            className="focus-ring bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-white disabled:opacity-50">Resolve</button>
-                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('needs_action')}
-                                            className="focus-ring border border-[#C5D4C2] bg-white px-4 py-2.5 text-[14px] font-bold disabled:opacity-50">Follow up</button>
-                                        <button type="button" disabled={busy || reason.trim().length < 5} onClick={() => decideIntegrationCase('dismiss')}
-                                            className="focus-ring border border-[#E5BCAC] bg-[#F6E1D4] px-4 py-2.5 text-[14px] font-bold text-[#8D513D] disabled:opacity-50">Close case</button>
-                                    </div>
-                                </div>
-                            ) : <p className="mt-4 text-[14px] text-[#5F6F61]">{['resolved', 'dismissed'].includes(String(selectedCase.status || '').toLowerCase()) ? 'Review completed.' : 'Read-only for your role.'}</p>}
-                        </section>
-                    )}
+                    </div>
                 </div>
             </AdminShell>
         );

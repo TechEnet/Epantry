@@ -301,7 +301,9 @@ html {
 
   scroll-behavior: smooth;
 
-  overscroll-behavior: none;
+  /* Preserve native trackpad Back/Forward swipes while suppressing vertical bounce. */
+  overscroll-behavior-x: auto;
+  overscroll-behavior-y: none;
 
   background: var(--color-epantry-background);
 }
@@ -320,7 +322,9 @@ body {
 
   overflow-x: clip;
 
-  overscroll-behavior: none;
+  /* Preserve native trackpad Back/Forward swipes while suppressing vertical bounce. */
+  overscroll-behavior-x: auto;
+  overscroll-behavior-y: none;
 
   background: var(--color-epantry-background);
 }
