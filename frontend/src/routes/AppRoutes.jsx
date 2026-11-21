@@ -56,6 +56,7 @@ import {
   normalizeHostWorkspaceType,
 } from '../features/host/hostWorkspace.config'
 import CustomerShell from '../features/customer/components/CustomerShell'
+import AdminShell from '../features/admin/components/AdminShell'
 import RouteLoading from '../features/system/components/RouteLoading'
 import AvailabilityNotifyModal from '../features/notifications/components/AvailabilityNotifyModal'
 
@@ -1633,6 +1634,17 @@ function CustomerWorkspacePresentation({
 
 function AccountSecurityWorkspacePresentation({children}) {
   const { hostEnabled, hostAccessStatus, activeMode } = useAuth()
+  const { hasAdminAccess, adminStatus } = useAdmin()
+
+  // Reuse the existing permission-aware Super Admin sidebar when access is ready.
+  // Do not require admin access to set up MFA: that can itself be a prerequisite.
+  if (hasAdminAccess && adminStatus === ADMIN_ACCESS_STATUSES.READY) {
+    return (
+      <AdminShell title="Sign-in security" flushTop showWorkspaceBadge={false}>
+        {children}
+      </AdminShell>
+    )
+  }
 
   if (
     activeMode === 'host' &&

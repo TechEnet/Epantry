@@ -13,6 +13,9 @@ import {
   CircleAlert,
   Clipboard,
   KeyRound,
+  LayoutDashboard,
+  ScrollText,
+  UserRoundCog,
   LoaderCircle,
   LockKeyhole,
   RefreshCw,
@@ -27,6 +30,8 @@ import {
 import {
   useAuth,
 } from '../context/AuthContext'
+
+import { useAdmin } from '../../admin/context/AdminContext'
 
 import {
   cancelTotpEnrollment,
@@ -55,6 +60,21 @@ function getPolicyLabel(
 
 
 const MFA_PAGE_STYLE = `
+/* MFA-only viewport: keep the global navigation and Admin sidebar, omit the footer. */
+  #root .app-frame:has(#ep-mfa-enrollment) { height: 100svh !important; min-height: 100svh !important; overflow: hidden !important; }
+  #root .app-frame:has(#ep-mfa-enrollment) > footer { display: none !important; }
+  #root .app-frame:has(#ep-mfa-enrollment) > .app-content { flex: 1 1 0 !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; }
+  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) { flex: 1; height: 100%; min-height: 0 !important; overflow: hidden; display: flex; flex-direction: column; }
+  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) > .page-shell { display: flex; flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 0; }
+  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) > .page-shell > div { display: flex; flex: 1; min-width: 0; min-height: 0; border-radius: 0; }
+  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) > .page-shell > div > div { flex: 1; min-width: 0; min-height: 0; height: 100%; }
+  #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+  #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas > header { display: none !important; }
+  #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas > div { flex: 1; min-height: 0; padding: 0 !important; overflow: hidden; }
+  @media (min-width: 1024px) {
+    /* Compensate only this route for the existing approved 75% admin canvas zoom. */
+    #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas { height: 133.333333%; }
+  }
   #ep-mfa-enrollment, #ep-mfa-enrollment * { box-sizing: border-box; }
   #ep-mfa-enrollment { width: 100%; min-width: 0; margin: 0; padding: clamp(16px,2.4vw,32px); background: #F7F6F2; color: #202421; }
   #ep-mfa-enrollment .mfa-layout { width: 100%; min-width: 0; max-width: none; margin: 0 auto; }
@@ -177,7 +197,88 @@ const MFA_PAGE_STYLE = `
     #ep-mfa-enrollment .mfa-setup-columns { padding: 17px; }
     #ep-mfa-enrollment .mfa-form-actions .mfa-primary { width: 100%; }
   }
-  @media (prefers-reduced-motion: reduce) { #ep-mfa-enrollment * { transition: none !important; animation-duration: .01ms !important; } }
+  /* Enrolled MFA: full-height security desk, route-scoped and using senior's palette. */
+  #ep-mfa-enrollment { height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; }
+  #ep-mfa-enrollment:has(.mfa-live-page) { display: flex; flex-direction: column; padding: clamp(15px, 2vw, 28px) !important; }
+  #ep-mfa-enrollment:has(.mfa-live-page) .mfa-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #ep-mfa-enrollment .mfa-live-page { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 17px; flex: 1; min-height: 0; }
+  #ep-mfa-enrollment .mfa-live-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 19px 4px 20px; border-bottom: 1px solid #D7DDCF; }
+  #ep-mfa-enrollment .mfa-live-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #9B4C2F; text-transform: uppercase; font-size: 12px; line-height: 1.4; letter-spacing: .075em; font-weight: 750; }
+  #root #ep-mfa-enrollment .mfa-live-header h1 { margin: 7px 0 0; color: #202421 !important; font-size: clamp(28px, 2.7vw, 37px) !important; line-height: 1.16 !important; letter-spacing: -.035em; font-weight: 750; }
+  #ep-mfa-enrollment .mfa-live-header p { margin: 5px 0 0; font-size: 14px; line-height: 1.45; color: #56675C; }
+  #ep-mfa-enrollment .mfa-live-confirmed { display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto; border: 1px solid #BCC9B7; background: #D7DDCF; color: #173F35; padding: 11px 16px; font-size: 13px; font-weight: 750; }
+  #ep-mfa-enrollment .mfa-live-grid { display: grid; grid-template-columns: minmax(0, 1.07fr) minmax(290px, .93fr); gap: 17px; min-height: 0; }
+  #ep-mfa-enrollment .mfa-live-security { min-width: 0; display: grid; grid-template-rows: minmax(200px, .90fr) minmax(230px, 1.1fr); min-height: 0; border: 1px solid #D7DDCF; }
+  #ep-mfa-enrollment .mfa-live-protected { position: relative; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 20px; padding: clamp(22px, 2.4vw, 34px); background: #173F35; color: #F7F6F2; }
+  #ep-mfa-enrollment .mfa-live-protected:after { content: ''; position: absolute; right: -110px; top: -125px; width: 315px; height: 315px; border: 1px solid rgba(247,246,242,.13); border-radius: 50%; box-shadow: 0 0 0 38px rgba(247,246,242,.045), 0 0 0 86px rgba(247,246,242,.025); pointer-events: none; }
+  #ep-mfa-enrollment .mfa-live-status-mark { position: relative; z-index: 1; display: inline-flex; gap: 9px; align-items: center; font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: #D7DDCF; }
+  #ep-mfa-enrollment .mfa-live-status-mark svg { color: #F7F6F2; }
+  #ep-mfa-enrollment .mfa-live-status-content { position: relative; z-index: 1; }
+  #root #ep-mfa-enrollment .mfa-live-protected h2 { max-width: 550px; margin: 0 0 8px; font-size: clamp(27px, 3vw, 43px) !important; line-height: 1.1 !important; letter-spacing: -.035em; color: #F7F6F2 !important; }
+  #ep-mfa-enrollment .mfa-live-protected p { max-width: 500px; margin: 0; color: #D7DDCF; font-size: 14px; line-height: 1.5; }
+  #ep-mfa-enrollment .mfa-live-protection-line { position: relative; z-index: 1; display: flex; align-items: center; gap: 9px; color: #F7F6F2; font-weight: 650; font-size: 13px; }
+  #ep-mfa-enrollment .mfa-live-protection-line svg { color: #F0B38F; }
+  #ep-mfa-enrollment .mfa-live-facts { min-width: 0; display: flex; flex-direction: column; background: #F7F6F2; }
+  #ep-mfa-enrollment .mfa-live-facts-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 19px 24px 14px; }
+  #root #ep-mfa-enrollment .mfa-live-facts-header h3 { margin: 0; color: #202421 !important; font-size: 19px !important; line-height: 1.25 !important; }
+  #ep-mfa-enrollment .mfa-live-facts-header span { color: #58685E; font-size: 12px; }
+  #ep-mfa-enrollment .mfa-live-facts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #D7DDCF; }
+  #ep-mfa-enrollment .mfa-live-fact { min-width: 0; padding: 17px 20px; }
+  #ep-mfa-enrollment .mfa-live-fact + .mfa-live-fact { border-left: 1px solid rgba(23,63,53,.14); }
+  #ep-mfa-enrollment .mfa-live-fact span { display: block; color: #4E6256; font-size: 12px; line-height: 1.45; }
+  #ep-mfa-enrollment .mfa-live-fact strong { display: block; margin-top: 7px; color: #173F35; font-size: clamp(18px, 1.8vw, 24px); line-height: 1.2; overflow-wrap: anywhere; }
+  #ep-mfa-enrollment .mfa-live-account { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: auto; padding: 16px 24px; }
+  #ep-mfa-enrollment .mfa-live-account-label { font-size: 11px; font-weight: 750; letter-spacing: .065em; text-transform: uppercase; color: #617064; }
+  #ep-mfa-enrollment .mfa-live-email { margin-top: 4px; color: #173F35; font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+  #ep-mfa-enrollment .mfa-live-refresh { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #B5C2B3; background: transparent; color: #173F35; padding: 9px 13px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  #ep-mfa-enrollment .mfa-live-refresh:hover { background: #D7DDCF; }
+  #ep-mfa-enrollment .mfa-live-tools { min-width: 0; display: flex; flex-direction: column; border: 1px solid #D7DDCF; background: #F7F6F2; }
+  #ep-mfa-enrollment .mfa-live-tools-header { padding: 22px 25px 20px; border-left: 5px solid #C56C42; border-bottom: 1px solid #D7DDCF; }
+  #ep-mfa-enrollment .mfa-live-tools-eyebrow { color: #A65334; font-size: 11px; font-weight: 750; letter-spacing: .075em; text-transform: uppercase; }
+  #root #ep-mfa-enrollment .mfa-live-tools-header h2 { margin: 8px 0 5px; color: #202421 !important; font-size: clamp(21px, 2vw, 27px) !important; line-height: 1.2 !important; }
+  #ep-mfa-enrollment .mfa-live-tools-header p { margin: 0; font-size: 13px; line-height: 1.45; color: #607164; }
+  #ep-mfa-enrollment .mfa-live-links { display: flex; flex-direction: column; padding: 0 24px; }
+  #ep-mfa-enrollment .mfa-live-link { display: flex; align-items: center; gap: 13px; padding: clamp(12px, 1.55vh, 17px) 0; text-decoration: none; color: #173F35; border-bottom: 1px solid #D7DDCF; min-width: 0; }
+  #ep-mfa-enrollment .mfa-live-link:hover { color: #A75334; padding-left: 4px; background: rgba(215,221,207,.23); }
+  #ep-mfa-enrollment .mfa-live-link-icon { display: grid; place-items: center; flex: 0 0 39px; width: 39px; height: 39px; background: #D7DDCF; color: #173F35; }
+  #ep-mfa-enrollment .mfa-live-link-text { flex: 1; min-width: 0; }
+  #ep-mfa-enrollment .mfa-live-link-text strong { display: block; color: inherit; font-size: 14px; line-height: 1.3; }
+  #ep-mfa-enrollment .mfa-live-link-text small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.35; color: #617064; }
+  #ep-mfa-enrollment .mfa-live-link > svg:last-child { flex: 0 0 auto; }
+  #ep-mfa-enrollment .mfa-live-tools-note { display: flex; align-items: flex-start; gap: 10px; margin-top: auto; padding: 17px 24px; color: #173F35; background: #D7DDCF; font-size: 13px; line-height: 1.45; }
+  #ep-mfa-enrollment .mfa-live-tools-note svg { flex: 0 0 auto; margin-top: 1px; }
+  #ep-mfa-enrollment .mfa-live-bottom { display: flex; justify-content: space-between; align-items: center; gap: 15px; border-top: 1px solid #D7DDCF; padding: 8px 4px 0; font-size: 12px; color: #526458; }
+  #ep-mfa-enrollment .mfa-live-back { display: inline-flex; align-items: center; gap: 7px; color: #173F35; text-decoration: none; font-weight: 750; white-space: nowrap; }
+  #ep-mfa-enrollment .mfa-live-back:hover { color: #A65334; }
+  #ep-mfa-enrollment :is(a,button):focus-visible { outline: 3px solid #C56C42; outline-offset: 3px; }
+  @media (max-width: 920px) {
+    #ep-mfa-enrollment .mfa-live-page { display: flex; flex-direction: column; min-height: 0; }
+    #ep-mfa-enrollment .mfa-live-grid { grid-template-columns: 1fr; min-height: auto; }
+    #ep-mfa-enrollment .mfa-live-security { grid-template-rows: auto auto; }
+    #ep-mfa-enrollment .mfa-live-protected { min-height: 205px; }
+  }
+  @media (max-width: 540px) {
+    #ep-mfa-enrollment:has(.mfa-live-page) { padding: 12px 10px 20px !important; }
+    #ep-mfa-enrollment .mfa-live-page { gap: 13px; }
+    #ep-mfa-enrollment .mfa-live-header { padding: 10px 3px 14px; gap: 12px; align-items: flex-start; }
+    #root #ep-mfa-enrollment .mfa-live-header h1 { font-size: 26px !important; }
+    #ep-mfa-enrollment .mfa-live-header p { font-size: 12px; }
+    #ep-mfa-enrollment .mfa-live-confirmed { padding: 7px 9px; font-size: 11px; }
+    #ep-mfa-enrollment .mfa-live-grid { gap: 12px; }
+    #ep-mfa-enrollment .mfa-live-protected { padding: 23px 18px; min-height: 193px; }
+    #root #ep-mfa-enrollment .mfa-live-protected h2 { font-size: 30px !important; }
+    #ep-mfa-enrollment .mfa-live-facts-header { padding: 16px 15px 12px; }
+    #ep-mfa-enrollment .mfa-live-fact { padding: 15px 10px; }
+    #ep-mfa-enrollment .mfa-live-fact strong { font-size: 17px; }
+    #ep-mfa-enrollment .mfa-live-account { align-items: flex-start; padding: 16px 14px; flex-wrap: wrap; }
+    #ep-mfa-enrollment .mfa-live-tools-header { padding: 17px 15px; }
+    #ep-mfa-enrollment .mfa-live-links { padding: 0 15px; }
+    #ep-mfa-enrollment .mfa-live-link { padding: 12px 0; }
+    #ep-mfa-enrollment .mfa-live-tools-note { padding: 13px 15px; }
+    #ep-mfa-enrollment .mfa-live-bottom { flex-wrap: wrap; }
+  }
+  @media (prefers-reduced-motion: reduce) { #ep-mfa-enrollment .mfa-live-link { transition: none !important; } }
+
 `
 
 function MfaFrame({children}) {
@@ -213,6 +314,8 @@ export default function MfaEnrollmentPage() {
     user,
     activeMode,
   } = useAuth()
+
+  const { hasAdminAccess, hasAdminPermission, isRootSuperAdmin } = useAdmin()
 
   const [
     mfaStatus,
@@ -518,8 +621,8 @@ export default function MfaEnrollmentPage() {
     }
 
   const policy = mfaStatus?.policy
-  const returnPath = activeMode === 'host' ? '/host/profile' : '/'
-  const returnLabel = activeMode === 'host' ? 'Back to Host profile' : 'Back to EPANTRY'
+  const returnPath = hasAdminAccess ? '/admin' : activeMode === 'host' ? '/host/profile' : '/'
+  const returnLabel = hasAdminAccess ? 'Admin overview' : activeMode === 'host' ? 'Back to Host profile' : 'Back to EPANTRY'
 
   if (isLoadingStatus) {
     return <MfaFrame><div className="mfa-panel mfa-loading" role="status"><LoaderCircle className="animate-spin" size={22} /> Loading your security settings…</div></MfaFrame>
@@ -540,51 +643,75 @@ export default function MfaEnrollmentPage() {
   if (mfaStatus?.enrolled && stage !== 'success') {
     return (
       <MfaFrame>
-        <MfaHero title="Sign-in security" description="Your authenticator is ready whenever an extra sign-in check is needed." active />
+        <div className="mfa-live-page">
+          <header className="mfa-live-header">
+            <div>
+              <div className="mfa-live-eyebrow"><ShieldCheck size={15} aria-hidden="true" /> Account security</div>
+              <h1>Sign-in security</h1>
+              <p>Manage the protection on your EPANTRY account.</p>
+            </div>
+            <span className="mfa-live-confirmed"><CheckCircle2 size={18} aria-hidden="true" /> MFA enabled</span>
+          </header>
 
-        <section className="mfa-security-grid" aria-label="Account protection overview">
-          <div className="mfa-status-feature">
-            <span className="mfa-feature-icon"><ShieldCheck size={28} aria-hidden="true" /></span>
-            <div className="mfa-feature-caption">Protection status</div>
-            <div className="mfa-feature-title">Active</div>
-            <div className="mfa-feature-text">Your account has an additional security factor.</div>
-          </div>
-          <div className="mfa-security-info">
-            <div className="mfa-overview-head">
-              <div>
-                <h2>Security details</h2>
-                <p>Your current sign-in protection</p>
+          <div className="mfa-live-grid">
+            <section className="mfa-live-security" aria-label="Account protection details">
+              <div className="mfa-live-protected">
+                <span className="mfa-live-status-mark"><ShieldCheck size={19} aria-hidden="true" /> Protection / Active</span>
+                <div className="mfa-live-status-content">
+                  <h2>Your account is protected.</h2>
+                  <p>{mfaStatus.totpEnrolled ? 'Your authenticator is ready for sign-in verification.' : 'Your account has an active additional sign-in check.'}</p>
+                </div>
+                <span className="mfa-live-protection-line"><CheckCircle2 size={17} aria-hidden="true" /> Extra sign-in verification is active</span>
               </div>
-              <span className="mfa-chip"><Check size={15} aria-hidden="true" /> Protected</span>
-            </div>
-            <div className="mfa-metric-grid">
-              <div className="mfa-metric">
-                <span className="mfa-metric-label">Authenticator app</span>
-                <strong className="mfa-metric-value">{mfaStatus.totpEnrolled ? 'Enabled' : 'Not enrolled'}</strong>
+              <div className="mfa-live-facts">
+                <div className="mfa-live-facts-header"><h3>Security details</h3><span>Current account status</span></div>
+                <div className="mfa-live-facts-grid">
+                  <div className="mfa-live-fact"><span>Authenticator</span><strong>{mfaStatus.totpEnrolled ? 'Enabled' : 'Not enrolled'}</strong></div>
+                  <div className="mfa-live-fact"><span>Security factors</span><strong>{mfaStatus.factorCount}</strong></div>
+                  <div className="mfa-live-fact"><span>Account policy</span><strong>{getPolicyLabel(policy?.mode)}</strong></div>
+                </div>
+                <div className="mfa-live-account">
+                  <div><span className="mfa-live-account-label">Signed-in account</span><div className="mfa-live-email">{user?.email || 'Signed-in account'}</div></div>
+                  <button type="button" className="mfa-live-refresh" onClick={loadStatus}><RefreshCw size={15} aria-hidden="true" /> Check status</button>
+                </div>
               </div>
-              <div className="mfa-metric">
-                <span className="mfa-metric-label">Security factors</span>
-                <strong className="mfa-metric-value">{mfaStatus.factorCount}</strong>
-              </div>
-              <div className="mfa-metric">
-                <span className="mfa-metric-label">Account policy</span>
-                <strong className="mfa-metric-value">{getPolicyLabel(policy?.mode)}</strong>
-              </div>
-            </div>
-            <div className="mfa-security-footer">
-              <span className="mfa-account">{user?.email || 'Signed-in account'}</span>
-              <Link to={returnPath} className="mfa-primary"><ArrowLeft size={16} aria-hidden="true" /> {returnLabel}</Link>
-            </div>
-          </div>
-        </section>
+            </section>
 
-        <aside className="mfa-advice">
-          <div className="mfa-advice-message">
-            <Info size={19} aria-hidden="true" />
-            <span><strong>Keep your authenticator available.</strong> You'll need its code when EPANTRY requests another sign-in check.</span>
+            <aside className="mfa-live-tools" aria-label={hasAdminAccess ? 'Super Admin shortcuts' : 'Workspace shortcut'}>
+              <div className="mfa-live-tools-header">
+                <span className="mfa-live-tools-eyebrow">{hasAdminAccess ? '02 / Super Admin workspace' : '02 / Your workspace'}</span>
+                <h2>{hasAdminAccess ? 'Quick access' : 'Return to your workspace'}</h2>
+                <p>{hasAdminAccess ? 'Open your admin tools directly.' : 'Continue where you left off.'}</p>
+              </div>
+              <nav className="mfa-live-links" aria-label="Security page navigation">
+                {hasAdminAccess ? (
+                  <Link className="mfa-live-link" to="/admin"><span className="mfa-live-link-icon"><LayoutDashboard size={19} aria-hidden="true" /></span><span className="mfa-live-link-text"><strong>Admin overview</strong><small>Dashboard and priorities</small></span><ArrowRight size={17} aria-hidden="true" /></Link>
+                ) : null}
+                {hasAdminAccess && hasAdminPermission('admin.audit.read') ? (
+                  <Link className="mfa-live-link" to="/admin/audit"><span className="mfa-live-link-icon"><ScrollText size={19} aria-hidden="true" /></span><span className="mfa-live-link-text"><strong>Admin activity history</strong><small>Recorded changes and decisions</small></span><ArrowRight size={17} aria-hidden="true" /></Link>
+                ) : null}
+                {hasAdminAccess && isRootSuperAdmin ? (
+                  <Link className="mfa-live-link" to="/admin/roles"><span className="mfa-live-link-icon"><UserRoundCog size={19} aria-hidden="true" /></span><span className="mfa-live-link-text"><strong>Admin roles & permissions</strong><small>Manage team access</small></span><ArrowRight size={17} aria-hidden="true" /></Link>
+                ) : null}
+                {hasAdminAccess && hasAdminPermission('trust_safety.read') ? (
+                  <Link className="mfa-live-link" to="/admin/trust-safety"><span className="mfa-live-link-icon"><ShieldCheck size={19} aria-hidden="true" /></span><span className="mfa-live-link-text"><strong>Trust, safety & claims</strong><small>Cases and safety reviews</small></span><ArrowRight size={17} aria-hidden="true" /></Link>
+                ) : null}
+                {hasAdminAccess && hasAdminPermission('admin.dashboard.read') ? (
+                  <Link className="mfa-live-link" to="/admin/policy"><span className="mfa-live-link-icon"><KeyRound size={19} aria-hidden="true" /></span><span className="mfa-live-link-text"><strong>Food rules & feature access</strong><small>Platform controls</small></span><ArrowRight size={17} aria-hidden="true" /></Link>
+                ) : null}
+                {!hasAdminAccess ? (
+                  <Link className="mfa-live-link" to={returnPath}><span className="mfa-live-link-icon"><ArrowLeft size={19} aria-hidden="true" /></span><span className="mfa-live-link-text"><strong>{returnLabel}</strong></span><ArrowRight size={17} aria-hidden="true" /></Link>
+                ) : null}
+              </nav>
+              <div className="mfa-live-tools-note"><Info size={17} aria-hidden="true" /><span>Your authenticator may be requested before sensitive changes.</span></div>
+            </aside>
           </div>
-          <span className="mfa-advice-small">Account protection</span>
-        </aside>
+
+          <div className="mfa-live-bottom">
+            <span>Security is enabled for this account.</span>
+            <Link to={returnPath} className="mfa-live-back">{returnLabel} <ArrowRight size={16} aria-hidden="true" /></Link>
+          </div>
+        </div>
       </MfaFrame>
     )
   }

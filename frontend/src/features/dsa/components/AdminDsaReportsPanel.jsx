@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiClient } from '../../../api/apiClient'
 
-const input = 'w-full rounded-xl border border-[#cbdcd2] bg-white px-3 py-2.5 text-sm text-[#193c31] focus:outline-none focus:ring-2 focus:ring-emerald-300'
-const button = 'rounded-xl bg-[#173f35] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50'
+const input = 'w-full border border-[#D7DDCF] bg-white px-3 py-2.5 text-sm text-[#202421] focus:outline-none focus:ring-2 focus:ring-[#C56C42]'
+const button = 'bg-[#173F35] px-4 py-2.5 text-sm font-bold text-[#F7F6F2] disabled:opacity-50'
 const unwrap = r => r?.data?.data || r?.data || {}
 const message = error => error?.response?.data?.message || error?.message || 'Unable to complete action.'
 async function mutate(url, body, method = 'patch') {
@@ -62,11 +62,14 @@ export default function AdminDsaReportsPanel({ canDecide }) {
     setCaseReference(''); setOutcome('no_violation_found')
     setListingId(report.enforcementListingId || ''); setEnforcementReason('')
   }
-  return <section aria-labelledby="dsa-reports-title" className="rounded-[20px] border border-[#dce6da] bg-[#f6f8f3] p-4 sm:p-6">
-    <div className="border-b border-[#d7e2d6] pb-5">
-      <h2 className="text-xl font-bold text-[#173f35]">EU trader traceability</h2>
-      <p className="mt-1 text-sm text-[#52675b]">Verify existing approved KYB, legal contact and accepted registration/payment documents before authorizing EU sales.</p>
-      {traders.length === 0 ? <p className="mt-3 text-sm text-[#647268]">No pending trader declarations.</p> : <div className="mt-3 divide-y divide-[#dce6da]">{traders.map(trader =>
+  return <section aria-labelledby="dsa-reports-title" className="min-w-0 bg-[#F7F6F2]">
+    <details className="border-b border-[#D7DDCF] bg-[#F7F6F2]">
+      <summary className="focus-ring flex cursor-pointer list-item items-center justify-between px-4 py-3 text-[14px] font-bold text-[#173F35] sm:px-6 sm:py-4">
+        EU seller checks <span className="ml-2 inline-flex bg-[#D7DDCF] px-2.5 py-0.5 text-[13px]">{traders.length}</span>
+      </summary>
+      <div className="px-4 pb-4 sm:px-6">
+        {traders.length > 0 && <p className="mb-2 text-[13px] leading-5 text-[#202421]">Confirm registration and payment documents before approving EU sales.</p>}
+      {traders.length === 0 ? <p className="mt-3 text-sm text-[#173F35]">No pending trader declarations.</p> : <div className="mt-3 divide-y divide-[#D7DDCF]">{traders.map(trader =>
         <div key={trader.id} className="space-y-2 py-3 text-sm"><p><strong>{trader.legalName}</strong> · {trader.contactEmail}</p>
           <p className="break-words text-[#52675b]">{trader.postalAddress} · {trader.contactPhone}</p>
           <p className="text-xs">Register: {trader.businessRegister} / {trader.registrationNumber}</p>
@@ -78,27 +81,31 @@ export default function AdminDsaReportsPanel({ canDecide }) {
               <button type="button" className="rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-50" disabled={busy || (traderReason[trader.id] || '').trim().length < 30}
                 onClick={() => decideTrader(trader.id,'rejected')}>Request corrections</button></div></>}
         </div>)}</div>}
-    </div>
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d7e2d6] pb-4">
-      <div><h2 id="dsa-reports-title" className="text-xl font-bold text-[#173f35]">Public listing reports</h2><p className="text-sm text-[#52675b]">Notice, review, decision and appeal records</p></div>
+      </div>
+    </details>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D7DDCF] bg-[#F7F6F2] px-4 py-3 sm:px-6 sm:py-4">
+      <div><h2 id="dsa-reports-title" className="text-[18px] font-bold text-[#202421] sm:text-[20px]">Customer reports <span className="ml-2 text-[14px] font-semibold text-[#173F35]">{total}</span></h2></div>
       <button type="button" onClick={() => load(1)} className={button} disabled={loading}>Refresh</button>
     </div>
     {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {notice && <p role="status" className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-900">{notice}</p>}
-    <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold text-[#2a654e]">
-      <Link to="/admin/host-operations" className="underline">Review existing Host KYB records</Link>
-      <Link to="/admin/host-listings" className="underline">Listing governance</Link>
-    </div>
-    <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(260px,.8fr)_minmax(0,1.2fr)]">
-      <div className="space-y-2">
+    <details className="border-b border-[#D7DDCF] px-4 py-3 text-[13px] text-[#173F35] sm:px-6">
+      <summary className="focus-ring cursor-pointer font-semibold">Related management pages</summary>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 font-semibold">
+        <Link to="/admin/host-operations" className="underline">Host verification</Link>
+        <Link to="/admin/host-listings" className="underline">Listing management</Link>
+      </div>
+    </details>
+    <div className={`grid gap-0 border-t border-[#D7DDCF] ${records.length ? "lg:grid-cols-[minmax(220px,.85fr)_minmax(0,1.15fr)]" : ""}`}>
+      <div className="min-w-0 space-y-2 p-3 sm:p-5">
         {loading && <p className="text-sm">Loading reports...</p>}
-        {!loading && records.length === 0 && <p className="text-sm">No public listing reports found.</p>}
-        {records.map(item => <button key={item.reference} type="button" onClick={() => select(item)} className={`block w-full rounded-xl border px-4 py-3 text-left text-sm ${selected?.reference === item.reference ? 'border-[#3b8b64] bg-[#e0efdf]' : 'border-[#dce6da] bg-white hover:bg-[#eef6ee]'}`}>
+        {!loading && records.length === 0 && <p className="text-sm">No reports to review.</p>}
+        {records.map(item => <button key={item.reference} type="button" onClick={() => select(item)} className={`block w-full border-l-4 px-3 py-3 text-left text-sm ${selected?.reference === item.reference ? 'border-[#C56C42] bg-[#D7DDCF]' : 'border-[#D7DDCF] bg-white hover:bg-[#D7DDCF]'}`}>
           <span className="block break-all font-bold">{item.reference}</span><span className="mt-1 block text-xs">{item.reason.replaceAll('_',' ')} · {item.status.replaceAll('_',' ')}</span><span className="mt-1 block truncate text-xs text-[#607468]">{item.listingUrl}</span>
         </button>)}
-        <div className="flex items-center gap-3 pt-3 text-xs"><button type="button" disabled={page <= 1 || loading} onClick={() => load(page - 1)} className="disabled:opacity-40">Previous</button><span>{page} · {total} total</span><button type="button" disabled={page * 20 >= total || loading} onClick={() => load(page + 1)} className="disabled:opacity-40">Next</button></div>
+        {(total > 0 || page > 1) && <div className="flex items-center gap-3 pt-3 text-xs"><button type="button" disabled={page <= 1 || loading} onClick={() => load(page - 1)} className="disabled:opacity-40">Previous</button><span>{page} · {total} total</span><button type="button" disabled={page * 20 >= total || loading} onClick={() => load(page + 1)} className="disabled:opacity-40">Next</button></div>}
       </div>
-      <div className="min-w-0 rounded-xl bg-white p-4 sm:p-5">
+      {records.length > 0 && <div className="min-w-0 border-t border-[#D7DDCF] bg-white p-3 sm:border-l sm:border-t-0 sm:p-5">
         {!selected ? <p className="text-sm text-[#637368]">Select a report to review.</p> : <div className="space-y-4 text-sm">
           <div><strong className="block break-all">{selected.reference}</strong><a href={selected.listingUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block break-all text-[#187450] underline">{selected.listingUrl}</a></div>
           <p className="whitespace-pre-wrap break-words">{selected.explanation}</p>
@@ -149,7 +156,7 @@ export default function AdminDsaReportsPanel({ canDecide }) {
           </div>}
           {selected.timeline?.length > 0 && <details><summary className="cursor-pointer font-semibold">Audit timeline</summary><ol className="mt-2 space-y-2 border-l pl-3 text-xs">{selected.timeline.map((entry, i) => <li key={`${entry.event}-${i}`}><strong>{entry.event.replaceAll('_',' ')}</strong> · {entry.at && new Date(entry.at).toLocaleString()}<p>{entry.note}</p></li>)}</ol></details>}
         </div>}
-      </div>
+      </div>}
     </div>
   </section>
 }

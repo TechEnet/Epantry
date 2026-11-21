@@ -113,6 +113,62 @@ function RunHistoryItem({ item }) {
   )
 }
 
+
+// Only the full AI Health page uses this editorial record layout.
+// The condensed widget on the Admin Dashboard keeps its original markup.
+function EditorialRunHistoryItem({ item }) {
+  const problem = item.status === 'failed' || item.status === 'fallback'
+  const details = [
+    ['AI model', item.modelId || 'Not recorded'],
+    ['AI provider', niceName(item.provider)],
+    ['Setup version', item.promptVersion || 'Not recorded'],
+    ['Confidence', item.confidence ?? 'Not recorded'],
+    ['Tools used', Array.isArray(item.toolNames) && item.toolNames.length ? item.toolNames.map(niceName).join(', ') : 'None recorded'],
+    ['Reason / error', item.fallbackCode || item.errorCode ? niceName(item.fallbackCode || item.errorCode) : 'None recorded'],
+    ['Interaction type', niceName(item.interactionType)],
+    ['Run ID', item.id || 'Not recorded'],
+    ['Session ID', item.sessionId || 'Not recorded'],
+    ['Source records', Array.isArray(item.sourceIds) && item.sourceIds.length ? item.sourceIds.join(', ') : 'None recorded'],
+  ]
+
+  return (
+    <article className="border-b border-[#D7DDCF] px-3 py-3 last:border-b-0 sm:px-6 sm:py-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex rounded-md px-2.5 py-1 text-[12px] font-bold ${item.status === 'succeeded' ? 'bg-[#D7DDCF] text-[#173F35]' : item.status === 'fallback' ? 'border border-[#C56C42] bg-[#F7F6F2] text-[#173F35]' : 'border border-[#C56C42] bg-[#D7DDCF] text-[#173F35]'}`}>
+              {STATUS_LABELS[item.status] || niceName(item.status)}
+            </span>
+            <span className="text-[13px] text-[#52645A]">{formatActorType(item.actorType)}</span>
+          </div>
+          <h4 className="mt-2 text-[16px] font-bold leading-snug text-[#202421] sm:text-[17px]">
+            {item.status === 'succeeded' ? 'Request completed' : item.status === 'fallback' ? 'Backup search was used' : item.status === 'failed' ? 'Request needs attention' : 'AI activity recorded'}
+          </h4>
+          {problem && (item.fallbackCode || item.errorCode) ? (
+            <p className="mt-1 break-words text-[13px] leading-5 text-[#52645A]">{niceName(item.fallbackCode || item.errorCode)}</p>
+          ) : null}
+        </div>
+        <div className="shrink-0 text-left sm:text-right">
+          <p className="text-[13px] font-medium text-[#52645A]">{dateLabel(item.recordedAt)}</p>
+          {item.latencyMs != null ? <p className="mt-1 flex items-center gap-1 text-[12px] text-[#52645A] sm:justify-end"><Clock3 size={13} aria-hidden="true" />{item.latencyMs} ms</p> : null}
+        </div>
+      </div>
+      <details className="group mt-3 border-t border-[#D7DDCF] pt-2.5">
+        <summary className="focus-ring w-fit cursor-pointer py-1 text-[13px] font-bold text-[#173F35]">View details <span className="inline-block transition-transform group-open:rotate-90" aria-hidden="true">›</span></summary>
+        <dl className="mt-3 grid gap-x-6 border-t border-[#D7DDCF] sm:grid-cols-2 lg:grid-cols-3">
+          {details.map(([label, value]) => <RunField key={label} label={label} value={value} />)}
+        </dl>
+        {item.usage != null ? (
+          <div className="mt-3 border-t border-[#D7DDCF] py-3">
+            <p className="text-[13px] font-bold text-[#173F35]">Service usage details</p>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all bg-[#D7DDCF] p-3 text-xs text-[#202421]">{JSON.stringify(item.usage, null, 2)}</pre>
+          </div>
+        ) : null}
+      </details>
+    </article>
+  )
+}
+
 export default function AdminAiQualityPanel({ refreshSignal = 0, condensed = false }) {
   const [data, setData] = useState(null)
   const [status, setStatus] = useState('')
@@ -147,6 +203,124 @@ export default function AdminAiQualityPanel({ refreshSignal = 0, condensed = fal
   const pages = Math.max(0, Number(data?.pagination?.pages || 0))
   const totalInFilter = Number(data?.pagination?.total || 0)
   const items = Array.isArray(data?.items) ? data.items : []
+
+  // Full monitoring page: a single, calm scorecard and a clear activity ledger.
+  // The condensed Dashboard widget below is intentionally unchanged.
+  if (!condensed) {
+    const total = Number(summary.total ?? 0)
+    const succeeded = Number(summary.succeeded ?? 0)
+    const fallback = Number(summary.fallback ?? 0)
+    const failed = Number(summary.failed ?? 0)
+    const filterCounts = { '': total, succeeded, fallback, failed }
+    const metrics = [
+      { label: 'Recorded runs', value: total },
+      { label: 'Worked normally', value: succeeded },
+      { label: 'Used backup', value: fallback },
+      { label: 'Needs attention', value: failed },
+    ]
+
+    return (
+      <section id="ai-quality" aria-label="Food Copilot activity" className="-mx-2 min-w-0 text-[#202421] sm:mx-0">
+        <header className="hidden flex-wrap items-center justify-between gap-4 border-b border-[#D7DDCF] pb-4 sm:flex sm:pb-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center bg-[#D7DDCF] text-[#173F35]" aria-hidden="true">
+              <Bot size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#C56C42]">AI performance</p>
+              <h2 className="mt-0.5 text-[22px] font-bold leading-tight tracking-[-0.025em] text-[#202421] sm:text-[28px]">Food Copilot activity</h2>
+              <p className="mt-1 text-[14px] leading-5 text-[#173F35]">Saved results, backups and issues.</p>
+            </div>
+          </div>
+          <button type="button" onClick={load} disabled={loading}
+            className="focus-ring inline-flex min-h-10 items-center gap-2 border border-[#173F35] bg-[#173F35] px-4 py-2 text-[14px] font-semibold text-[#F7F6F2] transition hover:opacity-90 disabled:opacity-50">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Refresh results
+          </button>
+        </header>
+
+        <section aria-label="Recorded AI results" className="mt-1 border-y border-[#D7DDCF] bg-[#D7DDCF] sm:mt-6">
+          <div className="flex items-center justify-between gap-2 px-3 pt-3 sm:px-6 sm:pt-4">
+            <h3 className="text-[13px] font-bold tracking-[0.01em] text-[#173F35] sm:uppercase sm:tracking-[0.07em]">Results overview</h3>
+            {data && !loading && !error ? (
+              <span className="hidden text-[12px] font-medium text-[#173F35] sm:inline">{total === 0 ? 'No runs recorded' : `${total} total`}</span>
+            ) : null}
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-px bg-[#F7F6F2] sm:grid-cols-4">
+            {metrics.map((metric) => (
+              <div key={metric.label} className="min-w-0 bg-[#D7DDCF] px-3 pb-3.5 pt-2.5 sm:px-6 sm:pb-6 sm:pt-4">
+                <p className="text-[26px] font-bold leading-none tabular-nums tracking-[-0.03em] text-[#173F35] sm:text-[38px]">{data ? metric.value : '—'}</p>
+                <p className="mt-1.5 text-[12.5px] font-medium leading-snug text-[#202421] sm:mt-2 sm:text-[14px]">{metric.label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section aria-label="AI activity history" className="mt-4 min-w-0 border-y border-[#D7DDCF] bg-[#F7F6F2] sm:mt-8">
+          <header className="flex items-end justify-between gap-2 px-3 py-3 sm:px-2 sm:py-5">
+            <div className="min-w-0">
+              <p className="hidden text-[12px] font-bold uppercase tracking-[0.08em] text-[#C56C42] sm:block">History</p>
+              <h3 className="text-[19px] font-bold leading-tight tracking-[-0.025em] text-[#202421] sm:mt-1 sm:text-[25px]">Recorded activity</h3>
+            </div>
+            {data && !error ? <span className="text-[13px] font-semibold tabular-nums text-[#173F35]">{totalInFilter} {totalInFilter === 1 ? 'record' : 'records'}</span> : null}
+          </header>
+
+          <div className="border-y border-[#D7DDCF] px-3 py-2.5 sm:hidden">
+            <label htmlFor="ai-health-mobile-filter" className="mb-1 block text-[13px] font-semibold text-[#173F35]">Filter results</label>
+            <select
+              id="ai-health-mobile-filter"
+              value={status}
+              onChange={(event) => { setStatus(event.target.value); setPage(1) }}
+              className="focus-ring min-h-10 w-full rounded-md border border-[#D7DDCF] bg-[#F7F6F2] px-3 py-2 text-[14px] font-semibold text-[#173F35]"
+            >
+              {FILTERS.map((filter) => <option key={filter.value} value={filter.value}>{filter.label}</option>)}
+            </select>
+          </div>
+
+          <div role="group" aria-label="Filter AI activity" className="hidden border-y border-[#D7DDCF] py-3 sm:flex sm:flex-wrap sm:gap-2 sm:py-4">
+            {FILTERS.map((filter) => (
+              <button type="button" key={filter.value} aria-pressed={status === filter.value}
+                onClick={() => { if (status !== filter.value) { setStatus(filter.value); setPage(1) } }}
+                className={`focus-ring flex min-w-0 items-center justify-between gap-2 border px-3 py-2.5 text-left text-[13px] font-semibold transition sm:justify-start sm:px-4 sm:text-[14px] ${status === filter.value ? 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]' : 'border-[#D7DDCF] bg-[#F7F6F2] text-[#173F35] hover:border-[#173F35]'}`}>
+                <span className="min-w-0">{filter.label}</span>
+                <span className={`shrink-0 tabular-nums ${status === filter.value ? 'text-[#F7F6F2]' : 'text-[#173F35]'}`}>{data ? filterCounts[filter.value] : '—'}</span>
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div role="status" className="flex items-center gap-2 px-2 py-8 text-[14px] text-[#173F35] sm:py-10">
+              <RefreshCw size={16} className="animate-spin" aria-hidden="true" /> Loading records…
+            </div>
+          ) : error ? (
+            <div role="alert" className="border-l-[3px] border-[#C56C42] px-4 py-5">
+              <p className="flex items-start gap-2 break-words text-[14px] font-semibold text-[#202421]"><AlertCircle size={18} className="shrink-0 text-[#C56C42]" aria-hidden="true" /> Could not load records: {error}</p>
+              <button type="button" onClick={load} className="focus-ring mt-3 bg-[#173F35] px-4 py-2 text-[13px] font-semibold text-[#F7F6F2]">Try again</button>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="flex items-start gap-2.5 px-3 py-4 sm:gap-3 sm:px-0 sm:py-9">
+              <span className="grid h-8 w-8 shrink-0 place-items-center bg-[#D7DDCF] text-[#173F35] sm:h-10 sm:w-10" aria-hidden="true"><CheckCircle2 size={18} className="sm:h-5 sm:w-5" /></span>
+              <div className="min-w-0">
+                <h4 className="text-[15px] font-bold leading-snug text-[#202421] sm:text-[16px]">{status ? 'No matching records' : 'No activity recorded yet'}</h4>
+                <p className="mt-1 hidden text-[13px] leading-5 text-[#173F35] sm:block">{status ? 'Try another result filter.' : 'New Food Copilot runs will appear here.'}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="-mx-3 sm:-mx-4">{items.map((item) => <EditorialRunHistoryItem key={item.id} item={item} />)}</div>
+          )}
+          {!loading && !error && pages > 1 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#D7DDCF] py-3">
+              <span className="text-[13px] font-semibold text-[#173F35]">Page {page} of {pages}</span>
+              <div className="flex gap-2">
+                <button type="button" disabled={page <= 1} onClick={() => setPage((old) => Math.max(1, old - 1))} className="focus-ring inline-flex items-center gap-1 border border-[#D7DDCF] px-3 py-2 text-[13px] font-semibold text-[#173F35] disabled:opacity-40"><ArrowLeft size={14} /> Previous</button>
+                <button type="button" disabled={page >= pages} onClick={() => setPage((old) => Math.min(pages, old + 1))} className="focus-ring inline-flex items-center gap-1 border border-[#D7DDCF] px-3 py-2 text-[13px] font-semibold text-[#173F35] disabled:opacity-40">Next <ArrowRight size={14} /></button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+        <p className="mt-4 hidden border-l-[3px] border-[#C56C42] px-3 text-[13px] leading-5 text-[#173F35] sm:block">Only saved Food Copilot runs are counted here.</p>
+      </section>
+    )
+  }
 
   return (
     <section

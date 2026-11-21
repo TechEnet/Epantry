@@ -569,93 +569,79 @@ import {
   
   // A17: only display records loaded from the Trust & Safety domain.
   // A failed request must never be presented as a genuinely empty queue.
+  // Trust & Safety case lists reuse the original permissions, pagination and selection handlers.
   function TrustSafetyWorkQueue({
-    title,
-    subtitle,
-    items,
-    total,
-    error,
-    onSelect,
-    selectedId,
-    onMore,
-    loadingMore,
-    icon: Icon,
-    tone,
+    title, subtitle, items, total, error, onSelect, selectedId, onMore, loadingMore, icon: Icon, tone,
   }) {
     const tones = {
-      blue: 'bg-[#e5effb] text-[#265a83]',
-      peach: 'bg-[#ffede0] text-[#955338]',
-      mint: 'bg-[#e5f3e9] text-[#196344]',
+      clay: 'bg-[#C56C42] text-[#F7F6F2]',
+      sage: 'bg-[#D7DDCF] text-[#173F35]',
+      forest: 'bg-[#173F35] text-[#F7F6F2]',
     };
     const failed = Boolean(error);
     const [expanded, setExpanded] = useState(false);
     const visibleItems = expanded ? items : items.slice(0, 4);
-
     return (
-      <section className="min-w-0 border-b border-[#d9e2dd] last:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0">
-        <div className="flex items-center justify-between gap-3 px-3.5 py-3 sm:px-5 sm:py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${tones[tone]}`}>
-              <Icon size={18} aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-[15px] font-bold leading-5 text-[#1a332b] sm:text-base">{title}</h3>
-              <p className="text-xs leading-4 text-stone-500">{subtitle}</p>
-            </div>
-          </div>
-          <span className="shrink-0 rounded-full bg-[#f0f3ef] px-3 py-1 text-sm font-bold text-[#315d4d]">
-            {failed ? '—' : total}
+      <section className="min-w-0 bg-[#F7F6F2]">
+        <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
+          <span className={`grid h-10 w-10 shrink-0 place-items-center ${tones[tone] || tones.sage}`}>
+            <Icon size={19} aria-hidden="true" />
           </span>
-        </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[16px] font-extrabold leading-5 text-[#202421]">{title}</h3>
+            {items.length ? <p className="mt-0.5 text-[13px] leading-5 text-[#173F35]">{subtitle}</p> : null}
+          </div>
 
+        </div>
         {failed ? (
-          <div role="alert" className="mx-3.5 mb-3 rounded-xl border border-red-200 bg-red-50 p-3 sm:mx-5">
-            <p className="text-sm font-semibold text-red-800">Unable to load {title.toLowerCase()}.</p>
-            <p className="mt-1 break-words text-xs text-red-700">{error}</p>
-            <p className="mt-1 text-xs text-red-700">Use Refresh above to try again.</p>
+          <div role="alert" className="mx-4 mb-3 border-l-4 border-[#C56C42] bg-white p-3 sm:mx-5">
+            <p className="text-sm font-bold text-[#202421]">Unable to load {title.toLowerCase()}.</p>
+            <p className="mt-1 break-words text-xs text-[#202421]">{error}</p>
+            <p className="mt-1 text-xs text-[#173F35]">Use Refresh above to try again.</p>
           </div>
         ) : items.length ? (
-          <div className="border-t border-[#e6ebe6]">
+          <div className="border-t border-[#D7DDCF]">
             {visibleItems.map((item, index) => (
               <button
                 key={item.id || `${title}-${index}`}
                 type="button"
                 onClick={() => onSelect(item)}
-                className={`focus-ring flex w-full min-w-0 items-center justify-between gap-3 border-b border-[#e9ece8] px-3.5 py-3 text-left last:border-b-0 hover:bg-[#f1f8f3] sm:px-5 ${selectedId === item.id ? 'bg-[#e6f4eb]' : ''}`}
+                aria-pressed={selectedId === item.id}
+                className={`focus-ring flex w-full min-w-0 items-center justify-between gap-3 border-b border-[#D7DDCF] px-4 py-3.5 text-left transition-colors hover:bg-[#D7DDCF] sm:px-5 ${selectedId === item.id ? 'bg-[#D7DDCF]' : ''}`}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block break-words text-sm font-semibold leading-5 text-[#1f3430]">
+                  <span className="block break-words text-sm font-bold leading-5 text-[#202421]">
                     {item.summary || item.title || item.description || item.caseKey || item.incidentKey || item.supportKey || 'Untitled record'}
                   </span>
-                  <span className="mt-1 block truncate text-xs text-stone-500">
+                  <span className="mt-1 block truncate text-xs text-[#173F35]">
                     {item.caseKey || item.incidentKey || item.supportKey || 'Record'} · {titleize(item.domain || 'trust_safety')} · {titleize(item.status)}
                   </span>
                 </span>
-                <span className="shrink-0 text-xs font-bold text-emerald-800">Review →</span>
+                <span className="shrink-0 text-xs font-bold text-[#C56C42]">Review →</span>
               </button>
             ))}
             {!expanded && items.length > 4 ? (
               <button type="button" onClick={() => setExpanded(true)}
-                className="focus-ring w-full px-4 py-3 text-sm font-bold text-[#0e6b4c] hover:bg-[#f1f8f3]">
+                className="focus-ring w-full px-4 py-3 text-sm font-bold text-[#173F35] hover:bg-[#D7DDCF]">
                 View all {items.length} loaded records
               </button>
             ) : null}
             {expanded && items.length > 4 ? (
               <button type="button" onClick={() => setExpanded(false)}
-                className="focus-ring w-full border-t border-[#e9ece8] px-4 py-2.5 text-xs font-bold text-stone-600 hover:bg-[#f1f8f3]">
+                className="focus-ring w-full border-t border-[#D7DDCF] px-4 py-2.5 text-xs font-bold text-[#173F35] hover:bg-[#D7DDCF]">
                 Show fewer
               </button>
             ) : null}
             {total > items.length && (expanded || items.length <= 4) ? (
               <button type="button" disabled={loadingMore} onClick={onMore}
-                className="focus-ring w-full px-4 py-3 text-sm font-bold text-[#0e6b4c] hover:bg-[#f1f8f3] disabled:opacity-50">
+                className="focus-ring w-full px-4 py-3 text-sm font-bold text-[#173F35] hover:bg-[#D7DDCF] disabled:opacity-50">
                 {loadingMore ? 'Loading…' : `Show more (${total - items.length} remaining)`}
               </button>
             ) : null}
           </div>
         ) : (
-          <p className="border-t border-[#e6ebe6] px-3.5 py-4 text-sm leading-5 text-stone-600 sm:px-5">
-            No {title.toLowerCase()} in Trust & Safety right now.
+          <p className="border-t border-[#D7DDCF] px-4 py-3 text-sm leading-5 text-[#173F35] sm:px-5">
+            Nothing waiting here.
           </p>
         )}
       </section>
@@ -1200,6 +1186,8 @@ import {
     // "All permitted" uses the backend's permission-filtered scope;
     // "Trust & Safety" restricts to its original domain. No private records are exposed.
     const [trustSafetyScope, setTrustSafetyScope] = useState('all');
+    const [trustSafetyView, setTrustSafetyView] = useState('reports');
+    const [trustSafetyActiveQueue, setTrustSafetyActiveQueue] = useState('reviews');
 
 
     const [dataQualityLoading, setDataQualityLoading] =
@@ -2663,18 +2651,18 @@ import {
 
         const statusTone = (value) => {
             if (['approved', 'active', 'paid'].includes(value)) {
-                return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+                return 'border-[#173F35] bg-[#173F35] text-[#F7F6F2]';
             }
 
             if (['pending_review', 'initiated'].includes(value)) {
-                return 'border-[#c8d8e5] bg-[#eef5fa] text-[#315f7a]';
+                return 'border-[#173F35] bg-[#D7DDCF] text-[#173F35]';
             }
 
             if (value === 'rejected') {
-                return 'border-rose-200 bg-rose-50 text-rose-700';
+                return 'border-[#C56C42] bg-[#F7F6F2] text-[#202421]';
             }
 
-            return 'border-stone-200 bg-stone-50 text-stone-600';
+            return 'border-[#D7DDCF] bg-[#F7F6F2] text-[#202421]';
         };
 
         const pendingCampaigns =
@@ -2778,412 +2766,638 @@ import {
             loadAdReviewWorkspace();
         };
 
+        // Display only the eight existing recent decisions, grouping identical
+        // outcomes without losing their occurrence counts or source details.
+        const recentServingGroups = [];
+        const recentServingIndex = new Map();
+        adDecisionLogs.slice(0, 8).forEach((log, index) => {
+            const key = JSON.stringify([
+                log.placement,
+                log.marketCode || 'IN',
+                log.promotedEntityType,
+                log.reasonCodes || [],
+                log.outcome,
+            ]);
+            if (recentServingIndex.has(key)) {
+                recentServingGroups[recentServingIndex.get(key)].count += 1;
+            } else {
+                recentServingIndex.set(key, recentServingGroups.length);
+                recentServingGroups.push({ key: `${key}-${index}`, log, count: 1 });
+            }
+        });
+
         return (
             <AdminShell
                 title="Ads & Promotions Review"
-                description="Review paid campaigns before they can run on EPANTRY."
+                description="Review campaigns, payments and ad-placement decisions."
                 actions={
                     <button
                         type="button"
                         onClick={refreshAdPage}
                         disabled={refreshing}
-                        className="focus-ring inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-black text-stone-600 shadow-sm disabled:opacity-50"
+                        className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-4 text-sm font-bold text-[#173F35] transition hover:bg-[#D7DDCF] disabled:opacity-50"
                     >
-                        <RefreshCw
-                            size={14}
-                            className={refreshing ? 'animate-spin' : ''}
-                            aria-hidden="true"
-                        />
+                        <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
                         Refresh
                     </button>
                 }
             >
-                <div className="overflow-hidden bg-[#f5f4f1] pb-7 sm:pb-9">
-                    <section className="border-b border-[#26384c] bg-[#233247] text-white">
-                        <div className="grid lg:grid-cols-[minmax(0,1fr)_420px]">
-                            <div className="px-4 py-4 sm:px-7 sm:py-6">
-                                <p className="text-[11px] font-bold text-[#b8c9dc] sm:text-xs">Ad review workspace</p>
-                                <h2 className="mt-1 max-w-3xl text-[22px] font-black leading-[1.08] sm:text-[31px]">
-                                    Check the campaign. Confirm payment. Make the decision.
-                                </h2>
-                                <p className="mt-2 line-clamp-2 max-w-2xl text-xs font-semibold leading-5 text-white/70 sm:hidden">
-                                    Review the ad customers may see, then approve or reject it.
-                                </p>
-                                <p className="mt-2 hidden max-w-2xl text-sm font-semibold leading-6 text-white/70 sm:block">
-                                    Open a paid campaign, check the creative and disclosure, then record the Super Admin decision.
-                                </p>
+                {/* Ads review only: mobile layout is full width, without changing other Admin pages. */}
+                <style>{`
+                    @media (max-width: 639px) {
+                      .page-shell:has(#admin-ads-promotions-mobile) {
+                        width: 100% !important;
+                        max-width: none !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                      }
+                      .page-shell:has(#admin-ads-promotions-mobile) > div {
+                        border: 0 !important;
+                        border-radius: 0 !important;
+                        box-shadow: none !important;
+                      }
+                      .page-shell:has(#admin-ads-promotions-mobile) .epantry-workspace-canvas > div {
+                        padding: 0 !important;
+                      }
+                      .page-shell:has(#admin-ads-promotions-mobile) .epantry-workspace-canvas > header {
+                        padding: 12px 14px !important;
+                      }
+                      #admin-ads-promotions-mobile {
+                        width: 100%;
+                        min-width: 0;
+                        overflow-x: clip;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-page-content { padding: 0 !important; }
+                      #admin-ads-promotions-mobile .ads-mobile-summary {
+                        display: block;
+                        overflow: visible;
+                        border-radius: 0;
+                        border-bottom: 1px solid #D7DDCF;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-intro {
+                        min-height: 0;
+                        padding: 19px 16px 15px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-intro h2 {
+                        max-width: none;
+                        font-size: 24px;
+                        line-height: 1.16;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-intro p { max-width: none; }
+                      #admin-ads-promotions-mobile .ads-mobile-intro > div:last-child { margin-top: 12px; }
+                      #admin-ads-promotions-mobile .ads-mobile-stats {
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-stats > div:first-child {
+                        grid-column: 1 / -1;
+                        padding: 11px 16px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-stats > div:first-child strong { font-size: 28px; }
+                      #admin-ads-promotions-mobile .ads-mobile-stats > div:not(:first-child) {
+                        padding: 12px 10px;
+                        min-width: 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-stats > div:not(:first-child) p:first-child {
+                        font-size: 23px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-review {
+                        margin: 0;
+                        padding: 18px 0 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-review > div:first-child {
+                        padding: 0 16px 12px;
+                        margin: 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-review-grid {
+                        display: block;
+                        overflow: visible;
+                        border: 0;
+                        border-radius: 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-inbox {
+                        padding: 14px 16px 16px;
+                        background: #F7F6F2;
+                        color: #202421;
+                        border-block: 1px solid #D7DDCF;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-inbox > p { color: #173F35; }
+                      #admin-ads-promotions-mobile .ads-mobile-tabs {
+                        gap: 0;
+                        border-bottom: 1px solid #D7DDCF;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-tabs > button {
+                        min-width: 0;
+                        padding: 10px 8px !important;
+                        border: 0 !important;
+                        border-bottom: 3px solid transparent !important;
+                        border-radius: 0 !important;
+                        background: transparent !important;
+                        color: #173F35 !important;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-tabs > button[aria-pressed="true"] {
+                        border-bottom-color: #C56C42 !important;
+                        background: #D7DDCF !important;
+                        color: #202421 !important;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-list {
+                        margin-top: 10px;
+                        padding-right: 0;
+                        gap: 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-list > button {
+                        border: 0 !important;
+                        border-bottom: 1px solid #D7DDCF !important;
+                        border-radius: 0 !important;
+                        background: transparent !important;
+                        color: #202421 !important;
+                        padding: 11px 3px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-list > button[aria-pressed="true"] {
+                        background: #D7DDCF !important;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-empty {
+                        margin: 0;
+                        padding: 14px 0 0;
+                        border-top: 0;
+                        color: #202421;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-empty h3 { color: #202421; font-size: 19px; }
+                      #admin-ads-promotions-mobile .ads-mobile-empty p { color: #173F35; }
+                      #admin-ads-promotions-mobile .ads-mobile-details {
+                        border-bottom: 1px solid #D7DDCF;
+                        background: #F7F6F2;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-preview {
+                        min-height: 0;
+                        padding: 16px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-payment {
+                        min-width: 0;
+                        border-radius: 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-creative {
+                        margin: 12px 0 0;
+                        border: 0;
+                        border-top: 3px solid #C56C42;
+                        border-radius: 0;
+                        background: transparent;
+                        padding: 14px 0 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-history {
+                        margin: 0;
+                        padding: 20px 16px 0;
+                        border-top: 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-history > div:first-child {
+                        margin-bottom: 12px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-history-list {
+                        border: 0;
+                        border-top: 1px solid #D7DDCF;
+                        border-radius: 0;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-history-row {
+                        padding: 14px 0;
+                        background: transparent;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-followup {
+                        margin: 16px 16px 0;
+                      }
+                      /* Mobile type hierarchy only: keep the existing page sections and actions. */
+                      .page-shell:has(#admin-ads-promotions-mobile) .epantry-workspace-canvas > header h1 {
+                        font-size: 22px !important;
+                        line-height: 1.17 !important;
+                        letter-spacing: -0.025em;
+                        text-wrap: wrap;
+                      }
+                      .page-shell:has(#admin-ads-promotions-mobile) .epantry-workspace-canvas > header p {
+                        font-size: 13px !important;
+                        line-height: 1.45 !important;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-intro h2 {
+                        margin-top: 10px;
+                        font-size: 21px;
+                        line-height: 1.22;
+                        letter-spacing: -0.02em;
+                        text-wrap: balance;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-intro > div:first-child > p:first-child {
+                        font-size: 11.5px;
+                        letter-spacing: 0.035em;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-intro > div:first-child > p:last-child {
+                        margin-top: 8px;
+                        font-size: 13px;
+                        line-height: 1.48;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-intro > div:last-child {
+                        margin-top: 10px;
+                        gap: 7px;
+                        font-size: 12px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-stats > div:first-child strong {
+                        font-size: 25px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-stats > div:not(:first-child) p:first-child {
+                        font-size: 21px;
+                        line-height: 1.1;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-stats p {
+                        line-height: 1.35;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-review > div:first-child h2,
+                      #admin-ads-promotions-mobile .ads-mobile-history > div:first-child h2 {
+                        margin-top: 5px;
+                        font-size: 21px;
+                        line-height: 1.2;
+                        letter-spacing: -0.018em;
+                        text-wrap: balance;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-review > div:first-child > span {
+                        font-size: 13px;
+                        line-height: 1.4;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-inbox > div:first-child p {
+                        font-size: 16px;
+                        line-height: 1.3;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-inbox > p {
+                        font-size: 13px;
+                        line-height: 1.45;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-tabs > button > span:first-child {
+                        font-size: 13.5px;
+                        line-height: 1.35;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-tabs > button > span:last-child {
+                        font-size: 12px;
+                        line-height: 1.35;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-empty h3 {
+                        font-size: 18px;
+                        line-height: 1.24;
+                        letter-spacing: -0.015em;
+                        text-wrap: balance;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-empty > svg {
+                        width: 22px;
+                        height: 22px;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-preview h3,
+                      #admin-ads-promotions-mobile .ads-mobile-details h3 {
+                        font-size: 20px;
+                        line-height: 1.23;
+                        letter-spacing: -0.017em;
+                        text-wrap: balance;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-preview > p,
+                      #admin-ads-promotions-mobile .ads-mobile-details p {
+                        overflow-wrap: anywhere;
+                      }
+                      #admin-ads-promotions-mobile .ads-mobile-followup summary span.block:last-child {
+                        font-size: 13.5px;
+                        line-height: 1.36;
+                      }
+                    }
+                `}</style>
+                <div id="admin-ads-promotions-mobile" className="w-full bg-[#F7F6F2] pb-9 text-[#202421] sm:pb-12">
+                    <div className="ads-mobile-page-content w-full px-3 pt-4 sm:px-7 sm:pt-6">
+                        <section aria-label="Campaign summary" className="ads-mobile-summary grid overflow-hidden rounded-[17px] lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
+                            <div className="ads-mobile-intro relative flex min-h-[195px] flex-col justify-between bg-[#C56C42] px-5 py-6 sm:px-8 sm:py-8">
+                                <div>
+                                    <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.08em] text-[#202421]">
+                                        <span className="h-[2px] w-7 bg-[#202421]" aria-hidden="true" />
+                                        Campaign review desk
+                                    </p>
+                                    <h2 className="mt-3 max-w-[660px] text-[29px] font-extrabold leading-[1.14] tracking-tight text-[#202421] sm:text-[39px]">
+                                        Make the decision.<br className="hidden sm:block" /> Know what goes live.
+                                    </h2>
+                                    <p className="mt-3 max-w-xl text-sm leading-6 text-[#202421] sm:text-[15px]">
+                                        Check each campaign, its payment and where it can appear.
+                                    </p>
+                                </div>
+                                <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold text-[#202421] sm:text-sm">
+                                    <span>Campaign</span><ChevronRight size={15} aria-hidden="true" />
+                                    <span>Payment</span><ChevronRight size={15} aria-hidden="true" />
+                                    <span>Decision</span>
+                                </div>
                             </div>
-
-                            <div className="grid grid-cols-3 gap-2 border-t border-white/12 p-3 sm:gap-3 sm:p-5 lg:border-l lg:border-t-0">
+                            <div className="ads-mobile-stats grid grid-cols-3 bg-[#D7DDCF] text-[#173F35]">
+                                <div className="col-span-3 flex items-center justify-between gap-5 border-b border-[#F7F6F2] px-5 py-5 sm:px-7">
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-[0.06em]">Waiting for your review</p>
+                                        <p className="mt-1 text-xs font-medium text-[#202421]">Campaigns requiring a decision</p>
+                                    </div>
+                                    <strong className="text-[43px] font-extrabold leading-none text-[#173F35] sm:text-[55px]">{pendingCampaigns.length}</strong>
+                                </div>
                                 {[
-                                    ['Waiting', pendingCampaigns.length, 'bg-[#31445d]'],
-                                    ['Paid & ready', paidPendingCampaigns.length, 'bg-[#315467]'],
-                                    ['Approved / live', liveOrApprovedCampaigns.length, 'bg-[#4b426a]'],
-                                ].map(([label, value, tone]) => (
-                                    <div key={label} className={`rounded-2xl border border-white/10 px-3 py-3 ${tone}`}>
-                                        <p className="text-xl font-black sm:text-2xl">{value}</p>
-                                        <p className="mt-1 text-[9px] font-bold leading-4 text-white/65 sm:text-[11px]">{label}</p>
+                                    ['All campaigns', adCampaigns.length],
+                                    ['Paid & ready', paidPendingCampaigns.length],
+                                    ['Approved / live', liveOrApprovedCampaigns.length],
+                                ].map(([label, count], index) => (
+                                    <div key={label} className={`min-w-0 px-3 py-4 sm:px-5 ${index !== 0 ? 'border-l border-[#F7F6F2]' : ''}`}>
+                                        <p className="text-[24px] font-extrabold leading-none text-[#173F35] sm:text-[29px]">{count}</p>
+                                        <p className="mt-2 text-xs font-semibold leading-4 text-[#202421]">{label}</p>
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </section>
 
-                        <div className="grid grid-cols-2 border-t border-white/12 lg:grid-cols-4">
-                            {[
-                                ['01', 'Choose campaign', 'Open the campaign that needs a decision.'],
-                                ['02', 'Check the ad', 'Read the headline, message and landing destination.'],
-                                ['03', 'Confirm payment', 'Make sure payment and sponsorship disclosure are ready.'],
-                                ['04', 'Approve or reject', 'Save a clear reason for the decision.'],
-                            ].map(([number, title, copy], index) => (
-                                <div
-                                    key={number}
-                                    className={`px-4 py-3 sm:px-6 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/12' : ''} ${index >= 2 ? 'border-t border-white/12 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l lg:border-white/12' : ''}`}
-                                >
-                                    <p className="text-[10px] font-black text-[#9fc2d7]">{number}</p>
-                                    <p className="mt-1 text-sm font-black">{title}</p>
-                                    <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-white/65 sm:text-xs sm:leading-5">{copy}</p>
+                        {adReviewError ? <div role="alert" className="mt-4 border-l-4 border-[#C56C42] bg-[#D7DDCF] px-4 py-3 text-sm font-bold text-[#202421]">{adReviewError}</div> : null}
+                        {error ? <div role="alert" className="mt-4 border-l-4 border-[#C56C42] bg-[#D7DDCF] px-4 py-3 text-sm font-bold text-[#202421]">{error}</div> : null}
+                        {notice ? <div role="status" className="mt-4 border-l-4 border-[#173F35] bg-[#D7DDCF] px-4 py-3 text-sm font-bold text-[#173F35]">{notice}</div> : null}
+
+                        <section id="epantry-campaigns" aria-label="Campaign review workspace" className="ads-mobile-review mt-6 sm:mt-8">
+                            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                                <div>
+                                    <p className="text-xs font-extrabold uppercase tracking-[0.06em] text-[#C56C42]">01 / Campaigns</p>
+                                    <h2 className="mt-1 text-[24px] font-extrabold tracking-tight text-[#202421] sm:text-[29px]">Review workspace</h2>
                                 </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    {adReviewError ? (
-                        <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700 sm:px-7 sm:text-sm">
-                            {adReviewError}
-                        </div>
-                    ) : null}
-
-                    {error ? (
-                        <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700 sm:px-7 sm:text-sm">
-                            {error}
-                        </div>
-                    ) : null}
-
-                    {notice ? (
-                        <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800 sm:px-7 sm:text-sm">
-                            {notice}
-                        </div>
-                    ) : null}
-
-                    <section className="border-b border-stone-200 bg-white">
-                        <div className="flex flex-col gap-3 border-b border-stone-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-4">
-                            <div>
-                                <p className="text-[10px] font-bold text-[#315f7a]">Campaign review</p>
-                                <h2 className="mt-0.5 text-lg font-black text-stone-950">Campaigns that need a decision</h2>
+                                <span className="text-sm font-semibold text-[#173F35]">{visibleCampaigns.length} {adQueueView === 'review' ? 'awaiting review' : 'in catalogue'}</span>
                             </div>
-
-                            <div className="inline-flex w-fit rounded-xl border border-stone-200 bg-[#f3f4f5] p-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setAdQueueView('review')}
-                                    className={`rounded-lg px-3 py-2 text-xs font-black ${adQueueView === 'review' ? 'bg-[#22384f] text-white' : 'text-stone-600'}`}
-                                >
-                                    Needs review ({pendingCampaigns.length})
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setAdQueueView('all')}
-                                    className={`rounded-lg px-3 py-2 text-xs font-black ${adQueueView === 'all' ? 'bg-[#22384f] text-white' : 'text-stone-600'}`}
-                                >
-                                    All campaigns ({adCampaigns.length})
-                                </button>
-                            </div>
-                        </div>
-
-                        {adReviewLoading ? (
-                            <div className="flex min-h-[220px] items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-stone-600">
-                                <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-                                Loading campaigns…
-                            </div>
-                        ) : visibleCampaigns.length === 0 ? (
-                            <div className="px-4 py-6 sm:px-7 sm:py-8">
-                                <p className="text-sm font-black text-stone-900">
-                                    {adQueueView === 'review' ? 'No campaigns need review right now.' : 'No ad campaigns have been created yet.'}
-                                </p>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-500">
-                                    {adQueueView === 'review' && adCampaigns.length
-                                        ? 'Approved, live and past campaigns are available under All campaigns.'
-                                        : 'Paid Host campaigns will appear here when they are ready for Super Admin review.'}
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid lg:grid-cols-[330px_minmax(0,1fr)]">
-                                <aside className="border-b border-stone-200 bg-[#f8f7f4] lg:border-b-0 lg:border-r">
-                                    <div className="px-4 py-3 sm:hidden">
-                                        <label className="text-xs font-bold text-stone-600">
-                                            Choose campaign
-                                            <select
-                                                value={selectedCampaign?.id || ''}
-                                                onChange={(event) => {
-                                                    const campaign = visibleCampaigns.find((item) => item.id === event.target.value);
-                                                    if (campaign) selectCampaign(campaign);
-                                                }}
-                                                className={`${inputClass} mt-2`}
-                                            >
-                                                {visibleCampaigns.map((campaign) => (
-                                                    <option key={campaign.id} value={campaign.id}>
-                                                        {campaign.title}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
+                            <div className="ads-mobile-review-grid grid gap-0 overflow-hidden rounded-[16px] border border-[#D7DDCF] lg:grid-cols-[minmax(275px,0.72fr)_minmax(0,1.48fr)]">
+                                <aside className="ads-mobile-inbox min-w-0 bg-[#202421] p-4 text-[#F7F6F2] sm:p-6" aria-label="Choose a campaign">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-[17px] font-extrabold">Campaign inbox</p>
+                                        <Megaphone size={19} className="text-[#C56C42]" aria-hidden="true" />
                                     </div>
-
-                                    <div className="hidden max-h-[680px] overflow-y-auto sm:block">
-                                        {visibleCampaigns.map((campaign, index) => {
-                                            const active = campaign.id === selectedCampaign?.id;
-
-                                            return (
-                                                <button
-                                                    key={campaign.id}
-                                                    type="button"
-                                                    onClick={() => selectCampaign(campaign)}
-                                                    className={`block w-full border-b border-stone-200 px-4 py-3 text-left transition sm:px-5 ${active ? 'bg-[#eaf2f8]' : 'bg-[#f8f7f4] hover:bg-white'}`}
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-black text-stone-950">{campaign.title}</p>
-                                                            <p className="mt-0.5 truncate text-xs font-semibold text-stone-500">{queueLabel(campaign)}</p>
-                                                        </div>
-                                                        <span className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-black ${statusTone(campaign.status)}`}>
-                                                            {statusLabel(campaign.status)}
+                                    <p className="mb-4 mt-1 text-xs text-[#D7DDCF]">Choose a list to see its campaign details.</p>
+                                    <div className="ads-mobile-tabs grid grid-cols-2 gap-2" role="group" aria-label="Campaign list filter">
+                                        <button
+                                            type="button"
+                                            aria-pressed={adQueueView === 'review'}
+                                            onClick={() => setAdQueueView('review')}
+                                            className={`focus-ring min-h-11 rounded-lg px-2 py-2.5 text-left text-sm font-bold transition sm:px-3 ${adQueueView === 'review' ? 'bg-[#C56C42] text-[#202421]' : 'border border-[#D7DDCF] bg-[#202421] text-[#F7F6F2] hover:bg-[#173F35]'}`}
+                                        >
+                                            <span className="block">Needs review</span><span className="text-xs">{pendingCampaigns.length} campaigns</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-pressed={adQueueView === 'all'}
+                                            onClick={() => setAdQueueView('all')}
+                                            className={`focus-ring min-h-11 rounded-lg px-2 py-2.5 text-left text-sm font-bold transition sm:px-3 ${adQueueView === 'all' ? 'bg-[#C56C42] text-[#202421]' : 'border border-[#D7DDCF] bg-[#202421] text-[#F7F6F2] hover:bg-[#173F35]'}`}
+                                        >
+                                            <span className="block">All campaigns</span><span className="text-xs">{adCampaigns.length} campaigns</span>
+                                        </button>
+                                    </div>
+                                    {adReviewLoading ? (
+                                        <div className="mt-6 flex items-center gap-2 text-sm text-[#F7F6F2]">
+                                            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> Loading campaigns…
+                                        </div>
+                                    ) : visibleCampaigns.length ? (
+                                        <div className="ads-mobile-list mt-5 max-h-[520px] space-y-2 overflow-y-auto overscroll-contain pr-1">
+                                            {visibleCampaigns.map((campaign) => {
+                                                const active = campaign.id === selectedCampaign?.id;
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={campaign.id}
+                                                        aria-pressed={active}
+                                                        onClick={() => selectCampaign(campaign)}
+                                                        className={`focus-ring flex w-full items-start justify-between gap-3 rounded-lg border-l-4 px-3 py-3 text-left transition ${active ? 'border-[#C56C42] bg-[#F7F6F2] text-[#202421]' : 'border-transparent bg-[#173F35] text-[#F7F6F2] hover:border-[#C56C42]'}`}
+                                                    >
+                                                        <span className="min-w-0">
+                                                            <span className="block break-words text-sm font-extrabold">{campaign.title}</span>
+                                                            <span className="mt-1 block break-words text-xs opacity-85">{queueLabel(campaign)}</span>
+                                                            <span className="mt-2 block text-xs font-semibold">{statusLabel(campaign.status)} · {statusLabel(campaign.payment?.status)}</span>
                                                         </span>
-                                                    </div>
-                                                    <p className="mt-2 text-[11px] font-bold text-stone-500">
-                                                        {campaign.placements?.length || 0} placements · {statusLabel(campaign.payment?.status)}
-                                                    </p>
+                                                        <ChevronRight size={17} className="mt-1 shrink-0" aria-hidden="true" />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="ads-mobile-empty mt-5 border-t border-[#173F35] pt-5">
+                                            <CheckCircle2 size={28} className="text-[#C56C42]" strokeWidth={1.8} aria-hidden="true" />
+                                            <h3 className="mt-2 text-lg font-extrabold text-[#F7F6F2]">
+                                                {adQueueView === 'review' ? 'Nothing to approve right now' : 'No campaigns yet'}
+                                            </h3>
+                                            <p className="mt-1 text-sm leading-5 text-[#D7DDCF]">
+                                                {adQueueView === 'review' ? 'Your review queue is clear.' : 'Submitted campaigns will appear here.'}
+                                            </p>
+                                            {adQueueView === 'review' && adCampaigns.length > 0 ? (
+                                                <button type="button" onClick={() => setAdQueueView('all')} className="focus-ring mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#C56C42] px-4 text-sm font-extrabold text-[#202421]">
+                                                    Browse all campaigns <ArrowUpRight size={17} aria-hidden="true" />
                                                 </button>
-                                            );
-                                        })}
-                                    </div>
+                                            ) : null}
+                                        </div>
+                                    )}
                                 </aside>
 
-                                <div className="min-w-0 px-4 py-4 sm:px-6 sm:py-5">
-                                    {selectedCampaign ? (
-                                        <>
-                                            <div className="flex flex-col gap-3 border-b border-stone-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                                                <div className="min-w-0">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${statusTone(selectedCampaign.status)}`}>
-                                                            {statusLabel(selectedCampaign.status)}
-                                                        </span>
-                                                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${statusTone(selectedCampaign.payment?.status)}`}>
-                                                            {statusLabel(selectedCampaign.payment?.status)}
-                                                        </span>
-                                                    </div>
-                                                    <h3 className="mt-2 text-xl font-black text-stone-950 sm:text-2xl">{selectedCampaign.title}</h3>
-                                                    <p className="mt-1 text-xs font-semibold text-stone-500 sm:text-sm">
-                                                        {selectedCampaign.organizationName || 'Host business'}
-                                                        {selectedCampaign.brandName ? ` · ${selectedCampaign.brandName}` : ''}
+                                <div className="ads-mobile-details min-w-0 bg-[#F7F6F2]">
+                                    {adReviewLoading ? (
+                                        <div className="flex min-h-[210px] items-center justify-center gap-3 p-6 text-sm font-semibold text-[#173F35]">
+                                            <LoaderCircle size={22} className="animate-spin" aria-hidden="true" /> Loading campaign details…
+                                        </div>
+                                    ) : !selectedCampaign ? (
+                                        <div className="ads-mobile-preview flex h-full min-h-[240px] flex-col justify-center px-5 py-6 sm:px-8">
+                                            {adQueueView === 'review' && adCampaigns.length > 0 ? (
+                                                <>
+                                                    <p className="text-xs font-extrabold uppercase tracking-[0.07em] text-[#C56C42]">Already in your catalogue</p>
+                                                    <h3 className="mt-2 break-words text-[24px] font-extrabold leading-tight text-[#202421]">{adCampaigns[0].title}</h3>
+                                                    <p className="mt-2 text-sm font-semibold text-[#173F35]">
+                                                        {queueLabel(adCampaigns[0])} · {statusLabel(adCampaigns[0].status)} · {statusLabel(adCampaigns[0].payment?.status)}
                                                     </p>
-                                                </div>
-                                                <p className="text-sm font-black text-[#315f7a]">
-                                                    {money(selectedCampaign.payment?.requiredAmountMinor, selectedCampaign.payment?.currency)}
-                                                </p>
-                                            </div>
-
-                                            <div className="grid border-b border-stone-200 sm:grid-cols-4">
-                                                {[
-                                                    ['Goal', titleize(selectedCampaign.objective)],
-                                                    ['Market', selectedCampaign.marketCodes?.join(', ') || 'Not set'],
-                                                    ['Starts', shortDate(selectedCampaign.startsAt)],
-                                                    ['Ends', shortDate(selectedCampaign.endsAt)],
-                                                ].map(([label, value], index) => (
-                                                    <div key={label} className={`py-3 ${index > 0 ? 'sm:border-l sm:border-stone-200 sm:pl-4' : 'sm:pr-4'}`}>
-                                                        <p className="text-[10px] font-bold text-stone-400">{label}</p>
-                                                        <p className="mt-1 line-clamp-2 text-xs font-black leading-5 text-stone-800 sm:text-sm">{value}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            <div className="grid gap-0 border-b border-stone-200 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-                                                <div className="py-4 lg:pr-6">
-                                                    <p className="text-[10px] font-bold text-[#5b4b85]">Ad customers may see</p>
-                                                    <div className="mt-2 rounded-2xl border border-[#d9d3e7] bg-[#f5f2fb] p-4">
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#5b4b85] shadow-sm">
-                                                                {selectedCampaign.creative?.sponsorLabel || 'Sponsored'}
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-stone-500">
-                                                                {selectedCampaign.placements?.length || 0} placements
-                                                            </span>
-                                                        </div>
-                                                        <h4 className="mt-3 text-lg font-black text-stone-950">{selectedCampaign.creative?.headline || selectedCampaign.title}</h4>
-                                                        {selectedCampaign.creative?.body ? (
-                                                            <p className="mt-1.5 line-clamp-3 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">{selectedCampaign.creative.body}</p>
-                                                        ) : null}
-                                                        <p className="mt-3 break-all text-[11px] font-bold text-[#315f7a]">{selectedCampaign.creative?.landingRef || 'No landing destination provided'}</p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="border-t border-stone-200 py-4 lg:border-l lg:border-t-0 lg:pl-6">
-                                                    <p className="text-[10px] font-bold text-[#315f7a]">Review checks</p>
-                                                    <div className="mt-2 divide-y divide-stone-200">
-                                                        <div className="flex items-center justify-between gap-4 py-2.5">
-                                                            <span className="text-xs font-semibold text-stone-500">Payment</span>
-                                                            <span className="text-xs font-black text-stone-900">{statusLabel(selectedCampaign.payment?.status)}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4 py-2.5">
-                                                            <span className="text-xs font-semibold text-stone-500">Disclosure</span>
-                                                            <span className="max-w-[65%] text-right text-xs font-black text-stone-900">{selectedCampaign.commercialDisclosure || 'Not provided'}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4 py-2.5">
-                                                            <span className="text-xs font-semibold text-stone-500">Placements</span>
-                                                            <span className="max-w-[65%] text-right text-xs font-black text-stone-900">{selectedCampaign.placements?.map(placementLabel).join(', ') || 'Not selected'}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-4 py-2.5">
-                                                            <span className="text-xs font-semibold text-stone-500">Frequency</span>
-                                                            <span className="text-xs font-black text-stone-900">Up to {selectedCampaign.frequencyCapPerContext || 1} times</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {selectedCampaign.status === 'pending_review' ? (
-                                                <div className="pt-4">
-                                                    {selectedCampaign.payment?.status !== 'paid' ? (
-                                                        <div className="mb-3 flex items-start gap-2 border-l-2 border-[#d69c4c] bg-[#fbf6ee] px-3 py-2.5 text-xs font-bold text-[#7a5525]">
-                                                            <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-                                                            Payment is not complete yet. You can reject the campaign, but approval becomes available after payment.
-                                                        </div>
-                                                    ) : null}
-
-                                                    {canReviewAds ? (
-                                                        <div className="grid gap-3">
-                                                            <textarea
-                                                                value={adReviewReason}
-                                                                onChange={(event) => setAdReviewReason(event.target.value)}
-                                                                rows={3}
-                                                                placeholder="Why are you approving or rejecting this campaign?"
-                                                                className={inputClass}
-                                                            />
-                                                            <input
-                                                                value={adEvidenceRef}
-                                                                onChange={(event) => setAdEvidenceRef(event.target.value)}
-                                                                placeholder="Evidence / reference"
-                                                                className={inputClass}
-                                                            />
-                                                            <div className="flex flex-wrap gap-2">
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={busy || adReviewReason.trim().length < 10 || selectedCampaign.payment?.status !== 'paid'}
-                                                                    onClick={() => reviewCampaign('approve')}
-                                                                    className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#294f68] px-4 text-xs font-black text-white disabled:opacity-40"
-                                                                >
-                                                                    <CheckCircle2 size={15} aria-hidden="true" />
-                                                                    Approve campaign
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={busy || adReviewReason.trim().length < 10}
-                                                                    onClick={() => reviewCampaign('reject')}
-                                                                    className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-black text-rose-700 disabled:opacity-40"
-                                                                >
-                                                                    <XCircle size={15} aria-hidden="true" />
-                                                                    Reject campaign
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs font-semibold text-stone-500">You can review this campaign, but only an authorised Super Admin can record the final decision.</p>
-                                                    )}
-                                                </div>
+                                                    <p className="mt-3 max-w-xl text-sm leading-6 text-[#202421]">
+                                                        No approval is pending. You can still open this campaign to see its record.
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { selectCampaign(adCampaigns[0]); setAdQueueView('all'); }}
+                                                        className="focus-ring mt-5 inline-flex w-fit min-h-11 items-center gap-2 rounded-lg bg-[#173F35] px-5 text-sm font-extrabold text-[#F7F6F2]"
+                                                    >
+                                                        Open campaign record <ArrowUpRight size={17} aria-hidden="true" />
+                                                    </button>
+                                                </>
                                             ) : (
-                                                <div className="pt-4">
-                                                    <p className="text-sm font-black text-stone-900">Decision recorded</p>
-                                                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-500">
-                                                        {selectedCampaign.review?.reason || `This campaign is ${statusLabel(selectedCampaign.status).toLowerCase()}.`}
-                                                    </p>
-                                                </div>
+                                                <>
+                                                    <p className="text-xs font-bold uppercase tracking-[0.07em] text-[#C56C42]">Campaign records</p>
+                                                    <h3 className="mt-2 text-xl font-extrabold text-[#202421]">No campaign selected</h3>
+                                                    <p className="mt-2 text-sm text-[#173F35]">Choose a campaign from the list to see its details.</p>
+                                                </>
                                             )}
-                                        </>
-                                    ) : null}
+                                        </div>
+                                    ) : (
+                                        <div className="min-w-0">
+                                            <div className="border-b border-[#D7DDCF] px-5 py-5 sm:px-7 sm:py-6">
+                                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-xs font-extrabold uppercase tracking-[0.07em] text-[#C56C42]">Selected campaign</p>
+                                                        <h3 className="mt-2 break-words text-[24px] font-extrabold leading-[1.13] tracking-tight text-[#202421] sm:text-[31px]">{selectedCampaign.title}</h3>
+                                                        <p className="mt-2 text-sm font-semibold text-[#173F35]">{queueLabel(selectedCampaign)}{selectedCampaign.brandName ? ` · ${selectedCampaign.brandName}` : ''}</p>
+                                                        <div className="mt-3 flex flex-wrap gap-2">
+                                                            <span className={`rounded-full border px-3 py-1.5 text-xs font-extrabold ${statusTone(selectedCampaign.status)}`}>{statusLabel(selectedCampaign.status)}</span>
+                                                            <span className={`rounded-full border px-3 py-1.5 text-xs font-extrabold ${statusTone(selectedCampaign.payment?.status)}`}>{statusLabel(selectedCampaign.payment?.status)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="ads-mobile-payment min-w-[170px] rounded-lg bg-[#173F35] px-4 py-3 text-[#F7F6F2]">
+                                                        <p className="text-xs font-semibold">Required payment</p>
+                                                        <p className="mt-1 text-[25px] font-extrabold leading-tight">{money(selectedCampaign.payment?.requiredAmountMinor, selectedCampaign.payment?.currency)}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[#D7DDCF] pt-4 sm:grid-cols-4">
+                                                    {[
+                                                        ['Purpose', titleize(selectedCampaign.objective)],
+                                                        ['Market', selectedCampaign.marketCodes?.join(', ') || 'Not set'],
+                                                        ['Starts', shortDate(selectedCampaign.startsAt)],
+                                                        ['Ends', shortDate(selectedCampaign.endsAt)],
+                                                    ].map(([label, value]) => (
+                                                        <div key={label} className="min-w-0">
+                                                            <p className="text-xs font-medium text-[#173F35]">{label}</p>
+                                                            <p className="mt-1 break-words text-sm font-extrabold text-[#202421]">{value}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="grid lg:grid-cols-2">
+                                                <section className="min-w-0 px-5 py-5 sm:px-7" aria-label="Ad creative preview">
+                                                    <h4 className="text-xs font-extrabold uppercase tracking-[0.07em] text-[#C56C42]">Ad creative</h4>
+                                                    <div className="ads-mobile-creative mt-3 rounded-lg border-l-4 border-[#C56C42] bg-[#D7DDCF] p-4">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <span className="rounded-md bg-[#F7F6F2] px-2.5 py-1 text-xs font-bold text-[#173F35]">{selectedCampaign.creative?.sponsorLabel || 'Sponsored'}</span>
+                                                            <span className="text-xs font-semibold text-[#173F35]">{selectedCampaign.placements?.length || 0} placements</span>
+                                                        </div>
+                                                        <p className="mt-3 break-words text-lg font-extrabold leading-snug text-[#202421]">{selectedCampaign.creative?.headline || selectedCampaign.title}</p>
+                                                        {selectedCampaign.creative?.body ? <p className="mt-2 break-words text-sm leading-6 text-[#173F35]">{selectedCampaign.creative.body}</p> : null}
+                                                        <p className="mt-3 break-all text-xs font-semibold text-[#173F35]">{selectedCampaign.creative?.landingRef || 'No destination provided'}</p>
+                                                    </div>
+                                                </section>
+                                                <section className="min-w-0 border-t border-[#D7DDCF] px-5 py-5 lg:border-l lg:border-t-0 sm:px-7" aria-label="Approval checks">
+                                                    <h4 className="text-xs font-extrabold uppercase tracking-[0.07em] text-[#C56C42]">Approval checklist</h4>
+                                                    <div className="mt-3 divide-y divide-[#D7DDCF]">
+                                                        {[
+                                                            ['Payment', statusLabel(selectedCampaign.payment?.status)],
+                                                            ['Sponsorship label', selectedCampaign.commercialDisclosure || 'Not provided'],
+                                                            ['Placement', selectedCampaign.placements?.map(placementLabel).join(', ') || 'Not selected'],
+                                                            ['Frequency', `Up to ${selectedCampaign.frequencyCapPerContext || 1} times`],
+                                                        ].map(([label, value]) => (
+                                                            <div key={label} className="flex items-start justify-between gap-3 py-3">
+                                                                <span className="text-xs font-medium text-[#173F35]">{label}</span>
+                                                                <span className="max-w-[60%] break-words text-right text-sm font-bold text-[#202421]">{value}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </section>
+                                            </div>
+                                            <div className="border-t border-[#D7DDCF] bg-[#F7F6F2] px-5 py-5 sm:px-7 sm:py-6">
+                                                {selectedCampaign.status === 'pending_review' ? (
+                                                    <>
+                                                        {selectedCampaign.payment?.status !== 'paid' ? (
+                                                            <div className="mb-4 flex gap-2 rounded-lg border-l-4 border-[#C56C42] bg-[#D7DDCF] px-4 py-3 text-sm font-semibold text-[#202421]">
+                                                                <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#C56C42]" aria-hidden="true" />
+                                                                Payment is incomplete. Approval is available once payment is confirmed.
+                                                            </div>
+                                                        ) : null}
+                                                        {canReviewAds ? (
+                                                            <div className="space-y-3">
+                                                                <label className="block text-sm font-bold text-[#202421]" htmlFor="ad-review-reason">Reason for decision</label>
+                                                                <textarea id="ad-review-reason" value={adReviewReason} onChange={(event) => setAdReviewReason(event.target.value)} rows={3} placeholder="Explain the campaign decision." className={inputClass} />
+                                                                <label className="block text-sm font-bold text-[#202421]" htmlFor="ad-review-evidence">Review reference</label>
+                                                                <input id="ad-review-evidence" value={adEvidenceRef} onChange={(event) => setAdEvidenceRef(event.target.value)} placeholder="Evidence / reference" className={inputClass} />
+                                                                <div className="flex flex-wrap gap-2 pt-2">
+                                                                    <button type="button" disabled={busy || adReviewReason.trim().length < 10 || selectedCampaign.payment?.status !== 'paid'} onClick={() => reviewCampaign('approve')} className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#173F35] px-5 text-sm font-bold text-[#F7F6F2] disabled:opacity-40"><CheckCircle2 size={18} aria-hidden="true" /> Approve campaign</button>
+                                                                    <button type="button" disabled={busy || adReviewReason.trim().length < 10} onClick={() => reviewCampaign('reject')} className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#C56C42] bg-[#F7F6F2] px-5 text-sm font-bold text-[#202421] disabled:opacity-40"><XCircle size={18} className="text-[#C56C42]" aria-hidden="true" /> Reject campaign</button>
+                                                                </div>
+                                                            </div>
+                                                        ) : <p className="text-sm text-[#173F35]">Only an authorised Super Admin can record the final decision.</p>}
+                                                    </>
+                                                ) : (
+                                                    <div className="border-l-[3px] border-[#173F35] pl-4">
+                                                        <p className="text-sm font-extrabold text-[#202421]">Decision recorded</p>
+                                                        <p className="mt-1 break-words text-sm leading-6 text-[#173F35]">{selectedCampaign.review?.reason || `This campaign is ${statusLabel(selectedCampaign.status).toLowerCase()}.`}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        )}
-                    </section>
+                        </section>
 
-                    <section className="border-b border-stone-200 bg-[#f0f3f6]">
-                        <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
-                            <div className="border-b border-stone-200 px-4 py-4 sm:px-7 sm:py-5 lg:border-b-0 lg:border-r">
-                                <p className="text-[10px] font-bold text-[#5b4b85]">Recent serving decisions</p>
-                                <h2 className="mt-1 text-lg font-black text-stone-950">What the ad system decided recently</h2>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-500">Recent sponsored-placement outcomes stay visible for review.</p>
+                        <section className="ads-mobile-history mt-7 border-t border-[#D7DDCF] pt-6 sm:mt-9" aria-label="Recent sponsored ad decisions">
+                            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-extrabold uppercase tracking-[0.07em] text-[#C56C42]">02 / Recent checks</p>
+                                    <h2 className="mt-1 text-[23px] font-extrabold leading-tight text-[#202421] sm:text-[28px]">Ad placement history</h2>
+                                </div>
+                                <span className="rounded-full bg-[#D7DDCF] px-4 py-2 text-xs font-bold text-[#173F35]">
+                                    {Math.min(adDecisionLogs.length, 8)} recent {Math.min(adDecisionLogs.length, 8) === 1 ? 'record' : 'records'}
+                                </span>
                             </div>
-
-                            <div className="bg-white/75 px-4 sm:px-7">
-                                {adDecisionLogs.length === 0 ? (
-                                    <div className="py-5">
-                                        <p className="text-sm font-black text-stone-900">No serving decisions recorded yet.</p>
-                                    </div>
+                            <div className="ads-mobile-history-list overflow-hidden rounded-[14px] border border-[#D7DDCF]">
+                                {recentServingGroups.length === 0 ? (
+                                    <p className="px-5 py-5 text-sm text-[#173F35]">No ad-placement decisions recorded yet.</p>
                                 ) : (
-                                    adDecisionLogs.slice(0, 8).map((log, index) => (
-                                        <div key={log.id || `${log.campaignId}-${index}`} className={`grid gap-1 py-3 sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-4 ${index > 0 ? 'border-t border-stone-200' : ''}`}>
-                                            <div>
-                                                <p className="text-sm font-black text-stone-900">{placementLabel(log.placement)}</p>
-                                                <p className="mt-0.5 text-xs font-semibold text-stone-500">{log.marketCode || 'IN'} · {titleize(log.promotedEntityType)}</p>
-                                            </div>
-                                            <p className="text-xs font-semibold text-stone-600">{(log.reasonCodes || []).map(titleize).join(', ') || 'No extra note'}</p>
-                                            <span className="text-xs font-black text-[#315f7a]">{titleize(log.outcome)}</span>
+                                    <>
+                                        <div className="hidden grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-4 bg-[#173F35] px-5 py-3 text-xs font-bold text-[#F7F6F2] sm:grid">
+                                            <span>Placement</span><span>Market</span><span>Reason</span><span>Result</span>
                                         </div>
-                                    ))
+                                        {recentServingGroups.map((entry) => {
+                                            const log = entry.log;
+                                            return (
+                                                <div key={entry.key} className="ads-mobile-history-row grid gap-2 border-t border-[#D7DDCF] bg-[#F7F6F2] px-4 py-4 first:border-t-0 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center sm:gap-4 sm:px-5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-extrabold text-[#202421]">{placementLabel(log.placement)}</span>
+                                                        {entry.count > 1 ? <span className="rounded-full bg-[#C56C42] px-2 py-0.5 text-xs font-bold text-[#202421]">×{entry.count}</span> : null}
+                                                    </div>
+                                                    <span className="text-xs font-semibold text-[#173F35] sm:text-sm">{log.marketCode || 'IN'} · {titleize(log.promotedEntityType)}</span>
+                                                    <p className="break-words text-xs text-[#173F35] sm:text-sm">{(log.reasonCodes || []).map(titleize).join(', ') || 'No extra note'}</p>
+                                                    <span className="w-fit rounded-full border border-[#D7DDCF] bg-[#D7DDCF] px-3 py-1.5 text-xs font-bold text-[#202421]">{titleize(log.outcome)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </>
                                 )}
                             </div>
-                        </div>
-                    </section>
+                        </section>
 
-                    <details className="border-b border-stone-200 bg-[#eceeea]">
-                        <summary className="cursor-pointer list-none px-4 py-4 sm:px-7">
-                            <div className="flex items-center justify-between gap-4">
-                                <div>
-                                    <p className="text-[10px] font-bold text-stone-500">Other admin follow-up</p>
-                                    <p className="mt-0.5 text-sm font-black text-stone-900">Marketplace cases and platform signals</p>
-                                </div>
-                                <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-stone-600 shadow-sm">{genericFollowUpCount} open items</span>
-                            </div>
-                        </summary>
-
-                        <div className="border-t border-stone-200 bg-white px-4 py-4 sm:px-7 sm:py-5">
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                {[
-                                    ['Review cases', reviewCases],
-                                    ['Incidents', incidents],
-                                    ['Support cases', supportCases],
-                                ].map(([label, items]) => (
-                                    <div key={label} className="border-l-2 border-[#c8d7e3] pl-3">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <p className="text-sm font-black text-stone-900">{label}</p>
-                                            <span className="text-xs font-black text-[#315f7a]">{items.length}</span>
-                                        </div>
-                                        {items.length ? (
-                                            <div className="mt-2 space-y-2">
-                                                {items.slice(0, 4).map((item) => (
-                                                    <div key={item.id} className="border-t border-stone-100 pt-2 first:border-t-0 first:pt-0">
-                                                        <p className="line-clamp-1 text-xs font-black text-stone-800">{item.summary || item.title || item.caseKey || item.incidentKey || item.supportKey || 'Admin item'}</p>
-                                                        <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-stone-500">{titleize(item.status)}</p>
-                                                    </div>
-                                                ))}
+                        <details className="ads-mobile-followup mt-7 border-y border-[#D7DDCF]" aria-label="Other admin follow-up">
+                            <summary className="focus-ring flex cursor-pointer items-center justify-between gap-4 py-4 text-[#202421]">
+                                <span>
+                                    <span className="block text-xs font-extrabold uppercase tracking-[0.06em] text-[#C56C42]">Other admin follow-up</span>
+                                    <span className="mt-1 block text-sm font-extrabold">Marketplace cases and platform issues</span>
+                                </span>
+                                <span className="shrink-0 bg-[#D7DDCF] px-3 py-1.5 text-xs font-bold text-[#173F35]">{genericFollowUpCount} open</span>
+                            </summary>
+                            <div className="border-t border-[#D7DDCF] pb-5 pt-4">
+                                <div className="grid gap-5 sm:grid-cols-3">
+                                    {[
+                                        ['Review cases', reviewCases],
+                                        ['Incidents', incidents],
+                                        ['Support cases', supportCases],
+                                    ].map(([label, items]) => (
+                                        <div key={label} className="border-l-4 border-[#C56C42] pl-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <p className="text-sm font-extrabold text-[#202421]">{label}</p>
+                                                <span className="text-sm font-bold text-[#173F35]">{items.length}</span>
                                             </div>
-                                        ) : (
-                                            <p className="mt-2 text-xs font-semibold text-stone-400">Nothing open.</p>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-
-                            <details className="mt-4 border-t border-stone-200 pt-3">
-                                <summary className="cursor-pointer text-xs font-black text-stone-600">Other platform counts</summary>
-                                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                    {metricEntries.map(([label, value]) => (
-                                        <div key={label} className="rounded-xl border border-stone-200 bg-[#f8f7f4] px-3 py-2.5">
-                                            <p className="text-lg font-black text-stone-900">{value ?? 0}</p>
-                                            <p className="mt-0.5 line-clamp-2 text-[10px] font-bold text-stone-500">{label}</p>
+                                            {items.length ? (
+                                                <div className="mt-2 space-y-2">
+                                                    {items.slice(0, 4).map((item) => (
+                                                        <div key={item.id} className="border-t border-[#D7DDCF] pt-2">
+                                                            <p className="break-words text-sm font-semibold text-[#202421]">{item.summary || item.title || item.caseKey || item.incidentKey || item.supportKey || 'Admin item'}</p>
+                                                            <p className="mt-1 text-xs text-[#173F35]">{titleize(item.status)}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : <p className="mt-2 text-sm text-[#173F35]">Nothing open.</p>}
                                         </div>
                                     ))}
                                 </div>
-                            </details>
-                        </div>
-                    </details>
+                                <details className="mt-5 border-t border-[#D7DDCF] pt-3">
+                                    <summary className="focus-ring cursor-pointer text-sm font-bold text-[#173F35]">Other platform counts</summary>
+                                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                        {metricEntries.map(([label, value]) => (
+                                            <div key={label} className="border border-[#D7DDCF] px-3 py-3">
+                                                <p className="text-lg font-extrabold text-[#202421]">{value ?? 0}</p>
+                                                <p className="mt-1 text-xs font-medium text-[#173F35]">{label}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </details>
+                            </div>
+                        </details>
+                    </div>
                 </div>
             </AdminShell>
         );
@@ -3392,33 +3606,63 @@ import {
         };
 
         const renderCmsRows = (items) =>
-            items.map((item, index) => (
-                <div
-                    key={item?.id || item?.slug || `${cmsCollection}-${index}`}
-                    className={`flex items-center justify-between gap-4 py-3 ${index > 0 ? 'border-t border-stone-200' : ''}`}
-                >
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-stone-950">
-                            {cmsItemTitle(item)}
-                        </p>
-                        <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-5 text-stone-500">
-                            {cmsItemMeta(item) || 'Published and available to the homepage.'}
-                        </p>
-                    </div>
+            items.map((item, index) => {
+                // All three image fields are already supplied by /landing/featured.
+                // A missing image remains a neutral icon, never a made-up photo.
+                const imageField = cmsCollection === 'brands'
+                    ? (item?.logoUrl || item?.logo?.url || item?.image?.url || item?.image)
+                    : (item?.image?.url || item?.image || item?.heroImageUrl);
+                const imageUrl = typeof imageField === 'string' ? imageField.trim() : '';
+                const ItemIcon = cmsCollection === 'brands'
+                    ? Building2
+                    : cmsCollection === 'grocery'
+                        ? ShoppingBag
+                        : Boxes;
 
-                    <Link
-                        to={selectedCollection.managePath}
-                        className="focus-ring shrink-0 rounded-lg border border-[#c8d7e3] bg-white px-3 py-2 text-[11px] font-black text-[#294f68]"
+                return (
+                    <div
+                        key={item?.id || item?.slug || `${cmsCollection}-${index}`}
+                        className="group flex min-w-0 items-center gap-2 border-b border-[#D7DDCF] px-2 py-2.5 transition-colors hover:bg-[#D7DDCF]/30 sm:gap-4 sm:px-5 sm:py-4"
                     >
-                        Manage
-                    </Link>
-                </div>
-            ));
+                        <div className="relative grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden rounded-lg border border-[#D7DDCF] bg-[#E6E9E0] sm:h-[94px] sm:w-[94px]">
+                            <ItemIcon size={27} className="text-[#173F35]/55" aria-hidden="true" />
+                            {imageUrl ? (
+                                <img
+                                    src={imageUrl}
+                                    alt={cmsItemTitle(item)}
+                                    loading="lazy"
+                                    decoding="async"
+                                    onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                                    className={`absolute inset-0 h-full w-full bg-[#F7F6F2] ${cmsCollection === 'brands' ? 'object-contain p-2.5' : 'object-cover'}`}
+                                />
+                            ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="break-words text-[13px] font-bold leading-[1.3] text-[#202421] sm:line-clamp-2 sm:text-base sm:leading-6">
+                                {cmsItemTitle(item)}
+                            </p>
+                            {cmsItemMeta(item) ? (
+                                <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-[#173F35]/75 sm:mt-1 sm:line-clamp-2 sm:text-[13px] sm:leading-5">
+                                    {cmsItemMeta(item)}
+                                </p>
+                            ) : null}
+                        </div>
+                        <Link
+                            to={selectedCollection.managePath}
+                            aria-label={`Manage ${cmsItemTitle(item)}`}
+                            className="focus-ring inline-flex h-8 w-8 shrink-0 items-center justify-center gap-1.5 self-center rounded-full bg-[#D7DDCF] text-xs font-bold text-[#173F35] transition-colors hover:text-[#C56C42] sm:h-auto sm:w-auto sm:rounded-none sm:border-b-2 sm:border-[#C56C42] sm:bg-transparent sm:pb-1 sm:text-sm"
+                        >
+                            <span className="hidden sm:inline">Manage</span>
+                            <ArrowUpRight size={16} aria-hidden="true" />
+                        </Link>
+                    </div>
+                );
+            });
 
         return (
             <AdminShell
                 title="Home Content"
-                description="See what is live on the homepage, open the right source, and review CMS changes."
+                description={<span className="hidden sm:inline">See what is live on the homepage, open the right source, and review CMS changes.</span>}
                 actions={
                     <button
                         type="button"
@@ -3435,52 +3679,52 @@ import {
                     </button>
                 }
             >
-                <div className="overflow-hidden bg-[#f6f4ef] pb-7 sm:pb-9">
-                    <section className="border-b border-[#203b52] bg-[#1d3550] text-white">
-                        <div className="grid lg:grid-cols-[minmax(0,1fr)_420px]">
-                            <div className="px-4 py-5 sm:px-7 sm:py-7">
-                                <p className="text-[11px] font-bold text-[#b9d6e8] sm:text-xs">Homepage workspace</p>
-                                <h2 className="mt-1.5 max-w-3xl text-[23px] font-black leading-[1.08] sm:text-[32px]">
-                                    See what is live. Change the source. Confirm the result.
+                <div className="min-w-0 bg-[#F7F6F2] pb-7 sm:pb-10">
+                    <section className="overflow-hidden border-b border-[#D7DDCF]">
+                        <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,1fr)]">
+                            <div className="relative bg-[#C56C42] px-3 py-4 text-[#202421] sm:px-8 sm:py-9">
+                                <p className="hidden items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] sm:flex">
+                                    <span className="h-[2px] w-7 bg-[#173F35]" aria-hidden="true" />
+                                    Homepage overview
+                                </p>
+                                <h2 className="mt-2 max-w-2xl text-[22px] font-bold leading-[1.15] tracking-[-0.03em] sm:mt-4 sm:text-[37px] sm:leading-[1.1] sm:tracking-[-0.04em]">
+                                    <span className="sm:hidden">Live homepage</span>
+                                    <span className="hidden sm:inline">Everything customers see, in one place.</span>
                                 </h2>
-                                <p className="mt-2 line-clamp-2 max-w-2xl text-xs font-semibold leading-5 text-white/70 sm:hidden">
-                                    Published Grocery, Brand and Recipe records feed the homepage.
+                                <p className="mt-3 hidden max-w-xl text-sm leading-6 text-[#202421]/85 sm:block">
+                                    Review live content, then open its source to make changes.
                                 </p>
-                                <p className="mt-2 hidden max-w-2xl text-sm font-semibold leading-6 text-white/70 sm:block">
-                                    Homepage collections are built from published Grocery, Brand and Recipe records. Open the source record when something needs to change.
-                                </p>
+                                <a
+                                    href="/"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="focus-ring mt-3 inline-flex items-center gap-2 border-b-2 border-[#202421] pb-1 text-xs font-bold text-[#202421] hover:text-[#173F35] sm:mt-5 sm:text-sm"
+                                >
+                                    Open homepage <ArrowUpRight size={16} aria-hidden="true" />
+                                </a>
                             </div>
-
-                            <div className="grid grid-cols-3 gap-px border-t border-white/15 bg-white/15 lg:border-l lg:border-t-0">
+                            <div className="grid grid-cols-3 bg-[#D7DDCF] lg:items-center">
                                 {[
                                     ['Live items', liveItemCount],
-                                    ['CMS reviews', reviewCases.length],
+                                    ['Reviews', reviewCases.length],
                                     ['Open issues', openCmsWork],
-                                ].map(([label, value]) => (
-                                    <div key={label} className="bg-[#25445d] px-3 py-4 sm:px-4 sm:py-5">
-                                        <p className="text-xl font-black sm:text-2xl">{value}</p>
-                                        <p className="mt-1 text-[9px] font-bold leading-4 text-white/60 sm:text-[11px]">{label}</p>
+                                ].map(([label, value], index) => (
+                                    <div
+                                        key={label}
+                                        className={`flex min-w-0 flex-col justify-center px-1.5 py-3 text-center sm:px-5 sm:py-6 ${index > 0 ? 'border-l border-[#173F35]/15' : ''}`}
+                                    >
+                                        <p className="text-[23px] font-bold tracking-[-0.04em] text-[#173F35] sm:text-[39px]">{value}</p>
+                                        <p className="mt-0.5 text-[12px] font-semibold text-[#173F35] sm:mt-1 sm:text-[13px]">{label}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-2 border-t border-white/15 lg:grid-cols-4">
-                            {[
-                                ['01', 'Check homepage', 'See the content customers can open now.'],
-                                ['02', 'Open the source', 'Update the product, brand or recipe record.'],
-                                ['03', 'Review changes', 'Handle any CMS review or issue that needs action.'],
-                                ['04', 'Confirm live', 'Refresh and make sure the homepage looks right.'],
-                            ].map(([number, title, body], index) => (
-                                <div
-                                    key={number}
-                                    className={`px-4 py-3 sm:px-5 sm:py-4 ${index % 2 === 1 ? 'border-l border-white/15' : ''} ${index >= 2 ? 'border-t border-white/15 lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l lg:border-white/15' : ''}`}
-                                >
-                                    <p className="text-[10px] font-black text-[#9fc8df] sm:text-xs">{number}</p>
-                                    <p className="mt-1 text-sm font-black">{title}</p>
-                                    <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-white/65 sm:text-xs sm:leading-5">{body}</p>
-                                </div>
-                            ))}
+                        <div className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 bg-[#202421] px-5 py-3 text-xs font-semibold text-[#F7F6F2] sm:flex sm:px-8 sm:text-sm">
+                            <span>01 / Check what's live</span>
+                            <ChevronRight size={13} className="text-[#C56C42]" aria-hidden="true" />
+                            <span>02 / Open its manager</span>
+                            <ChevronRight size={13} className="text-[#C56C42]" aria-hidden="true" />
+                            <span>03 / Refresh to confirm</span>
                         </div>
                     </section>
 
@@ -3496,43 +3740,35 @@ import {
                         </div>
                     ) : null}
 
-                    <section className="border-b border-stone-200 bg-white">
-                        <div className="border-b border-stone-200 px-4 py-4 sm:px-7 sm:py-5">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                                <div>
-                                    <p className="text-xs font-bold text-[#315f7a]">Homepage collections</p>
-                                    <h2 className="mt-0.5 text-xl font-black text-stone-950">Choose what you want to check</h2>
-                                </div>
-                                <a
-                                    href="/"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="focus-ring inline-flex h-9 items-center justify-center rounded-lg border border-[#c8d7e3] bg-[#edf4f8] px-3 text-xs font-black text-[#294f68]"
-                                >
-                                    View homepage
-                                </a>
+                    <section className="border-b border-[#D7DDCF] bg-[#F7F6F2] px-2 pb-0 pt-4 sm:px-7 sm:pt-8">
+                        <div className="flex flex-wrap items-end justify-between gap-2 pb-3 sm:gap-3 sm:pb-5">
+                            <div>
+                                <p className="hidden text-[11px] font-bold uppercase tracking-[0.06em] text-[#C56C42] sm:block">01 / Live collections</p>
+                                <h2 className="mt-0 text-[21px] font-bold tracking-[-0.03em] text-[#202421] sm:mt-1 sm:text-[30px]"><span className="sm:hidden">Collections</span><span className="hidden sm:inline">Choose what to review</span></h2>
                             </div>
+                            <p className="hidden max-w-sm text-[13px] leading-5 text-[#173F35]/80 sm:block">Published grocery, brands and recipes shown on your homepage.</p>
                         </div>
-
-                        <div className="grid sm:grid-cols-3">
+                        <div className="grid grid-cols-3 overflow-hidden border border-[#D7DDCF] bg-[#F7F6F2]">
                             {collectionDefinitions.map((item, index) => {
                                 const active = cmsCollection === item.value;
                                 return (
                                     <button
                                         key={item.value}
                                         type="button"
+                                        aria-pressed={active}
                                         onClick={() => {
                                             setCmsCollection(item.value);
                                             setCmsShowAll(false);
                                         }}
-                                        className={`focus-ring flex min-h-[76px] items-center justify-between gap-4 px-4 py-3 text-left sm:px-6 sm:py-4 ${index > 0 ? 'border-t border-stone-200 sm:border-l sm:border-t-0' : ''} ${active ? 'bg-[#e9f1f7] text-[#173b52]' : 'bg-white text-stone-700 hover:bg-stone-50'}`}
+                                        className={`focus-ring relative flex min-w-0 flex-col justify-between gap-1 px-2 py-2.5 text-left transition-colors sm:gap-3 sm:px-6 sm:py-5 ${index > 0 ? 'border-l border-[#D7DDCF]' : ''} ${active ? 'bg-[#173F35] text-[#F7F6F2]' : 'bg-[#F7F6F2] text-[#202421] hover:bg-[#D7DDCF]/45'}`}
                                     >
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-black">{item.label}</p>
-                                            <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 opacity-65 sm:text-xs">{item.description}</p>
+                                        {active ? <span className="absolute inset-x-0 top-0 h-[4px] bg-[#C56C42]" aria-hidden="true" /> : null}
+                                        <div className="flex min-w-0 items-center justify-between gap-2">
+                                            <span className="text-[12px] font-bold sm:text-[19px]">{item.label}</span>
+                                            <span className={`text-[13px] font-bold sm:text-2xl ${active ? 'text-[#F7F6F2]' : 'text-[#C56C42]'}`}>{item.count}</span>
                                         </div>
-                                        <span className={`grid h-8 min-w-8 shrink-0 place-items-center rounded-full px-2 text-xs font-black ${active ? 'bg-[#173b52] text-white' : 'bg-stone-100 text-stone-600'}`}>
-                                            {item.count}
+                                        <span className={`hidden text-[12px] leading-5 sm:block ${active ? 'text-[#F7F6F2]/75' : 'text-[#173F35]/70'}`}>
+                                            {item.value === 'grocery' ? 'Products on the homepage' : item.value === 'brands' ? 'Available brand profiles' : 'Recipes customers can open'}
                                         </span>
                                     </button>
                                 );
@@ -3540,87 +3776,92 @@ import {
                         </div>
                     </section>
 
-                    <section className="border-b border-stone-200 bg-[#fbfaf7]">
-                        <div className="flex items-end justify-between gap-4 border-b border-stone-200 px-4 py-3 sm:px-7 sm:py-4">
-                            <div>
-                                <p className="text-xs font-bold text-[#315f7a]">{selectedCollection.label}</p>
-                                <h2 className="mt-0.5 text-lg font-black text-stone-950">Live homepage items</h2>
+                    <section className="bg-[#F7F6F2] px-1 py-3 sm:px-7 sm:py-7">
+                        <div className="overflow-hidden border border-[#D7DDCF] border-t-[4px] border-t-[#C56C42] bg-[#F7F6F2]">
+                            <div className="flex items-center justify-between gap-2 border-b border-[#D7DDCF] px-3 py-3 sm:flex-wrap sm:items-end sm:gap-3 sm:px-6 sm:py-5">
+                                <div>
+                                    <p className="hidden text-[11px] font-bold uppercase tracking-[0.06em] text-[#C56C42] sm:block">02 / {selectedCollection.label}</p>
+                                    <h2 className="mt-0 text-[18px] font-bold tracking-[-0.02em] text-[#202421] sm:mt-1 sm:text-[26px]"><span className="sm:hidden">{selectedCollection.label} items</span><span className="hidden sm:inline">Live homepage items</span></h2>
+                                    <p className="mt-1 hidden text-[13px] text-[#173F35]/75 sm:block">{collectionItems.length} {collectionItems.length === 1 ? 'item' : 'items'} in this collection</p>
+                                </div>
+                                <Link
+                                    to={selectedCollection.managePath}
+                                    className="focus-ring inline-flex shrink-0 items-center gap-1 bg-[#173F35] px-2.5 py-2 text-xs font-bold text-[#F7F6F2] transition-colors hover:bg-[#202421] sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
+                                >
+                                    <span className="sm:hidden">Manage</span><span className="hidden sm:inline">Open manager</span> <ArrowUpRight size={15} aria-hidden="true" />
+                                </Link>
                             </div>
-                            <Link
-                                to={selectedCollection.managePath}
-                                className="focus-ring shrink-0 text-xs font-black text-[#294f68] underline decoration-[#aac5d5] underline-offset-4"
-                            >
-                                Open manager
-                            </Link>
+                            {cmsLoading ? (
+                                <div className="flex min-h-32 items-center justify-center gap-2 px-4 py-7 text-sm font-semibold text-[#173F35]">
+                                    <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
+                                    Loading homepage items…
+                                </div>
+                            ) : collectionItems.length === 0 ? (
+                                <div className="flex flex-col items-start gap-2 px-4 py-7 sm:px-6">
+                                    <p className="text-base font-bold text-[#202421]">No live {selectedCollection.label.toLowerCase()} items yet</p>
+                                    <p className="text-sm leading-5 text-[#173F35]/75">Publish an eligible item, then refresh this page.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="grid sm:hidden">
+                                        {renderCmsRows(cmsShowAll ? collectionItems : collectionItems.slice(0, 6))}
+                                    </div>
+                                    <div className="hidden sm:grid sm:grid-cols-2 sm:[&>div:nth-child(odd)]:border-r sm:[&>div:nth-child(odd)]:border-r-[#D7DDCF]">
+                                        {renderCmsRows(cmsShowAll ? collectionItems : collectionItems.slice(0, 10))}
+                                    </div>
+                                    {collectionItems.length > 6 ? (
+                                        <div className="py-2 text-center sm:hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCmsShowAll((value) => !value)}
+                                                className="focus-ring border-b-2 border-[#C56C42] px-2 py-1 text-sm font-bold text-[#173F35]"
+                                            >
+                                                {cmsShowAll ? 'Show fewer' : `View all ${collectionItems.length} items`}
+                                            </button>
+                                        </div>
+                                    ) : null}
+                                    {collectionItems.length > 10 ? (
+                                        <div className="hidden py-3 text-center sm:block">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCmsShowAll((value) => !value)}
+                                                className="focus-ring border-b-2 border-[#C56C42] px-2 py-1 text-sm font-bold text-[#173F35]"
+                                            >
+                                                {cmsShowAll ? 'Show fewer' : `View all ${collectionItems.length} items`}
+                                            </button>
+                                        </div>
+                                    ) : null}
+                                </>
+                            )}
                         </div>
-
-                        {cmsLoading ? (
-                            <div className="flex min-h-28 items-center justify-center gap-2 px-4 py-6 text-sm font-semibold text-stone-500">
-                                <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-                                Loading homepage content…
-                            </div>
-                        ) : collectionItems.length === 0 ? (
-                            <div className="px-4 py-5 sm:px-7">
-                                <p className="text-sm font-black text-stone-900">Nothing is live in this collection yet.</p>
-                                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-500">Publish an eligible record in its source manager, then refresh this page.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="px-4 sm:hidden">
-                                    {renderCmsRows(cmsShowAll ? collectionItems : collectionItems.slice(0, 6))}
-                                </div>
-                                <div className="hidden px-7 sm:block">
-                                    {renderCmsRows(cmsShowAll ? collectionItems : collectionItems.slice(0, 10))}
-                                </div>
-
-                                {collectionItems.length > 6 ? (
-                                    <div className="border-t border-stone-200 py-3 text-center sm:hidden">
-                                        <button
-                                            type="button"
-                                            onClick={() => setCmsShowAll((value) => !value)}
-                                            className="focus-ring rounded-lg border border-[#c8d7e3] bg-white px-4 py-2 text-xs font-black text-[#294f68]"
-                                        >
-                                            {cmsShowAll ? 'Show fewer' : `View all ${collectionItems.length}`}
-                                        </button>
-                                    </div>
-                                ) : null}
-
-                                {collectionItems.length > 10 ? (
-                                    <div className="hidden border-t border-stone-200 py-3 text-center sm:block">
-                                        <button
-                                            type="button"
-                                            onClick={() => setCmsShowAll((value) => !value)}
-                                            className="focus-ring rounded-lg border border-[#c8d7e3] bg-white px-4 py-2 text-xs font-black text-[#294f68]"
-                                        >
-                                            {cmsShowAll ? 'Show fewer' : `View all ${collectionItems.length}`}
-                                        </button>
-                                    </div>
-                                ) : null}
-                            </>
-                        )}
                     </section>
 
-                    <section className="border-b border-stone-200 bg-white">
-                        <div className="border-b border-stone-200 px-4 py-4 sm:px-7 sm:py-5">
-                            <p className="text-xs font-bold text-[#6b558d]">CMS review activity</p>
-                            <h2 className="mt-0.5 text-xl font-black text-stone-950">Changes and issues that need admin attention</h2>
-                            <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-500">Open an item only when a homepage or CMS change needs a recorded admin decision.</p>
+                    <section className="border-y border-[#D7DDCF] bg-[#E9ECE5]">
+                        <div className="flex items-center justify-between gap-2 border-b border-[#D7DDCF] px-3 py-3 sm:flex-wrap sm:items-end sm:gap-3 sm:px-7 sm:py-5">
+                            <div>
+                                <p className="hidden text-[11px] font-bold uppercase tracking-[0.06em] text-[#C56C42] sm:block">03 / Site checks</p>
+                                <h2 className="mt-0 text-[19px] font-bold tracking-[-0.02em] text-[#202421] sm:mt-1 sm:text-[26px]"><span className="sm:hidden">Site checks</span><span className="hidden sm:inline">Changes that need attention</span></h2>
+                            </div>
+                            <span className="text-sm font-bold text-[#173F35]">{openCmsWork} open</span>
                         </div>
-
-                        <div className="grid lg:grid-cols-3">
+                        {reviewCases.length + incidents.length + supportCases.length === 0 ? (
+                            <div className="flex items-center gap-2 px-3 py-3 text-[13px] font-semibold text-[#173F35] sm:hidden">
+                                <CheckCircle2 size={16} aria-hidden="true" /> All clear — nothing to review
+                            </div>
+                        ) : null}
+                        <div className={`${reviewCases.length + incidents.length + supportCases.length === 0 ? 'hidden sm:grid' : 'grid'} lg:grid-cols-3`}>
                             {[
                                 ['review', 'Change reviews', reviewCases],
                                 ['incident', 'Homepage issues', incidents],
-                                ['support', 'Support work', supportCases],
+                                ['support', 'Support requests', supportCases],
                             ].map(([type, label, items], groupIndex) => (
-                                <div key={type} className={`min-w-0 px-4 py-4 sm:px-6 ${groupIndex > 0 ? 'border-t border-stone-200 lg:border-l lg:border-t-0' : ''}`}>
+                                <div key={type} className={`min-w-0 px-3 py-3 sm:px-7 sm:py-5 ${groupIndex > 0 ? 'border-t border-[#D7DDCF] lg:border-l lg:border-t-0' : ''}`}>
                                     <div className="flex items-center justify-between gap-3">
-                                        <p className="text-sm font-black text-stone-900">{label}</p>
-                                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-black text-stone-600">{items.length}</span>
+                                        <p className="text-sm font-bold text-[#202421] sm:text-base">{label}</p>
+                                        <span className="text-base font-bold text-[#173F35]">{items.length}</span>
                                     </div>
-
                                     {items.length === 0 ? (
-                                        <p className="mt-3 text-xs font-semibold text-stone-400">Nothing waiting.</p>
+                                        <p className="mt-3 hidden text-[13px] text-[#173F35]/70 sm:block">Nothing waiting</p>
                                     ) : (
                                         <div className="mt-2">
                                             {items.map((item, index) => (
@@ -3628,14 +3869,14 @@ import {
                                                     key={item?.id || `${type}-${index}`}
                                                     type="button"
                                                     onClick={() => chooseCmsActivity(type, item)}
-                                                    className={`focus-ring block w-full py-3 text-left ${index > 0 ? 'border-t border-stone-200' : ''}`}
+                                                    className={`focus-ring block w-full py-3 text-left ${index > 0 ? 'border-t border-[#D7DDCF]' : ''}`}
                                                 >
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="min-w-0">
-                                                            <p className="truncate text-xs font-black text-stone-900">{cmsActivityTitle(type, item)}</p>
-                                                            <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-stone-500">{cmsActivityDescription(type, item)}</p>
+                                                            <p className="line-clamp-2 text-sm font-bold text-[#202421]">{cmsActivityTitle(type, item)}</p>
+                                                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#173F35]/75">{cmsActivityDescription(type, item)}</p>
                                                         </div>
-                                                        <span className="shrink-0 rounded-full bg-[#f0edf7] px-2 py-1 text-[9px] font-black text-[#675184]">{titleize(item?.status)}</span>
+                                                        <span className="shrink-0 border-l-2 border-[#C56C42] pl-2 text-[11px] font-semibold text-[#173F35]">{titleize(item?.status)}</span>
                                                     </div>
                                                 </button>
                                             ))}
@@ -3647,11 +3888,11 @@ import {
                     </section>
 
                     {activitySelection ? (
-                        <section className="border-b border-stone-200 bg-[#eef3f7] px-4 py-4 sm:px-7 sm:py-5">
+                        <section className="border-b border-[#D7DDCF] bg-[#D7DDCF] px-4 py-4 sm:px-7 sm:py-5">
                             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
                                 <div>
-                                    <p className="text-xs font-bold text-[#315f7a]">Selected admin item</p>
-                                    <h2 className="mt-1 text-lg font-black text-stone-950">{cmsActivityTitle(activitySelection.type, activitySelection.item)}</h2>
+                                    <p className="text-xs font-bold text-[#173F35]">Selected admin item</p>
+                                    <h2 className="mt-1 text-lg font-black text-[#202421]">{cmsActivityTitle(activitySelection.type, activitySelection.item)}</h2>
                                     <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-stone-600 sm:text-sm">{cmsActivityDescription(activitySelection.type, activitySelection.item)}</p>
                                     <p className="mt-2 text-[11px] font-bold text-stone-500">Status: {titleize(activitySelection.item?.status)}</p>
                                 </div>
@@ -3661,23 +3902,23 @@ import {
                                         value={reason}
                                         onChange={(event) => setReason(event.target.value)}
                                         placeholder="Reason for this decision"
-                                        className="h-11 w-full rounded-xl border border-[#c8d7e3] bg-white px-3 text-sm font-semibold text-stone-800 outline-none focus:border-[#315f7a]"
+                                        className="h-11 w-full rounded-xl border border-[#D7DDCF] bg-[#F7F6F2] px-3 text-sm font-semibold text-stone-800 outline-none focus:border-[#C56C42]"
                                     />
 
-                                    <details className="mt-2 border-t border-[#c8d7e3] pt-2">
+                                    <details className="mt-2 border-t border-[#D7DDCF] pt-2">
                                         <summary className="cursor-pointer text-[11px] font-black text-stone-600">Add evidence (optional)</summary>
                                         <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                                             <input
                                                 value={evidenceLabel}
                                                 onChange={(event) => setEvidenceLabel(event.target.value)}
                                                 placeholder="Evidence label"
-                                                className="h-10 rounded-lg border border-[#c8d7e3] bg-white px-3 text-xs font-semibold text-stone-800 outline-none focus:border-[#315f7a]"
+                                                className="h-10 rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 text-xs font-semibold text-stone-800 outline-none focus:border-[#C56C42]"
                                             />
                                             <input
                                                 value={evidenceReferenceId}
                                                 onChange={(event) => setEvidenceReferenceId(event.target.value)}
                                                 placeholder="Reference ID"
-                                                className="h-10 rounded-lg border border-[#c8d7e3] bg-white px-3 text-xs font-semibold text-stone-800 outline-none focus:border-[#315f7a]"
+                                                className="h-10 rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 text-xs font-semibold text-stone-800 outline-none focus:border-[#C56C42]"
                                             />
                                         </div>
                                     </details>
@@ -3689,7 +3930,7 @@ import {
                                                     type="button"
                                                     disabled={busy || reason.trim().length < 5}
                                                     onClick={completeCmsReview}
-                                                    className="focus-ring rounded-lg bg-[#315f7a] px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                                                    className="focus-ring rounded-lg bg-[#173F35] px-3 py-2 text-xs font-black text-white disabled:opacity-50"
                                                 >
                                                     Resolve review
                                                 </button>
@@ -3701,7 +3942,7 @@ import {
                                                         type="button"
                                                         disabled={busy || reason.trim().length < 3}
                                                         onClick={() => updateCmsIncident('monitoring')}
-                                                        className="focus-ring rounded-lg border border-[#c8d7e3] bg-white px-3 py-2 text-xs font-black text-[#315f7a] disabled:opacity-50"
+                                                        className="focus-ring rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 py-2 text-xs font-black text-[#173F35] disabled:opacity-50"
                                                     >
                                                         Keep monitoring
                                                     </button>
@@ -3709,7 +3950,7 @@ import {
                                                         type="button"
                                                         disabled={busy || reason.trim().length < 3}
                                                         onClick={() => updateCmsIncident('resolved')}
-                                                        className="focus-ring rounded-lg bg-[#315f7a] px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                                                        className="focus-ring rounded-lg bg-[#173F35] px-3 py-2 text-xs font-black text-white disabled:opacity-50"
                                                     >
                                                         Resolve issue
                                                     </button>
@@ -3722,7 +3963,7 @@ import {
                                                         type="button"
                                                         disabled={busy || reason.trim().length < 3}
                                                         onClick={() => updateCmsSupport('in_progress')}
-                                                        className="focus-ring rounded-lg border border-[#c8d7e3] bg-white px-3 py-2 text-xs font-black text-[#315f7a] disabled:opacity-50"
+                                                        className="focus-ring rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 py-2 text-xs font-black text-[#173F35] disabled:opacity-50"
                                                     >
                                                         Start work
                                                     </button>
@@ -3730,7 +3971,7 @@ import {
                                                         type="button"
                                                         disabled={busy || reason.trim().length < 3}
                                                         onClick={() => updateCmsSupport('resolved')}
-                                                        className="focus-ring rounded-lg bg-[#315f7a] px-3 py-2 text-xs font-black text-white disabled:opacity-50"
+                                                        className="focus-ring rounded-lg bg-[#173F35] px-3 py-2 text-xs font-black text-white disabled:opacity-50"
                                                     >
                                                         Resolve
                                                     </button>
@@ -3746,15 +3987,15 @@ import {
                     ) : null}
 
                     {metricEntries.length ? (
-                        <details className="bg-[#efeee9]">
-                            <summary className="cursor-pointer list-none border-b border-stone-200 px-4 py-3 text-xs font-black text-stone-700 sm:px-7">
+                        <details className="bg-[#D7DDCF]">
+                            <summary className="cursor-pointer list-none border-b border-[#D7DDCF] px-4 py-3 text-xs font-black text-stone-700 sm:px-7">
                                 Other admin signals
                             </summary>
                             <div className="grid grid-cols-2 sm:grid-cols-4">
                                 {metricEntries.map(([label, value], index) => (
                                     <div
                                         key={label}
-                                        className={`px-4 py-3 ${index % 2 === 1 ? 'border-l border-stone-200' : ''} ${index >= 2 ? 'border-t border-stone-200 sm:border-t-0' : ''} ${index > 0 ? 'sm:border-l sm:border-stone-200' : ''}`}
+                                        className={`px-4 py-3 ${index % 2 === 1 ? 'border-l border-[#D7DDCF]' : ''} ${index >= 2 ? 'border-t border-[#D7DDCF] sm:border-t-0' : ''} ${index > 0 ? 'sm:border-l sm:border-[#D7DDCF]' : ''}`}
                                     >
                                         <p className="text-lg font-black text-stone-900">{value ?? 0}</p>
                                         <p className="mt-0.5 text-[10px] font-bold text-stone-500">{USER_METRIC_LABELS[label] || label}</p>
@@ -5217,18 +5458,18 @@ import {
                         ? <><span className="sm:hidden">Data Quality & Duplicates</span><span className="hidden sm:inline">Data Quality & Duplicate Review</span></>
                         : section === 'recipeReview'
                             ? 'Recipe Publishing Review'
-                            : section === 'policy' ? <><span className="sm:hidden">Food rules & features</span><span className="hidden sm:inline">Food Rules & Feature Access</span></> : `${config.code} · ${config.title}`
+                            : section === 'policy' ? <><span className="block text-[22px] leading-[1.2] tracking-[-0.02em] sm:hidden">Food rules & features</span><span className="hidden sm:inline">Food Rules & Feature Access</span></> : section === 'aiQuality' ? 'Food Copilot Health' : `${config.code} · ${config.title}`
             }
             description={
                 section === 'trustSafety'
-                    ? 'Review safety reports, handle incidents and follow up on claims.'
+                    ? null
                     : section === 'users'
                     ? null
                     : section === 'recipeReview'
                         ? 'Review recipes waiting for a decision, check food readiness, and move each recipe to the right next step.'
                         : section === 'dataQuality'
                             ? <><span className="sm:hidden">Review issues, duplicates and batches.</span><span className="hidden sm:inline">Review product issues, duplicates and batches in one place.</span></>
-                        : section === 'policy' ? <><span className="text-[13px] leading-[1.3] sm:hidden">Manage rules and features.</span><span className="hidden sm:inline">Create and review food safety rules, manage feature access, and track related admin work.</span></> : config.description
+                        : section === 'policy' ? <><span className="text-[13px] leading-[1.3] sm:hidden">Manage rules and features.</span><span className="hidden sm:inline">Create and review food safety rules, manage feature access, and track related admin work.</span></> : section === 'aiQuality' ? 'Monitor saved AI results and issues.' : config.description
             }
             showWorkspaceBadge={section !== 'users'}
             flushTop={section === 'users'}
@@ -5268,7 +5509,7 @@ import {
                 </button>
             }
         >
-            {section !== 'dataQuality' && section !== 'recipeReview' && section !== 'users' ? (
+            {section !== 'dataQuality' && section !== 'recipeReview' && section !== 'users' && section !== 'trustSafety' ? (
                 <div className="flex items-center gap-2 text-emerald-700">
                     <Icon
                         size={18}
@@ -5280,7 +5521,7 @@ import {
                             ? 'People & business access'
                             : section === 'trustSafety'
                                 ? 'Safety reports & claims'
-                                : 'Governed admin operations'}
+                                : section === 'aiQuality' ? 'Food Copilot monitoring' : 'Governed admin operations'}
                     </p>
                 </div>
             ) : null}
@@ -5312,7 +5553,7 @@ import {
                 />
             ) : null}
 
-            {section !== 'recipeReview' && section !== 'users' && loading ? (
+            {section !== 'recipeReview' && section !== 'users' && section !== 'aiQuality' && loading ? (
                 <div
                     className={`grid place-items-center rounded-[22px] border border-stone-200 bg-white ${
                         section === 'users'
@@ -5352,78 +5593,409 @@ import {
                                 </section>
                             )}
 
-                            <section className="overflow-hidden rounded-[18px] border border-[#dfded8] bg-[#f8f7f3]">
-                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e4de] px-4 py-3 sm:px-5">
-                                    <div>
-                                        <h2 className="text-base font-bold text-stone-900">Other platform checks</h2>
-                                        <p className="mt-0.5 text-sm text-stone-600">The wider admin overview, separate from Food Copilot activity.</p>
-                                    </div>
-                                    {commandCenterError ? (
-                                        <span className="text-xs font-bold text-rose-700">Overview unavailable — use Refresh</span>
-                                    ) : null}
-                                </div>
-                                <div className="grid grid-cols-2 gap-px bg-[#e7e5dd] sm:grid-cols-4">
+                            <details className="group border-y border-[#D7DDCF] bg-[#F7F6F2]">
+                                <summary className="focus-ring flex cursor-pointer items-center justify-between gap-3 px-4 py-4 text-[14px] font-bold text-[#173F35] sm:px-5">
+                                    Other platform checks
+                                    <span className="text-[13px] font-medium text-[#C56C42] group-open:hidden">Show details +</span>
+                                    <span className="hidden text-[13px] font-medium text-[#C56C42] group-open:inline">Hide details −</span>
+                                </summary>
+                                {commandCenterError ? <p className="px-4 pb-3 text-[13px] text-[#C56C42] sm:px-5">Platform overview is unavailable.</p> : null}
+                                <div className="grid grid-cols-2 border-t border-[#D7DDCF] sm:grid-cols-4">
                                     {metricEntries.map(([label, value, MetricIcon]) => (
-                                        <div key={label} className="min-w-0 bg-[#fcfbf8] px-3 py-3 sm:px-5 sm:py-4">
-                                            <div className="flex items-center gap-2">
-                                                <MetricIcon size={15} className="shrink-0 text-emerald-700" aria-hidden="true" />
-                                                <span className="text-xl font-extrabold text-[#174836]">{commandCenterError ? '—' : (value ?? 0)}</span>
+                                        <div key={label} className="min-w-0 border-b border-r border-[#D7DDCF] p-3 sm:p-4">
+                                            <div className="flex items-center gap-2 text-[#173F35]">
+                                                <MetricIcon size={17} aria-hidden="true" />
+                                                <span className="text-[23px] font-bold tabular-nums">{commandCenterError || loading ? '—' : (value ?? 0)}</span>
                                             </div>
-                                            <p className="mt-1 text-xs font-semibold leading-4 text-stone-600 sm:text-sm">{label}</p>
+                                            <p className="mt-1 text-[13px] leading-5 text-[#52645A]">{label}</p>
                                         </div>
                                     ))}
                                 </div>
-                            </section>
+                            </details>
 
                             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-3 sm:pt-4">
-                                <p className="max-w-2xl text-sm leading-5 text-stone-600">Product and recipe approvals still need human review.</p>
+                                <p className="max-w-2xl text-sm leading-5 text-stone-600">AI results do not approve products or recipes.</p>
                                 <Link to="/admin/product-intelligence" className={primaryButtonClass}>
-                                    Open Product Intelligence review
+                                    Review product decisions
                                 </Link>
                             </div>
                         </div>
                     ) : null}
 
                     {section === 'policy' ? (
-                        <div className="mt-2 space-y-3 sm:mt-5 sm:space-y-5">
-                            <section className="overflow-hidden rounded-2xl border border-[#c6ded3] bg-[#e3f2ea]">
-                                <div className="grid gap-2 px-3 py-3 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-3 sm:px-6 sm:py-6">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-emerald-800"><span className="sm:hidden">Admin controls</span><span className="hidden sm:inline">Platform safety and access</span></p>
-                                        <h2 className="mt-1 text-xl font-extrabold leading-tight text-[#123f30] sm:text-[29px]"><span className="sm:hidden">Set rules. Manage features.</span><span className="hidden sm:inline">Keep food rules clear. Control what goes live.</span></h2>
-                                        <p className="mt-1 max-w-2xl text-sm leading-5 text-[#3d5e51]"><span className="sm:hidden">Create rules. Control what is live.</span><span className="hidden sm:inline">Create food-rule drafts, review feature availability, and record why changes are made.</span></p>
+                        <div id="epantry-policy-mobile" className="mt-4 min-w-0 space-y-6 pb-2 sm:mt-6 sm:space-y-8">
+                            <style>{`
+                              @media (max-width: 639px) {
+                                /* Full-bleed policy content within the AdminShell's content column. */
+                                #epantry-policy-mobile {
+                                  width: calc(100% + 20px);
+                                  margin-left: -10px;
+                                  margin-right: -10px;
+                                  padding-bottom: 0;
+                                  overflow-x: clip;
+                                }
+                                #epantry-policy-mobile > section {
+                                  border-radius: 0;
+                                  box-shadow: none;
+                                  border-left: 0;
+                                  border-right: 0;
+                                }
+                                #epantry-policy-mobile .policy-overview-intro {
+                                  padding: 15px 16px 16px;
+                                  border-left-width: 4px;
+                                }
+                                #epantry-policy-mobile .policy-overview-intro h2 {
+                                  font-size: 19px;
+                                  line-height: 1.26;
+                                  letter-spacing: -0.025em;
+                                }
+                                #epantry-policy-mobile .policy-overview-intro > p:last-child {
+                                  margin-top: 6px;
+                                  font-size: 13px;
+                                  line-height: 1.45;
+                                }
+                                #epantry-policy-mobile .policy-metrics > div {
+                                  padding: 12px 10px;
+                                }
+                                #epantry-policy-mobile .policy-metrics > div > p:first-child {
+                                  font-size: 24px;
+                                }
+                                #epantry-policy-mobile .policy-metrics > div > p:last-child {
+                                  margin-top: 4px;
+                                  font-size: 12px;
+                                  line-height: 1.25;
+                                }
+                                #epantry-policy-mobile .policy-feature-header {
+                                  gap: 7px;
+                                  padding: 17px 16px;
+                                }
+                                #epantry-policy-mobile .policy-feature-header h2 {
+                                  font-size: 19px;
+                                  line-height: 1.25;
+                                }
+                                #epantry-policy-mobile .policy-feature-header p:last-child {
+                                  font-size: 13px;
+                                  line-height: 1.45;
+                                }
+                                /* Balanced mobile typographic ladder: section -> item -> metadata. */
+                                #epantry-policy-mobile .policy-overview-intro > p:first-child,
+                                #epantry-policy-mobile .policy-feature-header > div > p:first-child,
+                                #epantry-policy-mobile .policy-food-heading > div > p:first-child,
+                                #epantry-policy-mobile .policy-followup > div:first-child > div > p:first-child {
+                                  font-size: 12.5px;
+                                  line-height: 1.4;
+                                  letter-spacing: 0.04em;
+                                }
+                                #epantry-policy-mobile .policy-feature-table > div:first-child {
+                                  font-size: 12.5px;
+                                  line-height: 1.45;
+                                }
+                                #epantry-policy-mobile .policy-feature-row > div:first-child > div:first-child p {
+                                  font-size: 14px;
+                                  line-height: 1.35;
+                                }
+                                #epantry-policy-mobile .policy-feature-row > div:first-child > div:first-child span:last-child {
+                                  font-size: 12.5px;
+                                  line-height: 1.3;
+                                }
+                                #epantry-policy-mobile .policy-feature-row > div:first-child > p {
+                                  font-size: 13px;
+                                  line-height: 1.5;
+                                }
+                                #epantry-policy-mobile .policy-food-heading > div > p:last-child {
+                                  font-size: 13px;
+                                  line-height: 1.5;
+                                }
+                                #epantry-policy-mobile .policy-food-heading > p:last-child {
+                                  font-size: 12.5px;
+                                  line-height: 1.5;
+                                }
+                                #epantry-policy-mobile .policy-followup .policy-followup-row h3 {
+                                  font-size: 14px;
+                                  line-height: 1.35;
+                                }
+                                #epantry-policy-mobile .policy-followup .policy-followup-row > p {
+                                  font-size: 12.5px;
+                                  line-height: 1.5;
+                                }
+                                #epantry-policy-mobile .policy-feature-table {
+                                  border: 0;
+                                }
+                                #epantry-policy-mobile .policy-feature-row {
+                                  gap: 8px;
+                                  border-left: 0 !important;
+                                  padding: 12px 16px;
+                                  background: #F7F6F2;
+                                }
+                                #epantry-policy-mobile .policy-feature-row > div:nth-child(2) {
+                                  display: flex;
+                                  justify-content: flex-start;
+                                }
+                                #epantry-policy-mobile .policy-feature-row > div:nth-child(2) button {
+                                  width: auto;
+                                  min-width: 128px;
+                                  min-height: 38px;
+                                  border-radius: 6px;
+                                  padding: 8px 13px;
+                                  font-size: 13px;
+                                }
+                                #epantry-policy-mobile .policy-feature-row > div:first-child > p {
+                                  margin-top: 3px;
+                                  line-height: 1.35;
+                                }
+                                #epantry-policy-mobile .policy-add-feature,
+                                #epantry-policy-mobile .policy-add-feature button {
+                                  border-radius: 0;
+                                }
+                                #epantry-policy-mobile .policy-add-feature > button {
+                                  padding: 15px 16px;
+                                }
+                                #epantry-policy-mobile .policy-add-feature > button > span:first-child > span:last-child {
+                                  font-size: 13px;
+                                }
+                                #epantry-policy-mobile .policy-food-heading {
+                                  min-height: auto;
+                                  padding: 18px 16px;
+                                }
+                                #epantry-policy-mobile .policy-food-heading h2 {
+                                  font-size: 19px;
+                                  line-height: 1.25;
+                                }
+                                #epantry-policy-mobile .policy-food-heading p {
+                                  line-height: 1.45;
+                                }
+                                #epantry-policy-mobile .policy-rule-library {
+                                  border: 0;
+                                }
+                                #epantry-policy-mobile .policy-followup {
+                                  border-top-width: 2px;
+                                }
+                                #epantry-policy-mobile .policy-followup > div:first-child {
+                                  padding: 17px 16px 12px;
+                                }
+                                #epantry-policy-mobile .policy-followup > div:first-child h2 {
+                                  font-size: 19px;
+                                  line-height: 1.26;
+                                }
+                                #epantry-policy-mobile .policy-followup .policy-followup-row {
+                                  padding: 12px 16px;
+                                  border-right: 0;
+                                  border-bottom: 1px solid #D7DDCF;
+                                }
+                                #epantry-policy-mobile .policy-followup .policy-followup-row > p:last-child {
+                                  margin-top: 3px;
+                                }
+                                /* The legacy admin queues remain reachable when they contain records.
+                                   When all three are empty, avoid rendering three more empty cards. */
+                                #policy-related-queues.policy-queues-empty {
+                                  display: none;
+                                }
+                                #policy-related-queues:not(.policy-queues-empty) {
+                                  display: block;
+                                  margin: 0;
+                                }
+                                #policy-related-queues > section {
+                                  margin: 0;
+                                  padding: 14px 16px;
+                                  border: 0;
+                                  border-bottom: 1px solid #D7DDCF;
+                                  border-radius: 0;
+                                  box-shadow: none;
+                                  background: #F7F6F2;
+                                }
+                                #policy-related-queues > section > div {
+                                  margin-top: 8px;
+                                }
+                                #policy-related-queues > section button,
+                                #policy-related-queues > section div > p {
+                                  border-radius: 0;
+                                }
+                              }
+                            `}</style>
+                            {/* Overview: a quiet, editorial heading instead of another oversized colour banner. */}
+                            <section className="border-y border-[#D7DDCF] bg-[#F7F6F2]">
+                                <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.65fr)]">
+                                    <div className="policy-overview-intro border-l-[5px] border-[#C56C42] px-4 py-5 sm:px-7 sm:py-7">
+                                        <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-[#C56C42]">FOOD SAFETY  /  PLATFORM CONTROLS</p>
+                                        <h2 className="mt-2 max-w-[650px] text-[26px] font-bold leading-[1.16] tracking-[-0.035em] text-[#202421] sm:text-[32px]">The rules behind a trusted food platform.</h2>
+                                        <p className="mt-2 text-[14px] leading-6 text-[#173F35]">Review what is available, then manage the rules that protect it.</p>
                                     </div>
-                                    <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-[#c5ded2] bg-white text-center sm:min-w-[225px]">
-                                        {[['Food rules', policyLoadIssues.rules ? '—' : policy?.ruleProfiles?.length ?? '—'], ['Features', policyLoadIssues.flags ? '—' : policy?.featureFlags?.length ?? '—'], ['Enabled', policyLoadIssues.flags ? '—' : policy?.featureFlags?.filter((flag) => flag.enabled).length ?? '—']].map(([label, value]) => (
-                                            <div key={label} className="min-w-0 border-r border-stone-100 px-2 py-1.5 last:border-r-0 sm:py-3">
-                                                <p className="text-xl font-extrabold text-[#124b36]">{value}</p>
-                                                <p className="text-xs font-semibold text-stone-600">{label}</p>
+                                    <div className="policy-metrics grid grid-cols-3 border-t border-[#D7DDCF] bg-[#D7DDCF] lg:border-l lg:border-t-0">
+                                        {[
+                                            ['Live features', policyLoadIssues.flags ? '—' : (policy?.featureFlags ?? []).filter((flag) => flag.enabled).length],
+                                            ['Total features', policyLoadIssues.flags ? '—' : (policy?.featureFlags?.length ?? 0)],
+                                            ['Food rules', policyLoadIssues.rules ? '—' : (policy?.ruleProfiles?.length ?? 0)],
+                                        ].map(([label, value]) => (
+                                            <div key={label} className="flex min-w-0 flex-col justify-center border-r border-[#173F35]/15 px-3 py-4 last:border-r-0 sm:px-5">
+                                                <p className="text-[28px] font-bold leading-none tabular-nums text-[#173F35] sm:text-[34px]">{value}</p>
+                                                <p className="mt-2 text-[12px] font-semibold leading-4 text-[#202421] sm:text-[13px]">{label}</p>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-px border-t border-[#c6ded3] bg-[#c6ded3]">
-                                    {[['01', 'Write or review a food rule'], ['02', 'Choose available features'], ['03', 'Save with a reason']].map(([number, label]) => (
-                                        <div key={number} className="flex min-w-0 items-center justify-center gap-1 bg-[#f2faf6] px-1 py-2 text-center text-xs sm:justify-start sm:gap-2 sm:px-5 sm:py-3 sm:text-sm">
-                                            <span className="font-extrabold text-emerald-800">{number}</span><span className="font-semibold text-[#27483c]"><span className="sm:hidden">{number === '01' ? 'Rules' : number === '02' ? 'Features' : 'Save'}</span><span className="hidden sm:inline">{label}</span></span>
-                                        </div>
-                                    ))}
+                            </section>
+
+                            {/* Primary operational surface: live feature states and controlled actions. */}
+                            <section id="policy-feature-access" className="min-w-0 bg-[#F7F6F2]">
+                                <div className="policy-feature-header flex flex-wrap items-end justify-between gap-4 border-b-[3px] border-[#C56C42] bg-[#173F35] px-4 py-5 sm:px-7 sm:py-6">
+                                    <div className="min-w-0">
+                                        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#D7DDCF]">01 / PLATFORM FEATURES</p>
+                                        <h2 className="mt-1 text-[24px] font-bold leading-tight tracking-[-0.02em] text-[#F7F6F2] sm:text-[29px]">Control feature availability</h2>
+                                        <p className="mt-1 text-[13px] leading-5 text-[#F7F6F2]/80 sm:text-sm">Check what is on and what is paused. Changes require confirmation.</p>
+                                    </div>
+                                    <span className="border border-[#D7DDCF]/40 px-3 py-2 text-[13px] font-bold text-[#F7F6F2]">{policyLoadIssues.flags ? 'Unavailable' : `${policy?.featureFlags?.length ?? 0} total`}</span>
+                                </div>
+                                <div className="policy-feature-table border-x border-[#D7DDCF]">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D7DDCF] bg-[#D7DDCF]/50 px-4 py-3 text-[13px] font-medium text-[#173F35] sm:px-6">
+                                        <span>Feature / availability</span>
+                                        <span>{isRootSuperAdmin ? 'Root Super Admin controls' : 'View only'}</span>
+                                    </div>
+                                    {policyLoadIssues.flags ? (
+                                    <p role="alert" className="p-4 text-sm text-rose-700">Features could not load: {policyLoadIssues.flags}. Select Refresh to retry.</p>
+                                ) : !policy?.featureFlags?.length ? (
+                                    <p className="p-4 text-sm text-stone-600 sm:p-5">No platform features found yet. Use Add a feature below if you have Root Super Admin access.</p>
+                                ) : (
+                                    <div className="divide-y divide-[#D7DDCF]">
+                                        {(policyFlagsExpanded ? policy.featureFlags : policy.featureFlags.slice(0, 8)).map((flag, index) => {
+                                            return (
+                                                <div key={flag.id} className="policy-feature-row grid min-w-0 gap-3 border-l-[3px] bg-[#F7F6F2] px-4 py-4 transition-colors hover:bg-[#ECEEE7] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6 sm:py-[18px]" style={{ borderLeftColor: flag.enabled ? '#173F35' : '#C56C42' }}>
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2.5">
+                                                            <span className="min-w-[24px] text-[11px] font-bold tabular-nums text-[#C56C42]">{String(index + 1).padStart(2, '0')}</span>
+                                                            <p className="break-words text-[15px] font-bold text-[#202421] sm:text-[16px]">{flag.key === 'aiCopilot' ? 'AI Copilot' : titleize(flag.key)}</p>
+                                                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${flag.enabled ? 'bg-[#D7DDCF] text-[#173F35]' : 'bg-[#F7F6F2] text-[#C56C42] border border-[#C56C42]/50'}`}>{flag.enabled ? 'Enabled' : 'Paused'}</span>
+                                                        </div>
+                                                        <p className="mt-1 text-[13px] leading-5 text-[#202421]/70 sm:text-[14px]">{flag.description || 'No description provided.'}</p>
+                                                        <p className="mt-1 text-[13px] leading-5 text-[#173F35]">{(flag.environments || []).length ? flag.environments.map((env) => ({ development: 'Testing site', staging: 'Preview site', production: 'Live site' }[env] || env)).join(', ') : 'No site selected'} · {flag.enabled && flag.rolloutPercentage > 0 ? `${flag.rolloutPercentage}% of visitors` : 'Not shown to visitors'}</p>
+                                                    </div>
+                                                    {isRootSuperAdmin ? (
+                                                        <div className="min-w-0">
+                                                            <button type="button" disabled={busy || Boolean(policyLoadIssues.flags)}
+                                                                aria-expanded={policyFlagAction?.id === flag.id}
+                                                                onClick={() => beginPolicyFlagAction(flag)}
+                                                                className={`focus-ring w-full rounded-md border px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${flag.enabled ? 'border-[#C56C42] bg-[#F7F6F2] text-[#202421] hover:bg-[#D7DDCF]' : 'border-[#173F35] bg-[#173F35] text-[#F7F6F2] hover:bg-[#202421]'}`}>
+                                                                {policyFlagAction?.id === flag.id ? 'Close changes' : (flag.enabled ? 'Pause feature' : 'Enable feature')}
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs font-medium text-stone-500">Only the Root Super Admin can change this feature.</p>
+                                                    )}
+                                                    {isRootSuperAdmin && policyFlagAction?.id === flag.id ? (
+                                                        <div className="min-w-0 border-l-[3px] border-[#C56C42] bg-[#D7DDCF]/40 p-4 sm:col-span-2 sm:p-5">
+                                                            <p className="text-sm font-bold text-[#202421]">{policyFlagAction.enabled ? 'Enable' : 'Pause'} {flag.key}</p>
+                                                            <p className="mt-1 text-sm text-stone-600">{policyFlagAction.enabled ? 'Choose the site and how many visitors can see it.' : 'Pause this feature without deleting it.'} Every change is recorded.</p>
+                                                            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
+                                                                {(flag.environments || []).length ? (
+                                                                    <p className="min-w-0 self-center text-sm font-semibold text-stone-700">Assigned sites: <span className="font-normal">{flag.environments.map((env) => ({ development: 'Testing site', staging: 'Preview site', production: 'Live website' }[env] || env)).join(', ')}</span></p>
+                                                                ) : (
+                                                                    <label className="min-w-0 text-sm font-semibold text-stone-700">Assign a site
+                                                                        <select className={`${inputClass} mt-1`} value={policyFlagAction.environment} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, environment: e.target.value }))}>
+                                                                            <option value="development">Testing site</option><option value="staging">Preview site</option><option value="production">Live website</option>
+                                                                        </select>
+                                                                    </label>
+                                                                )}
+                                                                {policyFlagAction.enabled ? (
+                                                                    <label className="min-w-0 text-sm font-semibold text-stone-700">Visitors who can see it (%)
+                                                                        <input type="number" min="1" max="100" className={`${inputClass} mt-1`} value={policyFlagAction.rollout} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, rollout: e.target.value }))} />
+                                                                    </label>
+                                                                ) : <p className="self-center text-sm text-stone-600">The feature will stop running.</p>}
+                                                                <label className="min-w-0 text-sm font-semibold text-stone-700">Reason for change
+                                                                    <input className={`${inputClass} mt-1`} maxLength={4000} placeholder="Why is this change needed?" value={policyFlagAction.reason} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, reason: e.target.value }))} />
+                                                                </label>
+                                                                <label className="min-w-0 text-sm font-semibold text-stone-700">Reference (required for live / high-risk)
+                                                                    <input className={`${inputClass} mt-1`} placeholder="Approval ticket or evidence" value={policyFlagAction.reference} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, reference: e.target.value }))} />
+                                                                </label>
+                                                            </div>
+                                                            <p className="mt-2 text-sm text-[#173F35]">Root Super Admin access and recent MFA are required. Live/high-risk changes also need evidence.</p>
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                <button type="button" className={primaryButtonClass} disabled={busy || policyFlagAction.reason.trim().length < 10 || (policyFlagAction.enabled && !(Number(policyFlagAction.rollout) >= 1 && Number(policyFlagAction.rollout) <= 100)) || ((flag.riskLevel === 'high' || flag.riskLevel === 'critical' || (policyFlagAction.enabled && ((flag.environments || []).includes('production') || (!(flag.environments || []).length && policyFlagAction.environment === 'production')))) && !policyFlagAction.reference.trim())} onClick={() => {
+                                                                    const current = policyFlagAction;
+                                                                    run(() => updateAdminFeatureFlag(flag.id, {
+                                                                        enabled: current.enabled,
+                                                                        ...((!flag.enabled && current.enabled && !(flag.environments || []).length) ? { environments: [current.environment] } : {}),
+                                                                        ...(current.enabled ? { rolloutPercentage: Number(current.rollout) } : {}),
+                                                                        reason: current.reason.trim(),
+                                                                        evidence: current.reference.trim() ? [{ type: 'external_reference', label: current.reference.trim(), referenceId: '', uri: '', checksumSha256: '', note: '' }] : [],
+                                                                    }), `${flag.key} ${current.enabled ? 'enabled' : 'paused'} successfully.`).then((result) => {
+                                                                        if (result) setPolicyFlagAction(null);
+                                                                    });
+                                                                }}>{policyFlagAction.enabled ? 'Confirm enable' : 'Confirm pause'}</button>
+                                                                <button type="button" onClick={() => setPolicyFlagAction(null)} className="focus-ring rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700">Cancel</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        })}
+                                        {policy.featureFlags.length > 8 ? <button type="button" onClick={() => setPolicyFlagsExpanded((v) => !v)} className="focus-ring w-full border-t border-[#D7DDCF] px-5 py-3 text-left text-sm font-bold text-[#173F35]">{policyFlagsExpanded ? 'Show fewer features' : `View all ${policy.featureFlags.length} features`}</button> : null}
+                                    </div>
+                                )}
                                 </div>
                             </section>
 
-                            <section className="overflow-hidden rounded-2xl border border-[#d1e3dd] bg-white">
-                                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#eaf3f6] px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-[#285d75]">01 · Food safety</p>
-                                        <h2 className="mt-0.5 text-xl font-extrabold text-[#1c4054]">Food rules</h2>
-                                        <p className="mt-1 text-sm leading-5 text-[#446371]"><span className="sm:hidden">Write rules. Another admin approves.</span><span className="hidden sm:inline">Set nutrition, allergen and dietary guidance. New rules start as drafts and need a different reviewer to approve them.</span></p>
-                                    </div>
-                                    {hasAdminPermission('trust_safety.mutate') ? (
-                                        <button type="button" onClick={() => setShowRuleForm((current) => !current)} className="focus-ring shrink-0 rounded-xl bg-[#175c49] px-4 py-2.5 text-sm font-bold text-white">{showRuleForm ? 'Close form' : '+ Create food rule'}</button>
+                            {isRootSuperAdmin ? (
+                                <section className="policy-add-feature border-x border-b border-[#D7DDCF] bg-[#F7F6F2]">
+                                    <button type="button" onClick={() => setShowFlagForm((v) => !v)} className="focus-ring flex w-full items-center justify-between gap-4 border-l-[3px] border-[#C56C42] px-4 py-4 text-left hover:bg-[#D7DDCF]/40 sm:px-6 sm:py-5">
+                                        <span className="min-w-0"><span className="block text-sm font-bold text-[#173F35]">ADD A FEATURE</span><span className="mt-1 block text-[18px] font-bold text-[#202421]">Create a new feature</span><span className="mt-1 block text-sm text-[#173F35]"><span className="sm:hidden">Add it paused. Enable later.</span><span className="hidden sm:inline">Create a paused feature now; enable it when it's ready.</span></span></span>
+                                        <span className="shrink-0 border border-[#173F35] bg-[#F7F6F2] px-3 py-2 text-sm font-bold text-[#173F35]">{showFlagForm ? 'Close' : 'Open form'}</span>
+                                    </button>
+                                    {showFlagForm ? (
+                                        <div className="grid gap-4 border-t border-[#D7DDCF] bg-[#F7F6F2] p-4 sm:grid-cols-2 sm:p-6">
+                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Reason for creating this feature
+                                                <input className={`${inputClass} mt-1`} minLength={10} value={featureFlagForm.reason} placeholder="Why is this needed?" onChange={(e) => setFeatureFlagForm((state) => ({ ...state, reason: e.target.value }))} />
+                                            </label>
+                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Approval ticket or reference
+                                                <input className={`${inputClass} mt-1`} value={featureFlagForm.evidenceLabel} placeholder="e.g. QA-2026-010" onChange={(e) => setFeatureFlagForm((state) => ({ ...state, evidenceLabel: e.target.value }))} />
+                                            </label>
+                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Feature ID
+                                                <input className={`${inputClass} mt-1`} placeholder="e.g. pantry.new-view" value={featureFlagForm.key} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, key: e.target.value.toLowerCase() }))} />
+                                            </label>
+                                            <label className="min-w-0 text-sm font-semibold text-stone-700">What does it do?
+                                                <input className={`${inputClass} mt-1`} placeholder="Short description" value={featureFlagForm.description} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, description: e.target.value }))} />
+                                            </label>
+                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Available in
+                                                <select className={`${inputClass} mt-1`} value={featureFlagForm.environments} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, environments: e.target.value }))}><option value="development">Testing (development)</option><option value="staging">Preview (staging)</option><option value="production">Live website (production)</option></select>
+                                            </label>
+                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Impact level
+                                                <select className={`${inputClass} mt-1`} value={featureFlagForm.riskLevel} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, riskLevel: e.target.value }))}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+                                            </label>
+                                            <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+                                                <p className="text-sm leading-5 text-[#173F35]">The change reason and ticket above are required. All new features start paused.</p>
+                                                <button type="button" disabled={busy || Boolean(policyLoadIssues.flags) || !/^[a-z][a-z0-9_.-]{2,}$/.test(featureFlagForm.key.trim()) || featureFlagForm.description.trim().length < 5 || featureFlagForm.reason.trim().length < 10 || !featureFlagForm.evidenceLabel.trim()} onClick={() => run(() => createAdminFeatureFlag({
+                                                    key: featureFlagForm.key.trim(), description: featureFlagForm.description.trim(), enabled: false,
+                                                    environments: [featureFlagForm.environments], rolloutPercentage: 0, ownerDomain: 'admin',
+                                                    riskLevel: featureFlagForm.riskLevel, expiresAt: null, reason: featureFlagForm.reason.trim(),
+                                                    evidence: [{ type: 'external_reference', label: featureFlagForm.evidenceLabel.trim(), referenceId: '', uri: '', checksumSha256: '', note: '' }],
+                                                }), 'Feature created in paused state.').then((result) => { if (result) setShowFlagForm(false); })} className={primaryButtonClass}>Create paused feature</button>
+                                            </div>
+                                        </div>
                                     ) : null}
-                                </div>
-                                {showRuleForm && hasAdminPermission('trust_safety.mutate') ? (
-                                    <form className="grid gap-3 border-b border-[#d6e6e0] bg-[#f4faf7] p-4 sm:grid-cols-2 sm:p-5" onSubmit={(event) => {
+                                </section>
+                            ) : null}
+
+                            {/* Separate rules area; not an empty sibling panel beside the active feature controls. */}
+                            <section id="policy-food-rules" className="min-w-0 border-y border-[#D7DDCF] bg-[#F7F6F2]">
+                                <div className="grid lg:grid-cols-[minmax(260px,0.38fr)_minmax(0,0.62fr)]">
+                                    <div className="policy-food-heading flex flex-col justify-between bg-[#C56C42] px-4 py-5 sm:px-7 sm:py-7">
+                                        <div>
+                                            <p className="text-[12px] font-bold uppercase tracking-[0.09em] text-[#202421]">02 / FOOD SAFETY</p>
+                                            <h2 className="mt-2 text-[25px] font-bold leading-tight tracking-[-0.03em] text-[#202421] sm:text-[29px]">Food safety rules</h2>
+                                            <p className="mt-2 max-w-[340px] text-[14px] leading-6 text-[#202421]">Create guidance for allergens, nutrition and dietary information.</p>
+                                        </div>
+                                        <p className="mt-5 border-t border-[#202421]/20 pt-3 text-[13px] font-medium leading-5 text-[#202421]">A rule starts as a draft. Another authorised reviewer must approve it.</p>
+                                    </div>
+                                    <div className="policy-rule-library min-w-0 border-t border-[#D7DDCF] lg:border-t-0">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D7DDCF] px-4 py-4 sm:px-6">
+                                            <div>
+                                                <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#173F35]">RULE LIBRARY</p>
+                                                <p className="mt-1 text-[14px] text-[#202421]">{policyLoadIssues.rules ? 'Rules unavailable' : `${policy?.ruleProfiles?.length ?? 0} recorded`}</p>
+                                            </div>
+                                            {hasAdminPermission('trust_safety.mutate') ? (
+                                                <button type="button" onClick={() => setShowRuleForm((current) => !current)} className="focus-ring inline-flex items-center justify-center bg-[#173F35] px-4 py-2.5 text-[14px] font-bold text-[#F7F6F2] transition-colors hover:bg-[#202421]">{showRuleForm ? 'Close form' : '+ Create rule'}</button>
+                                            ) : null}
+                                        </div>
+                                        {showRuleForm && hasAdminPermission('trust_safety.mutate') ? (
+                                    <form className="grid gap-4 border-b border-[#D7DDCF] bg-[#D7DDCF]/30 p-4 sm:grid-cols-2 sm:p-6" onSubmit={(event) => {
                                         event.preventDefault();
                                         run(() => createAdminFoodRuleDraft({
                                             ruleKey: ruleForm.ruleKey.trim(),
@@ -5462,11 +6034,11 @@ import {
                                 {policyLoadIssues.rules ? (
                                     <p role="alert" className="p-4 text-sm text-rose-700">Food rules could not load: {policyLoadIssues.rules}. Select Refresh to retry.</p>
                                 ) : !policy?.ruleProfiles?.length ? (
-                                    <div className="px-4 py-5 sm:px-6"><p className="text-sm font-bold text-stone-900">No food rules have been created yet.</p><p className="mt-1 text-sm text-stone-600">Start with a draft using Create food rule above.</p></div>
+                                    <div className="border-b border-[#D7DDCF] px-4 py-5 sm:px-6 sm:py-6"><p className="text-[17px] font-bold text-[#202421]">No food rules created yet.</p><p className="mt-1 text-[14px] text-[#173F35]">Create a draft to start the review process.</p></div>
                                 ) : (
-                                    <div className="divide-y divide-stone-100">
+                                    <div className="divide-y divide-[#D7DDCF]">
                                         {(policyRulesExpanded ? policy.ruleProfiles : policy.ruleProfiles.slice(0, 6)).map((rule) => (
-                                            <div key={rule.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+                                            <div key={rule.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
                                                 <div className="min-w-0">
                                                     <p className="break-words text-sm font-bold text-stone-900">{rule.ruleKey}</p>
                                                     <p className="mt-0.5 text-sm text-stone-600">{titleize(rule.ruleType)} · {rule.jurisdictionCode || 'All regions'} · Version {rule.version}</p>
@@ -5479,7 +6051,7 @@ import {
                                                             if (!reason || reason.trim().length < 3) return;
                                                             setRuleActionReason(reason);
                                                             run(() => activateAdminFoodRule(rule.id, reason.trim()), 'Food rule activated.');
-                                                        }} className="focus-ring rounded-lg border border-[#badace] bg-white px-3 py-2 text-sm font-bold text-[#176448] disabled:opacity-50">Approve draft</button>
+                                                        }} className="focus-ring rounded-lg border border-[#D7DDCF] bg-white px-3 py-2 text-sm font-bold text-[#173F35] disabled:opacity-50">Approve draft</button>
                                                     ) : null}
                                                 </div>
                                             </div>
@@ -5487,169 +6059,32 @@ import {
                                         {policy.ruleProfiles.length > 6 ? <button type="button" onClick={() => setPolicyRulesExpanded((v) => !v)} className="focus-ring w-full px-4 py-3 text-left text-sm font-bold text-emerald-800">{policyRulesExpanded ? 'Show fewer' : `View all ${policy.ruleProfiles.length} rules`}</button> : null}
                                     </div>
                                 )}
-                                <p className="border-t border-stone-100 px-3 py-2 text-sm text-stone-600 sm:px-6 sm:py-3"><span className="sm:hidden">A different admin must approve.</span><span className="hidden sm:inline">Only authorised food-safety admins can change rules. The creator cannot approve their own draft.</span></p>
-                            </section>
-
-                            <section className="overflow-hidden rounded-2xl border border-[#dad8ed] bg-white">
-                                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#eeeaf8] px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-[#66558b]">02 · Feature availability</p>
-                                        <h2 className="mt-0.5 text-xl font-extrabold text-[#302850]">Manage platform features</h2>
-                                        <p className="mt-1 text-sm leading-5 text-[#615779]"><span className="sm:hidden">Choose where a feature runs.</span><span className="hidden sm:inline">Enable or pause a feature in its selected environment. This does not change account permissions.</span></p>
+                                <p className="border-t border-[#D7DDCF] px-4 py-3 text-[13px] text-[#173F35] sm:px-6"><span className="sm:hidden">A different admin must approve.</span><span className="hidden sm:inline">Only authorised food-safety admins can change rules. The creator cannot approve their own draft.</span></p>
                                     </div>
-                                    <span className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-[#5c5084]">{policyLoadIssues.flags ? 'Unavailable' : `${policy?.featureFlags?.length ?? 0} features`}</span>
                                 </div>
-                                {isRootSuperAdmin ? (
-                                    <div className="grid gap-3 border-b border-[#e8e4f2] bg-[#faf9fd] p-3 sm:grid-cols-2 sm:p-5">
-                                        <p className="text-sm font-semibold text-[#4f416f] sm:hidden">Tap a feature to enable or pause it.</p>
-                                        <label className="hidden min-w-0 text-sm font-semibold text-stone-700 sm:block">New feature reason <span className="font-normal text-stone-500">(10+ characters)</span>
-                                            <input className={`${inputClass} mt-1`} minLength={10} value={featureFlagForm.reason} placeholder="e.g. Feature passed final checks" onChange={(e) => setFeatureFlagForm((s) => ({ ...s, reason: e.target.value }))} />
-                                        </label>
-                                        <label className="hidden min-w-0 text-sm font-semibold text-stone-700 sm:block">New feature reference
-                                            <input className={`${inputClass} mt-1`} value={featureFlagForm.evidenceLabel} placeholder="e.g. QA-2026-010" onChange={(e) => setFeatureFlagForm((s) => ({ ...s, evidenceLabel: e.target.value }))} />
-                                        </label>
-                                        <p className="text-sm text-stone-600 sm:col-span-2"><span className="sm:hidden">Each change needs a reason and MFA.</span><span className="hidden sm:inline">Select a feature to enter its reason and reference. Saving also requires recent MFA.</span></p>
-                                    </div>
-                                ) : <p className="border-b border-stone-100 px-4 py-3 text-sm text-stone-600">Only the Root Super Admin can enable, pause or create features.</p>}
-                                {policyLoadIssues.flags ? (
-                                    <p role="alert" className="p-4 text-sm text-rose-700">Features could not load: {policyLoadIssues.flags}. Select Refresh to retry.</p>
-                                ) : !policy?.featureFlags?.length ? (
-                                    <p className="p-4 text-sm text-stone-600 sm:p-5">No platform features found yet. Use Add a feature below if you have Root Super Admin access.</p>
-                                ) : (
-                                    <div className="divide-y divide-stone-100">
-                                        {(policyFlagsExpanded ? policy.featureFlags : policy.featureFlags.slice(0, 8)).map((flag) => {
-                                            return (
-                                                <div key={flag.id} className="grid min-w-0 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6 sm:py-3">
-                                                    <div className="min-w-0">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <p className="break-words text-sm font-extrabold text-stone-900">{flag.key}</p>
-                                                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${flag.enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-600'}`}>{flag.enabled ? 'Enabled' : 'Paused'}</span>
-                                                        </div>
-                                                        <p className="mt-1 line-clamp-2 text-sm leading-5 text-stone-600 sm:line-clamp-none">{flag.description || 'No description provided.'}</p>
-                                                        <p className="mt-1 text-sm text-[#625986]">{(flag.environments || []).length ? flag.environments.map((env) => ({ development: 'Testing site', staging: 'Preview site', production: 'Live site' }[env] || env)).join(', ') : 'No site selected'} · {flag.enabled && flag.rolloutPercentage > 0 ? `${flag.rolloutPercentage}% of visitors` : 'Not shown to visitors'}</p>
-                                                    </div>
-                                                    {isRootSuperAdmin ? (
-                                                        <div className="min-w-0">
-                                                            <button type="button" disabled={busy || Boolean(policyLoadIssues.flags)}
-                                                                aria-expanded={policyFlagAction?.id === flag.id}
-                                                                onClick={() => beginPolicyFlagAction(flag)}
-                                                                className={`focus-ring w-full rounded-lg border px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${flag.enabled ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border-[#165b48] bg-[#165b48] text-white hover:bg-[#0e4334]'}`}>
-                                                                {policyFlagAction?.id === flag.id ? 'Close changes' : (flag.enabled ? 'Pause feature' : 'Enable feature')}
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs font-medium text-stone-500">Only the Root Super Admin can change this feature.</p>
-                                                    )}
-                                                    {isRootSuperAdmin && policyFlagAction?.id === flag.id ? (
-                                                        <div className="min-w-0 rounded-xl border border-[#ddd4ef] bg-[#f8f6fd] p-3 sm:col-span-2 sm:p-4">
-                                                            <p className="text-sm font-bold text-[#392d61]">{policyFlagAction.enabled ? 'Enable' : 'Pause'} {flag.key}</p>
-                                                            <p className="mt-1 text-sm text-stone-600">{policyFlagAction.enabled ? 'Choose the site and how many visitors can see it.' : 'Pause this feature without deleting it.'} Every change is recorded.</p>
-                                                            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
-                                                                {(flag.environments || []).length ? (
-                                                                    <p className="min-w-0 self-center text-sm font-semibold text-stone-700">Assigned sites: <span className="font-normal">{flag.environments.map((env) => ({ development: 'Testing site', staging: 'Preview site', production: 'Live website' }[env] || env)).join(', ')}</span></p>
-                                                                ) : (
-                                                                    <label className="min-w-0 text-sm font-semibold text-stone-700">Assign a site
-                                                                        <select className={`${inputClass} mt-1`} value={policyFlagAction.environment} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, environment: e.target.value }))}>
-                                                                            <option value="development">Testing site</option><option value="staging">Preview site</option><option value="production">Live website</option>
-                                                                        </select>
-                                                                    </label>
-                                                                )}
-                                                                {policyFlagAction.enabled ? (
-                                                                    <label className="min-w-0 text-sm font-semibold text-stone-700">Visitors who can see it (%)
-                                                                        <input type="number" min="1" max="100" className={`${inputClass} mt-1`} value={policyFlagAction.rollout} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, rollout: e.target.value }))} />
-                                                                    </label>
-                                                                ) : <p className="self-center text-sm text-stone-600">The feature will stop running.</p>}
-                                                                <label className="min-w-0 text-sm font-semibold text-stone-700">Reason for change
-                                                                    <input className={`${inputClass} mt-1`} maxLength={4000} placeholder="Why is this change needed?" value={policyFlagAction.reason} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, reason: e.target.value }))} />
-                                                                </label>
-                                                                <label className="min-w-0 text-sm font-semibold text-stone-700">Reference (required for live / high-risk)
-                                                                    <input className={`${inputClass} mt-1`} placeholder="Approval ticket or evidence" value={policyFlagAction.reference} onChange={(e) => setPolicyFlagAction((s) => ({ ...s, reference: e.target.value }))} />
-                                                                </label>
-                                                            </div>
-                                                            <p className="mt-2 text-sm text-[#675b7d]">Root Super Admin access and recent MFA are required. Live/high-risk changes also need evidence.</p>
-                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                <button type="button" className={primaryButtonClass} disabled={busy || policyFlagAction.reason.trim().length < 10 || (policyFlagAction.enabled && !(Number(policyFlagAction.rollout) >= 1 && Number(policyFlagAction.rollout) <= 100)) || ((flag.riskLevel === 'high' || flag.riskLevel === 'critical' || (policyFlagAction.enabled && ((flag.environments || []).includes('production') || (!(flag.environments || []).length && policyFlagAction.environment === 'production')))) && !policyFlagAction.reference.trim())} onClick={() => {
-                                                                    const current = policyFlagAction;
-                                                                    run(() => updateAdminFeatureFlag(flag.id, {
-                                                                        enabled: current.enabled,
-                                                                        ...((!flag.enabled && current.enabled && !(flag.environments || []).length) ? { environments: [current.environment] } : {}),
-                                                                        ...(current.enabled ? { rolloutPercentage: Number(current.rollout) } : {}),
-                                                                        reason: current.reason.trim(),
-                                                                        evidence: current.reference.trim() ? [{ type: 'external_reference', label: current.reference.trim(), referenceId: '', uri: '', checksumSha256: '', note: '' }] : [],
-                                                                    }), `${flag.key} ${current.enabled ? 'enabled' : 'paused'} successfully.`).then((result) => {
-                                                                        if (result) setPolicyFlagAction(null);
-                                                                    });
-                                                                }}>{policyFlagAction.enabled ? 'Confirm enable' : 'Confirm pause'}</button>
-                                                                <button type="button" onClick={() => setPolicyFlagAction(null)} className="focus-ring rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700">Cancel</button>
-                                                            </div>
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            );
-                                        })}
-                                        {policy.featureFlags.length > 8 ? <button type="button" onClick={() => setPolicyFlagsExpanded((v) => !v)} className="focus-ring w-full px-4 py-3 text-left text-sm font-bold text-emerald-800">{policyFlagsExpanded ? 'Show fewer features' : `View all ${policy.featureFlags.length} features`}</button> : null}
-                                    </div>
-                                )}
                             </section>
 
-                            {isRootSuperAdmin ? (
-                                <section className="overflow-hidden rounded-2xl border border-[#cfe4d4] bg-[#f0f7ef]">
-                                    <button type="button" onClick={() => setShowFlagForm((v) => !v)} className="focus-ring flex w-full items-center justify-between gap-2 px-3 py-3 text-left sm:gap-3 sm:px-6 sm:py-4">
-                                        <span className="min-w-0"><span className="block text-sm font-bold text-emerald-800">03 · New feature</span><span className="mt-1 block text-xl font-extrabold text-[#184333]">Add a feature control</span><span className="mt-1 block text-sm text-[#476351]"><span className="sm:hidden">Add it paused. Enable later.</span><span className="hidden sm:inline">Create a paused feature now; enable it when it's ready.</span></span></span>
-                                        <span className="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-800">{showFlagForm ? 'Close' : 'Open form'}</span>
-                                    </button>
-                                    {showFlagForm ? (
-                                        <div className="grid gap-3 border-t border-[#d8e8da] p-3 sm:grid-cols-2 sm:p-6">
-                                            <label className="min-w-0 text-sm font-semibold text-stone-700 sm:hidden">Reason for creating this feature
-                                                <input className={`${inputClass} mt-1`} minLength={10} value={featureFlagForm.reason} placeholder="Why is this needed?" onChange={(e) => setFeatureFlagForm((state) => ({ ...state, reason: e.target.value }))} />
-                                            </label>
-                                            <label className="min-w-0 text-sm font-semibold text-stone-700 sm:hidden">Approval ticket or reference
-                                                <input className={`${inputClass} mt-1`} value={featureFlagForm.evidenceLabel} placeholder="e.g. QA-2026-010" onChange={(e) => setFeatureFlagForm((state) => ({ ...state, evidenceLabel: e.target.value }))} />
-                                            </label>
-                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Feature ID
-                                                <input className={`${inputClass} mt-1`} placeholder="e.g. pantry.new-view" value={featureFlagForm.key} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, key: e.target.value.toLowerCase() }))} />
-                                            </label>
-                                            <label className="min-w-0 text-sm font-semibold text-stone-700">What does it do?
-                                                <input className={`${inputClass} mt-1`} placeholder="Short description" value={featureFlagForm.description} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, description: e.target.value }))} />
-                                            </label>
-                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Available in
-                                                <select className={`${inputClass} mt-1`} value={featureFlagForm.environments} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, environments: e.target.value }))}><option value="development">Testing (development)</option><option value="staging">Preview (staging)</option><option value="production">Live website (production)</option></select>
-                                            </label>
-                                            <label className="min-w-0 text-sm font-semibold text-stone-700">Impact level
-                                                <select className={`${inputClass} mt-1`} value={featureFlagForm.riskLevel} onChange={(e) => setFeatureFlagForm((s) => ({ ...s, riskLevel: e.target.value }))}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
-                                            </label>
-                                            <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
-                                                <p className="text-sm leading-5 text-[#486455]">The change reason and ticket above are required. All new features start paused.</p>
-                                                <button type="button" disabled={busy || Boolean(policyLoadIssues.flags) || !/^[a-z][a-z0-9_.-]{2,}$/.test(featureFlagForm.key.trim()) || featureFlagForm.description.trim().length < 5 || featureFlagForm.reason.trim().length < 10 || !featureFlagForm.evidenceLabel.trim()} onClick={() => run(() => createAdminFeatureFlag({
-                                                    key: featureFlagForm.key.trim(), description: featureFlagForm.description.trim(), enabled: false,
-                                                    environments: [featureFlagForm.environments], rolloutPercentage: 0, ownerDomain: 'admin',
-                                                    riskLevel: featureFlagForm.riskLevel, expiresAt: null, reason: featureFlagForm.reason.trim(),
-                                                    evidence: [{ type: 'external_reference', label: featureFlagForm.evidenceLabel.trim(), referenceId: '', uri: '', checksumSha256: '', note: '' }],
-                                                }), 'Feature created in paused state.').then((result) => { if (result) setShowFlagForm(false); })} className={primaryButtonClass}>Create paused feature</button>
-                                            </div>
-                                        </div>
-                                    ) : null}
-                                </section>
-                            ) : null}
-
-                            <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
-                                <div className="bg-[#edf2f4] px-3 py-3 sm:px-6 sm:py-4">
-                                    <h2 className="text-xl font-extrabold text-stone-900">Related admin work</h2>
-                                    <p className="mt-1 text-sm text-stone-600"><span className="sm:hidden">Review cases, incidents and support.</span><span className="hidden sm:inline">Check review requests, platform incidents and support issues filed under the Admin area.</span></p>
+                            <section className="policy-followup border-t-[3px] border-[#202421] bg-[#F7F6F2]">
+                                <div className="flex flex-wrap items-end justify-between gap-2 px-4 py-4 sm:px-6 sm:py-5">
+                                    <div>
+                                        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#C56C42]">03 / ADMIN FOLLOW-UP</p>
+                                        <h2 className="mt-1 text-[22px] font-bold text-[#202421] sm:text-[24px]">Other requests & issues</h2>
+                                    </div>
+                                    <p className="text-[13px] text-[#173F35]">Review cases, incidents and support</p>
                                 </div>
                                 {policyRelatedIssues.length ? <p role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Some admin records could not load: {policyRelatedIssues.join(' · ')}. Select Refresh to retry.</p> : null}
-                                <div className="grid gap-px bg-stone-200 lg:grid-cols-3">
+                                <div className="grid border-t border-[#D7DDCF] md:grid-cols-3">
                                     {[
                                         ['Review requests', 'Cases waiting for an admin decision.', reviewCases, setSelectedReviewCase],
                                         ['Incidents', 'Issues being investigated or resolved.', incidents, setSelectedIncident],
                                         ['Support requests', 'Help requests assigned to the Admin area.', supportCases, setSelectedSupportCase],
                                     ].map(([name, help, records, select]) => (
-                                        <div key={name} className="min-w-0 bg-white p-4 sm:p-5">
-                                            <div className="flex items-center justify-between gap-2"><h3 className="text-base font-extrabold text-stone-900">{name}</h3><span className="rounded-full bg-[#e8f0ed] px-2.5 py-1 text-sm font-bold text-[#225c45]">{records.length}</span></div>
+                                        <div key={name} className="policy-followup-row min-w-0 border-b border-[#D7DDCF] px-4 py-4 md:border-r md:px-6 md:py-5 md:last:border-r-0">
+                                            <div className="flex items-center justify-between gap-2"><h3 className="text-[15px] font-bold text-[#202421]">{name}</h3><span className="bg-[#D7DDCF] px-2.5 py-1 text-[13px] font-bold tabular-nums text-[#173F35]">{records.length}</span></div>
                                             <p className="mt-1 text-sm text-stone-600">{help}</p>
                                             {records.length ? <div className="mt-3 space-y-1.5">{records.slice(0, 3).map((record) => (
-                                                <button key={record.id} type="button" onClick={() => select(record)} className="focus-ring block w-full rounded-lg bg-[#f6f8f7] px-3 py-2 text-left text-sm font-semibold text-[#195b45] hover:bg-[#e8f3ed]">{record.title || record.subject?.label || record.reviewCaseKey || record.incidentKey || record.supportKey || 'Open record'} →</button>
-                                            ))}</div> : <p className="mt-3 text-sm font-medium text-stone-500">No records in this Admin area right now.</p>}
+                                                <button key={record.id} type="button" onClick={() => select(record)} className="focus-ring block w-full border-b border-[#D7DDCF] px-1 py-2 text-left text-sm font-semibold text-[#173F35] hover:text-[#C56C42]">{record.title || record.subject?.label || record.reviewCaseKey || record.incidentKey || record.supportKey || 'Open record'} →</button>
+                                            ))}</div> : <p className="mt-3 text-sm font-medium text-stone-500">Nothing waiting for review.</p>}
                                         </div>
                                     ))}
                                 </div>
@@ -6249,125 +6684,91 @@ import {
                     ) : null}
   
                     {section === 'trustSafety' ? (
-                      <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
-                        <section className="overflow-hidden rounded-[20px] border border-[#c9dfd4] bg-[#e8f4ed] sm:rounded-[24px]">
-                          <div className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-5 sm:px-6 sm:py-5">
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-[#17664d]">Trust &amp; Safety workspace</p>
-                              <h2 className="mt-1 text-xl font-extrabold leading-tight text-[#113f30] sm:text-[26px]">
-                                <span className="whitespace-nowrap sm:hidden">Review safety reports</span>
-                                <span className="hidden sm:inline">Check reports. Protect customers. Resolve issues.</span>
-                              </h2>
-                              <p className="mt-1.5 text-sm leading-5 text-[#365b4e]">
-                                <span className="whitespace-nowrap sm:hidden">Manage cases, incidents &amp; support.</span>
-                                <span className="hidden sm:inline">Review cases, follow incidents, handle support requests and record each decision.</span>
-                              </p>
+                      <div className="-mx-2.5 mt-3 min-w-0 bg-[#F7F6F2] sm:mx-0 sm:mt-6">
+                        <section aria-labelledby="safety-overview-title" className="border-b border-[#D7DDCF]">
+                          <div className="grid lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
+                            <div className="bg-[#C56C42] px-4 py-5 text-[#202421] sm:px-7 sm:py-7">
+                              <p className="text-[12px] font-bold uppercase tracking-[0.07em]">Safety workspace</p>
+                              <h2 id="safety-overview-title" className="mt-1.5 text-[23px] font-bold leading-[1.18] tracking-tight sm:text-[29px]">Reports. Cases. Decisions.</h2>
                             </div>
-                            <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-[#c9dfd4] bg-white/90 sm:min-w-[310px]">
+                            <div className="grid grid-cols-3 bg-[#D7DDCF]" aria-label="Safety queues">
                               {[
                                 ['Review cases', trustSafetyQueueState.reviews.error ? '—' : trustSafetyQueueState.reviews.total],
                                 ['Incidents', trustSafetyQueueState.incidents.error ? '—' : trustSafetyQueueState.incidents.total],
                                 ['Support', trustSafetyQueueState.support.error ? '—' : trustSafetyQueueState.support.total],
                               ].map(([label, value], index) => (
-                                <div key={label} className={`min-w-0 px-2 py-2.5 text-center sm:px-3 ${index ? 'border-l border-[#e1ebe4]' : ''}`}>
-                                  <p className="text-xl font-extrabold text-[#123d30] sm:text-2xl">{value}</p>
-                                  <p className="text-xs leading-4 text-stone-600">{label}</p>
+                                <div key={label} className={`flex min-w-0 flex-col justify-center px-2 py-4 text-center sm:px-4 ${index ? 'border-l border-[#BDC6B8]' : ''}`}>
+                                  <strong className="text-[24px] font-bold leading-none text-[#173F35] sm:text-[34px]">{value}</strong>
+                                  <span className="mt-1.5 text-[12px] font-semibold leading-4 text-[#202421] sm:text-[13px]">{label}</span>
                                 </div>
                               ))}
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 border-t border-[#c9dfd4] bg-[#f3f9f5]">
+                        </section>
+
+                        <nav aria-label="Safety review workspaces" className="grid grid-cols-3 bg-[#202421] px-1.5 pt-1.5 sm:flex sm:gap-1.5 sm:px-2.5 sm:pt-2.5">
+                          {[
+                            ['reports', 'Listing reports', 'Reports'],
+                            ['cases', 'Cases & support', 'Cases'],
+                            ['status', 'Platform status', 'Status'],
+                          ].map(([value, desktopLabel, mobileLabel]) => (
+                            <button key={value} type="button" onClick={() => setTrustSafetyView(value)} aria-current={trustSafetyView === value ? 'page' : undefined}
+                              className={`focus-ring min-w-0 border-b-[3px] px-2 py-3 text-center text-[13px] font-bold leading-4 transition-colors sm:min-w-[165px] sm:px-5 sm:py-3.5 sm:text-[15px] ${trustSafetyView === value ? 'border-[#C56C42] bg-[#F7F6F2] text-[#173F35]' : 'border-transparent text-[#F7F6F2] hover:bg-[#173F35]'}`}>
+                              <span className="sm:hidden">{mobileLabel}</span><span className="hidden sm:inline">{desktopLabel}</span>
+                            </button>
+                          ))}
+                        </nav>
+
+                        <section className={trustSafetyView === 'reports' ? 'block' : 'hidden'} aria-labelledby="safety-reports-heading">
+                          <div className="border-b border-[#D7DDCF] px-4 py-4 sm:px-6 sm:py-5">
+                            <h3 id="safety-reports-heading" className="text-[20px] font-bold text-[#202421] sm:text-[24px]">Listing reports</h3>
+                          </div>
+                          <AdminDsaReportsPanel canDecide={isRootSuperAdmin || hasAdminPermission('trust_safety.mutate')} />
+                        </section>
+
+                        <section className={trustSafetyView === 'cases' ? 'block' : 'hidden'} aria-labelledby="safety-cases-heading">
+                          <div className="border-b border-[#D7DDCF] px-4 py-4 sm:px-6 sm:py-5">
+                            <h3 id="safety-cases-heading" className="text-[20px] font-bold text-[#202421] sm:text-[24px]">Cases &amp; support</h3>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 border-b border-[#D7DDCF] px-3 py-3 sm:px-6" aria-label="Case scope">
+                            <button type="button" aria-pressed={trustSafetyScope === 'all'}
+                              onClick={() => { setTrustSafetyScope('all'); setSelectedReviewCase(null); setSelectedIncident(null); setSelectedSupportCase(null); }}
+                              className={`focus-ring px-3 py-2 text-[13px] font-bold ${trustSafetyScope === 'all' ? 'bg-[#173F35] text-[#F7F6F2]' : 'border border-[#D7DDCF] text-[#173F35]'}`}>All accessible</button>
+                            <button type="button" aria-pressed={trustSafetyScope === 'trust_safety'}
+                              onClick={() => { setTrustSafetyScope('trust_safety'); setSelectedReviewCase(null); setSelectedIncident(null); setSelectedSupportCase(null); }}
+                              className={`focus-ring px-3 py-2 text-[13px] font-bold ${trustSafetyScope === 'trust_safety' ? 'bg-[#173F35] text-[#F7F6F2]' : 'border border-[#D7DDCF] text-[#173F35]'}`}>Safety only</button>
+                          </div>
+                          <div className="grid grid-cols-3 border-b border-[#D7DDCF] bg-[#D7DDCF] p-1.5" aria-label="Case categories">
                             {[
-                              ['01', 'Choose a report'],
-                              ['02', 'Check the facts'],
-                              ['03', 'Record the result'],
-                            ].map(([number, label], index) => (
-                              <div key={number} className={`flex min-w-0 items-center gap-2 px-2.5 py-2.5 sm:gap-3 sm:px-5 sm:py-3 ${index ? 'border-l border-[#d6e4da]' : ''}`}>
-                                <span className="shrink-0 text-xs font-extrabold text-[#187050]">{number}</span>
-                                <p className="text-xs font-semibold leading-4 text-[#254c3d] sm:text-sm">{label}</p>
-                              </div>
+                              ['reviews', 'Review cases', trustSafetyQueueState.reviews.total, trustSafetyQueueState.reviews.error],
+                              ['incidents', 'Incidents', trustSafetyQueueState.incidents.total, trustSafetyQueueState.incidents.error],
+                              ['support', 'Support', trustSafetyQueueState.support.total, trustSafetyQueueState.support.error],
+                            ].map(([value, label, count, failed]) => (
+                              <button key={value} type="button" aria-pressed={trustSafetyActiveQueue === value} onClick={() => setTrustSafetyActiveQueue(value)}
+                                className={`focus-ring flex min-w-0 flex-col items-center gap-1 px-1 py-3 text-[12px] font-bold leading-4 sm:flex-row sm:justify-center sm:gap-3 sm:text-sm ${trustSafetyActiveQueue === value ? 'bg-[#173F35] text-[#F7F6F2]' : 'bg-[#F7F6F2] text-[#202421]'}`}>
+                                <span>{label}</span><span className="tabular-nums">{failed ? '—' : count}</span>
+                              </button>
                             ))}
                           </div>
-                        </section>
-
-                        <AdminDsaReportsPanel canDecide={isRootSuperAdmin || hasAdminPermission('trust_safety.mutate')} />
-
-                        {/* Restore the complete platform overview from the original A17 page.
-                            These are real Command Center metrics, not calculated from the 3 queues. */}
-                        <section className="overflow-hidden rounded-[19px] border border-[#dfe5df] bg-white sm:rounded-[22px]">
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e7ece8] px-4 py-3 sm:px-5">
-                            <div className="min-w-0">
-                              <h2 className="text-[17px] font-bold text-[#173b2e] sm:text-lg">Platform safety &amp; operations</h2>
-                              <p className="text-sm leading-5 text-stone-600">The original eight admin counts, with their permitted data.</p>
-                            </div>
-                            <span className="text-xs font-semibold text-stone-500">Platform overview</span>
-                          </div>
-                          {commandCenterError ? (
-                            <div role="alert" className="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 sm:m-4">
-                              Platform counts could not load: {commandCenterError}. Try Refresh.
-                            </div>
-                          ) : metricEntries.length ? (
-                            <div className="grid grid-cols-2 gap-px bg-[#e1e8e2] sm:grid-cols-4">
-                              {metricEntries.map(([label, value, MetricIcon]) => (
-                                <div key={label} className="flex min-w-0 items-start justify-between gap-2 bg-[#fbfcfa] px-3 py-3 sm:px-4 sm:py-4">
-                                  <div className="min-w-0">
-                                    <p className="text-[21px] font-extrabold leading-7 text-[#18382e] sm:text-[25px]">{value}</p>
-                                    <p className="mt-0.5 text-xs font-semibold leading-4 text-[#52655a] sm:text-sm">{label}</p>
-                                  </div>
-                                  <MetricIcon size={16} className="mt-1 shrink-0 text-[#19805b]" aria-hidden="true" />
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="px-4 py-4 text-sm text-stone-600">No platform counts are available for your admin permissions.</p>
-                          )}
-                          <p className="border-t border-[#e7ece8] px-4 py-2.5 text-xs leading-5 text-stone-600 sm:px-5">
-                            <span className="whitespace-nowrap sm:hidden">Counts vary by access.</span>
-                            <span className="hidden sm:inline">Platform totals and the report lists below can be different: each number has its own category and permissions.</span>
-                          </p>
-                        </section>
-
-                        <section className="overflow-hidden rounded-[19px] border border-[#d9e2dd] bg-white sm:rounded-[23px]">
-                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5ebe6] px-3.5 py-3 sm:px-5 sm:py-4">
-                            <div className="min-w-0">
-                              <h2 className="text-[17px] font-bold text-[#1b3a2c] sm:text-xl">Review cases, incidents &amp; support</h2>
-                              <p className="text-sm leading-5 text-stone-600">Open a record for details, decisions and follow-up actions.</p>
-                            </div>
-                            <div className="flex min-w-0 items-center gap-1 rounded-xl border border-[#cfdfd5] bg-[#f3f8f4] p-1" aria-label="Report scope">
-                              <button type="button"
-                                onClick={() => { setTrustSafetyScope('all'); setSelectedReviewCase(null); setSelectedIncident(null); setSelectedSupportCase(null); }}
-                                aria-pressed={trustSafetyScope === 'all'}
-                                className={`focus-ring rounded-lg px-2.5 py-2 text-xs font-bold sm:px-3 sm:text-sm ${trustSafetyScope === 'all' ? 'bg-[#15583f] text-white' : 'text-[#305c48]'}`}>
-                                All permitted areas
-                              </button>
-                              <button type="button"
-                                onClick={() => { setTrustSafetyScope('trust_safety'); setSelectedReviewCase(null); setSelectedIncident(null); setSelectedSupportCase(null); }}
-                                aria-pressed={trustSafetyScope === 'trust_safety'}
-                                className={`focus-ring rounded-lg px-2.5 py-2 text-xs font-bold sm:px-3 sm:text-sm ${trustSafetyScope === 'trust_safety' ? 'bg-[#15583f] text-white' : 'text-[#305c48]'}`}>
-                                Trust &amp; Safety only
-                              </button>
-                            </div>
-                          </div>
-                          <p className="bg-[#f7faf8] px-3.5 py-2 text-xs leading-5 text-[#436451] sm:px-5">
-                            {trustSafetyScope === 'all'
-                              ? 'Showing records across the areas your Admin account can view.'
-                              : 'Showing only records filed under Trust & Safety.'}
-                          </p>
-                          <div className="grid min-w-0 lg:grid-cols-3">
-                            <TrustSafetyWorkQueue title="Review cases" subtitle="Reports that need a decision"
-                              icon={FileWarning} tone="blue" items={reviewCases}
+                          <div className={trustSafetyActiveQueue === 'reviews' ? 'block' : 'hidden'}>
+                            <TrustSafetyWorkQueue title="Review cases" subtitle="Reports needing a decision"
+                              icon={FileWarning} tone="clay" items={reviewCases}
                               total={trustSafetyQueueState.reviews.total} error={trustSafetyQueueState.reviews.error}
                               selectedId={selectedReviewCase?.id}
                               onSelect={(item) => { setSelectedReviewCase(item); setSelectedIncident(null); setSelectedSupportCase(null); }}
                               onMore={() => loadMoreTrustSafety('reviews')} loadingMore={trustSafetyMore === 'reviews'} />
+                          </div>
+                          <div className={trustSafetyActiveQueue === 'incidents' ? 'block' : 'hidden'}>
                             <TrustSafetyWorkQueue title="Incidents" subtitle="Safety issues to investigate"
-                              icon={ShieldAlert} tone="peach" items={incidents}
+                              icon={ShieldAlert} tone="sage" items={incidents}
                               total={trustSafetyQueueState.incidents.total} error={trustSafetyQueueState.incidents.error}
                               selectedId={selectedIncident?.id}
                               onSelect={(item) => { setSelectedIncident(item); setSelectedReviewCase(null); setSelectedSupportCase(null); }}
                               onMore={() => loadMoreTrustSafety('incidents')} loadingMore={trustSafetyMore === 'incidents'} />
-                            <TrustSafetyWorkQueue title="Support cases" subtitle="Requests that need a response"
-                              icon={UsersRound} tone="mint" items={supportCases}
+                          </div>
+                          <div className={trustSafetyActiveQueue === 'support' ? 'block' : 'hidden'}>
+                            <TrustSafetyWorkQueue title="Support cases" subtitle="Requests needing a reply"
+                              icon={UsersRound} tone="forest" items={supportCases}
                               total={trustSafetyQueueState.support.total} error={trustSafetyQueueState.support.error}
                               selectedId={selectedSupportCase?.id}
                               onSelect={(item) => { setSelectedSupportCase(item); setSelectedReviewCase(null); setSelectedIncident(null); }}
@@ -6375,28 +6776,34 @@ import {
                           </div>
                         </section>
 
-                        {/* Preserve both original safety notice and governance boundary. */}
-                        <div className="flex items-start gap-2 rounded-xl border border-[#eadaae] bg-[#fff6df] px-3.5 py-3 sm:px-5">
-                          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-[#956018]" aria-hidden="true" />
-                          <p className="min-w-0 text-sm leading-5 text-[#724b17]">
-                            <span className="whitespace-nowrap sm:hidden">Check evidence; never assume safe.</span>
-                            <span className="hidden sm:inline">Critical safety decisions need supporting evidence. Unknown food or allergen information must never be treated as safe or allergen-free.</span>
-                          </p>
-                        </div>
-                        <section className="rounded-[18px] bg-stone-950 px-4 py-4 text-white sm:px-5">
-                          <div className="flex items-start gap-3">
-                            <Database size={19} className="mt-0.5 shrink-0 text-emerald-300" aria-hidden="true" />
-                            <div className="min-w-0">
-                              <h2 className="text-sm font-bold">Governance boundary</h2>
-                              <p className="mt-1 text-sm leading-5 text-stone-300">
-                                Important changes need permission, verification when required, and a recorded reason. Never edit database records directly.
-                              </p>
-                              <details className="mt-2 text-xs leading-5 text-stone-400">
-                                <summary className="cursor-pointer font-semibold text-emerald-200">View original audit process</summary>
-                                <p className="mt-1">EPANTRY checks access, confirms identity when needed, records the reason and evidence, and saves a permanent audit history. Make changes through EPANTRY, not the database.</p>
-                              </details>
-                            </div>
+                        <section className={trustSafetyView === 'status' ? 'block' : 'hidden'} aria-labelledby="safety-platform-title">
+                          <div className="border-b border-[#D7DDCF] px-4 py-4 sm:px-6 sm:py-5">
+                            <h3 id="safety-platform-title" className="text-[20px] font-bold text-[#202421] sm:text-[24px]">Platform status</h3>
                           </div>
+                          {commandCenterError ? (
+                            <p role="alert" className="border-l-4 border-[#C56C42] px-4 py-4 text-sm text-[#202421]">Status unavailable: {commandCenterError}. Try Refresh.</p>
+                          ) : metricEntries.length ? (
+                            <div className="grid grid-cols-2 gap-px bg-[#D7DDCF] sm:grid-cols-4">
+                              {metricEntries.map(([label, value, MetricIcon]) => (
+                                <div key={label} className="flex min-w-0 items-center justify-between gap-2 bg-[#F7F6F2] px-4 py-4 sm:px-5 sm:py-5">
+                                  <div className="min-w-0">
+                                    <p className="text-[25px] font-bold leading-none text-[#173F35] sm:text-[31px]">{value}</p>
+                                    <p className="mt-1.5 text-[13px] font-semibold leading-5 text-[#202421]">{label}</p>
+                                  </div>
+                                  <MetricIcon size={18} className="shrink-0 text-[#C56C42]" aria-hidden="true" />
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="px-4 py-4 text-sm text-[#202421]">No status data available for this role.</p>
+                          )}
+                          <details className="border-t border-[#D7DDCF] px-4 py-4 sm:px-6">
+                            <summary className="focus-ring cursor-pointer text-[14px] font-bold text-[#173F35]">Safety decision rules</summary>
+                            <div className="mt-3 grid gap-3 text-[14px] leading-6 text-[#202421] sm:grid-cols-2">
+                              <p className="border-l-[3px] border-[#C56C42] pl-3">Unknown allergen information must never be treated as safe.</p>
+                              <p className="border-l-[3px] border-[#173F35] pl-3">Changes require the right permission, evidence and a recorded reason. Use EPANTRY rather than editing database records.</p>
+                            </div>
+                          </details>
                         </section>
                       </div>
                     ) : null}
@@ -6404,7 +6811,7 @@ import {
                     {config.domain &&
                     section !== 'dataQuality' &&
                     section !== 'recipeReview' && section !== 'trustSafety' ? (
-                        <div className="mt-5 grid gap-5 xl:grid-cols-3">
+                        <div id={section === 'policy' ? 'policy-related-queues' : undefined} className={`mt-5 grid gap-5 xl:grid-cols-3 ${section === 'policy' && !reviewCases.length && !incidents.length && !supportCases.length ? 'policy-queues-empty' : ''}`}>
                             <QueueList
                                 title="Review cases"
                                 items={reviewCases}
@@ -6433,7 +6840,7 @@ import {
                     (selectedReviewCase ||
                         selectedIncident ||
                         selectedSupportCase) ? (
-                        <section className="mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+                        <section className={section === 'trustSafety' ? '-mx-2.5 mt-0 border-t border-stone-200 bg-white px-3 py-4 shadow-none sm:mx-0 sm:mt-5 sm:rounded-[24px] sm:border sm:p-5 sm:shadow-sm' : 'mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm'}>
                             <h2 className="text-sm font-black text-stone-950">
                                 {section === 'trustSafety' ? 'Reason and supporting evidence' : 'Action context'}
                             </h2>
@@ -6484,7 +6891,7 @@ import {
                     {section !== 'dataQuality' &&
                     section !== 'recipeReview' &&
                     selectedReviewCase ? (
-                        <section className="mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+                        <section className={section === 'trustSafety' ? '-mx-2.5 mt-0 border-t border-stone-200 bg-white px-3 py-4 shadow-none sm:mx-0 sm:mt-5 sm:rounded-[24px] sm:border sm:p-5 sm:shadow-sm' : 'mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm'}>
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <p className="text-xs font-black uppercase tracking-[0.1em] text-emerald-700">
@@ -6635,7 +7042,7 @@ import {
                     section !== 'recipeReview' &&
                     selectedIncident &&
                     (canMutateDomain || section === 'trustSafety') ? (
-                        <section className="mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+                        <section className={section === 'trustSafety' ? '-mx-2.5 mt-0 border-t border-stone-200 bg-white px-3 py-4 shadow-none sm:mx-0 sm:mt-5 sm:rounded-[24px] sm:border sm:p-5 sm:shadow-sm' : 'mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm'}>
                             <p className="text-xs font-black uppercase tracking-[0.1em] text-amber-700">
                                 {selectedIncident.incidentKey}
                             </p>
@@ -6718,7 +7125,7 @@ import {
                     section !== 'recipeReview' &&
                     selectedSupportCase &&
                     (canMutateDomain || section === 'trustSafety') ? (
-                        <section className="mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm">
+                        <section className={section === 'trustSafety' ? '-mx-2.5 mt-0 border-t border-stone-200 bg-white px-3 py-4 shadow-none sm:mx-0 sm:mt-5 sm:rounded-[24px] sm:border sm:p-5 sm:shadow-sm' : 'mt-5 rounded-[24px] border border-stone-200 bg-white p-5 shadow-sm'}>
                             <p className="text-xs font-black uppercase tracking-[0.1em] text-emerald-700">
                                 {selectedSupportCase.supportKey}
                             </p>
@@ -6796,7 +7203,7 @@ import {
                     ) : null}
   
   
-                    {section !== 'dataQuality' && section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'users' ? (
+                    {section !== 'dataQuality' && section !== 'recipeReview' && section !== 'policy' && section !== 'trustSafety' && section !== 'aiQuality' && section !== 'users' ? (
                     <section
                         className={`shadow-sm ${
                             section === 'users'

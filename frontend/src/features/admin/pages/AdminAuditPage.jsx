@@ -21,7 +21,7 @@ const ACTION_OPTIONS = [
 ]
 
 const EMPTY_FIELDS = { action: '', outcome: '', actorUserId: '', requestId: '' }
-const FIELD_CLASS = 'focus-ring w-full min-w-0 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-emerald-600'
+const FIELD_CLASS = 'focus-ring w-full min-w-0 rounded-md border border-[#D7DDCF] bg-white px-3.5 py-3 text-sm font-medium text-[#202421] outline-none focus:border-[#173F35]'
 
 function formatDate(value) {
   if (!value) return 'Date unavailable'
@@ -134,10 +134,10 @@ function outcomeName(outcome) {
 }
 
 function outcomeClasses(outcome) {
-  if (outcome === 'success') return 'bg-emerald-100 text-emerald-800'
-  if (outcome === 'denied') return 'bg-amber-100 text-amber-900'
-  if (outcome === 'failed') return 'bg-red-100 text-red-700'
-  return 'bg-stone-100 text-stone-700'
+  if (outcome === 'success') return 'bg-[#D7DDCF] text-[#173F35]'
+  if (outcome === 'denied') return 'border-l-[3px] border-[#C56C42] bg-[#F7F6F2] text-[#202421]'
+  if (outcome === 'failed') return 'border-l-[3px] border-[#C56C42] bg-[#202421] text-[#F7F6F2]'
+  return 'bg-[#F7F6F2] text-[#202421]'
 }
 
 function getErrorMessage(error) {
@@ -210,7 +210,7 @@ function SnapshotBlock({ title, value }) {
         ))}
       </dl>
       <details className="group min-w-0 border-t border-stone-200">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3.5 py-3 text-xs font-semibold text-emerald-800 marker:hidden hover:bg-emerald-50">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3.5 py-3 text-xs font-semibold text-[#173F35] marker:hidden hover:bg-[#D7DDCF]/55">
           <span>View original JSON</span>
           <ChevronDown size={15} className="shrink-0 transition-transform group-open:rotate-180" />
         </summary>
@@ -405,197 +405,229 @@ export default function AdminAuditPage() {
   return (
     <AdminShell
       title="Admin Activity History"
-      description="See what changed, who made the change and whether it was successful."
+      description={isMobile ? "" : "Review who made a change, when it happened and the result."}
       actions={isFetching && !isLoading ? (
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-stone-500">
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-[#173F35]">
           <LoaderCircle size={16} className="animate-spin" /> Updating
         </span>
       ) : null}
     >
-      <section className="overflow-hidden rounded-[18px] border border-[#CFE6D9] bg-[#E6F4ED]">
-        <div className="grid gap-4 px-4 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:px-6 sm:py-6">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-emerald-800">Admin record</p>
-            <h2 className="mt-2 text-xl font-extrabold leading-tight text-[#124E3A] sm:mt-1 sm:text-2xl">Know who changed what.</h2>
-            <p className="mt-3 whitespace-nowrap text-[13px] leading-5 tracking-tight text-stone-700 max-[350px]:whitespace-normal sm:hidden">
-              Who, what, when, result & why. Read-only.
-            </p>
-            <p className="mt-2 hidden max-w-2xl text-sm leading-relaxed text-stone-700 sm:block">
-              EPANTRY keeps a history of important admin actions: who made a change, when it happened and whether it worked.
-              Open any activity to see its reason and details. This page is read-only.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 self-start rounded-xl border border-emerald-100 bg-white/90 px-4 py-3 sm:self-center">
-            <FileClock size={22} className="text-emerald-800" />
-            <div>
-              <p className="text-2xl font-extrabold tabular-nums text-[#124E3A]">{isLoading ? '—' : totalCount}</p>
-              <p className="text-xs font-medium text-stone-600">{filtered ? 'Matching actions' : 'Recorded actions'}</p>
-            </div>
-          </div>
+      {/* The shared shell remains unchanged globally. This page alone fills its mobile frame. */}
+      <style>{`
+        @media (max-width: 767px) {
+          .page-shell:has(#epantry-admin-audit-content) {
+            width: 100% !important;
+            max-width: none !important;
+            margin-inline: 0 !important;
+            padding: 0 !important;
+          }
+          .page-shell:has(#epantry-admin-audit-content) > div {
+            border-radius: 0 !important;
+            border-left: 0 !important;
+            border-right: 0 !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
+      <div id="epantry-admin-audit-content" className="-mx-2.5 min-w-0 sm:-mx-5 md:mx-0">
+      {/* Mobile: keep only the actionable total. Desktop keeps its approved overview. */}
+      <section aria-label="Admin activity count" className="flex items-center justify-between border-b border-[#D7DDCF] bg-[#173F35] px-4 py-3 text-[#F7F6F2] md:hidden">
+        <div className="flex items-baseline gap-2.5">
+          <strong className="text-[25px] font-bold tabular-nums leading-none">{isLoading ? '—' : totalCount}</strong>
+          <span className="text-[13px] font-medium">{filtered ? 'Matching activities' : 'Recorded activities'}</span>
         </div>
-        <div className="grid grid-cols-3 divide-x divide-emerald-100 border-t border-emerald-100 bg-white/60 text-center text-xs font-semibold text-[#124E3A] sm:text-sm">
-          <div className="px-1 py-3.5 sm:px-3 sm:py-3">01 Find a change</div>
-          <div className="px-1 py-3.5 sm:px-3 sm:py-3">02 Check who & when</div>
-          <div className="px-1 py-3.5 sm:px-3 sm:py-3">03 Read the details</div>
+        <span className="text-xs font-medium text-[#D7DDCF]">Read-only</span>
+      </section>
+      {/* Compact overview: actual count only, no decorative or invented statistics. */}
+      <section aria-label="Admin activity overview" className="hidden min-w-0 border-b border-[#D7DDCF] bg-[#F7F6F2] md:grid md:overflow-hidden md:border md:grid-cols-[minmax(0,1fr)_minmax(200px,0.32fr)]">
+        <div className="min-w-0 border-l-[4px] border-[#C56C42] px-4 py-4 md:border-l-[5px] md:px-7 md:py-7">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.06em] text-[#C56C42] md:text-xs md:tracking-[0.08em]">
+            <FileClock size={17} /> Admin record / Read only
+          </div>
+          <h2 className="mt-2 max-w-2xl text-[21px] font-extrabold leading-[1.2] tracking-tight text-[#202421] md:mt-3 md:text-[32px] md:leading-[1.15]">
+            Every change, on record.
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-[#173F35] md:mt-2 md:text-base md:leading-6">
+            Check what changed, who did it and whether it worked.
+          </p>
+        </div>
+        <div className="flex min-w-0 items-center justify-between gap-3 bg-[#173F35] px-4 py-3.5 text-[#F7F6F2] md:block md:px-6 md:py-6">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#D7DDCF] md:text-xs md:tracking-[0.08em]">{filtered ? 'Matching actions' : 'Recorded actions'}</p>
+            <p className="mt-1 text-[30px] font-extrabold tabular-nums leading-none md:text-5xl">{isLoading ? '—' : totalCount}</p>
+          </div>
+          <div className="flex max-w-[135px] items-center gap-2 border-l border-[#D7DDCF]/30 pl-3 text-[11px] leading-4 text-[#D7DDCF] md:mt-5 md:max-w-none md:border-l-0 md:border-t md:pl-0 md:pt-3 md:text-xs md:leading-5">
+            <ShieldCheck size={18} className="shrink-0 text-[#C56C42]" /> Saved history cannot be edited
+          </div>
         </div>
       </section>
 
-      <section className="mt-5 overflow-hidden rounded-[16px] border border-stone-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 px-4 py-3 sm:px-5">
-          <div>
-            <h2 className="text-base font-bold text-stone-900">Find an activity</h2>
-            <p className="text-sm text-stone-600">Choose an action or result to narrow the history.</p>
-          </div>
-        </div>
-        <form onSubmit={submitFilters} className="px-4 py-4 sm:px-5">
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:gap-3">
-            <label className="block min-w-0">
-              <span className="mb-1.5 block text-sm font-semibold text-stone-700 sm:mb-1">Activity</span>
-              <select value={actionKnown ? form.action : '__custom'} onChange={(event) => setField('action', event.target.value === '__custom' ? '' : event.target.value)} className={FIELD_CLASS}>
-                {ACTION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                {!actionKnown && <option value="__custom">Custom activity code</option>}
-              </select>
-            </label>
-            <label className="block min-w-0">
-              <span className="mb-1.5 block text-sm font-semibold text-stone-700 sm:mb-1">Result</span>
-              <select value={form.outcome} onChange={(event) => setField('outcome', event.target.value)} className={FIELD_CLASS}>
-                <option value="">All results</option>
-                <option value="success">Completed</option>
-                <option value="denied">Access denied</option>
-                <option value="failed">Failed</option>
-              </select>
-            </label>
-            <button type="submit" className="focus-ring inline-flex h-[42px] items-center justify-center gap-2 rounded-xl bg-[#0F5132] px-5 text-sm font-bold text-white">
-              <Search size={16} /> Search
+      <div className="grid min-w-0 gap-0 md:mt-5 md:gap-5 xl:grid-cols-[minmax(260px,0.29fr)_minmax(0,1fr)] xl:items-start">
+        {/* Filters and their exact API keys are preserved. */}
+        <section aria-label="Filter admin activity" className="min-w-0 border-b border-[#BFC9B9] bg-[#D7DDCF] md:border-b-0 xl:sticky xl:top-5">
+          <header className="border-b border-[#BFC9B9] px-4 pb-2.5 pt-4 md:border-[#D7DDCF] md:px-6 md:pb-4 md:pt-5">
+            <p className="hidden text-xs font-bold uppercase tracking-[0.08em] text-[#C56C42] md:block">01 / Search history</p>
+            <h2 className="text-[18px] font-bold leading-tight text-[#202421] md:mt-1.5 md:text-[22px]"><span className="md:hidden">Filter activity</span><span className="hidden md:inline">Find an activity</span></h2>
+            <p className="mt-1 hidden text-sm text-[#173F35] md:block">Choose what you want to check.</p>
+          </header>
+          <form onSubmit={submitFilters} className="px-4 pb-4 pt-3 md:px-6 md:py-5">
+            <div className="grid grid-cols-2 gap-2.5 md:gap-4 xl:grid-cols-1">
+              <label className="block min-w-0">
+                <span className="mb-1.5 block text-sm font-bold text-[#202421]"><span className="md:hidden">Type</span><span className="hidden md:inline">Activity type</span></span>
+                <select value={actionKnown ? form.action : '__custom'} onChange={(event) => setField('action', event.target.value === '__custom' ? '' : event.target.value)} className={FIELD_CLASS}>
+                  {ACTION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  {!actionKnown && <option value="__custom">Custom activity code</option>}
+                </select>
+              </label>
+              <label className="block min-w-0">
+                <span className="mb-1.5 block text-sm font-bold text-[#202421]">Result</span>
+                <select value={form.outcome} onChange={(event) => setField('outcome', event.target.value)} className={FIELD_CLASS}>
+                  <option value="">All results</option>
+                  <option value="success">Completed</option>
+                  <option value="denied">Access denied</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </label>
+            </div>
+            <button type="submit" className="focus-ring mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 bg-[#173F35] px-5 py-3 text-sm font-bold text-[#F7F6F2] transition hover:bg-[#202421] md:mt-4">
+              <Search size={17} /><span className="md:hidden">Search</span><span className="hidden md:inline">Search activity</span>
             </button>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-4 sm:mt-3">
-            <button type="button" onClick={() => setShowAdvanced((value) => !value)} aria-expanded={showAdvanced} className="focus-ring inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
-              <SlidersHorizontal size={16} /> {showAdvanced ? 'Hide ID filters' : 'Search by ID'}
-            </button>
-            <button type="button" onClick={clearFilters} className="focus-ring text-sm font-semibold text-stone-600 underline-offset-4 hover:underline">Clear filters</button>
-          </div>
-          {showAdvanced && (
-            <div className="mt-3 grid gap-3 rounded-xl bg-stone-50 p-3 sm:grid-cols-3">
-              <label className="block min-w-0">
-                <span className="mb-1.5 block text-sm font-semibold text-stone-700 sm:mb-1">Exact action code</span>
-                <input className={FIELD_CLASS} value={form.action} onChange={(event) => setField('action', event.target.value)} placeholder="e.g. catalog.publish" />
-              </label>
-              <label className="block min-w-0">
-                <span className="mb-1.5 block text-sm font-semibold text-stone-700 sm:mb-1">Admin user ID</span>
-                <input className={FIELD_CLASS} value={form.actorUserId} onChange={(event) => setField('actorUserId', event.target.value)} placeholder="Optional user ID" />
-              </label>
-              <label className="block min-w-0">
-                <span className="mb-1.5 block text-sm font-semibold text-stone-700 sm:mb-1">Request ID</span>
-                <input className={FIELD_CLASS} value={form.requestId} onChange={(event) => setField('requestId', event.target.value)} placeholder="Optional request ID" />
-              </label>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#BFC9B9] pt-3 md:mt-4 md:border-[#D7DDCF] md:pt-4">
+              <button type="button" onClick={() => setShowAdvanced((value) => !value)} aria-expanded={showAdvanced} className="focus-ring inline-flex items-center gap-1.5 text-sm font-bold text-[#173F35] hover:underline">
+                <SlidersHorizontal size={16} /><span className="md:hidden">{showAdvanced ? 'Hide ID search' : 'Search by ID'}</span><span className="hidden md:inline">{showAdvanced ? 'Hide ID filters' : 'Search by ID'}</span>
+              </button>
+              <button type="button" onClick={clearFilters} className="focus-ring text-sm font-semibold text-[#202421] underline-offset-4 hover:underline"><span className="md:hidden">Clear</span><span className="hidden md:inline">Clear filters</span></button>
+            </div>
+            {showAdvanced && (
+              <div className="mt-4 grid gap-3 border-t border-[#D7DDCF] pt-4">
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-sm font-semibold text-[#202421]">Exact action code</span>
+                  <input className={FIELD_CLASS} value={form.action} onChange={(event) => setField('action', event.target.value)} placeholder="e.g. catalog.publish" />
+                </label>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-sm font-semibold text-[#202421]">Admin user ID</span>
+                  <input className={FIELD_CLASS} value={form.actorUserId} onChange={(event) => setField('actorUserId', event.target.value)} placeholder="Optional user ID" />
+                </label>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-sm font-semibold text-[#202421]">Request ID</span>
+                  <input className={FIELD_CLASS} value={form.requestId} onChange={(event) => setField('requestId', event.target.value)} placeholder="Optional request ID" />
+                </label>
+              </div>
+            )}
+          </form>
+        </section>
+
+        <section aria-label="Recorded admin activity" className="min-w-0 border-t-[3px] border-[#C56C42] bg-[#F7F6F2] md:border-t-[4px]">
+          <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#D7DDCF] px-4 py-4 md:px-6 md:py-5">
+            <div className="min-w-0">
+              <p className="hidden text-xs font-bold uppercase tracking-[0.08em] text-[#C56C42] md:block">02 / Activity ledger</p>
+              <h2 className="text-[18px] font-bold leading-tight text-[#202421] md:mt-1.5 md:text-2xl"><span className="md:hidden">Activities</span><span className="hidden md:inline">Recorded activity</span></h2>
+              <p className="mt-1 hidden text-sm text-[#173F35] md:block">Select a record to see the details.</p>
+            </div>
+            {!isLoading && !error && (
+              <span className="border-l-[3px] border-[#C56C42] bg-[#D7DDCF] px-3 py-1.5 text-[13px] font-bold tabular-nums text-[#173F35] md:py-2 md:text-sm">
+                {displayedCount || 0} of {totalCount}
+              </span>
+            )}
+          </header>
+          {isLoading ? (
+            <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-[#173F35]">
+              <LoaderCircle size={20} className="animate-spin text-[#173F35]" /> Loading activity…
+            </div>
+          ) : error ? (
+            <div className="m-4 flex items-start gap-2 border-l-4 border-[#C56C42] bg-[#D7DDCF] p-4 text-sm text-[#202421]">
+              <CircleAlert size={18} className="shrink-0" /> {getErrorMessage(error)}
+            </div>
+          ) : events.length === 0 ? (
+            <div className="flex items-start gap-3 px-5 py-10 sm:px-6">
+              <ShieldCheck size={26} className="shrink-0 text-[#173F35]" />
+              <div>
+                <h3 className="text-base font-bold text-[#202421]">No matching activity</h3>
+                <p className="mt-1 text-sm text-[#173F35]">Try another filter or clear the search.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full table-fixed text-left">
+                  <thead className="bg-[#202421] text-sm font-semibold text-[#F7F6F2]">
+                    <tr>
+                      <th className="w-[39%] px-5 py-3.5">Activity</th>
+                      <th className="w-[18%] px-3 py-3.5">By</th>
+                      <th className="w-[15%] px-3 py-3.5">Result</th>
+                      <th className="w-[23%] px-3 py-3.5">When</th>
+                      <th className="w-[5%] px-2 py-3.5" aria-label="Open details" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#D7DDCF]">
+                    {visibleEvents.map((auditEvent) => (
+                      <tr key={auditEvent.eventId} onClick={() => setSelectedEventId(auditEvent.eventId)}
+                        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedEventId(auditEvent.eventId) } }}
+                        role="button" tabIndex={0} aria-label={`View details: ${eventName(auditEvent)}`}
+                        className="group focus-ring cursor-pointer align-middle transition hover:bg-[#D7DDCF]/55 focus:bg-[#D7DDCF]/55">
+                        <td className="border-l-[3px] border-transparent px-5 py-4 group-hover:border-[#C56C42]">
+                          <p className="break-words text-[15px] font-bold leading-snug text-[#202421]">{eventName(auditEvent)}</p>
+                          <p className="mt-1 text-[13px] text-[#173F35]">{entityName(auditEvent)}</p>
+                        </td>
+                        <td className="break-words px-3 py-4 text-sm text-[#202421]">{actorName(auditEvent)}</td>
+                        <td className="px-3 py-4"><OutcomeTag outcome={auditEvent.outcome} /></td>
+                        <td className="break-words px-3 py-4 text-sm text-[#173F35]">{formatDate(auditEvent.occurredAt)}</td>
+                        <td className="px-2 py-4"><ArrowRight size={18} className="text-[#C56C42]" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="divide-y divide-[#D7DDCF] md:hidden">
+                {visibleEvents.map((auditEvent) => (
+                  <button type="button" key={auditEvent.eventId} onClick={() => setSelectedEventId(auditEvent.eventId)}
+                    className="focus-ring block w-full border-l-[3px] border-transparent px-4 py-3.5 text-left transition hover:border-[#C56C42] hover:bg-[#D7DDCF]/40">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <p className="min-w-0 flex-1 text-[14px] font-bold leading-snug text-[#202421]">{eventName(auditEvent)}</p>
+                      <OutcomeTag outcome={auditEvent.outcome} />
+                    </div>
+                    <div className="mt-1.5 flex min-w-0 items-start justify-between gap-2 text-[12px] leading-4 text-[#173F35]">
+                      <span className="min-w-0">{actorName(auditEvent)} · {formatDate(auditEvent.occurredAt)}</span>
+                      <ArrowRight size={16} className="shrink-0 text-[#C56C42]" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col items-center justify-center gap-2 border-t border-[#D7DDCF] px-4 py-4 md:px-4">
+                {canViewMore && (
+                  <button type="button" onClick={toggleAll}
+                    className="focus-ring inline-flex w-full items-center justify-center gap-2 border border-[#173F35] bg-[#F7F6F2] px-5 py-2.5 text-sm font-bold text-[#173F35] transition hover:bg-[#D7DDCF] md:w-auto md:min-w-44">
+                    {viewAll ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                    {viewAll ? 'Show fewer' : 'View all activity'}
+                  </button>
+                )}
+                {viewAll && totalCount > filters.limit && (
+                  <p className="text-center text-xs text-[#173F35]">Showing up to 100 actions per page. Use Next for older records.</p>
+                )}
+              </div>
+            </>
+          )}
+          {!isLoading && !error && viewAll && events.length > 0 && totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#D7DDCF] px-4 py-3 sm:px-6">
+              <span className="text-sm font-medium text-[#202421]">Page {currentPage} of {totalPages}</span>
+              <div className="flex items-center gap-2">
+                <button type="button" aria-label="Previous page" disabled={currentPage <= 1}
+                  onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
+                  className="focus-ring inline-flex items-center gap-1 border border-[#D7DDCF] px-3 py-2 text-sm font-semibold text-[#202421] disabled:cursor-not-allowed disabled:opacity-40">
+                  <ChevronLeft size={17} /> Previous
+                </button>
+                <button type="button" aria-label="Next page" disabled={currentPage >= totalPages}
+                  onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}
+                  className="focus-ring inline-flex items-center gap-1 border border-[#D7DDCF] px-3 py-2 text-sm font-semibold text-[#202421] disabled:cursor-not-allowed disabled:opacity-40">
+                  Next <ChevronRight size={17} />
+                </button>
+              </div>
             </div>
           )}
-        </form>
-      </section>
+        </section>
+      </div>
 
-      <section className="mt-5 overflow-hidden rounded-[16px] border border-stone-200 bg-white">
-        <div className="flex flex-wrap items-end justify-between gap-2 border-b border-stone-100 px-4 py-4 sm:px-5">
-          <div>
-            <h2 className="text-lg font-bold text-stone-900">Recorded activity</h2>
-            <p className="mt-0.5 text-sm text-stone-600">Select an action to see what happened.</p>
-          </div>
-          {!isLoading && !error && <span className="text-sm font-semibold tabular-nums text-stone-600">{displayedCount || 0} of {totalCount}</span>}
-        </div>
-        {isLoading ? (
-          <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-stone-600">
-            <LoaderCircle size={20} className="animate-spin text-emerald-700" /> Loading activity…
-          </div>
-        ) : error ? (
-          <div className="m-4 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-800">
-            <CircleAlert size={18} className="shrink-0" /> {getErrorMessage(error)}
-          </div>
-        ) : events.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <ShieldCheck size={30} className="mx-auto text-emerald-700" />
-            <h3 className="mt-3 font-bold text-stone-900">No matching activity</h3>
-            <p className="mt-1 text-sm text-stone-600">Try another filter or clear your search.</p>
-          </div>
-        ) : (
-          <>
-            <div className="hidden md:block">
-              <table className="w-full table-fixed text-left">
-                <thead className="bg-stone-50 text-sm font-semibold text-stone-600">
-                  <tr>
-                    <th className="w-[39%] px-4 py-3">Change</th>
-                    <th className="w-[18%] px-3 py-3">By</th>
-                    <th className="w-[15%] px-3 py-3">Result</th>
-                    <th className="w-[23%] px-3 py-3">When</th>
-                    <th className="w-[5%] px-2 py-3" aria-label="Open details" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {visibleEvents.map((auditEvent) => (
-                    <tr key={auditEvent.eventId} onClick={() => setSelectedEventId(auditEvent.eventId)}
-                      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedEventId(auditEvent.eventId) } }}
-                      role="button" tabIndex={0} aria-label={`View details: ${eventName(auditEvent)}`}
-                      className="focus-ring cursor-pointer align-top transition hover:bg-emerald-50/60 focus:bg-emerald-50/60">
-                      <td className="px-4 py-3">
-                        <p className="break-words text-sm font-bold text-stone-900">{eventName(auditEvent)}</p>
-                        <p className="mt-0.5 text-xs text-stone-500">{entityName(auditEvent)}</p>
-                      </td>
-                      <td className="break-words px-3 py-3.5 text-sm text-stone-700">{actorName(auditEvent)}</td>
-                      <td className="px-3 py-3.5"><OutcomeTag outcome={auditEvent.outcome} /></td>
-                      <td className="break-words px-3 py-3.5 text-sm text-stone-600">{formatDate(auditEvent.occurredAt)}</td>
-                      <td className="px-2 py-3.5"><ArrowRight size={17} className="text-emerald-800" /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="divide-y divide-stone-100 md:hidden">
-              {visibleEvents.map((auditEvent) => (
-                <button type="button" key={auditEvent.eventId} onClick={() => setSelectedEventId(auditEvent.eventId)}
-                  className="focus-ring block w-full px-4 py-4 text-left transition hover:bg-emerald-50/50 sm:py-3.5">
-                  <div className="flex min-w-0 items-start justify-between gap-2">
-                    <p className="min-w-0 flex-1 text-sm font-bold leading-5 text-stone-900">{eventName(auditEvent)}</p>
-                    <OutcomeTag outcome={auditEvent.outcome} />
-                  </div>
-                  <p className="mt-2 text-xs text-stone-600 sm:mt-1">{actorName(auditEvent)} · {entityName(auditEvent)}</p>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-stone-500 sm:mt-1.5">
-                    <span className="min-w-0">{formatDate(auditEvent.occurredAt)}</span>
-                    <ArrowRight size={16} className="shrink-0 text-emerald-800" />
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-col items-center justify-center gap-2 border-t border-stone-100 px-4 py-4">
-              {canViewMore && (
-                <button type="button" onClick={toggleAll}
-                  className="focus-ring inline-flex min-w-44 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-bold text-[#0F5132] hover:bg-emerald-100">
-                  {viewAll ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-                  {viewAll ? 'Show fewer' : 'View all'}
-                </button>
-              )}
-              {viewAll && totalCount > filters.limit && (
-                <p className="text-center text-xs text-stone-500">Showing up to 100 actions per page. Use Next for older records.</p>
-              )}
-            </div>
-          </>
-        )}
-        {!isLoading && !error && viewAll && events.length > 0 && totalPages > 1 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 px-4 py-3 sm:px-5">
-            <span className="text-sm font-medium text-stone-600">Page {currentPage} of {totalPages}</span>
-            <div className="flex items-center gap-2">
-              <button type="button" aria-label="Previous page" disabled={currentPage <= 1}
-                onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
-                className="focus-ring inline-flex items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700 disabled:cursor-not-allowed disabled:opacity-40">
-                <ChevronLeft size={17} /> Previous
-              </button>
-              <button type="button" aria-label="Next page" disabled={currentPage >= totalPages}
-                onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}
-                className="focus-ring inline-flex items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700 disabled:cursor-not-allowed disabled:opacity-40">
-                Next <ChevronRight size={17} />
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
+      </div>
 
       {selectedEventId && typeof document !== 'undefined' && createPortal(
         <div
@@ -610,16 +642,16 @@ export default function AdminAuditPage() {
             className="flex w-full min-w-0 flex-col overflow-hidden rounded-[20px] border border-stone-200 bg-white shadow-2xl"
             style={{ maxWidth: 850, maxHeight: 'min(90dvh, 780px)' }}
           >
-            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[#cce5d7] bg-[#E6F4ED] px-4 py-4 sm:px-6 sm:py-5">
+            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[#D7DDCF] bg-[#D7DDCF] px-4 py-4 sm:px-6 sm:py-5">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Activity history / Record details</p>
-                <h2 className="mt-1 break-words text-lg font-extrabold leading-snug text-[#124E3A] sm:text-2xl">
+                <p className="hidden text-xs font-bold uppercase tracking-wide text-[#173F35] sm:block">Activity history / Record details</p>
+                <h2 className="mt-1 break-words text-lg font-extrabold leading-snug text-[#173F35] sm:text-2xl">
                   {selectedEvent ? eventName(selectedEvent) : 'Activity details'}
                 </h2>
-                <p className="mt-1 text-sm text-stone-600">A read-only record of what an admin did.</p>
+                <p className="mt-1 hidden text-sm text-stone-600 sm:block">A read-only record of what an admin did.</p>
               </div>
               <button type="button" aria-label="Close activity details" onClick={() => setSelectedEventId('')}
-                className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#cce5d7] bg-white text-stone-800 hover:bg-stone-50">
+                className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#D7DDCF] bg-white text-stone-800 hover:bg-stone-50">
                 <X size={18} />
               </button>
             </header>
@@ -627,13 +659,13 @@ export default function AdminAuditPage() {
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:space-y-5 sm:px-6 sm:py-5">
               {isLoadingDetail ? (
                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-stone-600">
-                  <LoaderCircle size={22} className="animate-spin text-emerald-700" /> Loading details…
+                  <LoaderCircle size={22} className="animate-spin text-[#173F35]" /> Loading details…
                 </div>
               ) : detailError ? (
                 <p className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{getErrorMessage(detailError)}</p>
               ) : selectedEvent ? (
                 <>
-                  <div className="rounded-xl border border-emerald-100 bg-[#F4F9F6] px-3.5 py-3.5 sm:px-4">
+                  <div className="rounded-xl border border-[#D7DDCF] bg-[#F7F6F2] px-3.5 py-3.5 sm:px-4">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <OutcomeTag outcome={selectedEvent.outcome} />
                       <span className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-700"><Clock3 size={15} /> {formatDate(selectedEvent.occurredAt)}</span>
@@ -657,7 +689,7 @@ export default function AdminAuditPage() {
                   {snapshotAvailable && (
                     <section aria-label="What changed" className="min-w-0">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="text-base font-extrabold text-[#124E3A]">What changed?</h3>
+                        <h3 className="text-base font-extrabold text-[#173F35]">What changed?</h3>
                         <span className="text-xs font-semibold text-stone-500">{changedFields.length} visible change{changedFields.length === 1 ? '' : 's'}</span>
                       </div>
                       {changedFields.length ? (
@@ -670,16 +702,16 @@ export default function AdminAuditPage() {
                                   <p className="text-xs font-semibold text-stone-500">Before</p>
                                   <p className="mt-1 break-words text-sm leading-5 text-stone-700">{field.before}</p>
                                 </div>
-                                <div className="min-w-0 rounded-lg bg-emerald-50 p-2.5">
-                                  <p className="text-xs font-semibold text-emerald-800">After</p>
-                                  <p className="mt-1 break-words text-sm font-semibold leading-5 text-[#124E3A]">{field.after}</p>
+                                <div className="min-w-0 rounded-lg bg-[#D7DDCF]/55 p-2.5">
+                                  <p className="text-xs font-semibold text-[#173F35]">After</p>
+                                  <p className="mt-1 break-words text-sm font-semibold leading-5 text-[#173F35]">{field.after}</p>
                                 </div>
                               </div>
                             </div>
                           ))}
                           {changedFields.length > 6 && (
                             <button type="button" onClick={() => setShowAllChanges((value) => !value)}
-                              className="focus-ring flex w-full items-center justify-center gap-2 border-t border-stone-100 px-3 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">
+                              className="focus-ring flex w-full items-center justify-center gap-2 border-t border-stone-100 px-3 py-3 text-sm font-bold text-[#173F35] hover:bg-[#D7DDCF]/55">
                               {showAllChanges ? <><ChevronUp size={16} /> Show fewer changes</> : <><ChevronDown size={16} /> Show all {changedFields.length} changes</>}
                             </button>
                           )}
@@ -734,9 +766,9 @@ export default function AdminAuditPage() {
               ) : <p className="text-sm text-stone-600">Activity details are not available.</p>}
             </div>
             <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-stone-200 bg-white px-4 py-3 sm:px-6">
-              <p className="text-xs font-medium text-stone-500">Read-only · No changes can be made here</p>
+              <p className="hidden text-xs font-medium text-stone-500 sm:block">Read-only · No changes can be made here</p>
               <button type="button" onClick={() => setSelectedEventId('')}
-                className="focus-ring shrink-0 rounded-xl bg-[#0F5132] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#124E3A]">Close</button>
+                className="focus-ring shrink-0 rounded-xl bg-[#173F35] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#202421]">Close</button>
             </footer>
           </section>
         </div>,
