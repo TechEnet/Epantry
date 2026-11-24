@@ -95,7 +95,7 @@ export function normalizeRecipeSources({
         ? String(item.images[0] || '')
         : '',
       cuisine: item?.cuisine || kind,
-      courseLabels: [item?.course, item?.mealType].filter(Boolean),
+      courseLabels: [item?.course, item?.mealType, item?.category].filter(Boolean),
       tags: Array.isArray(item?.tags) ? item.tags : [],
       originCountry: item?.countryOfOrigin || item?.originCountry || '',
       path: hostDetailPath(item),

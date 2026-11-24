@@ -27,42 +27,39 @@ import {
 } from '../services/executionScale.service'
 
 const executionScaleDashboardCss = String.raw`
-.exs-root{color:#202421;font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,sans-serif}
+/* This stylesheet is deliberately scoped to the Host Operations partner panel. */
+.exs-root{--ex-forest:#173f35;--ex-clay:#b76043;--ex-ink:#202824;--ex-soft:#f7f6f2;--ex-line:#d7ddd5;font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,sans-serif;color:var(--ex-ink);font-size:16px;line-height:1.5;min-width:0;width:100%;}
 .exs-root *,.exs-root *::before,.exs-root *::after{box-sizing:border-box}
-.exs-root .exs-head{background:#173F35!important;border:0!important;border-left:5px solid #C86C42!important;border-radius:17px!important;padding:clamp(20px,2.3vw,32px)!important;box-shadow:none!important}
-.exs-root .exs-head h2{font-size:clamp(23px,2.4vw,31px)!important;line-height:1.23!important;letter-spacing:-.04em!important;color:#fff!important}
-.exs-root .exs-head p{font-size:14px!important;line-height:1.55!important;color:#DFE8DE!important}
-.exs-root .exs-head p:first-child{color:#E6A17A!important;font-size:12px!important;letter-spacing:.12em!important}
-.exs-root .exs-head button{background:#FFFDF8!important;color:#173F35!important;border:1px solid #C9D7C8!important;border-radius:10px!important;min-height:42px;font-size:14px!important}
-.exs-root .exs-head .text-red-700{color:#FFC7C0!important}
-.exs-root .exs-groups{gap:20px!important}
-.exs-root .exs-partners,.exs-root .exs-purchases,.exs-root .exs-finance,.exs-root .exs-integrity{box-shadow:none!important;border-radius:16px!important;padding:clamp(18px,2.2vw,30px)!important}
-.exs-root .exs-partners{border:1px solid #D7E0D7!important;border-top:4px solid #C86C42!important;background:#FFFEFA!important}
-.exs-root .exs-purchases{border:1px solid #D3DDE8!important;border-top:4px solid #5E8CA5!important;background:#EEF3F5!important}
-.exs-root .exs-finance{border:1px solid #BFD7D1!important;border-top:4px solid #173F35!important;background:#E6F0EC!important}
-.exs-root .exs-integrity{border:1px solid #DADDD5!important;background:#F0F0E9!important}
-.exs-root h3{font-size:clamp(20px,1.9vw,25px)!important;line-height:1.25!important;letter-spacing:-.035em!important;color:#173F35!important;white-space:normal!important}
-.exs-root .exs-partners>div:first-child p,.exs-root .exs-purchases>div:first-child p,.exs-root .exs-finance>div:first-child p,.exs-root .exs-integrity>div:first-child p{font-size:14px!important;line-height:1.5!important;color:#4B5D53!important}
-.exs-root input,.exs-root textarea,.exs-root select{font-size:14px!important;min-height:43px!important;line-height:1.4!important;padding:10px 12px!important;border:1px solid #CBD3C9!important;background:#fff!important;border-radius:9px!important;max-width:100%}
-.exs-root label span{font-size:12.5px!important;line-height:1.4!important}
-.exs-root button{font-size:14px!important;min-height:40px;white-space:normal!important;line-height:1.3!important}
+.exs-root :is(button,input,select,textarea):focus-visible{outline:3px solid #c68c73!important;outline-offset:2px}
+.exs-root .exs-head{background:#e9eee8!important;color:var(--ex-forest)!important;border:1px solid #d3e0d7!important;border-left:4px solid var(--ex-forest)!important;border-radius:15px!important;padding:clamp(20px,2.3vw,29px)!important;box-shadow:none!important}
+.exs-root .exs-head h2{color:var(--ex-forest)!important;font-size:clamp(24px,2.3vw,30px)!important;font-weight:750!important;line-height:1.24!important;letter-spacing:-.035em!important}
+.exs-root .exs-head p{font-size:15px!important;line-height:1.5!important;color:#445c4e!important}
+.exs-root .exs-head p:first-child{font-size:13px!important;font-weight:700!important;color:#a0563e!important;letter-spacing:.035em!important}
+.exs-root .exs-head button{background:#fffefa!important;color:var(--ex-forest)!important;border:1px solid #becfc2!important;border-radius:9px!important;font-size:14px!important;font-weight:700!important;min-height:44px!important;padding:10px 15px!important;box-shadow:none!important}
+.exs-root .exs-head .text-red-700{color:#a33b32!important}
+.exs-root .exs-groups{gap:24px!important;align-items:start!important}
+.exs-root .exs-partners,.exs-root .exs-purchases,.exs-root .exs-finance,.exs-root .exs-integrity{box-shadow:none!important;border-radius:15px!important;min-width:0!important;padding:clamp(19px,2.2vw,28px)!important}
+.exs-root .exs-partners{background:#fffdfa!important;border:1px solid #e3d9cf!important;border-top:3px solid #be7759!important}
+.exs-root .exs-purchases{background:#eaf1f3!important;border:1px solid #ccdee5!important;border-top:3px solid #668ea5!important}
+.exs-root .exs-finance{background:#e8f1ea!important;border:1px solid #c8dcd0!important;border-top:3px solid #3c755d!important}
+.exs-root .exs-integrity{background:#f1efe9!important;border:1px solid #dbded7!important}
+.exs-root h3{font-size:clamp(20px,1.9vw,25px)!important;font-weight:750!important;line-height:1.25!important;letter-spacing:-.03em!important;color:var(--ex-forest)!important;white-space:normal!important}
+.exs-root .exs-partners>div:first-child p,.exs-root .exs-purchases>div:first-child p,.exs-root .exs-finance>div:first-child p,.exs-root .exs-integrity>div:first-child p{font-size:15px!important;line-height:1.48!important;color:#4d6156!important;font-weight:450!important}
+.exs-root .exs-partners>div:nth-child(2),.exs-root .exs-purchases>div:nth-child(2){margin-top:18px!important;gap:14px!important}
+.exs-root .exs-partners label>span:first-child,.exs-root .exs-purchases label>span:first-child{display:block!important;font-size:13px!important;font-weight:700!important;letter-spacing:0!important;text-transform:none!important;color:#39584a!important;line-height:1.4!important;margin-bottom:7px!important}
+.exs-root input,.exs-root textarea,.exs-root select{font-size:15px!important;min-height:46px!important;line-height:1.45!important;padding:10px 12px!important;border:1px solid #cdd6ce!important;background:#fff!important;border-radius:9px!important;box-shadow:none!important;max-width:100%;min-width:0}
+.exs-root textarea{min-height:82px!important;resize:vertical!important}
+.exs-root input::placeholder,.exs-root textarea::placeholder{color:#758078;opacity:1}
+.exs-root button{font-size:14px!important;min-height:42px!important;white-space:normal!important;line-height:1.35!important;font-weight:700!important}
 .exs-root .exs-partners button,.exs-root .exs-purchases button{border-radius:9px!important}
-.exs-root .exs-partners button:not(:disabled):hover,.exs-root .exs-purchases button:not(:disabled):hover{filter:brightness(.94)}
-.exs-root .exs-finance article,.exs-root .exs-purchases article{border-radius:10px!important;border:1px solid #D5DFD6!important;background:#FFFEFB!important}
-.exs-root .text-\[9px\],.exs-root .text-\[10px\],.exs-root .text-\[11px\]{font-size:13px!important;line-height:1.5!important}
-@media(max-width:680px){.exs-root{margin-top:20px!important}.exs-root .exs-head,.exs-root .exs-partners,.exs-root .exs-purchases,.exs-root .exs-finance,.exs-root .exs-integrity{padding:17px 15px!important}.exs-root .exs-purchases>div:nth-child(2),.exs-root .exs-partners>div:nth-child(2){grid-template-columns:minmax(0,1fr)!important}.exs-root .exs-purchases>div:nth-child(2)>*,.exs-root .exs-partners>div:nth-child(2)>*{grid-column:1/-1!important}.exs-root .exs-head h2{font-size:23px!important}.exs-root h3{font-size:20px!important}}
-
-/* Match the Host Operations typography without touching its workflows. */
-.exs-root{font-size:16px;line-height:1.55}
-.exs-root .exs-head p,.exs-root .exs-partners>div:first-child p,.exs-root .exs-purchases>div:first-child p,.exs-root .exs-finance>div:first-child p,.exs-root .exs-integrity>div:first-child p{font-size:15px!important;line-height:1.55!important}
-.exs-root .exs-head p:first-child{font-size:13px!important}
-.exs-root :is(.text-\[8px\],.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs){font-size:14px!important;line-height:1.5!important;letter-spacing:normal!important}
-.exs-root .text-sm{font-size:15px!important;line-height:1.5!important}
-.exs-root label span{font-size:14px!important;line-height:1.5!important}
-.exs-root input,.exs-root textarea,.exs-root select{font-size:16px!important;line-height:1.5!important;min-height:48px!important}
-.exs-root button{font-size:15px!important;min-height:44px!important;font-weight:700!important}
-.exs-root :is(button,input,select,textarea):focus-visible{outline:3px solid #C86C42!important;outline-offset:2px}
-@media(max-width:680px){.exs-root{font-size:15px}.exs-root :is(.text-\[8px\],.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs){font-size:13px!important}.exs-root input,.exs-root select,.exs-root textarea{font-size:16px!important}}
+.exs-root .exs-partners button:not(:disabled):hover,.exs-root .exs-purchases button:not(:disabled):hover{filter:brightness(.95)}
+.exs-root .exs-finance article,.exs-root .exs-purchases article{border-radius:10px!important;border:1px solid #d1dbd3!important;background:#fffefa!important}
+.exs-root .exs-partners .text-\[9px\],.exs-root .exs-purchases .text-\[9px\],.exs-root .exs-finance .text-\[10px\],.exs-root .exs-integrity .text-\[10px\]{font-size:13px!important;line-height:1.5!important}
+.exs-root .exs-partners .text-xs,.exs-root .exs-purchases .text-xs,.exs-root .exs-finance .text-xs{font-size:14px!important;line-height:1.5!important}
+.exs-root .exs-partners>p,.exs-root .exs-finance>div:last-child{border-radius:10px!important}
+.exs-root .exs-partners>p{background:#edf1e9!important;border:1px solid #d6ded4!important;color:#43604d!important}
+.exs-root .exs-finance>div:last-child{background:#fff5eb!important;border:1px solid #ecd8c7!important;color:#825342!important}
+@media(max-width:680px){.exs-root .exs-head,.exs-root .exs-partners,.exs-root .exs-purchases,.exs-root .exs-finance,.exs-root .exs-integrity{padding:18px 16px!important}.exs-root .exs-groups{gap:18px!important}.exs-root .exs-partners>div:nth-child(2),.exs-root .exs-purchases>div:nth-child(2){grid-template-columns:minmax(0,1fr)!important}.exs-root .exs-partners>div:nth-child(2)>*,.exs-root .exs-purchases>div:nth-child(2)>*{grid-column:1/-1!important}.exs-root .exs-head h2{font-size:24px!important}.exs-root h3{font-size:21px!important}.exs-root .exs-head>div:first-child{flex-wrap:wrap!important}.exs-root .exs-head button{margin-left:0!important}}
 @media(prefers-reduced-motion:reduce){.exs-root *{transition:none!important}}
 `;
 
@@ -96,7 +93,7 @@ function executionScaleDisplayError(message) {
   const value = String(message || '')
 
   if (/M22|execution[- ]scale/i.test(value) && /not enabled|disabled|unavailable/i.test(value)) {
-    return 'Partner execution tools are not available in this environment yet.'
+    return 'Partner tools are not available yet. Your business setup is still available.'
   }
 
   return value
@@ -563,15 +560,15 @@ export default function ExecutionScalePanel() {
         <div className="flex items-start justify-between gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-              PARTNER OPERATIONS
+              YOUR PARTNER WORKSPACE
             </p>
 
             <h2 className="mt-1 text-[14px] font-black leading-[17px] tracking-tight text-stone-950 sm:mt-2 sm:text-2xl sm:leading-normal">
-              Partner operations & finance
+              Suppliers, orders & payouts
             </h2>
 
             <p className="mt-1 max-w-4xl text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
-              Manage partner connections, purchase orders and payout progress.
+              Keep supplier connections, purchase orders and payments organized.
             </p>
           </div>
 
@@ -610,7 +607,7 @@ export default function ExecutionScalePanel() {
             </p>
           ) : loading ? (
             <p className="text-stone-500">
-              Loading execution evidence…
+              Loading partner activity…
             </p>
           ) : null}
         </div>
@@ -630,15 +627,15 @@ export default function ExecutionScalePanel() {
               </h3>
 
               <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-sm sm:leading-6">
-                <span className="sm:hidden">Add partner details and secure references. New connections wait for admin approval.</span>
-                <span className="hidden sm:inline">Add partner connection details and secure environment references. New connections stay pending until an admin approves them.</span>
+                <span className="sm:hidden">Add a partner. New connections need approval.</span>
+                <span className="hidden sm:inline">Connect a supplier or service partner. New connections need approval.</span>
               </p>
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 sm:grid-cols-2">
             <label className="min-w-0">
-              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Partner key</span>
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Partner ID</span>
               <input
                 className={
                   inputClass
@@ -666,7 +663,7 @@ export default function ExecutionScalePanel() {
             </label>
 
             <label className="min-w-0">
-              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Display name</span>
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Partner name</span>
               <input
                 className={
                   inputClass
@@ -777,7 +774,7 @@ export default function ExecutionScalePanel() {
             </label>
 
             <label className="min-w-0">
-              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Credential key</span>
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Credential ENV key</span>
               <input
                 className={
                   inputClass
@@ -800,12 +797,12 @@ export default function ExecutionScalePanel() {
                       }),
                     )
                 }
-                placeholder="Credential ENV key — not secret"
+                placeholder="Credential variable name (not a password)"
               />
             </label>
 
             <label className="min-w-0">
-              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Webhook key</span>
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Webhook ENV key</span>
               <input
                 className={
                   inputClass
@@ -828,7 +825,7 @@ export default function ExecutionScalePanel() {
                       }),
                     )
                 }
-                placeholder="Webhook secret ENV key"
+                placeholder="Webhook variable name"
               />
             </label>
 
@@ -889,7 +886,7 @@ export default function ExecutionScalePanel() {
             </label>
 
             <label className="min-w-0">
-              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">PO path</span>
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Purchase order path</span>
               <input
                 className={
                   inputClass
@@ -1128,8 +1125,8 @@ export default function ExecutionScalePanel() {
           </div>
 
           <p className="mt-3 rounded-xl border border-indigo-300 bg-indigo-100/75 p-2.5 text-[10px] font-semibold leading-4 text-indigo-900 sm:mt-4 sm:rounded-2xl sm:p-4 sm:text-xs sm:leading-5">
-            <span className="sm:hidden">Retailer checkout stays in EPANTRY's existing flow; no second customer route is created.</span>
-            <span className="hidden sm:inline">Retailer checkout links continue through EPANTRY's existing checkout system. This connection does not create a second customer checkout route.</span>
+            <span className="sm:hidden">Customer checkout stays in EPANTRY.</span>
+            <span className="hidden sm:inline">Customers will continue using the existing EPANTRY checkout.</span>
           </p>
         </section>
 
@@ -1142,19 +1139,19 @@ export default function ExecutionScalePanel() {
 
             <div className="min-w-0 flex-1">
               <h3 className="whitespace-nowrap text-[15px] font-black leading-4 text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal">
-                Purchase-order preparation
+                Purchase orders
               </h3>
 
               <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-sm sm:leading-6">
-                <span className="sm:hidden">Create purchase-order drafts from the reviewed supplier plan. EPANTRY keeps the selected supplier.</span>
-                <span className="hidden sm:inline">Turn the reviewed supplier plan into purchase-order drafts. EPANTRY keeps the selected supplier and does not switch suppliers automatically.</span>
+                <span className="sm:hidden">Create draft orders from an approved purchasing plan.</span>
+                <span className="hidden sm:inline">Create draft purchase orders from a reviewed supplier plan. Your chosen supplier stays the same.</span>
               </p>
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:block sm:space-y-3">
             <label className="min-w-0">
-              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Plan ID</span>
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Purchasing plan ID</span>
               <input
               className={
                 inputClass
@@ -1170,12 +1167,12 @@ export default function ExecutionScalePanel() {
                     event.target.value,
                   )
               }
-              placeholder="Procurement plan ID"
+              placeholder="Reviewed plan ID"
             />
             </label>
 
             <label className="min-w-0">
-              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Purchase reason</span>
+              <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-stone-500 sm:hidden">Order note</span>
               <textarea
                 rows={3}
                 className={`${inputClass} h-[38px] resize-none sm:h-auto`}
@@ -1480,12 +1477,12 @@ export default function ExecutionScalePanel() {
 
           <div className="min-w-0 flex-1">
             <h3 className="whitespace-nowrap text-[15px] font-black leading-4 text-stone-950 sm:whitespace-normal sm:text-lg sm:leading-normal">
-              Finance & payout tracking
+              Payout tracking
             </h3>
 
             <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-500 sm:mt-1 sm:text-sm sm:leading-6">
-              <span className="sm:hidden">Track payout progress here. Final settlement stays controlled by EPANTRY finance.</span>
-              <span className="hidden sm:inline">Track payout progress here. Final settlement and paid-status changes stay controlled by EPANTRY's finance workflow.</span>
+              <span className="sm:hidden">See payment progress and payout status.</span>
+              <span className="hidden sm:inline">View payout progress. Final payment status is confirmed by EPANTRY Finance.</span>
             </p>
           </div>
         </div>
@@ -1542,8 +1539,8 @@ export default function ExecutionScalePanel() {
           />
 
           <p className="text-[10px] font-semibold leading-4 sm:text-xs sm:leading-5">
-            <span className="sm:hidden">Provider confirmation shows payout progress only. Final paid status follows EPANTRY finance reconciliation.</span>
-            <span className="hidden sm:inline">A provider confirmation shows payout progress, not final settlement. Final paid status is confirmed only after EPANTRY finance reconciliation.</span>
+            <span className="sm:hidden">A provider update is not final payment confirmation.</span>
+            <span className="hidden sm:inline">A payout update is not final confirmation. EPANTRY Finance verifies the completed payment.</span>
           </p>
         </div>
       </section>
@@ -1557,12 +1554,12 @@ export default function ExecutionScalePanel() {
 
           <div className="min-w-0 flex-1">
             <h3 className="whitespace-nowrap text-[15px] font-black leading-4 sm:whitespace-normal sm:text-lg sm:leading-normal">
-              How partner data is treated
+              About partner updates
             </h3>
 
             <p className="mt-0.5 text-[10px] font-semibold leading-4 text-stone-600 sm:mt-2 sm:text-sm sm:leading-6">
-              <span className="sm:hidden">Partner updates support decisions but do not replace final product, price, stock, delivery, order or settlement records.</span>
-              <span className="hidden sm:inline">Partner responses are treated as supporting evidence, not final product, price, stock, delivery, purchase-order, ledger or settlement records. EPANTRY reconciles uncertain external updates before retrying.</span>
+              <span className="sm:hidden">Partner updates are checked before they change EPANTRY records.</span>
+              <span className="hidden sm:inline">Partner updates are checked before EPANTRY changes approved product, stock, order or payment records.</span>
             </p>
           </div>
         </div>

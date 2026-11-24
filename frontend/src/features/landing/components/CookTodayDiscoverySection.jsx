@@ -297,7 +297,7 @@ export default function CookTodayDiscoverySection({ recipes = [], selectedDiet =
     .filter((value) => value && !GENERIC_CUISINES.has(clean(value))))]
     .sort((a, b) => a.localeCompare(b)), [eligible])
 
-  const { shownRecipes, isFallback } = useMemo(() => {
+  const { shownRecipes } = useMemo(() => {
     if (activeDestination === 'cook') {
       const meals = eligible.filter((recipe) => recipe.kind === 'meal')
       if (curation !== 'meal') {
@@ -306,14 +306,10 @@ export default function CookTodayDiscoverySection({ recipes = [], selectedDiet =
         // Fall back visibly to ordinary eligible meals without a false label.
         return { shownRecipes: result.matched ? result.items : meals, isFallback: !result.matched }
       }
-      if (mealType === 'Dinner' || mealType === 'Lunch') {
-        // Do not silently assign generic main-course dishes to a specific meal.
-        const tagged = meals.filter((recipe) => mealMatches(recipe, mealType))
-        return { shownRecipes: tagged.length ? tagged : meals, isFallback: !tagged.length && meals.length > 0 }
-      }
+      // Meal tabs are strict: when none match, show the empty state instead
+      // of leaking Breakfast recipes into Lunch, Dinner, Snacks or Weekend.
       const exact = meals.filter((recipe) => mealMatches(recipe, mealType))
-      // Preserve the other meal tabs' existing discovery fallback.
-      return { shownRecipes: exact.length ? exact : meals, isFallback: !exact.length && meals.length > 0 }
+      return { shownRecipes: exact, isFallback: false }
     }
     if (activeDestination === 'world') return {
       shownRecipes: eligible.filter((recipe) => recipe.kind === 'meal'
@@ -881,10 +877,6 @@ export default function CookTodayDiscoverySection({ recipes = [], selectedDiet =
               </p>
             )}
 
-            {activeDestination === 'cook' && !neutralDietaryFallback && isFallback && curation === 'meal' && (
-              <p className="mb-3 text-[12px] text-[#526B5B]" role="status">No recipes explicitly labelled {mealType.toLowerCase()} yet. Showing available {selectedDiet === 'veg' ? 'vegetarian' : 'non-vegetarian'} recipes instead.</p>
-            )}
-
             {shownRecipes.length ? (
               <>
                 <div
@@ -904,7 +896,7 @@ export default function CookTodayDiscoverySection({ recipes = [], selectedDiet =
               </>
             ) : (
               <div className="flex min-h-[145px] flex-wrap items-center justify-between gap-4 rounded-[14px] border border-[#DBE5DA] bg-white px-5 py-6" aria-live="polite">
-                <p className="text-[14px] leading-6 text-[#53665B]">No published recipes found for this selection.</p>
+                <p className="text-[14px] leading-6 text-[#53665B]">{activeDestination === 'cook' && curation === 'meal' ? `No ${mealType.toLowerCase()} recipes available yet.` : 'No published recipes found for this selection.'}</p>
                 <Link to="/recipes" className="focus-ring inline-flex items-center gap-2 text-[14px] font-bold text-[#173F35] hover:underline">Browse all recipes <ArrowRight size={16} aria-hidden="true" /></Link>
               </div>
             )}

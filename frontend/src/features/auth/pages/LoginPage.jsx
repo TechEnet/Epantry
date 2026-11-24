@@ -122,150 +122,51 @@ function LoginShell({
 }) {
   return (
     <main
-      className="
-        relative
-        overflow-hidden
-        bg-[#F7F6F2]
-        py-4
-        lg:py-5
-      "
+      id="epantry-login"
+      className="flex min-h-[calc(100svh-76px)] w-full items-center bg-[#F6F4F0] px-3 py-4 sm:px-5 lg:px-6"
     >
+      <div className="mx-auto grid w-full max-w-[1280px] overflow-hidden rounded-[18px] border border-[#E6E0D9] bg-[#FFFDFB] shadow-[0_15px_40px_rgba(43,36,30,0.045)] lg:h-[calc(100svh-126px)] lg:max-h-[690px] lg:min-h-[550px] lg:grid-cols-[35%_65%] lg:rounded-[20px]">
+        <aside className="flex min-w-0 flex-col bg-[#EAC9B6] px-5 py-5 sm:px-7 lg:px-8 lg:py-7">
+          <div className="flex items-center gap-2 text-[13px] font-bold text-[#6F4C3F]">
+            <span>EPANTRY</span>
+            <span className="h-1 w-1 rounded-full bg-[#A97059]" aria-hidden="true" />
+            <span className="font-medium">Welcome back</span>
+          </div>
 
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -left-24
-          top-10
-          size-72
-          rounded-full
-          bg-[#DCE0CF]/50
-          blur-3xl
-        "
-        aria-hidden="true"
-      />
+          <div className="mt-4 flex items-center justify-between gap-4 sm:gap-6 lg:my-auto lg:flex-col lg:justify-center lg:gap-7">
+            <div className="min-w-0 lg:text-center">
+              <h2 className="max-w-[320px] text-[22px] font-bold leading-[1.18] tracking-[-0.03em] text-[#244539] sm:text-[27px] lg:mx-auto lg:text-[clamp(25px,2.25vw,31px)]">
+                Back to what you love.
+              </h2>
+              <p className="mt-2 hidden text-[14px] leading-[1.5] text-[#65574F] sm:block">
+                Your food journey continues here.
+              </p>
+            </div>
 
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -right-24
-          bottom-12
-          size-80
-          rounded-full
-          bg-[#DCE0CF]/40
-          blur-3xl
-        "
-        aria-hidden="true"
-      />
-
-      <div className="page-shell relative">
-
-        <div
-          className="
-            mx-auto
-            grid
-            max-w-6xl
-            overflow-hidden
-            rounded-[28px]
-            border
-            border-stone-200/80
-            bg-white
-            shadow-[0_20px_65px_rgba(28,25,23,0.08)]
-            lg:grid-cols-[0.9fr_1.1fr]
-          "
-        >
-
-          <aside
-            className="
-              relative
-              hidden
-              min-h-[610px]
-              overflow-hidden
-              bg-[#173F35]
-              p-8
-              text-white
-              lg:flex
-              lg:flex-col
-              xl:p-10
-            "
-          >
-
-            <div
-              className="
-                pointer-events-none
-                absolute
-                inset-0
-                bg-[radial-gradient(circle_at_20%_15%,rgba(220,224,207,0.15),transparent_34%)]
-              "
-              aria-hidden="true"
-            />
-
-            <Link
-              to="/"
-              aria-label="EPANTRY home"
-              className="focus-ring relative z-10 inline-flex w-fit items-center rounded-md bg-transparent p-0 transition hover:opacity-90"
-            >
-              <img
-                src="/branding/epantry-wordmark.webp"
-                alt="EPANTRY.in — Food Intelligence"
-                className="block h-auto w-[190px] max-w-full object-contain"
-                decoding="async"
-              />
-            </Link>
-
-            <div className="relative z-10 flex flex-1 items-center justify-center py-5">
-
+            <div className="w-[106px] shrink-0 overflow-hidden rounded-[16px] border-[5px] border-[#F8EBE3] bg-[#F9F5F0] shadow-[0_12px_25px_rgba(81,48,35,0.09)] sm:w-[146px] lg:aspect-square lg:w-[min(72%,238px)] lg:rounded-[20px] lg:border-[7px]">
               <video
                 autoPlay
                 muted
                 loop
                 playsInline
                 preload="metadata"
-                aria-label="EPANTRY login"
-                className="
-                  block
-                  max-h-[360px]
-                  w-auto
-                  max-w-[280px]
-                  rounded-[20px]
-                  object-contain
-                "
+                aria-label="EPANTRY login animation"
+                className="block aspect-square h-full w-full bg-[#F8F4EE] object-contain"
               >
-                <source
-                  src="/video/Login.mp4"
-                  type="video/mp4"
-                />
-
+                <source src="/video/Login.mp4" type="video/mp4" />
                 Your browser does not support video playback.
               </video>
-
             </div>
+          </div>
+          <div className="mt-5 hidden h-px w-full bg-[#D5AE9B] lg:block" aria-hidden="true" />
+        </aside>
 
-          </aside>
-
-          <section
-            className="
-              flex
-              min-h-[610px]
-              items-center
-              bg-white
-              px-6
-              py-8
-              sm:px-8
-              lg:px-10
-              xl:px-12
-            "
-          >
-            <div className="mx-auto w-full max-w-[500px]">
-              {children}
-            </div>
-          </section>
-
-        </div>
-
+        <section className="flex min-w-0 flex-col justify-center bg-[#FFFDFB] px-5 py-6 sm:px-8 lg:overflow-y-auto lg:px-[clamp(28px,4vw,62px)] lg:py-9">
+          <div className="mx-auto w-full max-w-[540px]">
+            {children}
+          </div>
+        </section>
       </div>
-
     </main>
   )
 }
@@ -863,308 +764,150 @@ export default function LoginPage() {
 
   return (
     <LoginShell>
-
-      <div className="text-center">
-
+      <header className="mb-6 flex items-start justify-between gap-4 border-b border-[#EAE6E0] pb-5 sm:mb-7">
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-[#B3644A]">
+            Your EPANTRY account
+          </p>
+          <h1 className="mt-1.5 text-[clamp(30px,3vw,39px)] font-bold leading-[1.15] tracking-[-0.035em] text-[#233B30]">
+            Welcome back
+          </h1>
+        </div>
         <Link
-          to="/"
-          aria-label="Go to EPANTRY home"
-          className="focus-ring mx-auto inline-flex items-center justify-center rounded-md bg-transparent p-0 transition hover:opacity-90"
+          to={registerHref}
+          className="shrink-0 pt-1 text-[14px] font-semibold text-[#AC5D43] underline-offset-4 transition hover:underline"
         >
-          <img
-            src="/branding/epantry-wordmark.webp"
-            alt="EPANTRY.in"
-            className="block h-auto w-[142px] object-contain"
-            decoding="async"
-          />
+          Sign up
         </Link>
-
-        <p className="mt-6 text-[10px] font-bold uppercase tracking-[0.28em] text-[#173F35]">
-          Welcome back
-        </p>
-
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#202421]">
-          Login
-        </h1>
-
-        <p className="mt-2 text-xs leading-5 text-[#202421]/75">
-          Sign in to continue to EPANTRY.
-        </p>
-
-      </div>
+      </header>
 
       {sessionNotice && (
         <div
-          className="mt-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800"
+          className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[14px] text-amber-900"
           role="status"
         >
-          <CircleAlert
-            size={17}
-            className="mt-0.5 shrink-0"
-          />
-
-          <p className="min-w-0 flex-1 text-xs font-medium leading-5">
-            {sessionNotice}
-          </p>
-
+          <CircleAlert size={18} className="mt-0.5 shrink-0" />
+          <p className="min-w-0 flex-1 leading-5">{sessionNotice}</p>
           <button
             type="button"
-            onClick={
-              clearSessionNotice
-            }
-            className="grid size-6 shrink-0 place-items-center rounded-md text-amber-700 transition hover:bg-amber-100"
+            onClick={clearSessionNotice}
+            className="grid size-7 shrink-0 place-items-center rounded-lg transition hover:bg-amber-100"
             aria-label="Dismiss session message"
           >
-            <X
-              size={14}
-            />
+            <X size={16} />
           </button>
         </div>
       )}
 
       {errorMessage && (
         <div
-          className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700"
+          className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-[14px] text-red-800"
           role="alert"
         >
-          <CircleAlert
-            size={17}
-            className="mt-0.5 shrink-0"
-          />
-
-          <p className="text-xs font-medium leading-5">
-            {errorMessage}
-          </p>
+          <CircleAlert size={18} className="mt-0.5 shrink-0" />
+          <p className="leading-5">{errorMessage}</p>
         </div>
       )}
 
-      <form
-        onSubmit={
-          handleSubmit
-        }
-        className="mt-8 space-y-6"
-        noValidate
-      >
-
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>
-
-          <InputShell>
-
-            <Mail
-              size={16}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#202421]/60"
-            />
-
+          <label
+            htmlFor="login-email"
+            className="mb-1.5 block text-[14px] font-semibold text-[#2C4035]"
+          >
+            Email address
+          </label>
+          <div className="flex h-[50px] items-center gap-3 rounded-[12px] border border-[#DFDED8] bg-white px-4 transition focus-within:border-[#B86C51] focus-within:ring-[3px] focus-within:ring-[#B86C51]/10">
+            <Mail size={18} className="shrink-0 text-[#8A938B]" aria-hidden="true" />
             <input
               id="login-email"
               type="email"
               autoComplete="email"
-              placeholder=" "
-              value={
-                form.email
-              }
-              onChange={(
-                event,
-              ) =>
-                updateField(
-                  'email',
-                  event.target.value,
-                )
-              }
-              className="peer h-14 w-full bg-transparent pb-2 pl-11 pr-4 pt-5 text-sm font-medium text-[#202421] outline-none placeholder:text-transparent"
-              aria-invalid={
-                Boolean(
-                  fieldErrors.email,
-                )
-              }
+              placeholder="you@example.com"
+              value={form.email}
+              onChange={(event) => updateField('email', event.target.value)}
+              className="h-full w-full min-w-0 bg-transparent text-[15px] text-[#26382F] outline-none placeholder:text-[#9A9D96]"
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
             />
-
-            <label
-              htmlFor="login-email"
-              className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 text-xs font-medium text-[#202421]/60 transition-all duration-200 peer-focus:top-3 peer-focus:text-[9px] peer-focus:text-[#173F35] peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-[9px]"
-            >
-              Email address
-            </label>
-
-          </InputShell>
-
-          <FieldError
-            message={
-              fieldErrors.email
-            }
-          />
-
+          </div>
+          {fieldErrors.email && (
+            <p id="login-email-error" className="mt-1.5 text-[13px] font-medium text-red-600">
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
 
         <div>
-
-          <InputShell>
-
-            <LockKeyhole
-              size={16}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#202421]/60"
-            />
-
-            <input
-              id="login-password"
-              type={
-                showPassword
-                  ? 'text'
-                  : 'password'
-              }
-              autoComplete="current-password"
-              placeholder=" "
-              value={
-                form.password
-              }
-              onChange={(
-                event,
-              ) =>
-                updateField(
-                  'password',
-                  event.target.value,
-                )
-              }
-              className="peer h-14 w-full bg-transparent pb-2 pl-11 pr-12 pt-5 text-sm font-medium text-[#202421] outline-none placeholder:text-transparent"
-              aria-invalid={
-                Boolean(
-                  fieldErrors.password,
-                )
-              }
-            />
-
+          <div className="mb-1.5 flex items-center justify-between gap-3">
             <label
               htmlFor="login-password"
-              className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 text-xs font-medium text-[#202421]/60 transition-all duration-200 peer-focus:top-3 peer-focus:text-[9px] peer-focus:text-[#173F35] peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-[9px]"
+              className="text-[14px] font-semibold text-[#2C4035]"
             >
               Password
             </label>
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowPassword(
-                  (current) =>
-                    !current,
-                )
-              }
-              className="absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-[#202421]/60 transition hover:bg-stone-100 hover:text-stone-800"
-              aria-label={
-                showPassword
-                  ? 'Hide password'
-                  : 'Show password'
-              }
-            >
-              {showPassword ? (
-                <EyeOff
-                  size={16}
-                />
-              ) : (
-                <Eye
-                  size={16}
-                />
-              )}
-            </button>
-
-          </InputShell>
-
-          <div className="mt-2 flex items-start justify-between gap-3">
-
-            <FieldError
-              message={
-                fieldErrors.password
-              }
-            />
-
             <Link
-              to={
-                forgotPasswordPath
-              }
-              className="ml-auto shrink-0 text-[11px] font-semibold text-[#202421]/75 transition hover:text-[#173F35]"
+              to={forgotPasswordPath}
+              className="text-[13px] font-semibold text-[#AC6147] underline-offset-4 transition hover:underline"
             >
               Forgot password?
             </Link>
-
           </div>
-
+          <div className="flex h-[50px] items-center gap-3 rounded-[12px] border border-[#DFDED8] bg-white pl-4 pr-2 transition focus-within:border-[#B86C51] focus-within:ring-[3px] focus-within:ring-[#B86C51]/10">
+            <LockKeyhole size={18} className="shrink-0 text-[#8A938B]" aria-hidden="true" />
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="Enter password"
+              value={form.password}
+              onChange={(event) => updateField('password', event.target.value)}
+              className="h-full w-full min-w-0 bg-transparent text-[15px] text-[#26382F] outline-none placeholder:text-[#9A9D96]"
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              className="grid size-9 shrink-0 place-items-center rounded-lg text-[#887E72] transition hover:bg-[#F7EAE3]"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          {fieldErrors.password && (
+            <p id="login-password-error" className="mt-1.5 text-[13px] font-medium text-red-600">
+              {fieldErrors.password}
+            </p>
+          )}
         </div>
 
         <button
           type="submit"
-          disabled={
-            isAuthenticating
-          }
-          className="
-            flex
-            h-12
-            w-full
-            items-center
-            justify-center
-            gap-2
-            rounded-xl
-            bg-[#173F35]
-            text-xs
-            font-bold
-            tracking-wide
-            text-white
-            shadow-[0_8px_18px_rgba(41,37,36,0.18)]
-            transition
-            hover:bg-emerald-800
-            active:translate-y-px
-            disabled:cursor-not-allowed
-            disabled:opacity-40
-          "
+          disabled={isAuthenticating}
+          className="flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[12px] bg-[#B86C51] px-4 text-[15px] font-bold text-white transition-colors hover:bg-[#9E553D] active:bg-[#88442F] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isAuthenticating ? (
             <>
-              <LoaderCircle
-                size={17}
-                className="animate-spin"
-              />
+              <LoaderCircle size={18} className="animate-spin" />
               Signing in...
             </>
           ) : (
             <>
-              Login
-              <ArrowRight
-                size={16}
-              />
+              Log in
+              <ArrowRight size={17} aria-hidden="true" />
             </>
           )}
         </button>
-
       </form>
 
-      <div className="my-7 flex items-center gap-3">
-        <div className="h-px flex-1 bg-stone-200" />
-
-        <ShieldCheck
-          size={13}
-          className="text-stone-300"
-        />
-
-        <div className="h-px flex-1 bg-stone-200" />
-      </div>
-
-      <p className="text-center text-[11px] text-[#202421]/75">
-        Don&apos;t have an account?{' '}
-
-        <Link
-          to={registerHref}
-          className="font-bold text-[#202421] transition hover:text-[#173F35]"
-        >
-          Sign Up
+      <p className="mt-6 text-center text-[14px] text-[#716B66]">
+        New to EPANTRY?{' '}
+        <Link to={registerHref} className="font-bold text-[#A95D44] underline-offset-4 hover:underline">
+          Create an account
         </Link>
       </p>
-
-      <div className="mt-6 flex items-center justify-center gap-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-stone-300">
-        <LockKeyhole
-          size={11}
-        />
-
-        Secure EPANTRY session
-      </div>
-
     </LoginShell>
   )
 }

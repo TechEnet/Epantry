@@ -2594,14 +2594,50 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   if (!organizationData?.organization) {
     return (
-      <main className="bg-[#f7f5ef] p-5 sm:p-7">
-        <Section
-          title="Initialize Host organization"
-          description="Host access already exists through M02. This creates the M05/M16 tenant operating context; it does not create a Seller or Brand login role."
-          icon={Building2}
-        >
+      <main className="min-w-0 w-full bg-[#f7f6f2] px-4 pb-2 pt-5 sm:px-6 sm:pt-6 lg:px-7">
+        <section className="overflow-hidden rounded-[18px] border border-[#e1cfc4] bg-[#f2ded2]">
+          <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.65fr)_minmax(250px,0.7fr)]">
+            <div className="min-w-0 px-5 py-6 sm:px-8 sm:py-7">
+              <p className="flex items-center gap-2 text-[13px] font-bold tracking-[0.035em] text-[#a04e34]">
+                <Building2 size={17} aria-hidden="true" /> BUSINESS OPERATIONS / GET STARTED
+              </p>
+              <h1 className="mt-2 text-[clamp(28px,2.65vw,36px)] font-extrabold leading-[1.16] tracking-[-0.04em] text-[#173f35]">
+                Set up your business
+              </h1>
+              <p className="mt-2 max-w-[620px] text-[15px] leading-[1.55] text-[#536057]">
+                Add your business name and choose what you do to open your Host workspace.
+              </p>
+            </div>
+            <div className="flex flex-col justify-center gap-3 border-t border-[#dcc3b4] bg-[#e6eee6] px-5 py-5 sm:px-7 lg:border-l lg:border-t-0">
+              <div className="flex items-start gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-[13px] font-bold text-[#173f35]">01</span>
+                <div>
+                  <p className="text-[15px] font-bold text-[#173f35]">Set up your workspace</p>
+                  <p className="mt-0.5 text-[13px] leading-[1.5] text-[#4c6256]">Save your business details below.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-[13px] font-bold text-[#173f35]">02</span>
+                <div>
+                  <p className="text-[15px] font-bold text-[#173f35]">Manage your operations</p>
+                  <p className="mt-0.5 text-[13px] leading-[1.5] text-[#4c6256]">Continue with your existing Host account.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-5 min-w-0 overflow-hidden rounded-[16px] border border-[#dde1d9] bg-[#fffefa]" aria-labelledby="business-setup-heading">
+          <div className="border-b border-[#e3e6dd] px-5 py-4 sm:px-7">
+            <h2 id="business-setup-heading" className="text-[22px] font-bold leading-[1.25] tracking-[-0.025em] text-[#173f35]">
+              Your business details
+            </h2>
+            <p className="mt-1 text-[14px] leading-[1.5] text-[#57645b]">
+              Use the business name you want to display in EPANTRY.
+            </p>
+          </div>
           <form
-            className="grid gap-3 sm:grid-cols-2"
+            className="grid min-w-0 gap-4 px-5 py-5 sm:grid-cols-2 sm:gap-5 sm:px-7 sm:py-6"
             onSubmit={(event) => {
               event.preventDefault();
 
@@ -2611,59 +2647,64 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               );
             }}
           >
-            <Field label="Organization name">
+            <label className="block min-w-0">
+              <span className="mb-2 block text-[14px] font-bold text-[#2a4439]">Business name</span>
               <input
                 required
-                className={inputClass}
+                className="block min-h-[48px] w-full min-w-0 rounded-[10px] border border-[#cbd5cd] bg-white px-4 text-[16px] text-[#202421] outline-none focus:border-[#1f644c] focus:ring-2 focus:ring-[#c7ddd0]"
+                placeholder="Enter your business name"
                 value={organizationForm.displayName}
                 onChange={(event) =>
                   setOrganizationForm((current) => ({
                     ...current,
-
                     displayName: event.target.value,
                   }))
                 }
               />
-            </Field>
+            </label>
 
-            <Field label="Commercial profile">
+            <label className="block min-w-0">
+              <span className="mb-2 block text-[14px] font-bold text-[#2a4439]">Business type</span>
               <select
-                className={inputClass}
+                className="block min-h-[48px] w-full min-w-0 rounded-[10px] border border-[#cbd5cd] bg-white px-4 text-[16px] text-[#202421] outline-none focus:border-[#1f644c] focus:ring-2 focus:ring-[#c7ddd0]"
                 value={organizationForm.organizationType}
                 onChange={(event) =>
                   setOrganizationForm((current) => ({
                     ...current,
-
                     organizationType: event.target.value,
                   }))
                 }
               >
                 <option value="seller">Seller</option>
-
                 <option value="brand">Brand</option>
-
                 <option value="restaurant">Restaurant</option>
-
                 <option value="chef">Chef</option>
-
                 <option value="b2b">B2B / Hospitality</option>
-
                 <option value="hybrid">Hybrid</option>
               </select>
-            </Field>
+            </label>
 
-            <button disabled={busy} className={`${buttonClass} sm:col-span-2`}>
-              <Building2 size={16} />
-              Initialize organization
-            </button>
+            <div className="flex min-w-0 flex-col gap-3 border-t border-[#e4e6df] pt-4 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-lg text-[14px] leading-[1.5] text-[#59665c]">
+                This sets up your business workspace. Your login and approval status stay the same.
+              </p>
+              <button
+                type="submit"
+                disabled={busy}
+                className="focus-ring inline-flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#173f35] px-6 py-3 text-[15px] font-bold text-white transition-colors hover:bg-[#27624e] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Building2 size={17} aria-hidden="true" />
+                Save business and continue
+                <ArrowRight size={17} aria-hidden="true" />
+              </button>
+            </div>
           </form>
-
           {error ? (
-            <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+            <p className="mx-5 mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[14px] font-semibold text-red-800 sm:mx-7">
               {error}
             </p>
           ) : null}
-        </Section>
+        </section>
       </main>
     );
   }

@@ -60,20 +60,78 @@ function getPolicyLabel(
 
 
 const MFA_PAGE_STYLE = `
-/* MFA-only viewport: keep the global navigation and Admin sidebar, omit the footer. */
+/* MFA-only full viewport. The HostShell's outer node is a DIV (not MAIN),
+   so the earlier > main selector never matched. This is scoped to this route. */
   #root .app-frame:has(#ep-mfa-enrollment) { height: 100svh !important; min-height: 100svh !important; overflow: hidden !important; }
   #root .app-frame:has(#ep-mfa-enrollment) > footer { display: none !important; }
   #root .app-frame:has(#ep-mfa-enrollment) > .app-content { flex: 1 1 0 !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; }
-  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) { flex: 1; height: 100%; min-height: 0 !important; overflow: hidden; display: flex; flex-direction: column; }
-  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) > .page-shell { display: flex; flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 0; }
-  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) > .page-shell > div { display: flex; flex: 1; min-width: 0; min-height: 0; border-radius: 0; }
-  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > main:has(.epantry-workspace-canvas) > .page-shell > div > div { flex: 1; min-width: 0; min-height: 0; height: 100%; }
-  #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+  /* Actual AccountSecurityWorkspacePresentation children: HostShell uses DIV;
+     AdminShell may use MAIN. Never change either shared component. */
+  #root .app-frame:has(#ep-mfa-enrollment) > .app-content > :is(div, main):has(#ep-mfa-enrollment) {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  #root .app-frame:has(#ep-mfa-enrollment) .page-shell:has(> div > .grid > aside) {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #root .app-frame:has(#ep-mfa-enrollment) .page-shell:has(> div > .grid > aside) > div {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+    overflow: hidden;
+  }
+  #root .app-frame:has(#ep-mfa-enrollment) .page-shell:has(> div > .grid > aside) > div > .grid {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0 !important;
+    height: 100%;
+  }
+  #root .app-frame:has(#ep-mfa-enrollment) .page-shell:has(> div > .grid > aside) > div > .grid > section {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
   #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas > header { display: none !important; }
   #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas > div { flex: 1; min-height: 0; padding: 0 !important; overflow: hidden; }
   @media (min-width: 1024px) {
-    /* Compensate only this route for the existing approved 75% admin canvas zoom. */
-    #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas { height: 133.333333%; }
+    /* Preserve the approved 75% visual density on this page while matching
+       the workspace's FULL visible width. Other workspace zoom stays 0.75. */
+    #root .app-frame:has(#ep-mfa-enrollment) .epantry-workspace-canvas {
+      zoom: 1 !important;
+      width: 133.333333% !important;
+      min-width: 133.333333% !important;
+      max-width: none !important;
+      height: 133.333333% !important;
+      flex: 0 0 auto !important;
+      transform: scale(0.75);
+      transform-origin: top left;
+    }
   }
   #ep-mfa-enrollment, #ep-mfa-enrollment * { box-sizing: border-box; }
   #ep-mfa-enrollment { width: 100%; min-width: 0; margin: 0; padding: clamp(16px,2.4vw,32px); background: #F7F6F2; color: #202421; }

@@ -12,6 +12,7 @@ import {
   ChefHat,
   Check,
   CheckCircle2,
+  ChevronDown,
   CircleAlert,
   Eye,
   EyeOff,
@@ -61,17 +62,122 @@ const ACCOUNT_TYPES = [
   {
     value: 'customer',
     label: 'Customer',
-    description:
-      'Shop, plan meals and build your personal EPANTRY experience.',
+    description: 'Cook, shop & save',
     icon: ShoppingBasket,
   },
   {
     value: 'host',
     label: 'Host',
-    description:
-      'Create a Customer account and submit your Host access for review.',
+    description: 'Apply to list & sell',
     icon: Building2,
   },
+]
+
+const PHONE_COUNTRIES = [
+  { code: 'AF', name: 'Afghanistan', dial: '+93', flag: '🇦🇫' },
+  { code: 'AL', name: 'Albania', dial: '+355', flag: '🇦🇱' },
+  { code: 'DZ', name: 'Algeria', dial: '+213', flag: '🇩🇿' },
+  { code: 'AR', name: 'Argentina', dial: '+54', flag: '🇦🇷' },
+  { code: 'AM', name: 'Armenia', dial: '+374', flag: '🇦🇲' },
+  { code: 'AU', name: 'Australia', dial: '+61', flag: '🇦🇺' },
+  { code: 'AT', name: 'Austria', dial: '+43', flag: '🇦🇹' },
+  { code: 'AZ', name: 'Azerbaijan', dial: '+994', flag: '🇦🇿' },
+  { code: 'BH', name: 'Bahrain', dial: '+973', flag: '🇧🇭' },
+  { code: 'BD', name: 'Bangladesh', dial: '+880', flag: '🇧🇩' },
+  { code: 'BE', name: 'Belgium', dial: '+32', flag: '🇧🇪' },
+  { code: 'BO', name: 'Bolivia', dial: '+591', flag: '🇧🇴' },
+  { code: 'BR', name: 'Brazil', dial: '+55', flag: '🇧🇷' },
+  { code: 'BG', name: 'Bulgaria', dial: '+359', flag: '🇧🇬' },
+  { code: 'KH', name: 'Cambodia', dial: '+855', flag: '🇰🇭' },
+  { code: 'CM', name: 'Cameroon', dial: '+237', flag: '🇨🇲' },
+  { code: 'CA', name: 'Canada', dial: '+1', flag: '🇨🇦' },
+  { code: 'CL', name: 'Chile', dial: '+56', flag: '🇨🇱' },
+  { code: 'CN', name: 'China', dial: '+86', flag: '🇨🇳' },
+  { code: 'CO', name: 'Colombia', dial: '+57', flag: '🇨🇴' },
+  { code: 'HR', name: 'Croatia', dial: '+385', flag: '🇭🇷' },
+  { code: 'CY', name: 'Cyprus', dial: '+357', flag: '🇨🇾' },
+  { code: 'CZ', name: 'Czechia', dial: '+420', flag: '🇨🇿' },
+  { code: 'DK', name: 'Denmark', dial: '+45', flag: '🇩🇰' },
+  { code: 'EG', name: 'Egypt', dial: '+20', flag: '🇪🇬' },
+  { code: 'ET', name: 'Ethiopia', dial: '+251', flag: '🇪🇹' },
+  { code: 'FI', name: 'Finland', dial: '+358', flag: '🇫🇮' },
+  { code: 'FR', name: 'France', dial: '+33', flag: '🇫🇷' },
+  { code: 'GE', name: 'Georgia', dial: '+995', flag: '🇬🇪' },
+  { code: 'DE', name: 'Germany', dial: '+49', flag: '🇩🇪' },
+  { code: 'GH', name: 'Ghana', dial: '+233', flag: '🇬🇭' },
+  { code: 'GR', name: 'Greece', dial: '+30', flag: '🇬🇷' },
+  { code: 'HU', name: 'Hungary', dial: '+36', flag: '🇭🇺' },
+  { code: 'IS', name: 'Iceland', dial: '+354', flag: '🇮🇸' },
+  { code: 'IN', name: 'India', dial: '+91', flag: '🇮🇳' },
+  { code: 'ID', name: 'Indonesia', dial: '+62', flag: '🇮🇩' },
+  { code: 'IR', name: 'Iran', dial: '+98', flag: '🇮🇷' },
+  { code: 'IQ', name: 'Iraq', dial: '+964', flag: '🇮🇶' },
+  { code: 'IE', name: 'Ireland', dial: '+353', flag: '🇮🇪' },
+  { code: 'IL', name: 'Israel', dial: '+972', flag: '🇮🇱' },
+  { code: 'IT', name: 'Italy', dial: '+39', flag: '🇮🇹' },
+  { code: 'JM', name: 'Jamaica', dial: '+1', flag: '🇯🇲' },
+  { code: 'JP', name: 'Japan', dial: '+81', flag: '🇯🇵' },
+  { code: 'JO', name: 'Jordan', dial: '+962', flag: '🇯🇴' },
+  { code: 'KZ', name: 'Kazakhstan', dial: '+7', flag: '🇰🇿' },
+  { code: 'KE', name: 'Kenya', dial: '+254', flag: '🇰🇪' },
+  { code: 'KW', name: 'Kuwait', dial: '+965', flag: '🇰🇼' },
+  { code: 'KG', name: 'Kyrgyzstan', dial: '+996', flag: '🇰🇬' },
+  { code: 'LA', name: 'Laos', dial: '+856', flag: '🇱🇦' },
+  { code: 'LV', name: 'Latvia', dial: '+371', flag: '🇱🇻' },
+  { code: 'LB', name: 'Lebanon', dial: '+961', flag: '🇱🇧' },
+  { code: 'LT', name: 'Lithuania', dial: '+370', flag: '🇱🇹' },
+  { code: 'LU', name: 'Luxembourg', dial: '+352', flag: '🇱🇺' },
+  { code: 'MY', name: 'Malaysia', dial: '+60', flag: '🇲🇾' },
+  { code: 'MT', name: 'Malta', dial: '+356', flag: '🇲🇹' },
+  { code: 'MX', name: 'Mexico', dial: '+52', flag: '🇲🇽' },
+  { code: 'MN', name: 'Mongolia', dial: '+976', flag: '🇲🇳' },
+  { code: 'MA', name: 'Morocco', dial: '+212', flag: '🇲🇦' },
+  { code: 'MM', name: 'Myanmar', dial: '+95', flag: '🇲🇲' },
+  { code: 'NP', name: 'Nepal', dial: '+977', flag: '🇳🇵' },
+  { code: 'NL', name: 'Netherlands', dial: '+31', flag: '🇳🇱' },
+  { code: 'NZ', name: 'New Zealand', dial: '+64', flag: '🇳🇿' },
+  { code: 'NG', name: 'Nigeria', dial: '+234', flag: '🇳🇬' },
+  { code: 'NO', name: 'Norway', dial: '+47', flag: '🇳🇴' },
+  { code: 'OM', name: 'Oman', dial: '+968', flag: '🇴🇲' },
+  { code: 'PK', name: 'Pakistan', dial: '+92', flag: '🇵🇰' },
+  { code: 'PA', name: 'Panama', dial: '+507', flag: '🇵🇦' },
+  { code: 'PY', name: 'Paraguay', dial: '+595', flag: '🇵🇾' },
+  { code: 'PE', name: 'Peru', dial: '+51', flag: '🇵🇪' },
+  { code: 'PH', name: 'Philippines', dial: '+63', flag: '🇵🇭' },
+  { code: 'PL', name: 'Poland', dial: '+48', flag: '🇵🇱' },
+  { code: 'PT', name: 'Portugal', dial: '+351', flag: '🇵🇹' },
+  { code: 'QA', name: 'Qatar', dial: '+974', flag: '🇶🇦' },
+  { code: 'RO', name: 'Romania', dial: '+40', flag: '🇷🇴' },
+  { code: 'RU', name: 'Russia', dial: '+7', flag: '🇷🇺' },
+  { code: 'SA', name: 'Saudi Arabia', dial: '+966', flag: '🇸🇦' },
+  { code: 'SN', name: 'Senegal', dial: '+221', flag: '🇸🇳' },
+  { code: 'SG', name: 'Singapore', dial: '+65', flag: '🇸🇬' },
+  { code: 'SK', name: 'Slovakia', dial: '+421', flag: '🇸🇰' },
+  { code: 'SI', name: 'Slovenia', dial: '+386', flag: '🇸🇮' },
+  { code: 'ZA', name: 'South Africa', dial: '+27', flag: '🇿🇦' },
+  { code: 'KR', name: 'South Korea', dial: '+82', flag: '🇰🇷' },
+  { code: 'ES', name: 'Spain', dial: '+34', flag: '🇪🇸' },
+  { code: 'LK', name: 'Sri Lanka', dial: '+94', flag: '🇱🇰' },
+  { code: 'SE', name: 'Sweden', dial: '+46', flag: '🇸🇪' },
+  { code: 'CH', name: 'Switzerland', dial: '+41', flag: '🇨🇭' },
+  { code: 'SY', name: 'Syria', dial: '+963', flag: '🇸🇾' },
+  { code: 'TW', name: 'Taiwan', dial: '+886', flag: '🇹🇼' },
+  { code: 'TZ', name: 'Tanzania', dial: '+255', flag: '🇹🇿' },
+  { code: 'TH', name: 'Thailand', dial: '+66', flag: '🇹🇭' },
+  { code: 'TN', name: 'Tunisia', dial: '+216', flag: '🇹🇳' },
+  { code: 'TR', name: 'Turkey', dial: '+90', flag: '🇹🇷' },
+  { code: 'UG', name: 'Uganda', dial: '+256', flag: '🇺🇬' },
+  { code: 'UA', name: 'Ukraine', dial: '+380', flag: '🇺🇦' },
+  { code: 'AE', name: 'United Arab Emirates', dial: '+971', flag: '🇦🇪' },
+  { code: 'GB', name: 'United Kingdom', dial: '+44', flag: '🇬🇧' },
+  { code: 'US', name: 'United States', dial: '+1', flag: '🇺🇸' },
+  { code: 'UY', name: 'Uruguay', dial: '+598', flag: '🇺🇾' },
+  { code: 'UZ', name: 'Uzbekistan', dial: '+998', flag: '🇺🇿' },
+  { code: 'VE', name: 'Venezuela', dial: '+58', flag: '🇻🇪' },
+  { code: 'VN', name: 'Vietnam', dial: '+84', flag: '🇻🇳' },
+  { code: 'YE', name: 'Yemen', dial: '+967', flag: '🇾🇪' },
+  { code: 'ZM', name: 'Zambia', dial: '+260', flag: '🇿🇲' },
+  { code: 'ZW', name: 'Zimbabwe', dial: '+263', flag: '🇿🇼' },
 ]
 
 const HOST_WORKSPACE_TYPES = [
@@ -79,28 +185,28 @@ const HOST_WORKSPACE_TYPES = [
     value: 'b2b',
     label: 'B2B',
     description:
-      'Run business-to-business operations and the tools approved for a B2B Host.',
+      'Wholesale & business orders',
     icon: Building2,
   },
   {
     value: 'brand_seller',
     label: 'Brand / Seller',
     description:
-      'Manage brand, product, listing and selling workflows for your business.',
+      'Products, listings & sales',
     icon: Store,
   },
   {
     value: 'hybrid',
     label: 'Hybrid',
     description:
-      'Use the combined Brand / Seller and B2B workspace approved for hybrid businesses.',
+      'B2B + brand selling',
     icon: BadgeCheck,
   },
   {
     value: 'chef_restaurant',
     label: 'Chef + Restaurant',
     description:
-      'Run restaurant operations, professional food content and the approved Chef workspace.',
+      'Recipes & restaurant operations',
     icon: ChefHat,
   },
 ]
@@ -111,37 +217,22 @@ const EMAIL_PATTERN =
 const PHONE_PATTERN =
   /^\+[1-9]\d{7,14}$/
 
-function normalizePhone(
-  value,
-) {
-  const raw =
-    String(
-      value || '',
-    ).trim()
+function getNationalPhone(phone, country) {
+  const full = String(phone || '')
+  return full.startsWith(country.dial)
+    ? full.slice(country.dial.length).replace(/\D/g, '')
+    : ''
+}
 
-  const hasPlus =
-    raw.startsWith('+')
-
-  const digits =
-    raw.replace(
-      /\D/g,
-      '',
-    )
-
-  if (!digits) {
-    return hasPlus
-      ? '+'
-      : ''
-  }
-
-  return `+${digits.slice(
-    0,
-    15,
-  )}`
+function toInternationalPhone(country, value) {
+  const maxDigits = Math.min(12, 15 - country.dial.length + 1)
+  const national = String(value || '').replace(/\D/g, '').slice(0, maxDigits)
+  return `${country.dial}${national}`
 }
 
 function validateRegistrationForm(
   form,
+  phoneCountry,
 ) {
   const errors = {}
 
@@ -162,13 +253,17 @@ function validateRegistrationForm(
       'Enter a valid email address.'
   }
 
+  const nationalPhone = getNationalPhone(form.phone, phoneCountry)
   if (
-    !PHONE_PATTERN.test(
-      form.phone.trim(),
-    )
+    !PHONE_PATTERN.test(form.phone.trim()) ||
+    nationalPhone.length < 7 ||
+    nationalPhone.length > 12 ||
+    (phoneCountry.code === 'IN' && nationalPhone.length !== 10) ||
+    (['US', 'CA'].includes(phoneCountry.code) && nationalPhone.length !== 10)
   ) {
-    errors.phone =
-      'Use international phone format.'
+    errors.phone = phoneCountry.code === 'IN'
+      ? 'Enter a valid 10-digit mobile number.'
+      : 'Check your mobile number for the selected country.'
   }
 
   if (
@@ -201,252 +296,85 @@ function validateRegistrationForm(
   return errors
 }
 
-function InputShell({
-  children,
-  hasError = false,
-}) {
+function InputShell({ children, hasError = false }) {
   return (
-    <div
-      className={[
-        'relative',
-        'w-full',
-        'rounded-lg',
-        'border',
-        'bg-[#F7F6F2]',
-        'shadow-[inset_2px_2px_5px_#e2e2e2,inset_-2px_-2px_5px_#ffffff]',
-        'transition',
-        'duration-200',
-        'focus-within:bg-white',
-        'focus-within:shadow-[inset_2px_2px_4px_#dedede,inset_-2px_-2px_4px_#ffffff,0_0_0_2px_rgba(16,185,129,0.08)]',
-        hasError
-          ? 'border-red-200'
-          : 'border-stone-100 focus-within:border-emerald-200',
-      ].join(' ')}
-    >
+    <div className={[
+      'relative w-full min-w-0 overflow-hidden rounded-[12px] border bg-white transition-all duration-150',
+      'focus-within:border-[#BC775B] focus-within:ring-[3px] focus-within:ring-[#BC775B]/10',
+      hasError ? 'border-red-400' : 'border-[#DDDCD6] hover:border-[#BCAFA6]',
+    ].join(' ')}>
       {children}
     </div>
   )
 }
 
-function FieldError({
-  message,
-  helper,
-}) {
-  if (message) {
-    return (
-      <p className="mt-1 text-[9px] font-semibold leading-3 text-red-600">
-        {message}
-      </p>
-    )
-  }
-
-  if (helper) {
-    return (
-      <p className="mt-1 text-[8px] leading-3 text-stone-400">
-        {helper}
-      </p>
-    )
-  }
-
-  return null
+function FieldError({ message, helper }) {
+  if (!message && !helper) return null
+  return (
+    <p className={message ? 'mt-1.5 text-[13px] font-medium text-red-700' : 'mt-1.5 text-[13px] text-[#746F69]'}>
+      {message || helper}
+    </p>
+  )
 }
 
-function AccountTypeCard({
-  item,
-  selected,
-  onSelect,
-}) {
-  const Icon =
-    item.icon
-
+function AccountTypeCard({ item, selected, onSelect }) {
+  const Icon = item.icon
   return (
     <button
       type="button"
-      onClick={() =>
-        onSelect(
-          item.value,
-        )
-      }
+      onClick={() => onSelect(item.value)}
+      aria-pressed={selected}
+      aria-label={`${item.label}: ${item.description}`}
       className={[
-        'relative',
-        'min-h-[72px]',
-        'rounded-lg',
-        'border',
-        'p-2.5',
-        'text-left',
-        'transition',
-        'duration-200',
-        'focus:outline-none',
-        'focus-visible:ring-2',
-        'focus-visible:ring-emerald-500',
+        'flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[12px] border px-3 text-[14px] font-semibold transition-colors',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B66D52]',
         selected
-          ? 'border-emerald-500 bg-emerald-50'
-          : 'border-stone-100 bg-[#F7F6F2] hover:border-stone-200 hover:bg-white',
+          ? 'border-[#B56B50] bg-[#F8E8DE] text-[#874B36]'
+          : 'border-[#DDDCD6] bg-white text-[#39483F] hover:border-[#C9A696] hover:bg-[#FFFBF8]',
       ].join(' ')}
-      aria-pressed={
-        selected
-      }
     >
-      <div className="flex items-start gap-2">
-
-        <div
-          className={[
-            'grid',
-            'size-7',
-            'shrink-0',
-            'place-items-center',
-            'rounded-md',
-            selected
-              ? 'bg-emerald-700 text-white'
-              : 'bg-white text-stone-500 shadow-sm',
-          ].join(' ')}
-        >
-          <Icon
-            size={13}
-            aria-hidden="true"
-          />
-        </div>
-
-        <div className="min-w-0 pr-3">
-          <p className="text-[10px] font-black text-[#202421]">
-            {item.label}
-          </p>
-
-          <p className="mt-0.5 text-[8px] leading-[1.35] text-stone-500">
-            {item.description}
-          </p>
-        </div>
-
-      </div>
-
-      {selected && (
-        <span
-          className="
-            absolute
-            right-2
-            top-2
-            grid
-            size-4
-            place-items-center
-            rounded-full
-            bg-emerald-700
-            text-white
-          "
-        >
-          <Check
-            size={10}
-            strokeWidth={3}
-            aria-hidden="true"
-          />
-        </span>
-      )}
-
+      <Icon size={17} className="shrink-0" aria-hidden="true" />
+      <span className="truncate">{item.label}</span>
+      {selected ? <Check size={15} className="shrink-0" aria-hidden="true" /> : null}
     </button>
   )
 }
 
-function AuthNotice({
-  message,
-}) {
-  if (!message) {
-    return null
-  }
-
+function AuthNotice({ message }) {
+  if (!message) return null
   return (
-    <div
-      className="
-        flex
-        items-start
-        gap-2
-        rounded-lg
-        border
-        border-red-200
-        bg-red-50
-        px-3
-        py-2
-        text-red-700
-      "
-      role="alert"
-    >
-      <CircleAlert
-        size={14}
-        className="mt-0.5 shrink-0"
-        aria-hidden="true"
-      />
-
-      <p className="text-[9px] font-semibold leading-4">
-        {message}
-      </p>
+    <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
+      <CircleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <p className="text-[14px] font-medium leading-5">{message}</p>
     </div>
   )
 }
 
-function HostWorkspaceTypeCard({
-  item,
-  selected,
-  onSelect,
-}) {
+function HostWorkspaceTypeCard({ item, selected, onSelect }) {
   const Icon = item.icon
-
   return (
     <button
       type="button"
-      onClick={() =>
-        onSelect(
-          item.value,
-        )
-      }
-      className={[
-        'rounded-xl',
-        'border',
-        'p-3',
-        'text-left',
-        'transition',
-        'duration-200',
-        'focus:outline-none',
-        'focus-visible:ring-2',
-        'focus-visible:ring-emerald-500',
-        selected
-          ? 'border-emerald-500 bg-emerald-50 shadow-[0_10px_28px_rgba(5,150,105,0.10)]'
-          : 'border-stone-100 bg-[#F7F6F2] hover:border-stone-200 hover:bg-white',
-      ].join(' ')}
+      onClick={() => onSelect(item.value)}
       aria-pressed={selected}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={[
-            'grid',
-            'size-10',
-            'shrink-0',
-            'place-items-center',
-            'rounded-lg',
-            selected
-              ? 'bg-emerald-700 text-white'
-              : 'bg-white text-stone-700 shadow-sm',
-          ].join(' ')}
-        >
-          <Icon size={18} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-black text-[#202421]">
-              {item.label}
-            </p>
-
-            {selected ? (
-              <Check
-                size={15}
-                className="shrink-0 text-emerald-700"
-              />
-            ) : null}
-          </div>
-
-          <p className="mt-1 text-[9px] leading-4 text-stone-500">
-            {item.description}
-          </p>
-        </div>
-      </div>
+      className={[
+        'flex min-h-[76px] items-center gap-3 rounded-[12px] border px-3 py-3 text-left transition-colors',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B7684E]',
+        selected ? 'border-[#245642] bg-[#E9F0E9]' : 'border-[#DCDDD7] bg-white hover:border-[#97B4A4]',
+      ].join(' ')}>
+      <span className={[
+        'grid size-9 shrink-0 place-items-center rounded-[10px]',
+        selected ? 'bg-[#245642] text-white' : 'bg-[#F3EAE5] text-[#AA654F]',
+      ].join(' ')}>
+        <Icon size={18} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-[15px] font-bold text-[#24352E]">
+          {item.label}
+          {selected ? <Check size={16} className="text-[#245642]" aria-hidden="true" /> : null}
+        </span>
+        <span className="mt-0.5 block text-[13px] leading-[1.35] text-[#697269]">{item.description}</span>
+      </span>
     </button>
   )
 }
@@ -457,223 +385,74 @@ function AuthShell({
   description,
   videoSrc,
   videoLabel,
+  leftAudience = 'Join us',
+  leftHeadline = 'A little more food, a lot more together.',
+  leftSubheading = 'Cook, discover and share with EPANTRY.',
   children,
 }) {
   return (
     <main
-      className="
-        relative
-        overflow-hidden
-        bg-[#F7F6F2]
-        py-4
-        lg:py-5
-      "
+      id="epantry-register"
+      className="min-h-[calc(100svh-76px)] w-full bg-[#F6F4F0] lg:h-[calc(100svh-76px)] lg:overflow-y-auto"
     >
-
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -left-24
-          top-10
-          size-72
-          rounded-full
-          bg-emerald-100/50
-          blur-3xl
-        "
-        aria-hidden="true"
-      />
-
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -right-24
-          bottom-12
-          size-80
-          rounded-full
-          bg-amber-100/50
-          blur-3xl
-        "
-        aria-hidden="true"
-      />
-
-      <div className="page-shell relative">
-
-        <div
-          className="
-            mx-auto
-            grid
-            max-w-6xl
-            overflow-hidden
-            rounded-[28px]
-            border
-            border-stone-200/80
-            bg-white
-            shadow-[0_20px_65px_rgba(28,25,23,0.08)]
-            lg:grid-cols-[0.9fr_1.1fr]
-          "
-        >
-
-          <aside
-            className="
-              relative
-              hidden
-              min-h-[610px]
-              overflow-hidden
-              bg-[#173F35]
-              p-8
-              text-white
-              lg:flex
-              lg:flex-col
-              xl:p-10
-            "
-          >
-
-            <div
-              className="
-                pointer-events-none
-                absolute
-                inset-0
-                bg-[radial-gradient(circle_at_20%_15%,rgba(220,224,207,0.15),transparent_34%)]
-              "
-              aria-hidden="true"
-            />
-
-            <Link
-              to="/"
-              aria-label="EPANTRY home"
-              className="focus-ring relative z-10 inline-flex w-fit items-center rounded-md bg-transparent p-0 transition hover:opacity-90"
-            >
-              <img
-                src="/branding/epantry-wordmark.webp"
-                alt="EPANTRY.in — Food Intelligence"
-                className="block h-auto w-[190px] max-w-full object-contain"
-                decoding="async"
-              />
-            </Link>
-
-            <div
-              className="
-                relative
-                z-10
-                flex
-                flex-1
-                items-center
-                justify-center
-                py-5
-              "
-            >
-
-              <video
-                key={
-                  videoSrc
-                }
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                aria-label={
-                  videoLabel
-                }
-                className="
-                  block
-                  max-h-[360px]
-                  w-auto
-                  max-w-[280px]
-                  rounded-[20px]
-                  object-contain
-                "
-              >
-                <source
-                  src={
-                    videoSrc
-                  }
-                  type="video/mp4"
-                />
-
-                Your browser does not support video playback.
-              </video>
-
+      <div className="mx-auto flex min-h-[calc(100svh-76px)] w-full max-w-[1420px] items-center px-3 py-3 sm:px-5 lg:h-full lg:min-h-[620px] lg:px-6 lg:py-5">
+        <div className="grid w-full overflow-hidden rounded-[18px] border border-[#E6E0D9] bg-[#FFFDFB] shadow-[0_15px_40px_rgba(43,36,30,0.045)] lg:h-full lg:grid-cols-[34%_66%] lg:rounded-[20px]">
+          <aside className="flex min-w-0 flex-col bg-[#EAC9B6] px-5 py-5 sm:px-7 lg:px-8 lg:py-7">
+            <div className="flex items-center gap-2 text-[13px] font-bold text-[#6F4C3F]">
+              <span>EPANTRY</span>
+              <span className="h-1 w-1 rounded-full bg-[#A97059]" aria-hidden="true" />
+              <span className="font-medium">{leftAudience}</span>
             </div>
 
+            <div className="mt-4 flex items-center justify-between gap-4 sm:gap-6 lg:my-auto lg:flex-col lg:justify-center lg:gap-7">
+              <div className="min-w-0 lg:text-center">
+                <h2 className="max-w-[330px] text-[23px] font-bold leading-[1.19] tracking-[-0.03em] text-[#244539] sm:text-[27px] lg:mx-auto lg:text-[clamp(25px,2.25vw,30px)]">
+                  {leftHeadline}
+                </h2>
+                <p className="mt-2 hidden text-[14px] leading-[1.55] text-[#65574F] sm:block lg:mt-3">
+                  {leftSubheading}
+                </p>
+              </div>
+              <div className="w-[108px] shrink-0 overflow-hidden rounded-[15px] border-[5px] border-[#F8EBE3] bg-[#F9F5F0] shadow-[0_12px_25px_rgba(81,48,35,0.09)] sm:w-[150px] lg:aspect-square lg:w-[min(72%,238px)] lg:rounded-[20px] lg:border-[7px]">
+                <video
+                  key={videoSrc}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  aria-label={videoLabel || 'EPANTRY registration video'}
+                  className="block aspect-square h-full w-full bg-[#F8F4EE] object-contain"
+                >
+                  <source src={videoSrc || '/video/customer.mp4'} type="video/mp4" />
+                  Your browser does not support video playback.
+                </video>
+              </div>
+            </div>
+
+            <div className="mt-5 hidden h-px w-full bg-[#D5AE9B] lg:block" aria-hidden="true" />
           </aside>
 
-          <section
-            className="
-              bg-white
-              px-5
-              py-5
-              sm:px-6
-              lg:px-7
-              lg:py-5
-              xl:px-8
-            "
-          >
-
-            <div className="mx-auto w-full max-w-[620px]">
-
-              <p
-                className="
-                  text-[8px]
-                  font-black
-                  uppercase
-                  tracking-[0.24em]
-                  text-emerald-700
-                "
-              >
-                {eyebrow}
-              </p>
-
-              <h1
-                className="
-                  mt-1
-                  text-2xl
-                  font-black
-                  tracking-tight
-                  text-[#202421]
-                "
-              >
-                {title}
-              </h1>
-
-              {description && (
-                <p
-                  className="
-                    mt-1
-                    max-w-xl
-                    text-[9px]
-                    leading-4
-                    text-stone-500
-                  "
-                >
-                  {description}
-                </p>
-              )}
-
-              <div
-                className={
-                  description
-                    ? 'mt-4'
-                    : 'mt-3'
-                }
-              >
-                {children}
-              </div>
-
+          <section className="flex min-w-0 flex-col justify-center bg-[#FFFDFB] px-5 py-6 sm:px-8 lg:overflow-y-auto lg:px-[clamp(26px,3.2vw,52px)] lg:py-6">
+            <div className="mx-auto w-full max-w-[840px]">
+              <header className="mb-6 flex items-start justify-between gap-4 border-b border-[#EAE6E0] pb-5 lg:mb-6">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-[#B3644A]">{eyebrow}</p>
+                  <h1 className="mt-1.5 text-[clamp(27px,2.45vw,35px)] font-bold leading-[1.14] tracking-[-0.035em] text-[#233B30]">{title}</h1>
+                  {description ? <p className="mt-2 max-w-[560px] text-[14px] leading-[1.5] text-[#756E68]">{description}</p> : null}
+                </div>
+                <Link to="/login" className="shrink-0 pt-1 text-[14px] font-semibold text-[#AC5D43] underline-offset-4 transition hover:underline">
+                  Log in
+                </Link>
+              </header>
+              {children}
             </div>
-
           </section>
-
         </div>
-
       </div>
-
     </main>
   )
 }
-
 
 function getSafeReturnTo(
   search,
@@ -759,6 +538,13 @@ export default function RegisterPage() {
     fieldErrors,
     setFieldErrors,
   ] = useState({})
+
+  const [phoneCountryCode, setPhoneCountryCode] = useState('IN')
+
+  const phoneCountry = useMemo(
+    () => PHONE_COUNTRIES.find((country) => country.code === phoneCountryCode) || PHONE_COUNTRIES.find((country) => country.code === 'IN'),
+    [phoneCountryCode],
+  )
 
   const [
     step,
@@ -1012,6 +798,7 @@ export default function RegisterPage() {
       const nextErrors =
         validateRegistrationForm(
           form,
+          phoneCountry,
         )
 
       if (
@@ -1325,8 +1112,8 @@ export default function RegisterPage() {
     return (
       <AuthShell
         eyebrow="Host application"
-        title="What kind of Host are you joining as?"
-        description="Choose the workspace you need. Super Admin will see this before approving Host access. Until approval, your Customer experience stays active."
+        title="Choose your Host type"
+        description="Select the workspace that fits your business."
         videoSrc={registrationVideoSrc}
         videoLabel={registrationVideoLabel}
       >
@@ -1350,19 +1137,17 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-700">
-              Before approval
-            </p>
-            <p className="mt-1 text-[9px] leading-4 text-sky-900">
-              This choice tells EPANTRY why you are applying as a Host. It does not grant Host access. You will continue as a Customer until Super Admin approves the application.
+          <div className="flex items-start gap-2.5 border-l-[3px] border-[#B86C51] bg-[#F9F1EA] px-3 py-2.5">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-[#A95B41]" aria-hidden="true" />
+            <p className="text-[13px] leading-[1.5] text-[#634D43]">
+              Host access starts after Super Admin approval. Until then, you can continue as a Customer.
             </p>
           </div>
 
           {errorMessage ? (
             <div className="flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-red-700">
               <CircleAlert size={16} className="mt-0.5 shrink-0" />
-              <p className="text-[9px] font-semibold leading-4">
+              <p className="text-[13px] font-semibold leading-4">
                 {errorMessage}
               </p>
             </div>
@@ -1375,7 +1160,7 @@ export default function RegisterPage() {
               !selectedHostWorkspaceType ||
               isSubmitting
             }
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#173F35] text-[10px] font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#20503D] text-[14px] font-black text-white transition hover:bg-[#173F30] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? (
               <LoaderCircle size={14} className="animate-spin" />
@@ -1409,7 +1194,7 @@ export default function RegisterPage() {
 
           <div className="flex flex-col items-center py-5 text-center">
 
-            <div className="grid size-12 place-items-center rounded-xl bg-[#173F35] text-white">
+            <div className="grid size-12 place-items-center rounded-xl bg-[#20503D] text-white">
               <LoaderCircle
                 size={24}
                 className="animate-spin"
@@ -1420,7 +1205,7 @@ export default function RegisterPage() {
               Finalizing secure registration
             </p>
 
-            <p className="mt-1 max-w-md text-[10px] leading-4 text-stone-500">
+            <p className="mt-1 max-w-md text-[14px] leading-4 text-stone-500">
               Please keep this page open while your verified account is completed.
             </p>
 
@@ -1469,7 +1254,7 @@ export default function RegisterPage() {
                   {form.email}
                 </p>
 
-                <p className="mt-1 text-[10px] leading-4 text-emerald-800">
+                <p className="mt-1 text-[14px] leading-4 text-emerald-800">
                   Email ownership is already verified for this registration attempt.
                 </p>
               </div>
@@ -1491,18 +1276,18 @@ export default function RegisterPage() {
             }
             className="
               flex
-              h-10
+              h-12
               w-full
               items-center
               justify-center
               gap-2
               rounded-lg
-              bg-[#173F35]
-              text-[10px]
-              font-black
+              bg-[#20503D]
+              text-[14px]
+              font-bold
               text-white
               transition
-              hover:bg-emerald-800
+              hover:bg-[#173F30]
               disabled:opacity-50
             "
           >
@@ -1520,7 +1305,7 @@ export default function RegisterPage() {
             }
             className="
               flex
-              h-10
+              h-12
               w-full
               items-center
               justify-center
@@ -1528,7 +1313,7 @@ export default function RegisterPage() {
               border
               border-stone-200
               bg-white
-              text-[10px]
+              text-[14px]
               font-bold
               text-stone-600
             "
@@ -1574,7 +1359,7 @@ export default function RegisterPage() {
               You are registered and signed in.
             </p>
 
-            <p className="mt-1 text-[10px] leading-4 text-emerald-800">
+            <p className="mt-1 text-[14px] leading-4 text-emerald-800">
               Your Customer experience is ready.
             </p>
 
@@ -1587,18 +1372,18 @@ export default function RegisterPage() {
             }
             className="
               flex
-              h-10
+              h-12
               w-full
               items-center
               justify-center
               gap-2
               rounded-lg
-              bg-[#173F35]
-              text-[10px]
-              font-black
+              bg-[#20503D]
+              text-[14px]
+              font-bold
               text-white
               transition
-              hover:bg-emerald-800
+              hover:bg-[#173F30]
             "
           >
             Continue to EPANTRY
@@ -1642,7 +1427,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-amber-700">
+                <p className="text-[12px] font-black uppercase tracking-[0.18em] text-amber-700">
                   Host status
                 </p>
 
@@ -1650,11 +1435,11 @@ export default function RegisterPage() {
                   Pending review
                 </p>
 
-                <p className="mt-1 text-[10px] leading-4 text-amber-800">
+                <p className="mt-1 text-[14px] leading-4 text-amber-800">
                   You can continue using EPANTRY as a Customer while your Host application is reviewed.
                 </p>
 
-                <p className="mt-2 text-[9px] font-bold text-amber-900">
+                <p className="mt-2 text-[13px] font-bold text-amber-900">
                   Requested workspace: {HOST_WORKSPACE_TYPES.find((item) => item.value === (result?.user?.hostWorkspaceType || selectedHostWorkspaceType))?.label || 'Host'}
                 </p>
               </div>
@@ -1670,18 +1455,18 @@ export default function RegisterPage() {
             }
             className="
               flex
-              h-10
+              h-12
               w-full
               items-center
               justify-center
               gap-2
               rounded-lg
-              bg-[#173F35]
-              text-[10px]
-              font-black
+              bg-[#20503D]
+              text-[14px]
+              font-bold
               text-white
               transition
-              hover:bg-emerald-800
+              hover:bg-[#173F30]
             "
           >
             Continue as Customer
@@ -1731,18 +1516,18 @@ export default function RegisterPage() {
 
             <div className="flex min-w-0 items-center gap-2.5">
 
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-emerald-700 shadow-sm">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-[#A45C42] shadow-sm">
                 <Mail
                   size={14}
                 />
               </span>
 
               <div className="min-w-0">
-                <p className="text-[7px] font-bold uppercase tracking-[0.16em] text-stone-400">
+                <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-stone-400">
                   Verification email
                 </p>
 
-                <p className="truncate text-[10px] font-black text-stone-900">
+                <p className="truncate text-[14px] font-black text-stone-900">
                   {form.email}
                 </p>
               </div>
@@ -1754,7 +1539,7 @@ export default function RegisterPage() {
               onClick={
                 handleEditDetails
               }
-              className="text-[9px] font-black text-emerald-700"
+              className="text-[13px] font-black text-[#A45C42]"
             >
               Edit
             </button>
@@ -1765,7 +1550,7 @@ export default function RegisterPage() {
 
             <label
               htmlFor="registration-otp"
-              className="mb-1.5 block text-[10px] font-bold text-stone-700"
+              className="mb-1.5 block text-[14px] font-bold text-stone-700"
             >
               Verification code
             </label>
@@ -1818,7 +1603,7 @@ export default function RegisterPage() {
 
             </InputShell>
 
-            <div className="mt-1.5 flex items-center justify-between gap-2 text-[8px] text-stone-400">
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-[12px] text-stone-400">
 
               <span>
                 {expiresSeconds >
@@ -1846,7 +1631,7 @@ export default function RegisterPage() {
                   resendSeconds >
                     0
                 }
-                className="font-black text-emerald-700 disabled:text-stone-400"
+                className="font-black text-[#A45C42] disabled:text-stone-400"
               >
                 {resendSeconds >
                 0
@@ -1867,18 +1652,18 @@ export default function RegisterPage() {
             }
             className="
               flex
-              h-10
+              h-12
               w-full
               items-center
               justify-center
               gap-2
               rounded-lg
-              bg-[#173F35]
-              text-[10px]
-              font-black
+              bg-[#20503D]
+              text-[14px]
+              font-bold
               text-white
               transition
-              hover:bg-emerald-800
+              hover:bg-[#173F30]
               disabled:opacity-50
             "
           >
@@ -1913,7 +1698,7 @@ export default function RegisterPage() {
               justify-center
               gap-2
               rounded-lg
-              text-[9px]
+              text-[13px]
               font-bold
               text-stone-500
               hover:bg-stone-50
@@ -1934,509 +1719,188 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      eyebrow="Create your account"
+      eyebrow="Create an account"
       title="Join EPANTRY"
-      videoSrc={
-        registrationVideoSrc
-      }
-      videoLabel={
-        registrationVideoLabel
-      }
+      videoSrc={registrationVideoSrc}
+      videoLabel={registrationVideoLabel}
+      leftAudience={form.accountType === 'host' ? 'For hosts' : 'For customers'}
+      leftHeadline={form.accountType === 'host' ? 'Bring your food to more tables.' : 'Discover food you love.'}
+      leftSubheading={form.accountType === 'host' ? 'Apply to list and sell.' : 'Cook, shop and save.'}
     >
-
-      <form
-        onSubmit={
-          handleRequestOtp
-        }
-        className="space-y-3"
-        noValidate
-      >
-
-        <AuthNotice
-          message={
-            errorMessage
-          }
-        />
+      <form onSubmit={handleRequestOtp} className="space-y-4 lg:space-y-5" noValidate>
+        <AuthNotice message={errorMessage} />
 
         {invitationPreview ? (
-          <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
-            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-violet-700">
-              Household invitation
-            </p>
-            <p className="mt-1 text-sm font-black text-violet-950">
-              Invited by {invitationPreview?.inviter?.name || 'a household administrator'}
-            </p>
-            <p className="mt-1 text-[10px] leading-4 text-violet-800">
-              Join {invitationPreview?.household?.name || 'this household'} as {invitationPreview?.invitation?.role === 'admin' ? 'Admin' : invitationPreview?.invitation?.roleLabel || 'Member'}. Register as a Customer with {invitationPreview?.invitation?.invitedEmail} to review and accept or reject this invitation.
+          <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+            <p className="text-[14px] font-bold text-violet-900">Household invitation</p>
+            <p className="mt-1 text-[13px] leading-5 text-violet-800">
+              {invitationPreview?.inviter?.name || 'A household administrator'} invited you to{' '}
+              {invitationPreview?.household?.name || 'a household'} as{' '}
+              {invitationPreview?.invitation?.role === 'admin'
+                ? 'Admin'
+                : invitationPreview?.invitation?.roleLabel || 'Member'}.
+              Register with {invitationPreview?.invitation?.invitedEmail} to respond.
             </p>
           </div>
         ) : null}
 
         {invitationPreviewError ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[10px] font-semibold leading-4 text-red-700">
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-[14px] text-red-800">
             {invitationPreviewError}
           </div>
         ) : null}
 
-        <div>
-
-          <label
-            htmlFor="registration-name"
-            className="mb-1 block text-[9px] font-bold text-stone-700"
-          >
-            Full Name
-          </label>
-
-          <InputShell
-            hasError={
-              Boolean(
-                fieldErrors.name,
-              )
-            }
-          >
-            <UserRound
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-            />
-
-            <input
-              id="registration-name"
-              type="text"
-              autoComplete="name"
-              value={
-                form.name
-              }
-              onChange={(
-                event,
-              ) =>
-                updateField(
-                  'name',
-                  event.target.value,
-                )
-              }
-              className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none placeholder:text-stone-400"
-              placeholder="Your full name"
-            />
-          </InputShell>
-
-          <FieldError
-            message={
-              fieldErrors.name
-            }
-          />
-
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-
-          <div>
-
-            <label
-              htmlFor="registration-email"
-              className="mb-1 block text-[9px] font-bold text-stone-700"
-            >
-              Email
-            </label>
-
-            <InputShell
-              hasError={
-                Boolean(
-                  fieldErrors.email,
-                )
-              }
-            >
-              <Mail
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-              />
-
+        {/* Row 1: equal-width name and email */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:gap-x-5">
+          <div className="min-w-0">
+            <label htmlFor="registration-name" className="mb-1.5 block text-[14px] font-semibold text-[#2C4035]">Full name</label>
+            <InputShell hasError={Boolean(fieldErrors.name)}>
+              <UserRound size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A938B]" aria-hidden="true" />
               <input
-                id="registration-email"
-                type="email"
-                autoComplete="email"
-                value={
-                  form.email
-                }
-                readOnly={
-                  Boolean(
-                    invitationPreview,
-                  )
-                }
-                onChange={(
-                  event,
-                ) =>
-                  updateField(
-                    'email',
-                    event.target.value,
-                  )
-                }
-                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none placeholder:text-stone-400"
+                id="registration-name" type="text" autoComplete="name" value={form.name}
+                onChange={(event) => updateField('name', event.target.value)}
+                className="h-12 w-full min-w-0 bg-transparent pl-11 pr-3 text-[15px] text-[#26382F] outline-none placeholder:text-[#9A9D96]"
+                placeholder="Your full name"
+              />
+            </InputShell>
+            <FieldError message={fieldErrors.name} />
+          </div>
+          <div className="min-w-0">
+            <label htmlFor="registration-email" className="mb-1.5 block text-[14px] font-semibold text-[#2C4035]">Email address</label>
+            <InputShell hasError={Boolean(fieldErrors.email)}>
+              <Mail size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A938B]" aria-hidden="true" />
+              <input
+                id="registration-email" type="email" autoComplete="email"
+                value={form.email} readOnly={Boolean(invitationPreview)}
+                onChange={(event) => updateField('email', event.target.value)}
+                className="h-12 w-full min-w-0 bg-transparent pl-11 pr-3 text-[15px] text-[#26382F] outline-none placeholder:text-[#9A9D96] read-only:bg-[#F6F2EE]"
                 placeholder="you@example.com"
               />
             </InputShell>
-
-            <FieldError
-              message={
-                fieldErrors.email
-              }
-            />
-
+            <FieldError message={fieldErrors.email} />
           </div>
-
-          <div>
-
-            <label
-              htmlFor="registration-phone"
-              className="mb-1 block text-[9px] font-bold text-stone-700"
-            >
-              Mobile
-            </label>
-
-            <InputShell
-              hasError={
-                Boolean(
-                  fieldErrors.phone,
-                )
-              }
-            >
-              <Smartphone
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-              />
-
-              <input
-                id="registration-phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={
-                  form.phone
-                }
-                onChange={(
-                  event,
-                ) =>
-                  updateField(
-                    'phone',
-                    normalizePhone(
-                      event.target.value,
-                    ),
-                  )
-                }
-                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none"
-                placeholder="+919876543210"
-              />
-            </InputShell>
-
-            <FieldError
-              message={
-                fieldErrors.phone
-              }
-            />
-
-          </div>
-
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-
-          <div>
-
-            <label
-              htmlFor="registration-password"
-              className="mb-1 block text-[9px] font-bold text-stone-700"
-            >
-              Password
-            </label>
-
-            <InputShell
-              hasError={
-                Boolean(
-                  fieldErrors.password,
-                )
-              }
-            >
-              <LockKeyhole
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-              />
-
+        {/* Row 2: mobile number and password */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:gap-x-5">
+          <div className="min-w-0">
+            <label htmlFor="registration-phone" className="mb-1.5 block text-[14px] font-semibold text-[#2C4035]">Mobile number</label>
+            <div className={[
+              'flex h-12 min-w-0 overflow-hidden rounded-[12px] border bg-white transition-all duration-150',
+              'focus-within:border-[#BC775B] focus-within:ring-[3px] focus-within:ring-[#BC775B]/10',
+              fieldErrors.phone ? 'border-red-400' : 'border-[#DDDCD6] hover:border-[#BCAFA6]',
+            ].join(' ')}>
+              <div className="relative flex w-[104px] shrink-0 items-center justify-center gap-1.5 border-r border-[#E9E1DA] bg-[#F9F2EC] px-2 sm:w-[108px]">
+                <span className="text-[17px] leading-none" aria-hidden="true">{phoneCountry.flag}</span>
+                <span className="text-[14px] font-semibold text-[#664C40]" aria-hidden="true">{phoneCountry.dial}</span>
+                <ChevronDown size={13} className="shrink-0 text-[#987A6C]" aria-hidden="true" />
+                <select
+                  aria-label="Country and dialing code"
+                  title={`${phoneCountry.name} (${phoneCountry.dial})`}
+                  value={phoneCountryCode}
+                  onChange={(event) => {
+                    const country = PHONE_COUNTRIES.find((item) => item.code === event.target.value)
+                    if (!country) return
+                    const previousLocal = getNationalPhone(form.phone, phoneCountry)
+                    setPhoneCountryCode(country.code)
+                    updateField('phone', toInternationalPhone(country, previousLocal))
+                  }}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                >
+                  {PHONE_COUNTRIES.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.flag} {country.name} ({country.dial})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <input
-                id="registration-password"
-                type={
-                  showPassword
-                    ? 'text'
-                    : 'password'
-                }
-                autoComplete="new-password"
-                value={
-                  form.password
-                }
-                onChange={(
-                  event,
-                ) =>
-                  updateField(
-                    'password',
-                    event.target.value,
-                  )
-                }
-                className="h-10 w-full bg-transparent pl-9 pr-9 text-[10px] font-semibold text-[#202421] outline-none"
-                placeholder="Create a password"
+                id="registration-phone" type="tel" inputMode="numeric" autoComplete="tel-national"
+                value={getNationalPhone(form.phone, phoneCountry)}
+                onChange={(event) => updateField('phone', toInternationalPhone(phoneCountry, event.target.value))}
+                className="h-full w-full min-w-0 bg-transparent px-3 text-[15px] text-[#26382F] outline-none placeholder:text-[#A39D97]"
+                placeholder={phoneCountry.code === 'IN' ? '9876543210' : 'Mobile number'}
+                aria-label={`Mobile number without country code (${phoneCountry.dial} selected)`}
               />
+            </div>
+            <FieldError message={fieldErrors.phone} />
+          </div>
 
+          <div className="min-w-0">
+            <label htmlFor="registration-password" className="mb-1.5 block text-[14px] font-semibold text-[#2C4035]">Password</label>
+            <InputShell hasError={Boolean(fieldErrors.password)}>
+              <LockKeyhole size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A938B]" aria-hidden="true" />
+              <input
+                id="registration-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+                value={form.password}
+                onChange={(event) => updateField('password', event.target.value)}
+                className="h-12 w-full min-w-0 bg-transparent pl-11 pr-11 text-[15px] text-[#26382F] outline-none placeholder:text-[#9A9D96]"
+                placeholder="At least 8 characters"
+              />
               <button
-                type="button"
-                onClick={() =>
-                  setShowPassword(
-                    (current) =>
-                      !current,
-                  )
-                }
-                className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-stone-400 hover:bg-white hover:text-stone-800"
-                aria-label={
-                  showPassword
-                    ? 'Hide password'
-                    : 'Show password'
-                }
+                type="button" onClick={() => setShowPassword((current) => !current)}
+                className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-lg text-[#887E72] transition hover:bg-[#F7EAE3]"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? (
-                  <EyeOff
-                    size={13}
-                  />
-                ) : (
-                  <Eye
-                    size={13}
-                  />
-                )}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </InputShell>
-
-            <FieldError
-              message={
-                fieldErrors.password
-              }
-              helper="Use at least 8 characters."
-            />
-
+            <FieldError message={fieldErrors.password} />
           </div>
+        </div>
 
-          <div>
-
-            <label
-              htmlFor="registration-confirm-password"
-              className="mb-1 block text-[9px] font-bold text-stone-700"
-            >
-              Confirm Password
-            </label>
-
-            <InputShell
-              hasError={
-                Boolean(
-                  fieldErrors.confirmPassword,
-                )
-              }
-            >
-              <LockKeyhole
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-              />
-
+        {/* Row 3: confirm password and account type (last) */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:gap-x-5">
+          <div className="min-w-0">
+            <label htmlFor="registration-confirm-password" className="mb-1.5 block text-[14px] font-semibold text-[#2C4035]">Confirm password</label>
+            <InputShell hasError={Boolean(fieldErrors.confirmPassword)}>
+              <LockKeyhole size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A938B]" aria-hidden="true" />
               <input
-                id="registration-confirm-password"
-                type={
-                  showPassword
-                    ? 'text'
-                    : 'password'
-                }
-                autoComplete="new-password"
-                value={
-                  form.confirmPassword
-                }
-                onChange={(
-                  event,
-                ) =>
-                  updateField(
-                    'confirmPassword',
-                    event.target.value,
-                  )
-                }
-                className="h-10 w-full bg-transparent pl-9 pr-3 text-[10px] font-semibold text-[#202421] outline-none"
-                placeholder="Repeat your password"
+                id="registration-confirm-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+                value={form.confirmPassword}
+                onChange={(event) => updateField('confirmPassword', event.target.value)}
+                className="h-12 w-full min-w-0 bg-transparent pl-11 pr-3 text-[15px] text-[#26382F] outline-none placeholder:text-[#9A9D96]"
+                placeholder="Repeat password"
               />
             </InputShell>
-
-            <FieldError
-              message={
-                fieldErrors.confirmPassword
-              }
-            />
-
+            <FieldError message={fieldErrors.confirmPassword} />
           </div>
 
-        </div>
-
-        <fieldset>
-
-          <legend className="text-[9px] font-bold text-stone-700">
-            Account Type
-          </legend>
-
-          <div className={invitationPreview ? 'mt-2 grid gap-2' : 'mt-2 grid gap-2 sm:grid-cols-2'}>
-
-            {(invitationPreview
-              ? ACCOUNT_TYPES.filter(
-                  (item) =>
-                    item.value ===
-                    'customer',
-                )
-              : ACCOUNT_TYPES
-            ).map(
-              (
-                item,
-              ) => (
+          <fieldset className="min-w-0">
+            <legend className="mb-1.5 text-[14px] font-semibold leading-[21px] text-[#2C4035]">Account type</legend>
+            <div className="flex min-w-0 gap-2.5">
+              {(invitationPreview ? ACCOUNT_TYPES.filter((item) => item.value === 'customer') : ACCOUNT_TYPES).map((item) => (
                 <AccountTypeCard
-                  key={
-                    item.value
-                  }
-                  item={
-                    item
-                  }
-                  selected={
-                    form.accountType ===
-                    item.value
-                  }
-                  onSelect={(
-                    value,
-                  ) =>
-                    updateField(
-                      'accountType',
-                      value,
-                    )
-                  }
+                  key={item.value}
+                  item={item}
+                  selected={form.accountType === item.value}
+                  onSelect={(value) => updateField('accountType', value)}
                 />
-              ),
-            )}
-
-          </div>
-
-          {fieldErrors.accountType && (
-            <p className="mt-1 text-[9px] font-semibold text-red-600">
-              {fieldErrors.accountType}
-            </p>
-          )}
-
-        </fieldset>
-
-        <div className="rounded-lg border border-stone-100 bg-[#F7F6F2] px-3 py-2">
-
-          <div className="flex items-start gap-2">
-
-            <ShieldCheck
-              size={13}
-              className="mt-0.5 shrink-0 text-emerald-700"
-            />
-
-            <p className="text-[8px] leading-3 text-stone-500">
-              Clicking{' '}
-              <strong className="font-black text-stone-700">
-                Send verification code
-              </strong>
-              {' '}sends your profile for the OTP challenge. Your password is not sent to the OTP endpoint.
-            </p>
-
-          </div>
-
+              ))}
+            </div>
+            {fieldErrors.accountType ? <FieldError message={fieldErrors.accountType} /> : null}
+          </fieldset>
         </div>
 
-        <p className="text-[12px] leading-5 text-[#55635B]">
-          Before registering, read our{' '}
-          <Link to="/terms" className="font-semibold text-[#174D38] underline underline-offset-2 hover:text-[#27694E]">Terms &amp; Conditions</Link>
+        <p className="text-[13px] leading-[1.55] text-[#74716C]">
+          By continuing, you agree to our{' '}
+          <Link to="/terms" className="font-semibold text-[#AC6147] underline underline-offset-[3px] hover:text-[#88442F]">Terms &amp; Conditions</Link>
           {' '}and{' '}
-          <Link to="/privacy-policy" className="font-semibold text-[#174D38] underline underline-offset-2 hover:text-[#27694E]">Privacy Policy</Link>.
-          Optional cookies and marketing have separate choices.
+          <Link to="/privacy-policy" className="font-semibold text-[#AC6147] underline underline-offset-[3px] hover:text-[#88442F]">Privacy Policy</Link>.
         </p>
 
         <button
           type="submit"
-          disabled={
-            isSubmitting ||
-            invitationPreviewPending ||
-            Boolean(
-              invitationToken &&
-              invitationPreviewError,
-            )
-          }
-          className="
-            flex
-            h-10
-            w-full
-            items-center
-            justify-center
-            gap-2
-            rounded-lg
-            bg-[#173F35]
-            text-[10px]
-            font-black
-            text-white
-            shadow-[0_6px_14px_rgba(41,37,36,0.14)]
-            transition
-            hover:bg-emerald-800
-            active:translate-y-px
-            disabled:cursor-not-allowed
-            disabled:opacity-50
-          "
+          disabled={isSubmitting || invitationPreviewPending || Boolean(invitationToken && invitationPreviewError)}
+          className="flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[12px] bg-[#B86C51] px-4 text-[15px] font-bold text-white transition-colors hover:bg-[#9E553D] active:bg-[#88442F] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? (
-            <>
-              <LoaderCircle
-                size={14}
-                className="animate-spin"
-              />
-              Sending code...
-            </>
+            <><LoaderCircle size={18} className="animate-spin" />Sending code...</>
           ) : (
-            <>
-              <Mail
-                size={14}
-              />
-              Send verification code
-              <ArrowRight
-                size={13}
-              />
-            </>
+            <>Send verification code <ArrowRight size={18} aria-hidden="true" /></>
           )}
         </button>
-
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-stone-200" />
-
-          <ShieldCheck
-            size={10}
-            className="text-stone-300"
-          />
-
-          <div className="h-px flex-1 bg-stone-200" />
-        </div>
-
-        <p className="text-center text-[9px] text-stone-500">
-          Already have an account?{' '}
-
-          <Link
-            to="/login"
-            className="font-black text-[#202421] transition hover:text-emerald-700"
-          >
-            Login
-          </Link>
-        </p>
-
-        <div className="flex items-center justify-center gap-1.5 text-[6px] font-semibold uppercase tracking-[0.14em] text-stone-300">
-          <LockKeyhole
-            size={8}
-          />
-          Secure EPANTRY registration
-        </div>
-
       </form>
-
     </AuthShell>
   )
 }
