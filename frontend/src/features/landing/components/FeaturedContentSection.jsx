@@ -70,6 +70,47 @@ function featuredRecipesForDiet(featuredItems, verifiedRecipes, selectedDiet) {
   return rows.slice(0, 8)
 }
 
+// Super Admin auto-publication creates an internal, listing-owned catalog
+// brand named "Host kitchen <id>". It is not a Host-declared brand and must
+// never be presented to customers as one.
+function isInternalHostCatalogBrand(brand) {
+  const name = String(brand?.name || '').trim()
+  const slug = String(brand?.slug || '').trim()
+  return /^epantry-host-[a-f\d]{24}$/i.test(slug) || /^host kitchen [a-f\d]{6}$/i.test(name)
+}
+
+// Display genuinely named catalog brands plus brand names explicitly entered
+// on Super Admin-approved Host grocery listings. The existing public listing
+// API exposes only the last approved packet, not unapproved draft edits.
+function getExplicitLandingBrands(catalogBrands, approvedHostItems) {
+  const byName = new Map()
+  const keyFor = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase()
+  for (const brand of Array.isArray(catalogBrands) ? catalogBrands : []) {
+    const name = String(brand?.name || '').trim().replace(/\s+/g, ' ')
+    if (!name || isInternalHostCatalogBrand(brand)) continue
+    const key = keyFor(name)
+    if (!byName.has(key)) byName.set(key, { ...brand, name })
+  }
+  for (const item of Array.isArray(approvedHostItems) ? approvedHostItems : []) {
+    const name = String(item?.declaredBrandName || '').trim().replace(/\s+/g, ' ')
+    if (!name || isInternalHostCatalogBrand({ name })) continue
+    const key = keyFor(name)
+    const existing = byName.get(key)
+    if (existing) {
+      if (existing.isDeclaredHostBrand) existing.productCount += 1
+      continue
+    }
+    byName.set(key, {
+      id: `host-declared-brand-${item.id}`,
+      name,
+      path: item.path,
+      productCount: 1,
+      isDeclaredHostBrand: true,
+    })
+  }
+  return [...byName.values()]
+}
+
 export default function FeaturedContentSection({ selectedDiet = 'veg', verifiedRecipes = [] }) {
   const navigate = useNavigate()
   const [selectedBrandFilter, setSelectedBrandFilter] = useState('all')
@@ -129,9 +170,9 @@ export default function FeaturedContentSection({ selectedDiet = 'veg', verifiedR
       const response = await listPublicHostListings('grocery')
       return (Array.isArray(response?.listings) ? response.listings : [])
         .filter((item) => item?.type === 'grocery' && item?.id && item?.title)
-        .slice(0, 8)
         .map((item) => ({
           id: `approved-host-grocery-${item.id}`,
+          declaredBrandName: String(item.brandName || '').trim(),
           isHostPreview: true,
           path: `/explore/host-listings?category=grocery&item=${encodeURIComponent(item.id)}`,
           name: item.title,
@@ -176,7 +217,7 @@ export default function FeaturedContentSection({ selectedDiet = 'veg', verifiedR
     ...verifiedGrocery,
   ].slice(0, 8)
   const recipes = visibleFeaturedRecipes
-  const brands = data?.brands || []
+  const brands = getExplicitLandingBrands(data?.brands, approvedHostGroceries)
   const brandFilterGroups = buildBrandFilterGroups(brands)
   const visibleBrands = getVisibleBrands({ brands, brandFilterGroups, selectedBrandFilter })
 
@@ -1155,6 +1196,18 @@ function FeaturedDiscoverySection({
           box-shadow:0 -8px 28px rgba(32,36,33,.10);
         }
         .ep-brand-motion__mobile-row { display:none; }
+        /* A short brand list is shown once, not repeated across two marquees. */
+        .ep-brand-motion__row.ep-brand-motion__row--static {
+          top:52svh; transform:translateY(-35%);
+          overflow:visible; -webkit-mask-image:none; mask-image:none;
+        }
+        .ep-brand-motion__row--static .ep-brand-motion__track {
+          width:100%; transform:none !important; justify-content:center;
+        }
+        .ep-brand-motion__row--static .ep-brand-motion__sequence {
+          width:100%; flex-wrap:wrap; justify-content:center;
+          gap:clamp(12px,3vw,36px); padding:0 20px;
+        }
         .ep-brand-motion__head {
           position:absolute; z-index:2; top:clamp(74px,10svh,118px);
           left:0; right:0; display:flex; align-items:end; justify-content:space-between; gap:14px;
@@ -1403,7 +1456,24 @@ function FeaturedBrandNamesWall({ brands, groups, selectedFilter, onSelectFilter
         </div>
       </div>
       {list.length === 0 ? (
-        <p className="ep-recipe-showcase__empty">Active food brands will appear here when available.</p>
+        <p className="ep-recipe-showcase__empty">Named food brands will appear here when available.</p>
+      ) : list.length <= 4 ? (
+        <div className="ep-brand-motion__row ep-brand-motion__row--static">
+          <div className="ep-brand-motion__track" style={{ animation: 'none' }}>
+            <div className="ep-brand-motion__sequence">
+              {list.map((brand, index) => (
+                <Link
+                  key={`named-brand-${brand?.id || brand?.slug || brand?.name}-${index}`}
+                  className="ep-brand-motion__name"
+                  to={getFeaturedBrandPath(brand)}
+                >
+                  <strong>{brand.name}</strong>
+                  <small>{formatBrandProductCount(brand.productCount)}</small>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           <FeaturedBrandMovingRow brands={list} direction="left" duration={26} rowClass="ep-brand-motion__row--first" />
@@ -1719,6 +1789,11 @@ function getVisibleBrands({
 function getFeaturedBrandPath(
   brand,
 ) {
+  // Host-declared brands without a canonical brand profile link to their
+  // approved public listing instead of a nonexistent /brands/:slug page.
+  if (brand?.isDeclaredHostBrand && String(brand?.path || '').startsWith('/explore/host-listings?')) {
+    return brand.path
+  }
   const brandKey =
     String(
       brand?.slug ||
