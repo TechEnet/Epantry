@@ -1121,9 +1121,11 @@ router.get('/public/host-listings', wrap(async (req, res) => {
   const category = String(req.query?.category || '').trim().toLowerCase()
   const type = String(req.query?.type || '').trim().toLowerCase()
   const filter = publicHostListingFilter()
-  if (category) filter.$and = [{ $or: [
+  // Append category constraints without replacing the mandatory approved-
+  // publication (and EU trader) gates from publicHostListingFilter().
+  if (category) filter.$and.push({ $or: [
     { 'publishedPacket.category': category }, { publishedPacket: null, 'packet.category': category },
-  ] }]
+  ] })
   if (type) filter.$and = [...(filter.$and || []), { $or: [
     { publishedType: type }, { publishedPacket: null, type },
   ] }]

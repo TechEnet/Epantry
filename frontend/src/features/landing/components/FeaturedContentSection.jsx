@@ -6,6 +6,7 @@ import { useLandingFeaturedQuery } from '../hooks/useLandingFeaturedQuery'
 import BookmarkButton from '../../bookmarks/components/BookmarkButton'
 import { getCatalogProducts } from '../../grocery/services/catalog.service'
 import { getProductFoodIntelligence } from '../../foodIntelligence/services/foodIntelligence.service'
+import { listPublicHostListings } from '../../host/services/hostUnifiedListing.service'
 
 // Only explicit, approved dietary outcomes establish a product's group.
 // Names, photos, categories, and missing classifications are NOT evidence.
@@ -116,6 +117,33 @@ export default function FeaturedContentSection({ selectedDiet = 'veg', verifiedR
     },
   })
 
+  // The Host grocery browse API is a separate approved public listing surface,
+  // not the canonical catalog. It must be displayed as discovery, without
+  // suggesting verified dietary information or an activated marketplace offer.
+  const { data: approvedHostGroceries, isPending: checkingHostGroceries } = useQuery({
+    queryKey: ['landing', 'featured', 'approved-host-groceries'],
+    staleTime: 15 * 1000,
+    refetchOnMount: 'always',
+    retry: false,
+    queryFn: async () => {
+      const response = await listPublicHostListings('grocery')
+      return (Array.isArray(response?.listings) ? response.listings : [])
+        .filter((item) => item?.type === 'grocery' && item?.id && item?.title)
+        .slice(0, 8)
+        .map((item) => ({
+          id: `approved-host-grocery-${item.id}`,
+          isHostPreview: true,
+          path: `/explore/host-listings?category=grocery&item=${encodeURIComponent(item.id)}`,
+          name: item.title,
+          image: typeof item.images?.[0] === 'string' ? item.images[0] : '',
+          subCategory: 'Host approved · Dietary not verified',
+          brand: item.brandName || item.host?.name || '',
+          quantity: item.packQuantity ?? null,
+          unit: item.packUnit || '',
+        }))
+    },
+  })
+
   const visibleFeaturedRecipes = useMemo(() =>
     featuredRecipesForDiet(data?.recipes, verifiedRecipes, selectedDiet),
     [data?.recipes, verifiedRecipes, selectedDiet])
@@ -138,7 +166,15 @@ export default function FeaturedContentSection({ selectedDiet = 'veg', verifiedR
     )
   }
 
-  const grocery = groceryByDiet?.[selectedDiet] || []
+  const verifiedGrocery = groceryByDiet?.[selectedDiet] || []
+  const hostGrocery = approvedHostGroceries || []
+  // Show newly approved Host groceries alongside canonical products, even
+  // before canonical publication. Cap Host cards at four when verified items
+  // exist so both sources remain visible in the existing eight-card gallery.
+  const grocery = [
+    ...hostGrocery.slice(0, verifiedGrocery.length ? 4 : 8),
+    ...verifiedGrocery,
+  ].slice(0, 8)
   const recipes = visibleFeaturedRecipes
   const brands = data?.brands || []
   const brandFilterGroups = buildBrandFilterGroups(brands)
@@ -157,9 +193,9 @@ export default function FeaturedContentSection({ selectedDiet = 'veg', verifiedR
       <FeaturedGroceryScrollStory
         products={grocery}
         onAddToCart={handleAddToCart}
-        emptyMessage={checkingGroceryDiet
-          ? 'Checking approved dietary information for published grocery products…'
-          : `No verified ${selectedDiet === 'nonveg' ? 'Non-Veg' : 'Veg'} grocery products are available in Featured Grocery yet.`}
+        emptyMessage={checkingGroceryDiet || checkingHostGroceries
+          ? 'Loading approved grocery listings…'
+          : `No approved grocery listings or verified ${selectedDiet === 'nonveg' ? 'Non-Veg' : 'Veg'} products are available yet.`}
       />
       <FeaturedDiscoverySection kind="recipes" items={recipes} neutralDietaryFallback={neutralRecipeFallback} />
       <FeaturedDiscoverySection
@@ -747,6 +783,9 @@ function FeaturedGroceryScrollStory({ products, onAddToCart, emptyMessage }) {
           <div>
             <span className="ep-landing-grocery-gallery__eyebrow">Featured grocery</span>
             <h2 id="ep-landing-grocery-title" className="ep-landing-grocery-gallery__heading">Find something good.</h2>
+            {items.some((item) => item.isHostPreview) && (
+              <p className="mt-1 text-sm text-[#526257]">Host-approved listings are for discovery. Dietary status and marketplace availability are not verified.</p>
+            )}
           </div>
           <Link className="ep-landing-grocery-gallery__link" to="/grocery">
             Explore Grocery <ArrowRight size={17} aria-hidden="true" />
@@ -774,12 +813,14 @@ function FeaturedGroceryScrollStory({ products, onAddToCart, emptyMessage }) {
                   key={product?.id || product?.slug || `grocery-${index}`}
                   className="ep-landing-grocery-card"
                 >
-                  <BookmarkButton
-                    kind="grocery"
-                    slug={product?.slug || productPath.split('/').filter(Boolean).pop()}
-                    title={product?.name || 'Grocery product'}
-                    className="ep-featured-bookmark"
-                  />
+                  {!product?.isHostPreview && (
+                    <BookmarkButton
+                      kind="grocery"
+                      slug={product?.slug || productPath.split('/').filter(Boolean).pop()}
+                      title={product?.name || 'Grocery product'}
+                      className="ep-featured-bookmark"
+                    />
+                  )}
                   <Link
                     to={productPath}
                     className="ep-landing-grocery-card__main"
@@ -806,17 +847,30 @@ function FeaturedGroceryScrollStory({ products, onAddToCart, emptyMessage }) {
                       {detail ? <span className="ep-landing-grocery-card__extra">{detail}</span> : null}
                     </div>
                   </Link>
-                  <button
-                    type="button"
-                    className="ep-landing-grocery-card__action"
-                    onClick={() => onAddToCart(product)}
-                    aria-label={`Add ${product?.name || 'product'} to cart`}
-                  >
-                    <span>Add to cart</span>
-                    <span className="ep-landing-grocery-card__action-icon">
-                      <ArrowRight size={17} aria-hidden="true" />
-                    </span>
-                  </button>
+                  {product?.isHostPreview ? (
+                    <Link
+                      to={productPath}
+                      className="ep-landing-grocery-card__action"
+                      aria-label={`View Host listing: ${product?.name || 'grocery product'}`}
+                    >
+                      <span>View listing</span>
+                      <span className="ep-landing-grocery-card__action-icon">
+                        <ArrowRight size={17} aria-hidden="true" />
+                      </span>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ep-landing-grocery-card__action"
+                      onClick={() => onAddToCart(product)}
+                      aria-label={`Add ${product?.name || 'product'} to cart`}
+                    >
+                      <span>Add to cart</span>
+                      <span className="ep-landing-grocery-card__action-icon">
+                        <ArrowRight size={17} aria-hidden="true" />
+                      </span>
+                    </button>
+                  )}
                 </article>
               )
             })
