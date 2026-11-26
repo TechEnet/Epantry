@@ -222,7 +222,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.11em] text-stone-500">
+      <span className="mb-2 block text-[13px] font-bold text-[#35483F]">
         {label}
         {required ? ' *' : ''}
       </span>
@@ -232,7 +232,7 @@ function Field({
 }
 
 const inputClassName =
-  'focus-ring w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-950 outline-none transition focus:border-emerald-500'
+  'focus-ring w-full min-h-12 rounded-xl border border-[#CBD4C6] bg-white px-4 py-3 text-[15px] font-medium text-[#202421] outline-none transition placeholder:text-[#8C948C] focus:border-[#C56C42] focus:ring-2 focus:ring-[#C56C42]/15'
 
 export default function DeliveryAddressPage() {
   const navigate =
@@ -858,682 +858,414 @@ export default function DeliveryAddressPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f5ef] pb-8 pt-0 sm:pb-10 sm:pt-0">
-      <div className="page-shell max-w-5xl">
-        <div className="overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-sm">
-          <header className="border-b border-stone-200 bg-gradient-to-r from-emerald-50 via-white to-amber-50 p-6 sm:p-8">
-            <div className="flex items-start gap-4">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white">
-                <MapPin
-                  size={23}
-                  aria-hidden="true"
-                />
+    <main className="min-h-[calc(100svh-84px)] bg-[#F7F6F2] px-3 pb-12 pt-5 text-[#202421] sm:px-6 lg:pt-7">
+      <div className="mx-auto w-full max-w-[1480px]">
+        <header className="relative overflow-hidden rounded-[22px] bg-[#C56C42] px-5 py-7 text-white sm:px-8 sm:py-8 lg:px-10">
+          <div className="pointer-events-none absolute -right-12 -top-32 h-80 w-80 rounded-full border-[38px] border-white/10" aria-hidden="true" />
+          <div className="pointer-events-none absolute bottom-0 right-[17%] h-20 w-px rotate-[32deg] bg-white/20" aria-hidden="true" />
+          <div className="relative flex flex-wrap items-center justify-between gap-5">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-white/85">
+                <MapPin size={16} aria-hidden="true" />
+                Delivery address
               </div>
-
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
-                  Delivery address
-                </p>
-                <h1 className="mt-1 text-3xl font-black tracking-tight text-stone-950">
-                  Where should we deliver?
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-                  {returnTo.startsWith(
-                    '/checkout/',
-                  )
-                    ? 'Choose the address EPANTRY should lock to this order before payment.'
-                    : 'EPANTRY needs a delivery address before a missing Recipe ingredient can enter the Marketplace cart flow.'}
-                </p>
-              </div>
+              <h1 className="max-w-2xl text-[30px] font-extrabold leading-[1.08] tracking-[-0.045em] sm:text-[38px] lg:text-[44px]">
+                Where should we deliver?
+              </h1>
+              <p className="mt-3 max-w-xl text-[15px] leading-6 text-white/90">
+                Select a saved address or add a new one.
+              </p>
             </div>
-          </header>
+            <div className="hidden shrink-0 items-center gap-3 border-l border-white/35 pl-6 lg:flex">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-white/15">
+                <Truck size={23} aria-hidden="true" />
+              </span>
+              <span className="text-sm font-semibold leading-5 text-white/95">
+                Your delivery,
+                <br />
+                your choice.
+              </span>
+            </div>
+          </div>
+        </header>
 
-          {checkoutCartId && (
-            <section className="border-b border-stone-200 bg-stone-950 px-6 py-4 text-white sm:px-8">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300">
-                    <Truck
-                      size={19}
-                      aria-hidden="true"
-                    />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-300">
-                      Distance-based delivery estimate
-                    </p>
-                    <p className="mt-0.5 text-sm font-black sm:text-base">
-                      {deliveryEtaLoading
-                        ? 'Calculating from seller pincode...'
-                        : deliveryEta?.available && Number.isFinite(
-                              remainingDeliveryMinutes,
-                            )
-                          ? remainingDeliveryMinutes <= 0
-                            ? 'Estimated arrival: now'
-                            : `Deliver in ~${remainingDeliveryMinutes} min`
-                          : 'ETA will appear when a serviceable stock pincode is available.'}
-                    </p>
-                  </div>
-                </div>
-
-                {deliveryEta?.available && (
-                  <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-white/65 sm:text-xs">
-                    <Clock3
-                      size={14}
-                      aria-hidden="true"
-                    />
-                    <span>
-                      ~{deliveryEta.estimatedRoadDistanceKm} km · {deliveryEta.averageSpeedKmh} km/h model
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {deliveryEta?.available && (
-                <p className="mt-2 text-[10px] leading-4 text-white/45 sm:text-[11px]">
-                  Approximate pincode-to-pincode ETA using current serviceable seller stock location, road-distance factor and a normal delivery speed. Live traffic is not included.
-                </p>
-              )}
-            </section>
-          )}
-
-          <div className="p-6 sm:p-8">
-            {addresses.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-                      Saved addresses
-                    </p>
-                    <h2 className="mt-1 text-xl font-black text-stone-950">
-                      Choose an existing address
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {addresses.map(
-                    (address) => (
-                      <div
-                        key={address.id}
-                        className={`rounded-2xl border p-4 transition ${
-                          editingAddressId === address.id
-                            ? 'border-emerald-400 bg-emerald-50/40'
-                            : 'border-stone-200 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-black text-stone-950">
-                              {getAddressTitle(address)}
-                            </p>
-                            <p className="mt-1 text-sm font-semibold text-stone-700">
-                              {address.recipientName}
-                            </p>
-                          </div>
-                          {address.isDefault && (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-emerald-800">
-                              Default
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-3 text-xs leading-5 text-stone-500">
-                          {[
-                            address.addressLine1,
-                            address.area,
-                            address.city,
-                            address.state,
-                            address.postalCode,
-                          ]
-                            .filter(Boolean)
-                            .join(', ')}
-                        </p>
-
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleUseSavedAddress(address)}
-                            disabled={Boolean(selectingId) || saving}
-                            className="focus-ring rounded-lg py-1.5 text-xs font-black text-emerald-700 transition hover:text-emerald-900 disabled:opacity-60"
-                          >
-                            {selectingId === address.id ? 'Selecting...' : 'Deliver here →'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditSavedAddress(address)}
-                            disabled={Boolean(selectingId) || saving}
-                            aria-label={`Edit ${getAddressTitle(address)} address`}
-                            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-black text-stone-700 transition hover:border-emerald-300 hover:text-emerald-800 disabled:opacity-60"
-                          >
-                            <Pencil size={13} aria-hidden="true" />
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </div>
-
-                <div className="my-7 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-stone-200" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-400">
-                    or add another
-                  </span>
-                  <div className="h-px flex-1 bg-stone-200" />
-                </div>
-              </section>
+        {checkoutCartId && (
+          <section className="mt-3 flex flex-wrap items-center gap-3 border-b border-[#D7DDCF] bg-[#E7EDE8] px-4 py-3 sm:px-6" aria-live="polite">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#173F35] text-white">
+              <Clock3 size={19} aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-[0.09em] text-[#456459]">Delivery estimate</p>
+              <p className="mt-0.5 text-sm font-semibold text-[#173F35] sm:text-base">
+                {deliveryEtaLoading
+                  ? 'Checking delivery time...'
+                  : deliveryEta?.available && Number.isFinite(remainingDeliveryMinutes)
+                    ? remainingDeliveryMinutes <= 0
+                      ? 'Estimated arrival: now'
+                      : `About ${remainingDeliveryMinutes} minutes`
+                    : 'Estimate appears when delivery is available.'}
+              </p>
+            </div>
+            {deliveryEta?.available && Number.isFinite(deliveryEta.estimatedRoadDistanceKm) && (
+              <span className="rounded-full border border-[#BBCFC1] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#173F35]">
+                Approx. {deliveryEta.estimatedRoadDistanceKm} km
+              </span>
             )}
+          </section>
+        )}
 
-            <section ref={addressFormRef} className="scroll-mt-24">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-                    Address details
-                  </p>
-                  <h2 className="mt-1 text-xl font-black text-stone-950">
-                    {editingAddressId ? 'Edit delivery address' : 'Add a delivery location'}
-                  </h2>
-                  {editingAddressId && (
-                    <p className="mt-1 text-xs font-medium text-stone-500">
-                      Update the details below and save your changes.
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocationRequested(
-                      true,
-                    )
-                    requestCurrentLocation()
-                  }}
-                  disabled={
-                    locationStatus ===
-                    'requesting'
-                  }
-                  className="focus-ring inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
-                >
-                  <LocateFixed
-                    size={17}
-                    className={
-                      locationStatus ===
-                      'requesting'
-                        ? 'animate-pulse'
-                        : ''
-                    }
-                    aria-hidden="true"
-                  />
-                  {locationStatus ===
-                  'requesting'
-                    ? 'Finding location...'
-                    : 'Use my current location'}
-                </button>
+        {addresses.length > 0 && (
+          <section className="mt-8" aria-label="Saved delivery addresses">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-2 border-b border-[#D7DDCF] pb-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#C56C42]">Your places</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#173F35]">Saved addresses</h2>
               </div>
+              <span className="text-sm text-[#5C6961]">Choose one to continue</span>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {addresses.map((address) => (
+                <div
+                  key={address.id}
+                  className={`flex min-w-0 flex-col gap-3 rounded-2xl border p-4 sm:p-5 ${
+                    editingAddressId === address.id
+                      ? 'border-[#C56C42] bg-[#F8E8DF]'
+                      : 'border-[#D7DDCF] bg-white'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E8EDE6] text-[#173F35]">
+                      <MapPin size={18} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-bold text-[#202421]">{getAddressTitle(address)}</h3>
+                        {address.isDefault && (
+                          <span className="rounded-full bg-[#D7DDCF] px-2.5 py-1 text-[11px] font-bold text-[#173F35]">Default</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm font-semibold text-[#35483F]">{address.recipientName}</p>
+                      <p className="mt-1 break-words text-sm leading-5 text-[#657067]">
+                        {[address.addressLine1, address.addressLine2, address.area, address.city, address.state, address.postalCode]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#E5E9E0] pt-3">
+                    <button
+                      type="button"
+                      onClick={() => handleEditSavedAddress(address)}
+                      disabled={Boolean(selectingId) || saving}
+                      aria-label={`Edit ${getAddressTitle(address)} address`}
+                      className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#D7DDCF] bg-white px-4 py-2 text-sm font-semibold text-[#173F35] transition hover:bg-[#F2F5EE] disabled:opacity-50"
+                    >
+                      <Pencil size={15} aria-hidden="true" />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUseSavedAddress(address)}
+                      disabled={Boolean(selectingId) || saving}
+                      className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#C56C42] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#B95E36] disabled:opacity-50"
+                    >
+                      {selectingId === address.id ? 'Selecting...' : 'Deliver here'}
+                      {!selectingId && <Check size={16} aria-hidden="true" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
+        <section ref={addressFormRef} className="mt-8 scroll-mt-24 overflow-hidden rounded-[20px] border border-[#D7DDCF] bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D7DDCF] bg-[#E8EDE6] px-5 py-5 sm:px-8">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#C56C42]">
+                {editingAddressId ? 'Update your place' : 'New delivery address'}
+              </p>
+              <h2 className="mt-1 text-[24px] font-bold leading-tight tracking-tight text-[#173F35] sm:text-[28px]">
+                {editingAddressId ? 'Edit address' : 'Add your address'}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationRequested(true)
+                requestCurrentLocation()
+              }}
+              disabled={locationStatus === 'requesting'}
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#173F35] bg-white px-4 py-2.5 text-sm font-bold text-[#173F35] transition hover:bg-[#F7F6F2] disabled:opacity-50"
+            >
+              <LocateFixed
+                size={18}
+                className={locationStatus === 'requesting' ? 'animate-pulse' : ''}
+                aria-hidden="true"
+              />
+              {locationStatus === 'requesting' ? 'Finding location...' : 'Use current location'}
+            </button>
+          </div>
+
+          {(locationError || (locationRequested && currentLocation)) && (
+            <div className="px-5 pt-4 sm:px-8" aria-live="polite">
               {locationError && (
-                <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                   {locationError}
                 </p>
               )}
-
-              {locationRequested &&
-              currentLocation && (
-                <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
-                  Location found: {currentLocation.label}. Please verify the address fields before saving.
+              {locationRequested && currentLocation && (
+                <p className="rounded-xl border border-[#D7DDCF] bg-[#F4F6F1] px-4 py-3 text-sm font-medium text-[#173F35]">
+                  Location found: {currentLocation.label}. Check the address before saving.
                 </p>
               )}
+            </div>
+          )}
 
-              <form
-                onSubmit={
-                  handleSubmit
-                }
-                className="mt-6 space-y-6"
-              >
+          <form onSubmit={handleSubmit}>
+            <div className="border-b border-[#E5E9E0] px-5 py-6 sm:px-8 sm:py-8">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F4E5DC] text-sm font-extrabold text-[#C56C42]">01</span>
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.11em] text-stone-500">
-                    Who is this order for?
-                  </p>
-
-                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                    {[
-                      {
-                        value:
-                          'self',
-                        label:
-                          'For me',
-                        hint:
-                          'I am receiving this order',
-                        Icon:
-                          UserRound,
-                      },
-                      {
-                        value:
-                          'other',
-                        label:
-                          'Someone else',
-                        hint:
-                          'Deliver to another person',
-                        Icon:
-                          UsersRound,
-                      },
-                    ].map(
-                      ({
-                        value,
-                        label,
-                        hint,
-                        Icon,
-                      }) => (
-                        <button
-                          key={
-                            value
-                          }
-                          type="button"
-                          onClick={() =>
-                            updateForm(
-                              'recipientType',
-                              value,
-                            )
-                          }
-                          className={`focus-ring flex items-center gap-3 rounded-2xl border p-4 text-left transition ${
-                            form.recipientType ===
-                            value
-                              ? 'border-emerald-400 bg-emerald-50'
-                              : 'border-stone-200 hover:bg-stone-50'
-                          }`}
-                        >
-                          <Icon
-                            size={20}
-                            className="text-emerald-700"
-                            aria-hidden="true"
-                          />
-                          <span>
-                            <span className="block text-sm font-black text-stone-950">
-                              {label}
-                            </span>
-                            <span className="mt-0.5 block text-xs text-stone-500">
-                              {hint}
-                            </span>
-                          </span>
-                        </button>
-                      ),
-                    )}
-                  </div>
+                  <h3 className="text-xl font-bold text-[#173F35]">Who's receiving?</h3>
+                  <p className="mt-0.5 text-sm text-[#687169]">Choose the recipient.</p>
                 </div>
+              </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field
-                    label="Recipient name"
-                    required
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {[
+                  { value: 'self', label: 'For me', Icon: UserRound },
+                  { value: 'other', label: 'Someone else', Icon: UsersRound },
+                ].map(({ value, label, Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={form.recipientType === value}
+                    onClick={() => updateForm('recipientType', value)}
+                    className={`focus-ring flex min-h-14 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                      form.recipientType === value
+                        ? 'border-[#C56C42] bg-[#C56C42] text-white'
+                        : 'border-[#D7DDCF] bg-[#F7F6F2] text-[#173F35] hover:border-[#C56C42]'
+                    }`}
                   >
-                    <input
-                      required
-                      value={
-                        form.recipientName
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'recipientName',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="Full name"
-                    />
-                  </Field>
+                    <span className="flex items-center gap-3 text-base font-bold">
+                      <Icon size={20} aria-hidden="true" />
+                      {label}
+                    </span>
+                    {form.recipientType === value && <Check size={18} aria-hidden="true" />}
+                  </button>
+                ))}
+              </div>
 
-                  <Field
-                    label="Phone number"
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <Field label="Recipient name" required>
+                  <input
                     required
-                  >
-                    <input
-                      required
-                      type="tel"
-                      value={
-                        form.phone
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'phone',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="9876543210"
-                    />
-                  </Field>
-                </div>
-
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.11em] text-stone-500">
-                    Save address as
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {ADDRESS_LABELS.map(
-                      ({
-                        value,
-                        label,
-                        icon:
-                          Icon,
-                      }) => (
-                        <button
-                          key={
-                            value
-                          }
-                          type="button"
-                          onClick={() =>
-                            updateForm(
-                              'label',
-                              value,
-                            )
-                          }
-                          className={`focus-ring inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-xs font-black transition ${
-                            form.label ===
-                            value
-                              ? 'border-stone-950 bg-stone-950 text-white'
-                              : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-                          }`}
-                        >
-                          <Icon
-                            size={14}
-                            aria-hidden="true"
-                          />
-                          {label}
-                        </button>
-                      ),
-                    )}
-                  </div>
-
-                  {form.label ===
-                    'other' && (
-                    <div className="mt-3 max-w-sm">
-                      <Field
-                        label="Custom label"
-                        required
-                      >
-                        <input
-                          required
-                          value={
-                            form.customLabel
-                          }
-                          onChange={(event) =>
-                            updateForm(
-                              'customLabel',
-                              event.target.value,
-                            )
-                          }
-                          className={
-                            inputClassName
-                          }
-                          placeholder="e.g. Parents, Studio"
-                        />
-                      </Field>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field
-                    label="Flat / house / building / street"
-                    required
-                  >
-                    <input
-                      required
-                      value={
-                        form.addressLine1
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'addressLine1',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="Flat 402, Tower B"
-                    />
-                  </Field>
-
-                  <Field label="Additional address line">
-                    <input
-                      value={
-                        form.addressLine2
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'addressLine2',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="Street / society / block"
-                    />
-                  </Field>
-
-                  <Field
-                    label="Area / locality"
-                    required
-                  >
-                    <input
-                      required
-                      value={
-                        form.area
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'area',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="Sector 62"
-                    />
-                  </Field>
-
-                  <Field label="Landmark">
-                    <input
-                      value={
-                        form.landmark
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'landmark',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="Near metro station"
-                    />
-                  </Field>
-
-                  <Field
-                    label="City"
-                    required
-                  >
-                    <input
-                      required
-                      value={
-                        form.city
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'city',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="Noida"
-                    />
-                  </Field>
-
-                  <Field
-                    label="State"
-                    required
-                  >
-                    <input
-                      required
-                      value={
-                        form.state
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'state',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="Uttar Pradesh"
-                    />
-                  </Field>
-
-                  <Field
-                    label="Postal code"
-                    required
-                  >
-                    <input
-                      required
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={
-                        form.postalCode
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'postalCode',
-                          event.target.value
-                            .replace(
-                              /\D/g,
-                              '',
-                            )
-                            .slice(
-                              0,
-                              6,
-                            ),
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                      placeholder="201301"
-                    />
-                  </Field>
-
-                  <Field
-                    label="Country"
-                    required
-                  >
-                    <input
-                      required
-                      value={
-                        form.country
-                      }
-                      onChange={(event) =>
-                        updateForm(
-                          'country',
-                          event.target.value,
-                        )
-                      }
-                      className={
-                        inputClassName
-                      }
-                    />
-                  </Field>
-                </div>
-
-                <Field label="Delivery instructions">
-                  <textarea
-                    rows={3}
-                    value={
-                      form.deliveryInstructions
-                    }
-                    onChange={(event) =>
-                      updateForm(
-                        'deliveryInstructions',
-                        event.target.value,
-                      )
-                    }
-                    className={
-                      inputClassName
-                    }
-                    placeholder="Gate number, floor, call on arrival, etc."
+                    autoComplete="name"
+                    value={form.recipientName}
+                    onChange={(event) => updateForm('recipientName', event.target.value)}
+                    className={inputClassName}
+                    placeholder="Full name"
                   />
                 </Field>
+                <Field label="Phone number" required>
+                  <input
+                    required
+                    type="tel"
+                    autoComplete="tel"
+                    value={form.phone}
+                    onChange={(event) => updateForm('phone', event.target.value)}
+                    className={inputClassName}
+                    placeholder="Mobile number"
+                  />
+                </Field>
+              </div>
+            </div>
 
-                {error && (
-                  <div
-                    role="alert"
-                    className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800"
-                  >
-                    {error}
-                  </div>
-                )}
-
-                {success && (
-                  <div className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-                    <Check
-                      size={17}
-                      className="mt-0.5 shrink-0"
-                      aria-hidden="true"
-                    />
-                    {success}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-stone-200 pt-5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editingAddressId) {
-                        handleCancelEdit()
-                      } else {
-                        navigate(returnTo)
-                      }
-                    }}
-                    className="focus-ring rounded-2xl border border-stone-200 px-5 py-3 text-sm font-black text-stone-700 hover:bg-stone-50"
-                  >
-                    {editingAddressId ? 'Cancel editing' : 'Cancel'}
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={
-                      saving ||
-                      loading
-                    }
-                    className="focus-ring inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800 disabled:opacity-60"
-                  >
-                    <Save
-                      size={17}
-                      aria-hidden="true"
-                    />
-                    {saving
-                      ? 'Saving address...'
-                      : editingAddressId
-                        ? 'Save changes'
-                        : 'Save & deliver here'}
-                  </button>
+            <div className="border-b border-[#E5E9E0] px-5 py-6 sm:px-8 sm:py-8">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F4E5DC] text-sm font-extrabold text-[#C56C42]">02</span>
+                <div>
+                  <h3 className="text-xl font-bold text-[#173F35]">Delivery location</h3>
+                  <p className="mt-0.5 text-sm text-[#687169]">Enter the delivery details.</p>
                 </div>
-              </form>
-            </section>
-          </div>
-        </div>
+              </div>
+              <div className="grid gap-x-5 gap-y-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <Field label="Flat / house / building / street" required>
+                    <input
+                      required
+                      autoComplete="address-line1"
+                      value={form.addressLine1}
+                      onChange={(event) => updateForm('addressLine1', event.target.value)}
+                      className={inputClassName}
+                      placeholder="Flat, building and street"
+                    />
+                  </Field>
+                </div>
+                <Field label="Additional address line">
+                  <input
+                    autoComplete="address-line2"
+                    value={form.addressLine2}
+                    onChange={(event) => updateForm('addressLine2', event.target.value)}
+                    className={inputClassName}
+                    placeholder="Society, block or apartment"
+                  />
+                </Field>
+                <Field label="Area / locality" required>
+                  <input
+                    required
+                    value={form.area}
+                    onChange={(event) => updateForm('area', event.target.value)}
+                    className={inputClassName}
+                    placeholder="Area or neighbourhood"
+                  />
+                </Field>
+                <Field label="Landmark">
+                  <input
+                    value={form.landmark}
+                    onChange={(event) => updateForm('landmark', event.target.value)}
+                    className={inputClassName}
+                    placeholder="Nearby landmark (optional)"
+                  />
+                </Field>
+                <Field label="City" required>
+                  <input
+                    required
+                    autoComplete="address-level2"
+                    value={form.city}
+                    onChange={(event) => updateForm('city', event.target.value)}
+                    className={inputClassName}
+                    placeholder="City"
+                  />
+                </Field>
+                <Field label="State" required>
+                  <input
+                    required
+                    autoComplete="address-level1"
+                    value={form.state}
+                    onChange={(event) => updateForm('state', event.target.value)}
+                    className={inputClassName}
+                    placeholder="State"
+                  />
+                </Field>
+                <Field label="PIN code" required>
+                  <input
+                    required
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    maxLength={6}
+                    value={form.postalCode}
+                    onChange={(event) => updateForm('postalCode', event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className={inputClassName}
+                    placeholder="6-digit PIN"
+                  />
+                </Field>
+                <Field label="Country" required>
+                  <input
+                    required
+                    autoComplete="country-name"
+                    value={form.country}
+                    onChange={(event) => updateForm('country', event.target.value)}
+                    className={inputClassName}
+                    placeholder="Country"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="bg-[#F3F5F0] px-5 py-6 sm:px-8 sm:py-8">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F4E5DC] text-sm font-extrabold text-[#C56C42]">03</span>
+                <div>
+                  <h3 className="text-xl font-bold text-[#173F35]">Save this place</h3>
+                  <p className="mt-0.5 text-sm text-[#687169]">Label it for next time.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ADDRESS_LABELS.map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={form.label === value}
+                    onClick={() => updateForm('label', value)}
+                    className={`focus-ring inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                      form.label === value
+                        ? 'border-[#173F35] bg-[#173F35] text-white'
+                        : 'border-[#D7DDCF] bg-white text-[#173F35] hover:border-[#C56C42]'
+                    }`}
+                  >
+                    <Icon size={16} aria-hidden="true" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {form.label === 'other' && (
+                <div className="mt-4 max-w-md">
+                  <Field label="Custom label" required>
+                    <input
+                      required
+                      value={form.customLabel}
+                      onChange={(event) => updateForm('customLabel', event.target.value)}
+                      className={inputClassName}
+                      placeholder="e.g. Parents, Studio"
+                    />
+                  </Field>
+                </div>
+              )}
+              <div className="mt-5">
+                <Field label="Delivery instructions (optional)">
+                  <textarea
+                    rows={2}
+                    value={form.deliveryInstructions}
+                    onChange={(event) => updateForm('deliveryInstructions', event.target.value)}
+                    className={inputClassName}
+                    placeholder="Gate number, floor, call on arrival..."
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {(error || success) && (
+              <div className="space-y-3 border-t border-[#D7DDCF] px-5 pt-5 sm:px-8" aria-live="polite">
+                {error && (
+                  <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+                    {error}
+                  </p>
+                )}
+                {success && (
+                  <p className="flex items-center gap-2 rounded-xl border border-[#D7DDCF] bg-[#E8EDE6] px-4 py-3 text-sm font-semibold text-[#173F35]">
+                    <Check size={18} aria-hidden="true" />
+                    {success}
+                  </p>
+                )}
+              </div>
+            )}
+            <footer className="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-[#D7DDCF] bg-[#F3F5F0] px-5 py-5 sm:flex-row sm:items-center sm:px-8">
+              <button
+                type="button"
+                onClick={() => {
+                  if (editingAddressId) {
+                    handleCancelEdit()
+                  } else {
+                    navigate(returnTo)
+                  }
+                }}
+                className="focus-ring min-h-12 rounded-xl border border-[#CBD4C6] bg-white px-5 py-3 text-sm font-bold text-[#173F35] transition hover:bg-[#E8EDE6]"
+              >
+                {editingAddressId ? 'Cancel editing' : 'Cancel'}
+              </button>
+              <button
+                type="submit"
+                disabled={saving || loading}
+                className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#C56C42] px-7 py-3 text-sm font-bold text-white transition hover:bg-[#B75F38] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Save size={18} aria-hidden="true" />
+                {saving ? 'Saving address...' : editingAddressId ? 'Save changes' : 'Save & deliver here'}
+              </button>
+            </footer>
+          </form>
+        </section>
       </div>
     </main>
   )

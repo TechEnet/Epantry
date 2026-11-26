@@ -2401,12 +2401,56 @@ export default function HostOperationsPage({ section = "dashboard" }) {
   const coverageApprovedProducts = useMemo(() => coverageListingRows.filter((listing) => {
     if (listing.status !== "approved" || !listing.id) return false;
     const packet = listing.packet || {};
-    const isSellable = packet.type === "grocery" || packet.type === "prepared_food" ||
-      (packet.type === "kitchen_recipe" && packet.sellReadyMade === true);
+    const kind = packet.type || listing.type;
+    const isSellable = kind === "grocery" || kind === "prepared_food" ||
+      (kind === "kitchen_recipe" && packet.sellReadyMade === true);
     if (!isSellable || packet.delivery?.fulfillment === "pickup") return false;
     const existing = [...new Set((packet.delivery?.postalCodes || []).map(String))].sort();
     return JSON.stringify(existing) !== JSON.stringify(coveragePublishedPins);
   }), [coverageListingRows, coveragePublishedPins]);
+
+  // Already-approved product PINs can differ from saved business coverage.
+  // Hosts can request a governed change for all affected items in one click.
+  // This does NOT update live customer coverage. Every item remains pending
+  // until its Super Admin approval refreshes the published packet + ServiceArea.
+  async function requestCoverageReviewForAllApprovedProducts() {
+    if (coverageApplying || coverageUnsaved || !coveragePublishedPins.length ||
+        coverageListingLoading || coverageListingError || !sharedDeliveryArea?.id) return;
+    const candidates = coverageApprovedProducts.slice();
+    if (!candidates.length) {
+      setCoverageApplyResult({ succeeded: [], failed: [], message: "All loaded approved delivery listings already use these business PINs." });
+      return;
+    }
+    // Never re-submit records that are already awaiting a Super Admin decision.
+    // Existing Host API currently lists a maximum of 100 records; do not claim
+    // coverage across any records that the API may not have returned.
+    setCoverageApplying(true);
+    setCoverageApplyResult(null);
+    const succeeded = [];
+    const failed = [];
+    try {
+      for (const row of candidates) {
+        const title = row.title || row.packet?.title || String(row.id);
+        try {
+          const before = row.packet?.delivery || {};
+          const updatedDelivery = { ...before, fulfillment: "delivery", postalCodes: [...coveragePublishedPins] };
+          await submitHostListingSectionRevision(row.id, { delivery: updatedDelivery });
+          succeeded.push(title);
+        } catch (cause) {
+          failed.push({ title, message: getHostOperationsErrorMessage(cause, "Super Admin update could not be requested.") });
+        }
+      }
+    } finally {
+      setCoverageApplying(false);
+      setCoverageSelectedIds([]);
+      setCoverageApplyResult({
+        succeeded,
+        failed,
+        message: "Customer delivery changes require Super Admin approval. No live coverage was changed here.",
+      });
+      setCoverageRefreshCounter((count) => count + 1);
+    }
+  }
 
   async function applyCoverageToSelectedListings() {
     if (coverageApplying || !sharedDeliveryArea?.id || coverageUnsaved || !coveragePublishedPins.length ||
@@ -3390,8 +3434,44 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                       const result = sharedDeliveryArea
                         ? await updateServiceArea(sharedDeliveryArea.id, { ...payload, status: "active" })
                         : await createServiceArea({ ...payload, serviceAreaKey: SHARED_DELIVERY_AREA_KEY });
-                      // Only clear the edit flag after the API confirms a save.
+                      // Coverage save is not a public listing approval. Request
+                      // review of affected, already-approved products through
+                      // the existing secured Host section-revision endpoint.
+                      // Bournvita and other older packets never become available
+                      // at unapproved PINs just because the business PINs saved.
                       deliveryAreaEditedRef.current = false;
+                      const reviewSummary = { succeeded: [], failed: [], message: "Delivery coverage saved. Product changes require Super Admin approval." };
+                      try {
+                        const latest = await listHostListingPackets();
+                        const rows = Array.isArray(latest?.listings) ? latest.listings : [];
+                        const sortedPins = [...new Set(postalCodes)].sort();
+                        for (const row of rows) {
+                          const packet = row.packet || {};
+                          const type = packet.type || row.type;
+                          const sells = type === "grocery" || type === "prepared_food" ||
+                            (type === "kitchen_recipe" && packet.sellReadyMade === true);
+                          if (!row.id || row.status !== "approved" || !sells || packet.delivery?.fulfillment === "pickup") continue;
+                          const currentPins = [...new Set((packet.delivery?.postalCodes || []).map(String))].sort();
+                          if (JSON.stringify(currentPins) === JSON.stringify(sortedPins)) continue;
+                          const title = row.title || packet.title || String(row.id);
+                          try {
+                            await submitHostListingSectionRevision(row.id, {
+                              delivery: { ...(packet.delivery || {}), fulfillment: "delivery", postalCodes: sortedPins },
+                            });
+                            reviewSummary.succeeded.push(title);
+                          } catch (cause) {
+                            reviewSummary.failed.push({ title,
+                              message: getHostOperationsErrorMessage(cause, "Could not request Super Admin approval.") });
+                          }
+                        }
+                        if (rows.length >= 100) {
+                          reviewSummary.message += " Host API returned 100 recent records; older listings may need individual review.";
+                        }
+                      } catch (cause) {
+                        reviewSummary.message += ` Host listing sync could not be completed: ${getHostOperationsErrorMessage(cause, "Listing API unavailable.")}`;
+                      }
+                      setCoverageApplyResult(reviewSummary);
+                      setCoverageRefreshCounter((count) => count + 1);
                       return result;
                     },
                     sharedDeliveryArea ? "Business coverage updated." : "Business coverage saved."
@@ -3443,7 +3523,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 <div className="max-w-[660px]">
                   <h3 className="text-[18px] font-extrabold leading-tight text-[#173F35]">Existing approved products</h3>
                   <p className="mt-1 text-[14px] leading-6 text-[#43554B]">
-                    Business PINs are the default for new listings. To cover older products, select them below and send their delivery update to Super Admin.
+                    Business PINs are used for new listings. Existing approved items retain their previous PINs until Super Admin approves a delivery update. Use the bulk button below or choose individual products.
                   </p>
                 </div>
                 <button type="button" onClick={() => setCoverageRefreshCounter((count) => count + 1)}
@@ -3460,7 +3540,25 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               {coverageListingLoading ? <p role="status" className="mt-3 text-sm text-[#43554B]">Loading approved products...</p> : null}
               {coverageListingError ? <p role="alert" className="mt-3 text-sm font-semibold text-[#B34E37]">{coverageListingError}</p> : null}
               {!coverageListingLoading && !coverageListingError && sharedDeliveryArea && !coverageApprovedProducts.length ? (
-                <p className="mt-3 text-sm text-[#43554B]">No approved delivery products need this update among the returned listings.</p>
+                <p className="mt-3 text-sm text-[#43554B]">No approved delivery products need an update among the records returned by Host Listing API. If a product is missing here, check its listing status in Listing History.</p>
+              ) : null}
+              {coverageApprovedProducts.length > 0 ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-y border-[#D6DDD2] py-4">
+                  <button
+                    type="button"
+                    onClick={requestCoverageReviewForAllApprovedProducts}
+                    disabled={coverageApplying || coverageUnsaved || coverageListingLoading || Boolean(coverageListingError)}
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#C56C42] px-5 py-2 text-[14px] font-extrabold text-white hover:bg-[#AE5934] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {coverageApplying ? "Sending review requests..." : `Request approval for all ${coverageApprovedProducts.length} affected products`}
+                  </button>
+                  <span className="text-[13px] leading-5 text-[#536358]">One request per approved product · Customer availability changes only after approval.</span>
+                </div>
+              ) : null}
+              {coverageListingRows.length >= 100 ? (
+                <p role="status" className="mt-2 text-[12px] font-semibold text-[#96512F]">
+                  The current Host listings API returns up to 100 recent items. Older products may require individual review.
+                </p>
               ) : null}
               {coverageApprovedProducts.length > 0 ? (
                 <div className="mt-4 space-y-0 border-y border-[#D6DDD2]">
@@ -3506,7 +3604,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
               {coverageApplyResult ? (
                 <div role="status" className="mt-4 border-l-[3px] border-[#C56C42] bg-[#F7F6F2] p-3 text-[13px] leading-6 text-[#173F35]">
                   <strong>{coverageApplyResult.succeeded.length} update(s) submitted for Super Admin review.</strong>
-                  <p>Current customer coverage stays unchanged until the updated listings are approved.</p>
+                  <p>{coverageApplyResult.message || "Current customer coverage stays unchanged until the updated listings are approved."}</p>
                   {coverageApplyResult.failed.map((entry, index) => (
                     <p key={`${entry.title}-${index}`} className="font-semibold text-[#9D4031]">
                       {entry.title}: {entry.message}

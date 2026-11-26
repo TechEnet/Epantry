@@ -502,262 +502,103 @@ export default function LoginPage() {
     isMfaRequired
   ) {
     return (
-      <main className="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-12">
-
-        <section
-          style={{
-            width:
-              'min(500px, calc(100vw - 32px))',
-          }}
-          className="
-            shrink-0
-            rounded-[22px]
-            border
-            border-[#DCE0CF]
-            bg-[#F7F6F2]
-            px-8
-            py-8
-            shadow-[0_24px_70px_rgba(41,37,36,0.13),0_4px_18px_rgba(41,37,36,0.06)]
-          "
-        >
-
-          <button
-            type="button"
-            onClick={
-              handleBackToPassword
-            }
-            disabled={
-              isCompletingMfa
-            }
-            className="inline-flex items-center gap-2 text-xs font-semibold text-[#202421]/75 transition hover:text-[#202421] disabled:opacity-50"
-          >
-            <ArrowLeft
-              size={15}
-            />
-            Back to password
-          </button>
-
-          <div className="mx-auto mt-5 flex justify-center" aria-label="EPANTRY branding">
-            <img
-              src="/branding/epantry-wordmark.webp"
-              alt="EPANTRY.in"
-              className="h-auto w-[194px] max-w-full object-contain"
-              draggable="false"
-            />
-          </div>
-
-          <div className="mx-auto mt-5 grid size-14 place-items-center rounded-2xl bg-[#DCE0CF] text-[#173F35]">
-            <ShieldCheck
-              size={27}
-            />
-          </div>
-
-          <div className="mt-6 text-center">
-
-            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#173F35]">
-              Two-step verification
-            </p>
-
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#202421]">
-              Security check
-            </h1>
-
-            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#202421]/75">
-              Enter the current 6-digit code from your authenticator app.
-            </p>
-
-          </div>
-
-          <div className="mt-6 flex items-center gap-3 rounded-xl border border-stone-100 bg-[#DCE0CF]/35 px-4 py-3.5">
-
-            <Mail
-              size={17}
-              className="shrink-0 text-[#202421]/60"
-            />
-
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#202421]/60">
-                Signing in as
-              </p>
-
-              <p className="mt-0.5 truncate text-xs font-semibold text-stone-800">
-                {form.email.trim()}
-              </p>
+      <main id="epantry-login-mfa" className="w-full bg-[#F7F6F2] px-4 py-7 sm:px-6 sm:py-12">
+        <style>{`
+          #epantry-login-mfa { display:grid; place-items:center; min-height: min(720px, calc(100svh - 76px)); padding: 32px 20px; }
+          #epantry-login-mfa .mfa-wrap { width:100%; max-width:480px; border:1px solid #D7DDCF; border-radius:18px; overflow:hidden; background:#fff; box-shadow:0 16px 48px rgba(23,63,53,.09); }
+          #epantry-login-mfa .mfa-header { background:#C56C42; color:#202421; padding:24px 30px; }
+          #epantry-login-mfa .mfa-header h1 { font-size:30px !important; line-height:1.15 !important; letter-spacing:-.035em; margin:16px 0 5px; }
+          #epantry-login-mfa .mfa-body { padding:24px 30px 28px; }
+          #epantry-login-mfa .mfa-code-wrap { position:relative; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+          #epantry-login-mfa .mfa-digit { height:58px; display:grid; place-items:center; border:1px solid #D7DDCF; border-radius:9px; background:#F7F6F2; font-size:25px; font-weight:700; color:#202421; }
+          #epantry-login-mfa .mfa-code-wrap:focus-within .mfa-digit.is-current { border-color:#C56C42; box-shadow:0 0 0 2px #C56C42; }
+          #epantry-login-mfa .mfa-code { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:text; }
+          #epantry-login-mfa button:focus-visible, #epantry-login-mfa select:focus-visible { outline:2px solid #173F35; outline-offset:3px; }
+          @media(max-width:480px) { #epantry-login-mfa { padding:20px 14px; min-height:0; } #epantry-login-mfa .mfa-header, #epantry-login-mfa .mfa-body { padding:20px; } #epantry-login-mfa .mfa-header h1 { font-size:27px !important; } #epantry-login-mfa .mfa-digit { height:50px; } #epantry-login-mfa .mfa-code-wrap { gap:6px; } }
+        `}</style>
+        <section className="mfa-wrap">
+          <header className="mfa-header">
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" onClick={handleBackToPassword} disabled={isCompletingMfa} className="inline-flex items-center gap-2 text-[14px] font-semibold hover:underline disabled:opacity-50"><ArrowLeft size={17}/> Back</button>
+              <span className="inline-flex items-center gap-2 text-[13px] font-semibold"><ShieldCheck size={18} aria-hidden="true"/> Step 2 of 2</span>
+            </div>
+            <h1 className="font-bold">Two-step verification</h1>
+            <p className="text-[15px] leading-relaxed">Enter the code from your authenticator app.</p>
+          </header>
+          <div className="mfa-body min-w-0">
+            <div className="flex items-center gap-3 rounded-[10px] bg-[#D7DDCF] px-4 py-3">
+              <Mail size={19} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[13px] text-[#173F35]">Signing in as</p>
+                <p className="break-all text-[15px] font-semibold text-[#202421]">{form.email.trim()}</p>
+              </div>
             </div>
 
-          </div>
-
-          {errorMessage && (
-            <div
-              className="mt-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700"
-              role="alert"
-            >
-              <CircleAlert
-                size={17}
-                className="mt-0.5 shrink-0"
-              />
-
-              <p className="text-xs font-medium leading-5">
-                {errorMessage}
-              </p>
-            </div>
-          )}
-
-          <form
-            onSubmit={
-              handleMfaSubmit
-            }
-            className="mt-7"
-            noValidate
-          >
-
-            {factors.length > 1 && (
-              <div className="mb-6">
-
-                <label
-                  htmlFor="mfa-factor"
-                  className="mb-2 block text-xs font-semibold text-stone-700"
-                >
-                  Authenticator
-                </label>
-
-                <InputShell>
-
-                  <Smartphone
-                    size={16}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#202421]/60"
-                  />
-
-                  <select
-                    id="mfa-factor"
-                    value={
-                      selectedFactorUid
-                    }
-                    onChange={(
-                      event,
-                    ) => {
-                      setSelectedFactorUid(
-                        event.target.value,
-                      )
-
-                      setVerificationCode('')
-                      setErrorMessage('')
-                    }}
-                    className="h-12 w-full appearance-none bg-transparent pl-11 pr-4 text-xs font-semibold text-stone-900 outline-none"
-                  >
-                    {factors.map(
-                      (
-                        factor,
-                        index,
-                      ) => (
-                        <option
-                          key={
-                            factor.uid
-                          }
-                          value={
-                            factor.uid
-                          }
-                        >
-                          {getFactorLabel(
-                            factor,
-                            index,
-                          )}
-                        </option>
-                      ),
-                    )}
-                  </select>
-
-                </InputShell>
-
+            {errorMessage && (
+              <div className="mt-4 flex items-start gap-3 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
+                <CircleAlert size={18} className="mt-0.5 shrink-0" />
+                <p className="text-[14px] font-medium leading-5">{errorMessage}</p>
               </div>
             )}
 
-            {factors.length === 1 && (
-              <div className="mb-6 flex items-center gap-3 rounded-xl border border-stone-100 bg-[#DCE0CF]/35 px-4 py-3">
-
-                <Smartphone
-                  size={17}
-                  className="text-[#173F35]"
-                />
-
-                <div>
-                  <p className="text-xs font-semibold text-stone-900">
-                    {getFactorLabel(
-                      selectedFactor,
-                      0,
-                    )}
-                  </p>
-
-                  <p className="mt-0.5 text-[10px] text-[#202421]/60">
-                    TOTP authenticator
-                  </p>
+            <form onSubmit={handleMfaSubmit} className="mt-5" noValidate>
+              {factors.length > 1 && (
+                <div className="mb-5">
+                  <label htmlFor="mfa-factor" className="mb-2 block text-[14px] font-semibold text-[#202421]">Authenticator</label>
+                  <div className="relative">
+                    <Smartphone size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#173F35]" aria-hidden="true" />
+                    <select
+                      id="mfa-factor"
+                      value={selectedFactorUid}
+                      onChange={(event) => {
+                        setSelectedFactorUid(event.target.value)
+                        setVerificationCode('')
+                        setErrorMessage('')
+                      }}
+                      className="h-12 w-full rounded-[10px] border border-[#D7DDCF] bg-white pl-10 pr-3 text-[15px] font-semibold text-[#202421]"
+                    >
+                      {factors.map((factor, index) => (
+                        <option key={factor.uid} value={factor.uid}>{getFactorLabel(factor, index)}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-
-              </div>
-            )}
-
-            <label
-              htmlFor="login-mfa-code"
-              className="mb-2 block text-xs font-semibold text-stone-700"
-            >
-              Authentication code
-            </label>
-
-            <InputShell>
-
-              <input
-                id="login-mfa-code"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={
-                  MFA_CODE_LENGTH
-                }
-                value={
-                  verificationCode
-                }
-                onChange={
-                  handleVerificationCodeChange
-                }
-                autoFocus
-                className="h-16 w-full bg-transparent px-4 text-center font-mono text-2xl font-bold tracking-[0.42em] text-[#202421] outline-none placeholder:text-[#202421]/50"
-                placeholder="000000"
-              />
-
-            </InputShell>
-
-            <button
-              type="submit"
-              disabled={
-                isCompletingMfa ||
-                verificationCode.length !==
-                  MFA_CODE_LENGTH ||
-                !selectedFactorUid
-              }
-              className="mt-7 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] text-xs font-bold text-white transition hover:bg-emerald-800 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isCompletingMfa ? (
-                <>
-                  <LoaderCircle
-                    size={17}
-                    className="animate-spin"
-                  />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <ShieldCheck
-                    size={17}
-                  />
-                  Verify & sign in
-                </>
               )}
-            </button>
 
-          </form>
+              {factors.length === 1 && (
+                <div className="mb-5 flex items-center gap-3 border-b border-[#D7DDCF] px-1 pb-4">
+                  <Smartphone size={20} className="shrink-0 text-[#173F35]" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="break-words text-[15px] font-semibold text-[#202421]">{getFactorLabel(selectedFactor, 0)}</p>
+                    
+                  </div>
+                </div>
+              )}
 
+              <label htmlFor="login-mfa-code" className="mb-2 block text-[15px] font-semibold text-[#202421]">6-digit code</label>
+              <div className="mfa-code-wrap">
+                {Array.from({ length: MFA_CODE_LENGTH }, (_, index) => (
+                  <span key={index} aria-hidden="true" className={`mfa-digit ${index === Math.min(verificationCode.length, MFA_CODE_LENGTH - 1) ? 'is-current' : ''}`}>
+                    {verificationCode[index] || <span className="text-[#D7DDCF]">–</span>}
+                  </span>
+                ))}
+                <input id="login-mfa-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={MFA_CODE_LENGTH} value={verificationCode} onChange={handleVerificationCodeChange} autoFocus className="mfa-code" />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isCompletingMfa || verificationCode.length !== MFA_CODE_LENGTH || !selectedFactorUid}
+                className="mt-5 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[12px] bg-[#C56C42] px-4 text-[15px] font-bold text-[#202421] transition hover:brightness-95 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isCompletingMfa ? (
+                  <><LoaderCircle size={18} className="animate-spin" /> Verifying...</>
+                ) : (
+                  <>Verify & sign in <ArrowRight size={18} aria-hidden="true" /></>
+                )}
+              </button>
+            </form>
+          </div>
         </section>
-
       </main>
     )
   }

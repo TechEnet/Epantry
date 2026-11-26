@@ -33,6 +33,49 @@ import {
 
 /*
 |--------------------------------------------------------------------------
+| Active Host-wide Delivery Coverage
+|--------------------------------------------------------------------------
+|
+| 'host-default-delivery' is explicitly saved by the Host in Operations
+| Center. It applies to this Host's approved, active delivery offers only.
+| This is not a substitute for Super Admin listing approval, a valid price,
+| active stock, fulfillment compatibility, or ownership checks.
+|
+| The older public offer guard checked only the snapshot of PINs saved at
+| the time of approval. Consequently, adding 110047 as a new *business*
+| delivery PIN did not make existing approved offers visible, even when the
+| matching active shared ServiceArea and real inventory/price existed.
+|--------------------------------------------------------------------------
+*/
+
+export const HOST_SHARED_DELIVERY_AREA_KEY = 'host-default-delivery'
+
+export function approvedHostDeliveryAllowsPin({ delivery, pincode, sharedCoverage = false }) {
+  if (delivery?.fulfillment === 'pickup') return false
+  const pin = normalizePostalCode(pincode)
+  if (!/^[1-9][0-9]{5}$/.test(String(pin || ''))) return false
+  const onApprovedListing = Array.isArray(delivery?.postalCodes) &&
+    delivery.postalCodes.some((value) => normalizePostalCode(value) === pin)
+  return Boolean(onApprovedListing || sharedCoverage)
+}
+
+export async function hasSharedHostDeliveryCoverage({ organizationId, pincode }) {
+  const pin = normalizePostalCode(pincode)
+  if (!organizationId || !/^[1-9][0-9]{5}$/.test(String(pin || ''))) return false
+  // A shared area must be organization-wide, active, and explicitly a
+  // delivery area. Any paused, node-scoped, or pickup-only area is excluded.
+  return Boolean(await ServiceArea.exists({
+    organizationId,
+    serviceAreaKey: HOST_SHARED_DELIVERY_AREA_KEY,
+    inventoryNodeId: null,
+    postalCodes: pin,
+    fulfillmentTypes: 'delivery',
+    status: 'active',
+  }))
+}
+
+/*
+|--------------------------------------------------------------------------
 | Pure Eligibility
 |--------------------------------------------------------------------------
 */
@@ -411,9 +454,21 @@ export async function listPublicEligibleOffers({
       ),
     )
 
-  // Unified Listing offers are scoped to one approved Host packet. Generic
-  // organization-wide service areas must NEVER widen that packet's PIN coverage.
-  // This guard is also used by Cart/Checkout, not only the Recipe Detail UI.
+  // Explicit business-wide delivery coverage must be checked for the same
+  // approved Host organization. Other service areas cannot widen an offer.
+  // All canonical identity, active account, stock and price checks below
+  // still run before anything becomes publicly purchasable.
+  const sharedAreas = fulfillmentType === 'pickup' ? [] : await ServiceArea.find({
+    organizationId: { $in: organizations.map((organization) => organization._id) },
+    serviceAreaKey: HOST_SHARED_DELIVERY_AREA_KEY,
+    inventoryNodeId: null,
+    postalCodes: normalizedPincode,
+    fulfillmentTypes: 'delivery',
+    status: 'active',
+  }).select('organizationId').lean()
+  const sharedCoverageByOrganization = new Set(
+    sharedAreas.map((area) => String(area.organizationId)),
+  )
   const unifiedRefs = offers.map((offer) =>
     /^epantry-([a-f\d]{24})$/i.exec(String(offer.merchantSku || ''))?.[1]).filter(Boolean)
   const linkedListings = unifiedRefs.length
@@ -440,7 +495,12 @@ export async function listPublicEligibleOffers({
     if (String(approved.catalogProductVersionId || '') !== String(canonical.publishedVersion._id)) return false
     const mode = approved.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
     if (mode === 'pickup') return fulfillmentType === 'pickup'
-    return approved.delivery?.postalCodes?.some((value) => String(value).trim() === normalizedPincode) === true
+    if (fulfillmentType === 'pickup') return false
+    return approvedHostDeliveryAllowsPin({
+      delivery: approved.delivery,
+      pincode: normalizedPincode,
+      sharedCoverage: sharedCoverageByOrganization.has(String(offer.organizationId)),
+    })
   })
 
   if (

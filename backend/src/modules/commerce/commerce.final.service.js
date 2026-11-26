@@ -2,6 +2,8 @@ import crypto from 'node:crypto'
 
 import mongoose from 'mongoose'
 
+import { ProductVersion } from '../catalog/catalog.models.js'
+
 import {
   ApiError,
 } from '../../utils/ApiError.js'
@@ -1211,6 +1213,43 @@ function reservationExpiry(
   )
 }
 
+// Platform-wide domestic checkout defaults. Seller-specific active INR policies
+// still take precedence. No seller record is created or modified at checkout.
+function resolveCheckoutPolicy({ policy, currency, deliveryCountry, fulfillmentType }) {
+  const normalizedCurrency = String(currency || '').trim().toUpperCase()
+  if (policy) {
+    return policy.status === 'active' &&
+      String(policy.currency || '').trim().toUpperCase() === normalizedCurrency
+      ? policy
+      : null
+  }
+
+  const country = String(deliveryCountry || '').trim().toLowerCase()
+  const domestic = fulfillmentType === 'pickup' || ['india', 'in', 'ind'].includes(country)
+  if (normalizedCurrency !== 'INR' || !domestic) return null
+
+  // Default to free delivery; an operator may configure a platform-wide fee
+  // in integer paise. Reject invalid configuration instead of charging it.
+  const configuredFee = String(process.env.EPANTRY_DEFAULT_DELIVERY_FEE_MINOR ?? '0').trim()
+  const deliveryFeeMinor = Number(configuredFee)
+  if (!/^\d+$/.test(configuredFee) || !Number.isSafeInteger(deliveryFeeMinor)) {
+    throw new ApiError(503, 'Default delivery charges are not configured correctly.', [
+      { code: 'CHECKOUT_DEFAULT_DELIVERY_FEE_INVALID' },
+    ])
+  }
+
+  return {
+    currency: 'INR',
+    deliveryFeeMinor,
+    freeDeliveryThresholdMinor: null,
+    version: 1,
+    cancellationPolicySummary:
+      'For cancellation requests, use the order support channels. Applicable consumer rights are preserved.',
+    returnPolicySummary:
+      'For return or refund requests, use the order support channels. Eligibility depends on the item and applicable consumer rights.',
+  }
+}
+
 function calculateDeliveryFee({
   policy,
   itemSubtotalMinor,
@@ -2229,8 +2268,6 @@ async function upgradeCheckoutIfReady({
             organizationIds,
         },
 
-        status:
-          'active',
       })
       .lean()
 
@@ -2262,23 +2299,14 @@ async function upgradeCheckoutIfReady({
     const sellerOrder
     of sellerOrders
   ) {
-    const policy =
-      policyByOrganization.get(
-        stringifyId(
-          sellerOrder.organizationId,
-        ),
-      )
+    const policy = resolveCheckoutPolicy({
+      policy: policyByOrganization.get(stringifyId(sellerOrder.organizationId)),
+      currency: order.totals?.currency || cart.currency,
+      deliveryCountry: order.deliveryAddressSnapshot?.country,
+      fulfillmentType: cart.fulfillmentType,
+    })
 
-    if (
-      !policy ||
-      String(
-        policy.currency,
-      ).toUpperCase() !==
-        String(
-          order.totals?.currency ||
-            cart.currency,
-        ).toUpperCase()
-    ) {
+    if (!policy) {
       blockers.push(
         'SELLER_POLICIES_NOT_CONFIGURED',
       )
@@ -3776,6 +3804,44 @@ export async function listCustomerOrders({
   }
 }
 
+// Order items refer to the exact purchased catalog version. Read only the
+// approved image URL, never current pricing, inventory or policy data.
+async function attachCustomerOrderItemImages(detail) {
+  const sellers = detail.sellerOrders || []
+  const ids = [...new Set(sellers.flatMap(seller => (seller.items || [])
+    .map(item => String(item.productVersionId || ''))
+    .filter(id => /^[a-f0-9]{24}$/i.test(id))))]
+  if (!ids.length) return detail
+  let versions
+  try {
+    versions = await ProductVersion.find({
+      _id: { $in: ids },
+      publicationStatus: { $in: ['published', 'retired'] },
+    }).select('_id images').lean()
+  } catch {
+    // Image decoration is best effort; orders remain usable during catalog errors.
+    return detail
+  }
+  const images = new Map(versions.map(version => {
+    const sorted = [...(version.images || [])].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+    const image = sorted.find(entry => {
+      const url = String(entry?.url || '').trim()
+      return (/^https?:\/\//i.test(url) || /^\/(?!\/)/.test(url)) && !/\/image\/(?:authenticated|private)\//i.test(url)
+    })
+    return [String(version._id), String(image?.url || '').trim()]
+  }))
+  return {
+    ...detail,
+    sellerOrders: sellers.map(seller => ({
+      ...seller,
+      items: (seller.items || []).map(item => {
+        const imageUrl = images.get(String(item.productVersionId || ''))
+        return imageUrl ? { ...item, imageUrl } : item
+      }),
+    })),
+  }
+}
+
 export async function getCustomerOrderDetail({
   orderId,
   actorUser,
@@ -3789,9 +3855,9 @@ export async function getCustomerOrderDetail({
       now,
     })
 
-  return enrichOrderDetail({
+  return attachCustomerOrderItemImages(await enrichOrderDetail({
     detail,
-  })
+  }))
 }
 
 export async function getCustomerOrderTracking({
@@ -3854,6 +3920,13 @@ export async function createPaymentIntent({
       orderId,
       actorUser,
     })
+
+  const deliveryCountry = order.deliveryAddressSnapshot?.country
+  if (deliveryCountry && !['india', 'in', 'ind'].includes(String(deliveryCountry).trim().toLowerCase())) {
+    throw new ApiError(409, 'International delivery is not available yet. Please choose a delivery address in India.', [
+      { code: 'INTERNATIONAL_DELIVERY_UNAVAILABLE' },
+    ])
+  }
 
   const existing =
     await CommercePaymentIntent

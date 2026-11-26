@@ -521,14 +521,6 @@ function notifyFloatingCartFly({ name, sourceElement }) {
   );
 }
 
-function formatOfferObservedAt(value) {
-  if (!value || Number.isNaN(new Date(value).getTime())) return "Not supplied";
-  return new Date(value).toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
 function formatMoney(amountMinor, currency = "INR") {
   if (amountMinor === null || amountMinor === undefined) {
     return "Price unavailable";
@@ -711,8 +703,6 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   const [manualEditorOpen, setManualEditorOpen] = useState(false);
   const [pinEntryError, setPinEntryError] = useState("");
   const pincode = manualPincode === null ? detectedPincode : manualPincode;
-  const isLocationApproximate =
-    currentLocation?.source === "network" || currentLocation?.accuracyMode === "approximate";
 
   const [offers, setOffers] = useState([]);
 
@@ -942,6 +932,20 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       ? rightPrice : Number.POSITIVE_INFINITY;
     return safeLeft - safeRight || String(left.seller?.name || "").localeCompare(String(right.seller?.name || ""));
   });
+  // A comparison is useful only when another Host sells this same canonical pack.
+  // Multiple offers from one Host do not count as competing sellers.
+  const distinctSellerKeys = new Set(
+    comparisonOffers.map((offer) =>
+      String(offer.seller?.slug || offer.seller?.name || "unknown-seller")
+        .trim()
+        .toLowerCase()
+    )
+  );
+  const hasCompetingSellers = distinctSellerKeys.size > 1;
+  const purchaseOffers = hasCompetingSellers
+    ? comparisonOffers
+    : comparisonOffers.slice(0, 1);
+
   const needsManualPin = !pincode || manualEditorOpen;
 
   function handleManualPinCheck(event) {
@@ -1060,26 +1064,24 @@ function MarketplaceOffers({ product, onOffersResolved }) {
   }
 
   return (
-    <section className="ep-product-offers min-w-0 border-t-[3px] border-[#214E4A] bg-[#E8F2F1] px-4 py-3 sm:px-5 sm:py-3">
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-[#C7DCD8] pb-2.5 sm:flex-nowrap">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[#CFE4E1] text-[#174E49]">
-          <Store size={19} aria-hidden="true" />
+    <section className="ep-product-offers min-w-0 border-t-[3px] border-[#C56C42] bg-[#F7F6F2] px-4 py-4 sm:px-5 sm:py-5">
+      <div className="flex flex-wrap items-center gap-3 border-b border-[#D7DDCF] pb-4 sm:flex-nowrap">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#D7DDCF] text-[#173F35]">
+          <Store size={21} aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-[#173F35] sm:text-xl">
-            {pincode ? (fulfillmentType === "pickup" ? "Pickup availability" : "Delivery availability") : "Check price by pincode"}
+          <h2 className="text-[21px] font-bold tracking-[-0.035em] text-[#173F35] sm:text-[24px]">
+            {fulfillmentType === "pickup" ? "Pickup availability" : "Delivery availability"}
           </h2>
-          <p className="mt-0.5 text-[13px] leading-5 text-[#676E67]">
-            {pincode
-              ? `${fulfillmentType === "pickup" ? "Pickup area PIN" : "Delivery PIN"} ${pincode}${manualPincode === null ? (isLocationApproximate ? " · Estimated location" : " · Current location") : " · Selected address"}`
-              : "Choose a PIN to see prices and Add to Cart."}
+          <p className="mt-0.5 text-sm text-[#202421]/70">
+            {pincode ? `PIN ${pincode}` : "Enter your PIN to check availability"}
           </p>
         </div>
         {pincode && !manualEditorOpen && (
           <button
             type="button"
             onClick={openManualPinEditor}
-            className="focus-ring ml-auto shrink-0 rounded-full border border-[#A9C8C4] bg-white px-3 py-2 text-sm font-semibold text-[#173F35] hover:border-[#173F35]"
+            className="focus-ring ml-auto min-h-10 shrink-0 rounded-full border border-[#173F35]/30 bg-[#F7F6F2] px-4 text-sm font-semibold text-[#173F35] transition hover:border-[#C56C42] hover:text-[#C56C42]"
           >
             Change PIN
           </button>
@@ -1097,8 +1099,9 @@ function MarketplaceOffers({ product, onOffersResolved }) {
               Checking delivery to {pincode}...
             </p>
           ) : !error && visibleOffers.length > 0 ? (
-            <p role="status" className="border-l-[3px] border-[#2F856D] bg-white/65 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-[#285E50]">
-              {visibleOffers.length} eligible EPANTRY seller{visibleOffers.length === 1 ? "" : "s"} for PIN {pincode}. Compare the same pack below.
+            <p role="status" className="inline-flex items-center gap-2 rounded-lg bg-[#D7DDCF]/55 px-3 py-2 text-sm font-semibold text-[#173F35]">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[#173F35]" aria-hidden="true" />
+              {fulfillmentType === "pickup" ? "Pickup available" : "Delivery available"}
             </p>
           ) : !error ? (
             <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
@@ -1192,148 +1195,119 @@ function MarketplaceOffers({ product, onOffersResolved }) {
       )}
 
       {!manualEditorOpen && visibleOffers.length > 0 && (
-        <div className="mt-3 min-w-0">
-          <div className="border-t border-[#B7D1CB] py-3">
-            <h3 className="text-base font-semibold text-[#173F35]">Compare EPANTRY sellers</h3>
-            <p className="mt-1 text-[13px] leading-5 text-[#4E655B]">
-              Same {formatQuantity(product?.netQuantity)} pack · lowest known item price first.
-              External retailer prices are not shown without verified feeds.
-              Delivery charges and any other checkout fees are not included.
-            </p>
-          </div>
-          <div
-            className="max-h-[340px] divide-y divide-[#C5D8D4] overflow-y-auto overscroll-y-auto border-t border-[#C5D8D4] [scrollbar-width:thin]"
-            role="region"
-            aria-label="EPANTRY sellers for the same product pack"
-            tabIndex={0}
-          >
-          {comparisonOffers.map((offer) => (
-            <article
-              key={offer.id}
-              className="grid min-w-0 gap-x-4 gap-y-3 bg-white/75 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-4"
-            >
-              <div className="min-w-0">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <p className="min-w-0 break-words text-[14px] font-semibold leading-5 text-[#173F35]">
-                    {offer.seller?.name || "Marketplace Host"}
-                  </p>
-                  <span className="shrink-0 rounded-full border border-emerald-200 bg-[#E5F3E8] px-2 py-0.5 text-[12px] font-semibold text-emerald-900">
-                    In stock
-                  </span>
-                </div>
-                <p className="mt-0.5 text-[13px] font-medium capitalize leading-5 text-[#66746D]">
-                  {offer.fulfillmentTypes?.join(" · ") || "Delivery"}
-                </p>
-                <p className="mt-1 text-[12px] leading-5 text-[#556D63]">
-                  Price recorded: {formatOfferObservedAt(offer.price?.recordedAt)}
-                  {" · "}Stock checked: {formatOfferObservedAt(offer.inventoryObservedAt)}
-                </p>
-              </div>
+        <div className="mt-4 min-w-0">
+          {hasCompetingSellers && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-lg font-bold tracking-[-0.03em] text-[#173F35]">
+                Compare EPANTRY sellers
+              </h3>
+              <span className="rounded-full bg-[#D7DDCF] px-3 py-1 text-xs font-semibold text-[#173F35]">
+                {distinctSellerKeys.size} sellers
+              </span>
+            </div>
+          )}
 
-              <div className="min-w-0 sm:text-right">
-                <p className="text-[12px] font-semibold text-[#66746D]">Your price</p>
-                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:justify-end">
-                  <p className="whitespace-nowrap text-[23px] font-semibold leading-tight tracking-[-0.04em] text-[#202421] sm:text-[25px]">
-                    {formatMoney(
-                      offer.price?.effectiveAmountMinor,
-                      offer.price?.currency || "INR"
-                    )}
-                  </p>
-                  {offer.price?.saleAmountMinor !== null &&
-                    offer.price?.saleAmountMinor !== undefined &&
-                    offer.price?.listAmountMinor !==
-                      offer.price?.saleAmountMinor && (
-                      <p className="text-xs font-semibold text-stone-400 line-through">
+          <div
+            className={hasCompetingSellers
+              ? "max-h-[420px] space-y-3 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]"
+              : ""}
+            role={hasCompetingSellers ? "region" : undefined}
+            aria-label={hasCompetingSellers ? "Eligible EPANTRY sellers for this product" : undefined}
+            tabIndex={hasCompetingSellers ? 0 : undefined}
+          >
+            {purchaseOffers.map((offer) => (
+              <article
+                key={offer.id}
+                className="min-w-0 overflow-hidden rounded-xl border border-[#D7DDCF] bg-[#F7F6F2]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-4 sm:px-5">
+                  <div className="min-w-0">
+                    <p className="break-words text-[16px] font-bold leading-6 text-[#173F35]">
+                      {offer.seller?.name || "EPANTRY Host"}
+                    </p>
+                    <p className="mt-1 flex items-center gap-2 text-xs font-medium text-[#173F35]">
+                      <span className="h-2 w-2 rounded-full bg-[#173F35]" aria-hidden="true" />
+                      In stock
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right">
+                    <div className="flex flex-wrap items-baseline gap-2 sm:justify-end">
+                      <span className="whitespace-nowrap text-[27px] font-bold leading-none tracking-[-0.045em] text-[#202421]">
                         {formatMoney(
-                          offer.price?.listAmountMinor,
+                          offer.price?.effectiveAmountMinor,
                           offer.price?.currency || "INR"
                         )}
-                      </p>
-                    )}
-                </div>
-              </div>
-
-              <div className="flex min-w-0 flex-wrap items-end gap-3 border-t border-[#E1E9E5] pt-2.5 sm:col-span-2 sm:justify-end">
-                <div className="min-w-0 sm:mr-auto">
-                  <p className="text-[12px] font-semibold text-[#66746D]">Known item subtotal</p>
-                  <p className="text-[17px] font-semibold text-[#173F35]">
-                    {offer.price?.effectiveAmountMinor == null
-                      ? "Price unavailable"
-                      : formatMoney(Number(offer.price.effectiveAmountMinor) * getOfferQuantity(offer), offer.price?.currency || "INR")}
-                  </p>
-                  <p className="text-[12px] text-[#66746D]">Final cost shown at checkout</p>
-                </div>
-                <div className="shrink-0">
-                  <p className="mb-1 text-[12px] font-semibold text-[#66746D]">Quantity</p>
-                  <div className="inline-flex items-center overflow-hidden border border-[#D4DAD2] bg-white">
-                    <button
-                      type="button"
-                      aria-label="Decrease quantity"
-                      disabled={
-                        Boolean(addingOfferId) ||
-                        getOfferQuantity(offer) <=
-                          getOfferQuantityBounds(offer).minimum
-                      }
-                      onClick={() =>
-                        handleQuantityStep(offer, getOfferQuantity(offer) - 1)
-                      }
-                      className="focus-ring grid h-9 w-9 place-items-center text-stone-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Minus size={15} aria-hidden="true" />
-                    </button>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      aria-label="Quantity"
-                      min={getOfferQuantityBounds(offer).minimum}
-                      max={getOfferQuantityBounds(offer).maximum}
-                      value={getOfferQuantity(offer)}
-                      disabled={Boolean(addingOfferId)}
-                      onChange={(event) =>
-                        setOfferQuantity(offer, event.target.value)
-                      }
-                      onBlur={() =>
-                        void syncExistingCartQuantity(
-                          offer,
-                          getOfferQuantity(offer)
-                        )
-                      }
-                      className="h-9 w-11 border-x border-stone-200 bg-white text-center text-sm font-semibold text-stone-950 outline-none disabled:opacity-50"
-                    />
-                    <button
-                      type="button"
-                      aria-label="Increase quantity"
-                      disabled={
-                        Boolean(addingOfferId) ||
-                        getOfferQuantity(offer) >=
-                          getOfferQuantityBounds(offer).maximum
-                      }
-                      onClick={() =>
-                        handleQuantityStep(offer, getOfferQuantity(offer) + 1)
-                      }
-                      className="focus-ring grid h-9 w-9 place-items-center text-stone-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Plus size={15} aria-hidden="true" />
-                    </button>
+                      </span>
+                      {offer.price?.saleAmountMinor != null &&
+                        offer.price?.listAmountMinor !== offer.price?.saleAmountMinor && (
+                          <span className="text-sm font-medium text-[#202421]/55 line-through">
+                            {formatMoney(
+                              offer.price?.listAmountMinor,
+                              offer.price?.currency || "INR"
+                            )}
+                          </span>
+                        )}
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={Boolean(addingOfferId)}
-                  onClick={(event) =>
-                    handleAddToCart(offer, event.currentTarget)
-                  }
-                  className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 bg-[#173F35] px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-[#265F49] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ShoppingCart size={16} aria-hidden="true" />
-                  {addingOfferId === offer.id
-                    ? "Adding..."
-                    : `Add ${getOfferQuantity(offer)} to Cart`}
-                </button>
-              </div>
-            </article>
-          ))}
+                <div className="flex flex-wrap items-end justify-between gap-3 border-t border-[#D7DDCF] px-4 py-3 sm:px-5">
+                  <div>
+                    <label
+                      htmlFor={`ep-offer-quantity-${offer.id}`}
+                      className="mb-1.5 block text-xs font-semibold text-[#173F35]"
+                    >
+                      Quantity
+                    </label>
+                    <div className="inline-flex h-11 items-center overflow-hidden rounded-lg border border-[#D7DDCF] bg-[#F7F6F2]">
+                      <button
+                        type="button"
+                        aria-label="Decrease quantity"
+                        disabled={Boolean(addingOfferId) ||
+                          getOfferQuantity(offer) <= getOfferQuantityBounds(offer).minimum}
+                        onClick={() => handleQuantityStep(offer, getOfferQuantity(offer) - 1)}
+                        className="focus-ring grid h-11 w-10 place-items-center text-[#173F35] transition hover:bg-[#D7DDCF] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Minus size={16} aria-hidden="true" />
+                      </button>
+                      <input
+                        id={`ep-offer-quantity-${offer.id}`}
+                        type="number"
+                        inputMode="numeric"
+                        min={getOfferQuantityBounds(offer).minimum}
+                        max={getOfferQuantityBounds(offer).maximum}
+                        value={getOfferQuantity(offer)}
+                        disabled={Boolean(addingOfferId)}
+                        onChange={(event) => setOfferQuantity(offer, event.target.value)}
+                        onBlur={() => void syncExistingCartQuantity(offer, getOfferQuantity(offer))}
+                        className="h-11 w-14 border-x border-[#D7DDCF] bg-[#F7F6F2] text-center text-sm font-semibold text-[#202421] outline-none disabled:opacity-50"
+                      />
+                      <button
+                        type="button"
+                        aria-label="Increase quantity"
+                        disabled={Boolean(addingOfferId) ||
+                          getOfferQuantity(offer) >= getOfferQuantityBounds(offer).maximum}
+                        onClick={() => handleQuantityStep(offer, getOfferQuantity(offer) + 1)}
+                        className="focus-ring grid h-11 w-10 place-items-center text-[#173F35] transition hover:bg-[#D7DDCF] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Plus size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={Boolean(addingOfferId)}
+                    onClick={(event) => handleAddToCart(offer, event.currentTarget)}
+                    className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#C56C42] px-5 py-2.5 text-sm font-bold text-[#F7F6F2] transition hover:bg-[#AD5934] disabled:cursor-not-allowed disabled:opacity-50 max-[390px]:w-full"
+                  >
+                    <ShoppingCart size={17} aria-hidden="true" />
+                    {addingOfferId === offer.id ? "Adding..." : "Add to Cart"}
+                  </button>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       )}

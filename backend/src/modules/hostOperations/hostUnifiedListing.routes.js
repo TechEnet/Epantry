@@ -19,7 +19,7 @@ import { publishProductVersion } from '../catalog/catalog.governance.service.js'
 import { findProductVersionDuplicateCandidates } from '../catalog/catalog.duplicate.service.js'
 import { MarketplaceOrganization, HostOffer } from '../marketplace/marketplace.models.js'
 import { validateOfferCanonicalPack } from '../marketplace/marketplace.host.service.js'
-import { listPublicEligibleOffers } from '../marketplace/marketplace.public.service.js'
+import { listPublicEligibleOffers, hasSharedHostDeliveryCoverage, approvedHostDeliveryAllowsPin } from '../marketplace/marketplace.public.service.js'
 import { listPublicProducts, buildPublicProductSlug } from '../catalog/catalog.public.service.js'
 import { listPublicRecipes } from '../recipes/recipe.public.service.js'
 import { publicListing, publicHostSlug, publishedHostRecord, publicHostListingFilter } from './hostUnifiedListing.public.js'
@@ -1218,16 +1218,25 @@ router.get('/public/host-listings/:id/pincode-quote', wrap(async (req, res) => {
   if (!sellable) problem('This approved sellable listing is unavailable.', 404)
   const delivery = approved.packet?.delivery || {}
   const pickupOnly = delivery.fulfillment === 'pickup'
-  const declaredCoverage = !pickupOnly && (delivery.postalCodes || []).some(code => String(code).trim() === pincode)
+  // For an existing approved item, the Host's saved and active business
+  // delivery area supplements the PINs captured in its older approved packet.
+  // No draft revisions are published and no product can sell without an
+  // active owned offer, current price, stock and inventory/serviceability.
+  const [catalog, organization] = pickupOnly ? [null, null] : await Promise.all([
+    resolveRecordPublishedCatalog(record),
+    MarketplaceOrganization.findOne({ ownerUserId: record.ownerUserId, status: 'active' }).select('_id').lean(),
+  ])
+  const sharedCoverage = !pickupOnly && organization ? await hasSharedHostDeliveryCoverage({
+    organizationId: organization._id, pincode,
+  }) : false
+  const declaredCoverage = approvedHostDeliveryAllowsPin({
+    delivery, pincode, sharedCoverage,
+  })
   const rawPrice = approved.packet?.selling?.salePrice
   const declaredPrice = rawPrice !== null && rawPrice !== undefined && Number.isFinite(Number(rawPrice)) && Number(rawPrice) >= 0 ? Number(rawPrice) : null
   let offers = []
   let packId = null
   if (declaredCoverage) {
-    const [catalog, organization] = await Promise.all([
-      resolveRecordPublishedCatalog(record),
-      MarketplaceOrganization.findOne({ ownerUserId: record.ownerUserId, status: 'active' }).select('_id').lean(),
-    ])
     if (catalog?.packId && organization) {
       const ownedOffers = await HostOffer.find({ organizationId: organization._id, packId: catalog.packId, status: 'active' })
         .select('_id').lean()

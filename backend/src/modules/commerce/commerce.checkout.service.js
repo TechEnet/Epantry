@@ -195,6 +195,12 @@ async function resolveDeliveryAddressSnapshot({
     )
   }
 
+  if (!['india', 'in', 'ind'].includes(String(address.country || 'India').trim().toLowerCase())) {
+    throw new ApiError(409, 'International delivery is not available yet. Please choose a delivery address in India.', [
+      { code: 'INTERNATIONAL_DELIVERY_UNAVAILABLE' },
+    ])
+  }
+
   const addressPincode =
     normalizePostalCode(
       address.postalCode,

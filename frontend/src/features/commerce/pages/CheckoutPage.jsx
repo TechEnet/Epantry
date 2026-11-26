@@ -12,6 +12,9 @@ import {
   CreditCard,
   LockKeyhole,
   MapPin,
+  Package,
+  ChevronDown,
+  ArrowRight,
   RefreshCw,
   ShieldCheck,
   Store,
@@ -40,6 +43,8 @@ import {
 import {
   useLocationStore,
 } from '../../location/store/location.store'
+
+import { getCatalogProducts } from '../../grocery/services/catalog.service'
 
 import { attachCookingOrder, getCookingReturnPath } from '../../recipes/utils/cookingJourney'
 
@@ -92,13 +97,14 @@ function formatMoney(
     'INR',
 ) {
   if (
+    amountMinor == null || amountMinor === '' ||
     !Number.isInteger(
       Number(
         amountMinor,
       ),
     )
   ) {
-    return 'Not available'
+    return 'Pending'
   }
 
   return new Intl.NumberFormat(
@@ -125,13 +131,16 @@ function blockerLabel(
 ) {
   const labels = {
     LANDED_COST_INCOMPLETE:
-      'A seller delivery fee or checkout promise is still missing.',
+      'Delivery charges are not confirmed yet.',
 
     SELLER_POLICIES_NOT_CONFIGURED:
-      'One or more Host organizations have not configured cancellation and return promises.',
+      'The seller must confirm delivery charges and policies before payment.',
+
+    INTERNATIONAL_DELIVERY_UNAVAILABLE:
+      INTERNATIONAL_MESSAGE,
 
     PAYMENT_PROVIDER_NOT_CONFIGURED:
-      'Razorpay credentials are not configured on the backend yet.',
+      'Online payment is temporarily unavailable.',
   }
 
   return (
@@ -149,6 +158,12 @@ function blockerLabel(
         ' ',
       )
   )
+}
+
+const INTERNATIONAL_MESSAGE = 'International delivery is not available yet. Please choose a delivery address in India.'
+
+function isInternationalAddress(address) {
+  return Boolean(address && !['india', 'in', 'ind'].includes(String(address.country || 'India').trim().toLowerCase()))
 }
 
 function formatDeliveryAddress(
@@ -176,6 +191,27 @@ function formatDeliveryAddress(
     )
     .filter(Boolean)
     .join(', ')
+}
+
+// Product images are presentation only. Never use catalog search for order prices.
+function checkoutImageUrl(record) {
+  return [record?.imageUrl, record?.thumbnailUrl, record?.photoUrl,
+    typeof record?.image === 'string' ? record.image : record?.image?.url,
+    record?.images?.[0]?.url, record?.photos?.[0]?.url, record?.media?.[0]?.url,
+  ].find(url => typeof url === 'string' && (/^https?:\/\//i.test(url) || (url.startsWith('/') && !url.startsWith('//')))) || ''
+}
+
+function checkoutImageKey(item) {
+  return String(item?.productVersionId || item?.packId || '').trim()
+}
+
+function CheckoutProductImage({ item, images }) {
+  const url = checkoutImageUrl(item) || images[checkoutImageKey(item)] || ''
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [url])
+  return <div className="ec2-product-image">{url && !failed
+    ? <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} />
+    : <Package size={25} aria-hidden="true" />}</div>
 }
 
 function loadRazorpayCheckout() {
@@ -349,6 +385,16 @@ export default function CheckoutPage() {
       '',
     )
 
+  const [internationalBlocked, setInternationalBlocked] = useState(false)
+  const [productImages, setProductImages] = useState({})
+  const internationalDialogRef = useRef(null)
+
+  useEffect(() => {
+    if (internationalBlocked && internationalDialogRef.current && !internationalDialogRef.current.open) {
+      internationalDialogRef.current.showModal()
+    }
+  }, [internationalBlocked])
+
   const prepare =
     useCallback(
       async ({
@@ -390,9 +436,9 @@ export default function CheckoutPage() {
           )
         }
 
-        setError(
-          '',
-        )
+        setError('')
+        setInternationalBlocked(false)
+        if (!refresh) setData(null)
 
         try {
           const cartResult =
@@ -422,6 +468,7 @@ export default function CheckoutPage() {
               null
 
             if (!selectedAddress?.id) {
+              setData(null)
               navigate(
                 `/delivery-addresses?returnTo=${encodeURIComponent(
                   `/checkout/${cartId}`,
@@ -437,6 +484,14 @@ export default function CheckoutPage() {
                 },
               )
 
+              return
+            }
+
+            if (isInternationalAddress(selectedAddress)) {
+              setData(null)
+              setDeliveryAddress(selectedAddress)
+              setInternationalBlocked(true)
+              setError(INTERNATIONAL_MESSAGE)
               return
             }
 
@@ -477,6 +532,10 @@ export default function CheckoutPage() {
         } catch (
           prepareError
         ) {
+          setData(null)
+          if (getCommerceErrorMessage(prepareError, '').includes('International delivery is not available')) {
+            setInternationalBlocked(true)
+          }
           setError(
             getCommerceErrorMessage(
               prepareError,
@@ -608,6 +667,13 @@ export default function CheckoutPage() {
   async function handlePayment() {
     const order =
       data?.order
+
+    if (isInternationalAddress(deliveryAddress)) {
+      setInternationalBlocked(true)
+      return
+    }
+
+    if (refreshing || loading || internationalBlocked) return
 
     if (
       !order?.id ||
@@ -771,6 +837,9 @@ export default function CheckoutPage() {
     } catch (
       paymentError
     ) {
+      if (getCommerceErrorMessage(paymentError, '').includes('International delivery is not available')) {
+        setInternationalBlocked(true)
+      }
       setError(
         getCommerceErrorMessage(
           paymentError,
@@ -784,531 +853,163 @@ export default function CheckoutPage() {
     }
   }
 
-  if (
-    loading
-  ) {
-    return (
-      <main className="min-h-screen bg-[#f6f7f3]">
-        <div className="page-shell py-8">
-          <div className="h-[640px] animate-pulse rounded-[32px] border border-emerald-100 bg-white shadow-[0_24px_70px_rgba(15,118,110,0.08)]" />
-        </div>
-      </main>
-    )
-  }
+  const order = data?.order || {}
+  const sellerOrders = data?.sellerOrders || []
+  const blockers = order.checkoutBlockers || []
+  const addressPath = `/delivery-addresses?returnTo=${encodeURIComponent(`/checkout/${cartId}`)}`
+  const total = order.totals?.totalLandedCostMinor
+  const currency = order.totals?.currency
+  const international = internationalBlocked || isInternationalAddress(deliveryAddress)
+  const ready = order.paymentReady === true && blockers.length === 0 && !international
+  const refreshCheckout = () => prepare({ refresh: true })
+  const cookingPath = getCookingReturnPath({ cartId })
+  const items = sellerOrders.flatMap(seller => seller.items || [])
+  const imageRequest = JSON.stringify([...new Map(items.filter(item => checkoutImageKey(item) && !checkoutImageUrl(item)).map(item => [checkoutImageKey(item), {
+    key: checkoutImageKey(item), productVersionId: item.productVersionId, packId: item.packId, displayName: item.displayName,
+  }])).values()])
+  useEffect(() => {
+    let active = true
+    const requests = JSON.parse(imageRequest)
+    async function loadImages() {
+      const resolved = {}
+      for (let offset = 0; offset < requests.length && active; offset += 4) {
+        await Promise.all(requests.slice(offset, offset + 4).map(async item => {
+          if (!item.displayName) return
+          try {
+            const response = await getCatalogProducts({ search: item.displayName, limit: 50 })
+            const exact = (response?.products || []).find(product =>
+              (item.productVersionId && String(product.productVersionId || product.id) === String(item.productVersionId)) ||
+              (item.packId && String(product.packId) === String(item.packId)))
+            const image = checkoutImageUrl(exact)
+            if (image) resolved[item.key] = image
+          } catch { /* Images are optional; checkout remains independent. */ }
+        }))
+      }
+      if (active) setProductImages(resolved)
+    }
+    void loadImages()
+    return () => { active = false }
+  }, [imageRequest])
 
-  if (
-    error &&
-    !data
-  ) {
-    return (
-      <main className="min-h-screen bg-[#f6f7f3]">
-        <div className="page-shell py-10">
-          <div className="mx-auto max-w-3xl rounded-[30px] border border-rose-200 bg-white p-7 shadow-[0_18px_55px_rgba(127,29,29,0.08)] sm:p-9">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
-              <AlertTriangle size={22} aria-hidden="true" />
-            </div>
-
-            <h1 className="mt-5 text-2xl font-black tracking-tight text-rose-950">
-              Checkout unavailable
-            </h1>
-
-            <p className="mt-2 text-sm leading-6 text-rose-800">
-              {error}
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                to={`/cart/${cartId}`}
-                className="focus-ring inline-flex items-center gap-2 rounded-xl bg-rose-950 px-4 py-2.5 text-sm font-black text-white transition hover:bg-rose-900"
-              >
-                <ArrowLeft size={16} aria-hidden="true" />
-                Back to Cart
-              </Link>
-
-              <Link
-                to={`/delivery-addresses?returnTo=${encodeURIComponent(
-                  `/checkout/${cartId}`,
-                )}`}
-                className="focus-ring inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-black text-rose-800 transition hover:bg-rose-50"
-              >
-                <MapPin size={16} aria-hidden="true" />
-                Choose delivery address
-              </Link>
-            </div>
-          </div>
-        </div>
-      </main>
-    )
-  }
-
-  const order =
-    data?.order ||
-    {}
-
-  const sellerOrders =
-    data?.sellerOrders ||
-    []
-
-  const blockers =
-    order.checkoutBlockers ||
-    []
+  // The missing seller policy also explains why the delivery fee is incomplete.
+  // Show one actionable message instead of duplicating the same underlying issue.
+  const visibleBlockers = blockers.filter(code => code !== 'LANDED_COST_INCOMPLETE' || !blockers.includes('SELLER_POLICIES_NOT_CONFIGURED'))
+  const sellerSettingsMissing = blockers.includes('SELLER_POLICIES_NOT_CONFIGURED')
+  const busy = loading || refreshing || paying
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9f5_0%,#f7f5ef_52%,#f4f2eb_100%)]">
-      <div className="page-shell py-6 sm:py-9">
-        <Link
-          to={`/cart/${cartId}`}
-          className="focus-ring inline-flex items-center gap-2 rounded-full px-2 py-2 text-sm font-black text-stone-600 transition hover:text-emerald-800"
-        >
-          <ArrowLeft
-            size={17}
-            aria-hidden="true"
-          />
-
-          Back to Cart
-        </Link>
-
-        {getCookingReturnPath({ cartId }) && (
-          <Link to={getCookingReturnPath({ cartId })}
-            className="mb-2 ml-3 inline-flex min-h-10 items-center gap-2 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-4 text-sm font-semibold text-[#173F35]">
-            Continue guided cooking (your checkout will remain available)
-          </Link>
-        )}
-
-        <section className="relative mt-3 overflow-hidden rounded-[32px] border border-emerald-100 bg-white shadow-[0_24px_70px_rgba(15,118,110,0.09)]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.13),transparent_34%),linear-gradient(120deg,rgba(236,253,245,0.72),transparent_48%)]" />
-
-          <div className="relative flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/85 px-3 py-1.5 text-emerald-800 shadow-sm backdrop-blur">
-                <LockKeyhole
-                  size={15}
-                  aria-hidden="true"
-                />
-
-                <p className="text-[11px] font-black uppercase tracking-[0.16em]">
-                  Secure checkout
-                </p>
-              </div>
-
-              <h1 className="mt-4 text-3xl font-black tracking-tight text-stone-950 sm:text-4xl lg:text-[42px]">
-                Review the payable promise
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600 sm:text-base">
-                EPANTRY resolves seller splits, delivery fees, cancellation
-                and return promises before hosted payment begins. Raw card
-                details never pass through EPANTRY.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                prepare({
-                  refresh:
-                    true,
-                })
-              }
-              disabled={
-                refreshing ||
-                paying
-              }
-              className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white/90 px-4 py-3 text-sm font-black text-stone-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCw
-                size={16}
-                className={
-                  refreshing
-                    ? 'animate-spin'
-                    : ''
-                }
-                aria-hidden="true"
-              />
-
-              Revalidate checkout
-            </button>
-          </div>
-
-          <div className="relative grid gap-3 border-t border-emerald-100 bg-white/80 p-4 sm:grid-cols-3 sm:p-5">
-            <div className="rounded-[22px] border border-stone-200 bg-stone-50/90 p-4 sm:p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-stone-500">
-                Items
-              </p>
-
-              <p className="mt-1.5 text-2xl font-black tracking-tight text-stone-950">
-                {formatMoney(
-                  order.totals
-                    ?.itemSubtotalMinor,
-                  order.totals
-                    ?.currency,
-                )}
-              </p>
-            </div>
-
-            <div className="rounded-[22px] border border-blue-100 bg-blue-50/65 p-4 sm:p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
-                Known fees
-              </p>
-
-              <p className="mt-1.5 text-2xl font-black tracking-tight text-stone-950">
-                {formatMoney(
-                  order.totals
-                    ?.knownFeesMinor,
-                  order.totals
-                    ?.currency,
-                )}
-              </p>
-            </div>
-
-            <div className="rounded-[22px] border border-emerald-200 bg-emerald-700 p-4 text-white shadow-[0_14px_34px_rgba(4,120,87,0.16)] sm:p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
-                Total landed cost
-              </p>
-
-              <p className="mt-1.5 text-2xl font-black tracking-tight">
-                {formatMoney(
-                  order.totals
-                    ?.totalLandedCostMinor,
-                  order.totals
-                    ?.currency,
-                )}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {deliveryAddress && (
-          <section className="mt-5 rounded-[26px] border border-emerald-200 bg-[#eaf9f3] p-5 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white">
-                  <MapPin
-                    size={18}
-                    aria-hidden="true"
-                  />
-                </div>
-
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                    Delivery address locked for this order
-                  </p>
-
-                  <p className="mt-1 text-base font-black text-stone-950">
-                    {deliveryAddress.recipientName || 'Recipient'}
-                    {deliveryAddress.phone
-                      ? ` · ${deliveryAddress.phone}`
-                      : ''}
-                  </p>
-
-                  <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-stone-600">
-                    {formatDeliveryAddress(
-                      deliveryAddress,
-                    )}
-                  </p>
-
-                  {deliveryAddress.deliveryInstructions && (
-                    <p className="mt-2 text-xs font-semibold text-stone-500">
-                      Delivery note: {deliveryAddress.deliveryInstructions}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <Link
-                to={`/delivery-addresses?returnTo=${encodeURIComponent(
-                  `/checkout/${cartId}`,
-                )}`}
-                className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
-              >
-                Change address
-              </Link>
-            </div>
-          </section>
-        )}
-
-        {error && (
-          <div className="mt-5 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800 shadow-sm">
-            <AlertTriangle size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.7fr)] lg:items-start">
-          <section className="space-y-4">
-            {sellerOrders.map(
-              (
-                sellerOrder,
-                sellerIndex,
-              ) => (
-                <article
-                  key={
-                    sellerOrder.id
-                  }
-                  className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_14px_42px_rgba(28,25,23,0.06)]"
-                >
-                  <div className="flex flex-col gap-4 border-b border-stone-100 bg-[linear-gradient(90deg,#ffffff_0%,#f4fbf7_100%)] p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white shadow-sm">
-                        <Store
-                          size={20}
-                          aria-hidden="true"
-                        />
-                      </div>
-
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.13em] text-emerald-700">
-                          Seller {sellerIndex + 1}
-                        </p>
-
-                        <h2 className="mt-1 text-lg font-black text-stone-950">
-                          {
-                            sellerOrder
-                              .sellerName
-                          }
-                        </h2>
-
-                        <p className="mt-1 text-sm text-stone-500">
-                          {
-                            sellerOrder
-                              .items?.length ||
-                            0
-                          } Marketplace items
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-left shadow-sm lg:text-right">
-                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-stone-500">
-                        Seller landed total
-                      </p>
-
-                      <p className="mt-1 text-xl font-black tracking-tight text-stone-950">
-                        {formatMoney(
-                          sellerOrder
-                            .commercialSnapshot
-                            ?.totalLandedCostMinor,
-
-                          sellerOrder
-                            .commercialSnapshot
-                            ?.currency,
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 p-5 sm:p-6 md:grid-cols-2">
-                    <div className="rounded-[22px] border border-stone-200 bg-stone-50/75 p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-stone-700 shadow-sm">
-                          <ShieldCheck size={16} aria-hidden="true" />
-                        </div>
-
-                        <p className="text-xs font-black uppercase tracking-[0.11em] text-stone-600">
-                          Cancellation
-                        </p>
-                      </div>
-
-                      <p className="mt-3 text-sm leading-6 text-stone-700">
-                        {
-                          sellerOrder
-                            .promise
-                            ?.cancellationPolicySummary ||
-                          'Not configured'
-                        }
-                      </p>
-                    </div>
-
-                    <div className="rounded-[22px] border border-stone-200 bg-stone-50/75 p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-stone-700 shadow-sm">
-                          <CheckCircle2 size={16} aria-hidden="true" />
-                        </div>
-
-                        <p className="text-xs font-black uppercase tracking-[0.11em] text-stone-600">
-                          Returns
-                        </p>
-                      </div>
-
-                      <p className="mt-3 text-sm leading-6 text-stone-700">
-                        {
-                          sellerOrder
-                            .promise
-                            ?.returnPolicySummary ||
-                          'Not configured'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              ),
-            )}
-          </section>
-
-          <aside className="lg:sticky lg:top-6">
-            <div className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_18px_52px_rgba(15,118,110,0.09)]">
-              <div className="border-b border-stone-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_72%)] p-5 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-700 text-white">
-                    <CreditCard size={18} aria-hidden="true" />
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.13em] text-emerald-700">
-                      Payment summary
-                    </p>
-
-                    <h2 className="mt-1 text-lg font-black text-stone-950">
-                      Ready to review
-                    </h2>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 p-5 sm:p-6">
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <span className="font-semibold text-stone-500">Items</span>
-                  <span className="font-black text-stone-950">
-                    {formatMoney(
-                      order.totals
-                        ?.itemSubtotalMinor,
-                      order.totals
-                        ?.currency,
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <span className="font-semibold text-stone-500">Known fees</span>
-                  <span className="font-black text-stone-950">
-                    {formatMoney(
-                      order.totals
-                        ?.knownFeesMinor,
-                      order.totals
-                        ?.currency,
-                    )}
-                  </span>
-                </div>
-
-                <div className="my-4 h-px bg-stone-200" />
-
-                <div className="flex items-end justify-between gap-4">
-                  <span className="text-sm font-black text-stone-700">Total</span>
-                  <span className="text-2xl font-black tracking-tight text-emerald-800">
-                    {formatMoney(
-                      order.totals
-                        ?.totalLandedCostMinor,
-                      order.totals
-                        ?.currency,
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              {blockers.length >
-              0 ? (
-                <div className="border-t border-amber-200 bg-amber-50 p-5 sm:p-6">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                      <AlertTriangle
-                        size={18}
-                        aria-hidden="true"
-                      />
-                    </div>
-
-                    <div>
-                      <h3 className="font-black text-amber-950">
-                        Payment is intentionally blocked
-                      </h3>
-
-                      <p className="mt-2 text-sm leading-6 text-amber-800">
-                        EPANTRY will not accept payment until the commercial promise
-                        is complete and Razorpay is configured.
-                      </p>
-                    </div>
-                  </div>
-
-                  <ul className="mt-4 space-y-2">
-                    {blockers.map(
-                      (
-                        blocker,
-                      ) => (
-                        <li
-                          key={
-                            blocker
-                          }
-                          className="rounded-xl border border-amber-200 bg-white/70 px-3 py-2.5 text-sm font-semibold leading-5 text-amber-900"
-                        >
-                          {blockerLabel(
-                            blocker,
-                          )}
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                </div>
-              ) : (
-                <div className="border-t border-emerald-100 bg-emerald-50/70 p-5 sm:p-6">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2
-                      size={20}
-                      className="mt-0.5 shrink-0 text-emerald-700"
-                      aria-hidden="true"
-                    />
-
-                    <div>
-                      <h3 className="font-black text-emerald-950">
-                        Checkout promise complete
-                      </h3>
-
-                      <p className="mt-1.5 text-sm leading-6 text-emerald-800">
-                        Scarce inventory is reserved temporarily and payment is verified before fulfilment is finalized.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={
-                      handlePayment
-                    }
-                    disabled={
-                      paying
-                    }
-                    className="focus-ring mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_28px_rgba(4,120,87,0.22)] transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <CreditCard
-                      size={18}
-                      aria-hidden="true"
-                    />
-
-                    {
-                      paying
-                        ? 'Opening payment…'
-                        : 'Pay with Razorpay'
-                    }
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-start gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-xs font-semibold leading-5 text-stone-500 shadow-sm backdrop-blur">
-              <ShieldCheck
-                size={15}
-                className="mt-0.5 shrink-0 text-emerald-700"
-                aria-hidden="true"
-              />
-
-              EPANTRY never stores raw card number, CVV or card expiry.
-            </div>
-            <p className="mt-3 text-[13px] leading-5 text-stone-600">
-              Review <Link to="/terms" className="font-semibold text-[#174D38] underline underline-offset-2">Terms &amp; Conditions</Link> and{' '}
-              <Link to="/privacy-policy" className="font-semibold text-[#174D38] underline underline-offset-2">Privacy Policy</Link>.
-              Order-specific delivery, charges and cancellation information remain the details shown at checkout.
-            </p>
-          </aside>
+    <main className="ep-checkout-v3">
+      <style>{`
+        .ep-checkout-v3 {background:#F7F6F2;color:#202421;min-height:70vh;}
+        .ep-checkout-v3 * {box-sizing:border-box;}
+        .ep-checkout-v3 .ec3-wrap {max-width:1380px;margin:auto;padding:24px 36px 54px;}
+        .ep-checkout-v3 .ec3-link {display:inline-flex;align-items:center;gap:7px;color:#173F35;font-size:14px;font-weight:700;text-decoration:none;}
+        .ep-checkout-v3 .ec3-link:hover {text-decoration:underline;}
+        .ep-checkout-v3 .ec3-toolbar,.ep-checkout-v3 .ec3-line {display:flex;justify-content:space-between;align-items:center;gap:12px;}
+        .ep-checkout-v3 .ec3-toolbar {margin-bottom:19px;flex-wrap:wrap;}
+        .ep-checkout-v3 .ec3-refresh {display:inline-flex;align-items:center;gap:7px;border:1px solid #D7DDCF;border-radius:9px;padding:8px 12px;background:transparent;color:#173F35;font-weight:650;font-size:14px;cursor:pointer;}
+        .ep-checkout-v3 button:disabled {opacity:.6;cursor:not-allowed;}
+        .ep-checkout-v3 .ec3-mast {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:22px;padding:23px 28px;background:#C56C42;color:#202421;border-radius:14px;margin-bottom:30px;}
+        .ep-checkout-v3 h1.ec3-title {font-size:38px!important;line-height:1.12!important;letter-spacing:-.045em;margin:0;font-weight:800!important;color:#202421;}
+        .ep-checkout-v3 .ec3-progress {display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;flex-wrap:wrap;}
+        .ep-checkout-v3 .ec3-progress span {display:inline-flex;align-items:center;gap:6px;}
+        .ep-checkout-v3 .ec3-progress .current {background:#F7F6F2;border-radius:7px;padding:9px 13px;color:#173F35;}
+        .ep-checkout-v3 .ec3-layout {display:grid;grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr);gap:34px;align-items:start;}
+        .ep-checkout-v3 .ec3-main {min-width:0;}
+        .ep-checkout-v3 h2.ec3-heading {font-size:24px!important;line-height:1.25!important;letter-spacing:-.025em;margin:0;font-weight:750!important;color:#202421;}
+        .ep-checkout-v3 .ec3-address {display:grid;grid-template-columns:50px minmax(0,1fr) auto;gap:15px;align-items:start;padding:22px;background:#D7DDCF;border-radius:13px;margin-bottom:31px;}
+        .ep-checkout-v3 .ec3-address-mark {display:grid;place-items:center;width:50px;height:50px;border-radius:12px;background:#F7F6F2;color:#173F35;}
+        .ep-checkout-v3 .ec3-address p {margin:0;overflow-wrap:anywhere;}
+        .ep-checkout-v3 .ec3-address-title {font-size:14px;font-weight:700;color:#173F35;margin-bottom:7px;}
+        .ep-checkout-v3 .ec3-recipient {font-size:17px;font-weight:750;line-height:1.5;}
+        .ep-checkout-v3 .ec3-muted {font-size:14px;line-height:1.5;color:#526359;}
+        .ep-checkout-v3 .ec3-change {border:1px solid #173F35;border-radius:8px;padding:8px 13px;white-space:nowrap;}
+        .ep-checkout-v3 .ec3-section-head {padding-bottom:12px;border-bottom:2px solid #C56C42;margin-bottom:4px;}
+        .ep-checkout-v3 .ec3-seller {margin:0 0 17px;}
+        .ep-checkout-v3 .ec3-seller-head {padding:17px 0 12px;}
+        .ep-checkout-v3 h3.ec3-seller-name {font-size:17px!important;font-weight:750!important;line-height:1.4!important;color:#173F35;margin:0;overflow-wrap:anywhere;}
+        .ep-checkout-v3 .ec3-product {display:grid;grid-template-columns:84px minmax(0,1fr) auto;gap:16px;align-items:center;padding:16px 0;border-top:1px solid #D7DDCF;}
+        .ep-checkout-v3 .ec2-product-image {display:grid;place-items:center;width:84px;height:84px;background:#fff;border:1px solid #D7DDCF;border-radius:10px;overflow:hidden;color:#173F35;}
+        .ep-checkout-v3 .ec2-product-image img {width:100%;height:100%;object-fit:contain;display:block;}
+        .ep-checkout-v3 .ec3-product-name {font-size:16px;font-weight:700;line-height:1.45;overflow-wrap:anywhere;}
+        .ep-checkout-v3 .ec3-price {font-size:16px;font-weight:750;color:#173F35;white-space:nowrap;font-variant-numeric:tabular-nums;}
+        .ep-checkout-v3 .ec3-policies {display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #D7DDCF;border-bottom:1px solid #D7DDCF;gap:20px;}
+        .ep-checkout-v3 .ec3-policies details {min-width:0;padding:13px 0;}
+        .ep-checkout-v3 .ec3-policies summary {display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;color:#173F35;font-weight:650;font-size:14px;}
+        .ep-checkout-v3 .ec3-policies summary::-webkit-details-marker {display:none;}
+        .ep-checkout-v3 .ec3-policies details[open] .ec3-chevron {transform:rotate(180deg);}
+        .ep-checkout-v3 .ec3-summary {background:#173F35;color:#F7F6F2;border-radius:16px;padding:25px;}
+        .ep-checkout-v3 .ec3-summary-label {display:flex;align-items:center;gap:9px;font-size:17px;font-weight:700;color:#F7F6F2;}
+        .ep-checkout-v3 .ec3-summary-row {display:flex;align-items:start;justify-content:space-between;gap:12px;padding:10px 0;font-size:15px;color:#F7F6F2;}
+        .ep-checkout-v3 .ec3-summary-row strong {text-align:right;}
+        .ep-checkout-v3 .ec3-total-block {border-top:1px solid #ffffff38;margin-top:10px;padding-top:17px;}
+        .ep-checkout-v3 .ec3-total {font-size:clamp(28px,3.4vw,42px);letter-spacing:-.04em;line-height:1.2;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+        .ep-checkout-v3 .ec3-primary {width:100%;min-height:52px;display:flex;align-items:center;justify-content:center;gap:9px;background:#C56C42;color:#202421;border:0;border-radius:10px;padding:12px 16px;font-size:16px;font-weight:800;cursor:pointer;margin-top:17px;}
+        .ep-checkout-v3 .ec3-primary:hover:not(:disabled) {box-shadow:inset 0 0 0 2px #F7F6F2;}
+        .ep-checkout-v3 .ec3-security {display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;color:#D7DDCF;margin-top:13px;}
+        .ep-checkout-v3 .ec3-notice {background:#F7F6F2;border-left:3px solid #C56C42;color:#202421;padding:13px 14px;border-radius:4px;font-size:14px;line-height:1.5;margin-top:15px;}
+        .ep-checkout-v3 .ec3-legal {font-size:13px;color:#526359;line-height:1.6;margin:15px 3px 0;}
+        .ep-checkout-v3 .ec3-alert {display:flex;gap:10px;background:#fff4f1;border-left:3px solid #a13226;color:#8b2c24;padding:13px 15px;margin-bottom:20px;font-size:14px;}
+        .ep-checkout-v3 .ec2-heading {font-size:24px!important;font-weight:750!important;line-height:1.25!important;}
+        .ep-checkout-v3 :is(button,a,summary):focus-visible {outline:2px solid #C56C42;outline-offset:3px;}
+        @media(min-width:1000px) {.ep-checkout-v3 .ec3-aside {position:sticky;top:96px;}}
+        @media(max-width:860px) {.ep-checkout-v3 .ec3-layout {grid-template-columns:1fr;gap:20px;} .ep-checkout-v3 .ec3-mast {grid-template-columns:1fr;gap:14px;} .ep-checkout-v3 .ec3-aside {position:static;} }
+        @media(max-width:600px) {.ep-checkout-v3 .ec3-wrap {padding:16px 12px 28px;} .ep-checkout-v3 .ec3-toolbar {margin-bottom:13px;} .ep-checkout-v3 .ec3-mast {padding:18px 16px;margin-bottom:20px;border-radius:12px;} .ep-checkout-v3 h1.ec3-title {font-size:29px!important;} .ep-checkout-v3 h2.ec3-heading {font-size:21px!important;} .ep-checkout-v3 .ec3-address {grid-template-columns:38px minmax(0,1fr);padding:15px;gap:10px;margin-bottom:23px;} .ep-checkout-v3 .ec3-address-mark {width:38px;height:38px;} .ep-checkout-v3 .ec3-change {grid-column:2;justify-self:start;padding:5px 10px;} .ep-checkout-v3 .ec3-product {grid-template-columns:62px minmax(0,1fr) auto;gap:10px;padding:12px 0;} .ep-checkout-v3 .ec2-product-image {width:62px;height:62px;} .ep-checkout-v3 .ec3-product-name,.ep-checkout-v3 .ec3-price {font-size:14px;} .ep-checkout-v3 .ec3-summary {padding:18px;} .ep-checkout-v3 .ec3-policies {gap:10px;} }
+        @media(max-width:350px) {.ep-checkout-v3 .ec3-product {grid-template-columns:56px minmax(0,1fr);} .ep-checkout-v3 .ec3-price {grid-column:2;} .ep-checkout-v3 .ec3-progress {gap:6px;} }
+      `}</style>
+      <div className="ec3-wrap">
+        <div className="ec3-toolbar">
+          <Link to={`/cart/${cartId}`} className="ec3-link"><ArrowLeft size={17} aria-hidden="true" /> Back to basket</Link>
+          {cookingPath && <Link to={cookingPath} className="ec3-link">Continue guided cooking</Link>}
+          <button type="button" onClick={refreshCheckout} disabled={busy} className="ec3-refresh"><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" /> {refreshing ? 'Refreshing…' : 'Refresh'}</button>
         </div>
+        <header className="ec3-mast">
+          <h1 className="ec3-title">Review &amp; pay</h1>
+          <div className="ec3-progress" aria-label="Checkout progress"><span><CheckCircle2 size={16} aria-hidden="true" /> Basket</span><ArrowRight size={14} aria-hidden="true" /><span><CheckCircle2 size={16} aria-hidden="true" /> Delivery</span><ArrowRight size={14} aria-hidden="true" /><span className="current" aria-current="step"><LockKeyhole size={15} aria-hidden="true" /> Payment</span></div>
+        </header>
+        {loading && <div role="status" className="py-12 text-center text-[#173F35]">Preparing checkout…</div>}
+        {error && <div role="alert" className="ec3-alert"><AlertTriangle size={18} className="shrink-0" aria-hidden="true" /><span>{error}</span></div>}
+        {!loading && <div className="ec3-layout">
+          <div className="ec3-main">
+            {deliveryAddress && <section className="ec3-address" aria-label="Delivery address">
+              <span className="ec3-address-mark"><MapPin size={24} aria-hidden="true" /></span>
+              <div className="min-w-0"><div className="ec3-address-title">Deliver to</div><p className="ec3-recipient">{deliveryAddress.recipientName || 'Recipient'}{deliveryAddress.phone ? ` · ${deliveryAddress.phone}` : ''}</p><p className="ec3-muted">{formatDeliveryAddress(deliveryAddress)}</p>{deliveryAddress.deliveryInstructions && <p className="ec3-muted">Delivery note: {deliveryAddress.deliveryInstructions}</p>}</div>
+              <Link to={addressPath} className="ec3-link ec3-change">Change</Link>
+            </section>}
+            {!data && !refreshing && <div className="mb-5"><Link to={addressPath} className="ec3-link">Choose delivery address <ArrowRight size={15} aria-hidden="true" /></Link></div>}
+            {refreshing && <p role="status" className="ec3-muted mb-3">Checking latest order details…</p>}
+            {data && <section>
+              <div className="ec3-line ec3-section-head"><h2 className="ec3-heading">Your order</h2><span className="ec3-muted">{items.length} {items.length === 1 ? 'item' : 'items'}</span></div>
+              {sellerOrders.map(sellerOrder => <article key={sellerOrder.id} className="ec3-seller">
+                <div className="ec3-line ec3-seller-head"><div className="flex min-w-0 items-center gap-2"><Store size={19} className="shrink-0 text-[#173F35]" aria-hidden="true" /><h3 className="ec3-seller-name">{sellerOrder.sellerName}</h3></div><div className="text-right"><div className="ec3-muted">Seller total</div><strong className="ec3-price">{formatMoney(sellerOrder.commercialSnapshot?.totalLandedCostMinor, sellerOrder.commercialSnapshot?.currency || currency)}</strong></div></div>
+                {(sellerOrder.items || []).map((item,index) => <div className="ec3-product" key={item.cartItemId || item.offerId || index}><CheckoutProductImage item={item} images={productImages} /><div className="min-w-0"><p className="ec3-product-name">{item.displayName || 'Product'}</p><p className="ec3-muted mt-1">Quantity: {item.packCount}</p></div><div className="ec3-price">{formatMoney(item.lineTotal?.amountMinor, item.lineTotal?.currency || currency)}</div></div>)}
+                <div className="ec3-policies">
+                  <details><summary><ShieldCheck size={17} aria-hidden="true" /> Cancellation <ChevronDown size={15} className="ec3-chevron ml-auto" aria-hidden="true" /></summary><p className="ec3-muted mt-2">{sellerOrder.promise?.cancellationPolicySummary || 'Not confirmed'}</p></details>
+                  <details><summary><CheckCircle2 size={17} aria-hidden="true" /> Returns <ChevronDown size={15} className="ec3-chevron ml-auto" aria-hidden="true" /></summary><p className="ec3-muted mt-2">{sellerOrder.promise?.returnPolicySummary || 'Not confirmed'}</p></details>
+                </div>
+              </article>)}
+            </section>}
+          </div>
+          {data && <aside className="ec3-aside min-w-0" aria-label="Payment summary">
+            <section className="ec3-summary">
+              <div className="ec3-summary-label"><CreditCard size={20} aria-hidden="true" /> Payment summary</div>
+              <div className="mt-4">
+                <div className="ec3-summary-row"><span>Items</span><strong>{formatMoney(order.totals?.itemSubtotalMinor, currency)}</strong></div>
+                <div className="ec3-summary-row"><span>Delivery &amp; fees</span><strong>{formatMoney(order.totals?.knownFeesMinor, currency)}</strong></div>
+              </div>
+              <div className="ec3-total-block"><div className="text-sm font-semibold">Total to pay</div><div className="ec3-total">{formatMoney(total, currency)}</div></div>
+              {!ready && <div className="ec3-notice" role="status"><p className="font-bold">{international ? 'Delivery unavailable' : 'Payment not ready'}</p>{international ? <p className="mt-1">{INTERNATIONAL_MESSAGE}</p> : visibleBlockers.length ? <><ul className="mt-1 space-y-1">{visibleBlockers.map(code => <li key={code}>{blockerLabel(code)}</li>)}</ul>{sellerSettingsMissing && <p className="mt-2">Once the seller updates checkout settings, check again.</p>}</> : <p className="mt-1">Check again to confirm the total.</p>}</div>}
+              {international ? <button type="button" className="ec3-primary" onClick={() => setInternationalBlocked(true)} disabled={busy}><MapPin size={18} aria-hidden="true" /> Change delivery address</button> : ready ? <button type="button" className="ec3-primary" onClick={handlePayment} disabled={busy}><LockKeyhole size={18} aria-hidden="true" />{paying ? 'Opening payment…' : `Pay ${formatMoney(total, currency)}`}<ArrowRight size={17} aria-hidden="true" /></button> : <button type="button" className="ec3-primary" disabled={busy} onClick={refreshCheckout}><RefreshCw size={17} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />{refreshing ? 'Checking checkout…' : 'Check payment again'}</button>}
+              <p className="ec3-security"><ShieldCheck size={16} aria-hidden="true" /> Secured by Razorpay</p>
+            </section>
+            <p className="ec3-legal"><Link to="/terms" className="font-semibold text-[#173F35] underline">Terms &amp; Conditions</Link> · <Link to="/privacy-policy" className="font-semibold text-[#173F35] underline">Privacy Policy</Link></p>
+          </aside>}
+        </div>}
       </div>
+      <dialog ref={internationalDialogRef} onClose={() => setInternationalBlocked(false)} className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-[#D7DDCF] bg-[#F7F6F2] p-0 text-[#202421] backdrop:bg-black/50" aria-labelledby="international-title">
+        <div className="bg-[#C56C42] p-5"><MapPin size={24} aria-hidden="true" /><h2 id="international-title" className="ec2-heading mt-2">Delivery outside India</h2></div>
+        <div className="space-y-4 p-5"><p className="text-[15px] leading-6">{INTERNATIONAL_MESSAGE}</p><Link to={addressPath} className="block rounded-lg bg-[#173F35] px-4 py-3 text-center font-semibold text-white">Choose Indian address</Link><button type="button" onClick={() => internationalDialogRef.current?.close()} className="w-full rounded-lg border border-[#D7DDCF] px-4 py-2 text-sm font-semibold">Close</button></div>
+      </dialog>
     </main>
   )
 }

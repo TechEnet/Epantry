@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
-  Clock3,
   Download,
   MapPin,
   PackageCheck,
@@ -30,7 +29,7 @@ import SponsoredCampaignSlot from "../../retailMedia/components/SponsoredCampaig
 import { getCookingReturnPath } from "../../recipes/utils/cookingJourney";
 
 function formatMoney(amountMinor, currency = "INR") {
-  if (!Number.isInteger(Number(amountMinor))) {
+  if (amountMinor == null || amountMinor === "" || !Number.isInteger(Number(amountMinor))) {
     return "Not available";
   }
 
@@ -645,32 +644,39 @@ function sellerItemQuantity(item) {
   return parts.join(" · ");
 }
 
-function statusClass(value) {
-  const normalized = String(value || "").toLowerCase();
+function getOrderItemImage(item) {
+  const candidates = [
+    item?.imageUrl,
+    item?.thumbnailUrl,
+    item?.photoUrl,
+    typeof item?.image === "string" ? item.image : item?.image?.url,
+    Array.isArray(item?.images) ? item.images[0]?.url || item.images[0] : "",
+    Array.isArray(item?.photos) ? item.photos[0]?.url || item.photos[0] : "",
+    Array.isArray(item?.media) ? item.media[0]?.url || item.media[0] : "",
+  ];
 
-  if (
-    normalized.includes("confirm") ||
-    normalized.includes("paid") ||
-    normalized.includes("captured") ||
-    normalized.includes("complete")
-  ) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  }
+  return (
+    candidates.find(
+      (url) =>
+        typeof url === "string" &&
+        (/^https?:\/\//i.test(url) || url.startsWith("/"))
+    ) || ""
+  );
+}
 
-  if (normalized.includes("pending") || normalized.includes("ready")) {
-    return "border-violet-200 bg-violet-50 text-violet-800";
-  }
+function OrderStatus({ value, prefix = "" }) {
+  const state = String(value || "").toLowerCase();
+  const tone = /cancel|fail|reject|unavailable|refund/.test(state) ? "error"
+    : /^(paid|confirmed|captured|completed|complete|delivered)$/.test(state) ? "success" : "neutral";
+  return <span className="od4-status" data-tone={tone}>{tone === "success" && <CheckCircle2 size={15} aria-hidden="true" />}{prefix}{label(value)}</span>;
+}
 
-  if (
-    normalized.includes("cancel") ||
-    normalized.includes("fail") ||
-    normalized.includes("reject") ||
-    normalized.includes("unavailable")
-  ) {
-    return "border-rose-200 bg-rose-50 text-rose-800";
-  }
-
-  return "border-stone-200 bg-stone-100 text-stone-700";
+function OrderItemPhoto({ item }) {
+  const photo = getOrderItemImage(item);
+  const [failedPhoto, setFailedPhoto] = useState("");
+  return <div className="od4-photo">
+    {photo && failedPhoto !== photo ? <img src={photo} alt={item.displayName || "Order item"} loading="lazy" onError={() => setFailedPhoto(photo)} /> : <PackageCheck size={25} aria-label="Product image unavailable" />}
+  </div>;
 }
 
 function SellerJourneyTimeline({ order, timeline, sellerOrder, sellerIndex }) {
@@ -736,145 +742,37 @@ function SellerJourneyTimeline({ order, timeline, sellerOrder, sellerIndex }) {
     .find((step) => step.completed);
   const highlightedStep = currentStep || mostRecentCompleted;
 
+  const sellerName = sellerOrder.sellerName || `Host ${sellerIndex + 1}`;
+
   return (
-    <article
-      className="border-b border-[#D2D7CC] last:border-b-0"
-      aria-label={`Tracking for ${sellerOrder.sellerName || "EPANTRY Host"}`}
-    >
-      <div className="grid min-w-0 lg:grid-cols-[minmax(235px,0.34fr)_minmax(0,0.66fr)]">
-        {/* A single, readable summary instead of repeated milestone cards. */}
-        <div className="od-timeline-summary relative flex min-w-0 flex-col justify-between overflow-hidden bg-[#173F35] px-5 py-7 text-[#F7F6F2] sm:px-8 sm:py-9 lg:px-8">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full border border-[#F7F6F2]/10" />
-          <div aria-hidden="true" className="pointer-events-none absolute -right-5 -top-9 h-36 w-36 rounded-full border border-[#F7F6F2]/10" />
-
-          <div className="relative min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#E6B59E]">
-              Delivery {String(sellerIndex + 1).padStart(2, "0")}
-            </p>
-            <h3 className="mt-3 break-words text-[1.45rem] font-semibold leading-tight tracking-[-0.025em] sm:text-[1.7rem]">
-              {sellerOrder.sellerName || "EPANTRY Host"}
-            </h3>
-            <span className={`mt-4 inline-flex max-w-full rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClass(sellerOrder.status)}`}>
-              {label(sellerOrder.status)}
-            </span>
-          </div>
-
-          <div className="od-current-stage relative mt-7 border-l-[3px] border-[#C56C42] pl-4 lg:mt-11">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#D7DDCF]">
-              {currentStep ? "Current stage" : "Last recorded milestone"}
-            </p>
-            <p className="mt-2 break-words text-xl font-semibold leading-tight text-[#F7F6F2] sm:text-[1.55rem]">
-              {highlightedStep?.title || "Tracking updates pending"}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[#E1E8DD]">
-              {highlightedStep?.description || "Updates will appear when they are available."}
-            </p>
-          </div>
-
-          <div className="od-journey-progress-wrap relative mt-auto pt-7">
-            {journeySteps.some(
-              (step) => step.current && step.key === "out_for_delivery"
-            ) && (
-              <div className="od-truck-wrap mb-2 flex min-w-0 flex-col items-start gap-3" aria-label="Live delivery update">
-                <p className="od-mobile-hide-copy max-w-[310px] text-sm leading-6 text-[#E1E8DD]">
-                  Your order has left the Host and is moving toward your delivery address.
-                </p>
-                <div className="w-full max-w-[310px]">
-                  <DeliveryTruckAnimation />
-                </div>
-              </div>
-            )}
-
-            <div className="od-progress relative border-t border-[#F7F6F2]/20 pt-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm font-medium text-[#E1E8DD]">Recorded progress</p>
-                <p className="text-base font-semibold tabular-nums text-[#F7F6F2]">
-                  {confirmedCount} <span className="font-normal text-[#D7DDCF]">/ {journeySteps.length}</span>
-                </p>
-              </div>
-              <div
-                className="mt-3 h-2 overflow-hidden rounded-full bg-[#F7F6F2]/20"
-                role="progressbar"
-                aria-label={`Completed milestones for ${sellerOrder.sellerName || "Host"}`}
-                aria-valuemin={0}
-                aria-valuemax={journeySteps.length}
-                aria-valuenow={confirmedCount}
-              >
-                <div
-                  className="h-full rounded-full bg-[#C56C42] transition-[width] duration-300 motion-reduce:transition-none"
-                  style={{ width: `${(confirmedCount / journeySteps.length) * 100}%` }}
-                />
-              </div>
-              <p className="od-mobile-hide-copy mt-2 text-xs leading-5 text-[#D7DDCF]">
-                Only recorded or reached milestones are shown as complete.
-              </p>
-            </div>
-          </div>
+    <article className="od4-tracking" aria-label={`Tracking for ${sellerName}`}>
+      <div className="od4-track-top">
+        <div className="od4-track-stage">
+          <div className="od4-kicker">{sellerName} · Delivery {sellerIndex + 1}</div>
+          <h3>{highlightedStep?.title || "Tracking updates pending"}</h3>
+          <p>{highlightedStep?.description || "Updates will appear when available."}</p>
+          {highlightedStep?.occurredAt && <time>{formatTimestamp(highlightedStep.occurredAt)}</time>}
         </div>
-
-        {/* One continuous path, with the active milestone visually anchored. */}
-        <div className="od-timeline-steps min-w-0 bg-[#F7F6F2] px-4 py-6 sm:px-8 sm:py-8 lg:px-9">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-[#D5D9D0] pb-4">
-            <h4 className="text-base font-semibold text-[#202421]">Tracking milestones</h4>
-            <p className="od-mobile-hide-copy text-xs font-medium text-[#647066]">From order placed to delivered</p>
+        <div className="od4-progress">
+          <div><span>Delivery progress</span><strong>{confirmedCount}/{journeySteps.length}</strong></div>
+          <div className="od4-progress-track" role="progressbar" aria-label={`Completed milestones for ${sellerName}`} aria-valuemin={0} aria-valuemax={journeySteps.length} aria-valuenow={confirmedCount}>
+            <div style={{ width: `${confirmedCount / journeySteps.length * 100}%` }} />
           </div>
-          <ol className="relative min-w-0 before:pointer-events-none before:absolute before:bottom-7 before:left-[18px] before:top-6 before:w-[2px] before:bg-[#C7CFC1] before:content-['']" aria-label={`Milestones for ${sellerOrder.sellerName || "Host"}`}>
-            {journeySteps.map((step, index) => (
-              <li
-                key={step.key}
-                className={`od-timeline-step relative grid min-w-0 grid-cols-[38px_minmax(0,1fr)] items-start gap-3 py-2.5 sm:gap-4 ${
-                  step.current ? "rounded-xl bg-[#F6E7DC]" : ""
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`relative z-10 flex h-[38px] w-[38px] items-center justify-center rounded-full border-[2px] text-xs font-semibold tabular-nums shadow-[0_0_0_4px_#F7F6F2] ${
-                    step.current
-                      ? "border-[#C56C42] bg-[#C56C42] text-white"
-                      : step.completed
-                        ? "border-[#173F35] bg-[#173F35] text-[#F7F6F2]"
-                        : "border-[#C7CFC1] bg-[#F7F6F2] text-[#778174]"
-                  }`}
-                >
-                  {step.completed && !step.current ? (
-                    <CheckCircle2 size={17} aria-hidden="true" />
-                  ) : (
-                    String(index + 1).padStart(2, "0")
-                  )}
-                </span>
-                <div className={`min-w-0 ${step.current ? "pr-3" : "pr-1"}`}>
-                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                    <p className={`break-words text-[15px] font-semibold leading-6 sm:text-base ${
-                      step.completed || step.current ? "text-[#202421]" : "text-[#6E786C]"
-                    }`}>
-                      {step.title}
-                    </p>
-                    {step.current ? (
-                      <span className="rounded-full bg-[#C56C42] px-2.5 py-1 text-[11px] font-semibold text-white">
-                        Current
-                      </span>
-                    ) : step.completed ? (
-                      <span className="text-xs font-semibold text-[#173F35]">Completed</span>
-                    ) : (
-                      <span className="text-xs font-medium text-[#7A8376]">Upcoming</span>
-                    )}
-                  </div>
-                  <p className={`od-milestone-description mt-0.5 break-words text-sm leading-[1.45rem] ${
-                    step.current ? "text-[#654935]" : "text-[#5B685D]"
-                  }`}>
-                    {step.description}
-                  </p>
-                  {step.occurredAt && (
-                    <p className="mt-1 text-xs font-medium tabular-nums text-[#536255]">
-                      {formatTimestamp(step.occurredAt)}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
+          <OrderStatus value={sellerOrder.status} />
         </div>
       </div>
+      {journeySteps.some(step => step.current && step.key === "out_for_delivery") && (
+        <div className="od4-truck"><DeliveryTruckAnimation /></div>
+      )}
+      <ol className="od4-milestones" aria-label={`Milestones for ${sellerName}`}>
+        {journeySteps.map((step, index) => (
+          <li key={step.key} className={`od4-milestone ${step.current ? "is-current" : step.completed ? "is-done" : "is-upcoming"}`} aria-current={step.current ? "step" : undefined}>
+            <div className="od4-step-mark" aria-hidden="true">{step.completed && !step.current ? <CheckCircle2 size={18} /> : String(index + 1).padStart(2, "0")}</div>
+            <div className="od4-step-copy"><strong>{step.title}</strong><p>{step.description}</p></div>
+            <div className="od4-step-meta"><span>{step.current ? "Current" : step.completed ? "Completed" : "Upcoming"}</span>{step.occurredAt && <time>{formatTimestamp(step.occurredAt)}</time>}</div>
+          </li>
+        ))}
+      </ol>
     </article>
   );
 }
@@ -1049,365 +947,153 @@ export default function OrderDetailPage() {
 
   const sellerOrders = data?.sellerOrders || [];
 
-  const isSingleHost = sellerOrders.length === 1;
-
   const timeline = data?.timeline || [];
-
   const deliveryEta = data?.deliveryEta || null;
-
   const remainingEtaMinutes = getRemainingEtaMinutes(deliveryEta, nowMs);
-
   const orderDisplayTitle = getOrderDisplayTitle(sellerOrders);
+  const cookingPath = getCookingReturnPath({ orderId });
+  const totalItems = sellerOrders.reduce((total, seller) => total + (seller.items || []).length, 0);
+  const address = order.deliveryAddressSnapshot;
+  const currency = order.totals?.currency;
 
   return (
-    <main className="od-mobile-page min-h-screen bg-[#F7F6F2] text-[#202421]">
+    <main className="od4-page">
       <style>{`
-        /* Order Detail: phone-only density and safe full-width layout.
-           All desktop styles and data-bearing elements remain unchanged. */
-        @media (max-width: 639px) {
-          .od-mobile-page {
-            box-sizing: border-box;
-            width: calc(100% + var(--ep-content-gutter, 16px) + var(--ep-content-gutter, 16px) - 2px);
-            max-width: none;
-            margin-inline: calc(0px - var(--ep-content-gutter, 16px));
-            overflow-x: clip;
-          }
-          .od-mobile-page .od-content { padding: 9px 12px 25px; }
-          .od-mobile-page .od-toolbar { margin-bottom: 9px; gap: 6px; }
-          .od-mobile-page .od-toolbar > p { font-size: 11px; line-height: 17px; }
-          .od-mobile-page .od-receipt { border-radius: 14px; }
-          .od-mobile-page .od-receipt-title-area { padding: 18px 16px 17px; }
-          .od-mobile-page #od-title { font-size: clamp(1.65rem, 7.1vw, 2rem); line-height: 1.14; }
-          .od-mobile-page .od-receipt-title-area > div:first-child { margin-bottom: 10px; }
-          .od-mobile-page .od-header-status { margin-top: 13px; gap: 7px; }
-          .od-mobile-page .od-header-status > span { padding: 5px 9px; }
-          .od-mobile-page .od-receipt-actions {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            margin-top: 14px;
-            gap: 8px;
-          }
-          .od-mobile-page .od-receipt-actions > button {
-            min-width: 0;
-            min-height: 40px;
-            padding: 9px 7px;
-            font-size: 12px;
-            line-height: 17px;
-            gap: 5px;
-            white-space: normal;
-          }
-          .od-mobile-page .od-receipt-actions > button svg { flex-shrink: 0; width: 14px; height: 14px; }
-          .od-mobile-page .od-receipt-total { padding: 13px 16px; }
-          .od-mobile-page .od-receipt-amount { margin-top: 5px; font-size: 1.85rem; }
-          .od-mobile-page .od-total-meta { margin-top: 9px; padding-top: 9px; }
-          .od-mobile-page .od-cost-strip > div {
-            padding: 10px 14px;
-            gap: 8px;
-            font-size: 14px;
-          }
-          .od-mobile-page .od-cost-strip > div p { overflow-wrap: anywhere; }
-          .od-mobile-page .od-delivery-address { margin-top: 17px; padding: 14px 15px; }
-          .od-mobile-page .od-delivery-address > div { gap: 12px; }
-          .od-mobile-page .od-delivery-address > div > div:first-child { gap: 10px; }
-          .od-mobile-page .od-delivery-address > div > div:first-child > span {
-            width: 33px; height: 33px;
-          }
-          .od-mobile-page .od-delivery-address p { line-height: 21px; }
-          .od-mobile-page .od-delivery-eta { min-width: 0; }
-          .od-mobile-page .od-host-section, .od-mobile-page .od-journey-section {
-            margin-top: 22px;
-          }
-          .od-mobile-page .od-host-header, .od-mobile-page .od-journey-header {
-            padding: 16px;
-            gap: 10px;
-          }
-          .od-mobile-page .od-host-header h2, .od-mobile-page .od-journey-header h2 {
-            font-size: 1.43rem;
-            line-height: 1.75rem;
-          }
-          .od-mobile-page .od-host-header > p { padding-left: 9px; }
-          .od-mobile-page .od-journey-header > div { padding-left: 12px; }
-          .od-mobile-page .od-host-identity {
-            padding: 15px 16px;
-            gap: 12px;
-          }
-          .od-mobile-page .od-host-identity h3 { margin-top: 5px; font-size: 1.3rem; }
-          .od-mobile-page .od-item-list { padding: 13px 16px; }
-          .od-mobile-page .od-item-list > div:first-child { padding-bottom: 8px; }
-          .od-mobile-page .od-item-row { padding: 9px 0; gap: 3px; }
-          .od-mobile-page .od-policies > div { padding: 13px 16px; }
-          .od-mobile-page .od-policies p { margin-top: 6px; font-size: 13px; line-height: 20px; }
-          .od-mobile-page .od-timeline-summary { padding: 16px; }
-          .od-mobile-page .od-timeline-summary h3 { margin-top: 7px; font-size: 1.35rem; }
-          .od-mobile-page .od-timeline-summary span.rounded-full { margin-top: 9px; }
-          .od-mobile-page .od-current-stage { margin-top: 18px; padding-left: 12px; }
-          .od-mobile-page .od-current-stage p:nth-child(2) { margin-top: 5px; font-size: 1.15rem; }
-          .od-mobile-page .od-current-stage p:last-child { margin-top: 4px; line-height: 20px; }
-          .od-mobile-page .od-journey-progress-wrap { padding-top: 15px; }
-          .od-mobile-page .od-truck-wrap { gap: 8px; margin-bottom: 10px; }
-          .od-mobile-page .od-truck-wrap > div { max-width: 310px; }
-          .od-mobile-page .od-progress { padding-top: 12px; }
-          .od-mobile-page .od-progress [role="progressbar"] { margin-top: 8px; }
-          .od-mobile-page .od-timeline-steps { padding: 16px; }
-          .od-mobile-page .od-timeline-steps > div:first-child { margin-bottom: 11px; padding-bottom: 11px; }
-          .od-mobile-page .od-timeline-step { padding: 7px 0; gap: 10px; }
-          .od-mobile-page .od-timeline-step .od-milestone-description { font-size: 12px; line-height: 19px; }
-          .od-mobile-page .od-timeline-step p.tabular-nums { margin-top: 3px; font-size: 11px; }
-          /* Hide duplicated explanatory copy, never receipts, values, policy text,
-             delivery address, items, stages, timestamps or notices. */
-          .od-mobile-page .od-mobile-hide-copy { display: none; }
-        }
+        .od4-page {--od-clay:#C56C42;--od-forest:#173F35;--od-ink:#202421;--od-sage:#D7DDCF;--od-paper:#F7F6F2;--od-line:#D7DDCF; color:var(--od-ink);background:var(--od-paper);width:100%;min-width:0;}
+        .od4-page * {box-sizing:border-box;}
+        .od4-page .od4-content {width:100%;max-width:1500px;margin:0 auto;padding:14px 28px 36px;}
+        .od4-page :is(h1,h2,h3,p,ol,dl,dd) {margin:0;}
+        .od4-page h1 {font-size:clamp(25px,2.3vw,34px)!important;line-height:1.17!important;font-weight:750!important;letter-spacing:-.035em!important;color:var(--od-ink)!important;overflow-wrap:anywhere;}
+        .od4-page h2 {font-size:24px!important;line-height:1.25!important;letter-spacing:-.025em!important;font-weight:750!important;color:var(--od-ink)!important;}
+        .od4-page h3 {font-size:18px!important;line-height:1.35!important;font-weight:700!important;color:var(--od-ink)!important;overflow-wrap:anywhere;}
+        .od4-page p,.od4-page time {font-size:14px;line-height:1.5;overflow-wrap:anywhere;}
+        .od4-page .od4-toolbar {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+        .od4-page .od4-toolbar a {display:inline-flex;align-items:center;gap:7px;color:var(--od-forest)!important;font-size:14px;font-weight:700;text-decoration:none;}
+        .od4-page .od4-toolbar time {color:#4A5B52!important;}
+        .od4-page .od4-hero {display:flex;align-items:center;justify-content:space-between;gap:20px;background:var(--od-clay)!important;color:var(--od-ink)!important;border-radius:14px;padding:20px 24px;}
+        .od4-page .od4-hero-main {min-width:0;display:grid;gap:7px;}
+        .od4-page .od4-hero .od4-kicker {color:#141815!important;}
+        .od4-page .od4-kicker {font-size:13px;font-weight:700;line-height:1.4;color:inherit;overflow-wrap:anywhere;}
+        .od4-page .od4-statuses {display:flex;flex-wrap:wrap;align-items:center;gap:7px;}
+        .od4-page .od4-status {display:inline-flex;align-items:center;gap:5px;border:1px solid #B8C5B6!important;background:var(--od-paper)!important;color:var(--od-forest)!important;border-radius:6px;padding:4px 9px;font-size:13px!important;font-weight:700!important;line-height:1.4!important;white-space:normal;overflow-wrap:anywhere;}
+        .od4-page .od4-status[data-tone="success"] {background:#E5F1E6!important;color:#173F35!important;border-color:#ADC6AE!important;}
+        .od4-page .od4-status[data-tone="error"] {background:#FBE7E3!important;color:#8A2D25!important;border-color:#E8BCB4!important;}
+        .od4-page .od4-actions {display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;}
+        .od4-page button.od4-button {display:inline-flex;justify-content:center;align-items:center;gap:7px;min-height:42px;padding:9px 13px;border:1px solid var(--od-forest)!important;border-radius:8px;font-size:14px!important;font-weight:700!important;line-height:1.35!important;background:var(--od-forest)!important;color:var(--od-paper)!important;cursor:pointer;}
+        .od4-page button.od4-button.secondary {background:var(--od-paper)!important;color:var(--od-forest)!important;border-color:var(--od-paper)!important;}
+        .od4-page button.od4-button:disabled {opacity:.6;cursor:wait;}
+        .od4-page :is(button,a):focus-visible {outline:2px solid var(--od-forest);outline-offset:3px;}
+        .od4-page .od4-grid {display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,32%);gap:24px;align-items:start;margin-top:24px;}
+        .od4-page .od4-grid > * {min-width:0;}
+        .od4-page .od4-section-head {display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:2px solid var(--od-clay);padding:0 0 12px;margin:0 0 14px;}
+        .od4-page .od4-section-head > span {font-size:14px;color:var(--od-forest)!important;flex-shrink:0;}
+        .od4-page .od4-seller {border-bottom:1px solid var(--od-line);margin-bottom:16px;}
+        .od4-page .od4-seller-head {background:var(--od-sage)!important;padding:12px 15px;border-radius:9px 9px 0 0;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+        .od4-page .od4-seller-name {display:flex;gap:9px;align-items:center;min-width:0;}
+        .od4-page .od4-item {display:grid;grid-template-columns:76px minmax(0,1fr) auto;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--od-line);min-width:0;}
+        .od4-page .od4-photo {width:76px;height:76px;display:grid;place-items:center;background:#fff!important;border:1px solid var(--od-line);border-radius:9px;overflow:hidden;color:var(--od-forest)!important;}
+        .od4-page .od4-photo img {width:100%;height:100%;object-fit:contain;display:block;}
+        .od4-page .od4-item strong {display:block;font-size:16px;line-height:1.45;color:var(--od-ink)!important;overflow-wrap:anywhere;}
+        .od4-page .od4-item p {margin-top:4px;color:#4A5B52!important;}
+        .od4-page .od4-price {font-size:16px;font-weight:750;color:var(--od-forest)!important;white-space:nowrap;}
+        .od4-page .od4-policy {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px;padding:13px 0 16px;}
+        .od4-page .od4-policy strong {display:flex;align-items:center;gap:6px;font-size:14px;color:var(--od-forest)!important;}
+        .od4-page .od4-policy p {margin-top:5px;color:#48544B!important;}
+        .od4-page .od4-side {display:grid;gap:16px;}
+        .od4-page .od4-payment {border:1px solid var(--od-line);border-radius:12px;overflow:hidden;background:#fff!important;}
+        .od4-page .od4-payment-top {background:var(--od-clay)!important;color:var(--od-ink)!important;padding:16px 19px;}
+        .od4-page .od4-payment-top > p {display:flex;align-items:center;gap:7px;font-weight:700;color:#141815!important;}
+        .od4-page .od4-total {display:block;font-size:clamp(27px,2.4vw,36px)!important;line-height:1.15;font-weight:800;color:var(--od-ink)!important;margin-top:6px;overflow-wrap:anywhere;}
+        .od4-page .od4-payment dl {padding:14px 19px;display:grid;gap:9px;}
+        .od4-page .od4-payment dl > div {display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:14px;color:var(--od-ink)!important;}
+        .od4-page .od4-payment dd {font-weight:700;text-align:right;overflow-wrap:anywhere;}
+        .od4-page .od4-address {background:var(--od-sage)!important;padding:17px 19px;border-radius:12px;color:var(--od-ink)!important;}
+        .od4-page .od4-address h2 {display:flex;align-items:center;gap:8px;font-size:19px!important;}
+        .od4-page .od4-address p {margin-top:7px;color:var(--od-ink)!important;}
+        .od4-page .od4-address .od4-eta {border-top:1px solid #B8C5B6;margin-top:12px;padding-top:10px;}
+        .od4-page .od4-journey {margin-top:30px;}
+        .od4-page .od4-tracking {border:1px solid var(--od-line);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+        .od4-page .od4-track-top {display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,30%);align-items:center;gap:18px;background:var(--od-sage)!important;padding:16px 20px;color:var(--od-ink)!important;}
+        .od4-page .od4-track-stage h3 {margin:4px 0;font-size:22px!important;}
+        .od4-page .od4-track-stage time {display:block;margin-top:3px;color:#4A5B52!important;}
+        .od4-page .od4-progress > div:first-child {display:flex;justify-content:space-between;gap:8px;font-size:14px;}
+        .od4-page .od4-progress-track {height:7px;background:#B6C4B5!important;border-radius:9px;overflow:hidden;margin:9px 0;}
+        .od4-page .od4-progress-track > div {height:100%;background:var(--od-forest)!important;transition:width .3s;}
+        .od4-page .od4-truck {padding:14px 20px;}
+        .od4-page .od4-milestones {list-style:none;padding:4px 20px 8px;}
+        .od4-page .od4-milestone {display:grid;grid-template-columns:34px minmax(0,1fr) minmax(110px,auto);gap:12px;align-items:start;padding:10px 8px;position:relative;border-bottom:1px solid var(--od-line);}
+        .od4-page .od4-milestone:last-child {border-bottom:0;}
+        .od4-page .od4-milestone.is-current {background:#F2E1D7!important;border-radius:7px;}
+        .od4-page .od4-step-mark {position:relative;width:34px;height:34px;border:1px solid #A8B5A7;border-radius:50%;display:grid;place-items:center;color:var(--od-forest)!important;background:var(--od-paper)!important;font-size:13px;font-weight:700;}
+        .od4-page .is-done .od4-step-mark {background:var(--od-forest)!important;color:var(--od-paper)!important;border-color:var(--od-forest);}
+        .od4-page .is-current .od4-step-mark {background:var(--od-clay)!important;color:#141815!important;border-color:var(--od-clay);}
+        .od4-page .od4-step-copy strong {font-size:15px;color:var(--od-ink)!important;line-height:1.4;}
+        .od4-page .od4-step-copy p {font-size:14px;color:#4A5B52!important;}
+        .od4-page .od4-step-meta {display:grid;text-align:right;gap:3px;font-size:13px;font-weight:700;color:var(--od-forest)!important;}
+        .od4-page .od4-step-meta time {font-size:13px;font-weight:400;color:#4A5B52!important;}
+        .od4-page .od4-empty {padding:15px 0;color:#4A5B52!important;}
+        .od4-page .od4-alert {border-left:3px solid #A33C32;background:#FBE7E3!important;color:#862F26!important;padding:12px 15px;margin:12px 0;}
+        @media(max-width:1100px) {.od4-page .od4-hero {align-items:flex-start;flex-direction:column;gap:12px;} .od4-page .od4-grid {grid-template-columns:minmax(0,1fr) minmax(225px,33%);gap:16px;} }
+        @media(max-width:850px) {.od4-page .od4-grid {grid-template-columns:minmax(0,1fr);} .od4-page .od4-side {grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;} }
+        @media(max-width:639px) {.od4-page {width:calc(100% + var(--ep-content-gutter,16px) + var(--ep-content-gutter,16px) - 2px);max-width:none;margin-inline:calc(0px - var(--ep-content-gutter,16px));overflow-x:clip;} .od4-page .od4-content {padding:12px 12px 25px;} .od4-page .od4-hero {padding:15px;gap:12px;} .od4-page h1 {font-size:25px!important;} .od4-page h2 {font-size:21px!important;} .od4-page .od4-actions {width:100%;display:grid;grid-template-columns:1fr 1fr;} .od4-page button.od4-button {padding:8px;font-size:13px!important;min-width:0;} .od4-page .od4-grid {margin-top:20px;} .od4-page .od4-side {grid-template-columns:minmax(0,1fr);} .od4-page .od4-item {grid-template-columns:60px minmax(0,1fr);gap:7px 11px;} .od4-page .od4-photo {height:60px;width:60px;grid-row:span 2;} .od4-page .od4-price {grid-column:2;white-space:normal;} .od4-page .od4-policy {grid-template-columns:1fr;gap:12px;} .od4-page .od4-track-top {grid-template-columns:1fr;gap:12px;padding:14px;} .od4-page .od4-milestones {padding:3px 8px;} .od4-page .od4-milestone {grid-template-columns:30px minmax(0,1fr);gap:4px 10px;padding:10px 6px;} .od4-page .od4-step-mark {width:30px;height:30px;grid-row:span 2;} .od4-page .od4-step-meta {grid-column:2;text-align:left;display:flex;flex-wrap:wrap;gap:6px 10px;} .od4-page .od4-journey {margin-top:24px;} }
+        @media(prefers-reduced-motion:reduce) {.od4-page .od4-progress-track > div {transition:none;}}
       `}</style>
-      <div className="od-content w-full px-3 pb-9 pt-2 sm:px-6 sm:pb-12 sm:pt-3 xl:px-9">
-        <div className="od-toolbar mb-3 flex min-w-0 flex-wrap items-center justify-between gap-2 sm:mb-5">
-          <Link to="/orders" className="focus-ring inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] transition-colors hover:text-[#C56C42]">
-            <ArrowLeft size={17} aria-hidden="true" /> Back to Orders
-          </Link>
-          {getCookingReturnPath({ orderId }) && (
-            <Link to={getCookingReturnPath({ orderId })}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-4 text-sm font-semibold text-[#173F35]">
-              Continue guided cooking
-            </Link>
-          )}
-          <p className="min-w-0 break-all text-xs text-[#626A63] sm:text-sm">
-            {order.createdAt ? `Placed ${formatTimestamp(order.createdAt)}` : "Order details"}
-          </p>
+      <div className="od4-content">
+        <div className="od4-toolbar">
+          <Link to="/orders"><ArrowLeft size={17} aria-hidden="true" /> Back to orders</Link>
+          {cookingPath && <Link to={cookingPath}>Continue guided cooking</Link>}
+          {order.createdAt && <time>{`Placed ${formatTimestamp(order.createdAt)}`}</time>}
         </div>
-
-        {/* The only large feature card: a purchase receipt, not another dashboard. */}
-        <section aria-labelledby="od-title" className="od-receipt overflow-hidden rounded-[18px] border border-[#C9D1C3] bg-[#F7F6F2] shadow-[0_14px_36px_rgba(23,63,53,0.07)] sm:rounded-[22px]">
-          <div className="grid lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,.67fr)]">
-            <div className="od-receipt-title-area relative min-w-0 bg-[#173F35] px-5 py-7 text-[#F7F6F2] sm:px-8 sm:py-9 xl:px-10">
-              <div className="mb-4 flex items-center gap-3 text-sm font-semibold text-[#E5EBDD]">
-                <span className="h-[2px] w-9 bg-[#C56C42]" aria-hidden="true" />
-                01 / Your order
-              </div>
-              <h1 id="od-title" className="max-w-[800px] break-words text-[clamp(1.7rem,3.1vw,3rem)] font-semibold leading-[1.14] tracking-[-0.035em] text-[#F7F6F2]">
-                {orderDisplayTitle}
-              </h1>
-              <p className="od-mobile-hide-copy mt-3 max-w-2xl text-sm leading-6 text-[#E1E9DF] sm:text-base">
-                Your payment, Host deliveries and order updates in one place.
-              </p>
-              <div className="od-header-status mt-5 flex flex-wrap items-center gap-2">
-                <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClass(order.status)}`}>{label(order.status)}</span>
-                <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClass(order.paymentStatus)}`}>Payment {label(order.paymentStatus)}</span>
-              </div>
-              <div className="od-receipt-actions mt-6 flex flex-wrap gap-2.5">
-                <button type="button" onClick={() => downloadOrderReceipt({ order, sellerOrders, customerName: currentUser?.name || "Customer" })} className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#F7F6F2] px-4 py-2.5 text-sm font-semibold text-[#173F35] transition hover:bg-[#D7DDCF]">
-                  <Download size={16} aria-hidden="true" /> Download receipt
-                </button>
-                <button type="button" onClick={() => load({ refresh: true })} disabled={refreshing} className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#A2B8A9] px-4 py-2.5 text-sm font-semibold text-[#F7F6F2] transition hover:bg-[#275344] disabled:cursor-not-allowed disabled:opacity-60">
-                  <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} aria-hidden="true" />{refreshing ? "Refreshing..." : "Refresh order"}
-                </button>
-              </div>
-            </div>
-            <div className="od-receipt-total flex min-w-0 flex-col justify-between bg-[#AC502D] px-5 py-6 text-[#F7F6F2] sm:px-8 sm:py-8 lg:px-7">
-              <div>
-                <p className="text-sm font-semibold text-[#FFF1E8]">Total paid / payable</p>
-                <p className="od-receipt-amount mt-3 break-words text-[clamp(1.9rem,3vw,2.9rem)] font-semibold leading-tight tracking-[-0.035em] tabular-nums text-white">
-                  {formatMoney(order.totals?.totalLandedCostMinor, order.totals?.currency)}
-                </p>
-              </div>
-              <div className="od-total-meta mt-6 border-t border-white/45 pt-4">
-                <p className="text-sm font-medium text-[#FFF1E8]">{sellerOrders.length} Host {sellerOrders.length === 1 ? "delivery" : "deliveries"}</p>
-                <p className="od-mobile-hide-copy mt-1 text-sm leading-6 text-[#FFF1E8]">Each Host's items, policies and journey are listed below.</p>
-              </div>
-            </div>
+        <header className="od4-hero" aria-labelledby="od-title">
+          <div className="od4-hero-main">
+            <div className="od4-kicker">Your order</div>
+            <h1 id="od-title">{orderDisplayTitle}</h1>
+            <div className="od4-statuses"><OrderStatus value={order.status} /><OrderStatus prefix="Payment " value={order.paymentStatus} /></div>
           </div>
-          <div className="od-cost-strip grid grid-cols-1 divide-y divide-[#D7DDCF] bg-[#EBEEE5] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-            <div className="flex min-w-0 items-center justify-between gap-3 px-5 py-3.5 sm:block sm:px-7 sm:py-5">
-              <p className="text-sm font-semibold text-[#56675B]">Items subtotal</p>
-              <p className="break-words text-base font-semibold tabular-nums text-[#202421] sm:mt-1.5 sm:text-xl">{formatMoney(order.totals?.itemSubtotalMinor, order.totals?.currency)}</p>
-            </div>
-            <div className="flex min-w-0 items-center justify-between gap-3 px-5 py-3.5 sm:block sm:px-7 sm:py-5">
-              <p className="text-sm font-semibold text-[#56675B]">Known fees</p>
-              <p className="break-words text-base font-semibold tabular-nums text-[#202421] sm:mt-1.5 sm:text-xl">{formatMoney(order.totals?.knownFeesMinor, order.totals?.currency)}</p>
-            </div>
-            <div className="flex min-w-0 items-center justify-between gap-3 px-5 py-3.5 sm:block sm:px-7 sm:py-5">
-              <p className="text-sm font-semibold text-[#56675B]">Payment</p>
-              <p className="break-words text-base font-semibold text-[#173F35] sm:mt-1.5 sm:text-xl">{label(order.paymentStatus)}</p>
-            </div>
+          <div className="od4-actions">
+            <button type="button" className="od4-button secondary" onClick={() => downloadOrderReceipt({ order, sellerOrders, customerName: currentUser?.name || "Customer" })}><Download size={16} aria-hidden="true" /> Receipt</button>
+            <button type="button" className="od4-button" onClick={() => load({ refresh: true })} disabled={refreshing}><RefreshCw size={16} className={refreshing ? "animate-spin" : ""} aria-hidden="true" /> {refreshing ? "Refreshing..." : "Refresh order"}</button>
           </div>
-        </section>
-
+        </header>
         <SponsoredCampaignSlot placement="post_purchase" slotKey="post_purchase_summary" embedded />
-
-        {order.deliveryAddressSnapshot && (
-          <section className="od-delivery-address mt-5 border-y border-[#CBD3C5] bg-[#D7DDCF] px-4 py-5 sm:mt-8 sm:px-7 sm:py-7" aria-labelledby="od-delivery">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-                <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#173F35] text-[#F7F6F2]"><MapPin size={19} aria-hidden="true" /></span>
-                <div className="min-w-0">
-                  <h2 id="od-delivery" className="text-sm font-semibold text-[#173F35]">Delivery address at checkout</h2>
-                  <p className="mt-1 text-base font-semibold text-[#202421]">{order.deliveryAddressSnapshot.recipientName || "Recipient"}{order.deliveryAddressSnapshot.phone ? ` · ${order.deliveryAddressSnapshot.phone}` : ""}</p>
-                  <p className="mt-1 break-words text-sm leading-6 text-[#3F5045] sm:text-base">{formatDeliveryAddress(order.deliveryAddressSnapshot)}</p>
-                  {order.deliveryAddressSnapshot.deliveryInstructions && <p className="mt-2 break-words text-sm leading-5 text-[#586A5B]">Delivery note: {order.deliveryAddressSnapshot.deliveryInstructions}</p>}
-                </div>
-              </div>
-              {deliveryEta?.available && (
-                <div className="od-delivery-eta min-w-[170px] border-l-[3px] border-[#C56C42] pl-4">
-                  <p className="text-sm font-semibold text-[#556559]">Approx. delivery</p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums text-[#173F35]">
-                    {Number.isFinite(remainingEtaMinutes) ? remainingEtaMinutes <= 0 ? "Arriving now" : `~${remainingEtaMinutes} min` : `~${deliveryEta.estimatedDeliveryMinutes} min`}
-                  </p>
-                  <p className="mt-0.5 text-sm text-[#59685E]">{formatEtaDistance(deliveryEta.estimatedRoadDistanceKm)}</p>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {error && <p role="alert" className="mt-4 border-l-4 border-rose-600 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-900">{error}</p>}
-
+        {error && <p role="alert" className="od4-alert">{error}</p>}
         <SponsoredCampaignSlot placement="post_purchase" slotKey="post_purchase_items" embedded />
-
-        {/* 02: Host details, purchased items, and exact published promises. */}
-        <section className="od-host-section mt-7 overflow-hidden border-y border-[#C9D1C3] sm:mt-10" aria-labelledby="od-host-heading">
-          <header className="od-host-header flex flex-wrap items-end justify-between gap-4 bg-[#D7DDCF] px-5 py-6 sm:px-8 sm:py-7">
-            <div>
-              <p className="text-sm font-semibold text-[#945032]">02 / Host deliveries</p>
-              <h2 id="od-host-heading" className="mt-1 text-[1.65rem] font-semibold leading-tight tracking-[-0.025em] text-[#173F35] sm:text-[2.1rem]">
-                Who is bringing your items
-              </h2>
-            </div>
-            <p className="border-l-[3px] border-[#C56C42] pl-3 text-sm font-semibold text-[#173F35]">
-              {sellerOrders.length} {sellerOrders.length === 1 ? "Host delivery" : "Host deliveries"}
-            </p>
-          </header>
-
-          {sellerOrders.length === 0 && (
-            <p className="bg-[#FBFAF7] px-5 py-7 text-sm leading-6 text-[#47574C] sm:px-8">
-              Host delivery details are not available for this order yet.
-            </p>
-          )}
-
-          <div className="divide-y divide-[#C9D1C3]">
+        <div className="od4-grid">
+          <section aria-labelledby="od-host-heading">
+            <header className="od4-section-head"><h2 id="od-host-heading">Items ordered</h2><span>{totalItems} {totalItems === 1 ? "item" : "items"}</span></header>
+            {!sellerOrders.length && <p className="od4-empty">Delivery details are not available yet.</p>}
             {sellerOrders.map((sellerOrder, sellerIndex) => (
-              <article
-                key={sellerOrder.id || sellerIndex}
-                aria-label={`Delivery from ${sellerOrder.sellerName || "Host"}`}
-                className="grid min-w-0 bg-[#FBFAF7] lg:grid-cols-[minmax(215px,.30fr)_minmax(0,.70fr)]"
-              >
-                <div className="od-host-identity flex min-w-0 flex-col justify-between gap-5 bg-[#173F35] px-5 py-6 text-[#F7F6F2] sm:px-8 sm:py-7">
-                  <div>
-                    <p className="text-sm font-medium text-[#D7DDCF]">
-                      Delivery {String(sellerIndex + 1).padStart(2, "0")}
-                    </p>
-                    <h3 className="mt-2 break-words text-xl font-semibold leading-snug sm:text-2xl">
-                      {sellerOrder.sellerName || "EPANTRY Host"}
-                    </h3>
+              <article className="od4-seller" key={sellerOrder.id || sellerIndex} aria-label={`Delivery from ${sellerOrder.sellerName || "Host"}`}>
+                <header className="od4-seller-head"><div className="od4-seller-name"><Store size={20} aria-hidden="true" /><h3>{sellerOrder.sellerName || "EPANTRY Host"}</h3></div><OrderStatus value={sellerOrder.status} /></header>
+                {sellerProblemCopy(sellerOrder.status) && <div role="status" className="od4-alert"><strong>Delivery needs attention</strong><p>{sellerProblemCopy(sellerOrder.status)}</p></div>}
+                {!(sellerOrder.items || []).length && <p className="od4-empty">No items are available for this delivery yet.</p>}
+                {(sellerOrder.items || []).map((item, index) => (
+                  <div className="od4-item" key={item.cartItemId || item.offerId || index}>
+                    <OrderItemPhoto item={item} />
+                    <div><strong>{item.displayName || "Marketplace item"}</strong>{sellerItemQuantity(item) && <p>{sellerItemQuantity(item)}</p>}</div>
+                    {item.lineTotal?.amountMinor != null && <span className="od4-price">{formatMoney(item.lineTotal.amountMinor, item.lineTotal.currency || currency)}</span>}
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClass(sellerOrder.status)}`}>
-                      {label(sellerOrder.status)}
-                    </span>
-                    <span className="text-sm text-[#E1E8DB]">
-                      {(sellerOrder.items || []).length} {(sellerOrder.items || []).length === 1 ? "item" : "items"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  {sellerProblemCopy(sellerOrder.status) && (
-                    <div className="border-b border-rose-200 bg-rose-50 px-5 py-4 sm:px-8" role="status">
-                      <p className="text-sm font-semibold text-rose-800">This delivery needs attention</p>
-                      <p className="mt-1 text-sm leading-6 text-rose-900">
-                        {sellerProblemCopy(sellerOrder.status)}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="od-item-list px-5 py-5 sm:px-8 sm:py-6">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[#D7DDCF] pb-3">
-                      <h4 className="text-base font-semibold text-[#173F35]">Items in this delivery</h4>
-                      <p className="text-sm text-[#58665A]">
-                        {(sellerOrder.items || []).length} {(sellerOrder.items || []).length === 1 ? "item" : "items"}
-                      </p>
-                    </div>
-                    {(sellerOrder.items || []).length === 0 ? (
-                      <p className="py-4 text-sm text-[#58665A]">No item details are available for this Host yet.</p>
-                    ) : (
-                      <div className="divide-y divide-[#E0E3D9]">
-                        {(sellerOrder.items || []).map((item, itemIndex) => (
-                          <div
-                            key={item.cartItemId || item.offerId || `${item.displayName}-${itemIndex}`}
-                            className="od-item-row grid min-w-0 gap-1 py-3.5 transition-colors hover:bg-[#EEF1E9] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-5 sm:px-2"
-                          >
-                            <span className="min-w-0 break-words text-sm font-semibold text-[#202421] sm:text-base">
-                              {item.displayName || "Marketplace item"}
-                            </span>
-                            {sellerItemQuantity(item) && (
-                              <span className="min-w-0 break-words text-sm text-[#526356] sm:text-right">
-                                {sellerItemQuantity(item)}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="od-policies grid border-t border-[#D7DDCF] bg-[#F0F1E9] md:grid-cols-2 md:divide-x md:divide-[#D1D9CB]">
-                    <div className="px-5 py-5 sm:px-8">
-                      <div className="flex items-center gap-2 text-[#95472D]">
-                        <ShieldCheck size={17} aria-hidden="true" />
-                        <h4 className="text-sm font-semibold">Cancellation promise</h4>
-                      </div>
-                      <p className="mt-2 break-words text-sm leading-6 text-[#35443A]">
-                        {sellerOrder.promise?.cancellationPolicySummary || "Not captured"}
-                      </p>
-                    </div>
-                    <div className="border-t border-[#D1D9CB] px-5 py-5 sm:px-8 md:border-t-0">
-                      <div className="flex items-center gap-2 text-[#173F35]">
-                        <RotateCcw size={17} aria-hidden="true" />
-                        <h4 className="text-sm font-semibold">Return promise</h4>
-                      </div>
-                      <p className="mt-2 break-words text-sm leading-6 text-[#35443A]">
-                        {sellerOrder.promise?.returnPolicySummary || "Not captured"}
-                      </p>
-                    </div>
-                  </div>
+                ))}
+                <div className="od4-policy">
+                  <div><strong><ShieldCheck size={16} aria-hidden="true" /> Cancellation</strong><p>{sellerOrder.promise?.cancellationPolicySummary || "Not captured"}</p></div>
+                  <div><strong><RotateCcw size={16} aria-hidden="true" /> Returns</strong><p>{sellerOrder.promise?.returnPolicySummary || "Not captured"}</p></div>
                 </div>
               </article>
             ))}
-          </div>
+          </section>
+          <aside className="od4-side" aria-label="Order summary">
+            <section className="od4-payment" aria-label="Payment summary">
+              <div className="od4-payment-top"><p><WalletCards size={18} aria-hidden="true" />{paymentIsComplete(order.paymentStatus) ? "Total paid" : "Total payable"}</p><strong className="od4-total">{formatMoney(order.totals?.totalLandedCostMinor, currency)}</strong></div>
+              <dl><div><dt>Items subtotal</dt><dd>{formatMoney(order.totals?.itemSubtotalMinor, currency)}</dd></div><div><dt>Known fees</dt><dd>{formatMoney(order.totals?.knownFeesMinor, currency)}</dd></div><div><dt>Deliveries</dt><dd>{sellerOrders.length}</dd></div></dl>
+            </section>
+            {address && <section className="od4-address" aria-labelledby="od-delivery"><h2 id="od-delivery"><MapPin size={19} aria-hidden="true" /> Delivery address</h2><p><strong>{address.recipientName || "Recipient"}</strong>{address.phone ? ` · ${address.phone}` : ""}</p><p>{formatDeliveryAddress(address)}</p>{address.deliveryInstructions && <p>Delivery note: {address.deliveryInstructions}</p>}{deliveryEta?.available && <div className="od4-eta"><p><strong>Approx. delivery: {Number.isFinite(remainingEtaMinutes) ? remainingEtaMinutes <= 0 ? "Arriving now" : `~${remainingEtaMinutes} min` : `~${deliveryEta.estimatedDeliveryMinutes} min`}</strong></p><p>{formatEtaDistance(deliveryEta.estimatedRoadDistanceKm)}</p></div>}</section>}
+          </aside>
+        </div>
+        <section className="od4-journey" aria-labelledby="od-journey-heading">
+          <header className="od4-section-head"><h2 id="od-journey-heading">Track delivery</h2><span>{sellerOrders.length} {sellerOrders.length === 1 ? "delivery" : "deliveries"}</span></header>
+          {!sellerOrders.length && <p className="od4-empty">Tracking updates will appear when a delivery is available.</p>}
+          {sellerOrders.map((sellerOrder, sellerIndex) => <SellerJourneyTimeline key={sellerOrder.id || sellerIndex} order={order} timeline={timeline} sellerOrder={sellerOrder} sellerIndex={sellerIndex} />)}
         </section>
-
-        {/* 03: An individual, chronological journey for every Host delivery. */}
-        <section className="od-journey-section mt-7 overflow-hidden border-y border-[#C9D1C3] sm:mt-10" aria-labelledby="od-journey-heading">
-          <header className="od-journey-header flex flex-wrap items-end justify-between gap-5 bg-[#D7DDCF] px-5 py-6 sm:px-8 sm:py-8">
-            <div className="max-w-[740px] border-l-[4px] border-[#C56C42] pl-4 sm:pl-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#954E31]">03 / Order journey</p>
-              <h2 id="od-journey-heading" className="mt-2 text-[1.75rem] font-semibold leading-tight tracking-[-0.03em] text-[#173F35] sm:text-[2.2rem]">
-                Your delivery, step by step
-              </h2>
-              <p className="od-mobile-hide-copy mt-2 text-sm leading-6 text-[#405444]">
-                Follow each Host's progress from payment to delivery.
-              </p>
-            </div>
-            <span className="shrink-0 rounded-full border border-[#B8C6B4] bg-[#F7F6F2] px-4 py-2 text-sm font-semibold text-[#173F35]">
-              {sellerOrders.length} {sellerOrders.length === 1 ? "delivery" : "deliveries"}
-            </span>
-          </header>
-          {sellerOrders.length === 0 ? (
-            <p className="bg-[#FBFAF7] px-5 py-7 text-sm leading-6 text-[#47574C] sm:px-8">
-              Tracking updates will appear when a Host delivery is available.
-            </p>
-          ) : (
-            <div>
-              {sellerOrders.map((sellerOrder, sellerIndex) => (
-                <SellerJourneyTimeline
-                  key={sellerOrder.id || sellerIndex}
-                  order={order}
-                  timeline={timeline}
-                  sellerOrder={sellerOrder}
-                  sellerIndex={sellerIndex}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
         <SponsoredCampaignSlot placement="post_purchase" slotKey="post_purchase_follow_up" embedded />
       </div>
     </main>

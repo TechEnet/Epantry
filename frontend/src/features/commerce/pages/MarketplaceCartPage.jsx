@@ -56,6 +56,7 @@ import {
 } from '../../outcomes/services/outcomePlan.service'
 
 import { attachRecipeCart, getCookingReturnPath } from '../../recipes/utils/cookingJourney'
+import { getCatalogProducts } from '../../grocery/services/catalog.service'
 
 const RECIPE_CART_PENDING_KEY =
   'epantry-pending-recipe-cart'
@@ -292,6 +293,31 @@ function formatMoney(
   )
 }
 
+
+// Display public catalog images without placing external media URLs in cart storage.
+function basketImageUrl(record) {
+  const candidates = [
+    record?.imageUrl,
+    record?.thumbnailUrl,
+    record?.photoUrl,
+    typeof record?.image === 'string' ? record.image : record?.image?.url,
+    record?.images?.[0]?.url,
+    record?.photos?.[0]?.url,
+    record?.media?.[0]?.url,
+  ]
+  return candidates.find((url) =>
+    typeof url === 'string' && (/^https?:\/\//i.test(url) || url.startsWith('/')),
+  ) || ''
+}
+
+function basketImageLookupKey(item) {
+  return String(item?.productVersionId || item?.packId || item?.id || item?.displayName || item?.name || '').trim()
+}
+
+function basketItemCount(item) {
+  return Math.max(1, Math.floor(Number(item?.packCount ?? item?.quantity ?? 1) || 1))
+}
+
 export default function MarketplaceCartPage() {
   const {
     cartId,
@@ -378,6 +404,7 @@ export default function MarketplaceCartPage() {
     updatingGroceryItemId,
     setUpdatingGroceryItemId,
   ] = useState('')
+  const [basketProductImages, setBasketProductImages] = useState({})
 
   const currentLocation = useLocationStore((state) => state.currentLocation)
   const detectedPincode = /^\d{6}$/.test(String(currentLocation?.postcode || '').trim())
@@ -685,6 +712,67 @@ export default function MarketplaceCartPage() {
     : []
   const groceryCartId = groceryCartData?.cart?.id || grocerySnapshot?.cartId || ''
   const totalBasketItems = recipeItems.length + groceryItems.length
+  const groceryImageSignature = groceryItems.map((item) =>
+    [basketImageLookupKey(item), item?.displayName || item?.name || ''].join(':'),
+  ).join('|')
+
+  // The Cart API supplies productVersionId, but does not currently serialize
+  // thumbnails. Enrich against the PUBLIC catalog using that exact identity.
+  // The catalog request is for decoration only; price/stock/cart mutations
+  // continue to use the authoritative Commerce Cart API.
+  useEffect(() => {
+    if (!isRecipeCart || !groceryImageSignature) return undefined
+    let active = true
+    const eligible = groceryItems.filter((item) =>
+      !basketImageUrl(item) && basketImageLookupKey(item) &&
+      !basketProductImages[basketImageLookupKey(item)],
+    )
+    if (!eligible.length) return undefined
+
+    const loadImages = async () => {
+      const resolved = {}
+      const unique = [...new Map(eligible.map((item) =>
+        [basketImageLookupKey(item), item],
+      )).values()]
+      // Bounded parallel requests, with a strict product-version / pack match.
+      for (let index = 0; index < unique.length; index += 4) {
+        const batch = unique.slice(index, index + 4)
+        const results = await Promise.all(batch.map(async (item) => {
+          const name = String(item.displayName || item.name || '').trim()
+          if (!name) return null
+          try {
+            const response = await getCatalogProducts({
+              search: name,
+              limit: 50,
+            })
+            const published = Array.isArray(response?.products) ? response.products : []
+            const exact = published.find((product) =>
+              (item?.productVersionId && String(product.productVersionId || product.id) === String(item.productVersionId)) ||
+              (item?.packId && String(product.packId) === String(item.packId)),
+            )
+            const normalizedName = name.toLowerCase().replace(/\s+/g, ' ')
+            const nameMatches = published.filter((product) =>
+              String(product.displayName || '').trim().toLowerCase().replace(/\s+/g, ' ') === normalizedName,
+            )
+            const product = exact || (nameMatches.length === 1 ? nameMatches[0] : null)
+            const imageUrl = basketImageUrl(product)
+            return imageUrl ? [basketImageLookupKey(item), imageUrl] : null
+          } catch {
+            return null
+          }
+        }))
+        results.filter(Boolean).forEach(([key, url]) => { resolved[key] = url })
+      }
+      if (active && Object.keys(resolved).length) {
+        setBasketProductImages((current) => ({ ...current, ...resolved }))
+      }
+    }
+    void loadImages()
+    return () => { active = false }
+    // The signature changes when the user adds a different product; image
+    // fetch results do not trigger the fetch again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRecipeCart, groceryImageSignature])
   const selectedRecipePincode = manualRecipePincode === null
     ? detectedPincode || savedAddressPincode
     : manualRecipePincode
@@ -806,6 +894,41 @@ export default function MarketplaceCartPage() {
       notifyFloatingCartUpdated()
     } catch (removeError) {
       setError(getCommerceErrorMessage(removeError, 'Unable to remove this Grocery item.'))
+    } finally {
+      setUpdatingGroceryItemId('')
+    }
+  }
+
+  async function handleChangeGroceryQuantity(item, adjustment) {
+    const itemId = String(item?.id || item?.packId || '').trim()
+    if (!groceryCartId || !itemId || updatingGroceryItemId || groceryLoading || groceryError ||
+        groceryCartData?.cart?.sourceType !== 'direct_product') return
+    const nextQuantity = basketItemCount(item) + adjustment
+    if (nextQuantity < 1) return
+    setUpdatingGroceryItemId(itemId)
+    setError('')
+    try {
+      const result = await updateDirectMarketplaceCartItem({
+        cartId: groceryCartId,
+        itemId,
+        operation: 'set_quantity',
+        quantity: nextQuantity,
+      })
+      setGroceryCartData(result)
+      const items = mapDirectCartItems(result)
+      if (items.length) {
+        saveFloatingMarketplaceCart({
+          cartId: result?.cart?.id || groceryCartId,
+          items,
+          pincode: result?.cart?.pincode || grocerySnapshot?.pincode || '',
+          fulfillmentType: result?.cart?.fulfillmentType || grocerySnapshot?.fulfillmentType || 'delivery',
+        })
+      } else {
+        window.sessionStorage.removeItem(FLOATING_MARKETPLACE_CART_KEY)
+      }
+      notifyFloatingCartUpdated()
+    } catch (updateError) {
+      setError(getCommerceErrorMessage(updateError, 'Unable to change this quantity.'))
     } finally {
       setUpdatingGroceryItemId('')
     }
@@ -1342,309 +1465,289 @@ export default function MarketplaceCartPage() {
       recipePinCoverage.status === 'checking' ||
       recipePinCoverage.status === 'unavailable'
     )
+    const hasAnyItems = hasRecipe || hasGroceries
+    const canEditGrocery = !groceryLoading && !groceryError && groceryCartData?.cart?.sourceType === 'direct_product'
 
     return (
-      <main className="ep-unified-basket w-full bg-[#F7F6F2] text-[#202421]">
+      <main className="ep-unified-basket ep-cart-v2">
         <style>{`
-          .ep-unified-basket { font-family: 'Plus Jakarta Sans', Inter, sans-serif; }
-          .ep-unified-basket .ep-basket-item { transition: background-color .18s ease, border-color .18s ease; }
-          .ep-unified-basket .ep-basket-item:hover, .ep-unified-basket .ep-basket-item:focus-within { background: #eef1e9; border-color: #adc2b7; }
-          .ep-unified-basket .ep-basket-cta { transition: background-color .18s ease, transform .18s ease; }
-          .ep-unified-basket .ep-basket-cta:hover:not(:disabled) { background: #295748; transform: translateY(-1px); }
-          .ep-unified-basket .ep-basket-cta:focus-visible, .ep-unified-basket button:focus-visible, .ep-unified-basket a:focus-visible, .ep-unified-basket input:focus-visible { outline: 3px solid #C56C42; outline-offset: 3px; }
-          /* Only the unified customer basket on phones. Desktop styles are unchanged. */
-          @media (max-width: 639px) {
-            .ep-unified-basket {
-              box-sizing: border-box;
-              width: calc(100% + 16px);
-              max-width: none;
-              min-width: 0;
-              margin-inline: -8px;
-            }
-            .ep-unified-basket .ep-basket-mobile-wrap { padding: 8px 8px 22px; }
-            .ep-unified-basket .ep-basket-top-links { padding-bottom: 7px; gap: 7px; }
-            .ep-unified-basket .ep-basket-top-links a { min-height: 40px; font-size: 13px; }
-            .ep-unified-basket .ep-basket-hero { border-radius: 14px; }
-            .ep-unified-basket .ep-basket-hero-main { padding: 17px 16px 12px; gap: 13px; }
-            .ep-unified-basket h1.ep-basket-hero-title { margin-top: 0; font-size: 26px !important; line-height: 1.16 !important; }
-            .ep-unified-basket .ep-basket-hero-description { margin-top: 6px; font-size: 14px; line-height: 1.45; }
-            .ep-unified-basket .ep-basket-hero-stats { padding: 9px 0; }
-            .ep-unified-basket .ep-basket-hero-stats > div { min-width: 0; padding-inline: 5px; }
-            .ep-unified-basket .ep-basket-hero-stats > div > p:first-child { font-size: 23px; line-height: 1.15; }
-            .ep-unified-basket .ep-basket-hero-stats > div > p:last-child { font-size: 12px; }
-            .ep-unified-basket .ep-basket-steps > div { min-width: 0; padding: 10px 3px; font-size: 12px; line-height: 1.2; }
-            .ep-unified-basket .ep-basket-main-grid { margin-top: 18px; gap: 19px; }
-            .ep-unified-basket .ep-basket-left-stack > * + * { margin-top: 19px !important; }
-            .ep-unified-basket .ep-basket-panel-head { padding: 14px 13px 12px; gap: 9px; align-items: center; }
-            .ep-unified-basket .ep-basket-panel-head h2 { font-size: 20px !important; line-height: 1.25 !important; }
-            .ep-unified-basket .ep-basket-panel-head > span { padding: 5px 9px; font-size: 12px; }
-            .ep-unified-basket .ep-basket-item { padding: 12px 12px; gap: 9px; }
-            .ep-unified-basket .ep-basket-item p { overflow-wrap: anywhere; }
-            .ep-unified-basket .ep-basket-item button { min-height: 40px; padding-inline: 10px; }
-            .ep-unified-basket .ep-basket-empty { padding: 16px 13px; }
-            .ep-unified-basket .ep-basket-empty p:first-child { font-size: 15px; }
-            .ep-unified-basket .ep-basket-extra-links { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding-top: 13px; }
-            .ep-unified-basket .ep-basket-extra-links a { min-width: 0; min-height: 46px; padding-inline: 10px; font-size: 13px; gap: 5px; }
-            .ep-unified-basket .ep-basket-extra-links a svg { width: 15px; flex-shrink: 0; }
-            .ep-unified-basket .ep-basket-summary-head { padding: 14px 16px 12px; }
-            .ep-unified-basket .ep-basket-summary-head h2 { font-size: 21px !important; line-height: 1.25 !important; }
-            .ep-unified-basket .ep-basket-summary-body { padding: 14px 16px 17px; }
-            .ep-unified-basket .ep-basket-summary-body > * + * { margin-top: 12px !important; }
-            .ep-unified-basket .ep-basket-summary-pin { padding: 11px 12px; }
-            .ep-unified-basket .ep-basket-summary-legal { padding-top: 11px; }
+          .ep-cart-v2 { --clay:#C56C42;--forest:#173F35;--charcoal:#202421;--sage:#D7DDCF;--porcelain:#F7F6F2; background:var(--porcelain);color:var(--charcoal);font-family:'Plus Jakarta Sans',Inter,sans-serif;min-width:0; }
+          .ep-cart-v2 * { box-sizing:border-box; }
+          .ep-cart-v2 .ep-cart-layout { padding:24px clamp(16px,3vw,44px) 52px; }
+          .ep-cart-v2 .ep-cart-topline { display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px; }
+          .ep-cart-v2 .ep-cart-return { display:inline-flex;align-items:center;gap:8px;font-weight:750;color:var(--forest);text-decoration:none;font-size:14px;min-height:42px; }
+          .ep-cart-v2 .ep-cart-return:hover { text-decoration:underline; }
+          .ep-cart-v2 .ep-cart-top-shop { display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
+          .ep-cart-v2 .ep-cart-top-shop a { color:var(--forest);text-decoration:none;font-size:13px;font-weight:750; }
+          .ep-cart-v2 .ep-cart-hero { display:flex;justify-content:space-between;gap:26px;align-items:center;background:var(--clay);color:#fff;border-radius:18px;padding:28px 34px;position:relative;overflow:hidden; }
+          .ep-cart-v2 .ep-cart-hero:after { content:'';position:absolute;width:230px;height:230px;border:1px solid rgba(255,255,255,.17);border-radius:50%;right:140px;top:-160px;pointer-events:none; }
+          .ep-cart-v2 .ep-cart-kicker { font-size:11px;text-transform:uppercase;letter-spacing:.13em;font-weight:850;color:#FFEBE1; }
+          .ep-cart-v2 .ep-cart-hero h1 { font-size:clamp(28px,3.1vw,46px);line-height:1.08;letter-spacing:-.045em;font-weight:800;color:#fff;margin:7px 0 0; }
+          .ep-cart-v2 .ep-cart-hero p { font-size:14px;margin:9px 0 0;color:#FFEEE5; }
+          .ep-cart-v2 .ep-cart-hero-count { min-width:164px;position:relative;display:flex;align-items:center;gap:12px;border-left:1px solid rgba(255,255,255,.32);padding-left:25px; }
+          .ep-cart-v2 .ep-cart-hero-count strong { font-size:54px;line-height:.9;letter-spacing:-.06em;font-variant-numeric:tabular-nums; }
+          .ep-cart-v2 .ep-cart-hero-count span { font-size:12px;line-height:1.3;font-weight:700;color:#FFF4EF; }
+          .ep-cart-v2 .ep-cart-progress { display:flex;gap:9px;align-items:center;border-bottom:1px solid #DFE2DA;padding:17px 0 18px;color:#758078;font-weight:700;font-size:12px; }
+          .ep-cart-v2 .ep-cart-progress .current { color:var(--clay); }
+          .ep-cart-v2 .ep-cart-progress .dot { width:5px;height:5px;border-radius:50%;background:#BFC8BF; }
+          .ep-cart-v2 .ep-cart-content { display:grid;grid-template-columns:minmax(0,1fr) minmax(275px,330px);gap:clamp(22px,2.4vw,38px);align-items:start;margin-top:28px; }
+          .ep-cart-v2 .ep-cart-items { min-width:0; }
+          .ep-cart-v2 .ep-cart-section { border-top:3px solid var(--clay);margin-bottom:30px; }
+          .ep-cart-v2 .ep-cart-section.recipe-section { border-top-color:var(--forest); }
+          .ep-cart-v2 .ep-cart-section-head { display:flex;justify-content:space-between;align-items:end;gap:16px;padding:19px 0 16px; }
+          .ep-cart-v2 .ep-cart-section-head small { display:block;text-transform:uppercase;font-size:11px;font-weight:850;letter-spacing:.095em;color:var(--clay);margin-bottom:5px; }
+          .ep-cart-v2 .ep-cart-section-head h2 { font-size:clamp(22px,2vw,29px);line-height:1.16;letter-spacing:-.045em;margin:0;color:var(--charcoal);font-weight:830; }
+          .ep-cart-v2 .ep-cart-section-head .count { background:#E6E9DF;color:var(--forest);border-radius:999px;padding:8px 11px;font-size:12px;font-weight:750;white-space:nowrap; }
+          .ep-cart-v2 .ep-cart-list { border-top:1px solid #DFE1D9; }
+          .ep-cart-v2 .ep-cart-row { display:grid;grid-template-columns:76px minmax(0,1fr) 112px 105px 85px;align-items:center;column-gap:17px;min-height:112px;padding:16px 4px;border-bottom:1px solid #DFE1D9;transition:background .15s ease; }
+          .ep-cart-v2 .ep-cart-row:hover { background:#FBFAF7; }
+          .ep-cart-v2 .ep-cart-thumb { position:relative;width:76px;height:78px;overflow:hidden;display:grid;place-items:center;background:#EBEEE7;border:1px solid #E3E6DF;border-radius:12px;color:var(--forest); }
+          .ep-cart-v2 .ep-cart-thumb img { position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:contain;background:#fff;display:block; }
+          .ep-cart-v2 .ep-cart-name { min-width:0;font-size:15px;line-height:1.45;font-weight:800;overflow-wrap:anywhere; }
+          .ep-cart-v2 .ep-cart-subline { margin-top:5px;font-size:12px;color:#65746D;font-weight:570; }
+          .ep-cart-v2 .ep-cart-price { font-size:16px;font-weight:850;color:var(--forest);text-align:right;white-space:nowrap; }
+          .ep-cart-v2 .ep-cart-qty { display:inline-flex;align-items:center;justify-self:center;border:1px solid #CCD4CB;border-radius:11px;overflow:hidden;background:white;height:39px; }
+          .ep-cart-v2 .ep-cart-qty button { border:0;background:white;color:var(--forest);height:38px;width:31px;display:grid;place-items:center;cursor:pointer; }
+          .ep-cart-v2 .ep-cart-qty button:hover:not(:disabled) { background:#DDE9DE; }
+          .ep-cart-v2 .ep-cart-qty button:disabled { opacity:.35;cursor:not-allowed; }
+          .ep-cart-v2 .ep-cart-qty output { min-width:31px;text-align:center;font-size:14px;font-weight:850;font-variant-numeric:tabular-nums; }
+          .ep-cart-v2 .ep-cart-remove { display:inline-flex;align-items:center;justify-content:center;gap:6px;color:#A64531;border:1px solid #ECCDBF;border-radius:10px;background:transparent;padding:9px 10px;min-height:39px;font-size:12px;font-weight:800;cursor:pointer; }
+          .ep-cart-v2 .ep-cart-remove:hover:not(:disabled) { background:#FFEDE6; }
+          .ep-cart-v2 .ep-cart-remove:disabled { opacity:.4;cursor:not-allowed; }
+          .ep-cart-v2 .ep-cart-empty { border:1px dashed #D3C8BA;background:#FEFCF8;border-radius:15px;padding:32px 20px;text-align:center; }
+          .ep-cart-v2 .ep-cart-empty h2 { font-size:22px;margin:10px 0 5px; }
+          .ep-cart-v2 .ep-cart-empty a { display:inline-flex;margin-top:14px;align-items:center;gap:8px;text-decoration:none;font-weight:800;color:var(--clay); }
+          .ep-cart-v2 .ep-cart-actions { display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid #DFE1D9;padding-top:16px; }
+          .ep-cart-v2 .ep-cart-actions a { display:inline-flex;align-items:center;gap:8px;color:var(--forest);font-size:13px;font-weight:800;text-decoration:none;min-height:38px; }
+          .ep-cart-v2 .ep-cart-actions a:hover { text-decoration:underline; }
+          .ep-cart-v2 .ep-cart-summary { position:sticky;top:100px;background:#FFFEFC;border:1px solid #E2DFD7;border-radius:16px;overflow:hidden;box-shadow:0 10px 26px rgba(29,38,31,.04); }
+          .ep-cart-v2 .ep-cart-summary-title { padding:22px 23px;background:#D7DDCF;border-bottom:1px solid #CBD3C3; }
+          .ep-cart-v2 .ep-cart-summary-title small { display:block;color:var(--forest);font-weight:850;letter-spacing:.1em;font-size:11px;text-transform:uppercase; }
+          .ep-cart-v2 .ep-cart-summary-title h2 { font-size:24px;letter-spacing:-.045em;margin:5px 0 0;color:var(--charcoal); }
+          .ep-cart-v2 .ep-cart-summary-body { padding:20px 23px 23px; }
+          .ep-cart-v2 .ep-cart-summary-line { display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px;color:#617067; }
+          .ep-cart-v2 .ep-cart-summary-line strong { color:var(--charcoal);font-size:17px; }
+          .ep-cart-v2 .ep-cart-summary-total { border-top:1px solid #E5E6DF;margin-top:15px;padding-top:17px; }
+          .ep-cart-v2 .ep-cart-summary-total strong { font-size:30px;color:var(--forest);letter-spacing:-.04em; }
+          .ep-cart-v2 .ep-cart-summary-note { margin:6px 0 0;color:#6A746B;font-size:12px; }
+          .ep-cart-v2 .ep-cart-summary-pin { padding:15px 0;margin-top:17px;border-top:1px solid #E5E6DF; }
+          .ep-cart-v2 .ep-cart-summary-pin-label { display:flex;align-items:center;justify-content:space-between;gap:14px; }
+          .ep-cart-v2 .ep-cart-summary-pin-label strong { color:var(--forest);font-weight:850; }
+          .ep-cart-v2 .ep-cart-summary-pin-label button { font-size:12px;font-weight:800;background:none;border:0;color:var(--clay);cursor:pointer; }
+          .ep-cart-v2 .ep-cart-pin-form { display:flex;gap:8px;margin-top:12px; }
+          .ep-cart-v2 .ep-cart-pin-form input { flex:1;min-width:0;height:42px;border:1px solid #C5CEC3;padding:0 12px;border-radius:8px; }
+          .ep-cart-v2 .ep-cart-pin-form button { border:0;border-radius:8px;background:var(--forest);color:white;font-weight:750;padding:0 16px; }
+          .ep-cart-v2 .ep-cart-checkout { width:100%;min-height:52px;border:0;border-radius:11px;background:var(--clay);color:#fff;font-weight:850;font-size:15px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;margin-top:20px; }
+          .ep-cart-v2 .ep-cart-checkout:hover:not(:disabled) { background:#AC5833; }
+          .ep-cart-v2 .ep-cart-checkout:disabled { opacity:.5;cursor:not-allowed; }
+          .ep-cart-v2 .ep-cart-alert { display:flex;gap:12px;align-items:start;margin-top:18px;padding:15px 17px;background:#FFF1ED;color:#8C392B;border-left:4px solid #C9473C;border-radius:8px;font-size:14px; }
+          .ep-cart-v2 .ep-cart-alert button { margin-top:12px;display:inline-flex;align-items:center;gap:8px;border:0;border-radius:8px;padding:10px 14px;background:var(--forest);color:white;font-weight:700; }
+          .ep-cart-v2 button:focus-visible,.ep-cart-v2 a:focus-visible,.ep-cart-v2 input:focus-visible { outline:3px solid var(--clay);outline-offset:3px; }
+          @media(max-width:1100px){ .ep-cart-v2 .ep-cart-content { grid-template-columns:minmax(0,1fr) 280px;gap:20px; } .ep-cart-v2 .ep-cart-row{grid-template-columns:66px minmax(0,1fr) 100px 90px 74px;gap:9px;} .ep-cart-v2 .ep-cart-thumb{width:66px;height:70px;} }
+          @media(max-width:900px){ .ep-cart-v2 .ep-cart-content{grid-template-columns:1fr;} .ep-cart-v2 .ep-cart-summary{position:static;} }
+          @media(max-width:620px){
+            .ep-cart-v2 .ep-cart-layout{padding:10px 12px 30px;}
+            .ep-cart-v2 .ep-cart-topline{margin-bottom:10px;gap:8px;}
+            .ep-cart-v2 .ep-cart-top-shop{gap:10px;}
+            .ep-cart-v2 .ep-cart-top-shop a{font-size:12px;}
+            .ep-cart-v2 .ep-cart-hero{padding:21px 19px;border-radius:14px;gap:12px;}
+            .ep-cart-v2 .ep-cart-hero h1{font-size:28px;}
+            .ep-cart-v2 .ep-cart-hero p{font-size:12px;margin-top:5px;}
+            .ep-cart-v2 .ep-cart-hero-count{min-width:auto;display:block;padding-left:13px;}
+            .ep-cart-v2 .ep-cart-hero-count strong{font-size:35px;display:block;}
+            .ep-cart-v2 .ep-cart-hero-count span{font-size:10px;}
+            .ep-cart-v2 .ep-cart-progress{padding:11px 0;font-size:11px;}
+            .ep-cart-v2 .ep-cart-content{margin-top:18px;gap:16px;}
+            .ep-cart-v2 .ep-cart-section-head{padding:14px 0;}
+            .ep-cart-v2 .ep-cart-section-head h2{font-size:22px;}
+            .ep-cart-v2 .ep-cart-row{grid-template-columns:64px minmax(0,1fr) 77px;gap:7px 11px;min-height:0;padding:14px 0;}
+            .ep-cart-v2 .ep-cart-thumb{width:64px;height:68px;grid-column:1;grid-row:1/3;}
+            .ep-cart-v2 .ep-cart-info{grid-column:2;grid-row:1;}
+            .ep-cart-v2 .ep-cart-name{font-size:13px;line-height:1.4;}
+            .ep-cart-v2 .ep-cart-subline{font-size:11px;margin-top:4px;}
+            .ep-cart-v2 .ep-cart-qty{grid-column:2;grid-row:2;justify-self:start;}
+            .ep-cart-v2 .ep-cart-price{grid-column:3;grid-row:2;font-size:14px;text-align:right;}
+            .ep-cart-v2 .ep-cart-remove{grid-column:3;grid-row:1;justify-self:end;align-self:start;padding:7px;min-height:32px;font-size:11px;}
+            .ep-cart-v2 .ep-cart-remove span{display:none;}
+            .ep-cart-v2 .ep-cart-summary-title{padding:16px 17px;}
+            .ep-cart-v2 .ep-cart-summary-title h2{font-size:21px;}
+            .ep-cart-v2 .ep-cart-summary-body{padding:16px 17px;}
           }
-          @media (prefers-reduced-motion: reduce) { .ep-unified-basket *, .ep-unified-basket *::before, .ep-unified-basket *::after { transition: none !important; scroll-behavior: auto !important; } }
+          @media(prefers-reduced-motion:reduce){.ep-cart-v2 *{transition:none!important;}}
         `}</style>
-        <div className="ep-basket-mobile-wrap w-full px-4 pb-8 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-12">
-          <div className="ep-basket-top-links flex flex-wrap items-center justify-between gap-2 pb-4">
-            <Link
-              to={recipeCart?.slug ? `/recipes/${recipeCart.slug}` : '/grocery'}
-              className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] hover:underline"
-            >
-              <ArrowLeft size={17} aria-hidden="true" />
-              <span className="sm:hidden">{hasRecipe ? 'Recipe' : 'Continue shopping'}</span>
-              <span className="hidden sm:inline">{hasRecipe ? 'Back to recipe' : 'Continue shopping'}</span>
+        <div className="ep-cart-layout">
+          <nav className="ep-cart-topline" aria-label="Basket navigation">
+            <Link className="ep-cart-return" to={recipeCart?.slug && hasRecipe ? `/recipes/${recipeCart.slug}` : '/grocery'}>
+              <ArrowLeft size={17} aria-hidden="true"/> Continue shopping
             </Link>
-            {(isRecipeCart ? getCookingReturnPath({ slug: recipeCart?.slug }) : getCookingReturnPath({ cartId })) && (
-              <Link to={isRecipeCart ? getCookingReturnPath({ slug: recipeCart?.slug }) : getCookingReturnPath({ cartId })}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-[#A5BEAA] bg-[#E7F1E7] px-3 text-sm font-semibold text-[#173F35]">
-                Continue cooking <ArrowRight size={15} aria-hidden="true" />
-              </Link>
-            )}
-            <Link to="/grocery" className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-[#173F35] hover:underline">
-              <span className="sm:hidden">Grocery</span><span className="hidden sm:inline">Browse grocery</span> <ArrowRight size={15} aria-hidden="true" />
-            </Link>
-          </div>
-
-          <header className="ep-basket-hero relative overflow-hidden rounded-[20px] bg-[#173F35] text-[#F7F6F2] sm:rounded-[26px]">
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-[#C56C42]/20 [clip-path:polygon(45%_0,100%_0,100%_100%,0_100%)]" aria-hidden="true" />
-            <div className="ep-basket-hero-main relative grid gap-5 px-5 py-7 sm:px-8 sm:py-9 lg:grid-cols-[minmax(0,1fr)_245px] lg:items-center">
-              <div>
-                <p className="hidden text-xs font-bold uppercase tracking-[0.09em] text-[#D7DDCF] sm:block">EPANTRY / Your basket</p>
-                <h1 className="ep-basket-hero-title mt-2 max-w-2xl text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#F7F6F2] sm:text-[42px]">
-                  <span className="sm:hidden">Your basket</span><span className="hidden sm:inline">All your shopping, together.</span>
-                </h1>
-                <p className="ep-basket-hero-description mt-3 max-w-xl text-[15px] leading-6 text-[#F7F6F2]/85">
-                  <span className="sm:hidden">Recipes and groceries, all in one place.</span>
-                  <span className="hidden sm:inline">Review ingredients from recipes and products from Grocery in one place.</span>
-                </p>
-              </div>
-              <div className="ep-basket-hero-stats grid grid-cols-3 gap-0 border-y border-white/25 py-3 text-center lg:border-y-0 lg:border-l lg:py-1">
-                <div className="px-2">
-                  <p className="text-[26px] font-semibold tabular-nums">{totalBasketItems}</p>
-                  <p className="text-xs text-[#D7DDCF]">Total</p>
-                </div>
-                <div className="border-x border-white/25 px-2">
-                  <p className="text-[26px] font-semibold tabular-nums">{recipeItems.length}</p>
-                  <p className="text-xs text-[#D7DDCF]">Recipe</p>
-                </div>
-                <div className="px-2">
-                  <p className="text-[26px] font-semibold tabular-nums">{groceryItems.length}</p>
-                  <p className="text-xs text-[#D7DDCF]">Grocery</p>
-                </div>
-              </div>
+            <div className="ep-cart-top-shop">
+              {hasRecipe && getCookingReturnPath({ slug: recipeCart?.slug }) && (
+                <Link to={getCookingReturnPath({ slug: recipeCart?.slug })}>Continue cooking</Link>
+              )}
+              <Link to="/grocery">Browse grocery <ArrowRight size={15} aria-hidden="true"/></Link>
             </div>
-            <div className="ep-basket-steps grid grid-cols-3 gap-px bg-white/20 text-xs font-medium sm:text-sm">
-              <div className="bg-[#234b3f] px-3 py-3 text-center text-white sm:px-5">01 / Review</div>
-              <div className="bg-[#234b3f] px-3 py-3 text-center text-white sm:px-5">02 / Delivery</div>
-              <div className="bg-[#234b3f] px-3 py-3 text-center text-white sm:px-5">03 / Checkout</div>
+          </nav>
+
+          <header className="ep-cart-hero">
+            <div>
+              <span className="ep-cart-kicker">EPANTRY / YOUR BASKET</span>
+              <h1>Your shopping basket.</h1>
+              <p>{hasAnyItems ? 'Review your items before checkout.' : 'Add something good to get started.'}</p>
+            </div>
+            <div className="ep-cart-hero-count">
+              <strong>{totalBasketItems}</strong>
+              <span>{totalBasketItems === 1 ? 'item' : 'items'} in your basket</span>
             </div>
           </header>
+          {hasAnyItems && (
+            <div className="ep-cart-progress" aria-label="Checkout steps">
+              <span className="current">Basket</span><span className="dot" aria-hidden="true"/>
+              <span>Delivery</span><span className="dot" aria-hidden="true"/><span>Checkout</span>
+            </div>
+          )}
 
           {error && (
-            <div role="alert" className="mt-5 flex gap-3 border-l-4 border-rose-700 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-              <AlertTriangle className="shrink-0" size={18} aria-hidden="true" /> {error}
-            </div>
+            <div role="alert" className="ep-cart-alert"><AlertTriangle size={18} aria-hidden="true"/><span>{error}</span></div>
           )}
           {recipeCoverageIssue && (
-            <section className="mt-5 border-l-4 border-rose-700 bg-rose-50 px-4 py-4 sm:px-5" aria-label="Delivery coverage issue">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-rose-950">Delivery needs your attention</h2>
-                  <p className="mt-1 text-sm leading-6 text-rose-800">
-                    {recipeCoverageIssue.unmatchedNames.length
-                      ? `${recipeCoverageIssue.unmatchedNames.join(', ')} ${recipeCoverageIssue.unmatchedNames.length === 1 ? 'is' : 'are'} not available for PIN ${recipeCoverageIssue.pincode}.`
-                      : `Some recipe items cannot currently be delivered to PIN ${recipeCoverageIssue.pincode}.`}
-                  </p>
-                </div>
-                <button type="button" onClick={handlePlaceRecipeOrder} className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800">
-                  <MapPin size={15} aria-hidden="true" /> Change address
-                </button>
+            <div className="ep-cart-alert" role="alert">
+              <AlertTriangle size={19} aria-hidden="true"/>
+              <div>
+                <strong>Delivery needs attention</strong>
+                <p>{recipeCoverageIssue.unmatchedNames?.length
+                  ? `${recipeCoverageIssue.unmatchedNames.join(', ')} unavailable for PIN ${recipeCoverageIssue.pincode}.`
+                  : `Some ingredients cannot be delivered to PIN ${recipeCoverageIssue.pincode}.`}</p>
+                <button type="button" onClick={handlePlaceRecipeOrder}>Change delivery address <ArrowRight size={15}/></button>
               </div>
-            </section>
+            </div>
           )}
 
-          <div className="ep-basket-main-grid mt-7 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start xl:gap-8">
-            <div className="ep-basket-left-stack min-w-0 space-y-7">
-              <section className="overflow-hidden border-t-[3px] border-[#C56C42] bg-white" aria-labelledby="ep-recipe-basket-title">
-                <div className="ep-basket-panel-head flex flex-wrap items-end justify-between gap-3 border-b border-[#D7DDCF] px-4 py-5 sm:px-6">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-[#C56C42]">01 / From your recipes</p>
-                    <h2 id="ep-recipe-basket-title" className="mt-1 text-[23px] font-semibold tracking-[-0.03em] text-[#202421] sm:text-[27px]">Ingredients to buy</h2>
+          <div className="ep-cart-content">
+            <div className="ep-cart-items">
+              {hasGroceries && (
+                <section className="ep-cart-section" aria-labelledby="ep-cart-grocery-heading">
+                  <div className="ep-cart-section-head">
+                    <div><small>Grocery & Brands</small><h2 id="ep-cart-grocery-heading">Your products</h2></div>
+                    <span className="count">{groceryItems.length} {groceryItems.length === 1 ? 'product' : 'products'}</span>
                   </div>
-                  <span className="rounded-full bg-[#D7DDCF] px-3 py-1 text-sm font-semibold text-[#173F35]">{recipeItems.length} items</span>
-                </div>
-                {hasRecipe ? (
-                  <div className="divide-y divide-[#D7DDCF]/70">
-                    {recipeItems.map((item, index) => (
-                      <article key={item.canonicalIngredientId || index} className="ep-basket-item grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-l-[3px] border-transparent px-4 py-4 sm:px-6">
-                        <div className="min-w-0">
-                          <p className="text-[16px] font-semibold leading-6 text-[#202421]">{item.name || 'Ingredient'}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-[#173F35]/80">
-                            <span>{formatRecipeQuantity(item)}</span>
-                            <span aria-hidden="true">·</span>
-                            <span>From recipe</span>
-                            {recipeCoverageIssue?.unmatchedCanonicalIngredientIds?.includes(String(item?.canonicalIngredientId || '')) && (
-                              <span className="font-semibold text-rose-700">Not available here</span>
-                            )}
+                  {groceryLoading && <p role="status">Refreshing your basket…</p>}
+                  {groceryError && <p role="alert" style={{color:'#9C3226',marginBottom:12}}>{groceryError}</p>}
+                  <div className="ep-cart-list">
+                    {groceryItems.map((item,index) => {
+                      const key = basketImageLookupKey(item)
+                      const photo = basketImageUrl(item) || basketProductImages[key] || ''
+                      const quantity = basketItemCount(item)
+                      const busy = Boolean(updatingGroceryItemId) || !canEditGrocery
+                      const title = item.displayName || item.name || 'Grocery product'
+                      return (
+                        <article className="ep-cart-row" key={item.id || item.packId || index}>
+                          <div className="ep-cart-thumb">
+                            <ShoppingBasket size={26} aria-hidden="true"/>{photo && <img src={photo} alt={title} loading="lazy" onError={(event) => { event.currentTarget.style.display='none' }} />}
                           </div>
-                        </div>
-                        <button type="button" onClick={() => handleRemoveRecipeItem(item.canonicalIngredientId)}
-                          aria-label={`Remove ${item.name || 'ingredient'} from basket`}
-                          className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-800 hover:bg-rose-50">
-                          <Trash2 size={16} aria-hidden="true" /> <span className="hidden sm:inline">Remove</span>
-                        </button>
-                      </article>
-                    ))}
+                          <div className="ep-cart-info">
+                            <div className="ep-cart-name">{title}</div>
+                            <div className="ep-cart-subline">{item.sellerName || 'EPANTRY seller'} · {item.packQuantity && item.packUnit ? `${item.packQuantity} ${item.packUnit}` : 'Per pack'}</div>
+                          </div>
+                          <div className="ep-cart-qty" aria-label={`Quantity for ${title}`}>
+                            <button type="button" onClick={() => handleChangeGroceryQuantity(item, -1)} disabled={busy || quantity <= 1} aria-label={`Decrease quantity of ${title}`}><Minus size={14}/></button>
+                            <output aria-live="polite">{quantity}</output>
+                            <button type="button" onClick={() => handleChangeGroceryQuantity(item, 1)} disabled={busy} aria-label={`Increase quantity of ${title}`}><Plus size={14}/></button>
+                          </div>
+                          <strong className="ep-cart-price">{item.lineTotal?.amountMinor != null ? formatMoney(item.lineTotal.amountMinor, item.lineTotal.currency || groceryCurrency) : '—'}</strong>
+                          <button type="button" className="ep-cart-remove" disabled={busy} onClick={() => handleRemoveGroceryItem(item)} aria-label={`Remove ${title} from basket`}><Trash2 size={15} aria-hidden="true"/><span>Remove</span></button>
+                        </article>
+                      )
+                    })}
                   </div>
-                ) : (
-                  <div className="ep-basket-empty px-5 py-6 sm:px-6">
-                    <p className="text-[16px] font-semibold text-[#202421]">No recipe ingredients in your basket.</p>
-                    <p className="mt-1 hidden text-sm text-[#173F35]/80 sm:block">Add missing ingredients from any recipe whenever you need them.</p>
-                    <Link to="/recipes" className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] underline underline-offset-4">Explore recipes <ArrowRight size={15} aria-hidden="true" /></Link>
-                  </div>
-                )}
-              </section>
+                </section>
+              )}
 
-              <section className="overflow-hidden border-t-[3px] border-[#173F35] bg-[#eef1e9]" aria-labelledby="ep-grocery-basket-title">
-                <div className="ep-basket-panel-head flex flex-wrap items-end justify-between gap-3 border-b border-[#c4ccbd] px-4 py-5 sm:px-6">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-[#173F35]">02 / From Grocery & Brands</p>
-                    <h2 id="ep-grocery-basket-title" className="mt-1 text-[23px] font-semibold tracking-[-0.03em] text-[#202421] sm:text-[27px]">Products in your basket</h2>
+              {hasRecipe && (
+                <section className="ep-cart-section recipe-section" aria-labelledby="ep-cart-recipe-heading">
+                  <div className="ep-cart-section-head">
+                    <div><small style={{color:'var(--forest)'}}>From your recipes</small><h2 id="ep-cart-recipe-heading">Recipe ingredients</h2></div>
+                    <span className="count">{recipeItems.length} {recipeItems.length === 1 ? 'ingredient' : 'ingredients'}</span>
                   </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-[#173F35]">{groceryItems.length} products</span>
+                  <div className="ep-cart-list">
+                    {recipeItems.map((item,index) => {
+                      const title = item.name || 'Ingredient'
+                      const photo = basketImageUrl(item)
+                      return (
+                        <article className="ep-cart-row" key={item.canonicalIngredientId || index}>
+                          <div className="ep-cart-thumb"><Package size={24} aria-hidden="true"/>{photo && <img src={photo} alt={title} loading="lazy" onError={(event) => {event.currentTarget.style.display='none'}}/>}</div>
+                          <div className="ep-cart-info">
+                            <div className="ep-cart-name">{title}</div>
+                            <div className="ep-cart-subline">{formatRecipeQuantity(item)}</div>
+                          </div>
+                          <span className="ep-cart-subline" style={{textAlign:'center'}}>Recipe item</span>
+                          <span className="ep-cart-price">—</span>
+                          <button type="button" className="ep-cart-remove" onClick={() => handleRemoveRecipeItem(item.canonicalIngredientId)} aria-label={`Remove ${title} from basket`}><Trash2 size={15}/><span>Remove</span></button>
+                        </article>
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {!hasAnyItems && (
+                <div className="ep-cart-empty">
+                  <ShoppingBasket size={28} color="#C56C42" aria-hidden="true"/>
+                  <h2>Your basket is empty</h2>
+                  <p>Browse products or choose ingredients from a recipe.</p>
+                  <Link to="/grocery">Explore grocery <ArrowRight size={16}/></Link>
                 </div>
-                {groceryLoading && <p role="status" className="px-5 py-4 text-sm text-[#173F35]">Checking saved grocery products...</p>}
-                {groceryError && <p role="alert" className="px-5 py-4 text-sm font-medium text-rose-800">{groceryError}</p>}
-                {hasGroceries ? (
-                  <div className="divide-y divide-[#c4ccbd]">
-                    {groceryItems.map((item, index) => (
-                      <article key={`grocery-${item.id || item.packId || index}`} className="ep-basket-item flex flex-wrap items-center justify-between gap-3 border-l-[3px] border-transparent px-4 py-4 sm:px-6">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[16px] font-semibold leading-6 text-[#202421]">{item.displayName || item.name || 'Grocery product'}</p>
-                          <p className="mt-1 text-[13px] text-[#173F35]/85">
-                            {item.sellerName || 'Grocery'} · {Number(item.packCount || item.quantity || 1)} pack{Number(item.packCount || item.quantity || 1) === 1 ? '' : 's'}
-                          </p>
-                          {item.lineTotal?.amountMinor !== undefined && (
-                            <p className="mt-2 text-[15px] font-semibold text-[#173F35]">{formatMoney(item.lineTotal.amountMinor, item.lineTotal.currency || 'INR')}</p>
-                          )}
-                        </div>
-                        <button type="button" onClick={() => handleRemoveGroceryItem(item)}
-                          disabled={Boolean(updatingGroceryItemId) || groceryLoading || Boolean(groceryError) || groceryCartData?.cart?.sourceType !== 'direct_product'}
-                          aria-label={`Remove ${item.displayName || item.name || 'grocery product'} from basket`}
-                          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
-                          <Trash2 size={16} aria-hidden="true" /> <span>Remove</span>
-                        </button>
-                      </article>
-                    ))}
-                  </div>
-                ) : !groceryLoading && !groceryError ? (
-                  <div className="ep-basket-empty px-5 py-6 sm:px-6">
-                    <p className="text-[16px] font-semibold text-[#202421]">No Grocery products added yet.</p>
-                    <p className="mt-1 hidden text-sm text-[#173F35]/80 sm:block">Products you add from Grocery and Brands will appear here.</p>
-                    <Link to="/grocery" className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#173F35] underline underline-offset-4">Shop groceries <ArrowRight size={15} aria-hidden="true" /></Link>
-                  </div>
-                ) : null}
-              </section>
-
-              <div className="ep-basket-extra-links grid gap-3 border-t border-[#D7DDCF] pt-4 sm:grid-cols-2">
-                <Link to="/recipes" className="group flex min-h-14 items-center justify-between rounded-xl border border-[#D7DDCF] bg-white px-4 text-[15px] font-semibold text-[#173F35] hover:border-[#173F35]">Add from recipes <ArrowRight size={18} aria-hidden="true" /></Link>
-                <Link to="/grocery" className="group flex min-h-14 items-center justify-between rounded-xl border border-[#D7DDCF] bg-white px-4 text-[15px] font-semibold text-[#173F35] hover:border-[#173F35]">Add from Grocery <ArrowRight size={18} aria-hidden="true" /></Link>
+              )}
+              <div className="ep-cart-actions">
+                <Link to="/grocery">+ Add more groceries <ArrowRight size={16}/></Link>
+                <Link to="/recipes">+ Add from recipes <ArrowRight size={16}/></Link>
               </div>
             </div>
 
-            <aside className="min-w-0 lg:sticky lg:top-24" aria-label="Basket checkout summary">
-              <div className="border-t-4 border-[#C56C42] bg-white shadow-[0_14px_36px_-28px_rgba(23,63,53,0.4)]">
-                <div className="ep-basket-summary-head bg-[#D7DDCF] px-5 py-5">
-                  <p className="text-xs font-bold uppercase tracking-wide text-[#173F35]">Your next step</p>
-                  <h2 className="mt-1 text-[23px] font-semibold tracking-[-0.025em] text-[#202421]">Ready to review?</h2>
-                </div>
-                <div className="ep-basket-summary-body space-y-4 px-5 py-5">
-                  <div className="flex items-center justify-between border-b border-[#D7DDCF] pb-3 text-sm">
-                    <span className="text-[#202421]/80">Selected items</span>
-                    <strong className="text-lg font-semibold text-[#173F35]">{totalBasketItems}</strong>
+            <aside className="ep-cart-summary" aria-label="Basket checkout summary">
+              <div className="ep-cart-summary-title"><small>Order summary</small><h2>Ready for checkout</h2></div>
+              <div className="ep-cart-summary-body">
+                <div className="ep-cart-summary-line"><span>Items</span><strong>{totalBasketItems}</strong></div>
+                {hasGroceries && groceryCartData?.items?.length > 0 && (
+                  <div className="ep-cart-summary-total">
+                    <span className="ep-cart-summary-line">Grocery subtotal</span>
+                    <strong>{formatMoney(grocerySubtotal,groceryCurrency)}</strong>
+                    {hasRecipe && <p className="ep-cart-summary-note">Recipe ingredients are priced at checkout.</p>}
                   </div>
-                  {hasGroceries && groceryCartData?.items?.length > 0 && (
-                    <div className="border-b border-[#D7DDCF] pb-4">
-                      <p className="text-xs font-medium text-[#173F35]/80">Grocery item prices so far</p>
-                      <p className="mt-1 text-2xl font-semibold text-[#202421]">{formatMoney(grocerySubtotal, groceryCurrency)}</p>
-                      <p className="mt-1 hidden text-xs leading-5 text-[#202421]/75 sm:block">Recipe ingredients, delivery fees and final availability are checked before checkout.</p>
+                )}
+                {hasRecipe && (
+                  <div className="ep-cart-summary-pin">
+                    <div className="ep-cart-summary-pin-label">
+                      <span>Delivery PIN<br/><strong>{selectedRecipePincode || 'Not set'}</strong></span>
+                      <button type="button" onClick={() => {setRecipePincodeDraft(selectedRecipePincode);setRecipePinError('');setRecipePinEditorOpen((open)=>!open)}}>{recipePinEditorOpen ? 'Cancel' : 'Change'}</button>
                     </div>
-                  )}
-                  {hasRecipe && (
-                    <div className="ep-basket-summary-pin rounded-xl bg-[#F7F6F2] p-3.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-[#173F35]">Delivery PIN</p>
-                          <p className="mt-1 text-[16px] font-semibold text-[#202421]">{selectedRecipePincode || 'Choose PIN'}
-                            {manualRecipePincode === null && selectedRecipePincode && <span className="ml-1 text-xs font-normal text-[#173F35]/75">{detectedPincode ? '· Current location' : '· Saved address'}</span>}
-                          </p>
-                        </div>
-                        <button type="button" onClick={() => { setRecipePincodeDraft(selectedRecipePincode); setRecipePinError(''); setRecipePinEditorOpen((open) => !open) }}
-                          className="min-h-9 rounded-lg border border-[#D7DDCF] bg-white px-3 text-xs font-semibold text-[#173F35] hover:bg-[#D7DDCF]">
-                          {recipePinEditorOpen ? 'Cancel' : 'Change PIN'}
-                        </button>
-                      </div>
-                      {(recipePinEditorOpen || !selectedRecipePincode) && (
-                        <form onSubmit={handleCheckRecipePincode} className="mt-3 space-y-2">
-                          <div className="flex gap-2">
-                            <input inputMode="numeric" autoComplete="postal-code" maxLength={6} pattern="[0-9]{6}" value={recipePincodeDraft}
-                              onChange={(event) => setRecipePincodeDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                              placeholder="6-digit PIN" aria-label="Delivery PIN code"
-                              className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#D7DDCF] bg-white px-3 text-sm text-[#202421]" />
-                            <button type="submit" className="min-h-11 rounded-lg bg-[#173F35] px-3 text-sm font-semibold text-white">Check</button>
-                          </div>
-                          {recipePinError && <p role="alert" className="text-xs text-rose-700">{recipePinError}</p>}
-                          {detectedPincode && (
-                            <button type="button" onClick={() => { setManualRecipePincode(null); setRecipePinEditorOpen(false); setRecipePinError('') }}
-                              className="text-left text-xs font-semibold text-[#173F35] underline">Use current PIN {detectedPincode}</button>
-                          )}
-                        </form>
-                      )}
-                      {selectedRecipePincode && (
-                        <p role="status" className={`mt-3 text-[13px] leading-5 ${recipePinCoverage.status === 'available' ? 'text-[#173F35]' : recipePinCoverage.status === 'unavailable' ? 'text-rose-700' : 'text-[#202421]/80'}`}>
-                          {recipePinCoverage.pincode !== selectedRecipePincode || recipePinCoverage.status === 'checking'
-                            ? `Checking Host availability for PIN ${selectedRecipePincode}...`
-                            : recipePinCoverage.status === 'available'
-                              ? `Recipe ingredients can be delivered to PIN ${selectedRecipePincode}.`
-                              : recipePinCoverage.status === 'unavailable'
-                                ? `Some ingredients are unavailable for PIN ${selectedRecipePincode}${recipePinCoverage.unmatchedNames?.length ? `: ${recipePinCoverage.unmatchedNames.join(', ')}` : ''}.`
-                                : recipePinCoverage.status === 'covered'
-                                  ? 'Your confirmed Pantry covers these ingredients. Nothing additional is needed for this recipe.'
-                                : recipePinCoverage.status === 'error'
-                                  ? (recipePinCoverage.message || 'Unable to check delivery right now.')
-                                  : 'Enter your delivery PIN to check current Hosts.'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => hasRecipe ? handlePlaceRecipeOrder() : navigate(`/checkout/${groceryCartId}`)}
-                    disabled={hasRecipe ? (placingRecipeOrder || recipeDeliveryBusy) : !canReviewGroceries}
-                    className="ep-basket-cta inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 py-3 text-[15px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {placingRecipeOrder ? 'Checking availability…' : hasRecipe ? 'Review delivery & checkout' : 'Review grocery checkout'}
-                    <ArrowRight size={18} aria-hidden="true" />
-                  </button>
-                  {!hasRecipe && !hasGroceries && (
-                    <p className="text-center text-sm leading-5 text-[#202421]/75">Add an ingredient or a product to begin.</p>
-                  )}
-                  <div className="ep-basket-summary-legal flex items-start gap-2 border-t border-[#D7DDCF] pt-4 text-xs leading-5 text-[#202421]/75">
-                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#173F35]" aria-hidden="true" />
-                    <span>Seller availability, delivery charges and final prices are checked before payment.</span>
+                    {(recipePinEditorOpen || !selectedRecipePincode) && (
+                      <form className="ep-cart-pin-form" onSubmit={handleCheckRecipePincode}>
+                        <input inputMode="numeric" autoComplete="postal-code" maxLength={6} pattern="[0-9]{6}" value={recipePincodeDraft} onChange={(event) => setRecipePincodeDraft(event.target.value.replace(/\D/g,'').slice(0,6))} placeholder="6-digit PIN" aria-label="Delivery PIN"/>
+                        <button type="submit">Check</button>
+                      </form>
+                    )}
+                    {recipePinError && <p style={{color:'#9C3226',fontSize:12}} role="alert">{recipePinError}</p>}
+                    {recipePinEditorOpen && detectedPincode && (
+                      <button type="button" style={{border:0,background:'none',textDecoration:'underline',fontWeight:700,color:'var(--forest)',marginTop:8,cursor:'pointer'}} onClick={() => {setManualRecipePincode(null);setRecipePinEditorOpen(false);setRecipePinError('')}}>Use current PIN {detectedPincode}</button>
+                    )}
+                    {selectedRecipePincode && <p style={{fontSize:12,lineHeight:1.5,marginTop:10,color:recipePinCoverage.status==='unavailable'?'#9C3226':'var(--forest)'}} role="status">
+                      {recipePinCoverage.pincode!==selectedRecipePincode || recipePinCoverage.status==='checking'
+                        ? 'Checking ingredient delivery…'
+                        : recipePinCoverage.status==='available'
+                          ? 'Ingredients available for delivery'
+                          : recipePinCoverage.status==='unavailable'
+                            ? `Some ingredients unavailable for PIN ${selectedRecipePincode}`
+                            : recipePinCoverage.status==='covered' ? 'Ingredients already in your Pantry'
+                            : recipePinCoverage.status==='error' ? (recipePinCoverage.message || 'Availability check failed')
+                            : 'Enter a PIN to check delivery'}
+                    </p>}
                   </div>
-                </div>
+                )}
+                <button type="button" className="ep-cart-checkout" onClick={() => hasRecipe ? handlePlaceRecipeOrder() : navigate(`/checkout/${groceryCartId}`)} disabled={hasRecipe ? (placingRecipeOrder || recipeDeliveryBusy) : !canReviewGroceries}>
+                  {placingRecipeOrder ? 'Checking availability…' : hasRecipe ? 'Review delivery & checkout' : 'Continue to checkout'}
+                  <ArrowRight size={18} aria-hidden="true"/>
+                </button>
+                {!hasAnyItems && <p className="ep-cart-summary-note" style={{textAlign:'center'}}>Add an item to continue.</p>}
               </div>
             </aside>
           </div>
