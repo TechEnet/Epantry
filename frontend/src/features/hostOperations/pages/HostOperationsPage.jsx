@@ -33,6 +33,8 @@ import { listHostBrandAuthorities } from "../../brands/services/brandAuthority.s
 
 import { listHostOrders } from "../../commerce/services/commerce.service";
 
+import { listHostListingPackets, submitHostListingSectionRevision } from "../../host/services/hostUnifiedListing.service";
+
 import { searchCommunityIngredients } from "../../community/services/community.service";
 
 import {
@@ -1852,6 +1854,19 @@ export default function HostOperationsPage({ section = "dashboard" }) {
 
   const [sharedDeliveryLoadError, setSharedDeliveryLoadError] = useState("");
 
+  // Coverage saved for the business is a DEFAULT for future listings. Already
+  // approved products retain their last approved delivery snapshot. The Host
+  // can explicitly request a governed update for chosen products below.
+  const [coverageListingRows, setCoverageListingRows] = useState([]);
+  const [coverageListingLoading, setCoverageListingLoading] = useState(false);
+  const [coverageListingError, setCoverageListingError] = useState("");
+  const [coverageSelectedIds, setCoverageSelectedIds] = useState([]);
+  const [coverageApplying, setCoverageApplying] = useState(false);
+  const [coverageApplyResult, setCoverageApplyResult] = useState(null);
+  const [coverageRefreshCounter, setCoverageRefreshCounter] = useState(0);
+  const [coverageDisplayCount, setCoverageDisplayCount] = useState(8);
+
+
   const [quality, setQuality] = useState(null);
 
   const [imports, setImports] = useState([]);
@@ -2346,6 +2361,86 @@ export default function HostOperationsPage({ section = "dashboard" }) {
   const displayedDeliveryPins = sharedDeliveryArea?.postalCodes?.length
     ? sharedDeliveryArea.postalCodes
     : previousDeliveryPins;
+
+  // This is a read-only preview. Only Host-selected items are ever submitted.
+  useEffect(() => {
+    if (section !== "dashboard" || !sharedDeliveryArea?.id) return undefined;
+    let active = true;
+    setCoverageListingLoading(true);
+    setCoverageListingError("");
+    listHostListingPackets()
+      .then((response) => {
+        if (!active) return;
+        if (!Array.isArray(response?.listings)) throw new Error("The Host listings API did not return a list.");
+        setCoverageListingRows(response.listings);
+        // Always require a fresh, explicit checkbox selection after refresh.
+        setCoverageSelectedIds([]);
+        setCoverageDisplayCount(8);
+      })
+      .catch((cause) => {
+        if (!active) return;
+        setCoverageListingRows([]);
+        setCoverageSelectedIds([]);
+        setCoverageListingError(getHostOperationsErrorMessage(cause, "Unable to load your approved listings."));
+      })
+      .finally(() => { if (active) setCoverageListingLoading(false); });
+    return () => { active = false; };
+  }, [section, sharedDeliveryArea?.id, coverageRefreshCounter]);
+
+  const coveragePublishedPins = useMemo(() => [...new Set(
+    (sharedDeliveryArea?.postalCodes || []).map((pin) => String(pin).trim())
+      .filter((pin) => /^[1-9][0-9]{5}$/.test(pin))
+  )].sort(), [sharedDeliveryArea]);
+
+  const coverageUnsaved = useMemo(() => {
+    const entered = [...new Set(deliveryAreaForm.postalCodes.split(/[\s,;]+/)
+      .map((pin) => pin.trim()).filter(Boolean))].sort();
+    return JSON.stringify(entered) !== JSON.stringify(coveragePublishedPins);
+  }, [deliveryAreaForm.postalCodes, coveragePublishedPins]);
+
+  const coverageApprovedProducts = useMemo(() => coverageListingRows.filter((listing) => {
+    if (listing.status !== "approved" || !listing.id) return false;
+    const packet = listing.packet || {};
+    const isSellable = packet.type === "grocery" || packet.type === "prepared_food" ||
+      (packet.type === "kitchen_recipe" && packet.sellReadyMade === true);
+    if (!isSellable || packet.delivery?.fulfillment === "pickup") return false;
+    const existing = [...new Set((packet.delivery?.postalCodes || []).map(String))].sort();
+    return JSON.stringify(existing) !== JSON.stringify(coveragePublishedPins);
+  }), [coverageListingRows, coveragePublishedPins]);
+
+  async function applyCoverageToSelectedListings() {
+    if (coverageApplying || !sharedDeliveryArea?.id || coverageUnsaved || !coveragePublishedPins.length ||
+      !coverageSelectedIds.length || coverageListingLoading || coverageListingError) return;
+    const chosen = coverageApprovedProducts.filter((row) => coverageSelectedIds.includes(String(row.id)));
+    if (!chosen.length) return;
+    // The Host explicitly chooses existing products. Never update the live
+    // ServiceArea or last-approved public packet here; existing secured
+    // section-revision writes generate Super Admin review requests instead.
+    setCoverageApplying(true);
+    setCoverageApplyResult(null);
+    const succeeded = [];
+    const failed = [];
+    try {
+      for (const row of chosen) {
+        try {
+          const existing = row.packet?.delivery || {};
+          await submitHostListingSectionRevision(row.id, {
+            delivery: { ...existing, fulfillment: "delivery", postalCodes: [...coveragePublishedPins] },
+          });
+          succeeded.push(row.title || row.packet?.title || String(row.id));
+        } catch (cause) {
+          failed.push({ title: row.title || row.packet?.title || String(row.id),
+            message: getHostOperationsErrorMessage(cause, "Could not submit coverage update.") });
+        }
+      }
+    } finally {
+      setCoverageApplying(false);
+      setCoverageSelectedIds([]);
+      setCoverageApplyResult({ succeeded, failed });
+      setCoverageRefreshCounter((count) => count + 1);
+    }
+  }
+
 
   async function run(action, successMessage = "") {
     setBusy(true);
@@ -3341,6 +3436,87 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                   <p className="hops-coverage-note">No delivery PIN codes have been saved yet.</p>
                 ) : null}
               </aside>
+            </div>
+
+            <div className="mt-5 border-t border-[#C8D4C9] pt-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="max-w-[660px]">
+                  <h3 className="text-[18px] font-extrabold leading-tight text-[#173F35]">Existing approved products</h3>
+                  <p className="mt-1 text-[14px] leading-6 text-[#43554B]">
+                    Business PINs are the default for new listings. To cover older products, select them below and send their delivery update to Super Admin.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setCoverageRefreshCounter((count) => count + 1)}
+                  disabled={coverageApplying || coverageListingLoading || !sharedDeliveryArea?.id}
+                  className="rounded-lg border border-[#BAC9BC] bg-[#F7F6F2] px-4 py-2 text-sm font-bold text-[#173F35] disabled:opacity-50">
+                  Refresh products
+                </button>
+              </div>
+              {!sharedDeliveryArea ? (
+                <p className="mt-3 text-sm font-semibold text-[#895330]">Save the business delivery coverage first.</p>
+              ) : coverageUnsaved ? (
+                <p role="status" className="mt-3 text-sm font-semibold text-[#975033]">PIN changes are not saved. Click Update delivery coverage first.</p>
+              ) : null}
+              {coverageListingLoading ? <p role="status" className="mt-3 text-sm text-[#43554B]">Loading approved products...</p> : null}
+              {coverageListingError ? <p role="alert" className="mt-3 text-sm font-semibold text-[#B34E37]">{coverageListingError}</p> : null}
+              {!coverageListingLoading && !coverageListingError && sharedDeliveryArea && !coverageApprovedProducts.length ? (
+                <p className="mt-3 text-sm text-[#43554B]">No approved delivery products need this update among the returned listings.</p>
+              ) : null}
+              {coverageApprovedProducts.length > 0 ? (
+                <div className="mt-4 space-y-0 border-y border-[#D6DDD2]">
+                  {coverageApprovedProducts.slice(0, coverageDisplayCount).map((listing) => {
+                    const selected = coverageSelectedIds.includes(String(listing.id));
+                    const currentPins = listing.packet?.delivery?.postalCodes || [];
+                    return (
+                      <label key={listing.id} className="flex cursor-pointer items-start gap-3 border-b border-[#D6DDD2] px-1 py-3 last:border-b-0 hover:bg-[#EDF1E9]">
+                        <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-[#C56C42]"
+                          checked={selected}
+                          disabled={coverageApplying || coverageListingLoading || coverageUnsaved || !sharedDeliveryArea}
+                          onChange={(event) => setCoverageSelectedIds((old) => event.target.checked
+                            ? [...new Set([...old, String(listing.id)])]
+                            : old.filter((id) => id !== String(listing.id)))} />
+                        <span className="min-w-0 flex-1">
+                          <strong className="block text-[14px] font-bold text-[#202421]">{listing.title || "Approved product"}</strong>
+                          <span className="block text-[12px] leading-5 text-[#536358]">
+                            Current: {currentPins.length ? currentPins.join(", ") : "no delivery PINs"}
+                          </span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-[#F8E9E0] px-2.5 py-1 text-[11px] font-bold text-[#9B5432]">Update needed</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {coverageApprovedProducts.length > coverageDisplayCount ? (
+                <button type="button" className="mt-3 text-sm font-bold text-[#173F35] underline underline-offset-4"
+                  onClick={() => setCoverageDisplayCount((count) => count + 8)}>
+                  Show next {Math.min(8, coverageApprovedProducts.length - coverageDisplayCount)} products
+                </button>
+              ) : null}
+              {coverageApprovedProducts.length > 0 ? (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[13px] text-[#536358]">{coverageSelectedIds.length} selected · New PINs: {coveragePublishedPins.join(", ")}</p>
+                  <button type="button" onClick={applyCoverageToSelectedListings}
+                    disabled={coverageApplying || !coverageSelectedIds.length || coverageUnsaved || coverageListingLoading || Boolean(coverageListingError)}
+                    className="inline-flex min-h-[43px] items-center justify-center rounded-xl bg-[#C56C42] px-5 py-2 text-[14px] font-bold text-white hover:bg-[#AE5934] disabled:cursor-not-allowed disabled:opacity-50">
+                    {coverageApplying ? "Submitting delivery updates..." : `Submit ${coverageSelectedIds.length || "selected"} to Super Admin`}
+                  </button>
+                </div>
+              ) : null}
+              {coverageApplyResult ? (
+                <div role="status" className="mt-4 border-l-[3px] border-[#C56C42] bg-[#F7F6F2] p-3 text-[13px] leading-6 text-[#173F35]">
+                  <strong>{coverageApplyResult.succeeded.length} update(s) submitted for Super Admin review.</strong>
+                  <p>Current customer coverage stays unchanged until the updated listings are approved.</p>
+                  {coverageApplyResult.failed.map((entry, index) => (
+                    <p key={`${entry.title}-${index}`} className="font-semibold text-[#9D4031]">
+                      {entry.title}: {entry.message}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              <p className="mt-3 text-[12px] leading-5 text-[#536358]">
+                Availability also requires an active offer, valid price and stock. This list uses the first 100 Host listings returned by the current API; refresh after each submission.
+              </p>
             </div>
           </Section>
 
