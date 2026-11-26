@@ -319,6 +319,8 @@ export async function uploadAccountProfilePhoto(
 |--------------------------------------------------------------------------
 */
 
+export const ACCOUNT_FOOD_PREFERENCES_CHANGED_EVENT = 'epantry:account-food-preferences-changed'
+
 export async function getAccountPreferences() {
   const response =
     await apiClient.get(
@@ -359,8 +361,15 @@ export async function updateAccountPreferences(
       response,
     )
 
-  return data?.preferences ||
-    null
+  const preferences = data?.preferences || null
+
+  // Only signal after a successful server write. Listeners re-read the
+  // current authenticated account rather than trusting a shared browser value.
+  if (Array.isArray(preferences?.dietaryLifestyles) && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ACCOUNT_FOOD_PREFERENCES_CHANGED_EVENT))
+  }
+
+  return preferences
 }
 
 /*

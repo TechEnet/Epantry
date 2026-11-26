@@ -15,8 +15,10 @@ import {
   Plus,
   Save,
   ShieldCheck,
-  SlidersHorizontal,
   UserRound,
+  Leaf,
+  Drumstick,
+  Utensils,
   X,
 } from 'lucide-react'
 
@@ -48,62 +50,26 @@ import {
 } from '../../deliveryAddresses/services/deliveryAddress.service'
 
 const DIETARY_OPTIONS = [
-  {
-    value:
-      'vegetarian',
-
-    label:
-      'Vegetarian',
-  },
-
-  {
-    value:
-      'vegan',
-
-    label:
-      'Vegan',
-  },
-
-  {
-    value:
-      'pescatarian',
-
-    label:
-      'Pescatarian',
-  },
-
-  {
-    value:
-      'halal',
-
-    label:
-      'Halal',
-  },
-
-  {
-    value:
-      'kosher',
-
-    label:
-      'Kosher',
-  },
-
-  {
-    value:
-      'gluten_free',
-
-    label:
-      'Gluten free',
-  },
-
-  {
-    value:
-      'dairy_free',
-
-    label:
-      'Dairy free',
-  },
+  { value: 'vegetarian', label: 'Veg', description: 'Vegetarian food' },
+  { value: 'non_vegetarian', label: 'Non-Veg', description: 'Includes meat, fish or eggs' },
+  { value: '', label: 'No preference', description: 'All food choices' },
 ]
+const OTHER_DIET_MODES = [
+  { value: 'vegan', label: 'Vegan' },
+  { value: 'pescatarian', label: 'Pescatarian' },
+]
+const DIET_MODE_VALUES = ['vegetarian', 'non_vegetarian', 'vegan', 'pescatarian']
+const OPTIONAL_DIETARY_OPTIONS = [
+  { value: 'halal', label: 'Halal' },
+  { value: 'kosher', label: 'Kosher' },
+  { value: 'gluten_free', label: 'Gluten free' },
+  { value: 'dairy_free', label: 'Dairy free' },
+]
+
+function selectDietMode(values, mode) {
+  const remaining = values.filter((value) => !DIET_MODE_VALUES.includes(value))
+  return mode ? [...remaining, mode] : remaining
+}
 
 const ALLERGEN_OPTIONS = [
   {
@@ -304,23 +270,11 @@ function formatConsentName(
   }
 }
 
-function ConsentStatus({
-  granted,
-  optional = false,
-}) {
-  return (
-    <span
-      className={[
-        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-semibold',
-        granted
-          ? 'bg-[#DCE8DE] text-[#173F35]'
-          : 'bg-[#EEEDE5] text-[#59645B]',
-      ].join(' ')}
-    >
-      {granted && <Check size={13} aria-hidden="true" />}
-      {optional ? (granted ? 'On' : 'Off') : (granted ? 'Accepted' : 'Not accepted')}
-    </span>
-  )
+function ConsentStatus({ granted, optional = false }) {
+  return <span className="aps-status" data-active={granted ? 'true' : 'false'}>
+    {granted && <Check size={15} aria-hidden="true" />}
+    {optional ? (granted ? 'On' : 'Off') : (granted ? 'Accepted' : 'Not accepted')}
+  </span>
 }
 
 export default function AccountSettingsPage() {
@@ -1115,130 +1069,166 @@ export default function AccountSettingsPage() {
     )
   }
 
+  const chosenDiet = ['vegan', 'pescatarian', 'vegetarian', 'non_vegetarian'].find((value) => preferenceForm.dietaryLifestyles.includes(value)) || ''
+  const dietLabel = [...DIETARY_OPTIONS, ...OTHER_DIET_MODES].find((option) => option.value === chosenDiet)?.label || 'No preference'
+  const chooseDiet = (mode) => {
+    setPreferenceForm((current) => ({ ...current, dietaryLifestyles: selectDietMode(current.dietaryLifestyles, mode) }))
+    setPreferenceMessage('')
+  }
+  const renderDiet = (option) => (
+    <label key={option.value || 'none'} className="aps-diet-option" data-selected={chosenDiet === option.value ? 'true' : 'false'}>
+      <input type="radio" name="account-diet-mode" value={option.value} checked={chosenDiet === option.value} onChange={() => chooseDiet(option.value)} />
+      <span className="aps-diet-symbol" aria-hidden="true">{option.value === 'non_vegetarian' ? <Drumstick size={28}/> : option.value === 'vegetarian' || option.value === 'vegan' ? <Leaf size={28}/> : <Utensils size={28}/>}</span>
+      <span className="aps-diet-copy"><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span>
+    </label>
+  )
+  const renderPreference = (key, option) => (
+    <label key={option.value} className="aps-chip" data-selected={preferenceForm[key].includes(option.value) ? 'true' : 'false'}>
+      <input type="checkbox" checked={preferenceForm[key].includes(option.value)} onChange={() => togglePreferenceValue(key, option.value)} />
+      {option.label}
+    </label>
+  )
   return (
-    <main className="w-full min-w-0 bg-[#F7F6F2] px-2 pb-5 pt-2 text-[#202421] sm:px-6 sm:pb-16 sm:pt-7 lg:px-9">
-      <div className="w-full">
-        <header className="border-b border-[#D7DDCF] pb-3 sm:pb-8">
-          <div className="mb-1.5 flex items-center gap-2 sm:mb-2 sm:gap-3">
-            <span className="h-[3px] w-7 rounded-full bg-[#C86C42]" aria-hidden="true" />
-            <p className="text-[13px] font-semibold tracking-[0.08em] text-[#173F35]">Your account</p>
-          </div>
-          <h1 className="text-[24px] font-bold leading-tight tracking-[-0.035em] sm:text-[34px]">Profile & preferences</h1>
-          <p className="mt-1 max-w-2xl text-[14px] leading-5 text-[#556158] sm:mt-2 sm:text-base sm:leading-6">
-            <span className="sm:hidden">Manage your profile, addresses, food choices and privacy.</span>
-            <span className="hidden sm:inline">Your details, delivery addresses, food choices and privacy settings—all in one place.</span>
-          </p>
-        </header>
-
-        {pageError && (
-          <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 sm:mt-5 sm:gap-3 sm:px-4 sm:py-3 text-sm font-medium leading-6 text-red-800">
-            <CircleAlert size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <span>{pageError}</span>
-          </div>
-        )}
-
-        {/* Personal profile: image, name, phone, email and save actions remain connected. */}
-        <section aria-labelledby="profile-heading" className="py-4 sm:py-9">
-          <div className="mb-3 flex items-center gap-2 sm:mb-5 sm:gap-3">
-            <span className="text-[14px] font-bold text-[#C86C42]">01</span>
-            <h2 id="profile-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]">Personal details</h2>
-          </div>
-          <div className="grid min-w-0 gap-0 overflow-hidden rounded-[12px] border border-[#D7DDCF] sm:rounded-[18px] lg:grid-cols-[0.85fr_1.45fr]">
-            <div className="relative flex flex-col justify-between gap-2 bg-[#173F35] p-3 text-white sm:gap-6 sm:p-7">
-              <div>
-                <p className="hidden text-sm font-medium text-[#DCE8DE] sm:block">Your profile photo</p>
-                <div className="flex items-center gap-3 sm:mt-4 sm:gap-4">
-                  <div className="relative shrink-0">
-                    {profile?.profilePhotoUrl ? (
-                      <img src={profile.profilePhotoUrl} alt="Your profile" className="h-14 w-14 rounded-full border-[3px] border-white/80 object-cover sm:h-24 sm:w-24" />
-                    ) : (
-                      <div className="grid h-14 w-14 place-items-center rounded-full border-[3px] border-white/60 bg-[#2B624E] text-2xl font-bold sm:h-24 sm:w-24 sm:text-[30px]">
-                        {String(profile?.name || 'E').trim().charAt(0).toUpperCase() || 'E'}
-                      </div>
-                    )}
-                    <label className="focus-within:ring-2 focus-within:ring-[#F7F6F2] focus-within:ring-offset-2 focus-within:ring-offset-[#173F35] absolute -bottom-1 -right-1 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-[#C86C42] text-white transition hover:bg-[#AD5631]" title="Change profile photo">
-                      {isUploadingPhoto ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Camera size={17} aria-hidden="true" />}
-                      <span className="sr-only">Change profile photo</span>
-                      <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={isUploadingPhoto} onChange={handlePhotoChange} aria-label="Change profile photo" />
-                    </label>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="break-words text-[17px] font-bold leading-snug sm:text-xl">{profile?.name || 'EPANTRY member'}</p>
-                    <p className="mt-0.5 text-[13px] leading-5 text-[#DFE9E1] sm:mt-1">{isUploadingPhoto ? 'Uploading your photo...' : <><span className="sm:hidden">Change photo with the camera icon.</span><span className="hidden sm:inline">Tap the camera to update your photo.</span></>}</p>
-                  </div>
-                </div>
+    <main className="aps-page">
+      <style>{`
+        .aps-page { --clay:#C56C42; --forest:#173F35; --ink:#202421; --paper:#F7F6F2; --sage:#D7DDCF; --line:#C8D0C2; --muted:#4D5A51; box-sizing:border-box; container-type:inline-size; min-width:0; width:100%; background:var(--paper); color:var(--ink); padding:28px 34px 48px; font-size:16px; line-height:1.5; }
+        .aps-page * { box-sizing:border-box; }
+        .aps-page :is(h1,h2,h3,p) { margin:0; }
+        .aps-page :is(h1,h2,h3,legend) { color:var(--ink)!important; font-weight:700; letter-spacing:-.025em; line-height:1.2; }
+        .aps-page .aps-hero { display:flex; align-items:center; gap:16px; padding:0 0 24px; border-bottom:2px solid var(--ink); }
+        .aps-page .aps-hero h1 { font-size:clamp(29px,3.2vw,40px); }
+        .aps-page .aps-hero-icon { width:52px; height:52px; background:var(--clay)!important; color:#141916!important; display:grid; place-items:center; border-radius:12px; flex:none; }
+        .aps-page .aps-section { min-width:0; display:grid; grid-template-columns:minmax(0,200px) minmax(0,1fr); column-gap:28px; align-items:start; padding:28px 0; border-bottom:1px solid var(--line); }
+        .aps-page > .aps-section:last-child { border-bottom:0; padding-bottom:0; }
+        .aps-page .aps-heading { display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding-top:4px; min-width:0; }
+        .aps-page .aps-heading h2 { font-size:26px; }
+        .aps-page .aps-heading .aps-section-mark { width:36px; height:4px; background:var(--clay); display:block; border-radius:2px; }
+        .aps-page h3,.aps-page legend { font-size:20px; }
+        .aps-page .aps-muted { color:var(--muted)!important; font-size:15px; line-height:1.5; }
+        .aps-page p,.aps-page strong,.aps-page a { overflow-wrap:anywhere; }
+        .aps-page .aps-account-grid,.aps-page .aps-address-column { display:contents; }
+        .aps-page .aps-profile { overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--paper); min-width:0; }
+        .aps-page .aps-identity { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:20px; padding:20px 24px; background:var(--clay)!important; color:#141916!important; min-width:0; }
+        .aps-page .aps-identity :is(h3,p,strong) { color:#141916!important; }
+        .aps-page .aps-avatar-row { display:flex; align-items:center; gap:16px; min-width:0; }
+        .aps-page .aps-avatar { width:76px; height:76px; flex:0 0 76px; position:relative; }
+        .aps-page .aps-avatar img,.aps-page .aps-initial { width:100%; height:100%; border-radius:50%; object-fit:cover; background:var(--forest)!important; color:white!important; display:grid; place-items:center; font-weight:700; font-size:32px; border:2px solid var(--paper); }
+        .aps-page .aps-camera { position:absolute; right:-3px; bottom:-3px; display:grid; place-items:center; background:var(--paper)!important; color:var(--forest)!important; width:34px; height:34px; border:2px solid var(--clay); border-radius:50%; cursor:pointer; }
+        .aps-page .aps-identity-email { min-width:0; overflow-wrap:anywhere; font-size:16px; padding-left:16px; border-left:1px solid #20242155; }
+        .aps-page .aps-identity-email strong { display:block; font-weight:650; }
+        .aps-page .aps-form { padding:22px 24px; min-width:0; }
+        .aps-page .aps-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+        .aps-page .aps-field { display:grid; align-content:start; gap:7px; min-width:0; }
+        .aps-page .aps-field label,.aps-page .aps-address-form label { color:var(--ink)!important; font-size:16px; font-weight:650; }
+        .aps-page input:not([type=radio]):not([type=checkbox]):not([type=file]),.aps-page select,.aps-page textarea { color:var(--ink)!important; background:#fff!important; border:1px solid #AEB9AA!important; border-radius:9px; padding:12px 14px; font-size:16px; width:100%; min-width:0; min-height:48px; }
+        .aps-page input::placeholder { color:#626B62; opacity:1; }
+        .aps-page :is(input,select,textarea,button,summary):focus-visible,.aps-page .aps-camera:focus-within { outline:2px solid var(--forest); outline-offset:3px; }
+        .aps-page .aps-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:18px; }
+        .aps-page .aps-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 16px; border:1px solid var(--forest); border-radius:9px; background:transparent!important; color:var(--forest)!important; font-size:15px; font-weight:700; cursor:pointer; max-width:100%; line-height:1.25; text-align:center; }
+        .aps-page .aps-button svg { flex-shrink:0; }
+        .aps-page .aps-primary { background:var(--clay)!important; border-color:var(--clay); color:#141916!important; }
+        .aps-page .aps-button:hover:not(:disabled) { box-shadow:inset 0 0 0 1px currentColor; }
+        .aps-page .aps-button:disabled { opacity:.55; cursor:not-allowed; }
+        .aps-page .aps-status { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:6px; font-size:14px; line-height:1.4; font-weight:650; background:#EBE8E0!important; color:var(--ink)!important; }
+        .aps-page .aps-status[data-active=true] { background:var(--sage)!important; color:var(--forest)!important; }
+        .aps-page .aps-address-content,.aps-page .aps-privacy-content { min-width:0; }
+        .aps-page .aps-address-list { background:var(--sage); border-radius:14px; overflow:hidden; }
+        .aps-page .aps-address-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:20px 24px; border-bottom:1px solid #B7C2B2; }
+        .aps-page .aps-address-row:last-child { border-bottom:0; }
+        .aps-page .aps-address-info { display:flex; flex:1 1 210px; gap:14px; align-items:flex-start; min-width:0; }
+        .aps-page .aps-address-info > div { min-width:0; }
+        .aps-page .aps-address-info p { margin-top:6px; }
+        .aps-page .aps-address-row .aps-status { background:var(--paper)!important; }
+        .aps-page .aps-icon { display:grid; place-items:center; width:44px; height:44px; flex:0 0 44px; background:var(--paper)!important; color:var(--forest)!important; border-radius:10px; }
+        .aps-page .aps-inline { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
+        .aps-page .aps-address-form { margin-top:16px; background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:20px; min-width:0; }
+        .aps-page .aps-household { display:flex; align-items:center; gap:14px; padding:14px 0 0; margin-top:16px; border-top:1px solid var(--line); }
+        .aps-page .aps-household .aps-icon { background:var(--sage)!important; color:var(--forest)!important; }
+        .aps-page .aps-household h2 { font-size:20px; margin-bottom:4px; }
+        .aps-page .aps-preferences { min-width:0; border:1px solid var(--line); border-radius:16px; overflow:hidden; background:var(--paper); }
+        .aps-page .aps-diet { min-width:0; background:var(--sage); padding:22px 24px; }
+        .aps-page fieldset { border:0; margin:0; padding:0; min-width:0; }
+        .aps-page .aps-diet-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:15px; }
+        .aps-page .aps-diet-top .aps-status { background:var(--paper)!important; }
+        .aps-page .aps-diet-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+        .aps-page .aps-diet-option { display:grid; grid-template-columns:1fr auto; align-items:start; gap:12px 8px; min-width:0; background:var(--paper)!important; border:1px solid #B5C0AF; border-radius:11px; padding:15px; cursor:pointer; color:var(--ink)!important; }
+        .aps-page .aps-diet-option[data-selected=true] { background:#F3DFD3!important; border:2px solid #944624; padding:14px; color:var(--ink)!important; }
+        .aps-page .aps-diet-option input { grid-column:2; grid-row:1; align-self:center; }
+        .aps-page .aps-diet-symbol { grid-column:1; grid-row:1; width:30px; height:30px; color:var(--forest)!important; display:grid; place-items:center; }
+        .aps-page .aps-diet-symbol svg { width:28px; height:28px; }
+        .aps-page .aps-diet-copy { grid-column:1/-1; min-width:0; display:grid; gap:3px; }
+        .aps-page .aps-diet-copy strong { font-size:20px; color:inherit!important; }
+        .aps-page .aps-diet-copy small { font-size:15px; color:var(--muted)!important; line-height:1.4; }
+        .aps-page input[type=radio],.aps-page input[type=checkbox] { accent-color:var(--forest); width:18px; height:18px; flex:0 0 18px; margin:0; appearance:auto; }
+        .aps-page .aps-optional { margin-top:16px; padding-top:12px; border-top:1px solid #B5C0AF; }
+        .aps-page .aps-optional summary { color:var(--forest)!important; font-size:15px; font-weight:700; cursor:pointer; }
+        .aps-page .aps-optional .aps-diet-grid { margin:12px 0; grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .aps-page .aps-pref-columns { min-width:0; display:grid; grid-template-columns:minmax(0,1fr); }
+        .aps-page .aps-pref-columns > div { min-width:0; padding:22px 24px; }
+        .aps-page .aps-pref-columns > div+div { border-top:1px solid var(--line); }
+        .aps-page .aps-chips { display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; }
+        .aps-page .aps-chip { display:inline-flex; align-items:center; gap:7px; min-height:42px; padding:8px 12px; border:1px solid #BFC8BA; border-radius:7px; background:var(--paper)!important; color:var(--ink)!important; font-size:16px; cursor:pointer; }
+        .aps-page .aps-chip[data-selected=true] { background:var(--sage)!important; color:var(--forest)!important; border-color:var(--forest); }
+        .aps-page .aps-save-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:12px; padding:16px 24px; border-top:1px solid var(--line); background:var(--paper); }
+        .aps-page .aps-privacy { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; }
+        .aps-page .aps-privacy-column { min-width:0; display:grid; grid-template-columns:minmax(130px,.38fr) minmax(0,1fr); align-items:start; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--paper); }
+        .aps-page .aps-privacy-group { grid-row:1/3; align-self:stretch; padding:20px; color:var(--forest)!important; background:var(--sage); font-size:18px; font-weight:700; }
+        .aps-page .aps-privacy-column+div .aps-privacy-group { background:#F3DFD3; color:var(--ink)!important; }
+        .aps-page .aps-consent-row { grid-column:2; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:17px 20px; border-bottom:1px solid var(--line); min-width:0; }
+        .aps-page .aps-consent-row:last-child { border-bottom:0; }
+        .aps-page .aps-consent-row > div { min-width:0; flex:1 1 200px; }
+        .aps-page .aps-consent-row h3 { font-size:19px; }
+        .aps-page .aps-consent-row a { color:var(--forest)!important; font-size:15px; font-weight:650; text-decoration:underline; text-underline-offset:3px; }
+        .aps-page .aps-consent-row p { margin:5px 0; }
+        .aps-page .aps-consent-row .aps-primary { background:var(--forest)!important; color:var(--paper)!important; border-color:var(--forest); }
+        .aps-page .aps-warning { background:#F3DFD3; border-left:4px solid var(--clay); color:var(--ink)!important; padding:13px 16px; margin-top:16px; font-size:15px; }
+        .aps-page .aps-error { background:#FBE7E5; color:#812D24!important; border-left:4px solid #A63F34; padding:13px; margin-top:14px; display:flex; gap:10px; align-items:flex-start; }
+        @container (min-width:1050px) { .aps-page .aps-pref-columns { grid-template-columns:minmax(0,.84fr) minmax(0,1.16fr); } .aps-page .aps-pref-columns > div+div { border-top:0; border-left:1px solid var(--line); } }
+        @container (max-width:940px) { .aps-page .aps-section { grid-template-columns:minmax(0,1fr); gap:14px; } .aps-page .aps-heading { flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:space-between; } .aps-page .aps-heading .aps-section-mark { display:none; } }
+        @container (max-width:600px) { .aps-page .aps-fields { grid-template-columns:minmax(0,1fr); gap:14px; } .aps-page .aps-identity,.aps-page .aps-form,.aps-page .aps-diet,.aps-page .aps-pref-columns > div { padding:17px; } .aps-page .aps-identity-email { padding-left:0; border-left:0; width:100%; } .aps-page .aps-diet-grid { grid-template-columns:minmax(0,1fr); gap:8px; } .aps-page .aps-diet-option { grid-template-columns:30px minmax(0,1fr) auto; align-items:center; gap:10px; padding:12px; } .aps-page .aps-diet-option[data-selected=true] { padding:11px; } .aps-page .aps-diet-option input { grid-column:3; } .aps-page .aps-diet-copy { grid-column:2; grid-row:1; } .aps-page .aps-save-bar { padding:14px 17px; } .aps-page .aps-address-row { padding:16px; } .aps-page .aps-optional .aps-diet-grid { grid-template-columns:minmax(0,1fr); } .aps-page .aps-privacy-column { grid-template-columns:minmax(0,1fr); } .aps-page .aps-privacy-group { grid-row:auto; padding:12px 16px; } .aps-page .aps-consent-row { grid-column:1; padding:16px; gap:10px; } .aps-page .aps-actions .aps-primary,.aps-page .aps-save-bar .aps-primary { width:100%; } }
+        @media(max-width:639px) { .aps-page { padding:14px 12px 30px; } .aps-page .aps-section { padding:22px 0; } .aps-page .aps-hero { padding-bottom:16px; gap:12px; } .aps-page .aps-hero-icon { width:44px; height:44px; } .aps-page .aps-address-form { padding:14px; } .aps-page .aps-heading h2 { font-size:24px; } }
+      `}</style>
+      <header className="aps-hero">
+        <span className="aps-hero-icon"><UserRound size={25} aria-hidden="true" /></span>
+        <h1>Profile & preferences</h1>
+      </header>
+      {pageError && <div className="aps-error" role="alert"><CircleAlert size={20} aria-hidden="true"/><span>{pageError}</span></div>}
+      <div className="aps-account-grid" data-editing={Boolean(addressForm)}>
+      <section className="aps-section" aria-labelledby="profile-heading">
+        <div className="aps-heading"><span className="aps-section-mark" aria-hidden="true"/><h2 id="profile-heading">Personal details</h2></div>
+        <div className="aps-profile">
+          <div className="aps-identity">
+            <div className="aps-avatar-row">
+              <div className="aps-avatar">
+                {profile?.profilePhotoUrl ? <img src={profile.profilePhotoUrl} alt="Your profile"/> : <span className="aps-initial">{String(profile?.name || 'E').trim().charAt(0).toUpperCase() || 'E'}</span>}
+                <label className="aps-camera" title="Change profile photo">{isUploadingPhoto ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true"/> : <Camera size={17} aria-hidden="true"/>}<span className="sr-only">Change profile photo</span><input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={isUploadingPhoto} onChange={handlePhotoChange} aria-label="Change profile photo"/></label>
               </div>
-              <div className="border-t border-white/20 pt-2 sm:pt-4">
-                <p className="text-[13px] font-medium text-[#D3E0D7]">Sign-in email</p>
-                <p className="mt-0.5 break-all text-[14px] font-semibold leading-5 sm:mt-1 sm:text-[15px] sm:leading-6">{profile?.email || 'Not available'}</p>
-                <p className="hidden text-[13px] leading-5 text-[#D3E0D7] sm:mt-2 sm:block">Your sign-in email cannot be changed here.</p>
-              </div>
+              <div className="min-w-0"><h3>{profile?.name || 'EPANTRY member'}</h3><p className="aps-muted">{isUploadingPhoto ? 'Uploading photo…' : 'Change profile photo'}</p></div>
             </div>
-
-            <form onSubmit={handleProfileSave} className="flex min-w-0 flex-col justify-between gap-3 bg-[#FEFDF9] p-3 sm:gap-6 sm:p-7">
-              <div>
-                <h3 className="hidden text-lg font-bold sm:block">Update your information</h3>
-                <p className="hidden text-sm leading-6 text-[#647067] sm:mt-1 sm:block">Keep your name and contact number up to date.</p>
-                <div className="mt-0 grid gap-3 sm:mt-5 sm:gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="account-name" className="mb-1 block text-[14px] font-semibold sm:mb-2">Full name</label>
-                    <input id="account-name" type="text" autoComplete="name" value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-base text-[#202421] outline-none focus:border-[#173F35]" />
-                  </div>
-                  <div>
-                    <label htmlFor="account-phone" className="mb-1 block text-[14px] font-semibold sm:mb-2">Phone number</label>
-                    <input id="account-phone" type="tel" autoComplete="tel" value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+91 98765 43210" className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-base text-[#202421] outline-none focus:border-[#173F35]" />
-                    {profile?.phoneVerified && <p className="mt-1.5 flex items-center gap-1.5 text-[13px] font-medium text-[#173F35]"><Check size={14} aria-hidden="true" /> Verified number</p>}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 border-t border-[#E2E5DC] pt-3 sm:gap-3 sm:pt-5">
-                <button type="submit" disabled={isSavingProfile} className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 text-[14px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:w-auto sm:px-5">
-                  {isSavingProfile ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
-                  Save profile
-                </button>
-                {profileMessage && <p role="status" className="text-sm font-semibold text-[#173F35]">{profileMessage}</p>}
-              </div>
-            </form>
+            <div className="aps-identity-email"><p className="aps-muted">Sign-in email</p><strong>{profile?.email || 'Not available'}</strong></div>
           </div>
-        </section>
-
-        {/* Addresses remain editable using the existing delivery-address endpoints. */}
-        <section aria-labelledby="addresses-heading" className="border-t border-[#D7DDCF] py-4 sm:py-9">
-          <div className="flex items-center justify-between gap-2 sm:flex-wrap sm:items-end sm:gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="text-[14px] font-bold text-[#C86C42]">02</span>
-                <h2 id="addresses-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]"><span className="sm:hidden">Addresses</span><span className="hidden sm:inline">Delivery addresses</span></h2>
-              </div>
-              <p className="hidden text-[14px] leading-6 text-[#647067] sm:mt-1.5 sm:block">Choose where your orders should arrive.</p>
+          <form className="aps-form" onSubmit={handleProfileSave}>
+            <div className="aps-fields">
+              <div className="aps-field"><label htmlFor="account-name">Full name</label><input id="account-name" type="text" autoComplete="name" value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}/></div>
+              <div className="aps-field"><label htmlFor="account-phone">Phone number</label><input id="account-phone" type="tel" autoComplete="tel" value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+91 98765 43210"/>{profile?.phoneVerified && <span className="aps-inline aps-muted"><Check size={15}/> Verified number</span>}</div>
             </div>
-            <button type="button" onClick={beginAddAddress} className="focus-ring inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-[#173F35] bg-[#173F35] px-3 text-[13px] font-semibold text-white transition hover:bg-[#27634E] sm:gap-2 sm:px-5 sm:text-[14px]"><Plus size={17} aria-hidden="true" /> Add address</button>
-          </div>
-          {addressMessage && <p role="status" className="mt-4 text-sm font-semibold text-[#173F35]">{addressMessage}</p>}
-          <div className="mt-3 grid gap-x-8 gap-y-0 border-t border-[#D7DDCF] sm:mt-5 md:grid-cols-2">
-            {addresses.length > 0 ? addresses.map((address) => (
-              <article key={address.id} className="flex items-start justify-between gap-2 border-b border-[#D7DDCF] py-3 sm:gap-4 sm:py-4">
-                <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#E5EADB] text-[#173F35] sm:size-10"><MapPin size={19} aria-hidden="true" /></span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-[16px] font-bold">{formatAddressTitle(address)}</h3>
-                      {address.isDefault && <span className="rounded-md bg-[#DCE8DE] px-2 py-0.5 text-[12px] font-semibold text-[#173F35]">Default</span>}
-                    </div>
-                    <p className="mt-0.5 break-words text-[14px] leading-5 text-[#556158] sm:mt-1 sm:leading-6">
-                      {[address.addressLine1, address.addressLine2, address.area, address.city, address.state, address.postalCode].filter(Boolean).join(', ')}
-                    </p>
-                  </div>
-                </div>
-                <button type="button" onClick={() => beginEditAddress(address)} aria-label={`Edit ${formatAddressTitle(address)} address`} className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl border border-[#D7DDCF] bg-white text-[#173F35] transition hover:border-[#C86C42] hover:text-[#C86C42]"><Pencil size={18} aria-hidden="true" /></button>
-              </article>
-            )) : (
-              <p className="py-5 text-[15px] text-[#647067]">You haven't added a delivery address yet.</p>
-            )}
-          </div>
-
+            <div className="aps-actions"><button className="aps-button aps-primary" type="submit" disabled={isSavingProfile}>{isSavingProfile ? <LoaderCircle size={17} className="animate-spin"/> : <Save size={17}/>} Save profile</button>{profileMessage && <p role="status" className="aps-muted">{profileMessage}</p>}</div>
+          </form>
+        </div>
+      </section>
+      <div className="aps-address-column">
+      <section className="aps-section" aria-labelledby="addresses-heading">
+        <div className="aps-heading"><span className="aps-section-mark" aria-hidden="true"/><h2 id="addresses-heading">Delivery addresses</h2><button type="button" className="aps-button aps-primary" onClick={beginAddAddress}><Plus size={18}/> Add address</button></div>
+        <div className="aps-address-content">
+        {addressMessage && <p role="status" className="aps-muted mb-3">{addressMessage}</p>}
+        <div className="aps-address-list">
+          {addresses.length ? addresses.map((address) => <article className="aps-address-row" key={address.id}>
+            <div className="aps-address-info"><span className="aps-icon"><MapPin size={20}/></span><div className="min-w-0"><div className="aps-inline"><h3>{formatAddressTitle(address)}</h3>{address.isDefault && <span className="aps-status" data-active="true">Default</span>}</div><p className="aps-muted">{[address.addressLine1,address.addressLine2,address.area,address.city,address.state,address.postalCode].filter(Boolean).join(', ')}</p></div></div>
+            <button type="button" className="aps-button" onClick={() => beginEditAddress(address)} aria-label={`Edit ${formatAddressTitle(address)} address`}><Pencil size={17}/> Edit</button>
+          </article>) : <p className="aps-address-row aps-muted">No delivery addresses added.</p>}
+        </div>
           {addressForm && (
-            <form onSubmit={handleAddressSubmit} className="mt-3 min-w-0 rounded-[12px] border border-[#D7DDCF] bg-[#E9EDE4] p-3 sm:mt-5 sm:rounded-[18px] sm:p-6">
+            <form onSubmit={handleAddressSubmit} className="aps-address-form">
               <div className="flex items-center justify-between gap-2 border-b border-[#C9D1C6] pb-2 sm:gap-3 sm:pb-4">
                 <h3 className="text-lg font-bold sm:text-xl">{addressForm.id ? 'Edit delivery address' : 'Add a delivery address'}</h3>
                 <button type="button" onClick={() => setAddressForm(null)} aria-label="Close address form" className="focus-ring grid size-10 shrink-0 place-items-center rounded-xl border border-[#C9D1C6] bg-white text-[#202421]"><X size={18} aria-hidden="true" /></button>
@@ -1286,172 +1276,69 @@ export default function AccountSettingsPage() {
                 </div>
               </div>
               <div className="mt-3 flex justify-end sm:mt-5">
-                <button type="submit" disabled={isSavingAddress} className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 text-[14px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:w-auto sm:justify-start sm:px-5">
+                <button type="submit" disabled={isSavingAddress} className="aps-button aps-primary">
                   {isSavingAddress ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
                   {addressForm.id ? 'Save address' : 'Add address'}
                 </button>
               </div>
             </form>
           )}
-        </section>
-
-        {/* Food preferences use existing preference form state and API. */}
-        <section aria-labelledby="preferences-heading" className="border-t border-[#D7DDCF] py-4 sm:py-9">
-          <div className="mb-3 flex items-center gap-2 sm:mb-5 sm:gap-3">
-            <span className="text-[14px] font-bold text-[#C86C42]">03</span>
-            <h2 id="preferences-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]">Food preferences</h2>
-          </div>
-          <form onSubmit={handlePreferencesSave} className="min-w-0 overflow-hidden rounded-[12px] border border-[#D7DDCF] bg-[#E5EADB] sm:rounded-[18px]">
-            <div className="grid lg:grid-cols-2">
-              <div className="p-3 sm:p-7">
-                <p className="mb-3 max-w-lg text-[14px] leading-5 text-[#43594A] sm:mb-5 sm:leading-6"><span className="sm:hidden">Choose your food preferences below.</span><span className="hidden sm:inline">Tell us what you like to eat, and which ingredients you'd prefer to avoid.</span></p>
-                <fieldset>
-                  <legend className="text-[17px] font-bold">How do you eat?</legend>
-                  <p className="hidden text-[13px] leading-5 text-[#536557] sm:mt-1 sm:block">Choose any dietary preferences that fit you.</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
-                    {DIETARY_OPTIONS.map((option) => {
-                      const selected = preferenceForm.dietaryLifestyles.includes(option.value)
-                      return (
-                        <label key={option.value} className={`focus-within:ring-2 focus-within:ring-[#173F35] inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-2.5 py-1.5 text-[14px] font-medium transition sm:px-3 sm:py-2 ${selected ? 'border-[#173F35] bg-[#173F35] text-white' : 'border-[#C9D4C6] bg-[#F7F6F2] text-[#202421] hover:border-[#173F35]'}`}>
-                          <input type="checkbox" className="sr-only" checked={selected} onChange={() => togglePreferenceValue('dietaryLifestyles', option.value)} />
-                          {option.label}
-                        </label>
-                      )
-                    })}
-                  </div>
-                </fieldset>
-                <div className="my-4 h-px bg-[#C4D0C1] sm:my-6" />
-                <fieldset>
-                  <legend className="text-[17px] font-bold">Ingredients to avoid</legend>
-                  <p className="mt-1 max-w-lg text-[13px] leading-5 text-[#536557]"><span className="sm:hidden">Flag allergens; always check product labels for safety.</span><span className="hidden sm:inline">Select allergens you want flagged. Always check packaging and ingredient information for safety.</span></p>
-                  <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
-                    {ALLERGEN_OPTIONS.map((option) => {
-                      const selected = preferenceForm.allergens.includes(option.value)
-                      return (
-                        <label key={option.value} className={`focus-within:ring-2 focus-within:ring-[#173F35] inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-2.5 py-1.5 text-[14px] font-medium transition sm:px-3 sm:py-2 ${selected ? 'border-[#C86C42] bg-[#F7E3D7] text-[#813D23]' : 'border-[#C9D4C6] bg-[#F7F6F2] text-[#202421] hover:border-[#C86C42]'}`}>
-                          <input type="checkbox" className="sr-only" checked={selected} onChange={() => togglePreferenceValue('allergens', option.value)} />
-                          {option.label}
-                        </label>
-                      )
-                    })}
-                  </div>
-                </fieldset>
-              </div>
-              <div className="border-t border-[#C9D3C5] bg-[#FEFDF9] p-3 sm:p-7 lg:border-l lg:border-t-0">
-                <h3 className="text-[17px] font-bold">Make it yours</h3>
-                <p className="hidden text-[14px] leading-6 text-[#647067] sm:mt-1 sm:block">Set your favorite cuisines and how measurements appear.</p>
-                <div className="mt-3 space-y-3 sm:mt-5 sm:space-y-5">
-                  <div>
-                    <label htmlFor="preferred-cuisines" className="mb-1 block text-[14px] font-semibold sm:mb-2">Favorite cuisines</label>
-                    <input id="preferred-cuisines" type="text" value={preferenceForm.preferredCuisines} onChange={(event) => setPreferenceForm((current) => ({ ...current, preferredCuisines: event.target.value }))} placeholder="Indian, Italian, Thai" className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-[15px]" />
-                    <p className="mt-1 text-[13px] text-[#647067] sm:mt-1.5"><span className="sm:hidden">Separate with commas.</span><span className="hidden sm:inline">Separate multiple cuisines with commas.</span></p>
-                  </div>
-                  <div>
-                    <label htmlFor="disliked-ingredients" className="mb-1 block text-[14px] font-semibold sm:mb-2">Ingredients you dislike</label>
-                    <input id="disliked-ingredients" type="text" value={preferenceForm.dislikedIngredients} onChange={(event) => setPreferenceForm((current) => ({ ...current, dislikedIngredients: event.target.value }))} placeholder="Olives, coriander" className="focus-ring min-h-11 w-full rounded-xl sm:min-h-12 border border-[#D8DDD4] bg-white px-4 text-[15px]" />
-                    <p className="mt-1 text-[13px] text-[#647067] sm:mt-1.5"><span className="sm:hidden">Separate with commas.</span><span className="hidden sm:inline">Separate multiple ingredients with commas.</span></p>
-                  </div>
-                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-4">
-                    <div>
-                      <label htmlFor="measurement-system" className="mb-1 block text-[14px] font-semibold sm:mb-2">Measurements</label>
-                      <select id="measurement-system" value={preferenceForm.measurementSystem} onChange={(event) => setPreferenceForm((current) => ({ ...current, measurementSystem: event.target.value }))} className="focus-ring min-h-11 min-w-0 w-full rounded-xl border border-[#D8DDD4] bg-white px-2 text-[14px] sm:min-h-12 sm:px-3 sm:text-[15px]">
-                        <option value="metric">Metric</option><option value="imperial">Imperial</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="account-locale" className="mb-1 block text-[14px] font-semibold sm:mb-2">Language & region</label>
-                      <select id="account-locale" value={preferenceForm.locale} onChange={(event) => setPreferenceForm((current) => ({ ...current, locale: event.target.value }))} className="focus-ring min-h-11 min-w-0 w-full rounded-xl border border-[#D8DDD4] bg-white px-2 text-[14px] sm:min-h-12 sm:px-3 sm:text-[15px]">
-                        {LOCALE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 border-t border-[#C9D3C5] bg-[#F7F6F2] px-3 py-3 sm:gap-3 sm:px-7 sm:py-4">
-              <button type="submit" disabled={isSavingPreferences} className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#173F35] px-4 text-[14px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:w-auto sm:justify-start sm:px-5">
-                {isSavingPreferences ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
-                Save food preferences
-              </button>
-              {preferenceMessage && <p role="status" className="text-sm font-semibold text-[#173F35]">{preferenceMessage}</p>}
-            </div>
-          </form>
-        </section>
-
-        {/* This is informational; it does not alter household membership. */}
-        <section aria-labelledby="household-heading" className="flex items-start gap-2 border-l-[4px] border-[#C86C42] bg-[#F4E8DF] px-3 py-3 sm:gap-5 sm:px-7 sm:py-5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-[#A85430] sm:size-10"><Home size={20} aria-hidden="true" /></span>
-          <div>
-            <h2 id="household-heading" className="text-[17px] font-bold sm:text-[19px]">Your household</h2>
-            {isLoadingHousehold ? (
-              <p className="mt-0.5 text-[14px] leading-5 text-[#63584E] sm:mt-1 sm:leading-6">Loading household details...</p>
-            ) : hasHousehold ? (
-              <p className="mt-0.5 text-[14px] leading-5 text-[#63584E] sm:mt-1 sm:leading-6"><span className="sm:hidden">Shared meal plans: <strong className="text-[#202421]">{household.name}</strong> · <strong className="text-[#202421]">{household.usualPeopleCount}</strong> people.</span><span className="hidden sm:inline">Your food preferences are yours. For shared meal planning, EPANTRY can also consider your household <strong className="text-[#202421]">{household.name}</strong>, which usually includes <strong className="text-[#202421]">{household.usualPeopleCount}</strong> people.</span></p>
-            ) : (
-              <p className="mt-0.5 text-[14px] leading-5 text-[#63584E] sm:mt-1 sm:leading-6"><span className="sm:hidden">No household yet. Your food choices still work.</span><span className="hidden sm:inline">You haven't created a household. You can still save your personal food preferences.</span></p>
-            )}
-          </div>
-        </section>
-
-        {/* Consent buttons preserve required/optional decision semantics. */}
-        <section aria-labelledby="consent-heading" className="py-4 sm:py-10">
-          <div className="mb-3 flex items-center gap-2 sm:mb-5 sm:gap-3">
-            <span className="text-[14px] font-bold text-[#C86C42]">04</span>
-            <h2 id="consent-heading" className="text-[21px] font-bold tracking-[-0.025em] sm:text-[26px]">Privacy & permissions</h2>
-          </div>
-          <p className="mb-3 max-w-3xl text-[14px] leading-5 text-[#647067] sm:mb-6 sm:leading-6"><span className="sm:hidden">Review policy approvals and optional settings.</span><span className="hidden sm:inline">Review the policies you've accepted and choose whether we can send marketing emails or personalize recommendations.</span></p>
-          <div className="border-t border-[#D7DDCF]">
-            {['terms_of_service', 'privacy_policy'].map((consentType) => {
-              const item = consentByType.get(consentType)
-              return (
-                <div key={consentType} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[#D7DDCF] py-3 sm:grid-cols-1 sm:items-stretch sm:gap-4 sm:py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
-                      <h3 className="text-[15px] font-bold leading-5 sm:text-[16px]">{formatConsentName(consentType)}</h3>
-                      <ConsentStatus granted={item?.granted === true} />
-                    </div>
-                    <p className="mt-1 text-[13px] leading-5 text-[#647067] sm:mt-1.5 sm:text-[14px] sm:leading-6">
-                      <span className="sm:hidden">{consentType === 'terms_of_service' ? 'Using EPANTRY.' : 'How your data is used.'} {item?.currentVersion ? `Version: ${item.currentVersion}` : ''}</span>
-                      <span className="hidden sm:inline">{consentType === 'terms_of_service' ? 'The terms for using EPANTRY.' : 'How we handle your personal information.'} {item?.currentVersion ? `Current version: ${item.currentVersion}` : ''}</span></p>
-                    <Link to={consentType === 'terms_of_service' ? '/terms' : '/privacy-policy'} className="mt-2 inline-flex text-[14px] font-semibold text-[#174D38] underline underline-offset-4 hover:text-[#27634E]">Read {consentType === 'terms_of_service' ? 'Terms & Conditions' : 'Privacy Policy'} before accepting</Link>
-                  </div>
-                  {!item?.granted && (
-                    <button type="button" disabled={activeConsentType === consentType} onClick={() => handleConsentDecision(consentType, 'granted')} className="focus-ring inline-flex min-h-11 w-fit shrink-0 items-center justify-center gap-1 rounded-xl bg-[#173F35] px-3 text-[13px] font-semibold text-white transition hover:bg-[#27634E] disabled:opacity-50 sm:gap-2 sm:px-5 sm:text-[14px]">
-                      {activeConsentType === consentType ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Check size={17} aria-hidden="true" />}
-                      <span className="sm:hidden">Accept</span><span className="hidden sm:inline">Accept current version</span>
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-            {['marketing_email', 'personalization'].map((consentType) => {
-              const item = consentByType.get(consentType)
-              const enabled = item?.granted === true
-              const isPersonalization = consentType === 'personalization'
-              return (
-                <div key={consentType} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[#D7DDCF] py-3 sm:grid-cols-1 sm:items-stretch sm:gap-4 sm:py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
-                      <h3 className="text-[15px] font-bold leading-5 sm:text-[16px]"><span className="sm:hidden">{isPersonalization ? 'Personalization' : 'Marketing emails'}</span><span className="hidden sm:inline">{isPersonalization ? 'Personalized recommendations' : 'Marketing emails'}</span></h3>
-                      <ConsentStatus granted={enabled} optional />
-                    </div>
-                    <p className="mt-1 max-w-3xl text-[13px] leading-5 text-[#647067] sm:mt-1.5 sm:text-[14px] sm:leading-6">
-                      <span className="sm:hidden">{isPersonalization ? 'Use food choices for better suggestions.' : 'Get occasional offers by email.'}</span>
-                      <span className="hidden sm:inline">{isPersonalization ? 'Let EPANTRY use your saved food preferences and available household details to suggest more relevant meals and products.' : 'Receive optional news, offers and promotional emails from EPANTRY.'}</span></p>
-                    {isPersonalization && <p className="mt-1 text-[13px] font-medium text-[#56675A] sm:mt-1.5">Recommendations based on your preferences: {preferenceForm.personalizationEnabled ? 'On' : 'Off'}</p>}
-                  </div>
-                  <button type="button" disabled={activeConsentType === consentType} onClick={() => handleConsentDecision(consentType, enabled ? 'revoked' : 'granted')} className={`focus-ring inline-flex min-h-11 w-fit min-w-[74px] shrink-0 items-center justify-center rounded-xl px-3 text-[13px] font-semibold transition disabled:opacity-50 sm:min-w-[100px] sm:px-5 sm:text-[14px] ${enabled ? 'border border-[#C86C42] bg-[#FFF7F2] text-[#A85430] hover:bg-[#F7E3D7]' : 'bg-[#173F35] text-white hover:bg-[#27634E]'}`}>
-                    {activeConsentType === consentType ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : enabled ? 'Disable' : 'Enable'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-          {consents && !consents.requiredConsentsSatisfied && (
-            <div role="status" className="mt-3 border-l-4 border-[#C86C42] bg-[#F9EBDD] px-3 py-2 text-[14px] font-medium leading-5 text-[#754523] sm:mt-5 sm:px-4 sm:py-3 sm:leading-6"><span className="sm:hidden">Accept the latest Terms and Privacy Policy to finish setup.</span><span className="hidden sm:inline">Please accept the current Terms of Service and Privacy Policy to finish your account setup.</span></div>
-          )}
-        </section>
+      <section className="aps-household" aria-labelledby="household-heading"><span className="aps-icon"><Home size={21}/></span><div className="min-w-0"><h2 id="household-heading">Your household</h2>{isLoadingHousehold ? <p className="aps-muted">Loading household…</p> : hasHousehold ? <p className="aps-muted"><strong>{household.name}</strong> · {household.usualPeopleCount} {Number(household.usualPeopleCount) === 1 ? 'person' : 'people'}</p> : <p className="aps-muted">No household yet.</p>}</div></section>
       </div>
+      </section>
+      </div>
+      </div>
+      <section className="aps-section" aria-labelledby="preferences-heading">
+        <div className="aps-heading"><span className="aps-section-mark" aria-hidden="true"/><h2 id="preferences-heading">Food preferences</h2></div>
+        <form className="aps-preferences" onSubmit={handlePreferencesSave}>
+          <div className="aps-diet">
+            <fieldset disabled={isSavingPreferences} aria-label="Food choice">
+              <div className="aps-diet-top"><h3>Food choice</h3><span className="aps-status" data-active="true">Selected: {dietLabel}</span></div>
+              <div className="aps-diet-grid">{DIETARY_OPTIONS.map(renderDiet)}</div>
+              <details className="aps-optional" open={OTHER_DIET_MODES.some((option) => option.value === chosenDiet) || undefined}>
+                <summary>Other dietary preferences</summary>
+                <div className="aps-diet-grid">{OTHER_DIET_MODES.map(renderDiet)}</div>
+                <div className="aps-chips">{OPTIONAL_DIETARY_OPTIONS.map((option) => renderPreference('dietaryLifestyles',option))}</div>
+              </details>
+            </fieldset>
+          </div>
+          <div className="aps-pref-columns">
+            <div><fieldset disabled={isSavingPreferences}><legend>Allergens to flag</legend><p className="aps-muted mt-1">Always check product labels for safety.</p><div className="aps-chips">{ALLERGEN_OPTIONS.map((option) => renderPreference('allergens',option))}</div></fieldset></div>
+            <div><div className="aps-fields">
+              <div className="aps-field"><label htmlFor="preferred-cuisines">Favorite cuisines</label><input id="preferred-cuisines" value={preferenceForm.preferredCuisines} onChange={(event) => setPreferenceForm((current) => ({ ...current, preferredCuisines: event.target.value }))} placeholder="Indian, Italian, Thai"/></div>
+              <div className="aps-field"><label htmlFor="disliked-ingredients">Ingredients you dislike</label><input id="disliked-ingredients" value={preferenceForm.dislikedIngredients} onChange={(event) => setPreferenceForm((current) => ({ ...current, dislikedIngredients: event.target.value }))} placeholder="Olives, coriander"/></div>
+              <div className="aps-field"><label htmlFor="measurement-system">Measurements</label><select id="measurement-system" value={preferenceForm.measurementSystem} onChange={(event) => setPreferenceForm((current) => ({ ...current, measurementSystem: event.target.value }))}><option value="metric">Metric</option><option value="imperial">Imperial</option></select></div>
+              <div className="aps-field"><label htmlFor="account-locale">Language & region</label><select id="account-locale" value={preferenceForm.locale} onChange={(event) => setPreferenceForm((current) => ({ ...current, locale: event.target.value }))}>{LOCALE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+            </div><p className="aps-muted mt-3">Separate multiple cuisines or ingredients with commas.</p></div>
+          </div>
+          <div className="aps-save-bar"><button type="submit" disabled={isSavingPreferences} className="aps-button aps-primary">{isSavingPreferences ? <LoaderCircle size={17} className="animate-spin"/> : <Save size={17}/>} Save food preferences</button>{preferenceMessage && <p className="aps-muted" role="status">{preferenceMessage}</p>}</div>
+        </form>
+      </section>
+
+      <section className="aps-section" aria-labelledby="consent-heading">
+        <div className="aps-heading"><span className="aps-section-mark" aria-hidden="true"/><h2 id="consent-heading">Privacy & permissions</h2></div>
+        <div className="aps-privacy-content">
+        <div className="aps-privacy">
+          <div className="aps-privacy-column">
+          <div className="aps-privacy-group">Required policies</div>
+          {['terms_of_service','privacy_policy'].map((consentType) => {
+            const item = consentByType.get(consentType)
+            const terms = consentType === 'terms_of_service'
+            return <div key={consentType} className="aps-consent-row"><div><div className="aps-inline"><h3>{formatConsentName(consentType)}</h3><ConsentStatus granted={item?.granted === true}/></div>{item?.currentVersion && <p className="aps-muted">Version: {item.currentVersion}</p>}<Link to={terms ? '/terms' : '/privacy-policy'}>Read {terms ? 'Terms & Conditions' : 'Privacy Policy'}</Link></div>{!item?.granted && <button type="button" disabled={activeConsentType === consentType} onClick={() => handleConsentDecision(consentType,'granted')} className="aps-button aps-primary">{activeConsentType === consentType ? <LoaderCircle size={17} className="animate-spin"/> : <Check size={17}/>} Accept</button>}</div>
+          })}
+          </div>
+          <div className="aps-privacy-column">
+          <div className="aps-privacy-group">Optional settings</div>
+          {['marketing_email','personalization'].map((consentType) => {
+            const enabled = consentByType.get(consentType)?.granted === true
+            const isPersonalization = consentType === 'personalization'
+            return <div key={consentType} className="aps-consent-row"><div><div className="aps-inline"><h3>{isPersonalization ? 'Personalized recommendations' : 'Marketing emails'}</h3><ConsentStatus granted={enabled} optional/></div><p className="aps-muted">{isPersonalization ? 'Use your food and household preferences for suggestions.' : 'Receive news and offers by email.'}</p>{isPersonalization && preferenceForm.personalizationEnabled !== enabled && <p className="aps-muted">Recommendations: {preferenceForm.personalizationEnabled ? 'On' : 'Off'}</p>}</div><button type="button" disabled={activeConsentType === consentType} onClick={() => handleConsentDecision(consentType,enabled ? 'revoked' : 'granted')} className={`aps-button ${enabled ? '' : 'aps-primary'}`}>{activeConsentType === consentType ? <LoaderCircle size={17} className="animate-spin"/> : enabled ? 'Disable' : 'Enable'}</button></div>
+          })}
+          </div>
+        </div>
+        {consents && !consents.requiredConsentsSatisfied && <p role="status" className="aps-warning">Accept the current Terms and Privacy Policy to finish account setup.</p>}
+        </div>
+      </section>
     </main>
   )
 }

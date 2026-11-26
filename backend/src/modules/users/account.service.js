@@ -247,6 +247,17 @@ const updatePreferencesSchema =
   })
     .strict()
     .refine(
+      (value) => {
+        const choices = value.dietaryLifestyles || []
+        return !choices.includes('non_vegetarian') ||
+          !choices.some((choice) => ['vegetarian', 'vegan', 'pescatarian'].includes(choice))
+      },
+      {
+        path: ['dietaryLifestyles'],
+        message: 'Choose either Non-Veg or a vegetarian, vegan or pescatarian diet.',
+      },
+    )
+    .refine(
       (value) =>
         Object.keys(
           value,

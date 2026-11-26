@@ -1,3 +1,4 @@
+import SavedFoodPreferenceGate from "../../account/components/SavedFoodPreferenceGate";
 import {
   ChefHat,
   ChevronRight,
@@ -710,13 +711,23 @@ function mergedById(existing, incoming) {
 
 
 export default function RecipesPage() {
+  return (
+    <SavedFoodPreferenceGate defaultDiet="all">
+      {(initialDiet, accountScope) => (
+        <RecipesPageContent key={`${accountScope}:${initialDiet}`} initialDiet={initialDiet} />
+      )}
+    </SavedFoodPreferenceGate>
+  );
+}
+
+function RecipesPageContent({ initialDiet }) {
   const [searchInput, setSearchInput] = useState("");
   const [collectionQuery, setCollectionQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const [hint, setHint] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState("all");
-  const [selectedDiet, setSelectedDiet] = useState("all");
+  const [selectedDiet, setSelectedDiet] = useState(initialDiet);
   // Editorial discovery is a preview of actual approved listings; the original
   // collection/search/diet filters and pagination remain authoritative.
   const [smartMode, setSmartMode] = useState("now");

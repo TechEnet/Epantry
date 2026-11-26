@@ -1,3 +1,4 @@
+import SavedFoodPreferenceGate from "../../account/components/SavedFoodPreferenceGate";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -63,13 +64,23 @@ const EXPERIENCE_BACKDROP_ROWS = [
 ];
 
 export default function LandingPage() {
+  return (
+    <SavedFoodPreferenceGate defaultDiet="veg">
+      {(initialDiet, accountScope) => (
+        <LandingPageContent key={`${accountScope}:${initialDiet}`} initialDiet={initialDiet} />
+      )}
+    </SavedFoodPreferenceGate>
+  );
+}
+
+function LandingPageContent({ initialDiet }) {
   // EPANTRY MOBILE NATIVE SCROLL - PERF FIX
   // Leave vertical touch gestures to the browser on phones. The former
   // preventDefault + scripted scrollTo snap conflicted with momentum scrolling
   // and the pinned Featured sections, making the page visibly jerk.
   // Explore's motion progress and gallery reveal still follow native scroll.
 
-  const [selectedDiet, setSelectedDiet] = useState('veg');
+  const [selectedDiet, setSelectedDiet] = useState(initialDiet);
   const [discoveryRecipes, setDiscoveryRecipes] = useState([]);
   const syncDiscoveryRecipes = useCallback((recipes) => {
     setDiscoveryRecipes(recipes);

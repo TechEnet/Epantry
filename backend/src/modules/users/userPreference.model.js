@@ -14,6 +14,7 @@ import mongoose from 'mongoose'
 export const DIETARY_LIFESTYLES =
   Object.freeze([
     'vegetarian',
+    'non_vegetarian',
     'vegan',
     'pescatarian',
     'halal',
