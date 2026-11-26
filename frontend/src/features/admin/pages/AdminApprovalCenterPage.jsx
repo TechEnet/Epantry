@@ -1,5 +1,5 @@
-import { lazy, Suspense, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   BookOpen,
   ChevronDown,
@@ -13,6 +13,7 @@ import AdminShell, {
   AdminEmbeddedShellContext,
 } from "../components/AdminShell";
 import { useAdmin } from "../context/AdminContext";
+import { apiClient } from "../../../api/apiClient";
 
 // Reuse proven tools and their existing protected APIs. No second approval
 // mutation is introduced, and no historical data is copied or rewritten.
@@ -90,6 +91,208 @@ function Loading() {
       Opening workspace…
     </div>
   );
+}
+
+// Excel/ZIP Host Listing Studio records are stored in HostUnifiedListingPacket.
+// Drafts and submitted listings live in this same table. The legacy Product
+// Evidence (NPI) bulk queue is a different backend collection and remains a
+// separate read-only choice below. Never turn an imported draft into approval.
+const BULK_LABELS = {
+  draft: 'Saved draft',
+  submitted_for_review: 'Awaiting approval',
+  changes_requested: 'Changes requested',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+const BULK_FILTERS = [
+  ['all', 'All batches'],
+  ['draft', 'Saved drafts'],
+  ['submitted_for_review', 'Awaiting review'],
+  ['approved', 'Approved'],
+  ['changes_requested', 'Needs changes'],
+  ['rejected', 'Rejected'],
+];
+const formatBulkDate = (date) => {
+  if (!date) return '';
+  const parsed = new Date(date);
+  return Number.isFinite(parsed.valueOf()) ? parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+};
+const batchSummary = (items) => ({
+  draft: items.filter((row) => row.status === 'draft').length,
+  submitted: items.filter((row) => row.status === 'submitted_for_review').length,
+  approved: items.filter((row) => row.status === 'approved').length,
+  changes: items.filter((row) => row.status === 'changes_requested').length,
+  rejected: items.filter((row) => row.status === 'rejected').length,
+});
+const listingPhoto = (item) => {
+  const images = item?.packet?.images;
+  const first = Array.isArray(images) ? images[0] : null;
+  const value = typeof first === 'string' ? first : (first?.url || first?.imageUrl || '');
+  return typeof value === 'string' && /^https:\/\//i.test(value) ? value : '';
+};
+
+function HostBulkSubmissionsPanel() {
+  const [rows, setRows] = useState([]);
+  const [meta, setMeta] = useState({ total: 0, hasMore: false, validMode: false });
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [refreshNumber, setRefreshNumber] = useState(0);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    setError('');
+    try {
+      // Unlike the ordinary approval queue, this secured mode includes drafts.
+      // The backend returns the mode marker so an old/stale API cannot silently
+      // masquerade as an empty database after only a frontend deploy.
+      const result = await apiClient.get('/admin/host-listing-packets', {
+        params: { bulkOnly: '1', includeDrafts: '1' },
+      });
+      const data = result?.data?.data ?? result?.data ?? {};
+      if (data?.mode !== 'bulk_overview' || !Array.isArray(data?.listings)) {
+        throw new Error('Backend Bulk Overview mode is not active. Replace backend hostUnifiedListing.routes.js and restart the backend; existing Admin approval API intentionally hides drafts.');
+      }
+      setRows(data.listings);
+      setMeta({
+        total: Number(data.total) || 0,
+        hasMore: data.hasMore === true,
+        validMode: true,
+      });
+    } catch (cause) {
+      setRows([]);
+      setMeta({ total: 0, hasMore: false, validMode: false });
+      setError(cause?.response?.data?.message || cause?.message || 'Cannot read Host imported batches. Check backend connectivity and Super Admin permissions.');
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load, refreshNumber]);
+
+  const batches = useMemo(() => {
+    const grouped = new Map();
+    for (const item of rows) {
+      if (!item?.bulkBatchId || !item.id) continue;
+      if (!grouped.has(item.bulkBatchId)) {
+        grouped.set(item.bulkBatchId, { id: item.bulkBatchId, items: [], newest: 0 });
+      }
+      const group = grouped.get(item.bulkBatchId);
+      group.items.push(item);
+      group.newest = Math.max(group.newest, new Date(item.updatedAt || item.submittedAt || 0).valueOf() || 0);
+    }
+    return [...grouped.values()]
+      .map((group) => ({ ...group, counts: batchSummary(group.items) }))
+      .sort((a, b) => b.newest - a.newest);
+  }, [rows]);
+
+  const totalCounts = useMemo(() => batchSummary(rows), [rows]);
+  const visibleBatches = useMemo(() => batches.filter((batch) =>
+    filter === 'all' || batch.items.some((row) => row.status === filter)
+  ), [batches, filter]);
+  const active = visibleBatches.find((batch) => batch.id === selectedBatchId) || visibleBatches[0];
+  const filteredItems = (active?.items || []).filter((item) => filter === 'all' || item.status === filter);
+
+  return (
+    <section aria-label="Host imported bulk listings" className="min-w-0 bg-[#F7F6F2] px-4 py-6 sm:px-6 sm:py-8">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#D7DDCF] pb-5">
+        <div className="min-w-0">
+          <p className="text-[12px] font-bold uppercase tracking-[.08em] text-[#C56C42]">Host listing studio / saved records</p>
+          <h2 className="mt-1 text-[29px] font-bold leading-tight tracking-[-.035em] text-[#173F35] sm:text-[34px]">Imported Host batches</h2>
+          <p className="mt-1 max-w-3xl text-[15px] leading-6 text-[#637066]">
+            See both imported drafts and submitted listings from the actual Host database. Only submitted listings can be approved.
+          </p>
+        </div>
+        <button type="button" onClick={() => setRefreshNumber((n) => n + 1)} disabled={busy}
+          className="min-h-11 shrink-0 rounded-lg border border-[#D0D8CB] bg-white px-4 py-2.5 text-[14px] font-bold text-[#173F35] hover:border-[#C56C42] disabled:opacity-50">
+          {busy ? 'Loading records…' : 'Refresh from backend'}
+        </button>
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-4 border-l-4 border-[#B74138] bg-[#FFF0ED] px-4 py-3 text-[15px] leading-6 text-[#8F3029]">{error}</p>
+      )}
+      {busy && <p role="status" className="py-8 text-[15px] text-[#5B6C61]">Loading Host listings from EPANTRY…</p>}
+      {meta.validMode && !busy && (
+        <>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-b border-[#D7DDCF] py-5 sm:grid-cols-4">
+            <div><strong className="block text-[30px] leading-none text-[#173F35]">{batches.length}</strong><span className="mt-1 block text-[13px] text-[#627164]">Imported server batches</span></div>
+            <div><strong className="block text-[30px] leading-none text-[#C56C42]">{totalCounts.draft}</strong><span className="mt-1 block text-[13px] text-[#627164]">Saved drafts</span></div>
+            <div><strong className="block text-[30px] leading-none text-[#173F35]">{totalCounts.submitted}</strong><span className="mt-1 block text-[13px] text-[#627164]">Awaiting Super Admin</span></div>
+            <div><strong className="block text-[30px] leading-none text-[#246041]">{totalCounts.approved}</strong><span className="mt-1 block text-[13px] text-[#627164]">Approved listings</span></div>
+          </div>
+          {meta.hasMore && <p role="status" className="mt-3 border-l-4 border-[#C56C42] bg-[#FBEEE6] px-4 py-3 text-[14px] text-[#6E4E3E]">
+            Showing the newest {rows.length} of {meta.total} imported records. Older batches are outside this API window; do not interpret these counters as all-time totals.
+          </p>}
+          {totalCounts.draft > 0 && <p className="mt-4 border-l-4 border-[#C56C42] bg-[#FBEEE6] px-4 py-3 text-[14px] leading-6 text-[#5E5146]">
+            <strong className="text-[#173F35]">{totalCounts.draft} imported draft{totalCounts.draft === 1 ? '' : 's'} exist.</strong>
+            {' '}They have not yet entered the approval queue. Sign in as that Host, open Bulk Listing, and use <strong>Submit to Super Admin</strong>. These drafts are read-only for Admin.
+          </p>}
+          <nav aria-label="Filter imported Host records" className="mt-5 flex flex-wrap gap-2 border-b border-[#DEE4DA] pb-4">
+            {BULK_FILTERS.map(([value, label]) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); setSelectedBatchId(''); }}
+              className={`min-h-10 rounded-lg border px-3.5 py-2 text-[14px] font-semibold transition ${filter === value ? 'border-[#C56C42] bg-[#C56C42] text-white' : 'border-[#D7DDCF] bg-white text-[#173F35] hover:bg-[#EDF2E9]'}`}>{label}</button>)}
+          </nav>
+          {visibleBatches.length ? (
+            <div className="mt-5 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(225px,290px)_minmax(0,1fr)]">
+              <div className="min-w-0 border-y border-[#DDE3D9]">
+                {visibleBatches.map((batch) => <button key={batch.id} type="button" aria-pressed={active?.id === batch.id} onClick={() => setSelectedBatchId(batch.id)}
+                  className={`flex w-full min-w-0 items-start justify-between gap-3 border-b border-[#E0E6DC] px-3 py-4 text-left transition hover:bg-[#EDEFE7] ${active?.id === batch.id ? 'border-l-[4px] border-l-[#C56C42] bg-[#F4E9DF]' : 'border-l-[4px] border-l-transparent'}`}>
+                  <span className="min-w-0">
+                    <strong className="block text-[15px] text-[#173F35]">Imported batch</strong>
+                    <span className="mt-1 block text-[12px] text-[#67746B]">{formatBulkDate(batch.newest)} · {batch.items.length} items</span>
+                    <span className="mt-1 block text-[12px] text-[#6A766D]">{batch.counts.draft} drafts · {batch.counts.submitted} in review</span>
+                  </span>
+                  <span className="rounded-full bg-[#D7DDCF] px-2 py-1 text-[12px] font-bold text-[#173F35]">{batch.items.length}</span>
+                </button>)}
+              </div>
+              <div className="min-w-0">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-[20px] font-bold text-[#173F35]">Listings in this batch</h3>
+                  <span className="text-[13px] text-[#647367]">{filteredItems.length} displayed</span>
+                </div>
+                <div className="divide-y divide-[#DCE4DA] border-y border-[#DCE4DA]">
+                  {filteredItems.map((item) => {
+                    const photo = listingPhoto(item);
+                    return <div key={item.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3 sm:flex-nowrap">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-[#D7DDCF]">
+                          {photo ? <img src={photo} alt="" loading="lazy" className="size-full object-cover" /> : <span className="grid size-full place-items-center text-[12px] text-[#173F35]">No photo</span>}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="break-words text-[15px] font-bold text-[#202421]">{item.title || 'Untitled listing'}</p>
+                          <p className="mt-1 text-[13px] text-[#68766B]">{String(item.type || 'Listing').replaceAll('_', ' ')} · {BULK_LABELS[item.status] || item.status}</p>
+                        </div>
+                      </div>
+                      {item.status === 'submitted_for_review' ? <Link
+                        to={`/admin/host-listings?tab=review&focus=${encodeURIComponent(item.id)}`}
+                        className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-[#173F35] px-3.5 text-[13px] font-bold text-white hover:bg-[#245643]">Open review</Link>
+                        : <span className="shrink-0 rounded-lg border border-[#D7DDCF] bg-[#F7F6F2] px-3 py-2 text-[13px] font-semibold text-[#52655A]">{item.status === 'draft' ? 'Waiting for Host' : BULK_LABELS[item.status] || 'Not pending'}</span>}
+                    </div>;
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : <p className="mt-6 border-y border-[#D7DDCF] py-6 text-[15px] leading-6 text-[#5C6C60]">
+            {batches.length ? 'No imported batches match this status filter.' : 'No saved Excel/ZIP Host batches were found in the database. If import preview succeeded but this remains empty, verify that Save Drafts completed successfully in the Host Studio. Preview alone does not create database records.'}
+          </p>}
+          <p className="mt-4 text-[13px] leading-5 text-[#728073]">One Excel upload of up to 100 listings can be stored as four backend batches of 25. The Product Evidence batch queue is separate and will not contain these Host records.</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function CombinedBulkWorkspace() {
+  const [source, setSource] = useState('host');
+  return <div className="min-w-0">
+    <div role="group" aria-label="Choose bulk submission source" className="flex flex-wrap gap-2 border-b border-[#D7DDCF] bg-[#F7F6F2] px-4 py-3 sm:px-6">
+      <button type="button" aria-pressed={source === 'host'} onClick={() => setSource('host')}
+        className={`min-h-11 rounded-lg px-4 py-2 text-[15px] font-bold transition ${source === 'host' ? 'bg-[#C56C42] text-white' : 'border border-[#D7DDCF] bg-white text-[#173F35]'}`}>Host listing batches</button>
+      <button type="button" aria-pressed={source === 'npi'} onClick={() => setSource('npi')}
+        className={`min-h-11 rounded-lg px-4 py-2 text-[15px] font-bold transition ${source === 'npi' ? 'bg-[#C56C42] text-white' : 'border border-[#D7DDCF] bg-white text-[#173F35]'}`}>Product evidence batches</button>
+    </div>
+    {source === 'host' ? <HostBulkSubmissionsPanel /> : <BulkReview />}
+  </div>;
 }
 
 export default function AdminApprovalCenterPage() {
@@ -274,7 +477,7 @@ export default function AdminApprovalCenterPage() {
                   {activeId === "evidence" && <EvidenceReview />}
                   {activeId === "catalog" && <CatalogGovernance productOnly />}
                   {activeId === "recipes" && (recipeView === "library" ? <RecipeLibrary /> : <RecipeReview section="recipeReview" />)}
-                  {activeId === "bulk" && <BulkReview />}
+                  {activeId === "bulk" && (isRootSuperAdmin ? <CombinedBulkWorkspace /> : <BulkReview />)}
                   {activeId === "audit" && (auditView === "listings" ? <ListingHistory /> : <AdminAudit />)}
                 </Suspense>
               </AdminEmbeddedShellContext.Provider>

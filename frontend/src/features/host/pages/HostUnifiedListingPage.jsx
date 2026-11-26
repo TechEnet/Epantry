@@ -58,6 +58,7 @@ import {
   parseHostBulkWorkbook,
   ingestWorkbookImages,
 } from "../utils/hostBulkWorkbook";
+import { previewHostBulkZip, ingestHostBulkZipMedia } from "../utils/hostBulkZipMedia";
 import {
   createHostListingPacket,
   deleteHostListingPacket,
@@ -410,6 +411,1228 @@ const editorialStyles = String.raw`
 @media(max-width:400px){.uel-ingredient-fields{grid-template-columns:1fr}.uel-ingredient-fields .uel-span-two{grid-column:1}.uel-custom-allergen-row{grid-template-columns:1fr}}
 
 @media (prefers-reduced-motion:reduce){.uel-page a,.uel-page button{transition:none!important}}
+/* EPANTRY_BULK_V4_READY */
+/* EPANTRY Bulk Studio v2 — isolated to Bulk tab. */
+.uel-bulk-redesign {--bx:#B76147;--bt:#F0D8CC;--bd:#203E35;--bm:#5C6A61;--bl:#E0E3D9;min-width:0;margin-top:22px}
+.uel-bulk-redesign *, .uel-bulk-redesign *::before,.uel-bulk-redesign *::after{box-sizing:border-box}
+.uel-bulk-redesign h2,.uel-bulk-redesign h3,.uel-bulk-redesign h4{margin:0!important;letter-spacing:-.035em!important;line-height:1.2!important}
+.uel-bulk-redesign p{margin:0!important;line-height:1.55!important;font-size:15px!important}
+.uel-bulk-kicker{font-size:12px!important;letter-spacing:.13em!important;text-transform:uppercase;font-weight:850!important;color:var(--bx)!important}
+.uel-bulk-intro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end;border-bottom:1px solid #CCD3C9;padding:6px 3px 22px}
+.uel-bulk-intro h2{font-size:clamp(27px,2.7vw,42px)!important;font-weight:850!important;color:var(--bd)!important;margin:7px 0 9px!important}
+.uel-bulk-intro p{max-width:670px;color:#56655C!important}
+.uel-bulk-limit{display:flex;align-items:center;gap:10px;border:1px solid #D9BDAF;background:#F8E9DF;padding:12px 16px;border-radius:11px;color:#753E30;white-space:nowrap;font-size:13px;font-weight:750}
+.uel-bulk-limit strong{font-size:24px;line-height:1;color:#AB573D}
+.uel-bulk-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;background:#E9EDE6;border:1px solid #D0DAD0;border-radius:13px;margin:20px 0 22px;overflow:hidden}
+.uel-bulk-steps > div{display:flex;align-items:center;gap:11px;padding:15px 17px;border-right:1px solid #D0DAD0;min-width:0;color:#426155}
+.uel-bulk-steps > div:last-child{border-right:0}
+.uel-bulk-steps b{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;font-size:13px;border:1px solid #B3C5B7;background:#FBFCF9;color:#1E493B}
+.uel-bulk-steps span{min-width:0;font-weight:760;font-size:14px;line-height:1.35}
+.uel-bulk-steps .is-active{background:#23483B;color:#fff}
+.uel-bulk-steps .is-active b{background:#F2D8CA;border-color:#F2D8CA;color:#7D3D2B}
+.uel-bulk-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,290px);gap:23px;align-items:start;min-width:0}
+.uel-bulk-content{background:#FFFEFC;border:1px solid #D9DED5;border-radius:17px;padding:clamp(19px,2.2vw,30px);min-width:0;box-shadow:0 7px 28px rgba(20,47,36,.035)}
+.uel-bulk-part-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:19px;min-width:0}
+.uel-bulk-part-number{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:#F4DBCF;color:#9E4E33;font-size:14px;font-weight:900}
+.uel-bulk-part-head h3{font-size:clamp(20px,2vw,25px)!important;font-weight:850!important;color:#203B32!important}
+.uel-bulk-part-head p{font-size:13px!important;color:#6D786F!important;margin-top:5px!important}
+.uel-bulk-template-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.uel-bulk-redesign a.uel-bulk-template-link{display:flex;align-items:center;gap:12px;min-width:0;border:1px solid #D8E0D7;background:#F9FAF7;padding:13px 14px;border-radius:11px;text-decoration:none;color:#173F35!important;min-height:73px;transition:background .18s,border-color .18s,transform .18s}
+.uel-bulk-redesign a.uel-bulk-template-link:hover{background:#FCE9DE;border-color:#CF9476;transform:translateY(-1px)}
+.uel-bulk-template-icon{display:grid;place-items:center;flex:none;width:42px;height:42px;background:#E5ECE4;border-radius:10px;color:#234E40}
+.uel-bulk-template-info{min-width:0;flex:1}
+.uel-bulk-template-info strong{font-size:14px!important;line-height:1.3;display:block;overflow-wrap:anywhere}
+.uel-bulk-template-info small{display:block;font-size:12px;line-height:1.4;color:#637267;margin-top:3px}
+.uel-bulk-template-download{flex:none;color:#9E583E}
+.uel-bulk-divider{height:1px;background:#DDE3DA;margin:27px 0 24px}
+.uel-bulk-methods{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px}
+.uel-page .uel-bulk-method{display:flex;align-items:flex-start;gap:12px;text-align:left;cursor:pointer;border:1.5px solid #D7DED4!important;border-radius:12px;background:#FBFBF8!important;padding:15px!important;color:#1E3D32!important;min-width:0;min-height:82px}
+.uel-page .uel-bulk-method[data-selected='true']{border-color:#B76147!important;background:#FAEBE3!important;box-shadow:inset 4px 0 0 #B76147}
+.uel-bulk-method strong{display:block;font-size:15px!important;line-height:1.25}
+.uel-bulk-method small{display:block;margin-top:5px;color:#617268;font-size:12px;line-height:1.4}
+.uel-bulk-method-icon{display:grid;place-items:center;width:29px;height:29px;flex:none;color:#A75B42}
+.uel-bulk-dropzone{position:relative;display:flex;align-items:center;gap:16px;background:#F6F6F1;border:1.8px dashed #C9D2C5;padding:21px 20px;border-radius:13px;min-width:0}
+.uel-bulk-dropzone:focus-within{border-color:#B76147;box-shadow:0 0 0 3px #B7614720}
+.uel-bulk-drop-icon{background:#E4EADF;color:#1E4839;padding:12px;border-radius:12px;flex:none}
+.uel-bulk-dropzone label{flex:1;min-width:0;display:block;font-weight:800;color:#183C31;font-size:15px;cursor:pointer}
+.uel-bulk-dropzone label span{display:block;font-weight:500;font-size:13px;color:#627066;margin:5px 0 10px}
+.uel-bulk-dropzone input[type=file]{display:block!important;max-width:100%;width:100%;font-size:13px;color:#52675A;cursor:pointer}
+.uel-bulk-dropzone input[type=file]::file-selector-button{border:1px solid #173F35;background:#173F35;color:white;padding:9px 13px;margin-right:10px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer}
+.uel-bulk-selected{margin-top:14px;padding:11px 13px;border-left:3px solid #B76147;background:#F9EDE5;color:#4C413B;display:flex;align-items:center;gap:8px;font-size:13px;overflow-wrap:anywhere}
+.uel-bulk-note{font-size:13px!important;color:#647168!important;margin-top:10px!important}
+.uel-bulk-preview{margin-top:22px;border:1px solid #D5DED4;border-radius:13px;background:#FBFCF8;overflow:hidden}
+.uel-bulk-preview-head{padding:17px 20px;background:#E5EDE5;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.uel-bulk-preview-head h3{font-size:20px!important;color:#193F33!important;font-weight:850!important}
+.uel-bulk-preview-count{color:#345849;font-size:13px;font-weight:800}
+.uel-bulk-list-preview{max-height:290px;overflow:auto;padding:0 19px}
+.uel-bulk-preview-row{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid #E1E8DE;min-width:0;align-items:center}
+.uel-bulk-preview-row:last-child{border-bottom:0}
+.uel-bulk-preview-row strong{font-size:14px;color:#24372D;display:block;overflow-wrap:anywhere}
+.uel-bulk-preview-row span,.uel-bulk-preview-row small{font-size:12px;color:#657266;line-height:1.45}
+.uel-bulk-warning{margin:10px 18px 0;background:#F9ECE2;border-left:3px solid #C16B45;padding:13px 15px;color:#6A3F2E;border-radius:5px}
+.uel-bulk-warning strong{font-size:14px}
+.uel-bulk-warning ul{font-size:13px;line-height:1.6;list-style:disc;padding-left:20px;margin-top:5px}
+.uel-bulk-progress{margin:12px 18px;background:#E8F0E8;padding:12px 14px;color:#164638;font-weight:800;font-size:14px}
+.uel-bulk-preview-foot{padding:16px 18px;background:#F3F6F1;border-top:1px solid #DFE6DB;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.uel-bulk-preview-foot p{font-size:12px!important;color:#5B6C60;max-width:430px}
+.uel-page .uel-bulk-submit{display:inline-flex;justify-content:center;align-items:center;gap:9px;padding:12px 18px!important;border:1px solid #173F35!important;background:#173F35!important;color:#fff!important;border-radius:9px!important;font-size:14px!important;font-weight:800!important;min-height:46px}
+.uel-page .uel-bulk-submit:hover:not(:disabled){background:#28614E!important}
+.uel-bulk-aside{display:flex;flex-direction:column;gap:13px;min-width:0}
+.uel-bulk-side-panel{border:1px solid #DBE0D7;border-radius:12px;background:#F0F2EC;padding:19px 19px 18px}
+.uel-bulk-side-panel h3{font-size:18px!important;color:#1E4035!important;font-weight:800!important;display:flex;align-items:center;gap:8px;margin-bottom:12px!important}
+.uel-bulk-side-panel p{color:#586A5D;font-size:13px!important;line-height:1.55!important}
+.uel-bulk-side-panel p+p{margin-top:10px!important}
+.uel-bulk-side-panel strong{color:#25483A}
+.uel-bulk-side-panel ol{list-style:none;margin:0;padding:0}
+.uel-bulk-side-panel li{display:grid;grid-template-columns:22px 1fr;gap:8px;border-top:1px solid #D4DCD1;padding:11px 0;color:#506254;font-size:13px;line-height:1.5}
+.uel-bulk-side-panel li:first-child{border-top:0}
+.uel-bulk-side-panel li b{display:grid;place-items:center;background:#E9D6C9;color:#96543C;width:21px;height:21px;border-radius:50%;font-size:11px}
+.uel-bulk-side-panel.is-clay{background:#F3DDD1;border-color:#E6C8B7}
+.uel-bulk-side-panel pre{font-size:12px!important;line-height:1.6!important;white-space:pre-wrap;word-break:break-word;color:#274638;background:rgba(255,255,255,.55);padding:12px;border:1px solid #E6CBC0;border-radius:7px;margin:10px 0 0}
+.uel-page .uel-bulk-advanced{margin-top:21px;border:1px solid #D9E1D7;background:#FCFDF9;border-radius:11px;padding:0!important;overflow:hidden}
+.uel-page .uel-bulk-advanced summary{padding:15px 19px!important;font-size:14px!important;cursor:pointer;font-weight:800!important;color:#1F483B}
+.uel-page .uel-bulk-advanced[open]>:not(summary){margin-left:19px;margin-right:19px}
+.uel-page .uel-bulk-advanced[open]>:last-child{margin-bottom:18px}
+.uel-page:has(.uel-bulk-redesign) .uel-hero{box-shadow:none;border:1px solid #D3DCD2}
+.uel-page:has(.uel-bulk-redesign) .uel-hero-main{padding:clamp(24px,2.6vw,38px)}
+.uel-page:has(.uel-bulk-redesign) .uel-hero-side{padding:clamp(20px,2.4vw,31px)}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-bar{border-bottom:0;margin-top:24px;padding-bottom:0}
+@media(max-width:1120px){.uel-bulk-workspace{grid-template-columns:minmax(0,1fr) 250px;gap:15px}.uel-bulk-side-panel{padding:15px}.uel-bulk-content{padding:20px}}
+@media(max-width:900px){.uel-bulk-workspace{grid-template-columns:1fr}.uel-bulk-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.uel-bulk-side-panel:last-child{grid-column:1/-1}.uel-bulk-intro{grid-template-columns:1fr}.uel-bulk-limit{justify-self:start}}
+@media(max-width:640px){.uel-bulk-redesign{margin-top:14px}.uel-bulk-intro{padding:0 0 16px}.uel-bulk-intro h2{font-size:29px!important}.uel-bulk-steps{grid-template-columns:1fr 1fr 1fr;margin:14px 0}.uel-bulk-steps > div{padding:10px 8px;flex-direction:column;gap:5px;text-align:center}.uel-bulk-steps b{width:26px;height:26px}.uel-bulk-steps span{font-size:11px}.uel-bulk-content{padding:15px;border-radius:10px}.uel-bulk-part-head{gap:9px}.uel-bulk-template-grid{grid-template-columns:1fr}.uel-bulk-methods{grid-template-columns:1fr 1fr;gap:7px}.uel-page .uel-bulk-method{padding:11px!important;min-height:90px;gap:7px}.uel-bulk-method-icon{width:18px}.uel-bulk-method strong{font-size:13px!important}.uel-bulk-method small{font-size:11px}.uel-bulk-dropzone{padding:15px;gap:10px;align-items:flex-start}.uel-bulk-drop-icon{padding:7px}.uel-bulk-aside{display:flex}.uel-bulk-preview-foot{align-items:stretch;flex-direction:column}.uel-page .uel-bulk-submit{width:100%}.uel-bulk-preview-row{align-items:flex-start;flex-direction:column;gap:5px}}
+/* EPANTRY BULK STUDIO V4 - Scoped redesign. Clay communicates page identity,
+   warm white for content, forest green only for action or success. The three
+   progress cells always share the same surface; state is conveyed by borders. */
+.uel-page:has(.uel-bulk-redesign){background:#F8F6F2!important}
+.uel-page:has(.uel-bulk-redesign) .uel-hero{display:none!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-bar{margin:12px 0 20px!important;padding:0 0 16px!important;border-bottom:1px solid #E5DED7!important}
+.uel-bulk-redesign{--bx:#B65F45;--bt:#F6E7DE;--bd:#193C31;--bm:#64655F;--bl:#E6DED5;--bpaper:#FFFEFC;max-width:none!important;margin:0 0 25px!important;color:#2C302C!important;min-width:0}
+.uel-bulk-redesign p{font-size:14px!important;line-height:1.55!important}
+.uel-bulk-redesign h2,.uel-bulk-redesign h3,.uel-bulk-redesign h4{letter-spacing:-.04em!important}
+.uel-bulk-banner{background:#C77558!important;color:#FFF9F5!important;border-radius:14px;border:1px solid #B5674C;padding:clamp(22px,3vw,38px);display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,225px);gap:35px;align-items:center;position:relative;overflow:hidden}
+.uel-bulk-banner::after{content:'';position:absolute;border:1px solid #FFFFFF3A;border-radius:100%;height:310px;width:310px;right:-170px;bottom:-220px;pointer-events:none}
+.uel-bulk-banner .uel-bulk-kicker{font-size:12px!important;letter-spacing:.16em!important;text-transform:uppercase;color:#FFF1E9!important;font-weight:850!important;margin:0 0 13px!important}
+.uel-bulk-banner h2{font-size:clamp(31px,3.3vw,48px)!important;line-height:1.05!important;max-width:660px;font-weight:850!important;color:#FFFDF9!important;margin:0 0 12px!important}
+.uel-bulk-banner p{font-size:16px!important;color:#FFF5F0!important;max-width:590px!important;line-height:1.56!important}
+.uel-bulk-banner-meta{border-left:1px solid #FFFFFF69;padding-left:24px;display:flex;flex-direction:column;gap:3px}
+.uel-bulk-banner-meta strong{font-size:clamp(44px,5vw,61px);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.065em;color:#FFFDF9}
+.uel-bulk-banner-meta span{font-size:13px;font-weight:800;color:#FFF5EF}
+.uel-bulk-banner-meta small{font-size:12px;line-height:1.45;color:#FBE5D9;margin-top:7px}
+/* ONE uniform row. Only underlined state/number distinguishes progress. */
+.uel-bulk-steps{margin:19px 0 22px!important;background:#FFFEFC!important;border:1px solid #E5DDD5!important;box-shadow:none!important;border-radius:10px!important;overflow:hidden!important}
+.uel-bulk-steps>div{background:#FFFEFC!important;color:#4F554F!important;min-width:0;min-height:68px;padding:14px 17px!important;border-right:1px solid #E5DDD5!important;border-bottom:3px solid transparent!important;gap:12px!important}
+.uel-bulk-steps>div:last-child{border-right:0!important}
+.uel-bulk-steps>div b{background:#F5F1EC!important;color:#68645E!important;border:1px solid #D9D1C8!important;width:30px!important;height:30px!important;border-radius:50%!important;box-shadow:none!important}
+.uel-bulk-steps>div.is-active{border-bottom-color:#B65F45!important;background:#FFFEFC!important;color:#283B31!important}
+.uel-bulk-steps>div.is-active b{color:#B65F45!important;background:#FAEDE4!important;border-color:#D5A38E!important}
+.uel-bulk-steps>div.is-complete{border-bottom-color:#B8C7BA!important;color:#334C3E!important}
+.uel-bulk-steps>div.is-complete b{background:#EEF3EC!important;color:#365D49!important;border-color:#BDD0C0!important}
+.uel-bulk-steps span{font-size:14px!important;font-weight:730!important}
+.uel-bulk-workspace{grid-template-columns:minmax(0,1fr) minmax(214px,250px)!important;gap:18px!important;align-items:start!important}
+.uel-bulk-content{background:#FFFEFC!important;border:1px solid #E6DED5!important;border-radius:11px!important;box-shadow:none!important;padding:clamp(19px,2.4vw,33px)!important}
+.uel-bulk-part-head{align-items:flex-start!important;gap:12px!important;margin-bottom:15px!important}
+.uel-bulk-part-number{background:#F4E5DC!important;color:#A5553D!important;min-width:35px;width:35px!important;height:35px!important;border-radius:7px!important;border:none!important;padding:0!important;font-size:13px!important}
+.uel-bulk-part-head h3{font-size:clamp(21px,2vw,26px)!important;line-height:1.17!important;color:#232D28!important;font-weight:820!important}
+.uel-bulk-part-head p{color:#656C64!important;font-size:13px!important;margin-top:7px!important}
+.uel-bulk-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0 20px!important}
+.uel-bulk-redesign a.uel-bulk-template-link{display:flex!important;align-items:center!important;border:0!important;border-bottom:1px solid #E9E4DD!important;padding:13px 4px!important;min-height:68px!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;transition:background .16s!important}
+.uel-bulk-redesign a.uel-bulk-template-link:hover{background:#FFF4ED!important;transform:none!important}
+.uel-bulk-template-icon{background:#F8EEE8!important;color:#A45842!important;border-radius:8px!important;width:39px!important;height:39px!important}
+.uel-bulk-template-info strong{color:#27362F!important;font-size:14px!important;font-weight:780!important}
+.uel-bulk-template-info small{color:#75776F!important;font-size:12px!important}
+.uel-bulk-template-download{color:#A85B45!important}
+.uel-bulk-divider{margin:27px 0 27px!important;background:#E5DED7!important;height:1px!important}
+.uel-bulk-methods{gap:12px!important;margin-bottom:16px!important}
+.uel-page .uel-bulk-method{background:#FFFDFC!important;color:#293930!important;border-radius:9px!important;border:1px solid #DAD5CE!important;padding:16px!important;box-shadow:none!important;min-height:90px!important}
+.uel-page .uel-bulk-method[data-selected='true']{background:#FFFDFC!important;border:2px solid #B96D52!important;box-shadow:inset 0 -3px 0 #B96D52!important}
+.uel-bulk-method strong{font-size:15px!important;color:#29352F!important}
+.uel-bulk-method small{font-size:12px!important;color:#74746C!important}
+.uel-bulk-method-icon{color:#A95843!important}
+.uel-bulk-dropzone{background:#FAF7F3!important;border:1.5px dashed #BEAC9D!important;border-radius:10px!important;padding:19px 20px!important}
+.uel-bulk-drop-icon{background:#F2E5DB!important;color:#AB5B45!important;border-radius:8px!important}
+.uel-bulk-dropzone label{font-size:15px!important;color:#29372F!important}
+.uel-bulk-dropzone label span{font-size:12px!important;color:#6C7169!important}
+.uel-bulk-dropzone input[type=file]::file-selector-button{background:#193C31!important;border-color:#193C31!important;color:#FFF!important}
+.uel-bulk-selected{border-left:3px solid #2D7450!important;background:#E9F2EB!important;color:#244636!important}
+.uel-bulk-note{color:#64675F!important;font-size:13px!important;margin-top:12px!important}
+.uel-bulk-aside{background:#F4F1EC!important;border:1px solid #E6DED5!important;border-radius:10px!important;padding:0 17px!important;gap:0!important;box-shadow:none!important}
+.uel-bulk-side-panel{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:18px 0!important}
+.uel-bulk-side-panel+.uel-bulk-side-panel{border-top:1px solid #DED5CA!important}
+.uel-bulk-side-panel h3{font-size:16px!important;line-height:1.3!important;color:#283D32!important;margin-bottom:10px!important}
+.uel-bulk-side-panel li{font-size:12px!important;color:#616960!important;padding:10px 0!important;border-color:#E0D8CE!important}
+.uel-bulk-side-panel li b{color:#9C543D!important;background:#F0DED2!important}
+.uel-bulk-side-panel p{color:#656860!important;font-size:12px!important}
+.uel-bulk-side-panel strong{color:#324E3B!important}
+.uel-bulk-preview{margin-top:24px!important;border:1px solid #D5DED4!important;border-radius:9px!important;background:#FFFDF9!important}
+.uel-bulk-preview-head{background:#F3F6F1!important;border-bottom:1px solid #DCE5DB!important}
+.uel-bulk-preview-head h3{color:#27372C!important}
+.uel-bulk-preview-count{color:#23523B!important}
+.uel-bulk-list-preview{max-height:320px!important}
+.uel-bulk-preview-row{border-color:#ECE8E1!important}
+.uel-bulk-warning{background:#FFF2E7!important;border-left-color:#B96D52!important}
+.uel-bulk-progress{background:#E9F2EB!important;color:#194C31!important}
+.uel-bulk-preview-foot{background:#FCFAF6!important;border-color:#E8E3DA!important}
+.uel-page .uel-bulk-submit{background:#173E32!important;border-color:#173E32!important;color:#FFF!important;box-shadow:none!important}
+.uel-page .uel-bulk-advanced{border:1px solid #E6DED5!important;background:#FFFEFC!important;border-radius:9px!important;box-shadow:none!important;margin-top:19px!important}
+.uel-page .uel-bulk-advanced summary{color:#39483E!important}
+/* Full-width media guide with readable folder trees, not squeezed in a sidebar. */
+.uel-bulk-folder-guide{margin-top:22px!important;padding:clamp(19px,2.4vw,32px)!important;background:#FFFEFC!important;border:1px solid #E6DED5!important;border-radius:11px!important;box-shadow:none!important}
+.uel-bulk-folder-head{display:flex;align-items:start;justify-content:space-between;gap:15px;border-bottom:1px solid #E5DED7;padding-bottom:18px;margin-bottom:18px;flex-wrap:wrap}
+.uel-bulk-folder-head h3{font-size:clamp(22px,2.2vw,28px)!important;color:#27382F!important;font-weight:850!important;margin:0 0 7px!important}
+.uel-bulk-folder-head p{color:#656960!important;max-width:710px!important;font-size:14px!important}
+.uel-bulk-folder-guide-tag{border:1px solid #D7B3A1!important;background:#F7E9E0!important;color:#99543C!important;padding:7px 11px!important;border-radius:6px!important;font-weight:780!important;font-size:12px!important;display:inline-block!important}
+.uel-bulk-folder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;min-width:0}
+.uel-bulk-folder-col{border:1px solid #E1D8CE;border-radius:9px;min-width:0;background:#FAF7F2;overflow:hidden}
+.uel-bulk-folder-col-head{display:flex;align-items:center;gap:8px;padding:14px 16px;color:#253E31;border-bottom:1px solid #E1D8CE;font-size:15px;font-weight:800}
+.uel-bulk-folder-col pre{padding:17px 18px!important;margin:0!important;background:#F8F5F0!important;color:#243D31!important;white-space:pre-wrap;overflow-wrap:anywhere;font:500 13px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace!important}
+.uel-bulk-folder-col p{font-size:13px!important;color:#696D65!important;padding:13px 16px 15px!important;border-top:1px solid #E5DED6!important}
+.uel-bulk-folder-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}
+.uel-bulk-folder-rule{padding:12px 0!important;border-top:2px solid #E6D1C3!important;min-width:0}
+.uel-bulk-folder-rule strong{display:block;color:#99523E!important;font-size:12px!important;margin-bottom:6px!important;text-transform:uppercase;letter-spacing:.06em}
+.uel-bulk-folder-rule p{font-size:13px!important;color:#667169!important}
+.uel-bulk-folder-rule code{font-size:12px;color:#294F3B}
+@media(max-width:1100px){.uel-bulk-workspace{grid-template-columns:minmax(0,1fr) minmax(190px,220px)!important;gap:13px!important}.uel-bulk-content{padding:22px!important}.uel-bulk-methods{grid-template-columns:1fr!important}}
+@media(max-width:920px){.uel-bulk-workspace{grid-template-columns:1fr!important}.uel-bulk-aside{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0 20px!important}.uel-bulk-side-panel+.uel-bulk-side-panel{border-top:none!important;border-left:1px solid #DED5CA!important;padding-left:20px!important}.uel-bulk-methods{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:670px){.uel-bulk-banner{grid-template-columns:1fr!important;gap:15px!important;padding:23px 18px!important}.uel-bulk-banner-meta{border-left:0!important;border-top:1px solid #FFFFFF60!important;padding:13px 0 0!important;display:grid!important;grid-template-columns:auto 1fr!important;gap:5px 12px!important;align-items:center!important}.uel-bulk-banner-meta strong{font-size:38px!important}.uel-bulk-banner-meta small{grid-column:1/-1!important;margin:0!important}.uel-bulk-steps>div{padding:11px 7px!important;min-height:75px!important;flex-direction:column!important;text-align:center!important;gap:6px!important}.uel-bulk-steps span{font-size:11px!important}.uel-bulk-template-grid,.uel-bulk-folder-grid{grid-template-columns:1fr!important}.uel-bulk-methods{grid-template-columns:1fr!important}.uel-bulk-aside{display:block!important}.uel-bulk-side-panel+.uel-bulk-side-panel{border-left:0!important;border-top:1px solid #DED5CA!important;padding-left:0!important}.uel-bulk-content{padding:18px!important}.uel-bulk-folder-rules{grid-template-columns:1fr!important;gap:7px!important}.uel-bulk-dropzone{align-items:flex-start!important;gap:11px!important}.uel-bulk-preview-foot{flex-direction:column!important;align-items:stretch!important}.uel-page .uel-bulk-submit{width:100%!important}}
+/* EPANTRY_BULK_V5_INK_STUDIO -- contained exclusively in Bulk Listing mode.
+   Visual rule: paper and slate everywhere; blue = current action, green = success,
+   amber = warning only. No decorative alternating step colours. */
+.uel-page:has(.uel-bulk-redesign){background:#F5F6F5!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-bar{margin:8px 0 17px!important;border-bottom:1px solid #DBE1E2!important;padding:0 0 14px!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-text h2{color:#203440!important;font-size:clamp(17px,1.7vw,21px)!important;font-weight:800!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-text p{color:#61717A!important}
+.uel-bulk-redesign{--bx:#527C92!important;--bt:#EBF1F4!important;--bd:#213541!important;--bm:#5D707A!important;--bl:#DCE3E5!important;--bpaper:#FFFFFF!important;color:#1F313C!important;margin:0 0 25px!important;min-width:0}
+.uel-bulk-redesign p{color:#5E6C72!important;font-size:14px!important;line-height:1.55!important}
+.uel-bulk-redesign h2,.uel-bulk-redesign h3,.uel-bulk-redesign h4{letter-spacing:-.035em!important}
+/* Light editorial heading, not a full-bleed marketing-coloured banner. */
+.uel-bulk-banner{background:#FCFDFD!important;border:1px solid #DBE4E6!important;border-top:4px solid #527C92!important;border-radius:13px!important;box-shadow:none!important;color:#203440!important;padding:clamp(21px,2.7vw,36px)!important;display:grid!important;grid-template-columns:minmax(0,1fr) minmax(170px,225px)!important;gap:clamp(15px,3.4vw,42px)!important;align-items:center!important;overflow:hidden!important}
+.uel-bulk-banner::after{display:none!important}
+.uel-bulk-banner .uel-bulk-kicker{color:#497386!important;text-transform:uppercase!important;letter-spacing:.15em!important;font-size:11px!important;font-weight:900!important;margin:0 0 9px!important}
+.uel-bulk-banner h2{font-size:clamp(31px,3.3vw,47px)!important;line-height:1.06!important;color:#203440!important;margin:0 0 11px!important;font-weight:860!important;max-width:660px!important}
+.uel-bulk-banner p{color:#63747C!important;font-size:15px!important;max-width:520px!important;line-height:1.5!important}
+.uel-bulk-banner-meta{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:4px!important;border:0!important;border-radius:12px!important;padding:18px 22px!important;background:#233E4B!important;min-height:135px!important;justify-content:center!important}
+.uel-bulk-banner-meta strong{font-size:clamp(43px,4.8vw,62px)!important;line-height:.98!important;color:#F8FCFD!important;font-weight:860!important;letter-spacing:-.06em!important}
+.uel-bulk-banner-meta span{color:#EAF2F4!important;font-size:14px!important;font-weight:780!important}
+.uel-bulk-banner-meta small{color:#C1D0D7!important;font-size:12px!important;line-height:1.4!important;margin-top:5px!important}
+/* One and the same paper surface for the entire step row; only bottom stroke changes state. */
+.uel-bulk-steps{margin:15px 0 22px!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;background:#FDFEFE!important;border:1px solid #DCE4E6!important;border-radius:11px!important;box-shadow:none!important;overflow:hidden!important}
+.uel-bulk-steps>div,.uel-bulk-steps>div.is-active,.uel-bulk-steps>div.is-complete{background:#FDFEFE!important;color:#5B6C73!important;border-right:1px solid #DEE5E6!important;border-bottom:3px solid transparent!important;min-width:0!important;min-height:66px!important;padding:13px 17px!important;gap:12px!important}
+.uel-bulk-steps>div:last-child{border-right:0!important}
+.uel-bulk-steps>div.is-active{border-bottom-color:#527C92!important;color:#203D4D!important}
+.uel-bulk-steps>div.is-complete{border-bottom-color:#B9C9CE!important;color:#47606C!important}
+.uel-bulk-steps>div b,.uel-bulk-steps>div.is-active b,.uel-bulk-steps>div.is-complete b{background:#F0F4F5!important;border:1px solid #D4E0E3!important;color:#526E7C!important;width:31px!important;height:31px!important;border-radius:7px!important;box-shadow:none!important;font-weight:850!important}
+.uel-bulk-steps>div.is-active b{background:#E5EFF3!important;color:#255B72!important;border-color:#94B5C2!important}
+.uel-bulk-steps span{font-size:14px!important;font-weight:750!important;letter-spacing:0!important}
+/* Expand the actual form to the full available host workspace width. */
+.uel-bulk-workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:15px!important;align-items:start!important;min-width:0!important}
+.uel-bulk-content{display:grid!important;gap:17px!important;padding:0!important;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;min-width:0!important}
+.uel-bulk-content>section[aria-label="Excel templates"],.uel-bulk-content>section[aria-label="Upload Excel or ZIP"]{background:#FFFFFF!important;border:1px solid #DBE4E6!important;border-radius:12px!important;padding:clamp(19px,2.5vw,29px)!important;box-shadow:none!important}
+.uel-bulk-divider{display:none!important}
+.uel-bulk-part-head{margin:0 0 18px!important;align-items:center!important;gap:13px!important}
+.uel-bulk-part-number{display:grid!important;place-items:center!important;background:#EAF0F2!important;border:1px solid #CBD9DF!important;color:#476D7F!important;border-radius:7px!important;min-width:38px!important;width:38px!important;height:38px!important;font-size:13px!important;font-weight:860!important}
+.uel-bulk-part-head h3{font-size:clamp(21px,2vw,26px)!important;line-height:1.15!important;color:#203440!important;font-weight:820!important}
+.uel-bulk-part-head p{font-size:13px!important;color:#66767E!important;margin-top:5px!important}
+.uel-bulk-template-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0 22px!important}
+.uel-bulk-redesign a.uel-bulk-template-link{background:transparent!important;box-shadow:none!important;min-width:0!important;display:flex!important;align-items:center!important;gap:12px!important;min-height:68px!important;padding:13px 7px!important;border:0!important;border-bottom:1px solid #E5ECEE!important;border-radius:0!important;color:#29424E!important;transition:background-color .15s!important;transform:none!important}
+.uel-bulk-redesign a.uel-bulk-template-link:hover,.uel-bulk-redesign a.uel-bulk-template-link:focus-visible{background:#F1F6F8!important;transform:none!important;outline-offset:0!important}
+.uel-bulk-template-icon{background:#EFF4F6!important;border:1px solid #E2EBEE!important;color:#4B7184!important;border-radius:8px!important;width:40px!important;height:40px!important}
+.uel-bulk-template-info strong{color:#273F4C!important;font-size:14px!important;line-height:1.4!important}
+.uel-bulk-template-info small{color:#72828A!important;font-size:12px!important}
+.uel-bulk-template-download{color:#5B8090!important}
+.uel-bulk-methods{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:13px!important;margin:0 0 17px!important}
+.uel-page .uel-bulk-method{position:relative!important;min-height:92px!important;padding:16px 20px!important;display:flex!important;align-items:center!important;gap:15px!important;background:#FBFCFC!important;border:1.5px solid #DAE4E7!important;border-radius:9px!important;box-shadow:none!important;text-align:left!important;color:#2A414C!important}
+.uel-page .uel-bulk-method[data-selected='true']{background:#EEF5F8!important;border:1.5px solid #6F9FB3!important;box-shadow:inset 4px 0 0 #527C92!important}
+.uel-bulk-method-icon{background:#EFF4F6!important;border-radius:8px!important;width:42px!important;height:42px!important;display:grid!important;place-items:center!important;color:#476F84!important}
+.uel-bulk-method strong{font-size:15px!important;color:#233B47!important;line-height:1.3!important}
+.uel-bulk-method small{font-size:12px!important;color:#708089!important;line-height:1.4!important}
+.uel-bulk-dropzone{background:#F3F7F8!important;border:1.5px dashed #8EABB8!important;border-radius:10px!important;padding:22px!important;box-shadow:none!important}
+.uel-bulk-dropzone:focus-within{border-color:#376A83!important;box-shadow:0 0 0 3px #A7CBD940!important}
+.uel-bulk-drop-icon{background:#E3EEF2!important;color:#3A697E!important;border-radius:10px!important}
+.uel-bulk-dropzone label{color:#243E4A!important;font-size:15px!important}
+.uel-bulk-dropzone label span{color:#6D808A!important;font-size:13px!important}
+.uel-bulk-dropzone input[type=file]{color:#344D58!important}
+.uel-bulk-dropzone input[type=file]::file-selector-button{background:#254653!important;border:1px solid #254653!important;color:white!important;border-radius:7px!important}
+.uel-bulk-selected{background:#E9F4EF!important;color:#255A41!important;border-left:3px solid #3D9067!important}
+.uel-bulk-note{color:#64777F!important;font-size:13px!important;margin-top:13px!important}
+.uel-bulk-aside{display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)!important;gap:16px!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+.uel-bulk-side-panel{border:1px solid #DCE4E6!important;border-radius:10px!important;background:#FAFCFC!important;box-shadow:none!important;padding:19px 22px!important;min-width:0!important}
+.uel-bulk-side-panel+.uel-bulk-side-panel{border:1px solid #DCE4E6!important;padding-left:22px!important}
+.uel-bulk-side-panel h3{font-size:17px!important;color:#203C49!important;font-weight:800!important;margin-bottom:12px!important;gap:8px!important}
+.uel-bulk-side-panel p{color:#657780!important;font-size:13px!important}
+.uel-bulk-side-panel strong{color:#2A4755!important}
+.uel-bulk-side-panel ol{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;list-style:none!important;margin:0!important;padding:0!important}
+.uel-bulk-side-panel li{display:flex!important;gap:9px!important;align-items:flex-start!important;border:0!important;padding:0!important;color:#5C707A!important;font-size:12px!important;line-height:1.5!important}
+.uel-bulk-side-panel li b{display:grid!important;place-items:center!important;width:22px!important;height:22px!important;min-width:22px!important;background:#E7EFF2!important;color:#476F82!important;border-radius:5px!important;font-size:11px!important}
+.uel-bulk-side-panel p+p{margin-top:9px!important}
+/* Review uses the same restrained palette. Warnings are amber only when needed. */
+.uel-bulk-preview{margin-top:0!important;background:#FFF!important;border:1px solid #D9E3E7!important;border-radius:11px!important;box-shadow:none!important}
+.uel-bulk-preview-head{background:#F1F6F8!important;border-bottom:1px solid #DCE6EA!important}
+.uel-bulk-preview-head h3{color:#244150!important}
+.uel-bulk-preview-count{color:#346F87!important}
+.uel-bulk-list-preview{max-height:350px!important}
+.uel-bulk-preview-row{border-color:#E6ECEE!important}
+.uel-bulk-warning{background:#FFF5E4!important;border-left-color:#C28B43!important;color:#7E5428!important}
+.uel-bulk-progress{background:#E8F3ED!important;color:#225940!important}
+.uel-bulk-preview-foot{background:#F7FAFB!important;border-color:#DEE9EB!important}
+.uel-page .uel-bulk-submit{background:#234855!important;border-color:#234855!important;color:#FFFFFF!important;border-radius:8px!important;box-shadow:none!important}
+.uel-page .uel-bulk-submit:hover:not(:disabled){background:#34687B!important}
+/* Distinctive file-system documentation rather than a stack of generic cards. */
+.uel-bulk-folder-guide{margin-top:19px!important;background:#FFFFFF!important;border:1px solid #D9E3E6!important;border-radius:12px!important;box-shadow:none!important;padding:clamp(19px,2.5vw,29px)!important;min-width:0!important}
+.uel-bulk-folder-head{display:flex!important;flex-wrap:wrap!important;justify-content:space-between!important;align-items:center!important;gap:17px!important;padding-bottom:17px!important;margin-bottom:19px!important;border-bottom:1px solid #E0E7EA!important}
+.uel-bulk-folder-head h3{color:#203845!important;font-size:clamp(22px,2.2vw,29px)!important;font-weight:850!important;margin-bottom:6px!important}
+.uel-bulk-folder-head p{color:#667B83!important;max-width:650px!important;font-size:13px!important}
+.uel-bulk-folder-guide-tag{background:#EAF2F5!important;color:#3B7187!important;border:1px solid #C7DBE2!important;border-radius:6px!important;padding:9px 11px!important;font-size:12px!important;font-weight:780!important}
+.uel-bulk-folder-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:15px!important;min-width:0!important}
+.uel-bulk-folder-col{min-width:0!important;overflow:hidden!important;background:#F8FAFA!important;border:1px solid #DBE4E7!important;border-radius:11px!important}
+.uel-bulk-folder-col-head{display:flex!important;align-items:center!important;gap:10px!important;font-size:14px!important;font-weight:800!important;color:#253F4B!important;padding:14px 16px!important;border-bottom:1px solid #E0E8EA!important;background:#F6F9FA!important}
+.uel-bulk-folder-col pre{margin:0!important;padding:18px 20px!important;min-height:245px!important;background:#192E3A!important;border:0!important;border-radius:0!important;color:#E6F3F8!important;font-size:clamp(11px,1.05vw,13px)!important;line-height:1.72!important;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;white-space:pre!important;overflow-x:auto!important}
+.uel-bulk-folder-col>p{background:#F8FAFA!important;padding:14px 17px!important;font-size:13px!important;color:#60747D!important}
+.uel-bulk-folder-col>p strong{color:#28546A!important}
+.uel-bulk-folder-rules{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:15px!important;margin-top:20px!important;background:transparent!important;border-top:1px solid #E0E8EA!important;padding-top:19px!important}
+.uel-bulk-folder-rule{background:transparent!important;border:0!important;padding:0 5px!important}
+.uel-bulk-folder-rule strong{font-size:12px!important;color:#346C81!important;text-transform:uppercase!important;letter-spacing:.055em!important}
+.uel-bulk-folder-rule p{font-size:12px!important;color:#667981!important;margin-top:6px!important;line-height:1.55!important}
+.uel-bulk-folder-rule code{color:#244F60!important;background:#EEF4F5!important;padding:2px 4px!important;border-radius:4px!important}
+.uel-page .uel-bulk-advanced{background:#FAFCFC!important;border:1px solid #DFE7E8!important;border-radius:9px!important;margin-top:15px!important;box-shadow:none!important}
+.uel-page .uel-bulk-advanced summary{color:#3A5A68!important}
+@media(max-width:1050px){.uel-bulk-workspace{grid-template-columns:1fr!important}.uel-bulk-aside{grid-template-columns:1fr 1fr!important}.uel-bulk-side-panel ol{grid-template-columns:1fr!important}.uel-bulk-side-panel li{padding:4px 0!important}}
+@media(max-width:740px){.uel-bulk-banner{grid-template-columns:1fr!important;padding:24px 20px!important}.uel-bulk-banner-meta{min-height:0!important;padding:13px 16px!important;display:grid!important;grid-template-columns:auto 1fr!important;align-items:center!important;gap:2px 14px!important}.uel-bulk-banner-meta strong{font-size:39px!important;grid-row:span 2!important}.uel-bulk-banner-meta small{grid-column:2!important;margin:0!important}.uel-bulk-steps>div{flex-direction:column!important;gap:5px!important;padding:11px 5px!important;min-height:77px!important;text-align:center!important}.uel-bulk-steps span{font-size:11px!important}.uel-bulk-template-grid{grid-template-columns:1fr!important}.uel-bulk-methods{grid-template-columns:1fr!important}.uel-bulk-aside{grid-template-columns:1fr!important}.uel-bulk-side-panel ol{grid-template-columns:repeat(3,minmax(0,1fr))!important}.uel-bulk-folder-grid,.uel-bulk-folder-rules{grid-template-columns:1fr!important}.uel-bulk-folder-col pre{min-height:0!important}.uel-bulk-content>section[aria-label="Excel templates"],.uel-bulk-content>section[aria-label="Upload Excel or ZIP"]{padding:18px!important}}
+@media(max-width:470px){.uel-bulk-side-panel ol{grid-template-columns:1fr!important}.uel-bulk-dropzone{align-items:flex-start!important}.uel-bulk-banner h2{font-size:30px!important}.uel-bulk-folder-head{align-items:flex-start!important}.uel-bulk-steps>div b{width:27px!important;height:27px!important}.uel-bulk-steps span{font-size:10px!important}}
+@media(prefers-reduced-motion:reduce){.uel-bulk-redesign a,.uel-bulk-redesign button{transition:none!important}}
+
+/* EPANTRY_BULK_V5_EDITORIAL_SECTIONS: section-first redesign.
+   No marketing-banner blocks, template cards, stacked instruction cards, or random alternating colours.
+   Ink: structure/typography. Clay: subtle editorial accent. Blue: actions/active. Green: real success only. */
+.uel-page:has(.uel-bulk-redesign){background:#F7F6F2!important;color:#202D38!important}
+.uel-page:has(.uel-bulk-redesign) .uel-shell{max-width:none!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-bar{margin:10px 0 0!important;padding-bottom:19px!important;border-bottom:1px solid #CBD1D2!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-text h2{color:#202D38!important}
+.uel-page:has(.uel-bulk-redesign) .uel-tabs{background:transparent!important;border:1px solid #C9CFD0!important;border-radius:3px!important;padding:3px!important}
+.uel-page:has(.uel-bulk-redesign) .uel-tab{border-radius:2px!important;box-shadow:none!important;color:#324352!important}
+.uel-page:has(.uel-bulk-redesign) .uel-tab[data-active='true']{background:#253E58!important;color:#fff!important}
+.uel-bulk-redesign{--bx:#375F87!important;--bt:#EEF2F4!important;--bd:#202D38!important;--bm:#616D75!important;--bl:#D3D7D8!important;--bpaper:#F7F6F2!important;padding:0!important;margin:0!important;background:transparent!important;color:#202D38!important}
+.uel-bulk-redesign p{color:#657077!important;font-size:15px!important;line-height:1.58!important}
+.uel-bulk-banner{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(160px,255px)!important;gap:38px!important;align-items:end!important;padding:clamp(28px,4.5vw,58px) 0 clamp(25px,3vw,39px)!important;background:transparent!important;border:0!important;border-bottom:1px solid #9BA8AA!important;border-top:0!important;border-radius:0!important;box-shadow:none!important;color:#202D38!important}
+.uel-bulk-banner::after{display:none!important}
+.uel-bulk-banner .uel-bulk-kicker{color:#AD6B50!important;font-size:12px!important;letter-spacing:.19em!important;font-weight:850!important;margin-bottom:18px!important}
+.uel-bulk-banner h2{color:#1C2D39!important;font-size:clamp(38px,4.6vw,63px)!important;line-height:1.02!important;letter-spacing:-.052em!important;font-weight:860!important;margin-bottom:14px!important;max-width:680px!important}
+.uel-bulk-banner p{font-size:16px!important;color:#627078!important;max-width:650px!important;line-height:1.55!important}
+.uel-bulk-banner-meta{display:flex!important;flex-direction:column!important;justify-content:flex-end!important;min-height:0!important;align-items:flex-start!important;border:0!important;border-left:1px solid #B8C1C3!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:4px 0 4px clamp(18px,3vw,32px)!important;gap:4px!important}
+.uel-bulk-banner-meta strong{font-size:clamp(64px,7.2vw,93px)!important;letter-spacing:-.072em!important;color:#25435C!important;font-weight:800!important;line-height:.88!important}
+.uel-bulk-banner-meta span{color:#2B4252!important;font-size:15px!important;font-weight:800!important}
+.uel-bulk-banner-meta small{font-size:12px!important;color:#738087!important;line-height:1.55!important;margin-top:7px!important}
+.uel-bulk-steps{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;margin:0 0 21px!important;padding:0!important;border:0!important;border-radius:0!important;border-bottom:1px solid #BEC9CB!important;background:transparent!important;box-shadow:none!important}
+.uel-bulk-steps>div,.uel-bulk-steps>div.is-active,.uel-bulk-steps>div.is-complete{min-height:76px!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;flex-direction:row!important;background:transparent!important;border:0!important;border-bottom:3px solid transparent!important;border-radius:0!important;padding:22px 13px 17px!important;gap:13px!important;color:#6B7780!important;box-shadow:none!important}
+.uel-bulk-steps>div+div{border-left:1px solid #E0E2E0!important}
+.uel-bulk-steps>div.is-active{border-bottom-color:#365D89!important;color:#253E58!important}
+.uel-bulk-steps>div.is-complete{border-bottom-color:#CAD2D4!important;color:#52616A!important}
+.uel-bulk-steps>div b,.uel-bulk-steps>div.is-complete b,.uel-bulk-steps>div.is-active b{background:transparent!important;border:0!important;border-radius:0!important;padding:0!important;width:auto!important;min-width:0!important;height:auto!important;font-size:14px!important;color:#B8795E!important;font-weight:800!important}
+.uel-bulk-steps>div.is-active b{color:#315F8B!important}
+.uel-bulk-steps span{font-size:15px!important;line-height:1.2!important;font-weight:750!important}
+.uel-bulk-workspace{display:block!important;padding:0!important;margin:0!important;grid-template-columns:1fr!important;background:transparent!important;border:0!important}
+.uel-bulk-content{display:block!important;padding:0!important;gap:0!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.uel-bulk-content>section[aria-label="Excel templates"],.uel-bulk-content>section[aria-label="Upload Excel or ZIP"]{background:transparent!important;padding:clamp(25px,3.5vw,40px) 0!important;border:0!important;border-bottom:1px solid #C9D0D0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
+.uel-bulk-divider{display:none!important}
+.uel-bulk-part-head{display:flex!important;gap:22px!important;align-items:flex-start!important;margin:0 0 22px!important}
+.uel-bulk-part-number{display:inline-block!important;background:transparent!important;border:0!important;border-radius:0!important;min-width:50px!important;width:50px!important;height:auto!important;font-size:22px!important;line-height:1.15!important;font-weight:800!important;color:#B5795F!important}
+.uel-bulk-part-head h3{font-size:clamp(23px,2.5vw,33px)!important;color:#1F323F!important;font-weight:820!important;line-height:1.15!important}
+.uel-bulk-part-head p{font-size:14px!important;color:#6A747A!important;margin-top:8px!important;max-width:670px!important}
+.uel-bulk-template-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0 34px!important;margin-left:72px!important}
+.uel-bulk-redesign a.uel-bulk-template-link{background:transparent!important;border:0!important;border-bottom:1px solid #D9DDDB!important;border-radius:0!important;box-shadow:none!important;padding:15px 6px 15px 1px!important;min-height:77px!important;transform:none!important;gap:14px!important;color:#293D4A!important}
+.uel-bulk-redesign a.uel-bulk-template-link:hover{background:transparent!important;border-bottom-color:#456E92!important;transform:none!important}
+.uel-bulk-redesign a.uel-bulk-template-link:focus-visible{outline:2px solid #365F8A!important;outline-offset:3px!important}
+.uel-bulk-template-icon{background:transparent!important;border:0!important;border-radius:0!important;color:#52778C!important;width:35px!important;height:35px!important}
+.uel-bulk-template-info strong{font-size:15px!important;color:#263E4C!important;font-weight:780!important}
+.uel-bulk-template-info small{font-size:12px!important;color:#758188!important}
+.uel-bulk-template-download{color:#A66D54!important}
+.uel-bulk-methods{margin:0 0 25px 72px!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:24px!important}
+.uel-page .uel-bulk-method,.uel-page .uel-bulk-method[data-selected='true']{background:transparent!important;border:0!important;border-bottom:2px solid #CED6D7!important;border-radius:0!important;box-shadow:none!important;min-height:83px!important;padding:12px 10px 16px 0!important;text-align:left!important;display:flex!important;align-items:center!important;gap:15px!important;color:#2A414F!important}
+.uel-page .uel-bulk-method[data-selected='true']{border-bottom-color:#375F87!important;background:transparent!important;box-shadow:none!important}
+.uel-page .uel-bulk-method:hover:not(:disabled){border-bottom-color:#6A8CAA!important}
+.uel-bulk-method-icon{background:transparent!important;border:0!important;color:#607E91!important;width:37px!important;height:37px!important;border-radius:0!important}
+.uel-bulk-method[data-selected='true'] .uel-bulk-method-icon{color:#315F88!important}
+.uel-bulk-method strong{font-size:16px!important;color:#243B49!important;font-weight:780!important}
+.uel-bulk-method small{font-size:13px!important;color:#728087!important}
+.uel-bulk-dropzone{display:flex!important;align-items:center!important;gap:18px!important;margin:0 0 0 72px!important;padding:24px 26px!important;background:transparent!important;border:1.5px dashed #A9B8BE!important;border-radius:2px!important;box-shadow:none!important}
+.uel-bulk-dropzone:focus-within{border-color:#315F88!important;box-shadow:0 0 0 3px #DCE6EB!important}
+.uel-bulk-drop-icon{background:transparent!important;border:0!important;color:#436D87!important;width:36px!important;height:36px!important;border-radius:0!important}
+.uel-bulk-dropzone label{color:#2C404D!important;font-size:16px!important;font-weight:760!important}
+.uel-bulk-dropzone label span{color:#69777E!important;font-size:13px!important}
+.uel-bulk-dropzone input[type=file]::file-selector-button{background:#294E6C!important;border-color:#294E6C!important;color:#fff!important;border-radius:3px!important;padding:8px 14px!important}
+.uel-bulk-selected,.uel-bulk-progress{margin:12px 0 0 72px!important;background:#EAF3ED!important;border:0!important;border-left:3px solid #46836A!important;border-radius:0!important;color:#255E45!important;padding:11px 14px!important}
+.uel-bulk-note{margin:15px 0 0 72px!important;color:#687780!important;font-size:13px!important}
+.uel-bulk-aside{display:grid!important;grid-template-columns:1.2fr 1fr!important;gap:30px!important;align-items:start!important;margin:0!important;padding:23px 0 26px!important;border:0!important;border-bottom:1px solid #C9D0D0!important;background:transparent!important;border-radius:0!important;box-shadow:none!important}
+.uel-bulk-side-panel,.uel-bulk-side-panel+.uel-bulk-side-panel{border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;min-width:0!important}
+.uel-bulk-side-panel h3{font-size:17px!important;font-weight:800!important;color:#263F4D!important;margin:0 0 16px!important}
+.uel-bulk-side-panel ol{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:22px!important;padding:0!important;margin:0!important}
+.uel-bulk-side-panel li{display:flex!important;align-items:start!important;gap:10px!important;min-width:0!important;padding:0!important;border:0!important;color:#617078!important;font-size:13px!important}
+.uel-bulk-side-panel li b{background:transparent!important;color:#AE795E!important;width:auto!important;min-width:0!important;height:auto!important;border-radius:0!important;font-size:15px!important}
+.uel-bulk-side-panel strong{color:#344F5D!important}
+.uel-bulk-side-panel p{font-size:13px!important;color:#67767F!important}
+.uel-bulk-side-panel p+p{margin-top:7px!important}
+.uel-bulk-preview{margin:26px 0 0 72px!important;border:0!important;border-top:1px solid #9AAEB6!important;border-bottom:1px solid #BFCACD!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+.uel-bulk-preview-head,.uel-bulk-preview-foot{padding:22px 0!important;background:transparent!important;border-bottom:1px solid #DBDFDE!important;border-radius:0!important}
+.uel-bulk-preview-head h3{font-size:24px!important;color:#243A48!important}
+.uel-bulk-preview-count{color:#365C79!important}
+.uel-bulk-list-preview{max-height:360px!important}
+.uel-bulk-preview-row{border-bottom:1px solid #DEE3E1!important;padding:12px 0!important}
+.uel-bulk-preview-foot{border:0!important;border-top:1px solid #D6DFE0!important}
+.uel-page .uel-bulk-submit{background:#2C506D!important;color:#fff!important;border:0!important;border-radius:3px!important;min-height:46px!important;box-shadow:none!important}
+.uel-page .uel-bulk-submit:hover:not(:disabled){background:#1E405C!important}
+.uel-bulk-warning{background:#FCF1DE!important;border-left:3px solid #C29A55!important;color:#806132!important;border-radius:0!important;margin-top:12px!important}
+.uel-bulk-folder-guide{background:transparent!important;border:0!important;border-top:1px solid #9AA6AA!important;border-bottom:1px solid #CAD2D2!important;border-radius:0!important;box-shadow:none!important;padding:clamp(27px,3.5vw,43px) 0!important;margin:0!important}
+.uel-bulk-folder-head{border:0!important;border-bottom:1px solid #CAD2D2!important;padding:0 0 23px!important;margin:0 0 25px!important;align-items:start!important}
+.uel-bulk-folder-head h3{font-size:clamp(26px,3vw,39px)!important;line-height:1.13!important;color:#213543!important;letter-spacing:-.05em!important;font-weight:800!important}
+.uel-bulk-folder-head .uel-bulk-kicker{color:#AD7157!important;font-size:12px!important;letter-spacing:.16em!important;margin:0 0 10px!important}
+.uel-bulk-folder-head p{max-width:790px!important;font-size:14px!important;color:#63717B!important}
+.uel-bulk-folder-guide-tag{background:transparent!important;border:0!important;border-left:2px solid #B57F65!important;color:#866047!important;padding:8px 0 8px 13px!important;border-radius:0!important;font-weight:760!important;font-size:12px!important}
+.uel-bulk-folder-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:35px!important}
+.uel-bulk-folder-col{border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;overflow:hidden!important}
+.uel-bulk-folder-col-head{background:transparent!important;border:0!important;border-bottom:1px solid #C8D3D5!important;color:#284352!important;border-radius:0!important;padding:0 0 15px!important;font-size:17px!important;font-weight:780!important}
+.uel-bulk-folder-col pre{min-height:240px!important;margin:0!important;padding:22px 24px!important;border:0!important;background:#EDF0F1!important;color:#304657!important;font-size:clamp(12px,1.15vw,14px)!important;line-height:1.7!important;border-radius:0!important;overflow-x:auto!important;box-shadow:none!important}
+.uel-bulk-folder-col>p{padding:17px 0 0!important;border:0!important;background:transparent!important;font-size:13px!important;color:#65737C!important}
+.uel-bulk-folder-col>p strong{color:#29485E!important}
+.uel-bulk-folder-rules{margin:27px 0 0!important;padding:23px 0 0!important;border-top:1px solid #CAD2D2!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:28px!important}
+.uel-bulk-folder-rule{background:transparent!important;border:0!important;padding:0!important}
+.uel-bulk-folder-rule strong{color:#AF7559!important;font-size:12px!important;letter-spacing:.12em!important}
+.uel-bulk-folder-rule p{font-size:13px!important;color:#68767F!important;margin-top:9px!important}
+.uel-bulk-folder-rule code{color:#244E6C!important;background:#E9EEF1!important;border-radius:2px!important}
+.uel-page .uel-bulk-advanced{background:transparent!important;border:0!important;border-bottom:1px solid #D2D9D9!important;border-radius:0!important;padding:12px 0 18px!important;margin:0!important;box-shadow:none!important}
+.uel-page .uel-bulk-advanced summary{color:#355B77!important}
+/* Saved listing area now reads as a catalogue table, not another white card. */
+.uel-page:has(.uel-bulk-redesign) .uel-history{margin-top:35px!important;border:0!important;border-top:2px solid #27475E!important;border-bottom:1px solid #CED4D2!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:27px 0!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history h2{color:#213847!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history-count{border-left:2px solid #B67A60!important;background:transparent!important;color:#314D5E!important;border-radius:0!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history-filters{border-color:#CFD6D6!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history-filter{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;color:#4E6270!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history-filter[data-active='true']{background:#274A65!important;border-radius:2px!important;color:#fff!important;border-color:#274A65!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history .uel-eyebrow{color:#AD725B!important}
+@media(max-width:1050px){.uel-bulk-template-grid,.uel-bulk-methods,.uel-bulk-dropzone,.uel-bulk-note,.uel-bulk-selected,.uel-bulk-preview{margin-left:0!important}.uel-bulk-aside{grid-template-columns:1fr!important;gap:22px!important}.uel-bulk-side-panel ol{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:760px){.uel-bulk-banner{grid-template-columns:1fr!important;gap:16px!important;padding:32px 0 22px!important}.uel-bulk-banner-meta{border-left:0!important;border-top:1px solid #D0D5D5!important;padding:12px 0 0!important;display:grid!important;grid-template-columns:auto 1fr!important;gap:2px 16px!important}.uel-bulk-banner-meta strong{font-size:48px!important;grid-row:span 2!important}.uel-bulk-banner-meta small{grid-column:2!important}.uel-bulk-steps>div{gap:5px!important;padding:16px 6px!important;flex-direction:column!important;text-align:center!important;min-height:72px!important}.uel-bulk-steps span{font-size:11px!important}.uel-bulk-template-grid,.uel-bulk-methods,.uel-bulk-folder-grid,.uel-bulk-folder-rules{grid-template-columns:1fr!important}.uel-bulk-methods{gap:8px!important}.uel-bulk-side-panel ol{grid-template-columns:1fr!important;gap:8px!important}.uel-bulk-folder-col pre{min-height:0!important}.uel-bulk-part-head{gap:10px!important}.uel-bulk-part-number{width:38px!important;min-width:38px!important;font-size:18px!important}.uel-bulk-content>section[aria-label="Excel templates"],.uel-bulk-content>section[aria-label="Upload Excel or ZIP"]{padding:25px 0!important}.uel-bulk-dropzone{padding:16px 12px!important;align-items:flex-start!important}}
+
+/* EPANTRY_BULK_V6_NAV_CLARITY
+   Purpose: make the bulk studio feel alive and obvious.
+   - clearer Single/Bulk toggle
+   - clearer step navigation
+   - upload methods look like selectable buttons
+   - more colour with meaning
+   - section-led layout, not dead flat divs */
+.uel-page:has(.uel-bulk-redesign){
+  background:
+    linear-gradient(180deg,#F8F1E8 0,#F8F1E8 315px,#FFFDF8 315px,#FFFDF8 100%)!important;
+  color:#20303C!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-bar{
+  margin:16px 0 0!important;
+  padding:16px 18px 18px!important;
+  background:#FFFDF9!important;
+  border:1px solid #E8DED2!important;
+  border-radius:18px!important;
+  box-shadow:0 8px 24px rgba(46,56,68,.05)!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-text h2{font-size:24px!important;color:#1D3242!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-text p{font-size:15px!important;color:#66737D!important}
+.uel-page:has(.uel-bulk-redesign) .uel-tabs{
+  background:#EEF3F6!important;
+  border:0!important;
+  border-radius:15px!important;
+  padding:6px!important;
+  gap:6px!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-tab{
+  min-width:152px!important;
+  min-height:48px!important;
+  border-radius:11px!important;
+  font-size:14px!important;
+  font-weight:820!important;
+  color:#355064!important;
+  background:transparent!important;
+  border:1px solid transparent!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-tab:hover{background:#E1EBF0!important;border-color:#C3D5DF!important}
+.uel-page:has(.uel-bulk-redesign) .uel-tab[data-active='true']{
+  background:#2C577B!important;
+  border-color:#2C577B!important;
+  color:#fff!important;
+  box-shadow:0 8px 18px rgba(44,87,123,.18)!important;
+}
+
+.uel-bulk-redesign{
+  --v6-blue:#2C577B;
+  --v6-blue-soft:#EAF1F6;
+  --v6-copper:#C9794E;
+  --v6-copper-soft:#FBEEE6;
+  --v6-green:#246041;
+  --v6-green-soft:#EAF5EE;
+  --v6-text:#20303C;
+  --v6-muted:#68757F;
+  --v6-line:#D9E0E4;
+  color:var(--v6-text)!important;
+}
+.uel-bulk-redesign p{color:var(--v6-muted)!important}
+
+.uel-bulk-banner{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(190px,260px)!important;
+  gap:26px!important;
+  align-items:stretch!important;
+  margin-top:18px!important;
+  padding:0 0 22px!important;
+  border-bottom:1px solid #D8E0E2!important;
+}
+.uel-bulk-banner>div:first-child{
+  background:linear-gradient(135deg,#FFF5EF 0,#FFFDFC 100%)!important;
+  border:1px solid #F0D6C8!important;
+  border-radius:24px!important;
+  padding:28px 28px 26px!important;
+  box-shadow:0 10px 26px rgba(70,54,38,.05)!important;
+}
+.uel-bulk-banner .uel-bulk-kicker{color:#B56740!important;margin-bottom:14px!important}
+.uel-bulk-banner h2{font-size:clamp(42px,4.8vw,68px)!important;line-height:.98!important;color:#1F3443!important;max-width:10ch!important;margin-bottom:12px!important}
+.uel-bulk-banner p{font-size:16px!important;line-height:1.6!important;color:#6A7680!important;max-width:60ch!important}
+.uel-bulk-banner-meta{
+  background:linear-gradient(180deg,#2C577B 0,#234865 100%)!important;
+  border:0!important;
+  border-radius:24px!important;
+  padding:24px 24px 22px!important;
+  color:#fff!important;
+  box-shadow:0 14px 28px rgba(44,87,123,.18)!important;
+  justify-content:space-between!important;
+}
+.uel-bulk-banner-meta strong{font-size:clamp(62px,7vw,92px)!important;color:#fff!important;letter-spacing:-.08em!important;line-height:.85!important}
+.uel-bulk-banner-meta span{color:#DCEBFF!important;font-size:14px!important;letter-spacing:.04em!important;text-transform:uppercase!important;font-weight:800!important}
+.uel-bulk-banner-meta small{color:#F4F8FC!important;font-size:12px!important;line-height:1.55!important;margin-top:auto!important}
+
+.uel-bulk-steps{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:14px!important;
+  margin:22px 0 26px!important;
+  border:0!important;
+}
+.uel-bulk-steps>div,.uel-bulk-steps>div.is-active,.uel-bulk-steps>div.is-complete{
+  min-height:88px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:14px!important;
+  padding:18px 18px!important;
+  border:1px solid var(--v6-line)!important;
+  border-radius:18px!important;
+  background:#FFFDF9!important;
+  color:#51606B!important;
+  box-shadow:0 6px 18px rgba(30,45,60,.04)!important;
+}
+.uel-bulk-steps>div b{
+  width:38px!important;height:38px!important;display:grid!important;place-items:center!important;
+  border-radius:999px!important;background:#EFF3F6!important;color:#32556F!important;
+  font-size:13px!important;font-weight:900!important;flex:none!important;
+}
+.uel-bulk-steps>div span{font-size:14px!important;font-weight:780!important;line-height:1.35!important;color:inherit!important}
+.uel-bulk-steps>div.is-active{
+  background:linear-gradient(180deg,#315E84 0,#2A5275 100%)!important;
+  border-color:#2A5275!important;
+  color:#fff!important;
+  box-shadow:0 14px 30px rgba(42,82,117,.18)!important;
+}
+.uel-bulk-steps>div.is-active b{background:rgba(255,255,255,.18)!important;color:#fff!important}
+.uel-bulk-steps>div.is-complete{
+  background:linear-gradient(180deg,#EEF8F1 0,#E7F3EA 100%)!important;
+  border-color:#B8D3C1!important;
+  color:#225A3D!important;
+}
+.uel-bulk-steps>div.is-complete b{background:#D7EDDE!important;color:#225A3D!important}
+
+.uel-bulk-workspace{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(245px,290px)!important;
+  gap:30px!important;
+  align-items:start!important;
+}
+.uel-bulk-content,.uel-bulk-aside,.uel-bulk-folder-guide,.uel-history{
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.uel-bulk-content>section[aria-label="Excel templates"],
+.uel-bulk-content>section[aria-label="Upload Excel or ZIP"],
+.uel-bulk-preview{
+  background:transparent!important;
+  border:0!important;
+  border-top:2px solid #DDE4E6!important;
+  border-radius:0!important;
+  padding:28px 0 0!important;
+  margin:0!important;
+}
+.uel-bulk-divider{display:none!important}
+.uel-bulk-part-head{margin-bottom:18px!important;align-items:flex-start!important}
+.uel-bulk-part-number{
+  width:44px!important;min-width:44px!important;height:44px!important;border-radius:999px!important;
+  background:var(--v6-copper-soft)!important;color:var(--v6-copper)!important;border:1px solid #F0C6B1!important;
+  display:grid!important;place-items:center!important;font-size:16px!important;font-weight:900!important;
+}
+.uel-bulk-part-head h3{font-size:32px!important;line-height:1.05!important;color:#1F3344!important;letter-spacing:-.05em!important;margin:0 0 7px!important}
+.uel-bulk-part-head p{font-size:15px!important;max-width:62ch!important}
+
+.uel-bulk-template-grid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:0 26px!important;
+  background:transparent!important;
+}
+.uel-bulk-template-link{
+  display:grid!important;
+  grid-template-columns:40px minmax(0,1fr) 20px!important;
+  align-items:center!important;
+  gap:14px!important;
+  padding:16px 6px!important;
+  background:transparent!important;
+  border:0!important;
+  border-bottom:1px solid #E0E6E8!important;
+  border-radius:0!important;
+  color:#233948!important;
+}
+.uel-bulk-template-link:hover{background:#FAF2EB!important}
+.uel-bulk-template-icon{
+  width:40px!important;height:40px!important;border-radius:11px!important;
+  background:#EEF3F7!important;color:#355B77!important;display:grid!important;place-items:center!important;
+}
+.uel-bulk-template-info strong{font-size:15px!important;color:#22394A!important}
+.uel-bulk-template-info small{font-size:12px!important;color:#75808A!important}
+.uel-bulk-template-download{color:#BA6E48!important}
+
+.uel-bulk-methods{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+  margin:0 0 18px!important;
+  padding:6px!important;
+  background:#EEF3F6!important;
+  border-radius:18px!important;
+  border:1px solid #D7E0E6!important;
+}
+.uel-page .uel-bulk-method{
+  min-height:96px!important;
+  align-items:center!important;
+  gap:14px!important;
+  padding:18px 18px!important;
+  background:transparent!important;
+  border:1px solid transparent!important;
+  border-radius:14px!important;
+  color:#294050!important;
+  box-shadow:none!important;
+}
+.uel-page .uel-bulk-method:hover:not(:disabled){background:#F5F8FA!important;border-color:#CFDCE4!important}
+.uel-page .uel-bulk-method[data-selected='true']{
+  background:#FFFFFF!important;
+  border:1px solid #B7CCDB!important;
+  box-shadow:0 10px 22px rgba(52,87,117,.08)!important;
+}
+.uel-bulk-method-icon{
+  width:44px!important;height:44px!important;border-radius:12px!important;
+  background:#FFF3EB!important;color:#C9794E!important;display:grid!important;place-items:center!important;
+}
+.uel-bulk-method[data-selected='true'] .uel-bulk-method-icon{background:#EAF1F6!important;color:#2C577B!important}
+.uel-bulk-method strong{font-size:16px!important;font-weight:820!important;color:#203447!important}
+.uel-bulk-method small{font-size:12px!important;color:#6F7E89!important;line-height:1.45!important}
+
+.uel-bulk-dropzone{
+  display:grid!important;
+  grid-template-columns:56px minmax(0,1fr)!important;
+  gap:16px!important;
+  align-items:start!important;
+  padding:22px 20px!important;
+  border:2px dashed #BFD0DB!important;
+  background:linear-gradient(180deg,#FBFDFF 0,#F6FAFC 100%)!important;
+  border-radius:20px!important;
+}
+.uel-bulk-drop-icon{
+  width:56px!important;height:56px!important;border-radius:16px!important;
+  background:#EAF1F6!important;color:#2D5A7E!important;display:grid!important;place-items:center!important;
+}
+.uel-bulk-dropzone label{display:flex!important;flex-direction:column!important;gap:6px!important;font-weight:800!important;color:#22384A!important;cursor:pointer!important}
+.uel-bulk-dropzone label span{font-weight:500!important;color:#6F7D87!important;line-height:1.55!important}
+.uel-bulk-dropzone input[type=file]{margin-top:10px!important}
+.uel-bulk-selected{
+  margin-top:14px!important;padding:12px 14px!important;border-radius:14px!important;
+  background:#EAF5EE!important;border:1px solid #BFD8C7!important;color:#22593C!important;
+}
+.uel-bulk-note{margin-top:14px!important;padding:0!important;color:#677580!important;font-size:14px!important}
+
+.uel-bulk-aside{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:18px!important;
+  align-content:start!important;
+  position:sticky!important;top:92px!important;
+}
+.uel-bulk-side-panel{
+  background:#FFFCF8!important;
+  border:1px solid #E8DED1!important;
+  border-radius:18px!important;
+  padding:18px 18px 16px!important;
+  box-shadow:0 8px 20px rgba(49,57,67,.05)!important;
+}
+.uel-bulk-side-panel h3{
+  display:flex!important;align-items:center!important;gap:10px!important;
+  font-size:18px!important;color:#1F3646!important;margin-bottom:14px!important;
+}
+.uel-bulk-side-panel h3 svg{color:#C9794E!important}
+.uel-bulk-side-panel ol{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:0!important;margin:0!important;list-style:none!important}
+.uel-bulk-side-panel li{
+  display:grid!important;grid-template-columns:28px minmax(0,1fr)!important;gap:10px!important;align-items:start!important;
+  padding:10px 0!important;border-top:1px solid #EEE6DC!important;
+}
+.uel-bulk-side-panel li:first-child{border-top:0!important;padding-top:0!important}
+.uel-bulk-side-panel li b{
+  width:28px!important;height:28px!important;display:grid!important;place-items:center!important;border-radius:999px!important;
+  background:#FFF1E8!important;color:#C9794E!important;font-size:12px!important;font-weight:900!important;
+}
+.uel-bulk-side-panel li span,.uel-bulk-side-panel p{font-size:14px!important;line-height:1.55!important;color:#66737E!important}
+.uel-bulk-side-panel p strong{color:#23465F!important}
+
+.uel-bulk-folder-guide{
+  margin-top:32px!important;
+  padding-top:30px!important;
+  border-top:2px solid #DDE5E8!important;
+}
+.uel-bulk-folder-head{
+  display:flex!important;justify-content:space-between!important;gap:18px!important;align-items:flex-end!important;
+  padding-bottom:16px!important;border-bottom:1px solid #E2E8EB!important;
+}
+.uel-bulk-folder-head h3{font-size:36px!important;line-height:1.05!important;color:#1F3546!important;letter-spacing:-.05em!important;margin:0 0 8px!important;max-width:15ch!important}
+.uel-bulk-folder-head p{font-size:15px!important;max-width:72ch!important}
+.uel-bulk-folder-guide-tag{
+  align-self:flex-start!important;background:#FFF2E8!important;color:#B86A44!important;
+  border:1px solid #F2CFBB!important;border-radius:999px!important;padding:10px 14px!important;font-size:12px!important;font-weight:800!important;
+}
+.uel-bulk-folder-grid{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:24px!important;margin-top:22px!important;
+}
+.uel-bulk-folder-col{
+  background:transparent!important;border:0!important;border-radius:0!important;padding:0!important;
+}
+.uel-bulk-folder-col-head{
+  display:flex!important;align-items:center!important;gap:10px!important;
+  padding:0 0 12px!important;margin-bottom:14px!important;border-bottom:1px solid #E2E9EB!important;
+  color:#233A49!important;font-size:18px!important;font-weight:820!important;
+}
+.uel-bulk-folder-col-head svg{color:#2D5A7E!important}
+.uel-bulk-folder-col pre{
+  background:#F6F8FA!important;border:1px solid #DEE6E9!important;border-radius:16px!important;
+  padding:18px!important;color:#294051!important;min-height:235px!important;font-size:13px!important;line-height:1.6!important;
+}
+.uel-bulk-folder-col>p{margin-top:12px!important;font-size:14px!important;line-height:1.58!important;color:#6A7882!important}
+.uel-bulk-folder-col>p strong{color:#2D5A7E!important}
+.uel-bulk-folder-rules{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:18px!important;
+  margin-top:24px!important;padding-top:18px!important;border-top:1px solid #E2E8EB!important;
+}
+.uel-bulk-folder-rule{
+  background:#FFFDF8!important;border:1px solid #ECE2D6!important;border-radius:16px!important;padding:16px 16px 14px!important;
+}
+.uel-bulk-folder-rule strong{display:block!important;font-size:12px!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:#B96F48!important;margin-bottom:8px!important}
+.uel-bulk-folder-rule p{font-size:14px!important;line-height:1.55!important;color:#667580!important}
+.uel-bulk-folder-rule code{background:#EEF3F6!important;color:#294E6A!important;padding:2px 6px!important;border-radius:6px!important}
+
+.uel-page .uel-bulk-advanced{
+  margin-top:26px!important;padding:14px 16px!important;background:#FBFCFD!important;border:1px solid #DEE5E8!important;border-radius:16px!important;
+}
+.uel-page .uel-bulk-advanced summary{font-size:14px!important;font-weight:780!important;color:#35546A!important}
+
+.uel-history{
+  margin-top:34px!important;
+  padding:28px 0 0!important;
+  border-top:2px solid #DDE5E8!important;
+  border-bottom:0!important;
+  background:transparent!important;
+}
+.uel-history-head{padding-bottom:16px!important;border-bottom:1px solid #E2E8EB!important}
+.uel-history h2{font-size:38px!important;line-height:1.02!important;color:#1D3344!important}
+.uel-history-count{background:#EEF3F7!important;border-left:4px solid #2C577B!important;color:#244258!important;border-radius:12px!important;padding:10px 14px!important}
+.uel-history-filters{padding:16px 0 18px!important;border-top:0!important;border-bottom:1px solid #E2E8EB!important}
+.uel-history-filter{border-radius:999px!important;padding:10px 14px!important}
+.uel-packet-row{grid-template-columns:minmax(0,1fr) minmax(105px,130px) auto!important;padding:18px 6px!important}
+.uel-packet-row:hover{background:#FBFCFD!important}
+
+@media (max-width:1100px){
+  .uel-bulk-workspace{grid-template-columns:1fr!important}
+  .uel-bulk-aside{position:static!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media (max-width:840px){
+  .uel-bulk-template-grid,.uel-bulk-folder-grid,.uel-bulk-folder-rules{grid-template-columns:1fr!important}
+  .uel-bulk-methods{grid-template-columns:1fr!important}
+  .uel-bulk-banner{grid-template-columns:1fr!important}
+  .uel-bulk-banner-meta{min-height:0!important}
+  .uel-bulk-aside{grid-template-columns:1fr!important}
+}
+@media (max-width:640px){
+  .uel-page:has(.uel-bulk-redesign){background:linear-gradient(180deg,#F8F1E8 0,#F8F1E8 215px,#FFFDF8 215px,#FFFDF8 100%)!important}
+  .uel-page:has(.uel-bulk-redesign) .uel-mode-bar{padding:14px!important;border-radius:16px!important}
+  .uel-page:has(.uel-bulk-redesign) .uel-tab{min-width:0!important;flex:1 1 0!important;padding:12px 10px!important}
+  .uel-bulk-banner>div:first-child,.uel-bulk-banner-meta{border-radius:18px!important;padding:22px 20px!important}
+  .uel-bulk-banner h2{font-size:38px!important;max-width:none!important}
+  .uel-bulk-steps{grid-template-columns:1fr!important;gap:10px!important}
+  .uel-bulk-steps>div,.uel-bulk-steps>div.is-active,.uel-bulk-steps>div.is-complete{min-height:72px!important;padding:14px 16px!important}
+  .uel-bulk-part-head h3{font-size:26px!important}
+  .uel-bulk-folder-head{align-items:flex-start!important;flex-direction:column!important}
+  .uel-history h2{font-size:30px!important}
+  .uel-packet-row{grid-template-columns:1fr!important;gap:10px!important}
+}
+
+/* EPANTRY_BULK_V7_CLAY_PALETTE
+   Exact approved palette:
+   PORCELAIN #F7F6F2 | FOREST #173F35 | CHARCOAL #202421
+   SOFT SAGE #D7DDCF | CLAY #C56C42 (dominant)
+   Scoped to Bulk Listing only: single listing and the global shell untouched.
+*/
+.uel-page:has(.uel-bulk-redesign){
+ --ep-porcelain:#F7F6F2; --ep-forest:#173F35; --ep-charcoal:#202421;
+ --ep-sage:#D7DDCF; --ep-clay:#C56C42;
+ --ep-soft-clay:color-mix(in srgb,var(--ep-clay) 13%,var(--ep-porcelain));
+ --ep-soft-forest:color-mix(in srgb,var(--ep-forest) 10%,var(--ep-porcelain));
+ --ep-quiet:color-mix(in srgb,var(--ep-charcoal) 70%,var(--ep-porcelain));
+ --ep-line:color-mix(in srgb,var(--ep-forest) 17%,var(--ep-porcelain));
+ color:var(--ep-charcoal)!important;
+ background:var(--ep-porcelain)!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-bar{
+ background:var(--ep-porcelain)!important;
+ border:0!important;border-bottom:1px solid var(--ep-line)!important;
+ border-radius:0!important;box-shadow:none!important;
+ padding:12px 0 17px!important;margin-top:8px!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-text h2{color:var(--ep-charcoal)!important}
+.uel-page:has(.uel-bulk-redesign) .uel-mode-text p{color:var(--ep-quiet)!important}
+.uel-page:has(.uel-bulk-redesign) .uel-tabs{
+ background:var(--ep-sage)!important;border:0!important;
+ border-radius:12px!important;padding:5px!important;gap:5px!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-tab{
+ background:transparent!important;border:1px solid transparent!important;
+ border-radius:9px!important;color:var(--ep-forest)!important;
+ box-shadow:none!important;min-height:46px!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-tab[data-active='true']{
+ background:var(--ep-clay)!important;border-color:var(--ep-clay)!important;
+ color:var(--ep-porcelain)!important;box-shadow:none!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-tab:hover:not([data-active='true']){
+ background:var(--ep-porcelain)!important;border-color:var(--ep-line)!important;
+}
+/* Hero: single dominant clay surface, supported by forest text and sage detail */
+.uel-page .uel-bulk-redesign{
+ --bx:var(--ep-clay)!important;--bt:var(--ep-soft-clay)!important;
+ --bd:var(--ep-charcoal)!important;--bm:var(--ep-quiet)!important;
+ --bl:var(--ep-line)!important;--bpaper:var(--ep-porcelain)!important;
+ color:var(--ep-charcoal)!important;
+}
+.uel-page .uel-bulk-redesign p{color:var(--ep-quiet)!important}
+.uel-page .uel-bulk-banner{
+ display:grid!important;grid-template-columns:minmax(0,1.5fr) minmax(185px,.5fr)!important;
+ gap:0!important;border:0!important;padding:0!important;
+ margin:20px 0 0!important;background:transparent!important;box-shadow:none!important;
+}
+.uel-page .uel-bulk-banner>div:first-child{
+ background:var(--ep-clay)!important;border:0!important;border-radius:15px 0 0 15px!important;
+ padding:clamp(25px,3.3vw,45px)!important;box-shadow:none!important;
+}
+.uel-page .uel-bulk-banner .uel-bulk-kicker{
+ color:var(--ep-porcelain)!important;letter-spacing:.15em!important;font-weight:850!important;
+}
+.uel-page .uel-bulk-banner h2{
+ color:var(--ep-porcelain)!important;max-width:18ch!important;
+ font-size:clamp(38px,4.3vw,60px)!important;line-height:1.04!important;
+}
+.uel-page .uel-bulk-banner p{color:var(--ep-porcelain)!important;opacity:.95}
+.uel-page .uel-bulk-banner-meta{
+ display:flex!important;flex-direction:column!important;justify-content:center!important;gap:5px!important;
+ margin:0!important;padding:clamp(22px,2.5vw,35px)!important;
+ background:var(--ep-forest)!important;border:0!important;border-radius:0 15px 15px 0!important;
+ box-shadow:none!important;align-items:flex-start!important;min-height:100%!important;
+}
+.uel-page .uel-bulk-banner-meta strong{color:var(--ep-porcelain)!important;font-size:clamp(58px,6vw,82px)!important}
+.uel-page .uel-bulk-banner-meta span,.uel-page .uel-bulk-banner-meta small{
+ color:var(--ep-porcelain)!important;opacity:.95;
+}
+/* Meaningful state colours. Upcoming remains neutral; active is Clay; complete is Sage. */
+.uel-page .uel-bulk-steps{gap:0!important;background:transparent!important;border-bottom:1px solid var(--ep-line)!important;
+ margin:20px 0 28px!important;padding:0!important;box-shadow:none!important;}
+.uel-page .uel-bulk-steps>div,
+.uel-page .uel-bulk-steps>div.is-active,
+.uel-page .uel-bulk-steps>div.is-complete{
+ display:flex!important;flex-direction:row!important;min-height:73px!important;
+ border:0!important;border-bottom:3px solid transparent!important;
+ border-radius:0!important;background:var(--ep-porcelain)!important;
+ box-shadow:none!important;padding:13px 12px!important;gap:13px!important;
+ color:var(--ep-quiet)!important;
+}
+.uel-page .uel-bulk-steps>div+div{border-left:1px solid var(--ep-line)!important}
+.uel-page .uel-bulk-steps>div b,
+.uel-page .uel-bulk-steps>div.is-active b,
+.uel-page .uel-bulk-steps>div.is-complete b{
+ width:34px!important;min-width:34px!important;height:34px!important;
+ border-radius:50%!important;background:var(--ep-sage)!important;
+ color:var(--ep-forest)!important;display:grid!important;place-items:center!important;
+ font-size:13px!important;font-weight:850!important;
+}
+.uel-page .uel-bulk-steps>div.is-active{
+ background:var(--ep-soft-clay)!important;border-bottom-color:var(--ep-clay)!important;
+ color:var(--ep-forest)!important;
+}
+.uel-page .uel-bulk-steps>div.is-active b{background:var(--ep-clay)!important;color:var(--ep-porcelain)!important}
+.uel-page .uel-bulk-steps>div.is-complete{
+ background:var(--ep-sage)!important;border-bottom-color:var(--ep-forest)!important;
+ color:var(--ep-forest)!important;
+}
+.uel-page .uel-bulk-steps>div.is-complete b{background:var(--ep-forest)!important;color:var(--ep-porcelain)!important}
+.uel-page .uel-bulk-steps span{font-size:14px!important;font-weight:760!important;color:inherit!important}
+/* Flat sections and legible template downloads */
+.uel-page .uel-bulk-content,.uel-page .uel-bulk-workspace{
+ background:transparent!important;border:0!important;box-shadow:none!important;
+}
+.uel-page .uel-bulk-content>section[aria-label="Excel templates"],
+.uel-page .uel-bulk-content>section[aria-label="Upload Excel or ZIP"],
+.uel-page .uel-bulk-preview{
+ background:transparent!important;border:0!important;border-bottom:1px solid var(--ep-line)!important;
+ padding:26px 0 31px!important;box-shadow:none!important;border-radius:0!important;
+}
+.uel-page .uel-bulk-part-number{
+ background:var(--ep-soft-clay)!important;color:var(--ep-clay)!important;
+ border:0!important;border-radius:50%!important;
+ min-width:45px!important;width:45px!important;height:45px!important;
+ font-size:16px!important;display:grid!important;place-items:center!important;
+}
+.uel-page .uel-bulk-part-head h3,.uel-page .uel-bulk-folder-head h3,
+.uel-page .uel-bulk-preview-head h3{color:var(--ep-charcoal)!important}
+.uel-page .uel-bulk-part-head p,.uel-page .uel-bulk-folder-head p{color:var(--ep-quiet)!important}
+.uel-page .uel-bulk-template-grid{gap:0 24px!important}
+.uel-page .uel-bulk-redesign a.uel-bulk-template-link{
+ border:0!important;border-bottom:1px solid var(--ep-line)!important;
+ border-radius:0!important;background:transparent!important;color:var(--ep-charcoal)!important;
+}
+.uel-page .uel-bulk-redesign a.uel-bulk-template-link:hover{
+ background:var(--ep-soft-clay)!important;border-bottom-color:var(--ep-clay)!important;
+}
+.uel-page .uel-bulk-template-icon{
+ border:0!important;background:var(--ep-sage)!important;color:var(--ep-forest)!important;
+ width:41px!important;height:41px!important;border-radius:8px!important;
+}
+.uel-page .uel-bulk-template-info strong{color:var(--ep-charcoal)!important}
+.uel-page .uel-bulk-template-info small{color:var(--ep-quiet)!important}
+.uel-page .uel-bulk-template-download{color:var(--ep-clay)!important}
+/* Mode choice is obviously a selection, rather than a plain underline. */
+.uel-page .uel-bulk-methods{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:10px!important;padding:6px!important;background:var(--ep-sage)!important;
+ border:0!important;border-radius:12px!important;
+}
+.uel-page .uel-bulk-method,
+.uel-page .uel-bulk-method[data-selected='true']{
+ background:transparent!important;border:1px solid transparent!important;
+ border-radius:9px!important;box-shadow:none!important;min-height:84px!important;
+ padding:14px 16px!important;color:var(--ep-charcoal)!important;display:flex!important;
+}
+.uel-page .uel-bulk-method:hover:not(:disabled){background:var(--ep-porcelain)!important;border-color:var(--ep-line)!important}
+.uel-page .uel-bulk-method[data-selected='true']{
+ background:var(--ep-porcelain)!important;border:2px solid var(--ep-clay)!important;
+ box-shadow:inset 4px 0 0 var(--ep-clay)!important;
+}
+.uel-page .uel-bulk-method-icon{
+ background:var(--ep-soft-clay)!important;color:var(--ep-clay)!important;
+ width:42px!important;height:42px!important;border-radius:9px!important;
+}
+.uel-page .uel-bulk-method strong{color:var(--ep-charcoal)!important}
+.uel-page .uel-bulk-method small{color:var(--ep-quiet)!important}
+/* File picker is the next primary action; maintain keyboard focus contrast. */
+.uel-page .uel-bulk-dropzone{
+ border:2px dashed var(--ep-clay)!important;border-radius:12px!important;
+ background:var(--ep-soft-clay)!important;box-shadow:none!important;padding:20px!important;
+}
+.uel-page .uel-bulk-drop-icon{
+ background:var(--ep-clay)!important;color:var(--ep-porcelain)!important;
+ width:48px!important;height:48px!important;border-radius:10px!important;
+}
+.uel-page .uel-bulk-dropzone label{color:var(--ep-forest)!important}
+.uel-page .uel-bulk-dropzone label span{color:var(--ep-quiet)!important}
+.uel-page .uel-bulk-dropzone input[type=file]::file-selector-button{
+ background:var(--ep-clay)!important;border:1px solid var(--ep-clay)!important;
+ color:var(--ep-porcelain)!important;border-radius:7px!important;padding:9px 15px!important;
+ font-weight:800!important;cursor:pointer!important;
+}
+.uel-page .uel-bulk-dropzone input[type=file]::file-selector-button:hover{background:var(--ep-forest)!important;border-color:var(--ep-forest)!important}
+.uel-page .uel-bulk-selected,.uel-page .uel-bulk-progress{
+ background:var(--ep-soft-forest)!important;border:0!important;border-left:4px solid var(--ep-forest)!important;
+ color:var(--ep-forest)!important;border-radius:0!important;
+}
+.uel-page .uel-bulk-note{color:var(--ep-quiet)!important}
+/* Checklist is supportive, not a competing main accent. */
+.uel-page .uel-bulk-aside{position:static!important;border-color:var(--ep-line)!important}
+.uel-page .uel-bulk-side-panel{
+ background:transparent!important;border:0!important;border-radius:0!important;
+ padding:0!important;box-shadow:none!important;
+}
+.uel-page .uel-bulk-side-panel h3{color:var(--ep-forest)!important}
+.uel-page .uel-bulk-side-panel h3 svg{color:var(--ep-clay)!important}
+.uel-page .uel-bulk-side-panel li{border-top-color:var(--ep-line)!important}
+.uel-page .uel-bulk-side-panel li b{
+ background:var(--ep-sage)!important;color:var(--ep-forest)!important;
+ border-radius:50%!important;
+}
+.uel-page .uel-bulk-side-panel p,.uel-page .uel-bulk-side-panel li span{color:var(--ep-quiet)!important}
+.uel-page .uel-bulk-side-panel p strong{color:var(--ep-forest)!important}
+/* ZIP guide remains an editorial section, not two giant cards. */
+.uel-page .uel-bulk-folder-guide{
+ background:transparent!important;border:0!important;border-top:2px solid var(--ep-clay)!important;
+ border-bottom:1px solid var(--ep-line)!important;padding:28px 0!important;margin-top:28px!important;
+}
+.uel-page .uel-bulk-folder-head,.uel-page .uel-bulk-folder-col-head,
+.uel-page .uel-bulk-folder-rules{border-color:var(--ep-line)!important}
+.uel-page .uel-bulk-folder-head .uel-bulk-kicker,.uel-page .uel-bulk-folder-rule strong{color:var(--ep-clay)!important}
+.uel-page .uel-bulk-folder-guide-tag{
+ color:var(--ep-forest)!important;background:var(--ep-sage)!important;
+ border:0!important;border-radius:6px!important;padding:9px 12px!important;
+}
+.uel-page .uel-bulk-folder-col{background:transparent!important;border:0!important;box-shadow:none!important}
+.uel-page .uel-bulk-folder-col-head,.uel-page .uel-bulk-folder-col-head svg{color:var(--ep-forest)!important}
+.uel-page .uel-bulk-folder-col pre{
+ background:var(--ep-sage)!important;color:var(--ep-charcoal)!important;
+ border:0!important;border-radius:7px!important;box-shadow:none!important;
+}
+.uel-page .uel-bulk-folder-col>p,.uel-page .uel-bulk-folder-rule p{color:var(--ep-quiet)!important}
+.uel-page .uel-bulk-folder-col>p strong{color:var(--ep-forest)!important}
+.uel-page .uel-bulk-folder-rule{background:transparent!important;border:0!important;border-radius:0!important;padding:0!important}
+.uel-page .uel-bulk-folder-rule code{
+ color:var(--ep-forest)!important;background:var(--ep-sage)!important;
+}
+.uel-page .uel-bulk-advanced{background:transparent!important;border-color:var(--ep-line)!important}
+.uel-page .uel-bulk-advanced summary{color:var(--ep-forest)!important}
+/* Preview and draft archive preserve existing data and status semantics. */
+.uel-page .uel-bulk-preview-count{color:var(--ep-forest)!important}
+.uel-page .uel-bulk-preview-row,.uel-page .uel-bulk-preview-foot{border-color:var(--ep-line)!important}
+.uel-page .uel-bulk-submit{
+ background:var(--ep-clay)!important;color:var(--ep-porcelain)!important;
+ border:1px solid var(--ep-clay)!important;border-radius:9px!important;
+}
+.uel-page .uel-bulk-submit:hover:not(:disabled){background:var(--ep-forest)!important;border-color:var(--ep-forest)!important}
+.uel-page .uel-bulk-warning{
+ color:var(--ep-charcoal)!important;background:var(--ep-soft-clay)!important;
+ border-left:4px solid var(--ep-clay)!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-history{
+ background:transparent!important;border:0!important;border-top:2px solid var(--ep-forest)!important;
+ border-bottom:1px solid var(--ep-line)!important;box-shadow:none!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-history h2{color:var(--ep-charcoal)!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history .uel-eyebrow{color:var(--ep-clay)!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history-count{
+ background:var(--ep-sage)!important;color:var(--ep-forest)!important;
+ border-left:3px solid var(--ep-clay)!important;border-radius:6px!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-history-filters{border-color:var(--ep-line)!important}
+.uel-page:has(.uel-bulk-redesign) .uel-history-filter{
+ background:transparent!important;border:1px solid var(--ep-line)!important;
+ color:var(--ep-forest)!important;border-radius:7px!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-history-filter[data-active='true']{
+ background:var(--ep-clay)!important;border-color:var(--ep-clay)!important;
+ color:var(--ep-porcelain)!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-history-filter:hover:not([data-active='true']){
+ background:var(--ep-soft-clay)!important;border-color:var(--ep-clay)!important;
+}
+.uel-page:has(.uel-bulk-redesign) .uel-packet-row{border-bottom-color:var(--ep-line)!important}
+.uel-page:has(.uel-bulk-redesign) .uel-packet-row:hover{background:var(--ep-soft-clay)!important}
+.uel-page:has(.uel-bulk-redesign) .uel-bulk-redesign :is(button,a,input,summary):focus-visible{
+ outline:3px solid var(--ep-forest)!important;outline-offset:3px!important;
+}
+@media(max-width:840px){
+ .uel-page .uel-bulk-banner{grid-template-columns:1fr!important}
+ .uel-page .uel-bulk-banner>div:first-child{border-radius:15px 15px 0 0!important}
+ .uel-page .uel-bulk-banner-meta{border-radius:0 0 15px 15px!important;padding:20px!important}
+}
+@media(max-width:700px){
+ .uel-page .uel-bulk-steps{gap:0!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}
+ .uel-page .uel-bulk-steps>div,.uel-page .uel-bulk-steps>div.is-active,.uel-page .uel-bulk-steps>div.is-complete{
+  flex-direction:column!important;min-height:78px!important;gap:6px!important;padding:12px 5px!important;text-align:center!important;
+ }
+ .uel-page .uel-bulk-steps span{font-size:11px!important}
+ .uel-page .uel-bulk-template-grid,.uel-page .uel-bulk-methods,.uel-page .uel-bulk-folder-grid{grid-template-columns:1fr!important}
+ .uel-page .uel-bulk-folder-rules{grid-template-columns:1fr!important}
+}
+/* EPANTRY_BULK_V8_UPLOAD_SECTION — limited to Section 02 only.
+   Exact palette: Clay #C56C42 primary; Porcelain #F7F6F2,
+   Forest #173F35, Charcoal #202421, Soft Sage #D7DDCF. */
+.uel-page .uel-bulk-upload-stage{background:transparent!important;border-bottom:1px solid var(--ep-line,#D2D7CD)!important;padding:27px 0 30px!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-part-head{margin-bottom:22px!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-part-head h3{color:#202421!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-part-head p{font-size:15px!important;color:#59645C!important;max-width:660px!important}
+/* Two clearly interactive choices, with a consistent pale surface instead of nested cards */
+.uel-page .uel-bulk-upload-stage .uel-bulk-methods{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  padding:0!important;margin:0 0 0!important;gap:14px!important;
+  background:transparent!important;border:0!important;border-radius:0!important;
+}
+.uel-page .uel-bulk-upload-stage .uel-bulk-method{
+  display:grid!important;grid-template-columns:48px minmax(0,1fr) 24px!important;
+  gap:14px!important;align-items:center!important;text-align:left!important;
+  min-height:104px!important;padding:18px 19px!important;cursor:pointer!important;
+  background:#F7F6F2!important;border:1.5px solid #C9D0C5!important;border-radius:12px!important;
+  color:#202421!important;box-shadow:none!important;transition:background .15s ease,border-color .15s ease!important;
+}
+.uel-page .uel-bulk-upload-stage .uel-bulk-method:hover:not(:disabled){background:#EDEFE8!important;border-color:#789486!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-method[data-selected='true']{
+  background:#FFFDFC!important;border:2px solid #C56C42!important;
+  box-shadow:inset 0 4px 0 #C56C42!important;
+}
+.uel-page .uel-bulk-upload-stage .uel-bulk-method-icon{
+  display:grid!important;place-items:center!important;width:48px!important;height:48px!important;
+  border-radius:10px!important;background:#D7DDCF!important;color:#173F35!important;
+}
+.uel-page .uel-bulk-upload-stage .uel-bulk-method[data-selected='true'] .uel-bulk-method-icon{background:#F5E6DC!important;color:#C56C42!important}
+.uel-bulk-choice-body{min-width:0!important;display:flex!important;flex-direction:column!important;gap:5px!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-choice-body strong{font-size:17px!important;font-weight:800!important;color:#202421!important;line-height:1.3!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-choice-body small{font-size:13px!important;line-height:1.4!important;color:#59645C!important}
+.uel-bulk-choice-indicator{display:grid!important;place-items:center!important;width:24px!important;height:24px!important;color:#C56C42!important;opacity:0!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-method[data-selected='true'] .uel-bulk-choice-indicator{opacity:1!important}
+/* The attach action is one clear horizontal band, NOT another huge dashed container. */
+.uel-page .uel-bulk-upload-stage .uel-bulk-upload-line{
+  display:grid!important;grid-template-columns:52px minmax(0,1fr) auto!important;
+  gap:17px!important;align-items:center!important;
+  background:transparent!important;border:0!important;border-top:1px solid #D4DAD0!important;
+  border-bottom:1px solid #D4DAD0!important;border-radius:0!important;
+  padding:24px 0!important;margin:20px 0 0!important;
+}
+.uel-bulk-upload-line-icon{display:grid!important;place-items:center!important;width:52px!important;height:52px!important;border-radius:12px!important;background:#D7DDCF!important;color:#173F35!important}
+.uel-bulk-upload-line-copy{min-width:0!important}
+.uel-bulk-upload-line-copy>strong{display:block!important;font-size:18px!important;font-weight:800!important;color:#173F35!important;line-height:1.3!important}
+.uel-bulk-upload-line-copy p{font-size:14px!important;line-height:1.52!important;margin:5px 0 5px!important;color:#59645C!important}
+.uel-bulk-upload-line-copy small{font-size:12px!important;color:#68726B!important;line-height:1.4!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-file-action{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:9px!important;
+  position:relative!important;overflow:hidden!important;min-width:157px!important;min-height:49px!important;
+  padding:12px 17px!important;border:1px solid #C56C42!important;border-radius:9px!important;
+  background:#C56C42!important;color:#F7F6F2!important;font-size:15px!important;font-weight:800!important;
+  cursor:pointer!important;box-shadow:none!important;white-space:nowrap!important;
+}
+.uel-page .uel-bulk-upload-stage .uel-bulk-file-action:hover{background:#AD5833!important;border-color:#AD5833!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-file-action:focus-within{outline:3px solid #173F35!important;outline-offset:3px!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-file-action:has(input:disabled){opacity:.5!important;cursor:not-allowed!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-file-action input[type=file]{
+  position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;
+  opacity:0!important;cursor:pointer!important;font-size:0!important;margin:0!important;padding:0!important;
+}
+.uel-page .uel-bulk-upload-stage .uel-bulk-upload-prompt{font-size:13px!important;margin:12px 0 0!important;color:#66716A!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-selected{margin:13px 0 0!important;padding:12px 14px!important;display:flex!important;gap:8px!important;align-items:center!important;border-left:3px solid #173F35!important;background:#EDF2EB!important;color:#173F35!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-note{margin:15px 0 0!important;padding:0!important;font-size:13px!important;line-height:1.55!important;color:#59645C!important}
+.uel-page .uel-bulk-upload-stage .uel-bulk-note strong{color:#173F35!important}
+@media(max-width:850px){
+ .uel-page .uel-bulk-upload-stage .uel-bulk-methods{grid-template-columns:1fr!important;gap:10px!important}
+ .uel-page .uel-bulk-upload-stage .uel-bulk-upload-line{grid-template-columns:42px minmax(0,1fr)!important;gap:12px!important}
+ .uel-bulk-upload-line-icon{width:42px!important;height:42px!important}
+ .uel-page .uel-bulk-upload-stage .uel-bulk-file-action{grid-column:1/-1!important;width:100%!important;margin-top:2px!important}
+}
+@media(max-width:420px){
+ .uel-page .uel-bulk-upload-stage .uel-bulk-method{grid-template-columns:40px minmax(0,1fr) 22px!important;padding:14px!important;min-height:85px!important;gap:10px!important}
+ .uel-page .uel-bulk-upload-stage .uel-bulk-method-icon{width:40px!important;height:40px!important}
+ .uel-page .uel-bulk-upload-stage .uel-bulk-choice-body strong{font-size:15px!important}
+ .uel-page .uel-bulk-upload-stage .uel-bulk-choice-body small{font-size:12px!important}
+}
+
+/* EPANTRY BULK UX V10: compact copy, progressive batches and scroll target.
+   Palette: #C56C42 / #F7F6F2 / #173F35 / #202421 / #D7DDCF */
+.uel-page .uel-bulk-banner h2{max-width:15ch!important}
+.uel-page .uel-bulk-list-preview{max-height:410px!important;overflow-y:auto!important;overscroll-behavior:contain!important}
+.uel-page .uel-bulk-aside{display:block!important;padding:12px 0!important;border:0!important}
+.uel-page .uel-bulk-banner>div:first-child p{max-width:38ch!important}
+.uel-page .uel-compact-limits{padding:17px 19px!important;border-top:3px solid #C56C42!important;background:#F2F2ED!important;border-radius:10px!important}
+.uel-page .uel-compact-limits h3{margin:0 0 12px!important}
+.uel-page .uel-compact-limits p{margin:6px 0!important;font-size:14px!important;line-height:1.5!important}
+.uel-page .uel-compact-folder-guide{margin-top:17px!important;padding:0!important;background:transparent!important;border:1px solid #D7DDCF!important;border-radius:12px!important;overflow:hidden!important}
+.uel-page .uel-compact-folder-guide .uel-compact-guide-trigger{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:15px!important;padding:17px 21px!important;cursor:pointer!important;list-style:none!important;color:#173F35!important;background:#EEF0E7!important}
+.uel-page .uel-compact-guide-trigger::-webkit-details-marker{display:none!important}
+.uel-page .uel-compact-guide-trigger>span{display:flex!important;align-items:center!important;gap:10px!important;font-size:16px!important;font-weight:800!important}
+.uel-page .uel-compact-guide-trigger small{font-size:13px!important;font-weight:500!important;color:#55645A!important}
+.uel-page .uel-compact-guide-trigger>span:last-child{color:#C56C42!important;font-size:13px!important;white-space:nowrap!important}
+.uel-page .uel-compact-folder-guide[open] .uel-compact-guide-trigger>span:last-child svg{transform:rotate(180deg)}
+.uel-page .uel-compact-guide-body{padding:19px 20px 20px!important}
+.uel-page .uel-compact-guide-body .uel-bulk-folder-grid{margin:0!important}
+.uel-page .uel-compact-guide-key{font-size:14px!important;margin:12px 0 0!important;padding-top:12px!important;border-top:1px solid #D7DDCF!important}
+.uel-page .uel-compact-guide-key code{font-size:13px!important;background:#D7DDCF!important;border-radius:4px!important;padding:2px 5px!important}
+.uel-page #epantry-submit-imported-batches{scroll-margin-top:115px!important;outline:0!important;border-top:3px solid #C56C42!important;margin:30px 0 0!important;padding:24px 0 6px!important}
+.uel-page .uel-imported-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.uel-page .uel-imported-step{font-size:12px!important;font-weight:850!important;letter-spacing:.1em!important;color:#C56C42!important}
+.uel-page .uel-imported-head h3{font-size:clamp(25px,2.8vw,37px)!important;letter-spacing:-.04em!important;line-height:1.1!important;color:#173F35!important;margin:8px 0!important;font-weight:850!important}
+.uel-page .uel-imported-head p{font-size:15px!important;color:#59645C!important;margin:0!important}
+.uel-page .uel-imported-refresh{min-height:42px!important;display:inline-flex!important;align-items:center!important;gap:8px!important;border:1px solid #BCC8B9!important;background:#F7F6F2!important;color:#173F35!important;border-radius:8px!important;padding:8px 14px!important;font-size:14px!important;font-weight:800!important}
+.uel-page .uel-imported-refresh:hover:not(:disabled){background:#D7DDCF!important}
+.uel-page .uel-imported-stats{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;margin:20px 0 14px!important;background:#D7DDCF!important;border:1px solid #D2D9CB!important;border-radius:11px!important;overflow:hidden!important}
+.uel-page .uel-imported-stats>div{padding:15px 18px!important;display:flex!important;flex-direction:column!important;gap:2px!important;border-right:1px solid #BFCDBA!important;min-width:0!important}
+.uel-page .uel-imported-stats>div:last-child{border-right:0!important}
+.uel-page .uel-imported-stats strong{font-size:29px!important;line-height:1.1!important;color:#173F35!important;font-variant-numeric:tabular-nums!important}
+.uel-page .uel-imported-stats span{font-size:13px!important;color:#435747!important;font-weight:750!important}
+.uel-page .uel-imported-range{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 2px;font-size:13px!important;font-weight:750!important;color:#687367!important}
+.uel-page .uel-imported-batch-list{border-top:1px solid #D7DDCF!important;border-bottom:1px solid #D7DDCF!important}
+.uel-page .uel-imported-batch-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:20px!important;align-items:center!important;padding:16px 6px!important;border-bottom:1px solid #D7DDCF!important;background:transparent!important}
+.uel-page .uel-imported-batch-row:last-child{border-bottom:0!important}
+.uel-page .uel-imported-batch-row:hover{background:#F1F0E9!important}
+.uel-page .uel-imported-batch-main{min-width:0!important}
+.uel-page .uel-imported-batch-title{display:flex!important;align-items:center!important;gap:11px!important;flex-wrap:wrap!important}
+.uel-page .uel-imported-batch-title strong{color:#202421!important;font-size:16px!important;font-weight:850!important}
+.uel-page .uel-imported-pill{border-radius:999px!important;padding:4px 9px!important;font-size:12px!important;font-weight:800!important}
+.uel-page .uel-imported-pill.is-ready{background:#F7E8DE!important;color:#9B4D27!important}
+.uel-page .uel-imported-pill.is-pending{background:#D7DDCF!important;color:#173F35!important}
+.uel-page .uel-imported-pill.is-done{background:#E4EBE0!important;color:#173F35!important}
+.uel-page .uel-imported-batch-names{font-size:14px!important;line-height:1.45!important;color:#56635A!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;max-width:100%!important;margin:5px 0 0!important}
+.uel-page .uel-imported-batch-main small{display:block!important;color:#6B796E!important;margin-top:5px!important;font-size:12px!important}
+.uel-page .uel-imported-send{min-height:44px!important;display:inline-flex!important;gap:8px!important;align-items:center!important;justify-content:center!important;padding:9px 15px!important;border:1px solid #C56C42!important;border-radius:9px!important;background:#C56C42!important;color:#F7F6F2!important;font-size:14px!important;font-weight:850!important;white-space:nowrap!important}
+.uel-page .uel-imported-send:hover:not(:disabled){background:#AD5935!important}
+.uel-page .uel-imported-send:disabled{background:#D7DDCF!important;border-color:#D7DDCF!important;color:#56645A!important;cursor:not-allowed!important}
+.uel-page .uel-imported-pagination{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;flex-wrap:wrap!important;margin:16px 0 8px!important}
+.uel-page .uel-imported-pagination>span{font-size:13px!important;font-weight:750!important;color:#56645A!important}
+.uel-page .uel-imported-pagination button{min-height:42px!important;border-radius:8px!important;border:1px solid #C5CFC1!important;padding:9px 16px!important;font-size:14px!important;font-weight:850!important;color:#173F35!important;background:#F7F6F2!important}
+.uel-page .uel-imported-pagination .uel-imported-page-next{display:flex!important;align-items:center!important;gap:7px!important;border-color:#173F35!important;background:#173F35!important;color:#F7F6F2!important}
+.uel-page .uel-imported-pagination .uel-imported-page-next:hover{background:#2A5948!important}
+.uel-page .uel-imported-pagination button:disabled{opacity:.45!important;cursor:not-allowed!important}
+.uel-page .uel-imported-empty{border-top:1px solid #D7DDCF!important;padding:20px 0!important;margin-top:16px!important;color:#5B6B5E!important;font-size:15px!important}
+@media(max-width:767px){
+ .uel-page .uel-imported-head h3{font-size:26px!important}
+ .uel-page .uel-imported-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .uel-page .uel-imported-stats>div:nth-child(2){border-right:0!important}
+ .uel-page .uel-imported-stats>div:nth-child(-n+2){border-bottom:1px solid #BFCDBA!important}
+ .uel-page .uel-imported-batch-row{grid-template-columns:1fr!important;gap:11px!important}
+ .uel-page .uel-imported-send{width:100%!important}
+ .uel-page .uel-imported-pagination{display:grid!important;grid-template-columns:1fr auto!important}
+ .uel-page .uel-imported-pagination .uel-imported-page-next{grid-column:1/-1!important;justify-content:center!important;width:100%!important}
+ .uel-page .uel-compact-guide-trigger{padding:14px 12px!important}
+ .uel-page .uel-compact-guide-trigger small{display:none!important}
+ .uel-page .uel-compact-guide-body{padding:12px!important}
+}
+
+/* EPANTRY BULK UX V11: progressive listing rows and clear post-save actions.
+   Clay / Forest / Porcelain / Soft Sage / Charcoal only. */
+.uel-page .uel-imported-success{display:flex;align-items:center;gap:12px;padding:15px 18px;margin-top:18px;background:#E9EEE5;border-left:4px solid #173F35;color:#173F35;border-radius:6px;font-size:15px;line-height:1.45}
+.uel-page .uel-imported-success svg{flex:none;color:#173F35}
+.uel-page .uel-imported-history-link{display:inline-flex;align-items:center;gap:5px;text-decoration:underline;text-underline-offset:3px;color:#173F35;font-size:13px;font-weight:800}
+.uel-page .uel-imported-pagination{display:flex!important;justify-content:center!important;gap:12px!important;margin-top:21px!important}
+.uel-page .uel-imported-pagination .uel-imported-page-next{display:flex!important;align-items:center!important;justify-content:center!important;gap:10px!important;min-width:220px!important;background:#C56C42!important;color:#F7F6F2!important;border:1px solid #C56C42!important;padding:12px 20px!important;border-radius:8px!important;font-weight:850!important}
+.uel-page .uel-imported-pagination .uel-imported-page-next:hover{background:#A85634!important}
+.uel-page #uel-history-title{scroll-margin-top:110px!important}
+.uel-page .uel-history{scroll-margin-top:115px!important;padding-top:30px!important}
+.uel-page .uel-history-view-more{display:inline-flex;align-items:center;gap:9px;justify-content:center;min-height:44px;padding:10px 18px;border:1px solid #C56C42;border-radius:8px;background:#F7F6F2;color:#A45433;font-size:14px;font-weight:850;cursor:pointer;margin:15px 0 0}
+.uel-page .uel-history-view-more:hover{background:#F3E5DC}
+.uel-page .uel-history-progress{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 2px 18px;color:#5F685F;font-size:13px;font-weight:700}
+.uel-page .uel-history-progress .uel-history-view-more{margin:0;background:#173F35;border-color:#173F35;color:#F7F6F2}
+.uel-page .uel-history-progress .uel-history-view-more:hover{background:#285548}
+.uel-page .uel-history .uel-packet-list{border-top:1px solid #D7DDCF!important}
+.uel-page .uel-history .uel-packet-row{background:transparent!important;border-bottom:1px solid #D7DDCF!important;box-shadow:none!important;padding-top:14px!important;padding-bottom:14px!important}
+.uel-page .uel-history .uel-packet-row:hover{background:#F2F1EC!important}
+.uel-page .uel-history .uel-history-filters{border-bottom:1px solid #D7DDCF!important}
+@media(max-width:767px){
+ .uel-page .uel-imported-pagination .uel-imported-page-next{width:100%!important;min-width:0!important}
+ .uel-page .uel-history-progress{align-items:stretch;flex-direction:column}
+ .uel-page .uel-history-progress .uel-history-view-more{width:100%}
+ .uel-page .uel-imported-success{padding:12px!important;font-size:14px!important}
+}
+
 `;
 
 const styles = {
@@ -1500,6 +2723,16 @@ function PreviouslyListedItems({ workspace }) {
   const [records, setRecords] = useState([]);
   const [pending, setPending] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [pageSize, setPageSize] = useState(8);
+  const [pagesVisible, setPagesVisible] = useState(1);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const resize = () => { setPageSize(mq.matches ? 4 : 8); setPagesVisible(1); };
+    resize();
+    mq.addEventListener?.("change", resize);
+    return () => mq.removeEventListener?.("change", resize);
+  }, []);
   useEffect(() => {
     let active = true;
     const canProduct = ["b2b", "brand_seller", "hybrid", "legacy"].includes(
@@ -1608,7 +2841,7 @@ function PreviouslyListedItems({ workspace }) {
         </p>
       )}
       <div className="mt-3 divide-y divide-[#DFE7DC]">
-        {records.map((row) => (
+        {records.slice(0, pageSize * pagesVisible).map((row) => (
           <div
             key={`${row.source}-${row.id}`}
             className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-2 text-sm"
@@ -1633,6 +2866,16 @@ function PreviouslyListedItems({ workspace }) {
           </div>
         ))}
       </div>
+      {records.length > pageSize * pagesVisible && (
+        <button
+          type="button"
+          className="uel-history-view-more"
+          onClick={() => setPagesVisible((count) => count + 1)}
+        >
+          View next {Math.min(pageSize, records.length - pageSize * pagesVisible)} older listings
+          <ArrowUpRight size={16} aria-hidden="true" />
+        </button>
+      )}
     </section>
   );
 }
@@ -1676,6 +2919,30 @@ function HostUnifiedListingEditor() {
   const [bulkPreview, setBulkPreview] = useState(null);
   const [bulkFileName, setBulkFileName] = useState("");
   const [bulkProgress, setBulkProgress] = useState("");
+  const [submittingBulkBatchId, setSubmittingBulkBatchId] = useState("");
+  const [bulkBatchPageIndex, setBulkBatchPageIndex] = useState(0);
+  const [bulkBatchPageSize, setBulkBatchPageSize] = useState(8);
+  const [historyPagesVisible, setHistoryPagesVisible] = useState(1);
+  const [lastSavedBulkCount, setLastSavedBulkCount] = useState(0);
+  const [completedBulkImportScrollKey, setCompletedBulkImportScrollKey] = useState(0);
+  const lastAutoScrollKeyRef = useRef(0);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const media = window.matchMedia("(max-width: 767px)");
+    const updateBatchPageSize = () => {
+      setBulkBatchPageSize(media.matches ? 4 : 8);
+      setBulkBatchPageIndex(0);
+      setHistoryPagesVisible(1);
+    };
+    updateBatchPageSize();
+    if (media.addEventListener) media.addEventListener("change", updateBatchPageSize);
+    else media.addListener(updateBatchPageSize);
+    return () => {
+      if (media.removeEventListener) media.removeEventListener("change", updateBatchPageSize);
+      else media.removeListener(updateBatchPageSize);
+    };
+  }, []);
+  const [bulkUploadMode, setBulkUploadMode] = useState("zip");
   const [pincodeText, setPincodeText] = useState("");
   const [savedPostalCodes, setSavedPostalCodes] = useState([]);
   const [selectedGroceryPhotoRole, setSelectedGroceryPhotoRole] =
@@ -1688,6 +2955,16 @@ function HostUnifiedListingEditor() {
   const [outlets, setOutlets] = useState([]);
   const [menus, setMenus] = useState([]);
   const [activeTab, setActiveTab] = useState("single");
+  useEffect(() => {
+    if (!completedBulkImportScrollKey || activeTab !== "bulk") return;
+    if (lastAutoScrollKeyRef.current === completedBulkImportScrollKey) return;
+    lastAutoScrollKeyRef.current = completedBulkImportScrollKey;
+    const section = document.getElementById("epantry-submit-imported-batches");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+      section.focus({ preventScroll: true });
+    }
+  }, [completedBulkImportScrollKey, activeTab]);
   const [historyFilter, setHistoryFilter] = useState("all");
   const [barcodeMatches, setBarcodeMatches] = useState([]);
   const [barcodeChecked, setBarcodeChecked] = useState("");
@@ -1741,6 +3018,33 @@ function HostUnifiedListingEditor() {
     activeListing?.status === "changes_requested"
       ? activeListing?.correctionSection
       : "";
+  const importedHostBatches = useMemo(() => {
+    const grouped = new Map();
+    for (const item of existing) {
+      if (!item?.bulkBatchId || !item.id) continue;
+      if (!grouped.has(item.bulkBatchId)) {
+        grouped.set(item.bulkBatchId, { id: item.bulkBatchId, items: [], newest: 0 });
+      }
+      const batch = grouped.get(item.bulkBatchId);
+      batch.items.push(item);
+      batch.newest = Math.max(batch.newest, new Date(item.updatedAt || 0).getTime() || 0);
+    }
+    return [...grouped.values()].map((batch) => ({
+      ...batch,
+      ready: batch.items.filter((item) => ['draft', 'changes_requested'].includes(item.status)),
+      awaiting: batch.items.filter((item) => item.status === 'submitted_for_review').length,
+      approved: batch.items.filter((item) => item.status === 'approved').length,
+    })).sort((a, b) => b.newest - a.newest);
+  }, [existing]);
+  const bulkBatchVisibleCount = (bulkBatchPageIndex + 1) * bulkBatchPageSize;
+  const visibleImportedHostBatches = importedHostBatches.slice(0, bulkBatchVisibleCount);
+  const remainingBulkBatches = Math.max(0, importedHostBatches.length - bulkBatchVisibleCount);
+  const importedBatchReadyCount = importedHostBatches.reduce((sum, batch) => sum + batch.ready.length, 0);
+  const importedBatchAwaitingCount = importedHostBatches.reduce((sum, batch) => sum + batch.awaiting, 0);
+  const importedBatchApprovedCount = importedHostBatches.reduce((sum, batch) => sum + batch.approved, 0);
+  const showNextBulkBatchPage = () => {
+    setBulkBatchPageIndex((current) => current + 1);
+  };
   const filteredHistory = existing.filter(
     (item) =>
       historyFilter === "all" ||
@@ -1748,6 +3052,9 @@ function HostUnifiedListingEditor() {
         ? ["changes_requested", "rejected"].includes(item.status)
         : item.status === historyFilter)
   );
+  const historyVisibleCount = historyPagesVisible * bulkBatchPageSize;
+  const visibleHistory = filteredHistory.slice(0, historyVisibleCount);
+  const remainingHistory = Math.max(0, filteredHistory.length - historyVisibleCount);
   const historyCount = (filter) =>
     filter === "all"
       ? existing.length
@@ -2280,6 +3587,32 @@ function HostUnifiedListingEditor() {
       setBusy(false);
     }
   }
+  // Keep backend's existing 25-packet endpoint and its security checks intact.
+  // A 100-item workbook is saved in up to four ordered requests.
+  async function importBulkPacketsChunked(packets) {
+    if (!Array.isArray(packets) || packets.length < 1 || packets.length > 100) {
+      throw new Error("Import between 1 and 100 listings at once.");
+    }
+    const saved = [];
+    for (let start = 0; start < packets.length; start += 25) {
+      const chunk = packets.slice(start, start + 25);
+      setBulkProgress(`Saving drafts ${start + 1}–${start + chunk.length} of ${packets.length}...`);
+      try {
+        const response = await importHostListingPackets(chunk);
+        const created = response?.listings;
+        if (!Array.isArray(created) || created.length !== chunk.length) {
+          throw new Error("The server did not confirm all drafts in this group.");
+        }
+        saved.push(...created);
+      } catch (cause) {
+        const reason = cause?.message || "Unknown server error";
+        const failure = new Error(`${saved.length} of ${packets.length} drafts were confirmed saved before the error. Check Your listings & drafts before retrying. ${reason}`);
+        failure.savedCount = saved.length;
+        throw failure;
+      }
+    }
+    return { listings: saved };
+  }
   async function bulkImport() {
     if (busy) return;
     let packets;
@@ -2291,8 +3624,8 @@ function HostUnifiedListingEditor() {
       setError(cause.message);
       return;
     }
-    if (!packets.length || packets.length > 25) {
-      setError("Import between 1 and 25 listings at once.");
+    if (!packets.length || packets.length > 100) {
+      setError("Import between 1 and 100 listings at once.");
       return;
     }
     if (packets.some((packet) => packet?.type === "prepared_food")) {
@@ -2303,7 +3636,7 @@ function HostUnifiedListingEditor() {
     setError("");
     setNotice("");
     try {
-      const result = await importHostListingPackets(packets);
+      const result = await importBulkPacketsChunked(packets);
       setNotice(
         `${
           result?.listings?.length || 0
@@ -2320,6 +3653,7 @@ function HostUnifiedListingEditor() {
   async function previewExcel(file) {
     if (!file) return;
     setError("");
+    setLastSavedBulkCount(0);
     setNotice("");
     setBulkPreview(null);
     setBulkProgress("");
@@ -2337,14 +3671,46 @@ function HostUnifiedListingEditor() {
       setError(cause?.message || "Unable to read this EPANTRY Excel template.");
     }
   }
+  async function previewZip(file) {
+    if (!file) return;
+    setError("");
+    setLastSavedBulkCount(0);
+    setNotice("");
+    setBulkPreview(null);
+    setBulkProgress("");
+    setBulkFileName(file.name);
+    try {
+      const preview = await previewHostBulkZip(
+        file,
+        allowed.map((type) => type.value),
+        parseHostBulkWorkbook
+      );
+      setBulkPreview(preview);
+      setNotice(`${preview.packets.length} listings and ${preview.mediaCount} images ready. Import saves drafts only.`);
+    } catch (cause) {
+      setError(cause?.message || "Unable to read ZIP. Check its workbook and media/ folder.");
+    }
+  }
   async function importExcelDrafts() {
     if (busy || !bulkPreview?.packets?.length) return;
     setBusy(true);
     setError("");
     setNotice("");
     setBulkProgress("");
+    // Make the failure stage explicit. Media is imported BEFORE any draft-saving call.
+    let importStage = "media";
     try {
-      const packets = await ingestWorkbookImages(
+      const packets = bulkPreview.source === "zip"
+        ? await ingestHostBulkZipMedia(
+            bulkPreview,
+            {
+              uploadImage: uploadHostListingImage,
+              uploadVideo: uploadHostListingVideo,
+              importRemoteImage: importHostListingRemoteImage,
+            },
+            (done, total) => setBulkProgress(`Uploading ZIP media: ${done} of ${total}`)
+          )
+        : await ingestWorkbookImages(
         bulkPreview.packets,
         importHostListingRemoteImage,
         (done, total) => {
@@ -2353,8 +3719,9 @@ function HostUnifiedListingEditor() {
           );
         }
       );
-      setBulkProgress("Saving approved-format drafts to EPANTRY...");
-      const result = await importHostListingPackets(packets);
+      importStage = "drafts";
+      setBulkProgress("Images verified. Saving approved-format drafts to EPANTRY...");
+      const result = await importBulkPacketsChunked(packets);
       setNotice(
         `${
           result?.listings?.length || 0
@@ -2364,14 +3731,69 @@ function HostUnifiedListingEditor() {
       setBulkFileName("");
       setBulkProgress("");
       await load();
+      if (result?.listings?.length) {
+        setHistoryFilter("all");
+        setHistoryPagesVisible(1);
+        setBulkBatchPageIndex(0);
+        setLastSavedBulkCount(result.listings.length);
+        setCompletedBulkImportScrollKey((key) => key + 1);
+      }
     } catch (cause) {
-      setError(
-        `${errorMessage(
-          cause
-        )} Nothing has been added to your draft listings. Check your Excel links or values and retry.`
-      );
+      if (importStage === "media") {
+        setError(
+          `${errorMessage(cause)} Excel media import stopped before saving any drafts. Fix the specific image's permission or service error shown above, then retry this same Excel workbook.`
+        );
+      } else {
+        setError(
+          `${errorMessage(cause)} The draft-saving request may have partially succeeded. Check Your listings & drafts before retrying to avoid duplicates.`
+        );
+      }
+      if (importStage === "drafts" && cause?.savedCount > 0) {
+        setBulkPreview(null);
+        setBulkFileName("");
+        await load();
+        setBulkBatchPageIndex(0);
+        // On partial failure, keep the error visible rather than scrolling away.
+      }
       setBulkProgress("");
     } finally {
+      setBusy(false);
+    }
+  }
+  // Explicit Host action: importing Excel/ZIP creates DRAFTS, never admin submissions.
+  // Reuse each listing's existing /submit endpoint and its full server-side
+  // validation, identity, authorization and notification requirements.
+  async function submitImportedHostBatch(batch) {
+    if (busy || uploading || !batch?.ready?.length) return;
+    const records = [...batch.ready];
+    const yes = window.confirm(
+      `Send ${records.length} listing${records.length === 1 ? '' : 's'} from this imported batch to Super Admin for review?\n\n` +
+      'Every listing is validated individually. Valid listings will be submitted; any invalid draft will remain editable.'
+    );
+    if (!yes) return;
+    setBusy(true);
+    setSubmittingBulkBatchId(batch.id);
+    setError('');
+    setNotice('');
+    let completed = 0;
+    const failed = [];
+    try {
+      for (const item of records) {
+        try {
+          await submitHostListingPacket(item.id);
+          completed += 1;
+        } catch (cause) {
+          failed.push(`${item.title || 'Untitled listing'}: ${errorMessage(cause)}`);
+        }
+      }
+      // Refresh the server's confirmed states even after partial failures.
+      await load();
+      if (completed) setNotice(`${completed} listing${completed === 1 ? '' : 's'} submitted to Super Admin. Open Admin → Listing approvals → Bulk review → Host batches to review them.`);
+      if (failed.length) {
+        setError(`${failed.length} listing${failed.length === 1 ? '' : 's'} were NOT submitted and remain editable. ${failed.slice(0, 4).join(' | ')}${failed.length > 4 ? ` | ${failed.length - 4} more: check and correct the remaining drafts.` : ''}`);
+      }
+    } finally {
+      setSubmittingBulkBatchId('');
       setBusy(false);
     }
   }
@@ -2440,13 +3862,10 @@ function HostUnifiedListingEditor() {
               </button>
             </div>
             <h1 className="uel-hero-title">
-              Create something
-              <br />
-              <em>worth sharing.</em>
+              {activeTab === "bulk" ? (<>List more.<br /><em>Work less.</em></>) : (<>Create something<br /><em>worth sharing.</em></>)}
             </h1>
             <p className="uel-hero-description">
-              Add groceries or recipes with photos, ingredients
-              and listing details.
+              {activeTab === "bulk" ? "One workbook. Every item, image and cooking step in its place." : "Add groceries or recipes with photos, ingredients and listing details."}
             </p>
             <div className="uel-hero-foot">
               <span className="uel-status">
@@ -2471,24 +3890,23 @@ function HostUnifiedListingEditor() {
             <div>
               <p className="uel-hero-side-kicker">Your path to publishing</p>
               <h2 className="uel-hero-side-title">
-                From idea to listing, in three clear steps.
+                {activeTab === "bulk" ? "Import. Check. Submit." : "From idea to listing, in three clear steps."}
               </h2>
               <div className="uel-hero-step">
                 <strong>01</strong>
-                <span>Add your item details</span>
+                <span>{activeTab === "bulk" ? "Download a template" : "Add your item details"}</span>
               </div>
               <div className="uel-hero-step">
                 <strong>02</strong>
-                <span>Save and check your draft</span>
+                <span>{activeTab === "bulk" ? "Upload ZIP or Excel" : "Save and check your draft"}</span>
               </div>
               <div className="uel-hero-step">
                 <strong>03</strong>
-                <span>Send it to Super Admin</span>
+                <span>{activeTab === "bulk" ? "Review and save drafts" : "Send it to Super Admin"}</span>
               </div>
             </div>
             <p className="uel-hero-approval">
-              Your listing is visible to customers only after approval.
-              Marketplace selling rules still apply separately.
+              {activeTab === "bulk" ? "Super Admin approval is required before publishing." : "Your listing is visible to customers only after approval. Marketplace selling rules still apply separately."}
             </p>
           </aside>
         </header>
@@ -2528,9 +3946,9 @@ function HostUnifiedListingEditor() {
 
         <div className="uel-mode-bar">
           <div className="uel-mode-text">
-            <h2>How would you like to add items?</h2>
+            <h2>{activeTab === "bulk" ? "Bulk listing workspace" : "How would you like to add items?"}</h2>
             <p>
-              Create one listing, or prepare several using our Excel templates.
+              {activeTab === "bulk" ? "Excel or ZIP. Save drafts, then submit." : "Create one listing, or prepare several using our Excel templates."}
             </p>
           </div>
           <div className="uel-tabs" role="tablist" aria-label="Listing mode">
@@ -2586,177 +4004,249 @@ function HostUnifiedListingEditor() {
           </nav>
         )}
         {activeTab === "bulk" ? (
-          <div className="mt-6 space-y-5">
-            <section className="uel-bulk-section">
-              <h2 className="text-2xl font-bold">
-                <span className="uel-section-number">01</span> / Download your
-                Excel template
-              </h2>
-              <p className="mt-2 text-sm text-[#4A5850]">
-                Choose the template for your listing. Grocery uses product
-                details and photos only; recipe and drink templates also include
-                individual ingredients, their photos, preparation steps and
-                costing.
-              </p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                {visibleTemplates.map((item) => (
-                  <a
-                    key={item.key}
-                    href={`/templates/EPANTRY_Bulk_${item.key}.xlsx`}
-                    download
-                    className="uel-template flex items-center justify-between gap-3 font-semibold text-[#173F35] focus-visible:outline-2 focus-visible:outline-[#C86C42]"
-                  >
-                    <span className="flex items-center gap-2">
-                      <FileSpreadsheet size={17} />
-                      {item.label}
-                    </span>
-                    <Download size={16} />
-                  </a>
-                ))}
+          <section className="uel-bulk-redesign" aria-label="Bulk listing editor">
+            <section className="uel-bulk-banner" aria-label="Bulk listing studio">
+              <div>
+                <p className="uel-bulk-kicker">BULK LISTING / WORKSPACE</p>
+                <h2>List more, in one upload.</h2>
+                <p>Excel or ZIP. Save up to 100 drafts.</p>
+              </div>
+              <div className="uel-bulk-banner-meta">
+                <strong>100</strong>
+                <span>listings per upload</span>
+                <small>Submit saved drafts for approval.</small>
               </div>
             </section>
-            <section className="uel-bulk-section grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-              <div>
-                <h2 className="text-2xl font-bold">
-                  <span className="uel-section-number">02</span> / Fill the
-                  sheets and upload
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-[#4A5850]">
-                  Open the Excel file and follow <strong>Start Here</strong>.
-                  Give each listing a unique <strong>listing_key</strong>. Use
-                  the same key in Photos, Ingredients, Steps and Allergens so
-                  every photo and detail attaches to the correct item. The
-                  sample sheet is for guidance only.
-                </p>
-                <label
-                  htmlFor="epantry-bulk-excel"
-                  className="mt-4 block text-sm font-semibold"
-                >
-                  Choose your completed Excel (.xlsx)
-                </label>
-                <input
-                  id="epantry-bulk-excel"
-                  type="file"
-                  disabled={busy}
-                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="mt-2 block w-full rounded-lg border border-[#CBD4C8] bg-white p-3 text-sm"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    if (file) await previewExcel(file);
-                    event.target.value = "";
-                  }}
-                />
-                {bulkFileName && (
-                  <p className="mt-2 text-sm text-[#173F35]">
-                    Selected: {bulkFileName}
-                  </p>
-                )}
+            <nav className="uel-bulk-steps" aria-label="Bulk listing progress">
+              <div className={!bulkFileName ? "is-active" : "is-complete"}><b>01</b><span>Template</span></div>
+              <div className={bulkFileName && !bulkPreview ? "is-active" : bulkPreview ? "is-complete" : ""}><b>02</b><span>Upload</span></div>
+              <div className={bulkPreview ? "is-active" : ""}><b>03</b><span>Save drafts</span></div>
+            </nav>
+            <section className="uel-bulk-workspace">
+              <section className="uel-bulk-content">
+                <section aria-label="Excel templates">
+                  <div className="uel-bulk-part-head">
+                    <span className="uel-bulk-part-number">01</span>
+                    <div>
+                      <h3>Download a template</h3>
+                      <p>Use one listing_key across sheets.</p>
+                    </div>
+                  </div>
+                  <div className="uel-bulk-template-grid">
+                    {visibleTemplates.map((item) => (
+                      <a
+                        key={item.key}
+                        className="uel-bulk-template-link"
+                        href={`/templates/EPANTRY_Bulk_${item.key}.xlsx`}
+                        download
+                        aria-label={`Download ${item.label} Excel template`}
+                      >
+                        <span className="uel-bulk-template-icon"><FileSpreadsheet size={22} /></span>
+                        <span className="uel-bulk-template-info">
+                          <strong>{item.label}</strong>
+                          <small>{item.type === "grocery" ? "Products · price · stock" : "Recipe · ingredients · steps"}</small>
+                        </span>
+                        <Download size={18} className="uel-bulk-template-download" />
+                      </a>
+                    ))}
+                  </div>
+                </section>
+                <div className="uel-bulk-divider" />
+                <section aria-label="Upload Excel or ZIP" className="uel-bulk-upload-stage">
+                  <div className="uel-bulk-part-head">
+                    <span className="uel-bulk-part-number">02</span>
+                    <div>
+                      <h3>Choose how to upload</h3>
+                      <p>Select Excel or ZIP.</p>
+                    </div>
+                  </div>
+                  <div className="uel-bulk-methods" role="group" aria-label="Choose your upload format">
+                    <button
+                      type="button"
+                      className="uel-bulk-method"
+                      data-selected={bulkUploadMode === "zip"}
+                      aria-pressed={bulkUploadMode === "zip"}
+                      onClick={() => { setBulkUploadMode("zip"); setBulkPreview(null); setBulkFileName(""); setBulkProgress(""); setError(""); }}
+                      disabled={busy}
+                    >
+                      <span className="uel-bulk-method-icon"><UploadCloud size={23} /></span>
+                      <span className="uel-bulk-choice-body">
+                        <strong>Excel + media ZIP</strong>
+                        <small>Excel + local photos/videos</small>
+                      </span>
+                      <span className="uel-bulk-choice-indicator" aria-hidden="true"><CheckCircle2 size={20}/></span>
+                    </button>
+                    <button
+                      type="button"
+                      className="uel-bulk-method"
+                      data-selected={bulkUploadMode === "excel"}
+                      aria-pressed={bulkUploadMode === "excel"}
+                      onClick={() => { setBulkUploadMode("excel"); setBulkPreview(null); setBulkFileName(""); setBulkProgress(""); setError(""); }}
+                      disabled={busy}
+                    >
+                      <span className="uel-bulk-method-icon"><FileSpreadsheet size={23}/></span>
+                      <span className="uel-bulk-choice-body">
+                        <strong>Excel only</strong>
+                        <small>Excel + public photo links</small>
+                      </span>
+                      <span className="uel-bulk-choice-indicator" aria-hidden="true"><CheckCircle2 size={20}/></span>
+                    </button>
+                  </div>
+                  {bulkUploadMode === "zip" ? (
+                    <section className="uel-bulk-upload-line" aria-label="Select media ZIP file">
+                      <span className="uel-bulk-upload-line-icon"><UploadCloud size={24}/></span>
+                      <div className="uel-bulk-upload-line-copy">
+                        <strong>Attach your ZIP file</strong>
+                        <p>Excel workbook + media folder.</p>
+                        <small>ZIP format · Maximum 320 MB</small>
+                      </div>
+                      <label htmlFor="epantry-bulk-zip" className="uel-bulk-file-action">
+                        <UploadCloud size={17}/>
+                        Choose ZIP
+                        <input
+                          id="epantry-bulk-zip"
+                          type="file"
+                          disabled={busy}
+                          accept=".zip,application/zip,application/x-zip-compressed"
+                          onChange={async (event) => {
+                            const file = event.target.files?.[0];
+                            if (file) await previewZip(file);
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </section>
+                  ) : (
+                    <section className="uel-bulk-upload-line" aria-label="Select Excel workbook">
+                      <span className="uel-bulk-upload-line-icon"><FileSpreadsheet size={24}/></span>
+                      <div className="uel-bulk-upload-line-copy">
+                        <strong>Attach your Excel workbook</strong>
+                        <p>Add public image links in the Photos sheet.</p>
+                        <small>XLSX format · Up to 100 listings</small>
+                      </div>
+                      <label htmlFor="epantry-bulk-excel" className="uel-bulk-file-action">
+                        <FileSpreadsheet size={17}/>
+                        Choose Excel
+                        <input
+                          id="epantry-bulk-excel"
+                          type="file"
+                          disabled={busy}
+                          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                          onChange={async (event) => {
+                            const file = event.target.files?.[0];
+                            if (file) await previewExcel(file);
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </section>
+                  )}
+                  {bulkFileName ? (
+                    <div className="uel-bulk-selected" role="status">
+                      <CheckCircle2 size={18}/>
+                      <span><strong>Selected file:</strong> {bulkFileName}</span>
+                    </div>
+                  ) : (
+                    <p className="uel-bulk-upload-prompt">Choose a file to preview.</p>
+                  )}
+                  <p className="uel-bulk-note"><strong>listing_key</strong> must match in every sheet and media folder.</p>
+                </section>
                 {bulkPreview && (
-                  <div className="mt-5 border border-[#B7C6B8] bg-[#F0F4ED] p-4">
-                    <h3 className="font-bold">
-                      <span className="uel-section-number">03</span> / Review
-                      before importing
-                    </h3>
-                    <p className="mt-1 text-sm">
-                      {bulkPreview.packets.length} draft listings ·{" "}
-                      {bulkPreview.mediaCount} unique images ·{" "}
-                      {bulkPreview.template.replaceAll("_", " ")} template
-                    </p>
-                    <div className="mt-3 max-h-72 overflow-auto border-t border-[#CBD4C8]">
+                  <section className="uel-bulk-preview" aria-label="Import preview">
+                    <div className="uel-bulk-preview-head">
+                      <div>
+                        <p className="uel-bulk-kicker">03 / Confirm your batch</p>
+                        <h3>Preview before saving</h3>
+                      </div>
+                      <span className="uel-bulk-preview-count">
+                        {bulkPreview.packets.length} listings · {bulkPreview.source === "zip" ? `${bulkPreview.imageCount} images · ${bulkPreview.videoCount} videos` : `${bulkPreview.mediaCount} images`}
+                      </span>
+                    </div>
+                    <div className="uel-bulk-list-preview">
                       {bulkPreview.packets.map((packet, index) => (
-                        <div
-                          key={index}
-                          className="flex flex-wrap justify-between gap-2 border-b border-[#CBD4C8] py-2 text-sm"
-                        >
-                          <span>
-                            <strong>
-                              {index + 1}. {packet.title}
-                            </strong>
-                            <br />
-                            {packet.category.replaceAll("_", " ")}
-                          </span>
-                          <span className="text-[#53635B]">
-                            {packet.images.length} photos ·{" "}
-                            {packet.ingredients.length} ingredients ·{" "}
-                            {packet.steps.length} steps
-                          </span>
+                        <div key={`${packet.sku || packet.title}-${index}`} className="uel-bulk-preview-row">
+                          <div>
+                            <strong>{String(index + 1).padStart(2,"0")} / {packet.title}</strong>
+                            <span>{String(packet.category || "other").replaceAll("_"," ")}</span>
+                          </div>
+                          <small>{packet.images.length} photos · {packet.ingredients.length} ingredients · {packet.steps.length} steps</small>
                         </div>
                       ))}
                     </div>
                     {bulkPreview.issues.length > 0 && (
-                      <div className="mt-3 border-l-4 border-[#C86C42] bg-[#FFF1E8] p-3 text-sm">
-                        <strong>
-                          Complete these fields before final submission:
-                        </strong>
-                        <ul className="mt-1 list-disc space-y-1 pl-4">
-                          {bulkPreview.issues
-                            .slice(0, 15)
-                            .map((issue, index) => (
-                              <li key={index}>
-                                {issue.key}: {issue.message}
-                              </li>
-                            ))}
+                      <div className="uel-bulk-warning" role="status">
+                        <strong>{bulkPreview.issues.length} checks to complete before publishing</strong>
+                        <ul>
+                          {bulkPreview.issues.slice(0,12).map((issue,index) => (
+                            <li key={index}>{issue.key}: {issue.message}</li>
+                          ))}
                         </ul>
-                        {bulkPreview.issues.length > 15 && (
-                          <p>
-                            And {bulkPreview.issues.length - 15} more notices.
-                            All records will remain drafts.
-                          </p>
-                        )}
+                        {bulkPreview.issues.length > 12 && <p>{bulkPreview.issues.length - 12} more notices. Drafts are still allowed.</p>}
                       </div>
                     )}
-                    {bulkProgress && (
-                      <p
-                        role="status"
-                        className="mt-3 text-sm font-semibold text-[#173F35]"
-                      >
-                        {bulkProgress}
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={importExcelDrafts}
-                      className={`${styles.button} mt-4`}
-                    >
-                      <UploadCloud size={16} className="mr-2 inline" />
-                      {busy
-                        ? "Importing..."
-                        : "Import images & save draft listings"}
-                    </button>
-                  </div>
+                    {bulkProgress && <div className="uel-bulk-progress" role="status">{bulkProgress}</div>}
+                    <div className="uel-bulk-preview-foot">
+                      <p>Imported items stay drafts until submitted.</p>
+                      <button type="button" disabled={busy} onClick={importExcelDrafts} className="uel-bulk-submit">
+                        <UploadCloud size={17}/>
+                        {busy ? "Importing…" : bulkPreview.source === "zip" ? "Upload media & save drafts" : "Import Excel & save drafts"}
+                      </button>
+                    </div>
+                  </section>
                 )}
-              </div>
-              <aside className="uel-bulk-help">
-                <h3 className="font-bold">Public Google Drive images</h3>
-                <p className="mt-2">
-                  Upload each image as a <strong>file</strong> to Google Drive →
-                  Share → General access → <strong>Anyone with the link</strong>{" "}
-                  → Viewer. Paste the copied <strong>file link</strong> into
-                  Excel. Folder links and private files will fail.
-                </p>
-                <p className="mt-3">
-                  During import, EPANTRY attempts to copy each accessible JPG,
-                  PNG or WebP into its own Cloudinary storage. The real uploaded
-                  photo is then attached to the corresponding item/ingredient,
-                  not a random placeholder.
-                </p>
-                <p className="mt-3 font-semibold">
-                  Up to 25 listings and 120 different images per workbook.
-                  Uploaded records remain drafts for review; delivery pincodes,
-                  stock and selling prices are never auto-published.
-                </p>
+              </section>
+              <aside className="uel-bulk-aside" aria-label="Bulk upload limits">
+                <section className="uel-bulk-side-panel uel-compact-limits">
+                  <h3><Package size={18}/> Upload limits</h3>
+                  <p><strong>100 listings</strong> · 500 photos · 100 recipe videos</p>
+                  <p>{bulkUploadMode === "zip" ? "ZIP 320 MB · photos 8 MB · videos 50 MB" : "Photos 8 MB each · public image links required"}</p>
+                </section>
               </aside>
             </section>
-            <details className="border-t border-[#D7DDCF] pt-4">
+            {bulkUploadMode === "zip" && (
+            <details className="uel-bulk-folder-guide uel-compact-folder-guide" aria-label="ZIP media folder instructions">
+              <summary className="uel-compact-guide-trigger">
+                <span><Package size={21}/> ZIP folder examples <small>Grocery and recipe media naming</small></span>
+                <span>View guide <ChevronDown size={18}/></span>
+              </summary>
+              <div className="uel-compact-guide-body">
+              <div className="uel-bulk-folder-grid">
+                <div className="uel-bulk-folder-col">
+                  <div className="uel-bulk-folder-col-head"><Package size={18}/> Grocery / photos</div>
+                  <pre>{`Grocery_Batch/
+├── Grocery_Batch.xlsx
+└── media/
+    ├── EP-ING-004/
+    │   ├── front.webp
+    │   └── back.webp
+    └── EP-ING-005/
+        └── front.webp`}</pre>
+                  <p><strong>front.webp</strong> = cover · <strong>back.webp</strong> = label/packaging.</p>
+                </div>
+                <div className="uel-bulk-folder-col">
+                  <div className="uel-bulk-folder-col-head"><FileSpreadsheet size={18}/> Recipe / media and steps</div>
+                  <pre>{`Recipe_Batch/
+├── Recipe_Batch.xlsx
+└── media/
+    └── V04/
+        ├── front.webp
+        ├── video.mp4
+        ├── ingredients/
+        │   └── 01.webp
+        └── steps/
+            └── 01.webp`}</pre>
+                  <p><strong>video.mp4</strong> = recipe video · numbered photos follow Excel row order.</p>
+                </div>
+              </div>
+                <p className="uel-compact-guide-key"><strong>Match the key:</strong> <code>media/V04/</code> belongs to Excel <code>listing_key = V04</code>.</p>
+              </div>
+            </details>
+            )}
+            <details className="uel-bulk-advanced">
               <summary className="cursor-pointer text-sm font-semibold text-[#173F35]">
                 Advanced: import existing JSON bulk file (unchanged)
               </summary>
-              <p className="mt-2 text-sm leading-6 text-[#4A5850]">
-                Existing JSON import stays available for automated Host
-                workflows. For normal bulk listing, use the Excel template
-                above.
-              </p>
+
               <input
                 type="file"
                 accept=".json,application/json"
@@ -2789,7 +4279,81 @@ function HostUnifiedListingEditor() {
                 Import JSON as drafts
               </button>
             </details>
-          </div>
+            <section
+              id="epantry-submit-imported-batches"
+              tabIndex={-1}
+              aria-label="Imported bulk batches awaiting Host submission"
+              className="uel-imported-batches-section"
+            >
+              <div className="uel-imported-head">
+                <div>
+                  <span className="uel-imported-step">04 / SUBMIT TO SUPER ADMIN</span>
+                  <h3>Send your batches for review</h3>
+                  <p>Choose a batch to send for approval.</p>
+                </div>
+                <button type="button" onClick={load} disabled={busy} className="uel-imported-refresh">
+                  <RefreshCw size={16} /> Refresh
+                </button>
+              </div>
+              {lastSavedBulkCount > 0 && (
+                <div className="uel-imported-success" role="status">
+                  <CheckCircle2 size={19} aria-hidden="true" />
+                  <span><strong>{lastSavedBulkCount} drafts saved.</strong> Select a batch below to submit for review.</span>
+                </div>
+              )}
+              <div className="uel-imported-stats" aria-label="Imported listing status counts">
+                <div><strong>{importedHostBatches.length}</strong><span>Batches</span></div>
+                <div><strong>{importedBatchReadyCount}</strong><span>Ready</span></div>
+                <div><strong>{importedBatchAwaitingCount}</strong><span>In review</span></div>
+                <div><strong>{importedBatchApprovedCount}</strong><span>Approved</span></div>
+              </div>
+              {importedHostBatches.length ? (
+                <>
+                  <div className="uel-imported-range" aria-live="polite">
+                    <span>Showing {visibleImportedHostBatches.length} of {importedHostBatches.length} batches</span>
+                    <a href="#uel-history-title" className="uel-imported-history-link">Your listings <ArrowUpRight size={15} /></a>
+                  </div>
+                  <div className="uel-imported-batch-list">
+                    {visibleImportedHostBatches.map((batch) => (
+                      <article key={batch.id} className="uel-imported-batch-row">
+                        <div className="uel-imported-batch-main">
+                          <div className="uel-imported-batch-title">
+                            <strong>{batch.items.length} item{batch.items.length !== 1 ? 's' : ''} in batch</strong>
+                            {batch.ready.length > 0 ? <span className="uel-imported-pill is-ready">{batch.ready.length} ready</span> :
+                              batch.awaiting > 0 ? <span className="uel-imported-pill is-pending">In review</span> :
+                              <span className="uel-imported-pill is-done">Submitted</span>}
+                          </div>
+                          <p className="uel-imported-batch-names" title={batch.items.map((item) => item.title || 'Untitled').join(', ')}>
+                            {batch.items.slice(0, 2).map((item) => item.title || 'Untitled').join(' · ')}{batch.items.length > 2 ? ` · +${batch.items.length - 2} more` : ''}
+                          </p>
+                          {batch.awaiting > 0 || batch.approved > 0 ? (
+                            <small>{batch.awaiting} in review · {batch.approved} approved</small>
+                          ) : null}
+                        </div>
+                        <button type="button"
+                          disabled={busy || Boolean(uploading) || !batch.ready.length}
+                          onClick={() => submitImportedHostBatch(batch)}
+                          className="uel-imported-send"
+                        >
+                          <Send size={16} />
+                          {submittingBulkBatchId === batch.id ? 'Submitting…' : batch.ready.length ? `Submit ${batch.ready.length} items` : 'No drafts to submit'}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                  {remainingBulkBatches > 0 && (
+                    <div className="uel-imported-pagination">
+                      <button type="button" className="uel-imported-page-next" onClick={showNextBulkBatchPage}>
+                        View next {Math.min(bulkBatchPageSize, remainingBulkBatches)} batches <ArrowUpRight size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="uel-imported-empty">No imported batches yet. Upload Excel or ZIP to create drafts.</p>
+              )}
+            </section>
+          </section>
         ) : (
           <>
             {activeListing?.status === "approved" &&
@@ -4689,11 +6253,9 @@ function HostUnifiedListingEditor() {
         <section className="uel-history" aria-labelledby="uel-history-title">
           <div className="uel-history-head">
             <div>
-              <p className="uel-eyebrow">Your work, all in one place</p>
+              <p className="uel-eyebrow">05 / YOUR LISTINGS</p>
               <h2 id="uel-history-title">Your listings & drafts</h2>
-              <p className="mt-2">
-                A clear view of everything you've saved, submitted or published.
-              </p>
+              <p className="mt-2">Edit, review or manage your listings.</p>
             </div>
             <span className="uel-history-count">
               {existing.length} {existing.length === 1 ? "listing" : "listings"}{" "}
@@ -4712,7 +6274,7 @@ function HostUnifiedListingEditor() {
                 className="uel-history-filter"
                 data-active={historyFilter === key}
                 aria-pressed={historyFilter === key}
-                onClick={() => setHistoryFilter(key)}
+                onClick={() => { setHistoryFilter(key); setHistoryPagesVisible(1); }}
               >
                 {label} <b>{historyCount(key)}</b>
               </button>
@@ -4720,7 +6282,7 @@ function HostUnifiedListingEditor() {
           </div>
           <div className="uel-packet-list">
             {filteredHistory.length ? (
-              filteredHistory.map((item) => (
+              visibleHistory.map((item) => (
                 <div key={item.id} className="uel-packet-row">
                   <div className="uel-packet-main">
                     <div className="uel-packet-photo">
@@ -4803,6 +6365,15 @@ function HostUnifiedListingEditor() {
               </div>
             )}
           </div>
+          {remainingHistory > 0 && (
+            <div className="uel-history-progress" aria-live="polite">
+              <span>Showing {visibleHistory.length} of {filteredHistory.length} listings</span>
+              <button type="button" className="uel-history-view-more" onClick={() => setHistoryPagesVisible((current) => current + 1)}>
+                View next {Math.min(bulkBatchPageSize, remainingHistory)} listings
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           <PreviouslyListedItems workspace={workspace} />
           {["b2b", "brand_seller", "hybrid", "legacy"].includes(workspace) && (
             <Link

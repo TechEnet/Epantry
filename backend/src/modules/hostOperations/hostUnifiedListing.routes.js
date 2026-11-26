@@ -637,12 +637,40 @@ router.post('/host/listing-packets/bulk', ...writeSecurity, wrap(async (req, res
 }))
 // Admin queue. Root Super Admin is required for all decisions, with existing
 // admin MFA, CSRF, anti-impersonation and active-session middleware preserved.
+// Secured Super Admin queue. Ordinary approval requests keep their original
+// non-draft behavior. The Bulk Overview mode explicitly includes Host-imported
+// drafts so the reviewer can SEE what was saved, not mistakenly treat 0 pending
+// approvals as 0 imported listings. Drafts are read-only to Super Admin: Host
+// must still submit each item through its validated /submit action.
 router.get('/admin/host-listing-packets', ...adminSecurity, superAdminOnly, wrap(async (req, res) => {
-  const filter = ['submitted_for_review', 'changes_requested', 'approved', 'rejected'].includes(req.query.status)
-    ? { status: req.query.status } : { status: { $ne: 'draft' } }
-  filter.deletedAt = null
-  const rows = await HostUnifiedListingPacket.find(filter).sort({ submittedAt: -1 }).limit(150)
-  respond(res, { listings: rows.map(serialize) })
+  const bulkOverview = req.query.bulkOnly === '1' && req.query.includeDrafts === '1'
+  const requestedStatus = String(req.query.status || '')
+  const knownStatuses = ['draft', 'submitted_for_review', 'changes_requested', 'approved', 'rejected']
+  const filter = { deletedAt: null }
+  if (bulkOverview) {
+    // Imported Excel/ZIP packets have an explicit backend-assigned bulkBatchId.
+    // The 100-item frontend import is persisted as <=25-item server batches.
+    filter.bulkBatchId = { $type: 'string', $ne: '' }
+    if (knownStatuses.includes(requestedStatus)) filter.status = requestedStatus
+  } else {
+    // Backwards compatible: the normal Host approvals page never includes drafts.
+    filter.status = knownStatuses.slice(1).includes(requestedStatus)
+      ? requestedStatus : { $ne: 'draft' }
+  }
+  const limit = bulkOverview ? 500 : 150
+  const rows = await HostUnifiedListingPacket.find(filter)
+    .sort(bulkOverview ? { updatedAt: -1, _id: -1 } : { submittedAt: -1, _id: -1 })
+    .limit(limit)
+  if (!bulkOverview) return respond(res, { listings: rows.map(serialize) })
+  const total = await HostUnifiedListingPacket.countDocuments(filter)
+  respond(res, {
+    mode: 'bulk_overview',
+    listings: rows.map(serialize),
+    total,
+    returned: rows.length,
+    hasMore: total > rows.length,
+    draftApprovalAllowed: false,
+  })
 }))
 router.get('/admin/host-listing-packets/:id', ...adminSecurity, superAdminOnly, wrap(async (req, res) => {
   if (!objectId(req.params.id)) problem('Invalid listing identifier.')
@@ -1121,11 +1149,9 @@ router.get('/public/host-listings', wrap(async (req, res) => {
   const category = String(req.query?.category || '').trim().toLowerCase()
   const type = String(req.query?.type || '').trim().toLowerCase()
   const filter = publicHostListingFilter()
-  // Append category constraints without replacing the mandatory approved-
-  // publication (and EU trader) gates from publicHostListingFilter().
-  if (category) filter.$and.push({ $or: [
+  if (category) filter.$and = [{ $or: [
     { 'publishedPacket.category': category }, { publishedPacket: null, 'packet.category': category },
-  ] })
+  ] }]
   if (type) filter.$and = [...(filter.$and || []), { $or: [
     { publishedType: type }, { publishedPacket: null, type },
   ] }]

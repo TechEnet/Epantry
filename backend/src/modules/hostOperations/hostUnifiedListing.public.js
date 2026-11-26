@@ -57,6 +57,8 @@ export function publicListing(record) {
     manufacturerPacker: approved.type === 'grocery' ? (packet.manufacturerPacker || '') : '',
     unitsPerPack: approved.type === 'grocery' ? (packet.unitsPerPack ?? null) : null,
     servingSize: approved.type === 'grocery' ? (packet.servingSize || '') : '',
+    ingredientDeclarationText: approved.type === 'grocery'
+      ? String(packet.labelDeclaration?.ingredients || '').trim() : '',
     barcode: approved.type === 'grocery' ? (packet.selling?.barcode || '') : '',
     // Only resolved from a published canonical ProductVersion by the public route.
     canonicalPackId: record.verifiedPackId || null,

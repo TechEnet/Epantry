@@ -42,6 +42,40 @@ function productPath(product) {
   return `/grocery/product/${encodeURIComponent(product?.slug || '')}`
 }
 
+// A Host-approved listing may also have a published catalog product. Show it
+// only once on this page: keep the catalog card, which has the product route.
+function groceryIdentityKey(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/(\d)([a-z])/g, '$1 $2')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function uniqueHostGrocerySpotlights(hostListings, catalogProducts) {
+  const catalogNames = new Set(catalogProducts.map((product) => groceryIdentityKey(productName(product))).filter(Boolean))
+  const catalogPacks = new Set(catalogProducts.map((product) => String(product?.packId || '').trim()).filter(Boolean))
+  const catalogPaths = new Set(catalogProducts.filter((product) => product?.slug).map(productPath))
+  const seen = new Set()
+
+  return hostListings.filter((listing) => {
+    const listingName = groceryIdentityKey(listing?.title)
+    const listingPack = String(listing?.canonicalPackId || '').trim()
+    const listingPath = String(listing?.marketplaceProductPath || '').trim()
+    if ((listingPack && catalogPacks.has(listingPack)) ||
+        (listingPath && catalogPaths.has(listingPath)) ||
+        (listingName && catalogNames.has(listingName))) return false
+
+    const listingKey = String(listing?.id || listing?.slug || listingName)
+    if (seen.has(listingKey)) return false
+    seen.add(listingKey)
+    return true
+  }).slice(0, 4)
+}
+
 function GroceryTile({ product }) {
   const title = productName(product)
   const category = product?.category?.name || 'Grocery'
@@ -286,6 +320,13 @@ export default function GroceryPage() {
     setVisibleCount(revealSize)
   }
 
+  // Keep recently approved Host-only listings, but do not show the same
+  // product twice when its published catalog card already exists below.
+  const recentHostGroceries = useMemo(
+    () => uniqueHostGrocerySpotlights(hostGroceryListings, products),
+    [hostGroceryListings, products],
+  )
+
   const total = Number(pagination?.total) || 0
   const totalPages = Number(pagination?.pages) || 0
   const visibleProducts = products.slice(0, visibleCount)
@@ -373,9 +414,9 @@ export default function GroceryPage() {
             </label>
           </form>
 
-          {hostGroceryListings.length > 0 && !categorySlug && !brandSlug && !search && <section className="mt-6 border-y border-[#D7DDCF] py-4" aria-label="Approved Host grocery submissions">
+          {recentHostGroceries.length > 0 && !categorySlug && !brandSlug && !search && <section className="mt-6 border-y border-[#D7DDCF] py-4" aria-label="Approved Host grocery submissions">
             <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">Recently approved Host groceries</h3><Link to="/explore/host-listings?category=grocery" className="text-sm font-semibold text-[#173F35] underline">View all</Link></div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{hostGroceryListings.slice(0, 4).map((item) => <Link key={item.id} to={`/explore/host-listings?category=grocery&item=${encodeURIComponent(item.id)}`} className="overflow-hidden border border-[#D7DDCF] bg-white hover:border-[#173F35]">{item.images?.[0] && <img src={item.images[0]} {...publicImageProps(item.images[0], { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 24vw" })} alt="" className="aspect-[4/3] w-full object-cover"/>}<div className="p-3"><p className="text-sm font-semibold text-[#C86C42]">Host-approved submission</p><h4 className="mt-1 text-base font-semibold">{item.title}</h4><p className="mt-1 text-xs text-[#526257]">Not yet a verified marketplace offer</p></div></Link>)}</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{recentHostGroceries.map((item) => <Link key={item.id} to={`/explore/host-listings?category=grocery&item=${encodeURIComponent(item.id)}`} className="overflow-hidden border border-[#D7DDCF] bg-white hover:border-[#173F35]">{item.images?.[0] && <img src={item.images[0]} {...publicImageProps(item.images[0], { widths: [320, 480, 720], sizes: "(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 24vw" })} alt="" className="aspect-[4/3] w-full object-cover"/>}<div className="p-3"><p className="text-sm font-semibold text-[#C86C42]">Host-approved submission</p><h4 className="mt-1 text-base font-semibold">{item.title}</h4><p className="mt-1 text-xs text-[#526257]">Not yet a verified marketplace offer</p></div></Link>)}</div>
           </section>}
           {error && <div role="alert" className="mt-5 rounded-[12px] border border-[#C86C42] bg-[#F7F6F2] p-4 text-sm text-[#202421]"><CircleAlert size={18} aria-hidden="true" className="mr-2 inline" />{error}</div>}
           {loading && products.length === 0 ? (

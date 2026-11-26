@@ -1,3 +1,4 @@
+// EPANTRY Listing History Sidebar + width, scoped to existing Host route.
 import { useState } from "react";
 
 import {
@@ -12,6 +13,7 @@ import {
   ChefHat,
   Clapperboard,
   FileSearch,
+  History,
   Home,
   LayoutDashboard,
   LockKeyhole,
@@ -83,6 +85,12 @@ const navigationGroups = [
         label: "Create Listing",
         to: "/host/listings",
         icon: Boxes,
+      },
+      {
+        label: "Listing History",
+        to: "/host/listings/new?manage=offers-history",
+        icon: History,
+        historyRoute: true,
       },
       {
         label: "Product Catalog",
@@ -211,6 +219,7 @@ const navigationGroups = [
 const mobileNavigationOrder = [
   "/host/operations",
   "/host/listings",
+  "/host/listings/new?manage=offers-history",
   "/host/catalog",
   "/host/scan",
   "/host/data-quality",
@@ -230,11 +239,14 @@ const mobileNavigationOrder = [
   "/host/listing-notices",
 ];
 
-function routeMatchesItem(item, pathname) {
-  if (item.end) {
-    return pathname === item.to;
-  }
+function routeMatchesItem(item, pathname, search = "") {
+  const listingHistoryActive =
+    pathname === "/host/listings/new" &&
+    new URLSearchParams(search).get("manage") === "offers-history";
 
+  if (item.historyRoute) return listingHistoryActive;
+  if (item.to === "/host/listings" && listingHistoryActive) return false;
+  if (item.end) return pathname === item.to;
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
@@ -245,6 +257,8 @@ function HostNavigationItem({
   onNavigate,
 }) {
   const Icon = item.icon;
+  const location = useLocation();
+  const listingItemActive = routeMatchesItem(item, location.pathname, location.search);
 
   return (
     <NavLink
@@ -253,13 +267,13 @@ function HostNavigationItem({
       onClick={onNavigate}
       aria-label={collapsed ? visibleLabel(item) : undefined}
       title={collapsed ? visibleLabel(item) : undefined}
-      className={({ isActive }) =>
+      className={() =>
         [
           collapsed
             ? "focus-ring mx-auto flex h-11 w-11 items-center justify-center rounded-[18px] border text-sm font-bold transition duration-200"
             : "focus-ring flex min-h-[44px] items-center gap-3 rounded-[17px] border px-3 py-2.5 text-sm font-bold transition duration-200",
           nested && !collapsed ? "" : "",
-          isActive
+          listingItemActive
             ? "border-[#C86C42] bg-[linear-gradient(145deg,#DCE0CF_0%,#DCE0CF_100%)] text-[#202421] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_5px_12px_rgba(118,83,47,0.14)]"
             : "border-[#DCE0CF] bg-[linear-gradient(145deg,rgba(255,254,250,0.96)_0%,rgba(248,239,226,0.96)_100%)] text-[#202421] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_8px_rgba(92,65,37,0.07)] hover:-translate-y-px hover:border-[#C86C42] hover:bg-[#F7F6F2] hover:text-[#173F35] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.98),0_5px_12px_rgba(92,65,37,0.10)]",
         ].join(" ")
@@ -438,6 +452,10 @@ export default function HostShell({ children }) {
 
   const isHostBrandsRoute = location.pathname === "/host/brands";
 
+  const isHostListingHistoryRoute =
+    location.pathname === "/host/listings/new" &&
+    new URLSearchParams(location.search).get("manage") === "offers-history";
+
   const isHostMarketplaceRoute = location.pathname === "/host/marketplace";
 
   const isHostOrdersRoute = location.pathname === "/host/orders";
@@ -496,8 +514,12 @@ export default function HostShell({ children }) {
       ) : null}
 
       <div
+        style={isHostListingHistoryRoute ? {
+          width: "100%", maxWidth: "none", margin: 0, padding: 0,
+        } : undefined}
         className={[
           "page-shell",
+          isHostListingHistoryRoute ||
           isHostBusinessProfileRoute ||
           isHostCatalogRoute ||
           isHostScanRoute ||
@@ -514,7 +536,9 @@ export default function HostShell({ children }) {
             : "py-5 sm:py-7",
         ].join(" ")}
       >
-        <div className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm">
+        <div className={isHostListingHistoryRoute
+          ? "overflow-hidden bg-[#F7F6F2]"
+          : "overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-sm"}>
           <div
             className={[
               "grid min-h-[760px] lg:transition-[grid-template-columns] lg:duration-[460ms] lg:ease-[cubic-bezier(0.22,1,0.36,1)]",
@@ -627,7 +651,7 @@ export default function HostShell({ children }) {
                 >
                   {visibleNavigationGroups.map((group) => {
                     const active = group.items.some((item) =>
-                      routeMatchesItem(item, location.pathname)
+                      routeMatchesItem(item, location.pathname, location.search)
                     );
 
                     return (

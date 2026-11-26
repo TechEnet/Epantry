@@ -112,7 +112,7 @@ export function hostListingAsGrocery(listing) {
     packId: text(listing.canonicalPackId) || null, canonicalPackId: text(listing.canonicalPackId) || null,
     manufacturerName: text(listing.manufacturerPacker), countryOfOrigin: text(listing.countryOfOrigin),
     barcode: text(listing.barcode), gtin: text(listing.barcode),
-    ingredientDeclarationText: (listing.ingredients || []).map(a => text(a.name)).filter(Boolean).join(', '),
+    ingredientDeclarationText: text(listing.ingredientDeclarationText),
     ingredients: (listing.ingredients || []).map(a => ({ displayName: text(a.name), percentage: null })),
     allergenStatement: allergens.map(a => `${readable(a.allergenKey)}: ${readable(a.relationType)}`).join(' · '),
     allergens,

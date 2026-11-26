@@ -2,10 +2,10 @@
 // It reads values from the fixed named worksheets; formulas/macros are never executed.
 const MAX_FILE_BYTES = 3 * 1024 * 1024
 const MAX_UNCOMPRESSED_BYTES = 10 * 1024 * 1024
-const MAX_LISTINGS = 25
+const MAX_LISTINGS = 100
 const TYPES = new Set(['grocery', 'brand_recipe', 'kitchen_recipe', 'prepared_food'])
 const CATEGORIES = new Set(['grocery', 'breakfast', 'lunch', 'dinner', 'snacks', 'drinks', 'sweets', 'desserts', 'bakery', 'main_course', 'side_dish', 'other'])
-const MAX_REFS = 120
+const MAX_REFS = 500
 
 function failure(message) { throw new Error(message) }
 function bytes(input, begin, length) { return new Uint8Array(input.slice(begin, begin + length)) }
@@ -121,29 +121,86 @@ function rowList(rows, key, name) {
   }
   return map
 }
-function mediaUrl(value, tab, row) {
+function mediaUrl(value, tab, row, allowLocal = false) {
   const input = String(value || '').trim()
   if (!input) return ''
+  if (allowLocal && !/^https:\/\//i.test(input)) {
+    const path = input.replace(/^\.\//, '')
+    const segments = path.split('/')
+    if (path.length > 300 || /[\\\x00-\x1f?#:]/.test(path) || segments.some((part) => !part || part === '.' || part === '..') || !/\.(jpe?g|png|webp)$/i.test(path)) {
+      failure(`${tab} row ${row}: use a safe .webp/.jpg/.png ZIP media path.`)
+    }
+    return path
+  }
   let url
   try { url = new URL(input) } catch { failure(`${tab} row ${row}: image link is not a valid URL.`) }
   if (url.protocol !== 'https:' || url.username || url.password) failure(`${tab} row ${row}: image link must be public HTTPS.`)
   if (!['drive.google.com', 'www.drive.google.com', 'res.cloudinary.com'].includes(url.hostname)) failure(`${tab} row ${row}: use a public Google Drive file link or EPANTRY Cloudinary image.`)
   return url.href
 }
-function makePacket(row, categoryDefault, type, mapped) {
+// Extra optional worksheets are imported into the existing Listing Packet fields.
+// Placeholder text from QA references is never treated as verified label evidence.
+function extraText(value) {
+  const input = String(value ?? '').trim()
+  if (!input || /^\[.*\]$/.test(input) || /^(?:not supplied|not verified|not declared|n\/a)$/i.test(input)) return ''
+  return input
+}
+function groceryFacet(value) {
+  const raw = extraText(value).toLowerCase().replace(/&/g, 'and')
+  const known = {
+    'vegetables and greens':'vegetables','fruits':'fruits',
+    'milk, dairy and cheese':'dairy','eggs':'eggs',
+    'meat and poultry':'meat_poultry','fish and seafood':'seafood',
+    'grains, rice and cereals':'grains_rice','pulses, beans and lentils':'pulses_legumes',
+    'spices, sauces and condiments':'spices_condiments','cooking oil and ghee':'oils_ghee',
+    'canned and jarred food':'canned_jarred','packaged snacks':'packaged_snacks',
+    'other packaged food':'packaged_food','frozen food':'frozen_food',
+    'beverages':'beverages','bread and bakery':'bakery_bread','other groceries':'other_grocery',
+  }
+  return known[raw] || (['vegetables','fruits','dairy','eggs','meat_poultry','seafood','grains_rice','pulses_legumes','spices_condiments','oils_ghee','canned_jarred','packaged_snacks','packaged_food','frozen_food','beverages','bakery_bread','other_grocery'].includes(raw)?raw:'')
+}
+function groceryPack(value) {
+  const raw=extraText(value).toLowerCase().replace(/\s+/g,'_')
+  return ({'loose_/_unpackaged':'loose','packet_/_pouch':'packet','can_/_tin':'can','box_/_carton':'box'}[raw]) ||
+    (['loose','packet','can','jar','bottle','box','tray','other'].includes(raw)?raw:'')
+}
+
+function makePacket(row, categoryDefault, type, mapped, allowLocal = false) {
   const isRecipe = type !== 'grocery'
   const sellingAllowed = type === 'grocery' || type === 'prepared_food' || (type === 'kitchen_recipe' && truthy(row.sell_ready_made))
+  const groceryMeta = mapped.groceryDetails.get(row.listing_key)?.[0] || {}
+  const recipeMeta = mapped.recipeDetails.get(row.listing_key)?.[0] || {}
   const ingredients = (mapped.ingredients.get(row.listing_key) || []).map((i) => ({
     name: i.ingredient_name || '', quantity: number(i.quantity), unit: i.unit || 'g',
     unitPrice: number(i.pack_price_inr), priceQuantity: number(i.pack_quantity), priceUnit: i.pack_unit || 'g',
-    imageUrl: mediaUrl(i.ingredient_image_url, 'Ingredients', i.__row), note: i.note || '',
+    imageUrl: mediaUrl(i.ingredient_image_url, 'Ingredients', i.__row, allowLocal), note: i.note || '',
   }))
   const steps = (mapped.steps.get(row.listing_key) || []).sort((a, b) => Number(a.step_number) - Number(b.step_number)).map((s) => ({
-    instruction: s.instruction || '', timerMinutes: number(s.timer_minutes), imageUrl: mediaUrl(s.step_image_url, 'Steps', s.__row),
+    instruction: s.instruction || '', timerMinutes: number(s.timer_minutes), imageUrl: mediaUrl(s.step_image_url, 'Steps', s.__row, allowLocal),
   }))
-  const photos = (mapped.photos.get(row.listing_key) || []).sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)).map((p) => mediaUrl(p.photo_url, 'Photos', p.__row)).filter(Boolean)
+  const photos = (mapped.photos.get(row.listing_key) || []).sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)).map((p) => mediaUrl(p.photo_url, 'Photos', p.__row, allowLocal)).filter(Boolean)
   return {
     type, title: row.title || '', description: row.description || '', category: row.category || categoryDefault,
+    grocerySubcategory: type === 'grocery' ? groceryFacet(groceryMeta.grocery_subcategory) : '',
+    packagingType: type === 'grocery' ? groceryPack(groceryMeta.packaging_type) : '',
+    countryOfOrigin: type === 'grocery' ? extraText(groceryMeta.country_of_origin) : extraText(recipeMeta.country),
+    regionOfOrigin: type === 'grocery' ? extraText(groceryMeta.region_of_origin) : extraText(recipeMeta.region),
+    productFamily: type === 'grocery' ? extraText(groceryMeta.product_family) : '',
+    manufacturerPacker: type === 'grocery' ? extraText(groceryMeta.manufacturer_packer) : '',
+    unitsPerPack: type === 'grocery' ? number(groceryMeta.units_per_pack) : '',
+    servingSize: type === 'grocery' ? extraText(groceryMeta.serving_size) : '',
+    labelDeclaration: {
+      ingredients: type === 'grocery' ? extraText(groceryMeta.ingredients_printed_label) : '',
+      allergens: type === 'grocery' ? extraText(groceryMeta.allergen_statement_printed_label) : '',
+      claims: type === 'grocery' ? extraText(groceryMeta.claims_printed_label) : '',
+    },
+    localRecipeName: isRecipe ? extraText(recipeMeta.local_recipe_name) : '',
+    localRecipeLanguage: isRecipe ? extraText(recipeMeta.language) : '',
+    englishNameReading: isRecipe ? extraText(recipeMeta.pronunciation) : '',
+    cuisine: isRecipe ? extraText(recipeMeta.cuisine) : '',
+    preparationMinutes: isRecipe ? number(recipeMeta.prep_minutes) : '',
+    cookingMinutes: isRecipe ? number(recipeMeta.cook_minutes) : '',
+    difficulty: isRecipe ? ({ advanced:'hard', medium:'medium', easy:'easy', hard:'hard' }[String(recipeMeta.difficulty || '').trim().toLowerCase()] || 'not_declared') : 'not_declared',
     brandName: row.brand_name || '', sku: row.sku || '', images: photos, videoUrl: isRecipe ? (row.video_url || '') : '',
     baseServings: row.base_servings === '' ? (isRecipe ? 4 : '') : number(row.base_servings),
     shareRecipe: type === 'brand_recipe' || (type === 'kitchen_recipe' && truthy(row.share_recipe, true)) || (type === 'prepared_food' && truthy(row.share_recipe)),
@@ -157,7 +214,7 @@ function makePacket(row, categoryDefault, type, mapped) {
   }
 }
 
-export async function parseHostBulkWorkbook(file, allowedTypes = []) {
+export async function parseHostBulkWorkbook(file, allowedTypes = [], options = {}) {
   if (!file || !/\.xlsx$/i.test(file.name || '')) failure('Select an EPANTRY .xlsx template file.')
   const entries = await readZip(await file.arrayBuffer())
   const book = xml(entries.get('xl/workbook.xml'), 'workbook.xml')
@@ -186,12 +243,14 @@ export async function parseHostBulkWorkbook(file, allowedTypes = []) {
   if (!TYPES.has(type) || String(config.format_version) !== '1') failure('Unknown or outdated EPANTRY Excel template.')
   if (!allowedTypes.includes(type)) failure('Your Host workspace does not have permission for this listing type.')
   const listings = sheets.get('Listings') || []
-  if (!listings.length || listings.length > MAX_LISTINGS) failure('Fill 1 to 25 rows in the Listings sheet.')
+  if (!listings.length || listings.length > MAX_LISTINGS) failure('Fill 1 to 100 rows in the Listings sheet.')
   const linked = {
     photos: rowList(sheets.get('Photos') || [], 'photo_url', 'Photos'),
     ingredients: rowList(sheets.get('Ingredients') || [], 'ingredient_name', 'Ingredients'),
     steps: rowList(sheets.get('Steps') || [], 'instruction', 'Steps'),
     allergens: rowList(sheets.get('Allergens') || [], 'allergen', 'Allergens'),
+    groceryDetails: rowList(sheets.get('Grocery Details') || [], 'listing_key', 'Grocery Details'),
+    recipeDetails: rowList(sheets.get('Recipe Details') || [], 'listing_key', 'Recipe Details'),
   }
   const keys = new Set()
   for (const row of listings) {
@@ -230,7 +289,7 @@ export async function parseHostBulkWorkbook(file, allowedTypes = []) {
     if (count(linked.ingredients) > 100) failure(`Listing ${row.listing_key} has more than 100 ingredients.`)
     if (count(linked.steps) > 75) failure(`Listing ${row.listing_key} has more than 75 steps.`)
     if (count(linked.allergens) > 20) failure(`Listing ${row.listing_key} has more than 20 allergen rows.`)
-    const packet = makePacket(row, config.default_category || 'other', type, linked)
+    const packet = makePacket(row, config.default_category || 'other', type, linked, options.allowLocalMediaPaths === true)
     if (!CATEGORIES.has(packet.category)) issues.push({ row: row.__row, key: row.listing_key, message: `Unknown category: ${packet.category}` })
     if (!packet.images.length) issues.push({ row: row.__row, key: row.listing_key, message: 'Add a main image in Photos before final submission.' })
     if (type !== 'grocery' && !packet.ingredients.length) issues.push({ row: row.__row, key: row.listing_key, message: 'Ingredients sheet has no rows for this recipe.' })
@@ -245,44 +304,103 @@ export async function parseHostBulkWorkbook(file, allowedTypes = []) {
     for (const step of packet.steps) if (step.imageUrl) sources.add(step.imageUrl)
   }
   if (sources.size > MAX_REFS) failure(`This file contains ${sources.size} images; import a smaller batch (up to ${MAX_REFS} unique links).`)
-  return { template: config.template_id || type, type, packets, issues, mediaCount: sources.size }
+  return { template: config.template_id || type, type, packets, issues, mediaCount: sources.size, listingKeys: listings.map((row) => row.listing_key) }
+}
+
+// Reuse successfully imported images within the current browser session. If
+// the fifth image fails, retrying the Excel import does not reupload images 1-4.
+// This cache never writes to the database or browser storage.
+const completedWorkbookImages = new Map()
+const MAX_IMPORTED_IMAGES_IN_MEMORY = 500
+const RETRYABLE_CODES = new Set([
+  'DRIVE_TIMEOUT', 'DRIVE_NETWORK_FAILED', 'DRIVE_TEMPORARY_ERROR',
+  'CLOUDINARY_TIMEOUT', 'CLOUDINARY_NETWORK_FAILED',
+])
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+function isTransientImportError(cause) {
+  const code = String(cause?.response?.data?.code || cause?.code || '')
+  const message = String(cause?.response?.data?.message || cause?.message || '')
+  if (RETRYABLE_CODES.has(code)) return true
+  if (['DRIVE_NOT_PUBLIC', 'DRIVE_HTML_RESPONSE', 'IMAGE_FORMAT_UNSUPPORTED',
+       'IMAGE_TOO_LARGE', 'IMAGE_URL_INVALID', 'CLOUDINARY_IMAGE_INVALID'].includes(code)) return false
+  return /timeout|timed out|temporary|temporarily|rate.?limit|\b429\b|\b502\b|\b503\b|network|could not contact|unable to reach/i.test(message)
 }
 
 export async function ingestWorkbookImages(packets, importer, onProgress) {
-  const images = new Set()
-  for (const packet of packets) {
-    packet.images.forEach((url) => images.add(url))
-    packet.ingredients.forEach((i) => { if (i.imageUrl) images.add(i.imageUrl) })
-    packet.steps.forEach((s) => { if (s.imageUrl) images.add(s.imageUrl) })
+  if (!Array.isArray(packets) || typeof importer !== 'function') {
+    failure('Invalid Excel image-import request.')
   }
-  const map = new Map()
-  const urls = [...images]
-  let next = 0
+  // All images are uploaded before ANY draft-saving API call.
+  const owners = new Map()
+  function add(url, packet, role) {
+    if (!url || owners.has(url)) return
+    owners.set(url, {
+      title: packet.title || 'Untitled listing',
+      sku: packet.sku || '',
+      role,
+    })
+  }
+  for (const packet of packets) {
+    ;(packet.images || []).forEach((url, i) => add(url, packet, `main photo ${i + 1}`))
+    ;(packet.ingredients || []).forEach((item, i) => add(item.imageUrl, packet, `ingredient photo ${i + 1}`))
+    ;(packet.steps || []).forEach((item, i) => add(item.imageUrl, packet, `step photo ${i + 1}`))
+  }
+  const urls = [...owners.keys()]
+  if (urls.length > MAX_REFS) failure(`This workbook has too many unique images (maximum ${MAX_REFS}).`)
+  const resolved = new Map()
   let completed = 0
-  let error = null
-  // Import up to three files concurrently, without flooding Cloudinary or freezing the UI.
-  async function worker() {
-    while (!error) {
-      const index = next++
-      if (index >= urls.length) return
+
+  // Sequential imports prevent Google Drive from rate-limiting concurrent
+  // downloads. Cloudinary failures can be retried without making drafts.
+  for (const [index, url] of urls.entries()) {
+    const cached = completedWorkbookImages.get(url)
+    if (cached?.imageUrl) {
+      resolved.set(url, cached.imageUrl)
+      completed += 1
+      onProgress?.(completed, urls.length)
+      continue
+    }
+    let response
+    let lastError
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const reply = await importer(urls[index])
-        if (!reply?.imageUrl) failure('This image is not public or is not a supported image file.')
-        map.set(urls[index], reply.imageUrl)
-        completed++
-        onProgress?.(completed, urls.length)
+        response = await importer(url)
+        if (!response?.imageUrl || !/^https:\/\//i.test(response.imageUrl)) {
+          throw new Error('The image service did not return an EPANTRY image URL.')
+        }
+        break
       } catch (cause) {
-        error = new Error(`Image ${index + 1} (${urls[index]}): ${cause?.message || 'Import failed'}`)
-        return
+        lastError = cause
+        if (attempt === 2 || !isTransientImportError(cause)) break
+        await delay(450)
       }
     }
+    if (!response?.imageUrl) {
+      const context = owners.get(url)
+      const identity = `"${context?.title || 'Untitled listing'}"`
+      const message = lastError?.message || 'Google Drive/Cloudinary image import failed.'
+      const error = new Error(`Excel photo ${index + 1} of ${urls.length} for ${identity} (${context?.role || 'photo'}): ${message} No draft-save request was sent.`)
+      error.code = 'BULK_IMAGE_IMPORT_FAILED'
+      throw error
+    }
+    resolved.set(url, response.imageUrl)
+    // Bound cache growth; an entire successful import remains available for retry.
+    if (completedWorkbookImages.size >= MAX_IMPORTED_IMAGES_IN_MEMORY) {
+      completedWorkbookImages.delete(completedWorkbookImages.keys().next().value)
+    }
+    completedWorkbookImages.set(url, { imageUrl: response.imageUrl })
+    completed += 1
+    onProgress?.(completed, urls.length)
   }
-  await Promise.all(Array.from({ length: Math.min(3, urls.length) }, () => worker()))
-  if (error) throw error
+
   return packets.map((packet) => ({
     ...packet,
-    images: packet.images.map((url) => map.get(url)),
-    ingredients: packet.ingredients.map((row) => ({ ...row, imageUrl: row.imageUrl ? map.get(row.imageUrl) : '' })),
-    steps: packet.steps.map((row) => ({ ...row, imageUrl: row.imageUrl ? map.get(row.imageUrl) : '' })),
+    images: (packet.images || []).map((url) => resolved.get(url)),
+    ingredients: (packet.ingredients || []).map((item) => ({
+      ...item, imageUrl: item.imageUrl ? resolved.get(item.imageUrl) : '',
+    })),
+    steps: (packet.steps || []).map((item) => ({
+      ...item, imageUrl: item.imageUrl ? resolved.get(item.imageUrl) : '',
+    })),
   }))
 }
