@@ -2817,6 +2817,20 @@ export async function getPublicProductBySlug(
   const now =
     new Date()
 
+  // A public slug is normalized by buildPublicProductSlug(), so legacy raw
+  // variant/pack keys may contain hyphens while the URL contains underscores.
+  // E.g. approved-host-listing -> approved_host_listing. Both representations
+  // must resolve the SAME published canonical ProductVersion. We keep exact
+  // equality matches (index-friendly) and do not relax publication gates.
+  const variantKeyCandidates = [...new Set([
+    parsed.variantKey,
+    parsed.variantKey.replace(/_/g, '-'),
+  ])]
+  const packKeyCandidates = [...new Set([
+    parsed.packKey,
+    parsed.packKey.replace(/_/g, '-'),
+  ])]
+
   const [
     version,
   ] =
@@ -2835,11 +2849,13 @@ export async function getPublicProductBySlug(
           'family.slug':
             parsed.familySlug,
 
-          'variant.variantKey':
-            parsed.variantKey,
+          'variant.variantKey': {
+            $in: variantKeyCandidates,
+          },
 
-          'pack.packKey':
-            parsed.packKey,
+          'pack.packKey': {
+            $in: packKeyCandidates,
+          },
         },
       },
 
