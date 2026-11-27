@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { InventoryReservation } from './commerce.transaction.models.js'
 
 import {
   ApiError,
@@ -28,6 +29,7 @@ import {
 
 import {
   listPublicEligibleOffers,
+  listIngredientDiscoveryOffers,
 } from '../marketplace/marketplace.public.service.js'
 
 import {
@@ -46,6 +48,7 @@ import {
 import {
   buildCommerceComparisonOptions,
   calculatePackPlan,
+  roundCommerceQuantity,
   COMMERCE_OBJECTIVES,
   sortCandidatesForObjective,
 } from './commerce.engine.js'
@@ -422,6 +425,7 @@ async function resolveServiceableOfferCapacity({
   offerId,
   pincode,
   fulfillmentType,
+  discoveryOnly = false,
 }) {
   const normalizedPincode =
     normalizePostalCode(
@@ -483,7 +487,7 @@ async function resolveServiceableOfferCapacity({
     activeNodes,
   ] =
     await Promise.all([
-      ServiceArea
+      discoveryOnly ? Promise.resolve([]) : ServiceArea
         .find({
           organizationId:
             organization._id,
@@ -523,7 +527,7 @@ async function resolveServiceableOfferCapacity({
     )
 
   const eligibleNodeIds =
-    new Set()
+    new Set(discoveryOnly && (offer.fulfillmentTypes || []).includes('delivery') ? activeNodeIds : [])
 
   for (
     const serviceArea
@@ -629,6 +633,14 @@ async function resolveServiceableOfferCapacity({
     }
   }
 
+  // Count only unexpired reservations, not stale reservation-state counters.
+  const activeReservations = await InventoryReservation.aggregate([
+    { $match: { organizationId: organization._id, offerId: offer._id,
+        inventoryNodeId: { $in: activeNodes.filter(node => eligibleNodeIds.has(stringifyId(node._id))).map(node => node._id) },
+        status: 'active', expiresAt: { $gt: new Date() } } },
+    { $group: { _id: '$inventoryNodeId', quantity: { $sum: '$quantity' } } },
+  ])
+  const heldByNode = new Map(activeReservations.map(row => [stringifyId(row._id), row.quantity]))
   let sellableQuantity = 0
 
   let latestObservedAt = null
@@ -638,9 +650,7 @@ async function resolveServiceableOfferCapacity({
     of latestByNode.values()
   ) {
     sellableQuantity +=
-      getSellableQuantity(
-        snapshot,
-      )
+      Math.max(0, getSellableQuantity(snapshot) - (heldByNode.get(stringifyId(snapshot.inventoryNodeId)) || 0))
 
     if (
       !latestObservedAt ||
@@ -673,6 +683,56 @@ async function resolveServiceableOfferCapacity({
 | Requirement -> Eligible Marketplace Candidates
 |--------------------------------------------------------------------------
 */
+
+// Discover real approved, stocked delivery listings without a customer PIN.
+// The result is informational, not a quote or a reservation. Checkout still
+// uses matchRequirementToMarketplace and the original PIN-specific guards.
+export async function listRecipeIngredientPacks({ canonicalIngredientIds, now = new Date() }) {
+  const packsByIngredient = Object.create(null)
+  // Deduplicate repeated versions and offers. Never use a historic version's size.
+  const publicLookups = new Map()
+  for (const canonicalIngredientId of new Set(canonicalIngredientIds.map(String))) {
+    const rows = []
+    const seen = new Set()
+    const versions = await findConservativeProductVersions({ canonicalIngredientId, now })
+    for (const { version } of versions) {
+      const packId = stringifyId(version.packId)
+      const packQuantity = Number(version.netQuantity?.value)
+      const packUnit = version.netQuantity?.unit
+      if (!packId || !Number.isFinite(packQuantity) || packQuantity <= 0 || !packUnit) continue
+      if (!publicLookups.has(packId)) {
+        publicLookups.set(packId, listIngredientDiscoveryOffers(packId).catch(error => {
+          if (error?.statusCode === 404 || error?.status === 404) return null
+          throw error
+        }))
+      }
+      const result = await publicLookups.get(packId)
+      if (!result || result.productVersionId !== stringifyId(version._id)) continue
+      for (const offer of result.offers || []) {
+        if (seen.has(String(offer.id))) continue
+        const amountMinor = Number(offer.price?.effectiveAmountMinor)
+        const currency = offer.price?.currency
+        if (offer.price?.effectiveAmountMinor == null || !Number.isSafeInteger(amountMinor) || amountMinor < 0 || !currency) continue
+        const capacity = await resolveServiceableOfferCapacity({ offerId: offer.id, fulfillmentType: 'delivery', discoveryOnly: true })
+        const minimumPackCount = Math.max(1, Number(offer.minimumOrderQuantity) || 1)
+        const maximumPackCount = Math.min(100000, Math.floor(capacity.sellableQuantity),
+          offer.maximumOrderQuantity == null ? 100000 : Math.floor(Number(offer.maximumOrderQuantity)))
+        if (!Number.isSafeInteger(maximumPackCount) || maximumPackCount < minimumPackCount) continue
+        seen.add(String(offer.id))
+        rows.push({ offerId: String(offer.id), packId, productVersionId: stringifyId(version._id),
+          productDisplayName: version.displayName || '', sellerName: offer.seller?.name || 'Marketplace Host',
+          packQuantity, packUnit, minimumPackCount, maximumPackCount,
+          unitPrice: { amountMinor, currency } })
+      }
+    }
+    packsByIngredient[canonicalIngredientId] = rows.sort((a,b) => a.packUnit.localeCompare(b.packUnit) || a.packQuantity-b.packQuantity || a.unitPrice.amountMinor-b.unitPrice.amountMinor)
+  }
+  return { packsByIngredient }
+}
+
+function isExactSinglePack(match) {
+  return match.packCount === 1 && roundCommerceQuantity(match.packQuantityInRequirementUnit) === roundCommerceQuantity(match.requirementQuantity)
+}
 
 async function matchRequirementToMarketplace({
   requirement,
@@ -893,6 +953,14 @@ async function matchRequirementToMarketplace({
           packPlan
             .packQuantityInRequirementUnit,
 
+        productDisplayName: String(version.displayName || '').slice(0, 300),
+
+        maximumPackCount: Math.min(
+          100000,
+          Math.floor(capacity.sellableQuantity),
+          offer.maximumOrderQuantity == null ? 100000 : Math.floor(Number(offer.maximumOrderQuantity)),
+        ),
+
         packCount:
           packPlan.packCount,
 
@@ -952,10 +1020,10 @@ async function matchRequirementToMarketplace({
       candidates,
       'best_value',
     )
-      .slice(
-        0,
-        PRODUCT_MATCH_LIMIT_PER_REQUIREMENT,
-      )
+      // Keep exact single-pack matches in the bounded quote even if a
+      // cheaper oversized pack ranks ahead of them.
+      .sort((a, b) => Number(isExactSinglePack(b)) - Number(isExactSinglePack(a)))
+      .slice(0, PRODUCT_MATCH_LIMIT_PER_REQUIREMENT)
       .map(
         (
           candidate,
@@ -1053,6 +1121,9 @@ function serializeProductMatch(raw) {
     packQuantityInRequirementUnit:
       match
         .packQuantityInRequirementUnit,
+
+    productDisplayName: match.productDisplayName || '',
+    maximumPackCount: match.maximumPackCount ?? match.packCount,
 
     packCount:
       match.packCount,
@@ -1464,6 +1535,7 @@ export async function optimizeOutcomeBasket({
   const quoteId =
     new mongoose.Types.ObjectId()
 
+  const requirementLabels = new Map((outcome.requirementBasket || []).map(line => [stringifyId(line.requirementLineId), line.label]))
   const candidateGroups = []
 
   const unmatchedRequirementLineIds =
@@ -1475,7 +1547,7 @@ export async function optimizeOutcomeBasket({
   ) {
     const result =
       await matchRequirementToMarketplace({
-        requirement,
+        requirement: { ...requirement, label: requirementLabels.get(stringifyId(requirement.requirementLineId)) || requirement.label || '' },
 
         pincode:
           normalizedPincode,
@@ -1829,11 +1901,8 @@ async function revalidateProductMatchForCart({
     )
 
   if (
-    currentPriceMinor !==
-    Number(
-      match.unitPrice
-        ?.amountMinor,
-    )
+    currentPriceMinor !== Number(match.unitPrice?.amountMinor) ||
+    (currentOffer.price?.currency || 'INR') !== (match.unitPrice?.currency || 'INR')
   ) {
     throw new ApiError(
       409,
@@ -1867,12 +1936,9 @@ async function revalidateProductMatchForCart({
     })
 
   if (
-    Number(
-      capacity.sellableQuantity,
-    ) <
-    Number(
-      match.packCount,
-    )
+    Number(capacity.sellableQuantity) < Number(match.packCount) ||
+    Number(match.packCount) < Number(currentOffer.minimumOrderQuantity || 1) ||
+    (currentOffer.maximumOrderQuantity != null && Number(match.packCount) > Number(currentOffer.maximumOrderQuantity))
   ) {
     throw new ApiError(
       409,
@@ -2171,6 +2237,7 @@ function serializeCart(rawCart) {
 export async function createMarketplaceCart({
   basketQuoteId,
   optionKey,
+  packSelections,
   idempotencyKey,
   actorUser,
 }) {
@@ -2296,27 +2363,10 @@ export async function createMarketplaceCart({
     )
   }
 
-  const selectedMatches =
-    await ProductMatch
-      .find({
-        basketQuoteId:
-          quote._id,
-
-        _id: {
-          $in:
-            option.productMatchIds ||
-            [],
-        },
-      })
-      .lean()
-
-  if (
-    selectedMatches.length !==
-    (
-      option.productMatchIds ||
-      []
-    ).length
-  ) {
+  const custom = packSelections !== undefined
+  const selectionIds = custom ? packSelections.map(entry => entry.productMatchId) : (option.productMatchIds || [])
+  const selectedMatches = await ProductMatch.find({ basketQuoteId: quote._id, _id: { $in: selectionIds } }).lean()
+  if (selectedMatches.length !== selectionIds.length) {
     throw new ApiError(
       409,
       'Basket quote selection is incomplete.',
@@ -2329,12 +2379,30 @@ export async function createMarketplaceCart({
     )
   }
 
+  // Match IDs are owned quote records. Never accept client pack sizes,
+  // ingredient quantities, prices or stock values.
+  const countsByMatch = new Map((packSelections || []).map(entry => [stringifyId(entry.productMatchId), entry.packCount]))
+  const requiredIds = new Set((outcome.productMatchingInput || []).map(row => stringifyId(row.requirementLineId)))
+  const chosenIds = new Set(selectedMatches.map(row => stringifyId(row.requirementLineId)))
+  if (custom && (chosenIds.size !== requiredIds.size || chosenIds.size !== selectedMatches.length || [...requiredIds].some(id => !chosenIds.has(id)))) {
+    throw new ApiError(409, 'Choose one pack option for every recipe ingredient.', [{ code: 'CART_REQUIREMENTS_UNMATCHED' }])
+  }
   const cartItems = []
+  const totalsByOffer = new Map()
+  let selectedCurrency = null
 
-  for (
-    const match
-    of selectedMatches
-  ) {
+  for (const originalMatch of selectedMatches) {
+    const match = { ...originalMatch }
+    if (custom) {
+      const count = countsByMatch.get(stringifyId(match._id))
+      const supplied = roundCommerceQuantity(count * match.packQuantityInRequirementUnit)
+      if (!Number.isSafeInteger(count) || count < match.packCount || count > (match.maximumPackCount ?? match.packCount) || supplied < roundCommerceQuantity(match.requirementQuantity)) {
+        throw new ApiError(409, 'Selected packs must cover the ingredient quantity and stay within the available order limit.', [{ code: 'CART_PACK_COUNT_INVALID' }])
+      }
+      match.packCount = count
+      match.suppliedQuantity = supplied
+      match.surplusQuantity = roundCommerceQuantity(Math.max(0, supplied - match.requirementQuantity))
+    }
     const {
       currentOffer,
       capacity,
@@ -2344,12 +2412,25 @@ export async function createMarketplaceCart({
         quote,
       })
 
+    if (custom) {
+      const key = stringifyId(match.offerId)
+      const total = (totalsByOffer.get(key) || 0) + match.packCount
+      if (total > capacity.sellableQuantity || (currentOffer.maximumOrderQuantity != null && total > Number(currentOffer.maximumOrderQuantity))) {
+        throw new ApiError(409, 'Combined selected packs exceed available stock. Refresh and choose again.', [{ code: 'BASKET_QUOTE_INVENTORY_CHANGED' }])
+      }
+      totalsByOffer.set(key, total)
+      const currency = currentOffer.price.currency || 'INR'
+      if (selectedCurrency && selectedCurrency !== currency) throw new ApiError(409, 'Choose packs in the same currency.')
+      selectedCurrency = currency
+    }
     cartItems.push({
       requirementLineId:
         match.requirementLineId,
 
       productMatchId:
         match._id,
+
+      displayName: match.productDisplayName || match.requirementLabel || '',
 
       canonicalIngredientId:
         match
@@ -2449,6 +2530,10 @@ export async function createMarketplaceCart({
       0,
     )
 
+  if (custom && (!Number.isSafeInteger(itemSubtotalMinor) || itemSubtotalMinor < 0)) {
+    throw new ApiError(409, 'Selected pack total is invalid. Refresh the quote.')
+  }
+
   const sellerCount =
     new Set(
       cartItems.map(
@@ -2477,7 +2562,7 @@ export async function createMarketplaceCart({
         basketQuoteId:
           quote._id,
 
-        optionKey,
+        optionKey: custom ? null : optionKey,
 
         pincode:
           quote.pincode,
@@ -2502,8 +2587,7 @@ export async function createMarketplaceCart({
           'item_prices_only',
 
         currency:
-          option.currency ||
-          'INR',
+          selectedCurrency || option.currency || 'INR',
 
         sellerCount,
 

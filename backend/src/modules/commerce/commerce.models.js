@@ -162,6 +162,14 @@ const productMatchSchema = new Schema(
       trim: true,
     },
 
+    productDisplayName: { type: String, trim: true, maxlength: 300, default: '' },
+
+    maximumPackCount: {
+      type: Number,
+      min: 1,
+      default: null,
+    },
+
     packQuantityInRequirementUnit: {
       type: Number,
       required: true,

@@ -1849,7 +1849,6 @@ export default function HostOperationsPage({ section = "dashboard" }) {
   const [serviceAreas, setServiceAreas] = useState([]);
 
   const [sharedDeliveryArea, setSharedDeliveryArea] = useState(null);
-  const [previousDeliveryPins, setPreviousDeliveryPins] = useState([]);
   const deliveryAreaEditedRef = useRef(false);
 
   const [sharedDeliveryLoadError, setSharedDeliveryLoadError] = useState("");
@@ -2216,29 +2215,14 @@ export default function HostOperationsPage({ section = "dashboard" }) {
         const exactSharedArea = (sharedCoverageResult?.serviceAreas || []).find(
           (area) => area.serviceAreaKey === SHARED_DELIVERY_AREA_KEY
         ) || null;
-        const originalPins = [...new Set(
-          activeAreas
-            .filter((area) =>
-              area.status === "active" &&
-              area.serviceAreaKey !== SHARED_DELIVERY_AREA_KEY &&
-              (area.fulfillmentTypes || []).includes("delivery")
-            )
-            .flatMap((area) => area.postalCodes || [])
-            .map((pin) => String(pin).trim())
-            .filter((pin) => /^[1-9][0-9]{5}$/.test(pin))
-        )].sort();
-        setPreviousDeliveryPins(originalPins);
         setSharedDeliveryArea(exactSharedArea);
         const coverageError = results[14]?.status === "fulfilled" && results[16]?.status === "fulfilled"
           ? ""
           : "Existing delivery coverage could not be loaded completely. Refresh before saving.";
         setSharedDeliveryLoadError(coverageError);
         if (!deliveryAreaEditedRef.current && !coverageError) {
-          // An existing business default takes priority. Until one is saved,
-          // restore all unique PINs from legacy per-product coverage for editing.
-          const pins = exactSharedArea?.postalCodes?.length
-            ? exactSharedArea.postalCodes
-            : originalPins;
+          // Item-specific PINs must never become business coverage implicitly.
+          const pins = exactSharedArea?.postalCodes || [];
           setDeliveryAreaForm({ postalCodes: pins.join(", ") });
         }
 
@@ -2358,9 +2342,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
     return JSON.stringify(profileForm) !== JSON.stringify(savedProfileForm);
   }, [profileForm, savedProfileForm]);
 
-  const displayedDeliveryPins = sharedDeliveryArea?.postalCodes?.length
-    ? sharedDeliveryArea.postalCodes
-    : previousDeliveryPins;
+  const displayedDeliveryPins = sharedDeliveryArea?.postalCodes || [];
 
   // This is a read-only preview. Only Host-selected items are ever submitted.
   useEffect(() => {
@@ -2405,6 +2387,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
     const isSellable = kind === "grocery" || kind === "prepared_food" ||
       (kind === "kitchen_recipe" && packet.sellReadyMade === true);
     if (!isSellable || packet.delivery?.fulfillment === "pickup") return false;
+    if (Array.isArray(packet.delivery?.extraPostalCodes)) return false; // Inherits current business PINs live.
     const existing = [...new Set((packet.delivery?.postalCodes || []).map(String))].sort();
     return JSON.stringify(existing) !== JSON.stringify(coveragePublishedPins);
   }), [coverageListingRows, coveragePublishedPins]);
@@ -3451,6 +3434,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                           const sells = type === "grocery" || type === "prepared_food" ||
                             (type === "kitchen_recipe" && packet.sellReadyMade === true);
                           if (!row.id || row.status !== "approved" || !sells || packet.delivery?.fulfillment === "pickup") continue;
+                          if (Array.isArray(packet.delivery?.extraPostalCodes)) continue; // Keep explicit item extras intact.
                           const currentPins = [...new Set((packet.delivery?.postalCodes || []).map(String))].sort();
                           if (JSON.stringify(currentPins) === JSON.stringify(sortedPins)) continue;
                           const title = row.title || packet.title || String(row.id);
@@ -3509,9 +3493,6 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                     <span>+{displayedDeliveryPins.length - 12} more</span>
                   ) : null}
                 </div>
-                {!sharedDeliveryArea && !sharedDeliveryLoadError && displayedDeliveryPins.length ? (
-                  <p className="hops-coverage-note">Previous delivery PINs are restored in the form. Save to make them the business default.</p>
-                ) : null}
                 {!sharedDeliveryArea && !sharedDeliveryLoadError && !displayedDeliveryPins.length ? (
                   <p className="hops-coverage-note">No delivery PIN codes have been saved yet.</p>
                 ) : null}
@@ -3523,7 +3504,7 @@ export default function HostOperationsPage({ section = "dashboard" }) {
                 <div className="max-w-[660px]">
                   <h3 className="text-[18px] font-extrabold leading-tight text-[#173F35]">Existing approved products</h3>
                   <p className="mt-1 text-[14px] leading-6 text-[#43554B]">
-                    Business PINs are used for new listings. Existing approved items retain their previous PINs until Super Admin approves a delivery update. Use the bulk button below or choose individual products.
+                    New-style listings inherit business PINs automatically and keep their own extra PINs. Older listings can be updated through the existing Super Admin review below.
                   </p>
                 </div>
                 <button type="button" onClick={() => setCoverageRefreshCounter((count) => count + 1)}

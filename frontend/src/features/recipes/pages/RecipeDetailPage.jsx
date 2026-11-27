@@ -48,10 +48,6 @@ import {
 } from '../../auth/context/AuthContext'
 
 import {
-  checkItemAvailability,
-} from '../../analytics/services/analytics.service'
-
-import {
   openAvailabilityNotifyModal,
 } from '../../notifications/components/AvailabilityNotifyModal'
 
@@ -60,6 +56,7 @@ import {
   createRestaurantRecipeMarketplaceCart,
   createDirectMarketplaceCart,
   getCommerceErrorMessage,
+  optimizeBasket,
 } from '../../commerce/services/commerce.service'
 
 import {
@@ -301,6 +298,124 @@ function getPantryLineStatus(
     line?.pantryStatus ||
     'uncertain'
   )
+}
+
+// The discovery endpoint is independent of delivery PIN and never reserves stock.
+async function loadIngredientPackAvailability(ids) {
+  const response = await apiClient.get('/recipe-ingredient-packs', {
+    params: { ingredientIds: ids.join(',') },
+  })
+  const result = response?.data?.data?.packsByIngredient
+  if (!result || typeof result !== 'object' || ids.some(id => !Array.isArray(result[id]))) {
+    throw new Error('Unable to verify EPANTRY pack availability.')
+  }
+  return result
+}
+
+function packKey(row) {
+  return `${row.offerId}:${row.packId}:${row.productVersionId}`
+}
+
+function IngredientPackDialog({ request, onFinish }) {
+  const ref = useRef(null)
+  const [pin, setPin] = useState(() => /^\d{6}$/.test(String(request.savedSelection?.pincode || '')) ? String(request.savedSelection.pincode) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [checkedPin, setCheckedPin] = useState('')
+  const [verified, setVerified] = useState({})
+  const candidates = request.packs || []
+  const saved = request.savedSelection
+  const exact = candidates.find(row => row.packUnit === request.unit && Number(row.packQuantity) === Number(request.quantity) && row.minimumPackCount <= 1)
+  const initial = candidates.find(row => saved && packKey(row) === packKey(saved)) || exact || candidates[0]
+  const [selectedKey, setSelectedKey] = useState(() => initial ? packKey(initial) : '')
+  const initialCount = row => Math.min(row.maximumPackCount, Math.max(row.minimumPackCount,
+    row.packUnit === request.unit ? Math.ceil(request.quantity / row.packQuantity) : 1))
+  const [count, setCount] = useState(() => initial ? (saved && packKey(initial) === packKey(saved) && saved.packCount >= initial.minimumPackCount && saved.packCount <= initial.maximumPackCount ? saved.packCount : initialCount(initial)) : 1)
+  const sequence = useRef(0)
+  const choice = candidates.find(row => packKey(row) === selectedKey)
+  const quoteChoice = checkedPin === pin.trim() ? verified[selectedKey] : null
+  const minCount = choice ? Math.max(choice.minimumPackCount, quoteChoice?.packCount || 1) : 1
+  const maxCount = choice ? Math.min(choice.maximumPackCount, quoteChoice?.maximumPackCount ?? choice.maximumPackCount) : 0
+  const supplied = quoteChoice ? Math.round(quoteChoice.packQuantityInRequirementUnit * count * 1000000) / 1000000 : 0
+  const extra = quoteChoice ? Math.round((supplied - quoteChoice.requirementQuantity) * 1000000) / 1000000 : 0
+  const valid = Boolean(!busy && choice && quoteChoice && count >= minCount && count <= maxCount && extra >= 0)
+  const checkDelivery = async (postalCode) => {
+    const ticket = ++sequence.current
+    setVerified({}); setCheckedPin(''); setError(''); setBusy(true)
+    try {
+      if (!/^\d{6}$/.test(postalCode)) throw new Error('Enter a valid 6-digit Indian delivery PIN.')
+      const outcome = await createRecipeOutcomePlan(request.slug, {
+        targetServings: request.servings, purchaseMode: request.purchaseMode,
+        selectedCanonicalIngredientIds: [request.canonicalIngredientId],
+        idempotencyKey: createOutcomePlanIdempotencyKey('ingredient-pack-preview'),
+      })
+      if (!outcome?.plan?.id) throw new Error('Unable to confirm the recipe quantity.')
+      const quote = await optimizeBasket({ outcomePlanId: outcome.plan.id, pincode: postalCode,
+        objective: 'best_value', fulfillmentType: 'delivery',
+        idempotencyKey: createCommerceIdempotencyKey('ingredient-pack-preview') })
+      if (ticket !== sequence.current) return
+      const rows = Object.values(quote?.candidatesByRequirement || {}).flat().filter(row =>
+        String(row.canonicalIngredientId) === request.canonicalIngredientId && row.offerId && row.packId &&
+        Number.isSafeInteger(row.packCount) && row.packCount > 0 && row.maximumPackCount >= row.packCount &&
+        row.packQuantityInRequirementUnit > 0 && row.requirementQuantity > 0 && Number.isInteger(row.unitPrice?.amountMinor))
+      const next = Object.fromEntries(rows.map(row => [packKey(row), row]))
+      setVerified(next); setCheckedPin(postalCode)
+      // Keep the customer-selected offer and count; prompt for changes if needed.
+    } catch (err) {
+      if (ticket === sequence.current) setError(getCommerceErrorMessage(err, err?.message || 'Unable to verify delivery. Please try again.'))
+    } finally { if (ticket === sequence.current) setBusy(false) }
+  }
+  useEffect(() => {
+    const dialog = ref.current
+    if (dialog && !dialog.open) dialog.showModal()
+    let active = true
+    // Prefill a saved Indian PIN, but do not hide packs or run the PIN check automatically.
+    getDefaultDeliveryAddress().then(result => {
+      if (!active) return
+      const address = result?.address
+      if (address?.country && !['india','in','ind'].includes(String(address.country).trim().toLowerCase())) return
+      const postalCode = String(address?.postalCode || '').trim()
+      if (/^\d{6}$/.test(postalCode)) setPin(previous => previous || postalCode)
+    }).catch(() => {})
+    return () => { active = false; sequence.current++; if (dialog?.open) dialog.close() }
+  }, [])
+  const price = quoteChoice?.unitPrice || choice?.unitPrice
+  const selectRow = row => {
+    setSelectedKey(packKey(row))
+    const checked = checkedPin === pin.trim() ? verified[packKey(row)] : null
+    setCount(checked ? checked.packCount : initialCount(row))
+  }
+  return <dialog ref={ref} aria-labelledby="ingredient-pack-title" onCancel={event => { event.preventDefault(); onFinish(null) }}
+    style={{position:'fixed',inset:0,margin:'auto',width:'min(620px, calc(100% - 24px))',maxHeight:'88dvh',overflow:'auto',padding:0,border:'1px solid #D7DDCF',borderRadius:16,background:'#F7F6F2',color:'#202421',boxShadow:'0 20px 70px #20242155'}}>
+    <style>{`dialog[aria-labelledby="ingredient-pack-title"]::backdrop{background:#20242199} dialog[aria-labelledby="ingredient-pack-title"]:focus{outline:none} .ep-ingredient-pack-option{display:flex;align-items:flex-start;gap:12px;padding:14px;border-bottom:1px solid #D7DDCF;cursor:pointer} .ep-ingredient-pack-option strong,.ep-ingredient-pack-option p{color:#202421!important} .ep-ingredient-pack-btn{background:#C56C42!important;color:#202421!important;border-radius:8px;padding:10px 16px;font-weight:700;min-height:42px} .ep-ingredient-pack-btn:disabled{opacity:.5;cursor:not-allowed}`}</style>
+    <header style={{background:'#C56C42',padding:'18px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><div><h2 id="ingredient-pack-title" style={{fontSize:24,fontWeight:750,color:'#202421'}}>Choose packs</h2><p style={{color:'#202421',fontSize:16}}>{request.name}</p></div><button type="button" aria-label="Close pack selection" onClick={()=>onFinish(null)} style={{background:'#F7F6F2',color:'#202421',padding:10,borderRadius:8}}><X size={20}/></button></header>
+    <div style={{padding:20}}>
+      <div style={{background:'#D7DDCF',padding:12,borderRadius:8,fontWeight:700,color:'#173F35'}}>Required: {quoteChoice?.requirementQuantity ?? request.quantity} {quoteChoice?.requirementUnit || request.unit}</div>
+      <h3 style={{fontSize:17,fontWeight:700,margin:'16px 0 2px',color:'#202421'}}>Available on EPANTRY</h3>
+      {candidates.map(row=>{const checked = checkedPin === pin.trim() ? verified[packKey(row)] : null; return <label className="ep-ingredient-pack-option" key={packKey(row)} style={{background:selectedKey===packKey(row)?'#C56C421A':'transparent'}}><input type="radio" name="ingredient-pack" checked={selectedKey===packKey(row)} disabled={busy} onChange={()=>selectRow(row)} style={{accentColor:'#173F35',marginTop:5}}/><div style={{flex:1,minWidth:0}}><strong>{row.packQuantity} {row.packUnit} pack</strong><p style={{fontSize:14,overflowWrap:'anywhere'}}>{row.productDisplayName || request.name} · {row.sellerName}</p><p style={{fontSize:14}}>{checked ? `${checked.maximumPackCount} max orderable · ${checked.packCount} needed` : `${row.maximumPackCount} listed stock limit · PIN not verified`}</p>{checkedPin && <p style={{fontSize:14,fontWeight:600}}>{checked ? 'Delivery verified for this PIN' : 'Required quantity not verified for this PIN'}</p>}</div><strong style={{whiteSpace:'nowrap'}}>{formatMoney(checked?.unitPrice || row.unitPrice)}</strong></label>})}
+      {choice && <><div style={{display:'flex',alignItems:'center',gap:12,marginTop:16,flexWrap:'wrap'}}><button type="button" aria-label="Decrease packs" disabled={busy || count<=choice.minimumPackCount} onClick={()=>setCount(v=>v-1)} style={{border:'1px solid #D7DDCF',padding:10,borderRadius:8,color:'#173F35'}}><Minus size={18}/></button><output style={{fontWeight:700}}>{count}</output><button type="button" aria-label="Increase packs" disabled={busy || count>=maxCount} onClick={()=>setCount(v=>v+1)} style={{border:'1px solid #D7DDCF',padding:10,borderRadius:8,color:'#173F35'}}><Plus size={18}/></button><strong style={{marginLeft:'auto',color:'#173F35'}}>{formatMoney({...price,amountMinor:price.amountMinor*count})}</strong></div>
+        <p aria-live="polite" style={{marginTop:12,color:'#173F35'}}>Selected: {formatQuantity(choice.packQuantity*count)} {choice.packUnit}{quoteChoice ? ` · ${extra===0?'Exact quantity':extra>0?`${extra} ${quoteChoice.requirementUnit} extra`:`${-extra} ${quoteChoice.requirementUnit} still needed`}` : ''}</p></>}
+      <div style={{borderTop:'1px solid #D7DDCF',marginTop:20,paddingTop:16}}>
+        <h3 style={{fontSize:17,fontWeight:700,marginBottom:8,color:'#202421'}}>Check delivery availability</h3>
+        <form onSubmit={event=>{event.preventDefault();void checkDelivery(pin.trim())}} style={{display:'flex',gap:8,alignItems:'end',flexWrap:'wrap'}}><label style={{flex:'1 1 160px',fontSize:14,fontWeight:600,color:'#202421'}}>Delivery PIN<input aria-label="Delivery PIN" inputMode="numeric" maxLength={6} value={pin} disabled={busy} onChange={event=>{setPin(event.target.value.replace(/\D/g,''));setVerified({});setCheckedPin('');setError('')}} style={{display:'block',width:'100%',background:'#fff',color:'#202421',border:'1px solid #D7DDCF',borderRadius:8,padding:10,marginTop:4}}/></label><button className="ep-ingredient-pack-btn" disabled={busy || !/^\d{6}$/.test(pin)} type="submit">Check delivery</button></form>
+        {busy && <p role="status" style={{color:'#173F35',padding:'12px 0'}}>Checking delivery and stock...</p>}
+        {error && <p role="alert" style={{color:'#8F3226',padding:12,background:'#F7E6DD',borderRadius:8,marginTop:10}}>{error}</p>}
+        {!busy && checkedPin && <p role="status" style={{marginTop:10,fontWeight:600,color:quoteChoice?'#173F35':'#8F3226'}}>{quoteChoice ? `Delivery available for ${checkedPin}. ${count < minCount ? `Select at least ${minCount} packs.` : count > maxCount ? `Only ${maxCount} packs can be ordered.` : ''}` : `The selected pack cannot be confirmed for the required quantity at ${checkedPin}. Choose another pack or PIN.`}</p>}
+        {!busy && checkedPin && !quoteChoice && <button type="button" onClick={()=>{onFinish(null);openAvailabilityNotifyModal({query:request.name,displayName:request.name,canonicalIngredientId:request.canonicalIngredientId,source:'recipe'})}} style={{color:'#173F35',fontWeight:700,textDecoration:'underline',marginTop:8}}>Notify me when available</button>}
+      </div>
+    </div>
+    <footer style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:16,background:'#D7DDCF',flexWrap:'wrap'}}><button type="button" onClick={()=>onFinish(null)} style={{color:'#173F35',fontWeight:600}}>Cancel</button><button type="button" className="ep-ingredient-pack-btn" disabled={!valid} onClick={()=>{if(valid) onFinish({offerId:quoteChoice.offerId,packId:quoteChoice.packId,productVersionId:quoteChoice.productVersionId,packCount:count,packQuantity:quoteChoice.packQuantity,packUnit:quoteChoice.packUnit,requirementQuantity:quoteChoice.requirementQuantity,requirementUnit:quoteChoice.requirementUnit,unitPrice:quoteChoice.unitPrice,sellerName:quoteChoice.sellerName,productDisplayName:quoteChoice.productDisplayName,pincode:pin,suppliedQuantity:supplied})}}>Add selected packs</button></footer>
+  </dialog>
+}
+
+function RecipeTrolleyItem({ item, ingredient }) {
+  const photo = item.imageUrl || ingredient?.imageUrl || ingredient?.ingredient?.imageUrl || ''
+  const [failed, setFailed] = useState(false)
+  useEffect(()=>setFailed(false),[photo])
+  return <div className="ep-trolley-item" title={item.name}>
+    {photo && !failed ? <img src={photo} alt={item.name} onError={()=>setFailed(true)} loading="lazy"/> : <span>{item.name}</span>}
+    {item.packSelection && <small>{item.packSelection.packCount}x</small>}
+  </div>
 }
 
 function savePendingRecipeCart(
@@ -1262,6 +1377,19 @@ export default function RecipeDetailPage() {
     }
   }, [ingredientMatchStorageKey])
   const [resolvedIngredientIds, setResolvedIngredientIds] = useState(() => new Set())
+  const [ingredientPackRequest, setIngredientPackRequest] = useState(null)
+  const ingredientPackResolve = useRef(null)
+  const finishIngredientPack = useCallback((selection) => {
+    const resolve = ingredientPackResolve.current
+    ingredientPackResolve.current = null
+    setIngredientPackRequest(null)
+    resolve?.(selection)
+  }, [])
+  useEffect(() => () => {
+    ingredientPackResolve.current?.(null)
+    ingredientPackResolve.current = null
+  }, [slug])
+
   const [pantrySetupItem, setPantrySetupItem] = useState(null)
   const [setupQuantity, setSetupQuantity] = useState('')
   const [setupUnit, setSetupUnit] = useState('g')
@@ -1873,6 +2001,30 @@ export default function RecipeDetailPage() {
     return canonicalIngredientId ? { ...ingredient, canonicalIngredientId } : ingredient
   }), [rawIngredientRows, confirmedIngredientIds, catalogRecoveredIds])
 
+  const [ingredientAvailability, setIngredientAvailability] = useState({ key: '', rows: {}, error: '' })
+  const [ingredientAvailabilityRetry, setIngredientAvailabilityRetry] = useState(0)
+  const ingredientAvailabilityIds = useMemo(() => [...new Set(ingredientRows.map(getRecipeIngredientCanonicalId).filter(Boolean))].sort().join(','), [ingredientRows])
+  const ingredientAvailabilityKey = `${slug}:${String(user?.id || user?._id || user?.uid || '')}:${ingredientAvailabilityIds}:${ingredientAvailabilityRetry}`
+  const availableIngredientPacks = ingredientAvailability.key === ingredientAvailabilityKey ? ingredientAvailability.rows : {}
+  const ingredientAvailabilityError = ingredientAvailability.key === ingredientAvailabilityKey ? ingredientAvailability.error : ''
+  useEffect(() => {
+    if (!canUseCustomerFeatures || !ingredientAvailabilityIds) return undefined
+    let active = true
+    const ids = ingredientAvailabilityIds.split(',')
+    const load = async () => {
+      const rows = {}
+      // Bounded requests; no per-ingredient request storm.
+      for (let i = 0; i < ids.length; i += 15) {
+        const result = await loadIngredientPackAvailability(ids.slice(i, i+15))
+        Object.assign(rows, result)
+        if (!active) return
+        setIngredientAvailability({ key: ingredientAvailabilityKey, rows: { ...rows }, error: '' })
+      }
+    }
+    load().catch(() => { if (active) setIngredientAvailability({ key: ingredientAvailabilityKey, rows: {}, error: 'Could not check product availability.' }) })
+    return () => { active = false }
+  }, [canUseCustomerFeatures, ingredientAvailabilityIds, ingredientAvailabilityKey])
+
   // For names that have no unambiguous automatic match, the customer can
   // choose the correct EXISTING catalog ingredient once, directly from I have.
   useEffect(() => {
@@ -2264,6 +2416,7 @@ export default function RecipeDetailPage() {
 
   useEffect(() => {
     ingredientDecisionLockRef.current.clear()
+    finishIngredientPack(null)
     restaurantOrderResumeRef.current = false
     setResolvedIngredientIds(new Set())
     setPantrySetupItem(null)
@@ -2361,7 +2514,7 @@ export default function RecipeDetailPage() {
         const next = current.filter(
           (item) => item.canonicalIngredientId !== canonicalIngredientId,
         )
-        savePendingRecipeCart({ slug, servings, items: next })
+        savePendingRecipeCart({ slug, servings, items: next, ...(hostListingMode ? { purchaseMode: 'full_recipe' } : {}) })
         notifyFloatingCartUpdated()
         return next
       })
@@ -2505,66 +2658,47 @@ export default function RecipeDetailPage() {
     const name = identity.name || 'Ingredient'
     const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
 
-    if (!canonicalIngredientId) {
-      setCartError(
-        'This Recipe ingredient is not linked to a canonical ingredient and cannot be added to the Recipe Cart yet.',
-      )
-      return false
-    }
+    if (!canonicalIngredientId || !availableIngredientPacks[canonicalIngredientId]?.length) return false
 
     const reconciliationLine = pantryByIngredientId.get(canonicalIngredientId)
     const state = getPantryLineStatus(reconciliationLine)
     const required = Number(reconciliationLine?.requiredQuantity)
     const confirmed = reconciliationLine?.confirmedAvailableQuantity
     const available = confirmed == null ? NaN : Number(confirmed)
-    const quantity = Math.round((required - available) * 1000000) / 1000000
+    let quantity = Math.round((required - available) * 1000000) / 1000000
+    let unit = reconciliationLine?.requiredUnit
     const sameCanonicalIdCount = ingredientRows.filter(
       item => getRecipeIngredientCanonicalId(item) === canonicalIngredientId,
     ).length
-    if (sameCanonicalIdCount !== 1 || !['missing', 'partial'].includes(state) ||
+    if (hostListingMode) {
+      // I want is an explicit request for the recipe amount, not an estimate
+      // of Pantry shortage. Recompute from the published base and servings.
+      const baseRow = (data?.ingredients || []).find(row => String(row.id) === String(ingredient.id))
+      const base = Number(data?.recipe?.baseServings)
+      const raw = baseRow?.quantity == null || baseRow.quantity === '' ? NaN : Number(baseRow.quantity)
+      quantity = Math.round(raw * (baseRow?.scalingRule === 'fixed' ? 1 : Number(servings) / base) * 1000) / 1000
+      unit = baseRow?.unit
+      if (sameCanonicalIdCount !== 1 || !Number.isFinite(base) || base <= 0 ||
+          !Number.isFinite(quantity) || quantity <= 0 || !String(unit || '').trim()) {
+        setCartError('This ingredient needs a unique, confirmed recipe quantity before it can be bought.')
+        return false
+      }
+    } else if (sameCanonicalIdCount !== 1 || !['missing', 'partial'].includes(state) ||
         !Number.isFinite(required) || !Number.isFinite(available) ||
-        !Number.isFinite(quantity) || quantity <= 0 ||
-        !String(reconciliationLine?.requiredUnit || '').trim()) {
-      setCartError('An exact, unique missing quantity could not be confirmed for this line. Use “Check missing & shop” for the server-verified basket; uncertain Pantry amounts are not guessed.')
+        !Number.isFinite(quantity) || quantity <= 0 || !String(unit || '').trim()) {
+      setCartError('Your Pantry quantity is not confirmed. Use Check missing & shop to review this ingredient.')
       return false
     }
     setCartError('')
 
-    try {
-      const availability =
-        await checkItemAvailability({
-          query:
-            name,
-          canonicalIngredientId,
-          source:
-            'recipe',
-        })
-
-      if (
-        availability?.available !==
-          true
-      ) {
-        openAvailabilityNotifyModal({
-          query:
-            name,
-          displayName:
-            name,
-          canonicalIngredientId,
-          source:
-            'recipe',
-        })
-
-        return false
-      }
-    } catch (availabilityError) {
-      setCartError(
-        availabilityError?.response?.data?.message ||
-          availabilityError?.message ||
-          'Unable to check whether this ingredient is available on EPANTRY right now.',
-      )
-
-      return false
-    }
+    if (ingredientPackResolve.current) return false
+    const packSelection = await new Promise(resolve => {
+      ingredientPackResolve.current = resolve
+      setIngredientPackRequest({ slug, servings, canonicalIngredientId, name, quantity, unit, packs: availableIngredientPacks[canonicalIngredientId],
+        savedSelection: shoppingTray.find(item => item.canonicalIngredientId === canonicalIngredientId)?.packSelection,
+        purchaseMode: hostListingMode ? 'full_recipe' : 'missing_only' })
+    })
+    if (!packSelection) return false
     setShoppingTray((current) => {
       const existingIndex = current.findIndex(
         (item) => item.canonicalIngredientId === canonicalIngredientId,
@@ -2572,14 +2706,16 @@ export default function RecipeDetailPage() {
       const nextItem = {
         canonicalIngredientId,
         name,
-        quantity,
-        unit: reconciliationLine.requiredUnit,
+        quantity: packSelection.requirementQuantity,
+        unit: packSelection.requirementUnit,
+        imageUrl: ingredient.imageUrl || identity.imageUrl || '',
+        packSelection,
       }
       const next = existingIndex >= 0
         ? current.map((item, index) => (index === existingIndex ? nextItem : item))
         : [...current, nextItem]
 
-      savePendingRecipeCart({ slug, servings, items: next })
+      savePendingRecipeCart({ slug, servings, items: next, ...(hostListingMode ? { purchaseMode: 'full_recipe' } : {}) })
       notifyFloatingCartUpdated()
       return next
     })
@@ -2590,11 +2726,12 @@ export default function RecipeDetailPage() {
 
   async function handleMissingIngredient(ingredient, sourceElement) {
     const canonicalIngredientId = getRecipeIngredientCanonicalId(ingredient)
-    if (
-      !canonicalIngredientId ||
-      ingredientDecisionLockRef.current.has(canonicalIngredientId)
-    ) return
-
+    if (ingredientPackResolve.current) return
+    if (!canonicalIngredientId) {
+      await addIngredientToRecipeCart(ingredient, sourceElement)
+      return
+    }
+    if (ingredientDecisionLockRef.current.has(canonicalIngredientId)) return
     ingredientDecisionLockRef.current.add(canonicalIngredientId)
     try {
       const added =
@@ -2866,6 +3003,16 @@ export default function RecipeDetailPage() {
 
   return (
     <main className="epantry-recipe-detail min-h-screen bg-[#F7F6F2]">
+      {ingredientPackRequest && <IngredientPackDialog request={ingredientPackRequest} onFinish={finishIngredientPack}/>}
+      <style>{`
+        .epantry-recipe-detail .ep-trolley-stage{position:relative;width:min(100%,430px);max-height:100%;flex-shrink:1;min-height:0;}
+        .epantry-recipe-detail .ep-trolley-stage > img{display:block;width:100%;height:auto;max-height:none;object-fit:contain;}
+        .epantry-recipe-detail .ep-trolley-contents{position:absolute;left:4%;top:56%;width:40%;height:27%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:3px;overflow:auto;overscroll-behavior:contain;padding:3px;}
+        .epantry-recipe-detail .ep-trolley-item{position:relative;min-width:0;min-height:28px;display:grid;place-items:center;overflow:hidden;border:1px solid #D7DDCF;border-radius:5px;background:#F7F6F2;color:#202421!important;font-size:11px;line-height:1.15;font-weight:650;text-align:center;overflow-wrap:anywhere;padding:3px;}
+        .epantry-recipe-detail .ep-trolley-item img{width:100%!important;height:38px!important;object-fit:contain!important;}
+        .epantry-recipe-detail .ep-trolley-item small{background:#173F35;color:#F7F6F2!important;border-radius:3px;padding:1px 4px;font-size:10px;}
+        .epantry-recipe-detail .ep-trolley-count{font-size:14px;font-weight:700;color:#173F35!important;text-align:center;margin-top:6px;}
+      `}</style>
       <style>{`
         /* EPANTRY Recipe Editorial: same five-color Japandi tokens as the public pages. */
         .epantry-recipe-detail {
@@ -5155,7 +5302,7 @@ export default function RecipeDetailPage() {
             width: 100%;
             overflow: hidden;
           }
-          .epantry-recipe-detail .epantry-recipe-cart-preview img {
+          .epantry-recipe-detail .epantry-recipe-cart-preview > img {
             display: block;
             width: 100%;
             height: 100%;
@@ -5943,13 +6090,14 @@ export default function RecipeDetailPage() {
               </div>
 
               {shoppingTray.length > 0 ? (
-                <div className="epantry-recipe-cart-preview hidden lg:flex" aria-live="polite">
-                  <img
-                    src="/video/cart.png"
-                    alt="EPANTRY Recipe Cart with selected ingredients"
-                    loading="lazy"
-                    draggable="false"
-                  />
+                <div className="epantry-recipe-cart-preview hidden lg:flex" aria-live="polite" style={{flexDirection:'column'}}>
+                  <div className="ep-trolley-stage">
+                    <img src="/video/cart.png" alt="EPANTRY shopping trolley" loading="lazy" draggable="false" />
+                    <div className="ep-trolley-contents" aria-label="Selected recipe ingredients">
+                      {shoppingTray.map(item => <RecipeTrolleyItem key={item.canonicalIngredientId} item={item} ingredient={ingredientRows.find(row=>getRecipeIngredientCanonicalId(row)===item.canonicalIngredientId)}/>)}
+                    </div>
+                  </div>
+                  <Link to="/cart/recipe" className="ep-trolley-count">{shoppingTray.length} selected {shoppingTray.length===1?'ingredient':'ingredients'} · View cart</Link>
                 </div>
               ) : null}
 
@@ -6091,6 +6239,7 @@ export default function RecipeDetailPage() {
               aria-label="Recipe ingredients"
             >
 
+              {canUseCustomerFeatures && ingredientAvailabilityError && <div role="alert" className="col-span-full flex flex-wrap items-center gap-2 px-3 py-2 text-sm text-[#8F3226]"><span>{ingredientAvailabilityError}</span><button type="button" className="font-semibold underline" onClick={()=>setIngredientAvailabilityRetry(v=>v+1)}>Retry</button></div>}
               {ingredientRows.map(
                 (
                   ingredient,
@@ -6222,10 +6371,12 @@ export default function RecipeDetailPage() {
                               event.currentTarget,
                             )
                           }
-                          title={!canonicalIngredientId ? 'This ingredient needs to be matched to the EPANTRY catalog before Pantry and Cart actions are available.' : undefined}
+                          title={!canonicalIngredientId ? 'Not linked to an EPANTRY ingredient.' : !availableIngredientPacks[canonicalIngredientId] ? 'Stock availability not verified yet.' : !availableIngredientPacks[canonicalIngredientId].length ? 'No in-stock pack on EPANTRY.' : undefined}
                           disabled={
                             decisionLocked ||
                             !canonicalIngredientId ||
+                            !availableIngredientPacks[canonicalIngredientId]?.length ||
+                            Boolean(ingredientPackRequest) ||
                             (
                               !canUseCustomerFeatures &&
                               !customerContextBlocked
@@ -6242,7 +6393,7 @@ export default function RecipeDetailPage() {
                             size={14}
                             aria-hidden="true"
                           />
-                          I want
+                          {shoppingTray.some(item => item.canonicalIngredientId === canonicalIngredientId && item.packSelection) ? 'Edit packs' : 'I want'}
                         </button>
 
                         <button
@@ -6334,7 +6485,7 @@ export default function RecipeDetailPage() {
 
             <div className="epantry-recipe-checkout-note mt-2 flex shrink-0 flex-col gap-2 rounded-xl border border-[#DCE0CF] bg-[#F7F6F2] px-3 py-2 text-[13px] leading-4 text-[#202421]/70 sm:flex-row sm:items-center sm:justify-between">
               <p className="max-w-xl">
-                Confirmed missing quantities can be saved to your Recipe Cart. For partial or uncertain Pantry amounts, use “Check missing & shop” for the verified requirement basket. Address is chosen at checkout.
+                {hostListingMode ? 'Choose available packs for your selected servings. Prices and stock are checked again at checkout.' : 'Confirmed missing quantities can be saved to your Recipe Cart. For partial or uncertain Pantry amounts, use “Check missing & shop” for the verified requirement basket. Address is chosen at checkout.'}
               </p>
 
               {shoppingTray.length > 0 ? (

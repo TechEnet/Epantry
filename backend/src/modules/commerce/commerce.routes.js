@@ -37,6 +37,7 @@ import {
   getBasketQuote,
   getMarketplaceCart,
   optimizeOutcomeBasket,
+  listRecipeIngredientPacks,
 } from './commerce.service.js'
 
 import {
@@ -146,6 +147,10 @@ export const createCartBodySchema =
           'minimum_waste',
           'one_retailer',
         ]),
+      packSelections: z.array(z.object({
+        productMatchId: objectIdSchema,
+        packCount: z.number().int().min(1).max(100000),
+      }).strict()).min(1).max(500).optional(),
     })
     .strict()
 
@@ -499,6 +504,7 @@ const commerceRoutes =
 
 commerceRoutes.use(
   [
+    '/recipe-ingredient-packs',
     '/basket-optimize',
     '/basket-quotes',
     '/cart',
@@ -513,6 +519,19 @@ commerceRoutes.use(
   loadCurrentUser,
   requireActiveAccount,
   requireCustomerAccess,
+)
+
+commerceRoutes.get(
+  '/recipe-ingredient-packs',
+  wrap(async (req, res) => {
+    const ids = parseOrThrow(
+      z.string().max(749).transform(value => [...new Set(value.split(',').map(id => id.trim().toLowerCase()))]).pipe(z.array(objectIdSchema).min(1).max(30)),
+      req.query.ingredientIds,
+      'RECIPE_INGREDIENT_PACKS_INVALID',
+      'Invalid ingredient IDs.',
+    )
+    return sendSuccess(req, res, 200, await listRecipeIngredientPacks({ canonicalIngredientIds: ids }), 'Ingredient packs loaded.')
+  }),
 )
 
 commerceRoutes.post(
@@ -724,6 +743,7 @@ commerceRoutes.post(
 
           optionKey:
             input.optionKey,
+          packSelections: input.packSelections,
 
           idempotencyKey:
             requireIdempotencyKey(

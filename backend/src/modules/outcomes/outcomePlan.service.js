@@ -1,4 +1,6 @@
 import mongoose from 'mongoose'
+import { HostUnifiedListingPacket } from '../hostOperations/hostUnifiedListing.models.js'
+import { publicHostListingFilter, publishedHostRecord, publicHostSlug } from '../hostOperations/hostUnifiedListing.public.js'
 
 import {
   ApiError,
@@ -218,6 +220,80 @@ async function loadRecipeRelations(
   }
 }
 
+// Host recipe shopping uses the published packet, not a browser-provided
+// quantity, price, ingredient name, or an unpublished Host revision.
+function hostIngredientKey(value) {
+  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+async function requirePublishedHostRecipe(recipeId, byId = false) {
+  const slug = String(recipeId || '').trim().toLowerCase()
+  const legacyId = /^host--([a-f0-9]{24})$/.exec(slug)?.[1]
+  const filter = byId || legacyId ? { _id: legacyId || slug } : { publicSlug: slug }
+  const record = await HostUnifiedListingPacket.findOne(publicHostListingFilter(filter)).lean()
+  // Public recipe detail has already resolved/backfilled legacy pretty slugs.
+  const approved = record ? publishedHostRecord(record) : null
+  const packet = approved?.packet
+  if (!approved || !['kitchen_recipe', 'brand_recipe', 'prepared_food'].includes(approved.type) ||
+      packet?.shareRecipe !== true) {
+    throw new ApiError(404, 'This approved Host recipe is unavailable for shopping.')
+  }
+  const baseServings = Number(packet.baseServings)
+  if (!Number.isFinite(baseServings) || baseServings <= 0) {
+    throw new ApiError(409, 'The Host must confirm the recipe serving size before shopping.')
+  }
+  return { hostListingId: record._id, hostPacket: packet, hostPublishedRevision: Number(record.publishedRevision || 0),
+    dish: { slug: publicHostSlug(record), name: approved.title || packet.title },
+    recipeVersion: { title: approved.title || packet.title }, substitutions: [] }
+}
+
+async function buildHostShoppingRequirements({ recipeContext, targetServings, selectedCanonicalIngredientIds }) {
+  const rows = (recipeContext.hostPacket.ingredients || []).slice(0, 100)
+  const ids = [...new Set(rows.map(row => String(row.canonicalIngredientId || '')).filter(id => OBJECT_ID_PATTERN.test(id)))]
+  const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const names = [...new Set(rows.flatMap(row => {
+    const name = String(row.name || '').trim()
+    return [name, name.replace(/\([^)]*\)/g, '').trim(), ...[...name.matchAll(/\(([^)]+)\)/g)].map(match => match[1].trim())]
+  }).filter(name => name.length >= 2 && name.length <= 200))]
+  const exactNames = names.map(name => new RegExp(`^\\s*${escapeRegex(name)}\\s*$`, 'i'))
+  const conditions = []
+  if (ids.length) conditions.push({ _id: { $in: ids } })
+  if (exactNames.length) conditions.push({ canonicalName: { $in: exactNames } }, { aliases: { $in: exactNames } })
+  const catalog = conditions.length ? await CanonicalIngredient.find({ status: 'active', $or: conditions }).select('_id canonicalName aliases').lean() : []
+  const selected = new Set(normalizeCanonicalIngredientIds(selectedCanonicalIngredientIds))
+  if (!selected.size) throw new ApiError(400, 'Select the Host recipe ingredients you want to buy first.')
+  const requirements = []
+  const factor = Number(targetServings) / Number(recipeContext.hostPacket.baseServings)
+  for (const row of rows) {
+    const name = String(row.name || '').trim()
+    const primary = hostIngredientKey(name)
+    const keys = new Set([primary, hostIngredientKey(name.replace(/\([^)]*\)/g, '')), ...[...name.matchAll(/\(([^)]+)\)/g)].map(match => hostIngredientKey(match[1]))].filter(Boolean))
+    const exact = catalog.filter(item => [item.canonicalName, ...(item.aliases || [])].some(alias => hostIngredientKey(alias) === primary))
+    const candidates = exact.length ? exact : catalog.filter(item => [item.canonicalName, ...(item.aliases || [])].some(alias => keys.has(hostIngredientKey(alias))))
+    const saved = exact.find(item => String(item._id) === String(row.canonicalIngredientId || ''))
+    const match = saved || (candidates.length === 1 ? candidates[0] : null)
+    const id = String(match?._id || '')
+    if (!selected.has(id)) continue
+    const rawQuantity = row.quantity == null || row.quantity === '' ? NaN : Number(row.quantity)
+    const requiredQuantity = Math.round(rawQuantity * (row.scalingRule === 'fixed' ? 1 : factor) * 1000) / 1000
+    if (!Number.isFinite(requiredQuantity) || requiredQuantity <= 0 || !String(row.unit || '').trim()) {
+      throw new ApiError(409, `The Host must confirm the quantity and unit for ${name || 'this ingredient'}.`)
+    }
+    requirements.push({ canonicalIngredientId: id, label: name, requiredQuantity, requiredUnit: row.unit, optional: row.role === 'optional' })
+  }
+  const found = new Set(requirements.map(row => row.canonicalIngredientId))
+  if ([...selected].some(id => !found.has(id))) {
+    throw new ApiError(400, 'A selected ingredient is not uniquely linked to the approved Host recipe. Ask the Host to link the correct catalog ingredient.')
+  }
+  const consolidated = consolidateOutcomeRequirements(requirements)
+  // Do not silently drop any selected ingredient because of an incompatible unit.
+  if ([...selected].some(id => !consolidated.some(row => row.canonicalIngredientId === id))) {
+    throw new ApiError(409, 'A selected ingredient has an unsupported recipe quantity or unit.')
+  }
+  return { scalingWarnings: [], requirements: consolidated }
+}
+
 async function requirePublishedRecipe(
   recipeId,
   now =
@@ -249,6 +325,10 @@ async function requirePublishedRecipe(
           'active',
       })
       .lean()
+
+  if (!dish && /(?:^host--[a-f0-9]{24}$|-[a-f0-9]{10}$)/i.test(String(recipeId || ''))) {
+    return requirePublishedHostRecipe(recipeId)
+  }
 
   if (
     !dish
@@ -406,6 +486,10 @@ async function buildScaledRequirements({
   selectedCanonicalIngredientIds =
     [],
 }) {
+  if (recipeContext.hostListingId) {
+    return buildHostShoppingRequirements({ recipeContext, targetServings, selectedCanonicalIngredientIds })
+  }
+
   const scaled =
     scaleRecipeAggregate({
       recipeVersion:
@@ -1469,6 +1553,10 @@ export async function createRecipeOutcomePlan({
       now,
     )
 
+  if (recipeContext.hostListingId && normalizedPurchaseMode !== 'full_recipe') {
+    throw new ApiError(400, 'Choose the ingredients you want to buy from this Host recipe.')
+  }
+
   const snapshot =
     await calculateOutcomeSnapshot({
       recipeContext,
@@ -1503,14 +1591,14 @@ export async function createRecipeOutcomePlan({
 
                 householdId,
 
-                sourceType:
-                  'recipe',
-
-                sourceDishId:
-                  recipeContext.dish._id,
-
-                sourceRecipeVersionId:
-                  recipeContext.recipeVersion._id,
+                sourceType: recipeContext.hostListingId ? 'host_recipe' : 'recipe',
+                ...(recipeContext.hostListingId ? {
+                  sourceHostListingId: recipeContext.hostListingId,
+                  sourceHostPublishedRevision: recipeContext.hostPublishedRevision,
+                } : {
+                  sourceDishId: recipeContext.dish._id,
+                  sourceRecipeVersionId: recipeContext.recipeVersion._id,
+                }),
 
                 sourceRecipeSlug:
                   recipeContext.dish.slug,
@@ -1811,10 +1899,12 @@ export async function updateOutcomePlanRequirements({
     )
   }
 
-  const recipeContext =
-    await requireRecipeVersionContext(
-      plan.sourceRecipeVersionId,
-    )
+  const recipeContext = plan.sourceType === 'host_recipe'
+    ? await requirePublishedHostRecipe(plan.sourceHostListingId, true)
+    : await requireRecipeVersionContext(plan.sourceRecipeVersionId)
+  if (plan.sourceType === 'host_recipe' && recipeContext.hostPublishedRevision !== Number(plan.sourceHostPublishedRevision || 0)) {
+    throw new ApiError(409, 'The Host recipe has changed. Open the recipe again to create a fresh basket.')
+  }
 
   const snapshot =
     await calculateOutcomeSnapshot({

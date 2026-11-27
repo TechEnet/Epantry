@@ -207,17 +207,21 @@ async function activateApprovedOffer({ listing, packet, organization, packId, re
     sourceType: 'manual', sourceReference: `approved-host-listing-${asId(listing._id)}`,
     observedAt: now, createdByUserId: reviewerId,
   }, session)
+  // Scoped listings inherit the organization-wide area dynamically. Never copy
+  // business PINs into their dedicated area, otherwise removal would leave stale coverage.
+  const areaPins = mode === 'delivery' && Array.isArray(packet.delivery?.extraPostalCodes)
+    ? packet.delivery.extraPostalCodes : pins
   const areaKey = `listing-${asId(listing._id)}`
   let area = await ServiceArea.findOne({ organizationId: organization._id, serviceAreaKey: areaKey }).session(session)
   if (!area) area = await inserted(ServiceArea, {
     organizationId: organization._id, inventoryNodeId: node._id,
     name: `Delivery - ${packet.title}`.slice(0, 220), serviceAreaKey: areaKey,
-    postalCodes: pins, fulfillmentTypes: [mode], status: 'active',
+    postalCodes: areaPins, fulfillmentTypes: [mode], status: 'active',
     createdByUserId: reviewerId, updatedByUserId: reviewerId,
   }, session)
   else {
     area.inventoryNodeId = node._id
-    area.postalCodes = pins
+    area.postalCodes = areaPins
     area.fulfillmentTypes = [mode]
     area.status = 'active'
     area.updatedByUserId = reviewerId

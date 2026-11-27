@@ -70,6 +70,8 @@ export function normalizeListingPacket(raw = {}) {
     name: text(item?.name, 200),
     canonicalIngredientId: text(item?.canonicalIngredientId, 80),
     imageUrl: cleanUrl(item?.imageUrl),
+    ...(item?.imageOrigin === 'catalog' || item?.imageOrigin === 'host' ? { imageOrigin: item.imageOrigin } : {}),
+    ...(item?.imageAutoFillDisabled === true ? { imageAutoFillDisabled: true } : {}),
     role: ['main', 'optional', 'garnish'].includes(item?.role) ? item.role : 'main',
     preparationState: text(item?.preparationState, 120),
     scalingRule: item?.scalingRule === 'fixed' ? 'fixed' : 'proportional',
@@ -172,6 +174,10 @@ export function normalizeListingPacket(raw = {}) {
     delivery: {
       fulfillment: commercial && input.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery',
       postalCodes,
+      ...(Array.isArray(input.delivery?.extraPostalCodes) ? {
+        extraPostalCodes: [...new Set(list(input.delivery.extraPostalCodes, 600)
+          .map(code => text(code, 12)).filter(code => /^[1-9][0-9]{5}$/.test(code)))].slice(0, 500),
+      } : {}),
       preparationMinutes: finiteNonnegative(input.delivery?.preparationMinutes),
       note: text(input.delivery?.note, 700),
     },

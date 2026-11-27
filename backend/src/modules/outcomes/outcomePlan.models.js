@@ -81,6 +81,7 @@ const outcomePlanSchema =
 
         enum: [
           'recipe',
+          'host_recipe',
         ],
 
         required:
@@ -97,8 +98,7 @@ const outcomePlanSchema =
         ref:
           'Dish',
 
-        required:
-          true,
+        required: function () { return this.sourceType !== 'host_recipe' },
       },
 
       sourceRecipeVersionId: {
@@ -108,12 +108,18 @@ const outcomePlanSchema =
         ref:
           'RecipeVersion',
 
-        required:
-          true,
+        required: function () { return this.sourceType !== 'host_recipe' },
 
         index:
           true,
       },
+
+      sourceHostListingId: {
+        type: objectId,
+        ref: 'HostUnifiedListingPacket',
+        required: function () { return this.sourceType === 'host_recipe' },
+      },
+      sourceHostPublishedRevision: { type: Number, min: 0, default: 0 },
 
       sourceRecipeSlug: {
         type:

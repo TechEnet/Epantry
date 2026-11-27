@@ -318,6 +318,90 @@ function basketItemCount(item) {
   return Math.max(1, Math.floor(Number(item?.packCount ?? item?.quantity ?? 1) || 1))
 }
 
+// All choices are server-issued quote matches for the selected delivery PIN.
+function recipePackGroups(quoteData) {
+  return Object.entries(quoteData?.candidatesByRequirement || {}).map(([id, candidates]) => {
+    const exact = candidates.find(candidate => candidate.packCount === 1 &&
+      Math.abs(candidate.packQuantityInRequirementUnit - candidate.requirementQuantity) < 0.0000005)
+    const suggested = exact || candidates[0]
+    return { id, candidates, exact, suggested }
+  }).filter(group => group.suggested)
+}
+
+function findSavedRecipePack(candidates, saved, normalizedPincode) {
+  if (!saved) return undefined
+  return candidates.find(row =>
+              String(row.offerId) === String(saved.offerId) && String(row.packId) === String(saved.packId) &&
+              String(row.productVersionId) === String(saved.productVersionId) &&
+              row.packQuantity === saved.packQuantity && row.packUnit === saved.packUnit &&
+              row.requirementQuantity === saved.requirementQuantity && row.requirementUnit === saved.requirementUnit &&
+              row.unitPrice?.amountMinor === saved.unitPrice?.amountMinor && row.unitPrice?.currency === saved.unitPrice?.currency &&
+              Number.isSafeInteger(saved.packCount) && saved.packCount >= row.packCount && saved.packCount <= row.maximumPackCount &&
+              saved.pincode === normalizedPincode)
+}
+
+function RecipePackPicker({ groups, pincode, onFinish }) {
+  const dialogRef = useRef(null)
+  const [choices, setChoices] = useState(() => Object.fromEntries(groups.map(group => [group.id, {
+    productMatchId: group.suggested.id, packCount: group.initialCount ?? group.suggested.packCount,
+  }])))
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (dialog && !dialog.open) dialog.showModal()
+    return () => { if (dialog?.open) dialog.close() }
+  }, [])
+  const selected = groups.map(group => {
+    const choice = choices[group.id]
+    const candidate = group.candidates.find(row => row.id === choice.productMatchId)
+    return { ...choice, candidate }
+  })
+  const valid = selected.every(({ candidate, packCount }) => candidate && packCount >= candidate.packCount && packCount <= candidate.maximumPackCount)
+  const currency = selected[0]?.candidate?.unitPrice?.currency || 'INR'
+  const sameCurrency = selected.every(row => (row.candidate?.unitPrice?.currency || 'INR') === currency)
+  const subtotal = selected.reduce((total, row) => total + row.packCount * (row.candidate?.unitPrice?.amountMinor || 0), 0)
+  function change(groupId, candidate, count) {
+    setChoices(current => ({ ...current, [groupId]: { productMatchId: candidate.id, packCount: count } }))
+  }
+  const round = value => Math.round(value * 1000000) / 1000000
+  return (
+    <dialog ref={dialogRef} aria-labelledby="recipe-pack-heading" onCancel={event => { event.preventDefault(); onFinish(null) }}
+      style={{ position:'fixed', inset:0, margin:'auto', width:'min(720px, calc(100% - 24px))', maxHeight:'88dvh', border:'1px solid #D7DDCF', borderRadius:16, background:'#F7F6F2', color:'#202421', padding:0, overflow:'hidden', boxShadow:'0 24px 80px #20242155' }}>
+      <style>{`dialog[aria-labelledby="recipe-pack-heading"]::backdrop { background: #20242199; }`}</style>
+      <div style={{display:'flex', flexDirection:'column', maxHeight:'88dvh'}}>
+        <header style={{background:'#C56C42', color:'#202421', padding:'18px 22px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+          <div><h2 id="recipe-pack-heading" style={{fontSize:24, fontWeight:750, color:'#202421', margin:0}}>Choose ingredient packs</h2><p style={{fontSize:14, color:'#202421', marginTop:4}}>Available for delivery to PIN {pincode}</p></div>
+          <button type="button" onClick={() => onFinish(null)} aria-label="Close pack selection" style={{background:'#F7F6F2', color:'#202421', borderRadius:8, width:40, height:40, fontSize:24, flexShrink:0}}>×</button>
+        </header>
+        <div style={{overflowY:'auto', padding:'4px 20px 16px'}}>
+          {groups.map(group => {
+            const choice = choices[group.id]
+            const chosen = group.candidates.find(row => row.id === choice.productMatchId)
+            const supplied = round(chosen.packQuantityInRequirementUnit * choice.packCount)
+            const surplus = round(supplied - chosen.requirementQuantity)
+            return <section key={group.id} style={{padding:'18px 0', borderBottom:'1px solid #D7DDCF'}}>
+              <div style={{display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8, marginBottom:12}}><h3 style={{fontSize:19,fontWeight:700,color:'#202421'}}>{chosen.requirementLabel || 'Ingredient'}</h3><strong style={{color:'#173F35'}}>Need {chosen.requirementQuantity} {chosen.requirementUnit}</strong></div>
+              {group.savedChanged && <p role="status" style={{color:'#8F3226',marginBottom:10}}>Availability, price or delivery PIN changed. Please choose packs again.</p>}
+              {group.exact && !group.allowChoice ? <p style={{background:'#D7DDCF',padding:12,borderRadius:8,color:'#173F35',fontWeight:600}}>Exact pack selected: {group.exact.packQuantity} {group.exact.packUnit} · {group.exact.sellerName} · {formatMoney(group.exact.unitPrice.amountMinor, group.exact.unitPrice.currency)}</p> :
+                <div style={{display:'grid',gap:8}}>{group.candidates.map(candidate => {
+                  const active = choice.productMatchId === candidate.id
+                  return <div key={candidate.id} style={{border:active?'2px solid #C56C42':'1px solid #D7DDCF', background:active?'#C56C421A':'#F7F6F2',borderRadius:9,padding:12}}>
+                    <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',color:'#202421'}}><input type="radio" name={`recipe-pack-${group.id}`} checked={active} onChange={() => change(group.id,candidate,candidate.packCount)} style={{accentColor:'#173F35'}}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:17,color:'#202421'}}>{candidate.packQuantity} {candidate.packUnit} pack</strong><p style={{fontSize:14,color:'#173F35',overflowWrap:'anywhere'}}>{candidate.productDisplayName ? `${candidate.productDisplayName} · ` : ''}{candidate.sellerName} · {candidate.maximumPackCount} max orderable</p></div><strong style={{color:'#173F35',whiteSpace:'nowrap'}}>{formatMoney(candidate.unitPrice.amountMinor,candidate.unitPrice.currency)} / pack</strong></label>
+                    {active && <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginTop:12,paddingLeft:24}}><div style={{display:'flex',alignItems:'center',gap:12}}><button type="button" aria-label="Decrease pack quantity" disabled={choice.packCount <= 1} onClick={() => change(group.id,candidate,choice.packCount-1)} style={{border:'1px solid #D7DDCF',background:'#F7F6F2',color:'#173F35',width:38,height:38,borderRadius:8,opacity:choice.packCount <= 1 ? 0.45 : 1}}><Minus size={16} style={{margin:'auto'}}/></button><output style={{fontWeight:700,minWidth:24,textAlign:'center'}}>{choice.packCount}</output><button type="button" aria-label="Increase pack quantity" disabled={choice.packCount >= candidate.maximumPackCount} onClick={() => change(group.id,candidate,choice.packCount+1)} style={{border:'1px solid #D7DDCF',background:'#F7F6F2',color:'#173F35',width:38,height:38,borderRadius:8,opacity:choice.packCount >= candidate.maximumPackCount ? 0.45 : 1}}><Plus size={16} style={{margin:'auto'}}/></button></div><strong style={{color:'#202421'}}>{formatMoney(choice.packCount*candidate.unitPrice.amountMinor,candidate.unitPrice.currency)}</strong></div>}
+                  </div>
+                })}</div>}
+              <p aria-live="polite" style={{marginTop:10,fontSize:14,color:surplus<0?'#8F3226':'#173F35'}}>Selected: {supplied} {chosen.requirementUnit}{surplus>0?` · ${surplus} ${chosen.requirementUnit} extra`:surplus<0?` · ${Math.abs(surplus)} ${chosen.requirementUnit} still needed`:' · exact quantity'}{choice.packCount<chosen.packCount?' · Increase packs to meet the minimum requirement.':''}</p>
+            </section>
+          })}
+        </div>
+        <footer style={{background:'#D7DDCF',padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+          <div><p style={{fontSize:14,color:'#173F35'}}>Items subtotal</p><strong style={{fontSize:22,color:'#202421'}}>{sameCurrency?formatMoney(subtotal,currency):'Mixed currencies'}</strong></div>
+          <button type="button" disabled={!valid || !sameCurrency} onClick={() => onFinish(selected.map(({productMatchId,packCount}) => ({productMatchId,packCount})))} style={{background:'#C56C42',color:'#202421',fontWeight:750,padding:'12px 18px',borderRadius:8,opacity:valid&&sameCurrency?1:.5}}>Confirm packs &amp; continue</button>
+        </footer>
+      </div>
+    </dialog>
+  )
+}
+
 export default function MarketplaceCartPage() {
   const {
     cartId,
@@ -421,6 +505,19 @@ export default function MarketplaceCartPage() {
     unmatchedNames: [],
   })
   const recipeCheckSequence = useRef(0)
+  const [packPicker, setPackPicker] = useState(null)
+  const packPickerResolve = useRef(null)
+  useEffect(() => () => {
+    if (packPickerResolve.current) packPickerResolve.current(null)
+    packPickerResolve.current = null
+  }, [])
+  const finishPackPicker = useCallback((selection) => {
+    const resolve = packPickerResolve.current
+    packPickerResolve.current = null
+    setPackPicker(null)
+    resolve?.(selection)
+  }, [])
+
 
   const [
     placingRecipeOrder,
@@ -801,7 +898,7 @@ export default function MarketplaceCartPage() {
         const selectedIds = [...new Set(recipeIngredientSignature.split('|'))]
         const outcome = await createRecipeOutcomePlan(recipeCart.slug, {
           targetServings: Number(recipeCart.servings || 1),
-          purchaseMode: 'missing_only',
+          purchaseMode: /(?:^host--[a-f0-9]{24}$|-[a-f0-9]{10}$)/i.test(String(recipeCart.slug || '')) ? 'full_recipe' : 'missing_only',
           selectedCanonicalIngredientIds: selectedIds,
           idempotencyKey: createOutcomePlanIdempotencyKey('recipe-pin-availability'),
         })
@@ -1066,7 +1163,7 @@ export default function MarketplaceCartPage() {
                   ),
 
                 purchaseMode:
-                  'missing_only',
+                  /(?:^host--[a-f0-9]{24}$|-[a-f0-9]{10}$)/i.test(String(recipeCart.slug || '')) ? 'full_recipe' : 'missing_only',
 
                 selectedCanonicalIngredientIds:
                   selectedIngredientIds,
@@ -1259,8 +1356,30 @@ export default function MarketplaceCartPage() {
             return
           }
 
+          const groups = recipePackGroups(quoteData)
+          if (groups.length !== totalRequirementCount) throw new Error('Pack options are incomplete. Refresh delivery availability and try again.')
+          // Match a customer's saved offer to a fresh server-issued quote. Quote match
+          // IDs change on each quote, so never reuse the old match ID or client price.
+          for (const group of groups) {
+            const canonicalId = String(group.suggested.canonicalIngredientId || '')
+            const saved = recipeItems.find(item => String(item.canonicalIngredientId) === canonicalId)?.packSelection
+            if (!saved) continue
+            group.allowChoice = true
+            const same = findSavedRecipePack(group.candidates, saved, normalizedPincode)
+            if (same) { group.suggested = same; group.initialCount = saved.packCount; group.savedValid = true }
+            else { group.savedChanged = true; group.exact = null }
+          }
+          let packSelections = groups.map(group => ({ productMatchId: group.suggested.id, packCount: group.initialCount ?? group.suggested.packCount }))
+          if (groups.some(group => group.savedChanged || (!group.savedValid && !group.exact))) {
+            packSelections = await new Promise(resolve => {
+              packPickerResolve.current = resolve
+              setPackPicker({ groups, pincode: normalizedPincode })
+            })
+            if (!packSelections) return
+          }
           const cartResult =
             await createMarketplaceCart({
+              packSelections,
               basketQuoteId:
                 quoteData.quote.id,
 
@@ -1470,6 +1589,7 @@ export default function MarketplaceCartPage() {
 
     return (
       <main className="ep-unified-basket ep-cart-v2">
+      {packPicker && <RecipePackPicker groups={packPicker.groups} pincode={packPicker.pincode} onFinish={finishPackPicker} />}
         <style>{`
           .ep-cart-v2 { --clay:#C56C42;--forest:#173F35;--charcoal:#202421;--sage:#D7DDCF;--porcelain:#F7F6F2; background:var(--porcelain);color:var(--charcoal);font-family:'Plus Jakarta Sans',Inter,sans-serif;min-width:0; }
           .ep-cart-v2 * { box-sizing:border-box; }
@@ -1677,10 +1797,11 @@ export default function MarketplaceCartPage() {
                           <div className="ep-cart-thumb"><Package size={24} aria-hidden="true"/>{photo && <img src={photo} alt={title} loading="lazy" onError={(event) => {event.currentTarget.style.display='none'}}/>}</div>
                           <div className="ep-cart-info">
                             <div className="ep-cart-name">{title}</div>
-                            <div className="ep-cart-subline">{formatRecipeQuantity(item)}</div>
+                            <div className="ep-cart-subline">{formatRecipeQuantity(item)} required</div>
+                            {item.packSelection && <div className="ep-cart-subline">{item.packSelection.sellerName} · {item.packSelection.packCount} × {item.packSelection.packQuantity} {item.packSelection.packUnit}</div>}
                           </div>
-                          <span className="ep-cart-subline" style={{textAlign:'center'}}>Recipe item</span>
-                          <span className="ep-cart-price">—</span>
+                          <span className="ep-cart-subline" style={{textAlign:'center'}}>{item.packSelection ? `${item.packSelection.packCount} packs` : 'Recipe item'}</span>
+                          <span className="ep-cart-price" title="Price is rechecked at checkout">{item.packSelection ? formatMoney(item.packSelection.packCount * item.packSelection.unitPrice.amountMinor,item.packSelection.unitPrice.currency) : '—'}</span>
                           <button type="button" className="ep-cart-remove" onClick={() => handleRemoveRecipeItem(item.canonicalIngredientId)} aria-label={`Remove ${title} from basket`}><Trash2 size={15}/><span>Remove</span></button>
                         </article>
                       )
@@ -1711,7 +1832,7 @@ export default function MarketplaceCartPage() {
                   <div className="ep-cart-summary-total">
                     <span className="ep-cart-summary-line">Grocery subtotal</span>
                     <strong>{formatMoney(grocerySubtotal,groceryCurrency)}</strong>
-                    {hasRecipe && <p className="ep-cart-summary-note">Recipe ingredients are priced at checkout.</p>}
+                    {hasRecipe && <p className="ep-cart-summary-note">Recipe pack prices shown are estimates until verified at checkout.</p>}
                   </div>
                 )}
                 {hasRecipe && (
@@ -2107,6 +2228,7 @@ export default function MarketplaceCartPage() {
 
   return (
     <main className="relative min-w-0 overflow-hidden bg-[#F7F6F2] text-stone-950">
+      {packPicker && <RecipePackPicker groups={packPicker.groups} pincode={packPicker.pincode} onFinish={finishPackPicker} />}
       <style>{`
         @keyframes epCartRise {
           from { opacity: 0; transform: translateY(14px); }

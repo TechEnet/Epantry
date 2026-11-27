@@ -54,8 +54,11 @@ export function approvedHostDeliveryAllowsPin({ delivery, pincode, sharedCoverag
   if (delivery?.fulfillment === 'pickup') return false
   const pin = normalizePostalCode(pincode)
   if (!/^[1-9][0-9]{5}$/.test(String(pin || ''))) return false
-  const onApprovedListing = Array.isArray(delivery?.postalCodes) &&
-    delivery.postalCodes.some((value) => normalizePostalCode(value) === pin)
+  // New listings store only explicitly added item PINs separately. Business
+  // coverage is read live; the union snapshot is not a permanent grant.
+  const listingPins = Array.isArray(delivery?.extraPostalCodes) ? delivery.extraPostalCodes : delivery?.postalCodes
+  const onApprovedListing = Array.isArray(listingPins) &&
+    listingPins.some((value) => normalizePostalCode(value) === pin)
   return Boolean(onApprovedListing || sharedCoverage)
 }
 
@@ -338,11 +341,21 @@ async function requirePublicCanonicalPack(
 |--------------------------------------------------------------------------
 */
 
-export async function listPublicEligibleOffers({
+// Discovery is read-only and never used by the public delivery/cart routes.
+// Keep the existing PIN-specific eligibility path unchanged for purchases.
+export async function listPublicEligibleOffers(input) {
+  return listEligibleOffersInternal(input, false)
+}
+
+export async function listIngredientDiscoveryOffers(packId) {
+  return listEligibleOffersInternal({ packId, fulfillmentType: 'delivery' }, true)
+}
+
+async function listEligibleOffersInternal({
   packId,
   pincode,
   fulfillmentType,
-}) {
+}, discoveryOnly) {
   const now =
     new Date()
 
@@ -458,7 +471,7 @@ export async function listPublicEligibleOffers({
   // approved Host organization. Other service areas cannot widen an offer.
   // All canonical identity, active account, stock and price checks below
   // still run before anything becomes publicly purchasable.
-  const sharedAreas = fulfillmentType === 'pickup' ? [] : await ServiceArea.find({
+  const sharedAreas = discoveryOnly || fulfillmentType === 'pickup' ? [] : await ServiceArea.find({
     organizationId: { $in: organizations.map((organization) => organization._id) },
     serviceAreaKey: HOST_SHARED_DELIVERY_AREA_KEY,
     inventoryNodeId: null,
@@ -496,6 +509,7 @@ export async function listPublicEligibleOffers({
     const mode = approved.delivery?.fulfillment === 'pickup' ? 'pickup' : 'delivery'
     if (mode === 'pickup') return fulfillmentType === 'pickup'
     if (fulfillmentType === 'pickup') return false
+    if (discoveryOnly) return true // A listed pack is not a delivery promise.
     return approvedHostDeliveryAllowsPin({
       delivery: approved.delivery,
       pincode: normalizedPincode,
@@ -584,7 +598,7 @@ export async function listPublicEligibleOffers({
         })
         .lean(),
 
-      ServiceArea.find({
+      discoveryOnly ? Promise.resolve([]) : ServiceArea.find({
         organizationId: {
           $in:
             activeOrganizationIds,
@@ -782,6 +796,14 @@ export async function listPublicEligibleOffers({
 
     const eligibleFulfillmentTypes =
       new Set()
+
+    if (discoveryOnly && (offer.fulfillmentTypes || []).includes('delivery')) {
+      eligibleFulfillmentTypes.add('delivery')
+      for (const nodeId of activeNodeIds) {
+        eligibleNodeIds.add(nodeId)
+        allCandidateNodeIds.add(nodeId)
+      }
+    }
 
     for (
       const serviceArea of
@@ -1074,5 +1096,6 @@ export async function listPublicEligibleOffers({
 
     offers:
       eligibleOffers,
+    ...(discoveryOnly ? { productVersionId: String(canonical.publishedVersion._id) } : {}),
   }
 }

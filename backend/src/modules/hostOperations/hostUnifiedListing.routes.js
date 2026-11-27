@@ -17,7 +17,7 @@ import { CommunityProductDraft } from '../universalProduct/universalProduct.mode
 import { materializeNpiDraftToCatalog } from '../universalProduct/universalProduct.catalogHandoff.service.js'
 import { publishProductVersion } from '../catalog/catalog.governance.service.js'
 import { findProductVersionDuplicateCandidates } from '../catalog/catalog.duplicate.service.js'
-import { MarketplaceOrganization, HostOffer } from '../marketplace/marketplace.models.js'
+import { MarketplaceOrganization, HostOffer, ServiceArea } from '../marketplace/marketplace.models.js'
 import { validateOfferCanonicalPack } from '../marketplace/marketplace.host.service.js'
 import { listPublicEligibleOffers, hasSharedHostDeliveryCoverage, approvedHostDeliveryAllowsPin } from '../marketplace/marketplace.public.service.js'
 import { listPublicProducts, buildPublicProductSlug } from '../catalog/catalog.public.service.js'
@@ -166,13 +166,22 @@ async function approvedPublicProjection(record) {
     verifiedProductPath: catalog?.productPath || null,
   })
 }
-function cleanIncoming(raw, workspace, submit = false) {
+async function cleanIncoming(raw, workspace, submit = false, ownerUserId, session = null) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) problem('Provide a listing object.')
   if ((raw.ingredients?.length || 0) > 100 || (raw.steps?.length || 0) > 75 || (raw.images?.length || 0) > 12) problem('Too many ingredients, steps or photos in this listing.')
   if (JSON.stringify(raw).length > 180000) problem('Listing packet exceeds the size limit.')
   const codes = raw.delivery?.postalCodes
   if (Array.isArray(codes) && codes.some((value) => !/^[1-9][0-9]{5}$/.test(String(value).trim()))) problem('Enter only valid six-digit delivery pincodes.')
+  const extra = raw.delivery?.extraPostalCodes
+  if (extra !== undefined && (!Array.isArray(extra) || extra.length > 500 || extra.some(value => !/^[1-9][0-9]{5}$/.test(String(value).trim())))) problem('Enter only valid six-digit extra delivery PIN codes (maximum 500).')
   const packet = normalizeListingPacket(raw)
+  if (Array.isArray(packet.delivery.extraPostalCodes) && needsCommercialPublication(packet) && packet.delivery.fulfillment === 'delivery') {
+    const org = await MarketplaceOrganization.findOne({ ownerUserId, status: 'active' }).select('_id').session(session).lean()
+    const area = org ? await ServiceArea.findOne({ organizationId: org._id, serviceAreaKey: 'host-default-delivery', inventoryNodeId: null, fulfillmentTypes: 'delivery', status: 'active' }).select('postalCodes').session(session).lean() : null
+    const shared = (area?.postalCodes || []).map(String).filter(pin => /^[1-9][0-9]{5}$/.test(pin))
+    packet.delivery.postalCodes = [...new Set([...shared, ...packet.delivery.extraPostalCodes])]
+    if (packet.delivery.postalCodes.length > 500) problem('A listing can have at most 500 delivery PIN codes.')
+  }
   const errors = validateListingPacket(packet, { workspace, submit })
   if (errors.length) problem(errors.join(' '))
   return packet
@@ -215,119 +224,158 @@ router.post('/host/listing-packets/video-upload-intent', ...writeSecurity, wrap(
   catch (error) { problem(error?.code === 'CLOUDINARY_NOT_CONFIGURED' ? 'Video upload provider is not configured.' : 'Unable to prepare video upload.', 503) }
 }))
 
-// Host Studio's ingredient picker must use Host authorization rather than
-// the Customer-only Community composer lookup. No create/edit permissions here.
+// Normalize ingredient lookup only; never rewrite a Host's ingredient name,
+// quantities or canonical identity based on a visually similar product.
+function ingredientLookupForms(value) {
+  const text = String(value || '').normalize('NFKC').toLowerCase().trim()
+    .replace(/(?:\s*[-\u2013\u2014,]\s*|\s+)\d+(?:\.\d+)?\s*(?:kg|g|gm|gms|grams?|ml|l|litres?|liters?|oz|lb|pieces?|pcs|packs?)\s*$/i, '')
+  const clean = name => name.replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ')
+  // Parenthetical names are often aliases (e.g. aubergine), but may also
+  // be variants. They are searchable; ambiguity is handled before auto-fill.
+  return [...new Set([clean(text), clean(text.replace(/\([^)]*\)/g, ' ')),
+    ...Array.from(text.matchAll(/\(([^)]+)\)/g), match => clean(match[1]))].filter(Boolean))]
+}
+function ingredientLookupScore(query, labels) {
+  const queries = ingredientLookupForms(query)
+  const names = labels.flatMap(ingredientLookupForms)
+  if (!queries.length || !names.length) return 0
+  if (queries[0] === names[0]) return 110
+  if (queries.some(q => names.includes(q))) return 100
+  // Prefix and whole-word searches support incomplete names, without matching
+  // unrelated substrings such as "oil" inside "boiled".
+  if (queries.some(q => q.length >= 3 && names.some(n => n.startsWith(q)))) return 70
+  if (queries.some(q => q.length >= 3 && names.some(n => (` ${n} `).includes(` ${q} `)))) return 60
+  return 0
+}
+function ingredientLookupPatterns(labels) {
+  const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const tokens = [...new Set(labels.flatMap(ingredientLookupForms).flatMap(name => name.split(' ')))]
+    .filter(token => token.length >= 2).slice(0, 24)
+  return tokens.map(token => new RegExp(`(?:^|[^a-zA-Z0-9])${escape(token)}`, 'i'))
+}
+function approvedIngredientPhoto(value) {
+  try {
+    const url = new URL(String(value || ''))
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''
+  } catch { return '' }
+}
+function selectIngredientPhoto(candidates) {
+  const ordered = candidates.filter(row => row.imageUrl && row.score > 0)
+    .sort((a, b) => b.score - a.score || a.priority - b.priority || a.name.localeCompare(b.name))
+  if (!ordered.length) return { photoMatches: [], groceryPhoto: null }
+  // Group different pack sizes of the same ingredient, not different foods.
+  const groups = new Map()
+  for (const row of ordered) {
+    const forms = ingredientLookupForms(row.name)
+    const key = row.identity || forms[0]
+    if (!groups.has(key)) groups.set(key, row)
+  }
+  const distinct = [...groups.values()]
+  const best = distinct[0]
+  // A unique normalized exact/alias match can auto-fill. A unique prefix or whole-word match
+  // can also auto-fill; ambiguous results are explicitly selectable instead.
+  const comparable = distinct.filter(row => best.score === 110 ? row.score === 110 : best.score >= 100 ? row.score >= 100 : true)
+  const groceryPhoto = comparable.length === 1 && best.score >= 60 ? best : null
+  return { photoMatches: distinct.slice(0, 20), groceryPhoto }
+}
+
+// Host-authorized, read-only ingredient search across approved sources.
 router.get('/host/listing-packets/catalog/ingredients', ...readSecurity, wrap(async (req, res) => {
   const search = String(req.query?.search || '').trim()
-  if (search.length < 2) return respond(res, { ingredients: [] })
+  if (search.length < 2) return respond(res, { ingredients: [], photoMatches: [], groceryPhoto: null })
   if (search.length > 120) problem('Ingredient search is too long.')
   const requestedLimit = Number(req.query?.limit)
-  const limit = Number.isFinite(requestedLimit)
-    ? Math.max(1, Math.min(20, Math.floor(requestedLimit))) : 6
-  const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const expression = new RegExp(escaped, 'i')
-  const rows = await CanonicalIngredient.find({
-    status: 'active',
-    $or: [{ canonicalName: expression }, { aliases: expression }, { slug: expression }],
-  }).sort({ canonicalName: 1 }).limit(limit).select('_id canonicalName slug aliases attributes.approvedImageUrl').lean()
-
-  // Reuse only an approved catalog image or an image from an already-published
-  // Host recipe. Never suggest pictures from pending drafts or unapproved edits.
-  const approvedImage = value => {
-    try {
-      const url = new URL(String(value || ''))
-      return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''
-    } catch { return '' }
+  const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(20, Math.floor(requestedLimit))) : 6
+  const patterns = ingredientLookupPatterns([search])
+  if (!patterns.length) return respond(res, { ingredients: [], photoMatches: [], groceryPhoto: null })
+  const failures = []
+  async function source(label, load) {
+    try { return await load() }
+    catch (error) {
+      failures.push(label)
+      console.warn(`[host ingredient lookup] ${label} unavailable`, error?.message || String(error))
+      return []
+    }
   }
-  const imageById = new Map()
-  const unmatched = rows.filter(row => {
-    const photo = approvedImage(row.attributes?.approvedImageUrl)
-    if (photo) imageById.set(String(row._id), { imageUrl: photo, imageSource: 'EPANTRY catalog' })
-    return !photo
+  const rows = (await source('canonical ingredients', () => CanonicalIngredient.find({
+    status: 'active', $or: [{ canonicalName: { $in: patterns } }, { aliases: { $in: patterns } }, { slug: { $in: patterns } }],
+  }).select('_id canonicalName slug aliases attributes').sort({ canonicalName: 1 }).limit(250).lean()))
+    .map(row => ({ ...row, score: ingredientLookupScore(search, [row.canonicalName, ...(row.aliases || []), row.slug]) }))
+    .filter(row => row.score > 0).sort((a, b) => b.score - a.score || a.canonicalName.localeCompare(b.canonicalName))
+  const exactRows = rows.filter(row => row.score >= 100)
+  const expandedPatterns = ingredientLookupPatterns([search, ...exactRows.flatMap(row => [row.canonicalName, ...(row.aliases || [])])])
+  const ids = rows.slice(0, 30).map(row => String(row._id))
+  // Match approved grocery titles independently of canonical ingredient IDs.
+  // Both last-approved snapshots and legacy approved packets are supported.
+  const [groceries, versions, recipes] = await Promise.all([
+    source('approved groceries', () => HostUnifiedListingPacket.find({ ...publicHostListingFilter(), $or: [
+      { publishedPacket: { $exists: true, $ne: null }, $and: [
+        { $or: [{ publishedType: 'grocery' }, { 'publishedPacket.type': 'grocery' }] },
+        { $or: [{ publishedTitle: { $in: expandedPatterns } }, { 'publishedPacket.title': { $in: expandedPatterns } }] },
+      ] },
+      { publishedPacket: null, status: 'approved', type: 'grocery', $or: [{ title: { $in: expandedPatterns } }, { 'packet.title': { $in: expandedPatterns } }] },
+    ] }).select('status type title packet publishedPacket publishedTitle publishedType approvedAt')
+      .sort({ approvedAt: -1, _id: 1 }).limit(250).lean()),
+    source('published products', () => ProductVersion.find({ publicationStatus: 'published', displayName: { $in: expandedPatterns }, 'images.0': { $exists: true } })
+      .select('displayName images').sort({ publishedAt: -1, _id: 1 }).limit(250).lean()),
+    ids.length ? source('approved recipe photos', () => {
+      const eligible = { imageUrl: { $type: 'string', $ne: '' }, $or: [{ canonicalIngredientId: { $in: ids } }, { name: { $in: expandedPatterns } }] }
+      return HostUnifiedListingPacket.find({ ...publicHostListingFilter(), $or: [
+        { publishedPacket: { $exists: true, $ne: null }, 'publishedPacket.ingredients': { $elemMatch: eligible } },
+        { publishedPacket: null, status: 'approved', 'packet.ingredients': { $elemMatch: eligible } },
+      ] }).select('status packet.ingredients publishedPacket.ingredients approvedAt').sort({ approvedAt: -1 }).limit(100).lean()
+    }) : Promise.resolve([]),
+  ])
+  const candidates = []
+  const identityFor = name => {
+    const forms = ingredientLookupForms(name)
+    const matched = rows.filter(row => {
+      const labels = [row.canonicalName, ...(row.aliases || [])].flatMap(ingredientLookupForms)
+      return labels.includes(forms[0]) || (forms.length > 1 && forms.slice(1).every(form => labels.includes(form)))
+    })
+    return matched.length === 1 ? String(matched[0]._id) : ''
+  }
+  function add(name, imageUrl, imageSource, priority, id = '') {
+    if (!name || !imageUrl) return
+    const identity = id || identityFor(name)
+    const canonical = rows.find(row => String(row._id) === identity)
+    const score = Math.max(ingredientLookupScore(search, [name]), canonical?.score || 0)
+    if (!score) return
+    candidates.push({ name, imageUrl, imageSource, priority, score,
+      identity: identity ? `canonical:${identity}` : '',
+      // Only an exact approved canonical name/alias may attach an ID.
+      id: canonical && canonical.score >= 100 ? identity : '' })
+  }
+  for (const row of rows) add(row.canonicalName, approvedIngredientPhoto(row.attributes?.approvedImageUrl), 'EPANTRY catalog', 0, String(row._id))
+  for (const record of groceries) {
+    const approved = publishedHostRecord(record)
+    if (!approved || approved.type !== 'grocery' || (!record.publishedPacket && record.status !== 'approved')) continue
+    const packet = approved.packet || {}
+    const images = Array.isArray(packet.images) ? packet.images : []
+    const roles = Array.isArray(packet.imageRoles) ? packet.imageRoles : []
+    const front = roles.find(entry => entry?.role === 'front_of_pack' && images.includes(entry.url))
+    const imageUrl = [front?.url, ...images].map(approvedIngredientPhoto).find(Boolean)
+    add(packet.title || approved.title, imageUrl, 'EPANTRY approved grocery', 1)
+  }
+  for (const version of versions) add(version.displayName,
+    (Array.isArray(version.images) ? version.images : []).map(entry => approvedIngredientPhoto(entry?.url)).find(Boolean), 'EPANTRY published product', 2)
+  for (const record of recipes) {
+    const entries = record.publishedPacket?.ingredients || (record.status === 'approved' ? record.packet?.ingredients : []) || []
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      const id = String(entry?.canonicalIngredientId || '')
+      const row = rows.find(row => String(row._id) === id)
+      add(entry?.name, approvedIngredientPhoto(entry?.imageUrl), 'EPANTRY approved recipe', 3, row ? id : '')
+    }
+  }
+  const { photoMatches, groceryPhoto } = selectIngredientPhoto(candidates)
+  const ingredients = rows.slice(0, limit).map(row => {
+    const id = String(row._id)
+    const image = candidates.filter(photo => photo.identity === `canonical:${id}`).sort((a, b) => a.priority - b.priority)[0]
+    return { id, canonicalName: row.canonicalName, slug: row.slug, aliases: row.aliases || [],
+      imageUrl: image?.imageUrl || '', imageSource: image?.imageSource || '' }
   })
-  if (unmatched.length) {
-    const ids = unmatched.map(row => String(row._id))
-    const exactNames = unmatched.flatMap(row => [row.canonicalName, ...(row.aliases || [])])
-      .filter(Boolean).map(name => new RegExp(`^${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
-    const eligibleIngredient = {
-      imageUrl: { $type: 'string', $ne: '' },
-      $or: [{ canonicalIngredientId: { $in: ids } }, { name: { $in: exactNames } }],
-    }
-    const published = await HostUnifiedListingPacket.find({ deletedAt: null, $or: [
-      { publishedPacket: { $exists: true, $ne: null }, 'publishedPacket.ingredients': { $elemMatch: eligibleIngredient } },
-      { status: 'approved', 'packet.ingredients': { $elemMatch: eligibleIngredient } },
-    ] }).select('status packet.ingredients publishedPacket.ingredients approvedAt')
-      .sort({ approvedAt: -1 }).limit(60).lean()
-    for (const record of published) {
-      const ingredients = record.publishedPacket?.ingredients ||
-        (record.status === 'approved' ? record.packet?.ingredients : []) || []
-      for (const entry of ingredients) {
-        const photo = approvedImage(entry?.imageUrl)
-        if (!photo) continue
-        for (const row of unmatched) {
-          const id = String(row._id)
-          if (imageById.has(id)) continue
-          const identicalId = entry?.canonicalIngredientId && String(entry.canonicalIngredientId) === id
-          const possibleNames = [row.canonicalName, ...(row.aliases || [])]
-          const identicalName = possibleNames.some(name => String(name).trim().toLowerCase() === String(entry.name || '').trim().toLowerCase())
-          if (identicalId || identicalName) imageById.set(id, { imageUrl: photo, imageSource: 'EPANTRY approved listing' })
-        }
-      }
-    }
-    // A plain ingredient may already have a photo as an approved grocery
-    // item (for example, a grocery listing titled exactly "Garlic"). Never
-    // reuse a different packaged/brand product's picture by fuzzy matching.
-    const stillMissing = unmatched.filter(row => !imageById.has(String(row._id)))
-    if (stillMissing.length) {
-      const names = stillMissing.flatMap(row => [row.canonicalName, ...(row.aliases || [])])
-        .filter(Boolean).map(name => new RegExp(`^${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
-      const groceries = await HostUnifiedListingPacket.find({ deletedAt: null, $or: [
-        { publishedType: 'grocery', 'publishedPacket.title': { $in: names }, 'publishedPacket.images.0': { $exists: true } },
-        { status: 'approved', type: 'grocery', title: { $in: names }, 'packet.images.0': { $exists: true } },
-      ] }).select('status type title packet.images publishedPacket.images publishedPacket.title publishedType')
-        .sort({ approvedAt: -1 }).limit(40).lean()
-      for (const record of groceries) {
-        const packet = record.publishedPacket || (record.status === 'approved' ? record.packet : null)
-        const name = String(record.publishedPacket ? record.publishedPacket.title : record.title || '').trim().toLowerCase()
-        const photo = approvedImage(packet?.images?.[0])
-        if (!photo) continue
-        for (const row of stillMissing) {
-          const id = String(row._id)
-          if (!imageById.has(id) && [row.canonicalName, ...(row.aliases || [])].some(label => String(label).trim().toLowerCase() === name)) {
-            imageById.set(id, { imageUrl: photo, imageSource: 'EPANTRY approved grocery' })
-          }
-        }
-      }
-      // Include older canonical catalog items when no Host photo was found.
-      // Exact published product names only; do not mistake a branded pack of
-      // garlic seasoning for a plain garlic ingredient photograph.
-      const withoutPhoto = stillMissing.filter(row => !imageById.has(String(row._id)))
-      if (withoutPhoto.length) {
-        const canonicalNames = withoutPhoto.flatMap(row => [row.canonicalName, ...(row.aliases || [])])
-          .filter(Boolean).map(name => new RegExp(`^${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
-        const versions = await ProductVersion.find({ publicationStatus: 'published',
-          displayName: { $in: canonicalNames }, 'images.0': { $exists: true },
-        }).select('displayName images.url').limit(30).lean()
-        for (const version of versions) {
-          const image = approvedImage(version.images?.[0]?.url)
-          if (!image) continue
-          for (const row of withoutPhoto) {
-            const id = String(row._id)
-            if (!imageById.has(id) && [row.canonicalName, ...(row.aliases || [])].some(name =>
-              String(name).trim().toLowerCase() === String(version.displayName || '').trim().toLowerCase())) {
-              imageById.set(id, { imageUrl: image, imageSource: 'EPANTRY published product' })
-            }
-          }
-        }
-      }
-    }
-  }
-  respond(res, { ingredients: rows.map(row => ({
-    id: String(row._id), canonicalName: row.canonicalName, slug: row.slug,
-    aliases: row.aliases || [],
-    imageUrl: imageById.get(String(row._id))?.imageUrl || '',
-    imageSource: imageById.get(String(row._id))?.imageSource || '',
-  })) })
+  if (failures.length === 3 && !ids.length && !photoMatches.length && !ingredients.length) problem('Ingredient lookup is temporarily unavailable.', 503)
+  respond(res, { ingredients, photoMatches, groceryPhoto, lookupIncomplete: failures.length > 0 })
 }))
 
 // List only brands this Host business can represent in brand recipes.
@@ -446,7 +494,7 @@ router.get('/host/listing-packets/:id/selling-readiness', ...readSecurity, wrap(
 
 router.post('/host/listing-packets', ...writeSecurity, wrap(async (req, res) => {
   const { ownerUserId, workspaceType } = context(req)
-  const packet = cleanIncoming(req.body?.packet, workspaceType)
+  const packet = await cleanIncoming(req.body?.packet, workspaceType, false, ownerUserId)
   const record = await HostUnifiedListingPacket.create({ ownerUserId, workspaceType, type: packet.type, title: packet.title, packet })
   respond(res, { listing: serialize(record) }, 201)
 }))
@@ -455,7 +503,7 @@ router.patch('/host/listing-packets/:id', ...writeSecurity, wrap(async (req, res
   if (!['draft', 'changes_requested', 'approved'].includes(record.status)) problem('Submitted listings are locked until Super Admin requests corrections.', 409)
   // A Host revision never changes the last Super Admin-approved public snapshot.
   const revisingApproved = record.status === 'approved'
-  const packet = cleanIncoming(req.body?.packet, record.workspaceType)
+  const packet = await cleanIncoming(req.body?.packet, record.workspaceType, false, record.ownerUserId)
   if (revisingApproved) {
     // Pre-snapshot approved listings are upgraded on their first edit.
     record.publishedPacket ||= structuredClone(record.packet)
@@ -507,7 +555,7 @@ router.post('/host/listing-packets/:id/section-revision', ...writeSecurity, wrap
     if (Object.prototype.hasOwnProperty.call(edits, key)) updatedCandidate[key] = edits[key]
   }
   // Full validation makes sure the revised listing is still eligible for review.
-  const normalized = cleanIncoming(updatedCandidate, record.workspaceType, true)
+  const normalized = await cleanIncoming(updatedCandidate, record.workspaceType, true, record.ownerUserId)
   await validateCatalogMatch(normalized)
   await validateBrandAuthority(normalized, actor(req))
   // Keep all identity, photo, video, ingredient and step data EXACTLY as they were.
@@ -563,7 +611,7 @@ router.delete('/host/listing-packets/:id', ...writeSecurity, wrap(async (req, re
 router.post('/host/listing-packets/:id/submit', ...writeSecurity, wrap(async (req, res) => {
   const record = await ownedRecord(req)
   if (!['draft', 'changes_requested'].includes(record.status)) problem('This listing has already been submitted.', 409)
-  const packet = cleanIncoming(record.packet, record.workspaceType, true)
+  const packet = await cleanIncoming(record.packet, record.workspaceType, true, record.ownerUserId)
   await validateCatalogMatch(packet)
   await validateBrandAuthority(packet, actor(req))
   record.packet = packet
@@ -590,7 +638,7 @@ router.post('/host/listing-packets/:id/resubmit-for-selling', ...writeSecurity, 
   if (record.status !== 'approved' || !needsCommercialPublication(record.packet)) {
     problem('Only an approved sellable listing can be resent for one-step selling approval.', 409)
   }
-  const packet = cleanIncoming(record.packet, record.workspaceType, true)
+  const packet = await cleanIncoming(record.packet, record.workspaceType, true, record.ownerUserId)
   const alreadyLinked = await resolveRecordPublishedCatalog(record.toObject())
   if (alreadyLinked?.packId) {
     const org = await MarketplaceOrganization.findOne({ ownerUserId: actor(req), status: 'active' }).select('_id').lean()
@@ -628,7 +676,7 @@ router.post('/host/listing-packets/bulk', ...writeSecurity, wrap(async (req, res
   const { ownerUserId, workspaceType } = context(req)
   const raw = req.body?.packets
   if (!Array.isArray(raw) || !raw.length || raw.length > 25) problem('Import between 1 and 25 food listings per batch.')
-  const packets = raw.map((item) => cleanIncoming(item, workspaceType))
+  const packets = await Promise.all(raw.map(item => cleanIncoming(item, workspaceType, false, ownerUserId)))
   const bulkBatchId = `bulk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   const records = await HostUnifiedListingPacket.insertMany(packets.map((packet) => ({
     ownerUserId, workspaceType, type: packet.type, title: packet.title, packet, bulkBatchId,
@@ -826,7 +874,7 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
       status: 'submitted_for_review', deletedAt: null })
     if (!candidate) problem('Only a submitted listing can be approved. Refresh the queue.', 409)
     if (candidate.moderationStatus === 'restricted') problem('This listing is restricted by Trust & Safety and cannot be approved.', 409)
-    const reviewedPacket = cleanIncoming(candidate.packet, candidate.workspaceType, true)
+    const reviewedPacket = await cleanIncoming(candidate.packet, candidate.workspaceType, true, candidate.ownerUserId)
     // The Host should not have to re-enter the same canonical identity when
     // resubmitting an already-approved listing with a price or stock update.
     const priorCatalogId = String(candidate.publishedPacket?.catalogProductVersionId || '')
@@ -852,7 +900,7 @@ router.post('/admin/host-listing-packets/:id/decision', ...adminWrite, superAdmi
           if (!pending || pending.moderationStatus === 'restricted' || pending.reviewRevision !== candidate.reviewRevision) {
             problem('Listing changed during approval. Refresh and review again.', 409)
           }
-          const approvedPacket = cleanIncoming(pending.packet, pending.workspaceType, true)
+          const approvedPacket = await cleanIncoming(pending.packet, pending.workspaceType, true, pending.ownerUserId, session)
           await assertEuTraderReady({ ownerUserId: pending.ownerUserId, session })
           // Recheck prior catalog identity within this exact submitted revision.
           if (reviewedPacket.catalogProductVersionId) approvedPacket.catalogProductVersionId = reviewedPacket.catalogProductVersionId

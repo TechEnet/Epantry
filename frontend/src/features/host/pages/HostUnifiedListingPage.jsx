@@ -1807,6 +1807,8 @@ const emptyIngredient = () => ({
   name: "",
   canonicalIngredientId: "",
   imageUrl: "",
+  imageOrigin: "",
+  imageAutoFillDisabled: false,
   quantity: 1,
   unit: "g",
   unitPrice: "",
@@ -1889,6 +1891,7 @@ function newPacket(type = "grocery") {
     delivery: {
       fulfillment: "delivery",
       postalCodes: [],
+      extraPostalCodes: [],
       preparationMinutes: "",
       note: "",
     },
@@ -1941,6 +1944,31 @@ function EditorField({ title, children }) {
     </label>
   );
 }
+function ingredientPhotoNameKey(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+function findIngredientPhoto(result, ingredient) {
+  const linked = String(ingredient.canonicalIngredientId || "");
+  if (linked) {
+    const match = (result?.ingredients || []).find((entry) => String(entry.id) === linked);
+    if (match?.imageUrl) return match;
+    const photo = result?.groceryPhoto;
+    return photo?.imageUrl && String(photo.id || "") === linked ? photo : null;
+  }
+  const photo = result?.groceryPhoto;
+  // The server ranks normalized names and aliases, and declines ambiguous matches.
+  // On a partial lookup failure, only exact/alias matches can auto-fill.
+  if (!photo?.imageUrl || (result.lookupIncomplete && Number(photo.score) < 100)) return null;
+  return photo;
+}
+function ingredientSearchChoices(result) {
+  const canonical = (result?.ingredients || []).map(row => ({ ...row, kind: "canonical" }));
+  const photos = (result?.photoMatches || []).filter(row => row.imageUrl &&
+    !canonical.some(item => item.imageUrl === row.imageUrl && item.id === row.id))
+    .map(row => ({ ...row, canonicalName: row.name, kind: "photo" }));
+  // Put approved photos first so a Host can choose the actual pictured item.
+  return [...photos, ...canonical];
+}
 function IngredientNameInput({ ingredient, onChange, className }) {
   const [matches, setMatches] = useState([]);
   const [searchError, setSearchError] = useState("");
@@ -1948,8 +1976,11 @@ function IngredientNameInput({ ingredient, onChange, className }) {
     const query = String(ingredient.name || "").trim();
     if (query.length < 2 || ingredient.canonicalIngredientId) {
       setMatches([]);
+      setSearchError("");
       return undefined;
     }
+    setMatches([]);
+    setSearchError("");
     let alive = true;
     const timer = setTimeout(async () => {
       try {
@@ -1958,8 +1989,8 @@ function IngredientNameInput({ ingredient, onChange, className }) {
           limit: 6,
         });
         if (alive) {
-          setMatches(result?.ingredients || []);
-          setSearchError("");
+          setMatches(ingredientSearchChoices(result));
+          setSearchError(result?.lookupIncomplete ? "Some catalog sources are unavailable. Available matches are shown." : "");
         }
       } catch {
         if (alive) {
@@ -1982,7 +2013,14 @@ function IngredientNameInput({ ingredient, onChange, className }) {
         className={className}
         value={ingredient.name || ""}
         onChange={(event) =>
-          onChange({ name: event.target.value, canonicalIngredientId: "" })
+          onChange({
+            name: event.target.value,
+            canonicalIngredientId: "",
+            ...(ingredientPhotoNameKey(event.target.value) !== ingredientPhotoNameKey(ingredient.name)
+              ? { imageAutoFillDisabled: false,
+                  ...(ingredient.imageOrigin === "catalog" ? { imageUrl: "", imageOrigin: "" } : {}) }
+              : {}),
+          })
         }
         placeholder="Search an EPANTRY ingredient"
         autoComplete="off"
@@ -1992,17 +2030,18 @@ function IngredientNameInput({ ingredient, onChange, className }) {
           {matches.map((match) => (
             <button
               type="button"
-              key={match.id}
+              key={`${match.kind}-${match.id || match.name}-${match.imageUrl || ""}`}
               className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-[#EDF1E9]"
               onClick={() => {
                 onChange({
-                  name: match.canonicalName,
-                  canonicalIngredientId: match.id,
-                  imageUrl:
-                    ingredient.canonicalIngredientId &&
-                    ingredient.canonicalIngredientId !== match.id
-                      ? match.imageUrl || ""
-                      : ingredient.imageUrl || match.imageUrl || "",
+                  // A photo suggestion does not replace the recipe ingredient's name
+                  // or claim an unverified canonical ingredient identity.
+                  ...(match.kind === "canonical"
+                    ? { name: match.canonicalName, canonicalIngredientId: match.id }
+                    : { ...(match.id ? { canonicalIngredientId: match.id } : {}) }),
+                  ...((!ingredient.imageUrl || ingredient.imageOrigin === "catalog") && match.imageUrl
+                    ? { imageUrl: match.imageUrl, imageOrigin: "catalog", imageAutoFillDisabled: false }
+                    : {}),
                 });
                 setMatches([]);
               }}
@@ -2026,7 +2065,7 @@ function IngredientNameInput({ ingredient, onChange, className }) {
                 </span>
                 {match.imageUrl && (
                   <span className="block text-xs text-[#557366]">
-                    EPANTRY photo available · no upload needed
+                    {match.kind === "photo" ? "Approved product photo" : "EPANTRY photo available"}
                   </span>
                 )}
               </span>
@@ -2054,49 +2093,61 @@ function IngredientPhotoPicker({
   uploadImage,
   uploading,
   onChange,
+  disabled = false,
 }) {
   const [suggestion, setSuggestion] = useState(null);
+  const [photoChoices, setPhotoChoices] = useState([]);
+  const [checking, setChecking] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const latest = useRef({ ingredient, onChange, disabled });
+  latest.current = { ingredient, onChange, disabled };
   useEffect(() => {
+    setSuggestion(null);
+    setPhotoChoices([]);
+    setSearchFailed(false);
+    setChecking(false);
     const name = String(ingredient.name || "").trim();
-    if (name.length < 2) {
-      setSuggestion(null);
-      return undefined;
-    }
+    const identity = String(ingredient.canonicalIngredientId || "");
+    if (disabled || name.length < 2) return undefined;
     let active = true;
+    setChecking(true);
     const timer = setTimeout(async () => {
       try {
-        const found = await searchHostListingIngredients({
-          search: name,
-          limit: 12,
-        });
-        const match = (found?.ingredients || []).find(
-          (entry) =>
-            (ingredient.canonicalIngredientId &&
-              String(entry.id) === String(ingredient.canonicalIngredientId)) ||
-            String(entry.canonicalName || "")
-              .trim()
-              .toLowerCase() === name.toLowerCase() ||
-            (entry.aliases || []).some(
-              (alias) =>
-                String(alias).trim().toLowerCase() === name.toLowerCase()
-            )
-        );
-        if (active) setSuggestion(match?.imageUrl ? match : null);
+        const found = await searchHostListingIngredients({ search: name, limit: 20 });
+        const match = findIngredientPhoto(found, { name, canonicalIngredientId: identity });
+        if (!active) return;
+        const current = latest.current;
+        if (current.disabled || ingredientPhotoNameKey(current.ingredient.name) !== ingredientPhotoNameKey(name) ||
+            String(current.ingredient.canonicalIngredientId || "") !== identity) return;
+        setSuggestion(match);
+        setPhotoChoices(identity ? [] : (found?.photoMatches || []));
+        setSearchFailed(Boolean(found?.lookupIncomplete) && !match?.imageUrl);
+        if (match?.imageUrl) {
+          current.onChange((row) => {
+            if (ingredientPhotoNameKey(row.name) !== ingredientPhotoNameKey(name) ||
+                String(row.canonicalIngredientId || "") !== identity ||
+                row.imageUrl || row.imageAutoFillDisabled) return {};
+            return { imageUrl: match.imageUrl, imageOrigin: "catalog",
+              ...(match.id ? { canonicalIngredientId: match.id } : {}) };
+          });
+        }
       } catch {
-        if (active) setSuggestion(null);
+        if (active) setSearchFailed(true);
+      } finally {
+        if (active) setChecking(false);
       }
     }, 420);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [ingredient.name, ingredient.canonicalIngredientId]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [ingredient.name, ingredient.canonicalIngredientId, disabled, retry]);
   const existing = suggestion?.imageUrl || "";
   const selected = Boolean(ingredient.imageUrl);
   const usingSuggested =
-    selected && Boolean(existing) && ingredient.imageUrl === existing;
+    selected && (ingredient.imageOrigin === "catalog" || (Boolean(existing) && ingredient.imageUrl === existing));
   return (
     <div className="flex min-w-0 flex-col gap-2">
+      {checking && !selected && <p role="status" className="text-[13px] text-[#173F35]">Checking EPANTRY photos...</p>}
+      {searchFailed && !selected && <button type="button" onClick={() => setRetry((value) => value + 1)} className="text-left text-[13px] font-semibold text-[#9A4F31] underline">Could not check catalog photos. Retry</button>}
       {selected && (
         <div className="flex items-center gap-3 rounded-lg border border-[#CBD4C8] bg-white p-2">
           <img
@@ -2109,6 +2160,9 @@ function IngredientPhotoPicker({
             {usingSuggested
               ? "Using EPANTRY photo — no new upload"
               : "Selected ingredient photo"}
+            {usingSuggested && suggestion?.name && suggestion.imageUrl === ingredient.imageUrl && (
+              <span className="block font-normal text-[#54635B]">{suggestion.name}</span>
+            )}
           </span>
         </div>
       )}
@@ -2136,7 +2190,9 @@ function IngredientPhotoPicker({
             onClick={() =>
               onChange({
                 imageUrl: existing,
-                canonicalIngredientId: suggestion.id,
+                imageOrigin: "catalog",
+                imageAutoFillDisabled: false,
+                ...(suggestion.id ? { canonicalIngredientId: suggestion.id } : {}),
               })
             }
           >
@@ -2144,10 +2200,24 @@ function IngredientPhotoPicker({
           </button>
         </div>
       )}
+      {!suggestion && photoChoices.length > 0 && (
+        <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-[#CBD4C8] bg-white p-2">
+          <p className="text-[13px] font-semibold text-[#173F35]">Choose a matching EPANTRY photo</p>
+          {photoChoices.map(photo => (
+            <button key={`${photo.identity || photo.name}-${photo.imageUrl}`} type="button" disabled={disabled}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-[#173F35] hover:bg-[#EDF1E9]"
+              onClick={() => onChange({ imageUrl: photo.imageUrl, imageOrigin: "catalog", imageAutoFillDisabled: false,
+                ...(photo.id ? { canonicalIngredientId: photo.id } : {}) })}>
+              <img src={photo.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" loading="lazy" />
+              <span className="min-w-0 break-words">{photo.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <label className="inline-flex min-h-[46px] cursor-pointer items-center gap-2 rounded-lg border border-[#A3B5A4] bg-white px-4 py-2 text-[14px] font-semibold text-[#173F35]">
           <ImagePlus size={17} />{" "}
-          {selected ? "Upload my own photo" : "Upload photo"}
+          {selected ? "Replace photo" : "Upload photo"}
           <input
             className="sr-only"
             type="file"
@@ -2162,7 +2232,7 @@ function IngredientPhotoPicker({
         {selected && (
           <button
             type="button"
-            onClick={() => onChange({ imageUrl: "" })}
+            onClick={() => onChange({ imageUrl: "", imageOrigin: "", imageAutoFillDisabled: true })}
             className="min-h-[46px] rounded-lg border border-[#D2B6A5] bg-[#FAF0E9] px-3 py-2 text-[13px] font-semibold text-[#7C4933]"
           >
             Remove photo
@@ -2943,14 +3013,17 @@ function HostUnifiedListingEditor() {
     };
   }, []);
   const [bulkUploadMode, setBulkUploadMode] = useState("zip");
-  const [pincodeText, setPincodeText] = useState("");
   const [savedPostalCodes, setSavedPostalCodes] = useState([]);
+  const [coverageReady, setCoverageReady] = useState(false);
+  const [coverageError, setCoverageError] = useState("");
+  const [coverageRefresh, setCoverageRefresh] = useState(0);
+  const [extraPinInput, setExtraPinInput] = useState("");
+  const [extraPinError, setExtraPinError] = useState("");
   const [selectedGroceryPhotoRole, setSelectedGroceryPhotoRole] =
     useState("front_of_pack");
   const [showOtherAllergen, setShowOtherAllergen] = useState(false);
   const [otherAllergenName, setOtherAllergenName] = useState("");
   const [otherAllergenStatus, setOtherAllergenStatus] = useState("");
-  const pincodeEditedRef = useRef(false);
   const skipPendingEditLoadRef = useRef(false);
   const [outlets, setOutlets] = useState([]);
   const [menus, setMenus] = useState([]);
@@ -2977,14 +3050,41 @@ function HostUnifiedListingEditor() {
   const fieldRef = useRef(null);
   const editIdFromUrl = params.get("edit") || "";
   const activeListing = existing.find((item) => item.id === editingId);
-  const hasLegacyDeliveryCoverage = Boolean(
-    editingId && activeListing && (
-      ["submitted_for_review", "approved", "changes_requested", "rejected"].includes(activeListing.status) ||
-      (activeListing.status === "draft" && (activeListing.packet?.delivery?.postalCodes || []).some(
-        (pin) => !savedPostalCodes.includes(String(pin))
-      ))
-    )
-  );
+  const extraPostalCodes = Array.isArray(form.delivery?.extraPostalCodes)
+    ? form.delivery.extraPostalCodes
+    : (form.delivery?.postalCodes || []).map(String).filter(pin => !savedPostalCodes.includes(pin));
+  const effectiveDelivery = () => ({
+    ...form.delivery,
+    extraPostalCodes: [...new Set(extraPostalCodes)],
+    postalCodes: [...new Set([...savedPostalCodes, ...extraPostalCodes])],
+  });
+  const addExtraPin = () => {
+    const pins = [...new Set(extraPinInput.trim().split(/[\s,;]+/).filter(Boolean))];
+    if (!pins.length || pins.some(pin => !/^[1-9][0-9]{5}$/.test(pin))) {
+      setExtraPinError("Enter a valid six-digit Indian PIN code.");
+      return;
+    }
+    const additions = pins.filter(pin => !savedPostalCodes.includes(pin) && !extraPostalCodes.includes(pin));
+    if (!additions.length) {
+      setExtraPinError("These PIN codes are already covered.");
+      return;
+    }
+    const next = [...extraPostalCodes, ...additions];
+    if (new Set([...savedPostalCodes, ...next]).size > 500) {
+      setExtraPinError("A listing can have at most 500 delivery PIN codes.");
+      return;
+    }
+    setForm(current => ({ ...current, delivery: { ...current.delivery,
+      extraPostalCodes: next, postalCodes: [...new Set([...savedPostalCodes, ...next])] } }));
+    setExtraPinInput("");
+    setExtraPinError("");
+  };
+  const removeExtraPin = pin => {
+    const next = extraPostalCodes.filter(value => value !== pin);
+    setForm(current => ({ ...current, delivery: { ...current.delivery,
+      extraPostalCodes: next, postalCodes: [...new Set([...savedPostalCodes, ...next])] } }));
+    setExtraPinError("");
+  };
   useEffect(() => {
     if (!editingId) {
       setSellingReadiness(null);
@@ -3139,60 +3239,26 @@ function HostUnifiedListingEditor() {
       cancelled = true;
     };
   }, [workspace]);
-  // Only the business-wide service area supplies NEW listing coverage.
-  // Historical listing packets keep their saved delivery PINs unchanged.
+  // Business PINs are read-only here. Only the Operations Center edits them.
   useEffect(() => {
     let cancelled = false;
-    const loadSavedDeliveryCoverage = async () => {
-      try {
-        const result = await listServiceAreas({
-          page: 1,
-          limit: 10,
-          status: "active",
-          search: "host-default-delivery",
-        });
+    setCoverageReady(false);
+    setCoverageError("");
+    listServiceAreas({ page: 1, limit: 10, status: "active", search: "host-default-delivery" })
+      .then(result => {
         if (cancelled) return;
-        const shared = (result?.serviceAreas || []).find(
-          (area) => area.serviceAreaKey === "host-default-delivery"
-        );
-        const pins = [...new Set((shared?.postalCodes || []).map(String).filter(
-          (value) => /^[1-9][0-9]{5}$/.test(value)
-        ))];
-        setSavedPostalCodes(pins);
-      } catch {
-        // Missing or unavailable shared coverage is not replaced with
-        // unrelated product-specific areas.
-        if (!cancelled) setSavedPostalCodes([]);
-      }
-    };
-    loadSavedDeliveryCoverage();
-    return () => {
-      cancelled = true;
-    };
-  }, [workspace]);
-  useEffect(() => {
-    if (
-      !savedPostalCodes.length ||
-      params.get("edit") ||
-      editingId ||
-      pincodeEditedRef.current
-    )
-      return;
-    setForm((current) =>
-      current.delivery?.postalCodes?.length
-        ? current
-        : {
-            ...current,
-            delivery: {
-              ...current.delivery,
-              postalCodes: [...savedPostalCodes],
-            },
-          }
-    );
-    setPincodeText((current) =>
-      current.trim() ? current : savedPostalCodes.join(", ")
-    );
-  }, [savedPostalCodes, editingId, params]);
+        if (!Array.isArray(result?.serviceAreas)) throw new Error("Coverage unavailable");
+        const shared = result.serviceAreas.find(area => area.serviceAreaKey === "host-default-delivery" &&
+          !area.inventoryNodeId && area.status === "active" && (area.fulfillmentTypes || []).includes("delivery"));
+        setSavedPostalCodes([...new Set((shared?.postalCodes || []).map(String).filter(pin => /^[1-9][0-9]{5}$/.test(pin)))]);
+        setCoverageReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCoverageError("Could not load business delivery PINs. Retry before saving delivery coverage.");
+      });
+    return () => { cancelled = true; };
+  }, [workspace, coverageRefresh]);
 
   useEffect(() => {
     // Only load a saved listing when the URL's edit ID changes. Editing state
@@ -3209,10 +3275,8 @@ function HostUnifiedListingEditor() {
           ...newPacket(data.listing.packet.type),
           ...data.listing.packet,
         });
-        pincodeEditedRef.current = true;
-        setPincodeText(
-          (data.listing.packet.delivery?.postalCodes || []).join(", ")
-        );
+        setExtraPinInput("");
+        setExtraPinError("");
         setEditingId(data.listing.id);
         setRevisingApproved(false);
         setBarcodeMatches([]);
@@ -3241,7 +3305,7 @@ function HostUnifiedListingEditor() {
     setForm((current) => ({
       ...current,
       [key]: current[key].map((item, offset) =>
-        offset === index ? { ...item, ...patchValue } : item
+        offset === index ? { ...item, ...(typeof patchValue === "function" ? patchValue(item) : patchValue) } : item
       ),
     }));
   const removeRow = (key, index) =>
@@ -3272,7 +3336,9 @@ function HostUnifiedListingEditor() {
     setLoading(false);
     const packet = newPacket(type);
     packet.delivery.postalCodes = [...savedPostalCodes];
-    pincodeEditedRef.current = false;
+    setExtraPinInput("");
+    setExtraPinError("");
+    setCoverageRefresh(value => value + 1);
     setShowOtherAllergen(false);
     setOtherAllergenName("");
     setOtherAllergenStatus("");
@@ -3280,7 +3346,6 @@ function HostUnifiedListingEditor() {
     setBarcodeChecked("");
     setRevisingApproved(false);
     setForm(packet);
-    setPincodeText(savedPostalCodes.join(", "));
     setEditingId("");
     setError("");
     setNotice("");
@@ -3309,7 +3374,7 @@ function HostUnifiedListingEditor() {
               : current.imageRoles || [],
           };
         });
-      } else updateRow(target, index, { imageUrl: url });
+      } else updateRow(target, index, { imageUrl: url, ...(target === "ingredients" ? { imageOrigin: "host", imageAutoFillDisabled: false } : {}) });
       setNotice("Image uploaded. Save this listing to keep it.");
     } catch (cause) {
       setError(errorMessage(cause));
@@ -3368,9 +3433,13 @@ function HostUnifiedListingEditor() {
     setError("");
     setNotice("");
     try {
+      const usesDelivery = canSell && form.delivery?.fulfillment === "delivery";
+      if (usesDelivery && !coverageReady) throw new Error("Load business delivery PINs before saving.");
+      if (usesDelivery && extraPinInput.trim()) throw new Error("Click Add PIN or clear the extra PIN input before saving.");
+      const packet = usesDelivery ? { ...form, delivery: effectiveDelivery() } : form;
       const result = editingId
-        ? await updateHostListingPacket(editingId, form)
-        : await createHostListingPacket(form);
+        ? await updateHostListingPacket(editingId, packet)
+        : await createHostListingPacket(packet);
       const id = result?.listing?.id;
       if (submit) await submitHostListingPacket(id);
       setEditingId(id);
@@ -3491,15 +3560,14 @@ function HostUnifiedListingEditor() {
     setError("");
     setNotice("");
     try {
+      if (canSell && form.delivery?.fulfillment === "delivery" && !coverageReady) throw new Error("Load business delivery PINs before saving.");
+      if (canSell && form.delivery?.fulfillment === "delivery" && extraPinInput.trim()) throw new Error("Click Add PIN or clear the extra PIN input before saving.");
       const sections = {
         nutrition: form.nutrition,
         allergens: form.allergens,
         dietary: form.dietary,
         selling: form.selling,
-        delivery: {
-          ...form.delivery,
-          postalCodes: pincodeText.split(/[\s,;]+/).filter(Boolean),
-        },
+        delivery: canSell && form.delivery?.fulfillment === "delivery" ? effectiveDelivery() : form.delivery,
       };
       const result = await submitHostListingSectionRevision(
         editingId,
@@ -3510,9 +3578,8 @@ function HostUnifiedListingEditor() {
           ...newPacket(result.listing.packet.type),
           ...result.listing.packet,
         });
-        setPincodeText(
-          (result.listing.packet.delivery?.postalCodes || []).join(", ")
-        );
+        setExtraPinInput("");
+        setExtraPinError("");
       }
       await load();
       setNotice(
@@ -5410,6 +5477,7 @@ function HostUnifiedListingEditor() {
                                 ingredient={item}
                                 index={index}
                                 uploading={uploading}
+                                disabled={locked || busy || loading || Boolean(uploading)}
                                 uploadImage={uploadImage}
                                 onChange={(value) =>
                                   updateRow("ingredients", index, value)
@@ -6108,35 +6176,30 @@ function HostUnifiedListingEditor() {
                     )}
                   </div>
                   {form.delivery?.fulfillment === "delivery" && (
-                  hasLegacyDeliveryCoverage ? (
-                    <EditorField title="Delivery pincodes (saved listing)">
-                      <textarea
-                        rows={2}
-                        className={`${field} mt-3`}
-                        value={pincodeText}
-                        onChange={(event) => {
-                          pincodeEditedRef.current = true;
-                          setPincodeText(event.target.value);
-                          nested(
-                            "delivery",
-                            "postalCodes",
-                            event.target.value.split(/[\s,;]+/).filter(Boolean)
-                          );
-                        }}
-                        placeholder="110001, 110002"
-                      />
-                    </EditorField>
-                  ) : (
-                    <div className="mt-3 rounded-xl border border-[#C9D5C9] bg-[#EFF3EC] px-4 py-3 text-[15px] text-[#173F35]">
-                      {savedPostalCodes.length
-                        ? `Business delivery coverage: ${savedPostalCodes.length} saved PIN codes.`
-                        : "Add business delivery coverage in Operations Center before submitting a delivery listing."}
-                      <Link className="ml-2 font-semibold underline underline-offset-2" to="/host/operations-center">
-                        Manage coverage
-                      </Link>
+                    <div className="mt-4 overflow-hidden rounded-xl border border-[#C9D5C9] bg-[#F7F6F2] text-[15px] text-[#202421]">
+                      <div className="border-b border-[#C9D5C9] bg-[#D7DDCF] px-4 py-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <strong className="text-base text-[#173F35]">Business delivery coverage</strong>
+                          <Link className="font-semibold text-[#173F35] underline underline-offset-2" to="/host/operations-center">Manage coverage</Link>
+                        </div>
+                        {coverageError ? <div role="alert" className="mt-2 text-[#913D26]">{coverageError} <button type="button" className="font-bold underline" onClick={() => setCoverageRefresh(value => value + 1)}>Retry</button></div> : !coverageReady ? <p role="status" className="mt-2">Loading saved PIN codes...</p> : savedPostalCodes.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">{savedPostalCodes.map(pin => <span key={pin} className="rounded-md border border-[#B9C6B4] bg-[#F7F6F2] px-3 py-1.5 font-semibold text-[#173F35]">{pin}</span>)}</div>
+                        ) : <p className="mt-2">No business PIN codes saved.</p>}
+                        <p className="mt-2 text-sm text-[#173F35]">Inherited from Operations Center. Applies to all eligible listings.</p>
+                      </div>
+                      <div className="px-4 py-4">
+                        <strong className="block text-base">Extra PIN codes for this item</strong>
+                        <p className="mt-1 text-sm text-[#45564B]">Only this listing will use these additional delivery PINs after approval.</p>
+                        {coverageReady && !Array.isArray(form.delivery?.extraPostalCodes) && editingId && extraPostalCodes.length > 0 && <p className="mt-2 text-sm text-[#913D26]">Older listing: PINs outside current business coverage are shown here. Review them before saving.</p>}
+                        {coverageReady && extraPostalCodes.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{extraPostalCodes.map(pin => <span key={pin} className="inline-flex items-center gap-2 rounded-md border border-[#C56C42] bg-[#F7F6F2] px-3 py-1.5 font-semibold">{pin}{savedPostalCodes.includes(pin) && <span className="text-xs font-normal">(also business)</span>}<button type="button" aria-label={`Remove extra PIN ${pin}`} className="text-[#913D26] text-lg leading-none" onClick={() => removeExtraPin(pin)}>×</button></span>)}</div>}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <input className={`${field} min-w-0 flex-1`} aria-label="Extra delivery PIN codes" placeholder="Enter PIN code" inputMode="numeric" value={extraPinInput} disabled={!coverageReady} onChange={event => { setExtraPinInput(event.target.value); setExtraPinError(""); }} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addExtraPin(); } }} />
+                          <button type="button" disabled={!coverageReady} onClick={addExtraPin} className="rounded-lg bg-[#C56C42] px-4 py-3 font-bold text-[#202421] disabled:opacity-50">+ Add PIN</button>
+                        </div>
+                        {extraPinError && <p role="alert" className="mt-2 text-sm text-[#913D26]">{extraPinError}</p>}
+                      </div>
                     </div>
-                  )
-                )}
+                  )}
                 <EditorField title="Delivery / pickup notes">
                     <textarea
                       rows={2}

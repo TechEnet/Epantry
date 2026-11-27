@@ -480,6 +480,7 @@ function checkoutReadiness(
 export async function createValidatedMarketplaceCart({
   basketQuoteId,
   optionKey,
+  packSelections,
   idempotencyKey,
   actorUser,
 }) {
@@ -519,6 +520,7 @@ export async function createValidatedMarketplaceCart({
   }
 
   if (
+    packSelections === undefined &&
     optionKey ===
       'one_retailer' &&
     option.objectiveSatisfied !==
@@ -539,6 +541,7 @@ export async function createValidatedMarketplaceCart({
   return createMarketplaceCart({
     basketQuoteId,
     optionKey,
+    packSelections,
     idempotencyKey,
     actorUser,
   })

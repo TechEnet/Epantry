@@ -382,6 +382,7 @@ export async function updateDirectMarketplaceCartItem({
 export async function createMarketplaceCart({
   basketQuoteId,
   optionKey,
+  packSelections,
   idempotencyKey,
 }) {
   const result = await csrfRequest({
@@ -399,6 +400,7 @@ export async function createMarketplaceCart({
         ).trim(),
 
       optionKey,
+      ...(packSelections ? { packSelections } : {}),
     },
 
     idempotencyKey,
